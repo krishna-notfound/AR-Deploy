@@ -67,10 +67,10 @@ Architecture: static Vite SPA on Vercel, with Supabase Postgres, Auth and Storag
 5. **Alternative if this is too much:** accept the risk for a pilot, label analytics "approximate", and watch `product_analytics` growth.
 
 ## Go-live checklist
-1. Apply the migrations (design/19 §3) to the **approved** project. Run the advisors.
+1. ~~Apply the migrations and run the advisors.~~ Done 2026-10-13 on `pmnjchhrgvajtjpadpqo`.
 2. Set the Supabase Auth settings (above). Create the first platform admin (SQL).
-3. Run `npm run db:types`, and swap the hand-written row types for the generated ones.
-4. Run the real-API tests (P8-11).
+3. ~~Generate types.~~ Done (`database.types.ts` + drift check).
+4. ~~Real-API tests.~~ Done: 10/10 live, 8/8 UI smoke. Re-run after any migration.
 5. Decide on analytics abuse (P8-17).
 6. Create the Vercel project, set the env vars, and add the domains (apex, www, wildcard).
 7. Smoke-test production: landing, `/login`, a business subdomain, a product page, and AR on a real iPhone and Android phone (P7-10).

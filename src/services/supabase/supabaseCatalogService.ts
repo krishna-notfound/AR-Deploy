@@ -29,9 +29,9 @@ export const LOGO_BUCKET = 'business-logos'
 const SIGNED_URL_TTL_SECONDS = 60 * 60
 const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*)'
 
-// Hand-written row shapes matching supabase/migrations. Replace with generated types once the
+// Hand-written row shapes matching supabase/migrations; schemaDrift.check.ts compares them with the
 // schema is applied (`npm run db:types`, see design/19-supabase.md).
-interface BusinessRow {
+export interface BusinessRow {
   id: string
   name: string
   slug: string
@@ -47,7 +47,7 @@ interface BusinessRow {
   created_at: string
   updated_at: string
 }
-interface ImageRow {
+export interface ImageRow {
   url: string | null
   storage_path: string | null
   alt: string | null
@@ -56,14 +56,14 @@ interface ImageRow {
   sort_order: number
   id: string
 }
-interface ModelRow {
+export interface ModelRow {
   format: ModelFormat
   url: string | null
   storage_path: string | null
   file_name: string
   size_bytes: number | null
 }
-interface VariantRow {
+export interface VariantRow {
   id: string
   name: LocalizedText
   color_hex: string | null
@@ -71,7 +71,7 @@ interface VariantRow {
   price_delta: number | null
   sort_order: number
 }
-interface ProductRow {
+export interface ProductRow {
   id: string
   business_id: string
   slug: string
@@ -98,7 +98,7 @@ interface ProductRow {
   product_models?: ModelRow[]
   product_variants?: VariantRow[]
 }
-interface DailyRow {
+export interface DailyRow {
   business_id: string
   product_id: string
   day: string
@@ -528,7 +528,11 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() : 'bin'
         // Path convention (design/19): {business_id}/{uuid}.{ext}; logos for a business not yet created go under new/.
         const path = `${businessId ?? 'new'}/${crypto.randomUUID()}.${ext}`
-        const { error } = await sb.storage.from(bucket).upload(path, file, { contentType: UPLOAD_CONTENT_TYPE[kind] ?? file.type, upsert: false })
+        // supabase-js sends a File with its own type (browsers report '' for .glb/.usdz, stored as
+        // application/octet-stream and refused by the bucket), so re-wrap it with the right type.
+        const contentType = UPLOAD_CONTENT_TYPE[kind] ?? file.type
+        const body = file.type === contentType ? file : new File([file], file.name, { type: contentType })
+        const { error } = await sb.storage.from(bucket).upload(path, body, { contentType, upsert: false })
         if (error) return fail('STORAGE', `Upload failed: ${error.message}`)
         if (bucket === LOGO_BUCKET) return ok({ url: sb.storage.from(bucket).getPublicUrl(path).data.publicUrl, status: 'valid' as const })
         const signed = await sb.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL_SECONDS)

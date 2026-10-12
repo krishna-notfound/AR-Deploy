@@ -13,10 +13,14 @@
 - [x] **P8-16** Pre-deployment security review of the migrations. — done 2026-10-12: 7 issues fixed in the unapplied files (cross-business file reference, forged analytics columns, unsafe URL schemes, size caps, trigger blocking trusted roles, public-bucket abort, trigger function execute); 80/80 PGlite checks; rollback script and read-only pre-flight added. Nothing applied.
 
 ## Discovered
-- [ ] **P8-10** Apply the migrations to the linked project (**blocked on the user's explicit approval of the target ref and plan**), following design/19 §3 steps 1–8. Then run advisors, `npm run db:types`, and replace the hand-written row types.
+- [x] **P8-10** Apply the migrations to the approved project. — done 2026-10-13: applied to `pmnjchhrgvajtjpadpqo` via MCP; local files renamed to the recorded versions; advisors clean for our objects; types generated, with a drift check.
 - [ ] **P8-17** Decide on public analytics flooding: accept for a pilot, or move to an Edge Function with rate limiting before public launch.
-- [ ] **P8-11** End-to-end Supabase run: sign in, create a business and product, upload an image and a GLB, publish, view the public page anonymously, check that a draft's file is not readable.
+- [x] **P8-11** End-to-end Supabase run. — done 2026-10-13: live suite 10/10 and UI smoke 8/8; found and fixed the GLB/USDZ upload MIME bug; QA data deleted.
 - [ ] **P8-12** Admin UI for memberships and invitations (currently SQL only).
 - [ ] **P8-13** Port the PGlite RLS cases to pgTAP (`supabase test db`).
 - [ ] **P8-14** Clean up orphaned Storage files after a product is deleted; rate-limit public analytics inserts.
 - [ ] **P8-15** Move the remaining direct `services/mock` imports (`RootLayout` store notices, Settings `FAIL_RATE_KEY` / credits) behind the service interface.
+
+- [ ] **P8-18** Add the index `product_analytics (product_id, business_id)` for the composite FK (performance advisor INFO).
+- [ ] **P8-19** Decide whether to revoke anon/authenticated EXECUTE on the platform function `public.rls_auto_enable()`. It is advisor-flagged but only runs as an event trigger. Coordinate with Supabase defaults.
+- [ ] **P8-20** Before launch: Vercel project, env vars, domains (design/20), Supabase Auth settings, custom SMTP, first real admin account.

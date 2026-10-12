@@ -201,9 +201,9 @@ Bundle notes:
 ### Migrations (`supabase/migrations/`, not applied)
 | File | Contents |
 |---|---|
-| `20261012171915_init_schema.sql` | Creates `businesses`, `platform_admins`, `business_members`, `products`, `product_images`, `product_models`, `product_variants`, `product_analytics` and the `product_analytics_daily` view (security_invoker). Adds checks, indexes, `updated_at` triggers, a slug/status guard trigger, helper functions, RLS and explicit grants. |
-| `20261012171919_storage.sql` | Creates the public `business-logos` bucket (2 MB, no SVG) and the private `product-media` bucket (50 MB, images + GLB + USDZ) with `storage.objects` policies. |
-| `20261012172029_save_product.sql` | Creates `save_product()`, a SECURITY INVOKER RPC that saves a product and its children in one transaction. |
+| `20261012192143_init_schema.sql` | Creates `businesses`, `platform_admins`, `business_members`, `products`, `product_images`, `product_models`, `product_variants`, `product_analytics` and the `product_analytics_daily` view (security_invoker). Adds checks, indexes, `updated_at` triggers, a slug/status guard trigger, helper functions, RLS and explicit grants. |
+| `20261012192159_storage.sql` | Creates the public `business-logos` bucket (2 MB, no SVG) and the private `product-media` bucket (50 MB, images + GLB + USDZ) with `storage.objects` policies. |
+| `20261012192454_save_product.sql` | Creates `save_product()`, a SECURITY INVOKER RPC that saves a product and its children in one transaction. |
 
 **RLS summary:**
 - The public sees only active businesses and published products of active businesses.
@@ -253,3 +253,29 @@ Everything from sections 1–8, plus the landing page. Demo mode creates no Supa
 - **Open decision:** rate-limiting public analytics events (P8-17).
 - **Target project:** `pmnjchhrgvajtjpadpqo`, from `.mcp.json` (not CLI-linked, no env files). Not contacted during the review.
 - **Secret scan:** no secret or service_role key in the source, built files, logs or test output. The only matches are fake test strings and the guard that rejects such keys.
+
+### Database deployment and real-API verification (2026-10-13)
+- **Pre-flight (read-only):**
+  - `pmnjchhrgvajtjpadpqo` had no tables, buckets, storage policies, migration history or users.
+  - It runs Postgres 17.11.
+  - It still uses legacy default privileges (anon gets full access to new tables). The migrations revoke and re-grant explicitly, and the 81 local checks were re-run under the same defaults.
+- **Applied with the owner's approval:**
+  - 3 migrations, recorded as `20261012192143`, `20261012192159` and `20261012192454`; the local files were renamed to match.
+  - Also fixed before applying: reserved subdomain names (`www`, `admin`, `api`, …) are refused as business slugs (app check, DB check and a sync test).
+  - No rollback SQL was run.
+- **Live verification:**
+  - RLS on all tables; policies, buckets and grants confirmed.
+  - Security advisors: nothing from these migrations.
+  - Real-API suite 10/10 and Supabase-mode UI smoke 8/8.
+  - A real bug was found and fixed: GLB/USDZ uploads were sent as octet-stream and rejected.
+  - The QA users and data were deleted afterwards.
+- **Deployment prep:**
+  - `vercel.json` (SPA rewrite, caching, security headers).
+  - design/20: env checklist, wildcard domain requirements, auth settings, analytics rate-limit proposal.
+  - Hostname routing verified 10/10 against a production build with mapped subdomains.
+- **Not done, needs approval:**
+  - Vercel project, domains and DNS.
+  - Supabase Auth settings (sign-ups off, redirects, SMTP).
+  - First real admin account.
+  - Analytics rate limiting (P8-17).
+  - Real-device AR (P7-10).

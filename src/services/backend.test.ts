@@ -230,7 +230,7 @@ describe('reserved subdomains', () => {
     const { RESERVED_SUBDOMAINS } = await import('@/tenant/resolveTenant')
     expect(validateBusiness({ ...businessInput, slug: 'www' }, []).slug).toMatch(/reserved/)
     const { readFileSync } = await import('node:fs')
-    const sql = readFileSync('supabase/migrations/20261012171915_init_schema.sql', 'utf8')
+    const sql = readFileSync('supabase/migrations/20261012192143_init_schema.sql', 'utf8')
     const list = /slug not in \(([^)]+)\)/.exec(sql)?.[1]?.match(/'([a-z]+)'/g)?.map((s) => s.slice(1, -1))
     expect(new Set(list)).toEqual(RESERVED_SUBDOMAINS)
   })

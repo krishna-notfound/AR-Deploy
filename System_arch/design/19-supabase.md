@@ -1,6 +1,22 @@
 # 19 · Supabase backend (foundation)
 Decisions: ADR-0015 (dual mode), ADR-0016 (routes). This file is the setup guide.
 
+## Status (2026-10-13): applied to `pmnjchhrgvajtjpadpqo`
+Applied with owner approval through the Supabase MCP. Recorded versions: `20261012192143_init_schema`, `20261012192159_storage`, `20261012192454_save_product`. The local files were renamed to match, so `supabase db push` sees them as already applied.
+
+**Live checks:**
+- **Schema:** RLS on all 8 tables, 23 table policies and 9 storage policies.
+- **Buckets:** `product-media` is private and `business-logos` public, with the size and type limits.
+- **Grants:** anon gets SELECT on the 5 catalog tables plus a column-level INSERT on analytics. Function execute is as designed.
+- **Advisors:**
+  - security: nothing from these migrations; only the pre-existing, platform-provided `rls_auto_enable` event-trigger function is flagged
+  - performance: INFO for an unindexed composite FK on `product_analytics` and unused indexes on an empty DB; WARN for multiple permissive SELECT policies (by design)
+- **Real-API suite:** `src/services/supabase/live.integration.test.ts` passed **10/10**. It covered roles, image/GLB/USDZ upload, isolation, the cross-business file reference, draft privacy, the owner slug/status guard, publish with signed-URL fetch, anon analytics plus forged-column rejection, unpublish, and the logo bucket rejecting SVG.
+- **UI smoke in Supabase mode:** 8/8 (real `/login`, redirects, admin pages, Settings mode, logout).
+- **Cleanup:** all QA users, data and files were deleted afterwards. The project is schema-only again.
+
+**Bug found by the live run, fixed:** uploads sent `.glb` and `.usdz` as `application/octet-stream` (supabase-js uses the File's own type), so the bucket rejected them. `uploadAsset` now re-wraps the file with the correct MIME type.
+
 ## Status (2026-10-12)
 **Written and tested locally:**
 - client, service, auth, migrations, RLS and storage policies
@@ -104,12 +120,15 @@ Who can do what:
   - Deleting a product does not delete its files (orphans). A scheduled cleanup or Edge Function would handle this.
   - Duplicated products share files.
 
+## Real-API test suite
+`npx vitest run src/services/supabase/live.integration.test.ts`, with `SUPABASE_IT_URL`, `SUPABASE_IT_KEY` (publishable) and `SUPABASE_IT_PASSWORD` set. It needs the users `qa-admin@`, `qa-owner-a@` and `qa-owner-b@furnish.example`, with that password, and qa-admin in `platform_admins`. It creates and deletes its own businesses, products and files. The suite is skipped when the variables are unset. Delete the QA users afterwards; never run it against a project with real customer data you can't afford to have touched.
+
 ## 7. Generated types
 After the schema is applied:
 ```
 npm run db:types   # npx supabase gen types typescript --project-id <ref> > src/services/supabase/database.types.ts
 ```
-Then replace the hand-written `*Row` interfaces in `supabaseCatalogService.ts` with the generated ones. Until then those interfaces are the only schema contract on the TS side. Don't commit generated types that weren't produced from a real schema.
+`src/services/supabase/database.types.ts` was generated from the live schema on 2026-10-13. `schemaDrift.check.ts` fails the typecheck if a hand-written `*Row` type reads a column that no longer exists. Regenerate after every migration.
 
 ## Data access map
 | Service method | Supabase call | Protected by |
