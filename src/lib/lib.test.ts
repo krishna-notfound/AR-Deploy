@@ -54,6 +54,7 @@ describe('resolveTenant', () => {
   it('resolves subdomains', () => {
     expect(resolveTenant('casa.furnish.app', 'furnish.app')).toEqual({ mode: 'hostname', slug: 'casa' })
     expect(resolveTenant('www.furnish.app', 'furnish.app')).toEqual({ mode: 'path' })
+    expect(resolveTenant('demo.furnish.app', 'furnish.app')).toEqual({ mode: 'path' })
     expect(resolveTenant('a.b.furnish.app', 'furnish.app')).toEqual({ mode: 'path' })
     expect(resolveTenant('localhost', 'furnish.app')).toEqual({ mode: 'path' })
   })

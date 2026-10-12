@@ -22,8 +22,10 @@
 create table public.businesses (
   id               uuid primary key default gen_random_uuid(),
   name             text not null check (char_length(btrim(name)) between 1 and 80),
+  -- Also the business subdomain: reserved names (src/tenant/resolveTenant.ts) are refused.
   slug             text not null unique
-                   check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length(slug) <= 63),
+                   check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length(slug) <= 63
+                          and slug not in ('www', 'admin', 'app', 'api', 'demo', 'login', 'mail', 'assets', 'static', 'cdn')),
   -- URLs are rendered as href/src on public pages: only http(s) (blocks javascript:/data:).
   logo_url         text check (logo_url ~* '^https?://' and char_length(logo_url) <= 2048),
   description      text not null default '' check (char_length(description) <= 5000),

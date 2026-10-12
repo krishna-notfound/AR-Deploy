@@ -1,6 +1,7 @@
 import type { Business, Product } from '@/domain/types'
 import { isHttpUrl } from '@/lib/files'
 import { isValidSlug } from '@/lib/slug'
+import { RESERVED_SUBDOMAINS } from '@/tenant/resolveTenant'
 import type { BusinessInput, ProductInput } from './catalogService'
 
 export type FieldErrors = Record<string, string>
@@ -14,6 +15,7 @@ export function validateBusiness(data: BusinessInput, others: Business[]): Field
   else if (name.length > 80) e.name = 'Use 80 characters or fewer.'
   if (!data.slug) e.slug = 'Catalog address is required.'
   else if (!isValidSlug(data.slug)) e.slug = 'Use lowercase letters, numbers and single hyphens only.'
+  else if (RESERVED_SUBDOMAINS.has(data.slug)) e.slug = 'This catalog address is reserved by the platform. Choose another.'
   else if (others.some((b) => b.slug === data.slug)) e.slug = 'This catalog address is already used by another business.'
   if (data.contact.email && !EMAIL.test(data.contact.email)) e['contact.email'] = 'Enter a valid email address.'
   if (data.contact.website && !isHttpUrl(data.contact.website)) e['contact.website'] = 'Enter a full URL starting with https://'

@@ -223,3 +223,15 @@ function sampleProduct(over: Partial<ProductInput> = {}): ProductInput {
     ...over,
   }
 }
+
+describe('reserved subdomains', () => {
+  it('refuses reserved catalog addresses and matches the database check', async () => {
+    const { validateBusiness } = await import('./validation')
+    const { RESERVED_SUBDOMAINS } = await import('@/tenant/resolveTenant')
+    expect(validateBusiness({ ...businessInput, slug: 'www' }, []).slug).toMatch(/reserved/)
+    const { readFileSync } = await import('node:fs')
+    const sql = readFileSync('supabase/migrations/20261012171915_init_schema.sql', 'utf8')
+    const list = /slug not in \(([^)]+)\)/.exec(sql)?.[1]?.match(/'([a-z]+)'/g)?.map((s) => s.slice(1, -1))
+    expect(new Set(list)).toEqual(RESERVED_SUBDOMAINS)
+  })
+})
