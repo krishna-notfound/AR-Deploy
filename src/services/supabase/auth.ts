@@ -16,6 +16,10 @@ export interface AuthService {
   getCurrentUser(): Promise<Result<SignedInAccount | null>>
   signInWithPassword(email: string, password: string): Promise<Result<void>>
   signOut(): Promise<Result<void>>
+  /** Sends a reset link. Succeeds whether or not the email has an account (no account enumeration). */
+  requestPasswordReset(email: string, redirectTo: string): Promise<Result<void>>
+  /** Sets a new password for the current (e.g. recovery) session. */
+  updatePassword(password: string): Promise<Result<void>>
   /** Returns an unsubscribe function. */
   onAuthStateChange(listener: () => void): () => void
 }
@@ -49,6 +53,17 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
     async signInWithPassword(email, password) {
       const { error } = await sb.auth.signInWithPassword({ email, password })
       return error ? fail('PERMISSION', error.message) : ok(undefined)
+    },
+
+    async requestPasswordReset(email, redirectTo) {
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo })
+      // Rate limits and delivery problems are reported; "unknown email" is not distinguishable by design.
+      return error ? fail('UNKNOWN', error.message) : ok(undefined)
+    },
+
+    async updatePassword(password) {
+      const { error } = await sb.auth.updateUser({ password })
+      return error ? fail('VALIDATION', error.message) : ok(undefined)
     },
 
     async signOut() {

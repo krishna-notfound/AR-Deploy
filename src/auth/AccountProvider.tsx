@@ -78,8 +78,10 @@ function SupabaseAccountProvider({ auth, children }: { auth: AuthService; childr
     if (account === undefined) return { user: undefined, business: null, ...extra }
     const user = account?.user ?? null
     if (!user?.businessId) return { user, business: null, ...extra }
-    const business = biz.data ?? null
-    if (!business) return { user: biz.status === 'loading' ? undefined : null, business: null, ...extra }
+    // Until the query for *this* business settles, the account is still loading (a stale result from the
+    // previous business id must not read as "signed out" and bounce the user to /login).
+    const business = biz.data?.id === user.businessId ? biz.data : null
+    if (!business) return { user: biz.status === 'error' ? null : undefined, business: null, ...extra }
     return { user, business, ...extra }
   }, [account, accountError, biz.data, biz.status, signInAs, logout])
 
@@ -109,10 +111,10 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AccountCtx>(() => {
     if (!session) return { user: null, business: null, signInAs, logout }
     if (session.role === 'super_admin') return { user: SUPER_ADMIN, business: null, signInAs, logout }
-    const business = biz.data ?? null
-    if (!business) return { user: biz.status === 'loading' ? undefined : null, business: null, signInAs, logout }
+    const business = biz.data?.id === businessId ? biz.data : null
+    if (!business) return { user: biz.status === 'error' ? null : undefined, business: null, signInAs, logout }
     return { user: businessAdminFor(business), business, signInAs, logout }
-  }, [session, biz.data, biz.status, signInAs, logout])
+  }, [session, businessId, biz.data, biz.status, signInAs, logout])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

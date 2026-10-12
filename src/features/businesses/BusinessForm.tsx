@@ -10,7 +10,7 @@ import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { type Business, type BusinessStatus, CURRENCIES, type Currency } from '@/domain/types'
 import { slugify } from '@/lib/slug'
-import { ROOT_DOMAIN, catalogPublicUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, PUBLIC_URL_MODE, ROOT_DOMAIN, catalogPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import type { BusinessInput } from '@/services/catalogService'
 import { BusinessIdentityPreview } from './BusinessIdentityPreview'
@@ -158,16 +158,18 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
             ) : (
               <>
                 <FormField
-                  label="Catalog address (subdomain)"
+                  label={PUBLIC_URL_MODE === 'path' ? 'Catalog address' : 'Catalog address (subdomain)'}
                   required
                   error={errors.slug}
                   hint={
                     mode === 'edit'
-                      ? 'Changing this breaks printed QR codes and shared links. Demo only: no DNS or SSL is configured.'
-                      : `Demo URL: ${catalogPublicUrl(previewBusiness)}. No DNS or SSL is configured in this demo.`
+                      ? `Changing this breaks printed QR codes and shared links.${PUBLIC_URLS_ARE_LIVE ? '' : ' Demo only: no DNS or SSL is configured.'}`
+                      : PUBLIC_URLS_ARE_LIVE
+                        ? `Catalog URL: ${catalogPublicUrl(previewBusiness)}`
+                        : `Demo URL: ${catalogPublicUrl(previewBusiness)}. No DNS or SSL is configured in this demo.`
                   }
                 >
-                  <InputAddon side="right" addon={`.${ROOT_DOMAIN}`}>
+                  <InputAddon side={PUBLIC_URL_MODE === 'path' ? 'left' : 'right'} addon={PUBLIC_URL_MODE === 'path' ? '/catalog/' : `.${ROOT_DOMAIN}`}>
                     <Input
                       value={data.slug}
                       onChange={(e) => {

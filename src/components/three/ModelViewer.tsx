@@ -16,6 +16,7 @@ export interface ModelViewerHandle {
   activateAR: () => Promise<void>
   canActivateAR: () => boolean
   getDimensions: () => MeasuredSize | null
+  resetCamera: () => void
 }
 
 export interface ModelViewerProps {
@@ -31,16 +32,18 @@ export interface ModelViewerProps {
   onError?: () => void
   onProgress?: (p: number) => void
   onArStatus?: (s: ArStatus) => void
+  /** First time the visitor rotates or zooms the model (camera change from user input). */
+  onInteract?: () => void
 }
 
 export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(function ModelViewer(
-  { src, iosSrc, poster, alt, ar = false, autoRotate = false, className, onLoad, onError, onProgress, onArStatus },
+  { src, iosSrc, poster, alt, ar = false, autoRotate = false, className, onLoad, onError, onProgress, onArStatus, onInteract },
   ref,
 ) {
   const elRef = useRef<ModelViewerElement | null>(null)
   const [ready, setReady] = useState(false)
-  const cbs = useRef({ onLoad, onError, onProgress, onArStatus })
-  cbs.current = { onLoad, onError, onProgress, onArStatus }
+  const cbs = useRef({ onLoad, onError, onProgress, onArStatus, onInteract })
+  cbs.current = { onLoad, onError, onProgress, onArStatus, onInteract }
 
   useEffect(() => {
     let alive = true
@@ -58,6 +61,13 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
     },
     canActivateAR: () => !!elRef.current?.canActivateAR,
     getDimensions: () => readDims(elRef.current),
+    resetCamera: () => {
+      const el = elRef.current
+      if (!el) return
+      el.cameraOrbit = 'auto auto auto'
+      el.cameraTarget = 'auto auto auto'
+      el.fieldOfView = 'auto'
+    },
   }))
 
   useEffect(() => {
@@ -69,6 +79,12 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       const p = (e as CustomEvent<{ totalProgress?: number }>).detail?.totalProgress
       if (typeof p === 'number') cbs.current.onProgress?.(p)
     }
+    let interacted = false
+    const handleCamera = (e: Event) => {
+      if (interacted || (e as CustomEvent<{ source?: string }>).detail?.source !== 'user-interaction') return
+      interacted = true
+      cbs.current.onInteract?.()
+    }
     const handleAr = (e: Event) => {
       const s = (e as CustomEvent<{ status?: ArStatus }>).detail?.status
       if (s) cbs.current.onArStatus?.(s)
@@ -77,7 +93,9 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
     el.addEventListener('error', handleError)
     el.addEventListener('progress', handleProgress)
     el.addEventListener('ar-status', handleAr)
+    el.addEventListener('camera-change', handleCamera)
     return () => {
+      el.removeEventListener('camera-change', handleCamera)
       el.removeEventListener('load', handleLoad)
       el.removeEventListener('error', handleError)
       el.removeEventListener('progress', handleProgress)

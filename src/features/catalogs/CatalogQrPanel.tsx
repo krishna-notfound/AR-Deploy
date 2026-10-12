@@ -10,7 +10,7 @@ import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessCatalog } from '@/domain/types'
 import { downloadDataUrl } from '@/lib/download'
-import { absoluteLocalUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, absoluteLocalUrl } from '@/lib/urls'
 import { useQrCode } from '@/lib/useQrCode'
 
 /**
@@ -45,7 +45,9 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
               <code className="min-w-0 flex-1 truncate text-sm">{catalog.catalogUrl}</code>
               <CopyButton text={catalog.catalogUrl} label="Copy URL" toastTitle="Catalog URL copied" />
             </div>
-            <p className="mt-1.5 text-xs text-ink-muted">Demo URL. The subdomain is not live until DNS and hosting are set up with the backend.</p>
+            {!PUBLIC_URLS_ARE_LIVE && (
+              <p className="mt-1.5 text-xs text-ink-muted">Demo URL. The subdomain is not live until DNS and hosting are set up with the backend.</p>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">

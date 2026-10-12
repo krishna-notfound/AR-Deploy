@@ -13,6 +13,8 @@ import { store } from './store'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const FAIL_RATE_KEY = 'arfurn:debug:failRate'
+const OWNERS_DEMO_MESSAGE =
+  'Owner accounts exist only with the Supabase backend. In this demo, open a business dashboard from the demo account picker instead.'
 
 function failRate(): number {
   try {
@@ -332,6 +334,11 @@ export const mockCatalogService: CatalogService = {
       const items = store.get().activity.filter((a) => !opts.businessId || a.businessId === opts.businessId)
       return ok(items.slice(0, opts.limit ?? 10))
     }),
+
+  // Demo accounts are not real users, so owner management exists only in Supabase mode.
+  getBusinessMembers: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
+  addBusinessMember: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
+  removeBusinessMember: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
 
   // Images become data URLs stored with the demo data; 3D files are session-only blob URLs (ADR-0007).
   uploadAsset: async ({ kind, file }) => {

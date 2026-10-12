@@ -30,12 +30,14 @@ async function signIn(email: string): Promise<Actor> {
   if (error) throw new Error(`sign-in failed for ${email}: ${error.message}`)
   return { sb, svc: createSupabaseCatalogService(sb) }
 }
+const mediaPathsOf = (p: Product) => [...p.images.map((i) => i.storagePath), p.models.glb?.storagePath, p.models.usdz?.storagePath].filter((x): x is string => !!x)
+
 function must<T>(r: { ok: true; data: T } | { ok: false; error: { code: string; message: string } }): T {
   if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`)
   return r.data
 }
 
-describe.skipIf(!enabled)('Supabase live API', () => {
+describe.skipIf(!enabled)('Supabase live API', { timeout: 30_000 }, () => {
   const tag = Math.random().toString(36).slice(2, 8)
   let admin: Actor, ownerA: Actor, ownerB: Actor
   const anon: Actor = enabled ? { sb: client(), svc: createSupabaseCatalogService(client()) } : (null as never)
@@ -151,6 +153,21 @@ describe.skipIf(!enabled)('Supabase live API', () => {
     expect(s.ok).toBe(false)
   })
 
+  it('platform admin manages owners; owners cannot manage owners', async () => {
+    const list = must(await admin.svc.getBusinessMembers(bizA))
+    expect(list.map((m) => m.email)).toEqual(['qa-owner-a@furnish.example'])
+    expect((await ownerA.svc.getBusinessMembers(bizA)).ok === false).toBe(true)
+    expect((await ownerA.svc.addBusinessMember(bizB, 'qa-owner-a@furnish.example')).ok).toBe(false)
+    const unknown = await admin.svc.addBusinessMember(bizA, 'nobody-here@furnish.example')
+    expect(unknown.ok === false && unknown.error.code).toBe('NOT_FOUND')
+    // Linking owner B to A gives B access to A's draft; removing it takes access away again.
+    must(await admin.svc.addBusinessMember(bizA, 'qa-owner-b@furnish.example'))
+    expect((await ownerB.svc.getProductById(draftA.id)).ok).toBe(true)
+    const bId = (await ownerB.sb.auth.getUser()).data.user!.id
+    must(await admin.svc.removeBusinessMember(bizA, bId))
+    expect((await ownerB.svc.getProductById(draftA.id)).ok).toBe(false)
+  })
+
   it('publishes, then the public can see the product and fetch its files via signed URLs', async () => {
     must(await ownerA.svc.publishProduct(draftA.id))
     const { product } = must(await anon.svc.getPublicProduct(`qa-a-${tag}`, `qa-chair-${tag}`))
@@ -164,6 +181,7 @@ describe.skipIf(!enabled)('Supabase live API', () => {
   it('records anonymous analytics (insert only) and shows them to the owner only', async () => {
     must(await anon.svc.recordEvent({ productId: draftA.id, businessId: bizA, type: 'view' }))
     must(await anon.svc.recordEvent({ productId: draftA.id, businessId: bizA, type: 'ar_activation' }))
+    must(await anon.svc.recordEvent({ productId: draftA.id, businessId: bizA, type: 'model_interaction' }))
     expect((await anon.sb.from('product_analytics').select('id')).error).not.toBeNull()
     const forged = await anon.sb.from('product_analytics').insert({ product_id: draftA.id, business_id: bizA, event_type: 'view', created_at: '2020-01-01T00:00:00Z' })
     expect(forged.error?.code).toBe('42501')
@@ -176,15 +194,39 @@ describe.skipIf(!enabled)('Supabase live API', () => {
     expect(s.isSample).toBe(false)
     expect(s.totals.views).toBe(1)
     expect(s.totals.arActivations).toBe(1)
+    expect(s.totals.modelInteractions).toBe(1)
     // Another owner can see that the (active) business exists, but RLS hides its events.
     const asB = must(await ownerB.svc.getBusinessAnalytics(bizA))
     expect(asB.totals.views + asB.totals.arActivations).toBe(0)
   })
 
+  it('rate-limits a burst from one visitor and stores at most the allowed events', async () => {
+    const before = must(await ownerA.svc.getBusinessAnalytics(bizA)).totals.views
+    const results = await Promise.all(Array.from({ length: 70 }, () => anon.svc.recordEvent({ productId: draftA.id, businessId: bizA, type: 'view' })))
+    const limited = results.filter((r) => !r.ok && r.error.code === 'RATE_LIMITED').length
+    const recorded = results.filter((r) => r.ok).length
+    expect(limited).toBeGreaterThan(0)
+    const after = must(await ownerA.svc.getBusinessAnalytics(bizA)).totals.views
+    expect(after - before).toBe(recorded)
+    expect(recorded).toBeLessThanOrEqual(60) // 30 per minute window; a burst can span two windows
+  }, 60_000)
+
   it('unpublishing hides the product and its files again', async () => {
     must(await ownerA.svc.unpublishProduct(draftA.id))
     expect((await anon.svc.getPublicProduct(`qa-a-${tag}`, `qa-chair-${tag}`)).ok).toBe(false)
     expect((await anon.sb.storage.from(MEDIA_BUCKET).createSignedUrl(draftA.images[0]!.storagePath!, 60)).error).not.toBeNull()
+  })
+
+  it('replacing or deleting product media removes the files nobody references any more', async () => {
+    const oldImage = draftA.images[0]!.storagePath!
+    const next = must(await ownerA.svc.uploadAsset({ kind: 'image', businessId: bizA, file: new File([PNG], 'new.png', { type: 'image/png' }) }))
+    uploaded.push({ bucket: MEDIA_BUCKET, path: next.storagePath! })
+    const updated = must(await ownerA.svc.updateProduct(draftA.id, { images: [{ id: 'n', url: next.url, storagePath: next.storagePath, isPrimary: true, kind: 'gallery' }] }))
+    expect(updated.images[0]?.storagePath).toBe(next.storagePath)
+    expect((await admin.sb.storage.from(MEDIA_BUCKET).download(oldImage)).error).not.toBeNull()
+    const remaining = mediaPathsOf(updated)
+    must(await ownerA.svc.deleteProduct(draftA.id))
+    for (const path of remaining) expect((await admin.sb.storage.from(MEDIA_BUCKET).download(path)).error).not.toBeNull()
   })
 
   it('public logo bucket accepts the owner’s logo and refuses SVG', async () => {

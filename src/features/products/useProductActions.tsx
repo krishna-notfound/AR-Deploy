@@ -3,7 +3,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, Product } from '@/domain/types'
 import { copyText } from '@/lib/clipboard'
-import { productLocalPath, productPublicUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import type { ServiceError } from '@/services/catalogService'
 
@@ -34,7 +34,7 @@ export function useProductActions(scope: EditorScope) {
     async publish(p: Product, business?: Business) {
       const r = await service.publishProduct(p.id)
       if (!r.ok) return toast.error('Cannot publish yet', describeErrors(r.error))
-      toast.success('Published', business ? `Live at the demo URL ${productPublicUrl(business, p)}` : undefined)
+      toast.success('Published', business ? `Live at ${PUBLIC_URLS_ARE_LIVE ? '' : 'the demo URL '}${productPublicUrl(business, p)}` : undefined)
       return r.data
     },
     async unpublish(p: Product) {
@@ -69,7 +69,7 @@ export function useProductActions(scope: EditorScope) {
     async copyUrl(p: Product, business: Business | undefined) {
       if (!business) return
       const ok = await copyText(productPublicUrl(business, p))
-      if (ok) toast.success('Product URL copied', 'This is a demo URL. The real domain is configured with the backend.')
+      if (ok) toast.success('Product URL copied', PUBLIC_URLS_ARE_LIVE ? undefined : 'This is a demo URL. The real domain is configured with the backend.')
       else toast.error('Copy failed', 'Your browser blocked clipboard access.')
     },
     openPreview(p: Product, business: Business | undefined) {

@@ -1,4 +1,4 @@
-// Generated from the live schema of pmnjchhrgvajtjpadpqo on 2026-10-13 (Supabase type generator).
+// Generated from the live schema of pmnjchhrgvajtjpadpqo on 2026-10-13 after migration 20261012200813 (Supabase type generator).
 // Only `Json` and `Database` are kept; regenerate with `npm run db:types` after any migration.
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
@@ -276,6 +276,7 @@ export type Database = {
           ar_activations: number | null
           business_id: string | null
           day: string | null
+          model_interactions: number | null
           product_id: string | null
           views: number | null
         }
@@ -291,8 +292,17 @@ export type Database = {
       }
     }
     Functions: {
+      admin_add_business_member: { Args: { p_business_id: string; p_email: string }; Returns: string }
+      admin_list_business_members: {
+        Args: { p_business_id: string }
+        Returns: { created_at: string; email: string; user_id: string }[]
+      }
       is_business_member: { Args: { bid: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      record_event_limited: {
+        Args: { p_business_id: string; p_event_type: string; p_product_id: string; p_visitor_key: string }
+        Returns: string
+      }
       save_product: {
         Args: { p_images: Json; p_models: Json; p_product: Json; p_variants: Json }
         Returns: string

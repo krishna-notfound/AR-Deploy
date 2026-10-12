@@ -14,13 +14,13 @@
 
 ## Discovered
 - [x] **P8-10** Apply the migrations to the approved project. — done 2026-10-13: applied to `pmnjchhrgvajtjpadpqo` via MCP; local files renamed to the recorded versions; advisors clean for our objects; types generated, with a drift check.
-- [~] **P8-17** Analytics rate limiting. — built 2026-10-13: migration `20261012193902_analytics_rate_limit`, Edge Function `track-event`, client switch; handler 11/11, PGlite 98/98. **Not deployed:** needs approval for the salt secret, function deploy and migration (design/20).
+- [x] **P8-17** Analytics rate limiting. — LIVE 2026-10-13 (see P9). — built 2026-10-13: migration `20261012200810_analytics_rate_limit`, Edge Function `track-event`, client switch; handler 11/11, PGlite 98/98. **Not deployed:** needs approval for the salt secret, function deploy and migration (design/20).
 - [x] **P8-11** End-to-end Supabase run. — done 2026-10-13: live suite 10/10 and UI smoke 8/8; found and fixed the GLB/USDZ upload MIME bug; QA data deleted.
-- [ ] **P8-12** Admin UI for memberships and invitations (currently SQL only).
+- [x] **P8-12** Admin UI for memberships. — done 2026-10-13: Owners tab links existing accounts. Email invitations still need SMTP.
 - [ ] **P8-13** Port the PGlite RLS cases to pgTAP (`supabase test db`).
-- [ ] **P8-14** Clean up orphaned Storage files after a product is deleted; rate-limit public analytics inserts.
+- [x] **P8-14** Orphaned Storage cleanup + analytics rate limit. — done 2026-10-13. Abandoned, never-saved uploads are not swept.
 - [ ] **P8-15** Move the remaining direct `services/mock` imports (`RootLayout` store notices, Settings `FAIL_RATE_KEY` / credits) behind the service interface.
 
-- [ ] **P8-18** Add the index `product_analytics (product_id, business_id)` for the composite FK (performance advisor INFO).
+- [x] **P8-18** Composite FK index. — done in migration 20261012200810.
 - [ ] **P8-19** Decide whether to revoke anon/authenticated EXECUTE on the platform function `public.rls_auto_enable()`. It is advisor-flagged but only runs as an event trigger. Coordinate with Supabase defaults.
 - [ ] **P8-20** Before launch: Vercel project, env vars, domains (design/20), Supabase Auth settings, custom SMTP, first real admin account. — 2026-10-13: Vercel inspected read-only (team `track0`, no project for this app, no domains); Auth steps written in design/20; Node pinned to 24.x.

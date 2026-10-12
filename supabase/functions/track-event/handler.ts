@@ -12,7 +12,7 @@ export interface TrackEventDeps {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const EVENT_TYPES = new Set(['view', 'ar_activation'])
+const EVENT_TYPES = new Set(['view', 'ar_activation', 'model_interaction'])
 const MAX_BODY_BYTES = 1024
 
 // Public endpoint (catalog subdomains and the apex both call it); no cookies or credentials involved.

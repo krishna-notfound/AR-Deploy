@@ -96,6 +96,14 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'view' })
   }, [product.id, product.businessId, isPreview])
 
+  // One 3D-interaction event per page view, the first time the visitor turns or zooms the model.
+  const interacted = useRef(false)
+  const onModelInteract = () => {
+    if (interacted.current || isPreview) return
+    interacted.current = true
+    void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'model_interaction' })
+  }
+
   useEffect(() => {
     document.title = `${name} · ${business.name}`
   }, [name, business.name])
@@ -152,6 +160,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
               product={product}
               viewerRef={viewerRef}
               onArStatus={(s) => s === 'failed' && toast.error(t('ar.failed'))}
+              onInteract={onModelInteract}
               onModelState={(s, info) => {
                 setModelState(s)
                 if (info) {

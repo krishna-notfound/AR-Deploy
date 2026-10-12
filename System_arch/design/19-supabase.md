@@ -1,6 +1,16 @@
 # 19 · Supabase backend (foundation)
 Decisions: ADR-0015 (dual mode), ADR-0016 (routes). This file is the setup guide.
 
+## Status (2026-10-13, later): 5 migrations + Edge Function live on `pmnjchhrgvajtjpadpqo`
+- **Migrations:** `20261012192143_init_schema`, `20261012192159_storage`, `20261012192454_save_product`, `20261012200810_analytics_rate_limit`, `20261012200813_business_member_admin`.
+- **Edge Function:** `track-event` (version 1, ACTIVE).
+- **Live suite:** 13/13.
+- **UI journey in Supabase mode:** 9/9 (reset-password page, admin creates a business, Owners tab add/unknown email, real path-mode catalog URL, owner dashboard, owner refused `/admin`, session survives reload, logout).
+- **Advisor WARNs, by design:**
+  - `admin_list_business_members` and `admin_add_business_member` are SECURITY DEFINER functions callable by signed-in users; each checks `is_platform_admin()` first, and the tests confirm 42501 for everyone else
+  - `rls_auto_enable` is platform-provided
+- **Advisor INFO:** `private.analytics_hits` has RLS on with no policies (intentional).
+
 ## Status (2026-10-13): applied to `pmnjchhrgvajtjpadpqo`
 Applied with owner approval through the Supabase MCP. Recorded versions: `20261012192143_init_schema`, `20261012192159_storage`, `20261012192454_save_product`. The local files were renamed to match, so `supabase db push` sees them as already applied.
 
@@ -138,7 +148,7 @@ npm run db:types   # npx supabase gen types typescript --project-id <ref> > src/
 | create / update / duplicate product | `rpc('save_product')` | Caller's RLS, inside one transaction. |
 | publish / unpublish / delete | `products` update or delete | RLS, plus a DB check that published products have a price, dimensions and a name. |
 | analytics | `product_analytics_daily` view + `summarize()` | View is security_invoker; RLS lets only members and admins read events. |
-| `recordEvent` | `functions.invoke('track-event')` → `record_event_limited()` (after migration 20261012193902; before it, a direct insert) | Rate limit 30/min per hashed visitor; published products of active businesses only; direct inserts closed; no personal data stored. |
+| `recordEvent` | `functions.invoke('track-event')` → `record_event_limited()` (after migration 20261012200810; before it, a direct insert) | Rate limit 30/min per hashed visitor; published products of active businesses only; direct inserts closed; no personal data stored. |
 | `uploadAsset` | Storage upload + public URL or signed URL | Bucket policies (above). |
 | sign-in / role | `auth.signInWithPassword`, `auth.getUser`, `platform_admins`, `business_members` | Rows that users cannot write. |
 

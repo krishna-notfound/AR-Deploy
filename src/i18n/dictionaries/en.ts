@@ -60,6 +60,8 @@ export const en = {
   'viewer.errorTitle': 'The 3D model could not be loaded',
   'viewer.errorBody': 'You can still browse the photos.',
   'viewer.retry': 'Try again',
+  'viewer.reset': 'Reset view',
+  'viewer.timeout': 'The 3D model is taking too long to load. Check your connection and try again.',
   'viewer.unavailable': '3D view is not available for this product yet.',
 
   'ar.button': 'View in my home',

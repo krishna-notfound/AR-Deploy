@@ -112,7 +112,8 @@ export interface Product {
   updatedAt: ISODate
 }
 
-export type AnalyticsEventType = 'view' | 'ar_activation'
+/** model_interaction = the visitor rotated/zoomed the 3D model (recorded once per page view). */
+export type AnalyticsEventType = 'view' | 'ar_activation' | 'model_interaction'
 
 export interface AnalyticsEvent {
   id: ID
@@ -135,6 +136,7 @@ export interface ProductAnalytics {
   businessId: ID
   views: number
   arActivations: number
+  modelInteractions: number
   arRate: number
 }
 
@@ -153,6 +155,7 @@ export interface AnalyticsSummary {
     drafts: number
     views: number
     arActivations: number
+    modelInteractions: number
   }
   series: DailyPoint[]
   byProduct: ProductAnalytics[]

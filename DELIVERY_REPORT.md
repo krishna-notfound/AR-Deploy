@@ -282,7 +282,7 @@ Everything from sections 1–8, plus the landing page. Demo mode creates no Supa
 
 ### Production preparation (2026-10-13)
 - **Analytics protection (built, not deployed):**
-  - migration `20261012193902_analytics_rate_limit` adds a private counter table and `record_event_limited()` (30 events/min per hashed visitor, service_role only), and closes direct anonymous inserts
+  - migration `20261012200810_analytics_rate_limit` adds a private counter table and `record_event_limited()` (30 events/min per hashed visitor, service_role only), and closes direct anonymous inserts
   - Edge Function `track-event` (SHA-256 of IP|date|secret salt; no raw identifiers stored)
   - the client now goes through the function
   - tests: handler 11/11, PGlite 98/98, rollback re-verified, `deno check` passes
@@ -292,4 +292,30 @@ Everything from sections 1–8, plus the landing page. Demo mode creates no Supa
   - Node pinned to 24.x
   - the frontend reads exactly the four public `VITE_*` variables, and no secret appears in the source or the build
 - **Auth:** exact dashboard changes are listed in design/20; nothing was changed live.
+
+### P9 release work (2026-10-13)
+- **Backend (live on `pmnjchhrgvajtjpadpqo`):**
+  - migrations `20261012200810_analytics_rate_limit` and `20261012200813_business_member_admin` applied, 5 in total
+  - Edge Function `track-event` version 1 ACTIVE
+  - types regenerated
+- **New in the app:**
+  - password reset (`/reset-password`)
+  - Owners tab: platform admins link owner accounts by email
+  - 3D-interaction analytics, a viewer stall timeout and Reset view
+  - storage cleanup after a product or business is deleted, or a file replaced
+  - real path-mode public URLs in production (no `example.com` outside demo mode)
+- **Fixed:** an account-loading race that bounced signed-in users through `/login` on a fresh load of a guarded route.
+- **Verified:**
+  - live API suite 13/13
+  - Supabase-mode UI journey 9/9
+  - PGlite 110/110 + rollback
+  - unit tests 66 (13 live tests skipped without credentials)
+  - e2e 22/22; typecheck and build OK; lint 0 errors
+- **Blocked:**
+  - Vercel project creation (403: no write access to team `track0`)
+  - production domain
+  - Supabase Auth dashboard settings
+  - custom SMTP (password emails reach only org members)
+  - first real platform admin (email needed)
+  - real-device AR
 

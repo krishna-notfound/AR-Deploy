@@ -105,6 +105,7 @@ export interface DailyRow {
   day: string
   views: number
   ar_activations: number
+  model_interactions: number
 }
 
 type DbError = { code?: string; message: string }
@@ -127,6 +128,8 @@ export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictFiel
     case '23502':
     case '22P02':
       return fail('VALIDATION', `The database rejected this data: ${e.message}`)
+    case 'P0002':
+      return fail('NOT_FOUND', e.message)
     case 'PGRST116':
       return fail('NOT_FOUND', ctx.notFound ?? 'Not found.')
     default:
@@ -247,6 +250,18 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
   }
 }
 
+/** Storage paths a product points at (images + models). */
+export function mediaPaths(p: Pick<Product, 'images' | 'models'>): string[] {
+  return [...p.images.map((i) => i.storagePath), p.models.glb?.storagePath, p.models.usdz?.storagePath].filter((x): x is string => !!x)
+}
+
+/** Object path of a logo stored in our public bucket, or null for external URLs. */
+export function logoPath(url: string | undefined): string | null {
+  const marker = `/storage/v1/object/public/${LOGO_BUCKET}/`
+  const i = url?.indexOf(marker) ?? -1
+  return url && i >= 0 ? decodeURIComponent(url.slice(i + marker.length).split('?')[0] ?? '') || null : null
+}
+
 const isBlobOrDataUrl = (u: string) => u.startsWith('blob:') || u.startsWith('data:')
 
 const UPLOAD_CONTENT_TYPE: Partial<Record<UploadKind, string>> = { glb: 'model/gltf-binary', usdz: 'model/vnd.usdz+zip' }
@@ -316,6 +331,31 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     )
   }
 
+  /**
+   * Best-effort removal of product-media files no product references any more (after delete or
+   * replace). Runs with the caller's storage policies (own folder / admin). Cross-business references
+   * are impossible (RLS), so the caller can see every row that could still point at the file.
+   */
+  async function removeUnreferencedMedia(paths: string[]): Promise<void> {
+    const unique = [...new Set(paths)]
+    if (!unique.length) return
+    const [img, mdl] = await Promise.all([
+      sb.from('product_images').select('storage_path').in('storage_path', unique).returns<{ storage_path: string }[]>(),
+      sb.from('product_models').select('storage_path').in('storage_path', unique).returns<{ storage_path: string }[]>(),
+    ])
+    if (img.error || mdl.error) return // keep files when unsure
+    const stillUsed = new Set([...img.data, ...mdl.data].map((r) => r.storage_path))
+    const orphans = unique.filter((p) => !stillUsed.has(p))
+    if (orphans.length) await sb.storage.from(MEDIA_BUCKET).remove(orphans)
+  }
+
+  async function removeFolder(bucket: string, folder: string): Promise<void> {
+    // ponytail: one page of 1000 objects per bucket; loop with offset if a business ever stores more.
+    const { data } = await sb.storage.from(bucket).list(folder, { limit: 1000 })
+    const files = (data ?? []).filter((f) => f.id).map((f) => `${folder}/${f.name}`)
+    if (files.length) await sb.storage.from(bucket).remove(files)
+  }
+
   async function saveProduct(id: ID | null, input: ProductInput): Promise<Result<Product>> {
     const errors = validateProductDraft(input, [])
     const local = [...input.images.map((i) => i.url), input.models.glb?.url ?? '', input.models.usdz?.url ?? '']
@@ -350,7 +390,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         {
           businesses,
           products: (p.data ?? []).map((x) => ({ id: x.id, businessId: x.business_id, status: x.status })),
-          dailyStats: (d.data ?? []).map((x) => ({ productId: x.product_id, businessId: x.business_id, date: x.day, views: Number(x.views), arActivations: Number(x.ar_activations) })),
+          dailyStats: (d.data ?? []).map((x) => ({ productId: x.product_id, businessId: x.business_id, date: x.day, views: Number(x.views), arActivations: Number(x.ar_activations), modelInteractions: Number(x.model_interactions ?? 0) })),
           events: [],
         },
         businessId,
@@ -397,7 +437,11 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
         const { data, error } = await sb.from('businesses').update(fromBusinessInput(patch)).eq('id', id).select('*').maybeSingle<BusinessRow>()
         if (error) return mapDbError(error, { conflictField: 'business' })
-        return changed(data ? ok(toBusiness(data)) : fail('NOT_FOUND', 'Business not found, or your account cannot change it.'))
+        if (!data) return fail('NOT_FOUND', 'Business not found, or your account cannot change it.')
+        // A replaced or removed logo from our bucket is deleted (logos are never shared).
+        const oldLogo = logoPath(current.data.logoUrl)
+        if (oldLogo && 'logoUrl' in patch && patch.logoUrl !== current.data.logoUrl) await sb.storage.from(LOGO_BUCKET).remove([oldLogo])
+        return changed(ok(toBusiness(data)))
       }),
     setBusinessStatus: (id, status) =>
       guard(async () => {
@@ -407,9 +451,15 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       }),
     deleteBusiness: (id) =>
       guard(async () => {
+        const current = await businessById(id)
         const { data, error } = await sb.from('businesses').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
-        return changed(data.length ? ok(undefined) : fail('NOT_FOUND', 'Business not found, or your account cannot delete it.'))
+        if (!data.length) return fail('NOT_FOUND', 'Business not found, or your account cannot delete it.')
+        // Rows cascade in the database; files live in Storage and are removed here (folder = business id).
+        await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id)])
+        const logo = current.ok ? logoPath(current.data.logoUrl) : null
+        if (logo) await sb.storage.from(LOGO_BUCKET).remove([logo])
+        return changed(ok(undefined))
       }),
     getCatalog: (slug) =>
       guard(async () => {
@@ -462,7 +512,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           const pubErrors = validateForPublish(next)
           if (Object.keys(pubErrors).length) return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
         }
-        return changed(await saveProduct(id, next))
+        const saved = await saveProduct(id, next)
+        if (saved.ok) await removeUnreferencedMedia(mediaPaths(current.data))
+        return changed(saved)
       }),
     duplicateProduct: (id) =>
       guard(async () => {
@@ -477,9 +529,12 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       }),
     deleteProduct: (id) =>
       guard(async () => {
+        const current = await productById(id)
         const { data, error } = await sb.from('products').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
-        return changed(data.length ? ok(undefined) : fail('NOT_FOUND', 'Product not found, or your account cannot delete it.'))
+        if (!data.length) return fail('NOT_FOUND', 'Product not found, or your account cannot delete it.')
+        if (current.ok) await removeUnreferencedMedia(mediaPaths(current.data))
+        return changed(ok(undefined))
       }),
     publishProduct: (id) =>
       guard(async () => {
@@ -523,6 +578,26 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           (p.data ?? []).map((x) => ({ id: x.id, businessId: x.business_id, name: x.name, createdAt: x.created_at, publishedAt: x.published_at ?? undefined })),
         )
         return ok(items.slice(0, opts.limit ?? 10))
+      }),
+
+    // ---------------- business owners ----------------
+    getBusinessMembers: (businessId) =>
+      guard(async () => {
+        const { data, error } = await sb.rpc('admin_list_business_members', { p_business_id: businessId })
+        if (error) return mapDbError(error)
+        const rows = (data ?? []) as { user_id: string; email: string; created_at: string }[]
+        return ok(rows.map((r) => ({ userId: r.user_id, email: r.email, addedAt: r.created_at })))
+      }),
+    addBusinessMember: (businessId, email) =>
+      guard(async () => {
+        const { error } = await sb.rpc('admin_add_business_member', { p_business_id: businessId, p_email: email })
+        return changed(error ? mapDbError(error) : ok(undefined))
+      }),
+    removeBusinessMember: (businessId, userId) =>
+      guard(async () => {
+        const { data, error } = await sb.from('business_members').delete().eq('business_id', businessId).eq('user_id', userId).select('id')
+        if (error) return mapDbError(error)
+        return changed(data.length ? ok(undefined) : fail('NOT_FOUND', 'This owner was not found, or your account cannot remove owners.'))
       }),
 
     // ---------------- files ----------------

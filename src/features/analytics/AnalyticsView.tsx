@@ -92,6 +92,7 @@ export function AnalyticsView({
         stats={[
           { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0) },
           { label: 'AR button activations', value: formatNumber(s?.totals.arActivations ?? 0) },
+          { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Visitors who turned or zoomed a model' },
           { label: 'AR activation rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : '—', hint: 'Activations per product view' },
           { label: 'Published products', value: formatNumber(s?.totals.published ?? 0) },
         ]}

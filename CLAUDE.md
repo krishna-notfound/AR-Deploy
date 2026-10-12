@@ -5,7 +5,7 @@ This project is a multi-tenant 3D furniture catalog with AR. It has three surfac
 - Business Admin (`/dashboard`, scope pending)
 - Public EN/PT catalog and product pages
 
-It runs in **demo mode** by default (a mock service layer, no setup). A **Supabase mode** is prepared behind the same service interface (`VITE_DATA_MODE=supabase`); its migrations in `supabase/migrations/` are applied to project `pmnjchhrgvajtjpadpqo` (2026-10-13). Never re-apply or roll back without the owner's approval. All architecture docs live in `System_arch/`.
+It runs in **demo mode** by default (a mock service layer, no setup). A **Supabase mode** is prepared behind the same service interface (`VITE_DATA_MODE=supabase`); its 5 migrations in `supabase/migrations/` and the `track-event` Edge Function are live on project `pmnjchhrgvajtjpadpqo` (2026-10-13). Never re-apply or roll back without the owner's approval. All architecture docs live in `System_arch/`.
 
 **Status (2026-10-12):** P0–P8 done. P8 added the editorial redesign, the landing page at `/` (demo picker moved to `/demo`) and the Supabase foundation. Open follow-ups are in `System_arch/tasks/P7-qa.md` and `P8-design-supabase.md` under "Discovered". See `DELIVERY_REPORT.md`.
 

@@ -64,45 +64,79 @@ Project `pmnjchhrgvajtjpadpqo`. Replace `furnish.app` with the real domain.
 
 **Also needed:** the first real platform admin. Create the user (Authentication → Users → Add user, with auto-confirm), then run `insert into public.platform_admins (user_id) select id from auth.users where email = '<admin email>';`. Then a membership per business owner (design/19 §4).
 
-## Analytics protection (built and tested locally; NOT deployed)
-**Problem.** Public view and AR events were direct table inserts, so anyone could add unlimited events.
-
-**Built:**
-- **Migration `20261012193902_analytics_rate_limit.sql`:**
-  - adds `private.analytics_hits(visitor_key, window_start, hits)` in a schema the Data API doesn't expose, with RLS on and no policies
-  - adds `public.record_event_limited(visitor_key, product_id, business_id, event_type)`: SECURITY DEFINER, `search_path=''`, EXECUTE for `service_role` only
-    - counts every call (valid or not) in a 1-minute window per visitor key
-    - returns `rate_limited` above **30/min**
-    - otherwise records the event only for a published product of an active business with a matching `business_id`
-    - opportunistically deletes counters older than 1 h
-  - **drops the public insert policy and revokes INSERT** on `product_analytics` from anon and authenticated, so the limiter can't be bypassed
-- **Edge Function `supabase/functions/track-event`:**
-  - `handler.ts` holds the logic and `index.ts` wires it to Deno; `verify_jwt = false` in `config.toml` because browsers send the publishable key, which is not a JWT
-  - it validates `{productId, businessId, type}` (UUIDs, `view|ar_activation`, body ≤ 1 KB)
-  - visitor key = `sha256(first X-Forwarded-For IP | UTC date | ANALYTICS_SALT)`; **only this digest reaches the database**, and the raw IP is never stored or logged
-  - responses: 204 recorded, 400 bad input, 422 not recordable, 429 + `Retry-After: 60` when limited, 500 if misconfigured or the DB fails
-  - the service key is read inside the function from `SUPABASE_SECRET_KEYS`, falling back to `SUPABASE_SERVICE_ROLE_KEY`, and never leaves the runtime
-- **Client:** `recordEvent` now calls `functions.invoke('track-event')`, and a 429 surfaces as `RATE_LIMITED`.
-
-**Tests:**
-- `handler.test.ts`: 11 cases (valid view/AR, digest-only key, same/different visitor and day, 429 after limit, invalid bodies, JSON/size/method errors, 422, CORS, fail-closed)
-- unit tests for the client path
-- PGlite: 98/98, including 17 rate-limit cases (recorded, draft/mismatch/inactive/unknown type invalid, malformed key not counted, 31st call limited with exactly 30 stored, invalid spam counted, other visitors unaffected, anon/authenticated can't call the function, direct inserts closed, counters hold only digest/window/count)
-- `deno check` passes; the rollback script was updated and re-verified
-
-**Deploy order (needs approval; until all three steps are done, events are not recorded):**
-1. Set the Edge Function secret `ANALYTICS_SALT` (random, ≥ 32 chars; never commit it).
-2. Deploy `track-event` (CLI `npx supabase functions deploy track-event`, or the MCP `deploy_edge_function`, which keeps `verify_jwt=false`).
-3. Apply migration `20261012193902_analytics_rate_limit`.
-4. Re-run the live suite (it now also asserts that direct inserts fail).
-
-**Limits that remain:** bots that rotate IPs are counted per IP. Use Vercel/Cloudflare bot protection if that becomes a problem. One function call per event is about 500k/month on the free plan.
+## Analytics protection (LIVE since 2026-10-13)
+- **Live components:**
+  - Edge Function `track-event`: ACTIVE, version 1, `verify_jwt=false`
+  - migration `20261012200810_analytics_rate_limit`
+- **Events:** `view`, `ar_activation`, and `model_interaction` (the first rotate or zoom per product page view).
+- **Rate limit:** 30 events per minute per visitor key. The key is the SHA-256 of `IP | UTC date | salt`.
+- **Salt:** the optional secret `ANALYTICS_SALT` overrides it. When unset (current state), the salt is derived from the function's server-only secret key, so hashes are unguessable from outside. Set `ANALYTICS_SALT` to rotate hashes independently of key rotation.
+- **Direct inserts are closed:** anon and authenticated have no INSERT on `product_analytics`.
+- **Verified against the live API:**
+  - all three event types are recorded
+  - forged and direct inserts get 42501
+  - a wrong business gets 422
+  - a 70-event burst returns 429s, and only the accepted events are stored
+  - the owner sees the counts; another owner sees zero
+- **Remaining limit:** bots that rotate IPs. Use a WAF if that ever matters.
 
 ## Go-live checklist
 1. ~~Apply the migrations and run the advisors.~~ Done 2026-10-13 on `pmnjchhrgvajtjpadpqo`.
 2. Set the Supabase Auth settings (above). Create the first platform admin (SQL).
 3. ~~Generate types.~~ Done (`database.types.ts` + drift check).
 4. ~~Real-API tests.~~ Done: 10/10 live, 8/8 UI smoke. Re-run after any migration.
-5. Deploy analytics protection: the salt secret, function and migration (above).
+5. ~~Deploy analytics protection.~~ Done 2026-10-13 (function and migration live; salt derived server-side).
 6. Create the Vercel project, set the env vars, and add the domains (apex, www, wildcard).
 7. Smoke-test production: landing, `/login`, a business subdomain, a product page, and AR on a real iPhone and Android phone (P7-10).
+
+## Release runbook
+**Environments:**
+
+| Where | `VITE_DATA_MODE` | Backend |
+|---|---|---|
+| Local `npm run dev` | unset → demo | none |
+| Vercel Preview + Development | `demo` | none, so previews can never touch production data |
+| Vercel Production | `supabase` + URL + publishable key | `pmnjchhrgvajtjpadpqo` |
+
+**First release** (needs a Vercel token or MCP connection allowed to write to team `track0`; see blockers):
+1. Create project `ar-furniture` in team `track0`:
+   - Git `krishna-notfound/AR-Deploy`, production branch `main`
+   - framework Vite, build `npm run build`, output `dist`, install `npm ci`, root directory = repo root
+2. Env vars:
+   - Production: `VITE_DATA_MODE=supabase`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_ROOT_DOMAIN` once a domain exists
+   - Preview + Development: `VITE_DATA_MODE=demo` only
+3. Deploy a preview from `feature/design-supabase-foundation` and verify the demo flows.
+4. Merge into `main` (no force push). The production deployment builds from `main`.
+5. Verify: deployment READY; commit SHA matches `main`; deep-link reloads; `/login` against Supabase; a published product, its 3D model and the analytics event; console free of errors.
+
+**Later releases:** run the full gate (typecheck, lint, test, test:e2e, build), merge to `main`, then smoke-test the production URL.
+
+**Database changes:**
+1. Create the file with `npx supabase migration new <name>`.
+2. Verify it locally (PGlite harness, design/19).
+3. Apply it with approval. CLI: `supabase db push`. Or the MCP `apply_migration`, after which you rename the local file to the recorded version.
+4. Run the advisors.
+5. Regenerate types: `database.types.ts` and the drift check.
+
+**Edge Function changes:** `deno check supabase/functions/track-event/index.ts`, then deploy (CLI `npx supabase functions deploy track-event`, or the MCP `deploy_edge_function` with `verify_jwt=false`).
+
+**Rollback:**
+- **App:** promote the previous production deployment in Vercel (Deployments → … → Promote / Instant Rollback). This is safe because the frontend has no data migrations.
+- **Edge Function:** redeploy the previous version from Git.
+- **Database:**
+  - Prefer a forward fix: a new migration.
+  - `supabase/rollback/20261012_p8_rollback.sql` drops **everything and all data**; use it only with a backup.
+  - Restoring from a backup needs the Pro plan's PITR or a manual `db dump` taken beforehand.
+
+**Troubleshooting:**
+
+| Symptom | Likely cause | Check |
+|---|---|---|
+| "The backend is not configured" screen | Production env vars missing or misspelled; the build reads them at build time | Vercel env vars, then redeploy |
+| Sign-in works but "not linked yet" | No `platform_admins` or `business_members` row | Owners tab (admin) or SQL in design/19 §4 |
+| Dashboard shows a permission error | RLS denied the action (correct for other businesses) | The user's membership |
+| Images or models don't load on a public page | Product unpublished or business inactive (private bucket); or a signed URL older than 1 h on a long-open tab | Publish state; reload the page |
+| 3D model stuck, then "taking too long" | No download progress for 45 s (network/CORS) or a corrupt GLB | Open the file URL; check the GLB in a validator |
+| No AR button on a phone | Device/browser lacks AR (`canActivateAR` false), or an in-app browser | Open in Safari/Chrome; iOS needs a USDZ for best results |
+| Analytics not counting | Rate limit (30/min/visitor), unpublished product, or the function is down | Edge Function logs in the Supabase dashboard |
+| Password reset email never arrives | Default SMTP only mails org members (about 2/h) | Configure custom SMTP (Auth table above) |

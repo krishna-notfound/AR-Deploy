@@ -12,17 +12,18 @@ import { Package } from 'lucide-react'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
+import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 import { useBusinessActions } from '../businesses/useBusinessActions'
 import { CatalogQrPanel } from '../catalogs/CatalogQrPanel'
 import { ProductTable } from '../products/ProductTable'
 import { useProductStats } from '../products/useCatalogData'
 
-type Tab = 'details' | 'products' | 'qr'
+type Tab = 'details' | 'products' | 'owners' | 'qr'
 
 export default function BusinessDetailPage() {
   const { businessId = '' } = useParams()
   const [params, setParams] = useSearchParams()
-  const tab = (['details', 'products', 'qr'].includes(params.get('tab') ?? '') ? params.get('tab') : 'details') as Tab
+  const tab = (['details', 'products', 'owners', 'qr'].includes(params.get('tab') ?? '') ? params.get('tab') : 'details') as Tab
   const setTab = (t: Tab) => setParams(t === 'details' ? {} : { tab: t }, { replace: true })
 
   const business = useServiceQuery(() => service.getBusinessById(businessId), [businessId])
@@ -96,6 +97,7 @@ export default function BusinessDetailPage() {
         tabs={[
           { value: 'details', label: 'Details' },
           { value: 'products', label: 'Products', badge: <span className="rounded-full bg-subtle px-1.5 text-xs text-ink-muted tabular-nums">{productCount}</span> },
+          { value: 'owners', label: 'Owners' },
           { value: 'qr', label: 'Catalog & QR' },
         ]}
       />
@@ -129,6 +131,7 @@ export default function BusinessDetailPage() {
           />
         </Card>
       )}
+      {tab === 'owners' && <BusinessOwnersPanel business={b} />}
       {tab === 'qr' && (catalog.data ? <CatalogQrPanel catalog={catalog.data} productsLink={`/admin/products?business=${b.id}`} /> : <FullPageSpinner />)}
     </>
   )

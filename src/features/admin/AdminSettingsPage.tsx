@@ -114,6 +114,7 @@ export default function AdminSettingsPage() {
         </Card>
         )}
 
+        {isDemoMode && (
         <Card>
           <CardHeader title="What this demo does and does not do" description="Frontend behaviour versus functionality that needs the backend phase." />
           <div className="overflow-x-auto">
@@ -145,6 +146,7 @@ export default function AdminSettingsPage() {
             </table>
           </div>
         </Card>
+        )}
 
         <Card>
           <CardHeader title="Sample asset credits" />

@@ -62,6 +62,8 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'viewer.errorTitle': 'Não foi possível carregar o modelo 3D',
   'viewer.errorBody': 'Pode continuar a ver as fotografias.',
   'viewer.retry': 'Tentar novamente',
+  'viewer.reset': 'Repor vista',
+  'viewer.timeout': 'O modelo 3D está a demorar demasiado a carregar. Verifique a ligação e tente novamente.',
   'viewer.unavailable': 'A vista 3D ainda não está disponível para este produto.',
 
   'ar.button': 'Ver na minha casa',

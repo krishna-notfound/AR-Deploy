@@ -13,6 +13,7 @@ export interface DailyStat {
   date: string // YYYY-MM-DD
   views: number
   arActivations: number
+  modelInteractions?: number
 }
 
 export interface AnalyticsInput {
@@ -32,14 +33,15 @@ export function summarize(db: AnalyticsInput, businessId?: ID, now: Date = new D
   for (let i = DAYS - 1; i >= 0; i--) days.push(isoDay(new Date(now.getTime() - i * 86_400_000)))
   const seriesMap = new Map<string, DailyPoint>(days.map((d) => [d, { date: d, views: 0, arActivations: 0 }]))
   const byProduct = new Map<ID, ProductAnalytics>(
-    products.map((p) => [p.id, { productId: p.id, businessId: p.businessId, views: 0, arActivations: 0, arRate: 0 }]),
+    products.map((p) => [p.id, { productId: p.id, businessId: p.businessId, views: 0, arActivations: 0, modelInteractions: 0, arRate: 0 }]),
   )
 
-  const add = (productId: ID, date: string, views: number, ar: number) => {
+  const add = (productId: ID, date: string, views: number, ar: number, interactions = 0) => {
     const pa = byProduct.get(productId)
     if (!pa) return
     pa.views += views
     pa.arActivations += ar
+    pa.modelInteractions += interactions
     const point = seriesMap.get(date)
     if (point) {
       point.views += views
@@ -47,10 +49,10 @@ export function summarize(db: AnalyticsInput, businessId?: ID, now: Date = new D
     }
   }
 
-  for (const s of db.dailyStats) if (productIds.has(s.productId)) add(s.productId, s.date, s.views, s.arActivations)
+  for (const s of db.dailyStats) if (productIds.has(s.productId)) add(s.productId, s.date, s.views, s.arActivations, s.modelInteractions ?? 0)
   for (const e of db.events) {
     if (!productIds.has(e.productId)) continue
-    add(e.productId, e.at.slice(0, 10), e.type === 'view' ? 1 : 0, e.type === 'ar_activation' ? 1 : 0)
+    add(e.productId, e.at.slice(0, 10), e.type === 'view' ? 1 : 0, e.type === 'ar_activation' ? 1 : 0, e.type === 'model_interaction' ? 1 : 0)
   }
 
   const byProductList = [...byProduct.values()]
@@ -77,6 +79,7 @@ export function summarize(db: AnalyticsInput, businessId?: ID, now: Date = new D
       drafts: products.filter((p) => p.status === 'draft').length,
       views: byProductList.reduce((s, r) => s + r.views, 0),
       arActivations: byProductList.reduce((s, r) => s + r.arActivations, 0),
+      modelInteractions: byProductList.reduce((s, r) => s + r.modelInteractions, 0),
     },
     series: days.map((d) => seriesMap.get(d)!),
     byProduct: byProductList,

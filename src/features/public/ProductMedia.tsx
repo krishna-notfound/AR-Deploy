@@ -1,5 +1,5 @@
-import { AlertTriangle, Box, ChevronLeft, ChevronRight, Images, RotateCw } from 'lucide-react'
-import { type Ref, useState } from 'react'
+import { AlertTriangle, Box, ChevronLeft, ChevronRight, Images, Maximize, RotateCw } from 'lucide-react'
+import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/Form'
 import { SmartImage } from '@/components/ui/SmartImage'
@@ -12,16 +12,21 @@ import type { MeasuredSize } from '@/lib/scale'
 
 export type ModelState = 'none' | 'loading' | 'loaded' | 'error'
 
+/** A model that makes no download progress for this long is treated as failed (no endless spinner). */
+export const MODEL_STALL_TIMEOUT_MS = 45_000
+
 export function ProductMedia({
   product,
   viewerRef,
   onModelState,
   onArStatus,
+  onInteract,
 }: {
   product: Product
   viewerRef: Ref<ModelViewerHandle>
   onModelState: (s: ModelState, info?: { canActivateAR: boolean; dimensions: MeasuredSize | null }) => void
   onArStatus: (s: ArStatus) => void
+  onInteract?: () => void
 }) {
   const { t, localized } = useI18n()
   const glb = product.models.glb && !isStaleSessionAsset(product.models.glb) ? product.models.glb : undefined
@@ -31,6 +36,14 @@ export function ProductMedia({
   const [state, setState] = useState<ModelState>(glb ? 'loading' : 'none')
   const [progress, setProgress] = useState(0)
   const [attempt, setAttempt] = useState(0)
+  const [timedOut, setTimedOut] = useState(false)
+  const innerRef = useRef<ModelViewerHandle>(null)
+  useImperativeHandle(viewerRef, () => ({
+    activateAR: () => innerRef.current?.activateAR() ?? Promise.resolve(),
+    canActivateAR: () => innerRef.current?.canActivateAR() ?? false,
+    getDimensions: () => innerRef.current?.getDimensions() ?? null,
+    resetCamera: () => innerRef.current?.resetCamera(),
+  }))
   const name = localized(product.name)
   const poster = gallery.find((i) => i.isPrimary)?.url ?? gallery[0]?.url
 
@@ -38,6 +51,18 @@ export function ProductMedia({
     setState(s)
     onModelState(s, info)
   }
+  const updateRef = useRef(update)
+  updateRef.current = update
+
+  // Restart the stall timer on every progress tick; fail only when nothing has arrived for the whole window.
+  useEffect(() => {
+    if (state !== 'loading') return
+    const timer = setTimeout(() => {
+      setTimedOut(true)
+      updateRef.current('error')
+    }, MODEL_STALL_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [state, progress, attempt])
 
   return (
     <div>
@@ -46,7 +71,7 @@ export function ProductMedia({
           <div className={cn('absolute inset-0', mode !== '3d' && 'invisible')} aria-hidden={mode !== '3d'}>
             <ModelViewer
               key={attempt}
-              ref={viewerRef}
+              ref={innerRef}
               src={glb.url}
               iosSrc={usdz?.url}
               poster={poster}
@@ -57,6 +82,7 @@ export function ProductMedia({
               onLoad={(info) => update('loaded', info)}
               onError={() => update('error')}
               onArStatus={onArStatus}
+              onInteract={onInteract}
             />
             {state === 'loading' && (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 pb-5" role="status">
@@ -67,21 +93,33 @@ export function ProductMedia({
               </div>
             )}
             {state === 'loaded' && (
-              <p className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-xs text-ink-muted">
-                <RotateCw className="mr-1 inline size-3 align-[-1px]" aria-hidden />
-                {t('viewer.hint')}
-              </p>
+              <>
+                <p className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-xs text-ink-muted">
+                  <RotateCw className="mr-1 inline size-3 align-[-1px]" aria-hidden />
+                  {t('viewer.hint')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => innerRef.current?.resetCamera()}
+                  className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-xs text-ink shadow-[var(--shadow-card)] hover:bg-surface"
+                >
+                  <Maximize className="size-3.5" aria-hidden />
+                  {t('viewer.reset')}
+                </button>
+              </>
             )}
             {state === 'error' && (
               <div className="absolute inset-0 grid place-items-center bg-canvas/85 p-6 text-center" role="alert">
                 <div className="max-w-xs">
                   <AlertTriangle className="mx-auto size-6 text-warning" aria-hidden />
                   <p className="mt-2 text-sm font-medium">{t('viewer.errorTitle')}</p>
-                  <p className="mt-1 text-[13px] text-ink-muted">{t('viewer.errorBody')}</p>
+                  <p className="mt-1 text-[13px] text-ink-muted">{timedOut ? t('viewer.timeout') : t('viewer.errorBody')}</p>
                   <div className="mt-4 flex justify-center gap-2">
                     <Button
                       size="sm"
                       onClick={() => {
+                        setTimedOut(false)
+                        setProgress(0)
                         setAttempt((a) => a + 1)
                         update('loading')
                       }}

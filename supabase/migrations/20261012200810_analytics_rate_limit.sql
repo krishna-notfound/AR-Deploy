@@ -3,7 +3,8 @@
 -- Function, which rate-limits per hashed visitor key. Direct inserts from the
 -- browser are removed so the limiter cannot be bypassed.
 --
--- Safe to review before applying: creates a private schema, one table, one function;
+-- Safe to review before applying: adds the model_interaction event type (constraint + view column),
+-- creates a private schema, one table, one function;
 -- revokes anon/authenticated INSERT on product_analytics and drops its insert policy.
 -- No data is deleted. Deploy the Edge Function together with this migration
 -- (design/20 "Analytics protection"); until it is deployed, events are not recorded.
@@ -11,6 +12,28 @@
 -- Privacy: only a SHA-256 hex digest of (ip | utc date | secret salt) is stored, for at
 -- most ~1 hour. No IP address, user agent or user id is stored anywhere.
 -- =============================================================================
+
+-- 3D-viewer interaction is a third event type (first rotate/zoom per product page view).
+alter table public.product_analytics
+  drop constraint product_analytics_event_type_check,
+  add constraint product_analytics_event_type_check
+    check (event_type in ('view', 'ar_activation', 'model_interaction'));
+
+-- Same view plus one appended column (create or replace keeps grants and existing columns).
+create or replace view public.product_analytics_daily
+with (security_invoker = true) as
+select
+  business_id,
+  product_id,
+  (created_at at time zone 'utc')::date as day,
+  count(*) filter (where event_type = 'view') as views,
+  count(*) filter (where event_type = 'ar_activation') as ar_activations,
+  count(*) filter (where event_type = 'model_interaction') as model_interactions
+from public.product_analytics
+group by business_id, product_id, (created_at at time zone 'utc')::date;
+
+-- Covers the composite FK (product_id, business_id) → products; flagged by the performance advisor.
+create index product_analytics_product_business_idx on public.product_analytics (product_id, business_id);
 
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;
@@ -64,7 +87,7 @@ begin
     return 'rate_limited';
   end if;
 
-  if p_event_type is null or p_event_type not in ('view', 'ar_activation')
+  if p_event_type is null or p_event_type not in ('view', 'ar_activation', 'model_interaction')
      or not exists (
        select 1 from public.products p
        join public.businesses b on b.id = p.business_id

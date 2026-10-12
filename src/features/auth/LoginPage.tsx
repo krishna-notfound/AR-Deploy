@@ -1,6 +1,6 @@
 import { LogIn } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -67,6 +67,11 @@ export default function LoginPage() {
             <Button type="submit" variant="primary" className="w-full" loading={pending} icon={<LogIn className="size-4" aria-hidden />} disabled={!email || !password}>
               Sign in
             </Button>
+            <p className="text-center text-sm">
+              <Link to="/reset-password" className="text-accent-ink hover:underline">
+                Forgot your password?
+              </Link>
+            </p>
           </form>
         )}
       </main>

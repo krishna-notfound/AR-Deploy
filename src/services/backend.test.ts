@@ -86,7 +86,7 @@ function fakeClient(resp: Resp | (() => never), calls: { table: string; op: stri
   const settle = () => (typeof resp === 'function' ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(resp))
   const builder = (table: string): Record<string, unknown> => {
     const b: Record<string, unknown> = {}
-    for (const op of ['select', 'insert', 'update', 'delete', 'eq', 'gte', 'order', 'limit', 'returns'])
+    for (const op of ['select', 'insert', 'update', 'delete', 'eq', 'in', 'gte', 'order', 'limit', 'returns'])
       b[op] = (...args: unknown[]) => {
         calls.push({ table, op, args })
         return b
@@ -102,7 +102,16 @@ function fakeClient(resp: Resp | (() => never), calls: { table: string; op: stri
       calls.push({ table: 'rpc', op: 'rpc', args })
       return settle()
     },
-    storage: { from: () => ({ createSignedUrls: () => Promise.resolve({ data: [], error: null }) }) },
+    storage: {
+      from: (bucket: string) => ({
+        createSignedUrls: () => Promise.resolve({ data: [], error: null }),
+        list: () => Promise.resolve({ data: [], error: null }),
+        remove: (paths: string[]) => {
+          calls.push({ table: `storage:${bucket}`, op: 'remove', args: [paths] })
+          return Promise.resolve({ data: [], error: null })
+        },
+      }),
+    },
     functions: {
       invoke: (name: string, opts: unknown) => {
         calls.push({ table: 'functions', op: name, args: [opts] })
@@ -245,5 +254,31 @@ describe('reserved subdomains', () => {
     const sql = readFileSync('supabase/migrations/20261012192143_init_schema.sql', 'utf8')
     const list = /slug not in \(([^)]+)\)/.exec(sql)?.[1]?.match(/'([a-z]+)'/g)?.map((s) => s.slice(1, -1))
     expect(new Set(list)).toEqual(RESERVED_SUBDOMAINS)
+  })
+})
+
+describe('storage path helpers', () => {
+  it('collects every stored file of a product, ignoring external URLs', async () => {
+    const { mediaPaths } = await import('./supabase/supabaseCatalogService')
+    const p = sampleProduct({
+      images: [
+        { id: 'a', url: 'https://s/x', storagePath: 'b1/a.jpg', isPrimary: true, kind: 'gallery' },
+        { id: 'b', url: 'https://cdn.example/y.jpg', isPrimary: false, kind: 'additional' },
+      ],
+      models: { glb: { format: 'glb', url: 'https://s/m', storagePath: 'b1/m.glb', fileName: 'm.glb', status: 'valid' } },
+    })
+    expect(mediaPaths(p)).toEqual(['b1/a.jpg', 'b1/m.glb'])
+  })
+
+  it('extracts the object path of logos in our public bucket only', async () => {
+    const { logoPath } = await import('./supabase/supabaseCatalogService')
+    expect(logoPath('https://ref.supabase.co/storage/v1/object/public/business-logos/b1/l%201.png')).toBe('b1/l 1.png')
+    expect(logoPath('https://cdn.example/logo.png')).toBeNull()
+    expect(logoPath(undefined)).toBeNull()
+  })
+
+  it('demo mode reports owner management as unavailable instead of faking it', async () => {
+    const res = await mockCatalogService.getBusinessMembers('biz_casa')
+    expect(res.ok === false && res.error.code).toBe('UNSUPPORTED')
   })
 })

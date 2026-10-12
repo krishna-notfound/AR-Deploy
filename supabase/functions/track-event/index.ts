@@ -1,5 +1,5 @@
 // Supabase Edge Function: records a public product view / AR activation through the
-// rate-limited public.record_event_limited() (migration 20261012193902_analytics_rate_limit).
+// rate-limited public.record_event_limited() (migration 20261012200810_analytics_rate_limit).
 // Deployed with verify_jwt = false (supabase/config.toml): the endpoint is public by design and
 // browsers send the publishable key, which is not a JWT. Protection = validation + rate limit.
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
@@ -16,9 +16,13 @@ const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', serviceKey(), 
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
+// ANALYTICS_SALT is an optional override (set it to rotate visitor hashes independently). Without it,
+// the salt is derived from the server-only secret key, which never leaves this runtime.
+const salt = Deno.env.get('ANALYTICS_SALT') || (serviceKey() ? `derived-from-secret-key:${serviceKey()}` : '')
+
 Deno.serve((req) =>
   handleTrackEvent(req, {
-    salt: Deno.env.get('ANALYTICS_SALT') ?? '',
+    salt,
     async record({ visitorKey, productId, businessId, eventType }) {
       const { data, error } = await supabase.rpc('record_event_limited', {
         p_visitor_key: visitorKey,

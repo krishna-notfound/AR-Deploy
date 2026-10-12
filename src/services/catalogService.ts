@@ -62,6 +62,12 @@ export interface UploadedAsset {
   status: AssetStatus
 }
 
+export interface BusinessMember {
+  userId: ID
+  email: string
+  addedAt: string
+}
+
 export interface CatalogService {
   // businesses
   getBusinesses(): Promise<Result<Business[]>>
@@ -91,6 +97,12 @@ export interface CatalogService {
   getBusinessAnalytics(businessId: ID): Promise<Result<AnalyticsSummary>>
   recordEvent(e: { productId: ID; businessId: ID; type: AnalyticsEventType }): Promise<Result<void>>
   getRecentActivity(opts?: { businessId?: ID; limit?: number }): Promise<Result<ActivityItem[]>>
+
+  // business owners (platform admins only; enforced by the database)
+  getBusinessMembers(businessId: ID): Promise<Result<BusinessMember[]>>
+  /** Links an existing account by email. */
+  addBusinessMember(businessId: ID, email: string): Promise<Result<void>>
+  removeBusinessMember(businessId: ID, userId: ID): Promise<Result<void>>
 
   // files: validate on the client first (lib/files.ts); this only stores them
   uploadAsset(input: { kind: UploadKind; file: File; businessId?: ID }): Promise<Result<UploadedAsset>>

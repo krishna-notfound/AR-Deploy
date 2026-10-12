@@ -12,6 +12,7 @@ import { RootLayout } from './RootLayout'
 const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
 const DemoEntryPage = lazy(() => import('@/features/demo/DemoEntryPage'))
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
+const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
 const NotFoundPage = lazy(() => import('@/features/demo/NotFoundPage'))
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/AdminOverviewPage'))
@@ -103,6 +104,7 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/', element: <LandingPage /> },
             { path: '/demo', element: <DemoEntryPage /> },
             { path: '/login', element: <LoginPage /> },
+            { path: '/reset-password', element: <ResetPasswordPage /> },
           ],
         },
         adminRoutes,

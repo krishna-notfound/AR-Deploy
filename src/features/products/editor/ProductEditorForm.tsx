@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { type Business, CATEGORIES, CURRENCIES, type Category, type Currency, type Product, type ProductStatus } from '@/domain/types'
 import { cn } from '@/lib/cn'
 import { slugify } from '@/lib/slug'
-import { productLocalPath, productPublicUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import { primaryImage } from '@/lib/product'
 import { type EditorScope, editPath, useProductActions } from '../useProductActions'
@@ -278,7 +278,7 @@ export function ProductEditorForm({
               label="Product URL"
               required
               error={err('slug')}
-              hint={business ? `Demo URL: ${productPublicUrl(business, { slug: form.input.slug || 'product-name' })}` : 'Lowercase letters, numbers and hyphens.'}
+              hint={business ? `${PUBLIC_URLS_ARE_LIVE ? 'URL' : 'Demo URL'}: ${productPublicUrl(business, { slug: form.input.slug || 'product-name' })}` : 'Lowercase letters, numbers and hyphens.'}
             >
               <InputAddon addon="/products/">
                 <Input value={form.input.slug} onChange={(e) => setForm((f) => ({ ...f, slugTouched: true, input: { ...f.input, slug: slugify(e.target.value) || e.target.value.toLowerCase() } }))} />
@@ -436,9 +436,11 @@ export function ProductEditorForm({
               <code className="min-w-0 flex-1 truncate text-[13px]">{productPublicUrl(business, product)}</code>
               <CopyButton text={productPublicUrl(business, product)} label="Copy" toastTitle="Product URL copied" />
             </div>
-            <p className="mt-2 text-xs text-ink-muted">
-              Demo URL built from the business and product slugs. The domain itself is not configured yet. In this demo the page opens at {productLocalPath(business, product)}.
-            </p>
+            {!PUBLIC_URLS_ARE_LIVE && (
+              <p className="mt-2 text-xs text-ink-muted">
+                Demo URL built from the business and product slugs. The domain itself is not configured yet. In this demo the page opens at {productLocalPath(business, product)}.
+              </p>
+            )}
           </div>
         )}
       </Modal>
