@@ -133,6 +133,23 @@ Who can do what:
 ## Real-API test suite
 `npx vitest run src/services/supabase/live.integration.test.ts`, with `SUPABASE_IT_URL`, `SUPABASE_IT_KEY` (publishable) and `SUPABASE_IT_PASSWORD` set. It needs the users `qa-admin@`, `qa-owner-a@` and `qa-owner-b@furnish.example`, with that password, and qa-admin in `platform_admins`. It creates and deletes its own businesses, products and files. The suite is skipped when the variables are unset. Delete the QA users afterwards; never run it against a project with real customer data you can't afford to have touched.
 
+## Sample data (loaded 2026-10-13)
+`pmnjchhrgvajtjpadpqo` holds the demo catalog as sample data: 4 businesses (Oak & Ember is inactive), 21 products (18 published, 3 drafts), 7 real 3D models, variants, and about 16.8k analytics events for the last 30 days.
+- **Intentional test cases:**
+  - Tejo Side Table has a missing GLB (viewer error state)
+  - Damask Accent Chair has a scale mismatch (AR scale unverified)
+  - Rio Sideboard has no Portuguese (fallback)
+- **Accounts:**
+  - `krishnagtkr@gmail.com`: platform admin
+  - `owner.casa@furnish.example` → Casa Lisboa
+  - `owner.nordhaus@furnish.example` → Nordhaus
+  - Passwords were given to the owner in chat and are never stored in the repo. Change them via `/reset-password` while signed in.
+- **Re-seed (resets only the sample businesses):**
+  1. Run `npm run db:sample-sql`.
+  2. Run `supabase/seed/sample_data.sql` in the SQL editor.
+  3. Run `SEED_ADMIN_EMAIL=… SEED_ADMIN_PASSWORD=… npm run db:sample-logos`.
+- **Remove the sample data:** run the `delete from public.businesses where id in (…)` line at the top of the SQL file. It cascades to products, events and memberships; logos stay until deleted from the bucket.
+
 ## 7. Generated types
 After the schema is applied:
 ```

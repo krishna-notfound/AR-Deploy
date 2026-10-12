@@ -28,3 +28,4 @@ If a decision is replaced, set the old ADR's status to `Superseded by ADR-NNNN`.
 | [0014](ADR-0014-editorial-design-refresh.md) | Editorial refresh: orange accent split by contrast job, charcoal actions, hairlines | Accepted (supersedes 0011 palette) | design/11 |
 | [0015](ADR-0015-supabase-dual-mode.md) | Supabase behind the service layer; demo stays the default | Accepted (refines 0002) | design/05, 07, 18, 19 |
 | [0016](ADR-0016-landing-page-and-demo-route.md) | Landing page at `/`, demo picker at `/demo`, `/login` for Supabase | Accepted | design/07, 14 |
+| [0017](ADR-0017-sample-data-from-demo-seed.md) | Supabase sample data generated from the demo seed (jiti, dev-only) | Accepted | design/19 |

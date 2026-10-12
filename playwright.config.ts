@@ -19,5 +19,7 @@ export default defineConfig({
     url: 'http://localhost:5199',
     reuseExistingServer: true,
     timeout: 60_000,
+    // E2E covers demo mode; process env beats .env.local, so a developer's Supabase setup is not used here.
+    env: { VITE_DATA_MODE: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_ROOT_DOMAIN: '' },
   },
 })

@@ -13,7 +13,7 @@ import { SmartImage } from '@/components/ui/SmartImage'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { Business, BusinessCatalog, BusinessStatus } from '@/domain/types'
 import { formatDate, formatNumber } from '@/lib/format'
-import { service } from '@/services'
+import { isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useBusinessActions } from '../businesses/useBusinessActions'
 
@@ -100,7 +100,7 @@ export default function BusinessesListPage() {
     <>
       <PageHeader
         title="Businesses"
-        description="Furniture businesses and their catalogs. Views and AR are last-30-day sample figures."
+        description={`Furniture businesses and their catalogs. Views and AR are last-30-day ${isDemoMode ? 'sample ' : ''}figures.`}
         actions={
           <ButtonLink to="/admin/businesses/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
             Create business

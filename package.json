@@ -14,7 +14,9 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "db:types": "supabase gen types typescript --project-id ${SUPABASE_PROJECT_REF:?set SUPABASE_PROJECT_REF} > src/services/supabase/database.types.ts"
+    "db:types": "supabase gen types typescript --project-id ${SUPABASE_PROJECT_REF:?set SUPABASE_PROJECT_REF} > src/services/supabase/database.types.ts",
+    "db:sample-sql": "node scripts/sample-data/build-sql.mjs",
+    "db:sample-logos": "node scripts/sample-data/upload-logos.mjs"
   },
   "dependencies": {
     "@google/model-viewer": "^4.4.0",
@@ -37,6 +39,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "jiti": "2.7.0",
     "jsdom": "^30.1.2",
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.3",

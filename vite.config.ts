@@ -24,6 +24,8 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts'],
       css: false,
+      // Tests always run in demo mode, whatever a developer's .env.local says.
+      env: { VITE_DATA_MODE: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_ROOT_DOMAIN: '' },
     },
   }
 })

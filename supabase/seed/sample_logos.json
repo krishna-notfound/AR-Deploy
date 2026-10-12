@@ -1,0 +1,22 @@
+[
+  {
+    "id": "8a262eb4-8981-440d-8b35-a834a1893e33",
+    "name": "Casa Lisboa Interiors",
+    "svg": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2096%2096%22%3E%3Crect%20width%3D%2296%22%20height%3D%2296%22%20rx%3D%2220%22%20fill%3D%22%237A5C45%22%2F%3E%3Ctext%20x%3D%2248%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Georgia%2C%20'Times%20New%20Roman'%2C%20serif%22%20font-size%3D%2234%22%20font-weight%3D%22600%22%20fill%3D%22%23FFFFFF%22%20letter-spacing%3D%221%22%3ECL%3C%2Ftext%3E%3C%2Fsvg%3E"
+  },
+  {
+    "id": "7f963399-3a96-47ab-8fc0-658709ff73d4",
+    "name": "Nordhaus Living",
+    "svg": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2096%2096%22%3E%3Crect%20width%3D%2296%22%20height%3D%2296%22%20rx%3D%2220%22%20fill%3D%22%232F5D62%22%2F%3E%3Ctext%20x%3D%2248%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Georgia%2C%20'Times%20New%20Roman'%2C%20serif%22%20font-size%3D%2234%22%20font-weight%3D%22600%22%20fill%3D%22%23FFFFFF%22%20letter-spacing%3D%221%22%3ENH%3C%2Ftext%3E%3C%2Fsvg%3E"
+  },
+  {
+    "id": "fc458dc0-4d9a-485e-85da-dcfe781f1c60",
+    "name": "Atelier Verde",
+    "svg": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2096%2096%22%3E%3Crect%20width%3D%2296%22%20height%3D%2296%22%20rx%3D%2220%22%20fill%3D%22%234F6B3A%22%2F%3E%3Ctext%20x%3D%2248%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Georgia%2C%20'Times%20New%20Roman'%2C%20serif%22%20font-size%3D%2234%22%20font-weight%3D%22600%22%20fill%3D%22%23FFFFFF%22%20letter-spacing%3D%221%22%3EAV%3C%2Ftext%3E%3C%2Fsvg%3E"
+  },
+  {
+    "id": "39a3ec2b-03e4-4ea0-874b-f1719f2f77ed",
+    "name": "Oak & Ember Studio",
+    "svg": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2096%2096%22%3E%3Crect%20width%3D%2296%22%20height%3D%2296%22%20rx%3D%2220%22%20fill%3D%22%235A4636%22%2F%3E%3Ctext%20x%3D%2248%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Georgia%2C%20'Times%20New%20Roman'%2C%20serif%22%20font-size%3D%2234%22%20font-weight%3D%22600%22%20fill%3D%22%23FFFFFF%22%20letter-spacing%3D%221%22%3EOE%3C%2Ftext%3E%3C%2Fsvg%3E"
+  }
+]
