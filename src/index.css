@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+
+/* Design tokens: System_arch/design/11-design-system.md, ADR-0014 (editorial refresh) */
+@theme {
+  --font-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Surfaces & ink. ink-muted is the lightest colour allowed for body text (>= 4.5:1 on canvas). */
+  --color-canvas: #faf9f7;
+  --color-surface: #ffffff;
+  --color-subtle: #f2f1ee;
+  --color-line: #e7e5e1;
+  --color-line-strong: #d3d0ca;
+  --color-ink: #161616;
+  --color-ink-body: #333333;
+  --color-ink-muted: #5f5d59;
+  --color-ink-faint: #8c8a85;
+
+  /* Orange accent, used sparingly. Contrast on white: bright 2.8 (fills under dark text only),
+     accent 3.4 (rings, indicators, icons), ink 5.5 (text and links). */
+  --color-accent-bright: #fe6f2d;
+  --color-accent: #e85f1f;
+  --color-accent-hover: #d4521a;
+  --color-accent-ink: #b4441a;
+  --color-accent-soft: #fff1ea;
+
+  --color-success: #2f6b4f;
+  --color-success-soft: #e5f0e9;
+  --color-warning: #8f5a0b;
+  --color-warning-soft: #f8eedc;
+  --color-danger: #a8362a;
+  --color-danger-soft: #f8e5e2;
+  --color-info: #33597a;
+  --color-info-soft: #e5edf4;
+
+  /* Type scale. Display/headline are light and tight (editorial); UI text stays 13-15px. */
+  --text-display: clamp(2.5rem, 1.6rem + 3.2vw, 4.4rem);
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.04em;
+  --text-headline: clamp(1.85rem, 1.35rem + 2vw, 3rem);
+  --text-headline--line-height: 1.08;
+  --text-headline--letter-spacing: -0.03em;
+  --text-title: 1.625rem;
+  --text-title--line-height: 1.2;
+  --text-title--letter-spacing: -0.02em;
+  --text-lead: 1.125rem;
+  --text-lead--line-height: 1.6;
+
+  /* Spacing follows the Tailwind 4px scale; the rhythm is 1.5 (6px), 3.5 (14px), 6 (24px), 8 (32px), 16 (64px). */
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-stage: 14px;
+
+  /* Hairlines instead of elevation. Only floating layers (menus, dialogs, toasts) cast a shadow. */
+  --shadow-card: 0 0 0 1px var(--color-line);
+  --shadow-pop: 0 16px 40px -16px rgb(22 22 22 / 0.24), 0 0 0 1px rgb(22 22 22 / 0.06);
+
+  --animate-toast-in: toast-in 160ms ease-out;
+  --animate-fade-in: fade-in 140ms ease-out;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-canvas text-ink-body antialiased;
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-ink);
+  }
+  h1,
+  h2,
+  h3 {
+    color: var(--color-ink);
+    text-wrap: balance;
+  }
+  /* Brand accent used on public pages; set per business (falls back to the platform accent). */
+  :root {
+    --brand-accent: var(--color-accent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* model-viewer sizing */
+model-viewer {
+  width: 100%;
+  height: 100%;
+  --poster-color: transparent;
+  --progress-bar-color: transparent;
+}

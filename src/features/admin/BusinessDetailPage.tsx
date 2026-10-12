@@ -1,0 +1,135 @@
+import { ExternalLink, PackagePlus, Power, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { useParams, useSearchParams } from 'react-router'
+import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { BusinessStatusBadge } from '@/components/ui/Badge'
+import { Button, ButtonLink } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { EmptyState, ErrorState } from '@/components/ui/States'
+import { Tabs } from '@/components/ui/Tabs'
+import { Package } from 'lucide-react'
+import { service } from '@/services'
+import { useServiceQuery } from '@/services/hooks'
+import { BusinessForm } from '../businesses/BusinessForm'
+import { useBusinessActions } from '../businesses/useBusinessActions'
+import { CatalogQrPanel } from '../catalogs/CatalogQrPanel'
+import { ProductTable } from '../products/ProductTable'
+import { useProductStats } from '../products/useCatalogData'
+
+type Tab = 'details' | 'products' | 'qr'
+
+export default function BusinessDetailPage() {
+  const { businessId = '' } = useParams()
+  const [params, setParams] = useSearchParams()
+  const tab = (['details', 'products', 'qr'].includes(params.get('tab') ?? '') ? params.get('tab') : 'details') as Tab
+  const setTab = (t: Tab) => setParams(t === 'details' ? {} : { tab: t }, { replace: true })
+
+  const business = useServiceQuery(() => service.getBusinessById(businessId), [businessId])
+  const b = business.data
+  const catalog = useServiceQuery(() => (b ? service.getCatalog(b.slug) : Promise.resolve({ ok: true as const, data: null })), [b?.slug, b?.updatedAt])
+  const products = useServiceQuery(() => service.getProductsByBusiness(businessId), [businessId])
+  const stats = useProductStats(businessId)
+  const actions = useBusinessActions()
+  const [deleting, setDeleting] = useState(false)
+
+  if (business.status === 'loading' && !b) return <FullPageSpinner />
+  if (!b) {
+    const notFound = business.status === 'error' && business.error.code === 'NOT_FOUND'
+    return (
+      <>
+        <PageHeader title={notFound ? 'Business not found' : 'Could not load business'} breadcrumbs={[{ label: 'Businesses', to: '/admin/businesses' }]} />
+        <Card>
+          {notFound ? (
+            <EmptyState title="This business does not exist" body="It may have been deleted." action={<ButtonLink to="/admin/businesses">Back to businesses</ButtonLink>} />
+          ) : (
+            <ErrorState message={business.status === 'error' ? business.error.message : 'Unknown error'} onRetry={business.refetch} />
+          )}
+        </Card>
+      </>
+    )
+  }
+
+  const productCount = products.data?.length ?? 0
+  const bizMap = new Map([[b.id, b]])
+
+  return (
+    <>
+      <PageHeader
+        title={b.name}
+        breadcrumbs={[{ label: 'Businesses', to: '/admin/businesses' }, { label: b.name }]}
+        meta={
+          <>
+            <BusinessStatusBadge status={b.status} />
+            <span className="text-[13px] text-ink-muted">/catalog/{b.slug}</span>
+          </>
+        }
+        actions={
+          <>
+            <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(`/catalog/${b.slug}`, '_blank', 'noopener')}>
+              Open catalog
+            </Button>
+            <Button icon={<Power className="size-4" aria-hidden />} onClick={() => void actions.setActive(b, b.status !== 'active')}>
+              {b.status === 'active' ? 'Deactivate' : 'Activate'}
+            </Button>
+            <Button
+              variant="ghost"
+              className="text-danger hover:bg-danger-soft"
+              icon={<Trash2 className="size-4" aria-hidden />}
+              loading={deleting}
+              onClick={async () => {
+                setDeleting(true)
+                const ok = await actions.remove(b, productCount, { after: '/admin/businesses' })
+                if (!ok) setDeleting(false)
+              }}
+            >
+              Delete
+            </Button>
+          </>
+        }
+      />
+      <Tabs
+        label="Business sections"
+        value={tab}
+        onChange={setTab}
+        className="mb-6"
+        tabs={[
+          { value: 'details', label: 'Details' },
+          { value: 'products', label: 'Products', badge: <span className="rounded-full bg-subtle px-1.5 text-xs text-ink-muted tabular-nums">{productCount}</span> },
+          { value: 'qr', label: 'Catalog & QR' },
+        ]}
+      />
+      {tab === 'details' && <BusinessForm business={b} mode="edit" />}
+      {tab === 'products' && (
+        <Card>
+          <div className="flex items-center justify-between gap-3 border-b border-line p-4">
+            <p className="text-sm text-ink-muted">Products in {b.name}’s catalog</p>
+            <ButtonLink to={`/admin/products/new?business=${b.id}`} size="sm" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
+              Add product
+            </ButtonLink>
+          </div>
+          <ProductTable
+            scope="admin"
+            products={products.data ?? []}
+            businesses={bizMap}
+            stats={stats.map}
+            loading={products.status === 'loading' && !products.data}
+            empty={
+              <EmptyState
+                icon={Package}
+                title="No products yet"
+                body="Add the first product to this catalog."
+                action={
+                  <ButtonLink to={`/admin/products/new?business=${b.id}`} variant="primary">
+                    Add product
+                  </ButtonLink>
+                }
+              />
+            }
+          />
+        </Card>
+      )}
+      {tab === 'qr' && (catalog.data ? <CatalogQrPanel catalog={catalog.data} productsLink={`/admin/products?business=${b.id}`} /> : <FullPageSpinner />)}
+    </>
+  )
+}
