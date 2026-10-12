@@ -412,3 +412,8 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Public analytics endpoint: browsers send the publishable key (not a JWT), so the gateway JWT check
+# is off; the function validates input and rate-limits per hashed visitor (design/20).
+[functions.track-event]
+verify_jwt = false

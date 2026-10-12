@@ -279,3 +279,17 @@ Everything from sections 1–8, plus the landing page. Demo mode creates no Supa
   - First real admin account.
   - Analytics rate limiting (P8-17).
   - Real-device AR (P7-10).
+
+### Production preparation (2026-10-13)
+- **Analytics protection (built, not deployed):**
+  - migration `20261012193902_analytics_rate_limit` adds a private counter table and `record_event_limited()` (30 events/min per hashed visitor, service_role only), and closes direct anonymous inserts
+  - Edge Function `track-event` (SHA-256 of IP|date|secret salt; no raw identifiers stored)
+  - the client now goes through the function
+  - tests: handler 11/11, PGlite 98/98, rollback re-verified, `deno check` passes
+- **Vercel (read-only):** team `track0`, no project for this app, no domains. Nothing was created or changed.
+- **Readiness:**
+  - `vercel.json` sets framework vite, build `npm run build`, output `dist`, the SPA rewrite and security headers
+  - Node pinned to 24.x
+  - the frontend reads exactly the four public `VITE_*` variables, and no secret appears in the source or the build
+- **Auth:** exact dashboard changes are listed in design/20; nothing was changed live.
+

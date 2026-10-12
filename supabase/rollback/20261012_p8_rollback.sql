@@ -1,5 +1,5 @@
 -- =============================================================================
--- ROLLBACK for the three P8 migrations (init_schema, storage, save_product).
+-- ROLLBACK for the P8 migrations (init_schema, storage, save_product, analytics_rate_limit).
 -- NOT a migration: kept outside supabase/migrations so the CLI never runs it.
 --
 -- DESTRUCTIVE: drops every table below and ALL rows in them (businesses, products,
@@ -29,6 +29,11 @@ drop policy if exists "Members and admins delete media" on storage.objects;
 delete from storage.buckets b
 where b.id in ('business-logos', 'product-media')
   and not exists (select 1 from storage.objects o where o.bucket_id = b.id);
+
+-- analytics_rate_limit (20261012193902)
+drop function if exists public.record_event_limited(text, uuid, uuid, text);
+drop table if exists private.analytics_hits;
+drop schema if exists private; -- only if nothing else lives there (no cascade)
 
 drop function if exists public.save_product(jsonb, jsonb, jsonb, jsonb);
 

@@ -14,7 +14,7 @@
 
 ## Discovered
 - [x] **P8-10** Apply the migrations to the approved project. — done 2026-10-13: applied to `pmnjchhrgvajtjpadpqo` via MCP; local files renamed to the recorded versions; advisors clean for our objects; types generated, with a drift check.
-- [ ] **P8-17** Decide on public analytics flooding: accept for a pilot, or move to an Edge Function with rate limiting before public launch.
+- [~] **P8-17** Analytics rate limiting. — built 2026-10-13: migration `20261012193902_analytics_rate_limit`, Edge Function `track-event`, client switch; handler 11/11, PGlite 98/98. **Not deployed:** needs approval for the salt secret, function deploy and migration (design/20).
 - [x] **P8-11** End-to-end Supabase run. — done 2026-10-13: live suite 10/10 and UI smoke 8/8; found and fixed the GLB/USDZ upload MIME bug; QA data deleted.
 - [ ] **P8-12** Admin UI for memberships and invitations (currently SQL only).
 - [ ] **P8-13** Port the PGlite RLS cases to pgTAP (`supabase test db`).
@@ -23,4 +23,4 @@
 
 - [ ] **P8-18** Add the index `product_analytics (product_id, business_id)` for the composite FK (performance advisor INFO).
 - [ ] **P8-19** Decide whether to revoke anon/authenticated EXECUTE on the platform function `public.rls_auto_enable()`. It is advisor-flagged but only runs as an event trigger. Coordinate with Supabase defaults.
-- [ ] **P8-20** Before launch: Vercel project, env vars, domains (design/20), Supabase Auth settings, custom SMTP, first real admin account.
+- [ ] **P8-20** Before launch: Vercel project, env vars, domains (design/20), Supabase Auth settings, custom SMTP, first real admin account. — 2026-10-13: Vercel inspected read-only (team `track0`, no project for this app, no domains); Auth steps written in design/20; Node pinned to 24.x.

@@ -23,6 +23,8 @@ export type ServiceErrorCode =
   | 'CONFIG'
   /** The operation exists only in demo mode (e.g. reset demo data). */
   | 'UNSUPPORTED'
+  /** Too many requests from this visitor (analytics limiter). */
+  | 'RATE_LIMITED'
   | 'UNKNOWN'
 
 export interface ServiceError {

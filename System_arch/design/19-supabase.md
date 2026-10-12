@@ -138,7 +138,7 @@ npm run db:types   # npx supabase gen types typescript --project-id <ref> > src/
 | create / update / duplicate product | `rpc('save_product')` | Caller's RLS, inside one transaction. |
 | publish / unpublish / delete | `products` update or delete | RLS, plus a DB check that published products have a price, dimensions and a name. |
 | analytics | `product_analytics_daily` view + `summarize()` | View is security_invoker; RLS lets only members and admins read events. |
-| `recordEvent` | insert into `product_analytics` | Public may insert only for published products, with a matching business; no read-back; no personal data stored. |
+| `recordEvent` | `functions.invoke('track-event')` → `record_event_limited()` (after migration 20261012193902; before it, a direct insert) | Rate limit 30/min per hashed visitor; published products of active businesses only; direct inserts closed; no personal data stored. |
 | `uploadAsset` | Storage upload + public URL or signed URL | Bucket policies (above). |
 | sign-in / role | `auth.signInWithPassword`, `auth.getUser`, `platform_admins`, `business_members` | Rows that users cannot write. |
 

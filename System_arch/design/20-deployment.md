@@ -10,9 +10,16 @@ Architecture: static Vite SPA on Vercel, with Supabase Postgres, Auth and Storag
 
 | Setting | Value |
 |---|---|
-| Node.js | 22.x (supabase-js 2.117 needs Node ≥ 22) |
+| Node.js | 24.x, pinned in `package.json` `engines` (Vercel follows it; supabase-js 2.117 needs ≥ 22; every local check ran on Node 24.21) |
 | Install | `npm ci` (lockfile committed) |
 | Production branch | `main` (create it from the reviewed feature branch) |
+| Framework / build / output | `vite` / `npm run build` / `dist` (from `vercel.json`; overrides the dashboard) |
+
+## Vercel account state (read-only inspection, 2026-10-13)
+- **Team:** the connected Vercel MCP sees one team, `track0` (`team_tOPocMPMfQihQE0P4kMAurPU`). Deployments are created by user `krishnatechzero-1399`.
+  - `GET /v2/user` returns "User not found" and the teams list is empty, so the connection is scoped to that team.
+- **Projects:** there is **no project for this app**. The existing 7 projects (`shringaar-virtual-try-on*`, `portfolio*`, `tracker0`) are unrelated and were not touched.
+- **Domains:** none registered in this scope, so the production domain still has to be chosen and added.
 
 ## Environment variables (Vercel → Settings → Environment Variables)
 | Name | Production | Preview | Notes |
@@ -40,37 +47,62 @@ Architecture: static Vite SPA on Vercel, with Supabase Postgres, Auth and Storag
   - copied catalog URLs use the subdomain
 - **Not verified:** a real DNS/TLS deployment on Vercel.
 
-## Supabase Auth settings for production
-- **URLs:** Site URL `https://furnish.app`. Redirect URLs `https://furnish.app/login`, plus each preview origin you use.
-- **Sign-up:** turn off public sign-ups (accounts are created by admins). Turn on leaked-password protection and set a minimum password length.
-- **Email:** custom SMTP before inviting real users (the default sender is rate-limited).
+## Supabase Auth settings for production (owner applies; not changed by Claude)
+Project `pmnjchhrgvajtjpadpqo`. Replace `furnish.app` with the real domain.
 
-## Analytics abuse: proposal before public launch (not built)
-**Problem.** `product_analytics` accepts public inserts, so anyone can add unlimited valid events for a published product. Postgres has no per-visitor identity to rate-limit on. Column grants already stop forged dates and ids.
+| # | Dashboard page | Setting | Value |
+|---|---|---|---|
+| 1 | Authentication → URL Configuration (`/dashboard/project/_/auth/url-configuration`) | Site URL | `https://furnish.app` |
+| 2 | same page | Redirect URLs (exact entries) | `https://furnish.app/login`, `https://www.furnish.app/login`. For Vercel previews add `https://*-track0.vercel.app/**`. For local work add `http://localhost:5173/**`. |
+| 3 | Authentication → Sign In / Providers (`/auth/providers`) | Allow new users to sign up | **Off**. Accounts are created by a platform admin; a stray sign-up has no role and sees only public data, but shouldn't exist. |
+| 4 | same page → Email provider | Confirm email | On (default). Minimum password length **12**; require lower, upper, digits. |
+| 5 | same page → Email provider | Prevent use of leaked passwords (HaveIBeenPwned) | **On**. Requires the **Pro plan or above**; on Free it is unavailable. Treat that as a launch decision. |
+| 6 | Authentication → Emails → SMTP Settings (`/auth/smtp`) | Enable custom SMTP | Host, port, user, password from your mail provider (Resend, Postmark, SES…). Sender `no-reply@furnish.app`, name "Furnish AR". |
+| 7 | Authentication → Rate Limits (`/auth/rate-limits`) | Emails per hour | Starts at 30 after custom SMTP. Raise only if needed. |
 
-**Proposal.** Record events through a Supabase Edge Function that rate-limits per hashed IP. About 1 SQL migration plus 1 function, with no new infrastructure.
+**Why SMTP is a blocker:** the default sender delivers only to members of the Supabase organisation, at about 2 emails/hour, with no delivery guarantee. Confirmation and password emails to real business owners would fail with "Email address not authorized".
 
-1. **Migration** (apply only after approval):
-   - Add `private.analytics_hits(key text, window_start timestamptz, hits int, primary key (key, window_start))` in a non-exposed `private` schema.
-   - Add `public.record_event_limited(p_key text, p_product uuid, p_business uuid, p_type text) returns boolean`: SECURITY DEFINER, `search_path=''`, execute granted to `service_role` only. It upserts the 1-minute window counter and returns false above ~30 hits per key per minute. Otherwise it inserts the event (still checking published, matching business).
-   - Revoke `insert` on `product_analytics` from `anon, authenticated`.
-2. **Edge Function `track-event`:**
-   - It accepts `{productId, businessId, type}` and computes `key = sha256(ip + utc_date + ANALYTICS_SALT)`. Only the hash is stored, so no IP is kept.
-   - It calls `record_event_limited` with the service-role client, which is available only inside the function as `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SECRET_KEYS`.
-   - It responds 204, or 429 when limited.
-   - The IP is the first value of `x-forwarded-for`. Confirm the header on the deployed platform before relying on it.
-3. **Client:** `recordEvent` calls `supabase.functions.invoke('track-event', …)` instead of the table insert.
-4. **Costs and limits:**
-   - One function call per product view or AR tap (500k/month on the free plan).
-   - Hashing per IP and day lets one IP be counted for at most ~30 events per minute.
-   - Bots that rotate IPs need a WAF or bot protection (Vercel Firewall can rate-limit the page, but not the Supabase endpoint).
-5. **Alternative if this is too much:** accept the risk for a pilot, label analytics "approximate", and watch `product_analytics` growth.
+**Also needed:** the first real platform admin. Create the user (Authentication → Users → Add user, with auto-confirm), then run `insert into public.platform_admins (user_id) select id from auth.users where email = '<admin email>';`. Then a membership per business owner (design/19 §4).
+
+## Analytics protection (built and tested locally; NOT deployed)
+**Problem.** Public view and AR events were direct table inserts, so anyone could add unlimited events.
+
+**Built:**
+- **Migration `20261012193902_analytics_rate_limit.sql`:**
+  - adds `private.analytics_hits(visitor_key, window_start, hits)` in a schema the Data API doesn't expose, with RLS on and no policies
+  - adds `public.record_event_limited(visitor_key, product_id, business_id, event_type)`: SECURITY DEFINER, `search_path=''`, EXECUTE for `service_role` only
+    - counts every call (valid or not) in a 1-minute window per visitor key
+    - returns `rate_limited` above **30/min**
+    - otherwise records the event only for a published product of an active business with a matching `business_id`
+    - opportunistically deletes counters older than 1 h
+  - **drops the public insert policy and revokes INSERT** on `product_analytics` from anon and authenticated, so the limiter can't be bypassed
+- **Edge Function `supabase/functions/track-event`:**
+  - `handler.ts` holds the logic and `index.ts` wires it to Deno; `verify_jwt = false` in `config.toml` because browsers send the publishable key, which is not a JWT
+  - it validates `{productId, businessId, type}` (UUIDs, `view|ar_activation`, body ≤ 1 KB)
+  - visitor key = `sha256(first X-Forwarded-For IP | UTC date | ANALYTICS_SALT)`; **only this digest reaches the database**, and the raw IP is never stored or logged
+  - responses: 204 recorded, 400 bad input, 422 not recordable, 429 + `Retry-After: 60` when limited, 500 if misconfigured or the DB fails
+  - the service key is read inside the function from `SUPABASE_SECRET_KEYS`, falling back to `SUPABASE_SERVICE_ROLE_KEY`, and never leaves the runtime
+- **Client:** `recordEvent` now calls `functions.invoke('track-event')`, and a 429 surfaces as `RATE_LIMITED`.
+
+**Tests:**
+- `handler.test.ts`: 11 cases (valid view/AR, digest-only key, same/different visitor and day, 429 after limit, invalid bodies, JSON/size/method errors, 422, CORS, fail-closed)
+- unit tests for the client path
+- PGlite: 98/98, including 17 rate-limit cases (recorded, draft/mismatch/inactive/unknown type invalid, malformed key not counted, 31st call limited with exactly 30 stored, invalid spam counted, other visitors unaffected, anon/authenticated can't call the function, direct inserts closed, counters hold only digest/window/count)
+- `deno check` passes; the rollback script was updated and re-verified
+
+**Deploy order (needs approval; until all three steps are done, events are not recorded):**
+1. Set the Edge Function secret `ANALYTICS_SALT` (random, ≥ 32 chars; never commit it).
+2. Deploy `track-event` (CLI `npx supabase functions deploy track-event`, or the MCP `deploy_edge_function`, which keeps `verify_jwt=false`).
+3. Apply migration `20261012193902_analytics_rate_limit`.
+4. Re-run the live suite (it now also asserts that direct inserts fail).
+
+**Limits that remain:** bots that rotate IPs are counted per IP. Use Vercel/Cloudflare bot protection if that becomes a problem. One function call per event is about 500k/month on the free plan.
 
 ## Go-live checklist
 1. ~~Apply the migrations and run the advisors.~~ Done 2026-10-13 on `pmnjchhrgvajtjpadpqo`.
 2. Set the Supabase Auth settings (above). Create the first platform admin (SQL).
 3. ~~Generate types.~~ Done (`database.types.ts` + drift check).
 4. ~~Real-API tests.~~ Done: 10/10 live, 8/8 UI smoke. Re-run after any migration.
-5. Decide on analytics abuse (P8-17).
+5. Deploy analytics protection: the salt secret, function and migration (above).
 6. Create the Vercel project, set the env vars, and add the domains (apex, www, wildcard).
 7. Smoke-test production: landing, `/login`, a business subdomain, a product page, and AR on a real iPhone and Android phone (P7-10).

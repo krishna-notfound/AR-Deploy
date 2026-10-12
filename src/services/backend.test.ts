@@ -103,6 +103,12 @@ function fakeClient(resp: Resp | (() => never), calls: { table: string; op: stri
       return settle()
     },
     storage: { from: () => ({ createSignedUrls: () => Promise.resolve({ data: [], error: null }) }) },
+    functions: {
+      invoke: (name: string, opts: unknown) => {
+        calls.push({ table: 'functions', op: name, args: [opts] })
+        return typeof resp === 'function' ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(resp)
+      },
+    },
   } as unknown as SupabaseClient
 }
 
@@ -163,11 +169,17 @@ describe('Supabase catalog service', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('records analytics as an insert-only row without personal data', async () => {
+  it('records analytics only through the rate-limited Edge Function, never by direct insert', async () => {
     const calls: { table: string; op: string; args: unknown[] }[] = []
     const svc = createSupabaseCatalogService(fakeClient({ data: null, error: null }, calls))
     expect((await svc.recordEvent({ productId: 'p1', businessId: 'b1', type: 'view' })).ok).toBe(true)
-    expect(calls).toEqual([{ table: 'product_analytics', op: 'insert', args: [{ product_id: 'p1', business_id: 'b1', event_type: 'view' }] }])
+    expect(calls).toEqual([{ table: 'functions', op: 'track-event', args: [{ body: { productId: 'p1', businessId: 'b1', type: 'view' } }] }])
+  })
+
+  it('surfaces a rate-limited event as RATE_LIMITED, not success', async () => {
+    const svc = createSupabaseCatalogService(fakeClient({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: { status: 429 } } as never }))
+    const res = await svc.recordEvent({ productId: 'p1', businessId: 'b1', type: 'view' })
+    expect(res.ok === false && res.error.code).toBe('RATE_LIMITED')
   })
 
   it('refuses to save products that still reference browser-only files', async () => {

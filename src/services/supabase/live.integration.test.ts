@@ -167,6 +167,9 @@ describe.skipIf(!enabled)('Supabase live API', () => {
     expect((await anon.sb.from('product_analytics').select('id')).error).not.toBeNull()
     const forged = await anon.sb.from('product_analytics').insert({ product_id: draftA.id, business_id: bizA, event_type: 'view', created_at: '2020-01-01T00:00:00Z' })
     expect(forged.error?.code).toBe('42501')
+    // Requires the analytics_rate_limit migration + deployed track-event function: direct inserts are closed.
+    const direct = await anon.sb.from('product_analytics').insert({ product_id: draftA.id, business_id: bizA, event_type: 'view' })
+    expect(direct.error?.code).toBe('42501')
     const wrongBiz = await anon.svc.recordEvent({ productId: draftA.id, businessId: bizB, type: 'view' })
     expect(wrongBiz.ok).toBe(false)
     const s = must(await ownerA.svc.getBusinessAnalytics(bizA))

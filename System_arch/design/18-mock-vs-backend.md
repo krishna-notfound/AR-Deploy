@@ -12,7 +12,7 @@ Feeds the delivery report. Setup steps: design/19-supabase.md. "Prepared" means 
 | GLB→USDZ conversion | **Not provided** | **Not provided** | Out of scope |
 | Product and catalog URLs | Demo URL + local routes | Same | Real domain, DNS, TLS |
 | QR codes | Real QR of the catalog URL | Same | Nothing once real URLs exist |
-| Analytics | Seeded sample data + local events (labelled "Sample data") | Insert-only `product_analytics` + daily view (no personal data) | Rate limiting / bot filtering (Edge Function) |
+| Analytics | Seeded sample data + local events (labelled "Sample data") | Rate-limited `track-event` Edge Function + daily view (no personal data); built, deploy pending | Deploy function + migration; bot protection for IP-rotating bots |
 | Activity feed | Logged in demo data | Derived from timestamps (no deletions) | Audit table if needed |
 | AR | Real model-viewer AR | Same, with files from Storage | Real-device testing (P7-10) |
 | i18n | Static dictionaries + localized fields | Localized fields stored as jsonb | – |

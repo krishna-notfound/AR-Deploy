@@ -26,6 +26,7 @@ import { normalizeImages, validateBusiness, validateForPublish, validateProductD
 
 export const MEDIA_BUCKET = 'product-media'
 export const LOGO_BUCKET = 'business-logos'
+export const TRACK_EVENT_FUNCTION = 'track-event'
 const SIGNED_URL_TTL_SECONDS = 60 * 60
 const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*)'
 
@@ -495,9 +496,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     getBusinessAnalytics: (businessId) => guard(() => analytics(businessId)),
     recordEvent: ({ productId, businessId, type }) =>
       guard(async () => {
-        // Insert only (no select): the public may record events but never read them back.
-        const { error } = await sb.from('product_analytics').insert({ product_id: productId, business_id: businessId, event_type: type })
-        return error ? mapDbError(error) : ok(undefined)
+        // Through the rate-limited track-event Edge Function; browsers cannot insert events directly.
+        const { error } = await sb.functions.invoke(TRACK_EVENT_FUNCTION, { body: { productId, businessId, type } })
+        if (!error) return ok(undefined)
+        const status = (error as { context?: { status?: number } }).context?.status
+        if (status === 429) return fail('RATE_LIMITED', 'Too many events from this visitor. Try again in a minute.')
+        if (status === 400 || status === 422) return fail('VALIDATION', 'This event cannot be recorded for this product.')
+        return fail('UNKNOWN', `Could not record the event: ${error.message}`)
       }),
     getRecentActivity: (opts = {}) =>
       guard(async () => {
