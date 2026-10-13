@@ -85,7 +85,7 @@ Once the ref exists, follow "Separate staging project" below, then point Vercel 
 - Edit `VITE_DATA_MODE`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` so their target is **Production only** (values unchanged).
 - Add the same three names for **Preview** with the staging values (`VITE_DATA_MODE=supabase`).
 - Check: `vercel api "/v10/projects/ar-deploy/env?teamId=track0"` lists each name twice (production / preview). After a preview deploy, DevTools → Network shows requests to the staging ref only.
-- If Preview values are missing, the app shows a configuration error instead of falling back to production or demo data (`src/services/backendConfig.ts`).
+- Fail-safe (`src/services/backendConfig.ts`): with **no** Preview variables the preview build runs in demo mode (built-in sample data, never a database); with `VITE_DATA_MODE=supabase` but a missing or malformed URL/key it shows a configuration error. It never falls back to production. Production builds refuse demo mode and secret keys.
 
 ## Deploying
 
