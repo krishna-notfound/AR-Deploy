@@ -60,3 +60,30 @@ export function useServiceMutation<A extends unknown[], T>(fn: (...args: A) => P
   }, [])
   return { mutate, pending }
 }
+
+/**
+ * Re-runs `refetch` when the visitor comes back to the tab (focus / visibilitychange) and the data was
+ * loaded more than `maxAgeMs` ago. Used for pages holding signed media URLs that expire
+ * (MEDIA_URL_TTL_SECONDS): a page left open overnight gets fresh URLs before AR re-downloads the model.
+ * `data` identifies the current load; its age restarts whenever it changes.
+ */
+export function useRefreshWhenStale(refetch: () => void, maxAgeMs: number, data: unknown): void {
+  const loadedAt = useRef(0) // set on mount and on every new load by the effect below
+  useEffect(() => {
+    loadedAt.current = Date.now()
+  }, [data])
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState !== 'hidden' && Date.now() - loadedAt.current > maxAgeMs) {
+        loadedAt.current = Date.now()
+        refetch()
+      }
+    }
+    window.addEventListener('focus', check)
+    document.addEventListener('visibilitychange', check)
+    return () => {
+      window.removeEventListener('focus', check)
+      document.removeEventListener('visibilitychange', check)
+    }
+  }, [refetch, maxAgeMs])
+}

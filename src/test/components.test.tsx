@@ -80,3 +80,46 @@ describe('LanguageSwitcher', () => {
     expect(document.documentElement.lang).toBe('pt-PT')
   })
 })
+
+describe('useRefreshWhenStale', () => {
+  it('refetches on return to the page only once the data is older than the limit', async () => {
+    const { renderHook } = await import('@testing-library/react')
+    const { useRefreshWhenStale } = await import('@/services/hooks')
+    const { vi } = await import('vitest')
+    vi.useFakeTimers({ now: 0, toFake: ['Date'] })
+    const refetch = vi.fn()
+    renderHook(() => useRefreshWhenStale(refetch, 60_000, 'data-v1'))
+    window.dispatchEvent(new Event('focus'))
+    expect(refetch).not.toHaveBeenCalled() // fresh
+    vi.setSystemTime(61_000)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(refetch).toHaveBeenCalledOnce() // stale: signed media URLs would be close to expiry
+    vi.useRealTimers()
+  })
+})
+
+describe('product filters in the URL', () => {
+  it('keeps every filter when two updates land before a re-render (search + status)', async () => {
+    const { MemoryRouter, useLocation } = await import('react-router')
+    const { useProductFilterParams } = await import('@/features/products/ProductFilters')
+    let update!: ReturnType<typeof useProductFilterParams>[1]
+    let search = ''
+    function Harness() {
+      update = useProductFilterParams()[1]
+      search = useLocation().search
+      return null
+    }
+    render(
+      <MemoryRouter initialEntries={['/admin/products']}>
+        <Harness />
+      </MemoryRouter>,
+    )
+    act(() => {
+      update({ q: 'Aurora' }) // the debounced search write...
+      update({ status: 'published' }) // ...and a filter change from the same render
+    })
+    const params = new URLSearchParams(search)
+    expect(params.get('q')).toBe('Aurora')
+    expect(params.get('status')).toBe('published')
+  })
+})

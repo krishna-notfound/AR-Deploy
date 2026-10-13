@@ -21,13 +21,15 @@ import type {
 import { uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, isoDay, summarize } from '../analytics'
-import { type BusinessInput, type CatalogService, type ProductInput, type Result, type UploadKind, fail, ok } from '../catalogService'
+import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type Result, type UploadKind, fail, ok } from '../catalogService'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
 export const LOGO_BUCKET = 'business-logos'
 export const TRACK_EVENT_FUNCTION = 'track-event'
-const SIGNED_URL_TTL_SECONDS = 60 * 60
+// 12 h: anonymous visitors can already sign any published product's media (storage policy), so a longer
+// lifetime only widens the window in which a just-unpublished file stays reachable by an old link.
+const SIGNED_URL_TTL_SECONDS = MEDIA_URL_TTL_SECONDS
 const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*)'
 
 // Hand-written row shapes matching supabase/migrations; schemaDrift.check.ts compares them with the
@@ -115,25 +117,36 @@ const SLUG_TAKEN = {
   product: 'Another product in this catalog already uses this slug.',
 }
 
-/** Maps Postgres/PostgREST/Storage errors to service errors with a message the user can act on. */
+/** Rules raised by our own triggers (supabase/migrations), keyed by their exception message. */
+const DB_RULES: Record<string, { field: string; message: string }> = {
+  publish_requires_gallery_image: { field: 'images', message: 'Add at least one product image before publishing.' },
+}
+
+/**
+ * Maps Postgres/PostgREST/Storage errors to service errors with a message the user can act on.
+ * Raw database text (policy, constraint and column names) is never shown; in development it is logged.
+ */
 export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictField?: keyof typeof SLUG_TAKEN } = {}): Result<T> {
+  if (import.meta.env.DEV) console.error('[supabase]', e.code, e.message)
+  const rule = DB_RULES[e.message]
+  if (rule) return fail('VALIDATION', 'Please fix the highlighted fields.', { [rule.field]: rule.message })
   switch (e.code) {
     case '23505':
       return ctx.conflictField
         ? fail('CONFLICT', 'Please fix the highlighted fields.', { slug: SLUG_TAKEN[ctx.conflictField] })
-        : fail('CONFLICT', `This record already exists (${e.message}).`)
+        : fail('CONFLICT', 'This record already exists.')
     case '42501':
-      return fail('PERMISSION', `Your account is not allowed to do this. (${e.message})`)
+      return fail('PERMISSION', 'Your account is not allowed to do this.')
     case '23514':
     case '23502':
     case '22P02':
-      return fail('VALIDATION', `The database rejected this data: ${e.message}`)
+      return fail('VALIDATION', 'Some values were rejected. Check the fields and try again.')
     case 'P0002':
       return fail('NOT_FOUND', e.message)
     case 'PGRST116':
       return fail('NOT_FOUND', ctx.notFound ?? 'Not found.')
     default:
-      return fail('UNKNOWN', `Supabase request failed: ${e.message}`)
+      return fail('UNKNOWN', 'The request could not be completed. Try again in a moment.')
   }
 }
 
@@ -260,6 +273,12 @@ export function logoPath(url: string | undefined): string | null {
   const marker = `/storage/v1/object/public/${LOGO_BUCKET}/`
   const i = url?.indexOf(marker) ?? -1
   return url && i >= 0 ? decodeURIComponent(url.slice(i + marker.length).split('?')[0] ?? '') || null : null
+}
+
+/** A logo file we may delete for this business: only objects in its own folder (never `new/` or another business). */
+export function ownedLogoPath(url: string | undefined, businessId: ID): string | null {
+  const path = logoPath(url)
+  return path && path.startsWith(`${businessId}/`) && !path.includes('..') ? path : null
 }
 
 const isBlobOrDataUrl = (u: string) => u.startsWith('blob:') || u.startsWith('data:')
@@ -438,8 +457,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const { data, error } = await sb.from('businesses').update(fromBusinessInput(patch)).eq('id', id).select('*').maybeSingle<BusinessRow>()
         if (error) return mapDbError(error, { conflictField: 'business' })
         if (!data) return fail('NOT_FOUND', 'Business not found, or your account cannot change it.')
-        // A replaced or removed logo from our bucket is deleted (logos are never shared).
-        const oldLogo = logoPath(current.data.logoUrl)
+        // A replaced or removed logo is deleted only if it sits in this business's own folder: logo_url is
+        // writable by members, so it could point at another business's file (security audit P1-07).
+        const oldLogo = ownedLogoPath(current.data.logoUrl, id)
         if (oldLogo && 'logoUrl' in patch && patch.logoUrl !== current.data.logoUrl) await sb.storage.from(LOGO_BUCKET).remove([oldLogo])
         return changed(ok(toBusiness(data)))
       }),
@@ -457,7 +477,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (!data.length) return fail('NOT_FOUND', 'Business not found, or your account cannot delete it.')
         // Rows cascade in the database; files live in Storage and are removed here (folder = business id).
         await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id)])
-        const logo = current.ok ? logoPath(current.data.logoUrl) : null
+        const logo = current.ok ? ownedLogoPath(current.data.logoUrl, id) : null
         if (logo) await sb.storage.from(LOGO_BUCKET).remove([logo])
         return changed(ok(undefined))
       }),

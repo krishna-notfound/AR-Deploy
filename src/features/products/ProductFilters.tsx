@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { Select } from '@/components/ui/Form'
 import { SearchInput } from '@/components/ui/SearchInput'
@@ -11,28 +12,43 @@ export interface ProductFilterState {
   page: number
 }
 
-/** Filters live in the URL so views can be linked and survive reloads. */
-export function useProductFilterParams() {
-  const [params, setParams] = useSearchParams()
+function readFilters(params: URLSearchParams): ProductFilterState {
   const status = params.get('status')
   const category = params.get('category')
-  const state: ProductFilterState = {
+  return {
     q: params.get('q') ?? '',
     business: params.get('business') ?? '',
     status: status === 'draft' || status === 'published' ? status : '',
     category: CATEGORIES.includes(category as Category) ? (category as Category) : '',
     page: Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1),
   }
+}
+
+/** Filters live in the URL so views can be linked and survive reloads. */
+export function useProductFilterParams() {
+  const [params, setParams] = useSearchParams()
+  // Updates build on the newest params, including ones written earlier in the same tick: React Router hands
+  // both direct and functional updates the params of the last render, so two quick updates (the debounced
+  // search write and a filter change) used to overwrite each other.
+  // Navigation commits asynchronously, so a render may still show the old URL after we wrote a new one:
+  // resync only when the URL itself changed (back/forward, links), never from a stale render.
+  const latest = useRef(params)
+  const seen = useRef(params.toString())
+  if (params.toString() !== seen.current) {
+    seen.current = params.toString()
+    latest.current = params
+  }
   const update = (patch: Partial<ProductFilterState>) => {
-    const next = new URLSearchParams(params)
-    const merged = { ...state, ...patch, page: patch.page ?? 1 }
+    const next = new URLSearchParams(latest.current)
+    const merged = { ...readFilters(latest.current), ...patch, page: patch.page ?? 1 }
     for (const [k, v] of Object.entries(merged)) {
       if (v === '' || (k === 'page' && v === 1)) next.delete(k)
       else next.set(k, String(v))
     }
+    latest.current = next
     setParams(next, { replace: true })
   }
-  return [state, update] as const
+  return [readFilters(params), update] as const
 }
 
 export function applyProductFilters(products: Product[], f: ProductFilterState): Product[] {

@@ -33,6 +33,12 @@ export interface ServiceError {
   fieldErrors?: Record<string, string>
 }
 
+/**
+ * Media URLs returned by the service stay valid at least this long (Supabase: signed URLs of the private
+ * product-media bucket; demo: never expire). Pages refresh before expiry (useRefreshWhenStale).
+ */
+export const MEDIA_URL_TTL_SECONDS = 12 * 60 * 60
+
 export type Result<T> = { ok: true; data: T } | { ok: false; error: ServiceError }
 
 export const ok = <T>(data: T): Result<T> => ({ ok: true, data })

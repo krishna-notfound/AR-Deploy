@@ -282,3 +282,58 @@ describe('storage path helpers', () => {
     expect(res.ok === false && res.error.code).toBe('UNSUPPORTED')
   })
 })
+
+describe('database errors shown to users', () => {
+  it('never echo raw Postgres text (policy, constraint or column names)', async () => {
+    const { mapDbError } = await import('./supabase/supabaseCatalogService')
+    const raw = 'new row violates row-level security policy "Members manage products" for table "products"'
+    for (const code of ['42501', '23514', '23502', '22P02', 'XX000', undefined]) {
+      const r = mapDbError({ code, message: raw })
+      expect(r.ok === false && r.error.message).not.toMatch(/policy|products|violates/)
+    }
+  })
+
+  it('turns the publish-needs-a-photo database rule into a field error', async () => {
+    const { mapDbError } = await import('./supabase/supabaseCatalogService')
+    const r = mapDbError({ code: '23514', message: 'publish_requires_gallery_image' })
+    expect(r.ok === false && r.error.fieldErrors?.images).toMatch(/image/)
+  })
+
+  it('keeps our own user-facing messages from database functions (P0002)', async () => {
+    const { mapDbError } = await import('./supabase/supabaseCatalogService')
+    const r = mapDbError({ code: 'P0002', message: 'No account uses this email address' })
+    expect(r.ok === false && r.error.message).toBe('No account uses this email address')
+  })
+})
+
+describe('logo cleanup', () => {
+  it('only deletes logo files inside the business’s own folder', async () => {
+    const { ownedLogoPath } = await import('./supabase/supabaseCatalogService')
+    const url = (p: string) => `https://ref.supabase.co/storage/v1/object/public/business-logos/${p}`
+    expect(ownedLogoPath(url('b1/l.png'), 'b1')).toBe('b1/l.png')
+    expect(ownedLogoPath(url('b2/l.png'), 'b1')).toBeNull() // another business's logo
+    expect(ownedLogoPath(url('new/l.png'), 'b1')).toBeNull() // shared staging folder: never deleted
+    expect(ownedLogoPath(url('b1/../b2/l.png'), 'b1')).toBeNull()
+  })
+})
+
+describe('production build guard', () => {
+  const good = { VERCEL_ENV: 'production', VITE_DATA_MODE: 'supabase', VITE_SUPABASE_URL: URL_, VITE_SUPABASE_PUBLISHABLE_KEY: KEY }
+  it('accepts a complete Supabase configuration', async () => {
+    const { productionBuildProblem } = await import('./backendConfig')
+    expect(productionBuildProblem(good)).toBeNull()
+  })
+  it('rejects demo mode, missing values, http URLs and secret keys in production', async () => {
+    const { productionBuildProblem } = await import('./backendConfig')
+    expect(productionBuildProblem({ ...good, VITE_DATA_MODE: undefined })).toMatch(/VITE_DATA_MODE/)
+    expect(productionBuildProblem({ ...good, VITE_SUPABASE_URL: '' })).toMatch(/VITE_SUPABASE_URL/)
+    expect(productionBuildProblem({ ...good, VITE_SUPABASE_URL: 'http://abc.supabase.co' })).toMatch(/https/)
+    expect(productionBuildProblem({ ...good, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_x' })).toMatch(/secret/)
+    expect(productionBuildProblem({ ...good, VITE_SUPABASE_PUBLISHABLE_KEY: jwt({ role: 'service_role' }) })).toMatch(/secret/)
+  })
+  it('leaves local, preview and demo builds alone', async () => {
+    const { productionBuildProblem } = await import('./backendConfig')
+    expect(productionBuildProblem({})).toBeNull()
+    expect(productionBuildProblem({ VERCEL_ENV: 'preview', VITE_DATA_MODE: 'demo' })).toBeNull()
+  })
+})

@@ -3,11 +3,17 @@ import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
+import { productionBuildProblem } from './src/services/backendConfig.ts'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  // Stop a Vercel production build that would ship demo data or a bad Supabase config (design/20).
+  // Does not cover `vercel deploy --prebuilt` from a laptop: production deploys go through Git only.
+  const problem = command === 'build' ? productionBuildProblem({ ...env, VERCEL_ENV: process.env.VERCEL_ENV }) : null
+  if (problem) throw new Error(`Production build blocked: ${problem}`)
   // Let local dev/preview answer on business subdomains (e.g. casa-lisboa.furnish.test) when hostname mode is on.
-  const root = loadEnv(mode, process.cwd(), 'VITE_').VITE_ROOT_DOMAIN
+  const root = env.VITE_ROOT_DOMAIN
   const allowedHosts = root ? [root, `.${root}`] : []
   return {
     server: { allowedHosts },
@@ -22,7 +28,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
-      include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts'],
+      include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts', 'supabase/tests/**/*.test.ts'],
       css: false,
       // Tests always run in demo mode, whatever a developer's .env.local says.
       env: { VITE_DATA_MODE: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_ROOT_DOMAIN: '' },
