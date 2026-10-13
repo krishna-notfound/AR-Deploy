@@ -99,7 +99,7 @@ These describe the removed custom WebXR session or the old analytics behaviour. 
 | typecheck, lint (0 errors), build | pass | automated |
 | `npm test` (unit + component + PGlite DB) | 118 passed, 13 skipped (live tests) | automated |
 | PGlite DB suite | 22/22, incl. 10 new: draft registration, claim links (admin-only, hashed, single-use, expiring, replaced), no ownership by email match, cross-business storage/analytics/member isolation | automated, disposable Postgres |
-| E2E (Playwright, demo mode) | 27/27; Scene Viewer intent at fixed scale on a **simulated** Android UA; no WebXR even when offered; one launch per double tap | automated, emulated browser |
+| E2E (Playwright, demo mode) | 27/27 (latest full run after review fixes; one earlier run had 1 flaky failure, see 6c); Scene Viewer intent at fixed scale on a **simulated** Android UA; no WebXR even when offered; one launch per double tap | automated, emulated browser |
 | Live integration (staging) | written, **not run**: no staging project yet | BLOCKED |
 | Real-device AR (iOS Quick Look, Android Scene Viewer) | not run | BLOCKED (no devices) |
 | Vercel Preview isolation | not checked (no Vercel access) | BLOCKED (owner) |
@@ -116,6 +116,7 @@ Fixed (smallest change each, tests added where logic changed):
 - In-app browser notice on the catalog page too (QR landing); share links keep `?lang=` when dropping `?preview=`; AR metric labelled "AR launch attempts"; scale copy says "5% or 1 cm"; network errors no longer look like "signed out"; QR panel warns on preview/local addresses (SEC-07).
 
 Known, not fixed (Low):
+- Flaky E2E: `accounts-persistence.spec.ts` "corrupt stored data is reset safely" (demo mode only) failed once in a full run, then passed alone (4/4) and in the next full run (27/27). Watch it; not related to the changes above.
 - Some public UI strings are English-only: "Try again", "Close dialog", photo button labels, raw service error text.
 - Negative or invalid variant price differences are dropped silently.
 - The catalog card shows the base price; the product page opens on the first variant's price.
