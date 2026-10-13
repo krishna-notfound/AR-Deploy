@@ -17,7 +17,8 @@ import { cn } from '@/lib/cn'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
 import { service } from '@/services'
-import { useServiceQuery } from '@/services/hooks'
+import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
+import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { ArSessionOverlay } from '../ar/ArSessionOverlay'
 import { useArExperience } from '../ar/useArExperience'
 import { ArSection } from './ArSection'
@@ -41,6 +42,9 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   const wantsPreview = search.get('preview') === '1'
   const canPreview = wantsPreview && !!user
   const res = useServiceQuery(() => service.getPublicProduct(businessSlug, productSlug, { allowDraft: canPreview }), [businessSlug, productSlug, canPreview])
+  // Signed media URLs expire: refresh them when a visitor returns to a long-open page (never inside the AR tap,
+  // which must keep its user gesture). 10 minutes of margin before expiry.
+  useRefreshWhenStale(res.refetch, MEDIA_URL_TTL_SECONDS * 1000 - 10 * 60_000, res.data)
   const catalogHref = tenantSlug ? '/' : `/catalog/${businessSlug}`
   // A business admin may only preview their own unpublished products.
   const hiddenFromPublic = !!res.data && (res.data.product.status !== 'published' || res.data.business.status !== 'active')
@@ -86,6 +90,8 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const viewerRef = useRef<ModelViewerHandle>(null)
   const [modelState, setModelState] = useState<ModelState>(product.models.glb ? 'loading' : 'none')
   const [canAR, setCanAR] = useState(false)
+  /** model-viewer reported ar-status "failed": it will not launch the native viewer again on this page. */
+  const [nativeFailed, setNativeFailed] = useState(false)
   const [measured, setMeasured] = useState<MeasuredSize | null>(null)
   const [tipsOpen, setTipsOpen] = useState<null | 'before-ar' | 'info'>(null)
   const [unit, setUnit] = useState<LengthUnit>(product.dimensions.unit)
@@ -117,7 +123,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const price = product.price + (variant?.priceDelta ?? 0)
   const scale = useMemo(() => checkScale(measured, product.dimensions), [measured, product.dimensions])
   const overlayRoot = useRef<HTMLDivElement>(null)
-  const ar = useArExperience({ glbUrl: product.models.glb?.url, modelState, nativeAR: canAR, overlayRoot, messages: { modelFailed: t('ar.session.modelFailed') } })
+  const ar = useArExperience({ glbUrl: product.models.glb?.url, modelState, nativeAR: canAR, nativeFailed, overlayRoot, messages: { modelFailed: t('ar.session.modelFailed') } })
   const arReady = ar.mode.mode === 'webxr' || ar.mode.mode === 'native'
   const d = product.dimensions
   const dimsLabel = `W ${fmtNum(d.width)} × D ${fmtNum(d.depth)} × H ${fmtNum(d.height)} ${d.unit}`
@@ -133,8 +139,13 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     }
   }
 
+  // ar_activation = the visitor asked for AR on this page view (an attempt, not a confirmed placement).
+  // Counted once per page view, however many taps, retries or fallbacks follow.
+  const arRecorded = useRef(false)
   const recordAr = () => {
-    if (!isPreview) void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
+    if (arRecorded.current || isPreview) return
+    arRecorded.current = true
+    void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
   }
 
   const onActivate = () => {
@@ -178,7 +189,11 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             <ProductMedia
               product={product}
               viewerRef={viewerRef}
-              onArStatus={(s) => s === 'failed' && toast.error(t('ar.failed'))}
+              onArStatus={(s) => {
+                if (s !== 'failed') return
+                setNativeFailed(true)
+                toast.error(t('ar.failed'))
+              }}
               onInteract={onModelInteract}
               onModelState={(s, info) => {
                 setModelState(s)
@@ -196,7 +211,18 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             <LocalizedSpan as="p" text={product.shortDescription} className="mt-3 text-[15px] leading-7 text-ink-muted" />
 
             <div className="mt-6 space-y-3">
-              <ArSection mode={ar.mode} startFailed={ar.webxrFailed} canOpenNative={canAR} onActivate={onActivate} onOpenNative={() => void startAR()} onShowTips={() => setTipsOpen('info')} />
+              <ArSection
+                mode={ar.mode}
+                startFailed={ar.webxrFailed || nativeFailed}
+                canOpenNative={canAR && !nativeFailed}
+                onActivate={onActivate}
+                onOpenNative={() => void startAR()}
+                onPrecise={() => {
+                  recordAr()
+                  void ar.startWebXr()
+                }}
+                onShowTips={() => setTipsOpen('info')}
+              />
               <div className="flex flex-wrap items-center gap-2">
                 {product.cta.url ? (
                   <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={buttonClasses(arReady ? 'secondary' : 'brand', 'lg', 'flex-1')}>

@@ -121,3 +121,17 @@ export function groundOffset(box: { min: Vec; max: Vec }): Vec {
   const r = (v: number) => Math.round(v * 1e6) / 1e6
   return { x: r(-(box.min.x + box.max.x) / 2), y: r(-box.min.y), z: r(-(box.min.z + box.max.z) / 2) }
 }
+
+/** Placement settle: the item is shown this high above the floor and eases down onto its shadow. */
+export const SETTLE_DROP_M = 0.12
+export const SETTLE_MS = 250
+
+/**
+ * Height above the floor `elapsedMs` after placement (ease-out cubic, like a short drop that lands softly).
+ * Cosmetic only: no physics engine, no collision. Zero when the user prefers reduced motion.
+ */
+export function settleOffset(elapsedMs: number, reducedMotion = false): number {
+  if (reducedMotion || elapsedMs >= SETTLE_MS) return 0
+  const t = Math.max(0, elapsedMs) / SETTLE_MS
+  return SETTLE_DROP_M * (1 - t) ** 3
+}

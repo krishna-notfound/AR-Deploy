@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { chooseArMode } from './capability'
-import { ROTATE_STEP_DEG, facingYaw, groundOffset, hintFor, initialPlacement, isUsableHit, placementReducer } from './placement'
+import { AR_DEFAULT_PREFERENCE, chooseArMode } from './capability'
+import { ROTATE_STEP_DEG, SETTLE_DROP_M, SETTLE_MS, facingYaw, groundOffset, hintFor, initialPlacement, isUsableHit, placementReducer, settleOffset } from './placement'
 
 describe('chooseArMode', () => {
   const base = { hasModel: true, modelState: 'loaded' as const, webxrAR: false, nativeAR: false }
@@ -10,7 +10,7 @@ describe('chooseArMode', () => {
   })
 
   it('uses the native viewer (Quick Look / Scene Viewer) when WebXR AR is unavailable', () => {
-    expect(chooseArMode({ ...base, nativeAR: true })).toEqual({ mode: 'native' })
+    expect(chooseArMode({ ...base, nativeAR: true })).toEqual({ mode: 'native', webxrBeta: false })
   })
 
   it('offers no AR without a model, with a failed model or on unsupported devices', () => {
@@ -25,8 +25,23 @@ describe('chooseArMode', () => {
   })
 
   it('falls back to native after the WebXR session failed to start', () => {
-    expect(chooseArMode({ ...base, webxrAR: true, nativeAR: true, webxrFailed: true })).toEqual({ mode: 'native' })
-    expect(chooseArMode({ ...base, webxrAR: true, webxrFailed: true })).toEqual({ mode: 'none', reason: 'unsupported' })
+    expect(chooseArMode({ ...base, webxrAR: true, nativeAR: true, webxrFailed: true })).toEqual({ mode: 'native', webxrBeta: false })
+    expect(chooseArMode({ ...base, webxrAR: true, webxrFailed: true })).toEqual({ mode: 'none', reason: 'failed' })
+  })
+
+  it('stops offering the native viewer after it reported a failure (no dead button)', () => {
+    expect(chooseArMode({ ...base, nativeAR: true, nativeFailed: true })).toEqual({ mode: 'none', reason: 'failed' })
+    expect(chooseArMode({ ...base, webxrAR: true, nativeAR: true, nativeFailed: true, prefer: 'native' })).toEqual({ mode: 'webxr' })
+  })
+
+  it('native-first (pending client approval): native viewer, with our WebXR session as a beta option', () => {
+    expect(chooseArMode({ ...base, webxrAR: true, nativeAR: true, prefer: 'native' })).toEqual({ mode: 'native', webxrBeta: true })
+    expect(chooseArMode({ ...base, webxrAR: true, prefer: 'native' })).toEqual({ mode: 'webxr' })
+    expect(chooseArMode({ ...base, webxrAR: true, nativeAR: true, webxrFailed: true, prefer: 'native' })).toEqual({ mode: 'native', webxrBeta: false })
+  })
+
+  it('keeps the current WebXR-first default until the client approves a change', () => {
+    expect(AR_DEFAULT_PREFERENCE).toBe('webxr')
   })
 })
 
@@ -120,5 +135,19 @@ describe('placement geometry', () => {
 
   it('moves the model origin to the centre of its base so it sits on the floor', () => {
     expect(groundOffset({ min: { x: -1, y: 0.2, z: -0.4 }, max: { x: 1.2, y: 1, z: 0.6 } })).toEqual({ x: -0.1, y: -0.2, z: -0.1 })
+  })
+})
+
+describe('settleOffset (item drops onto the floor when placed)', () => {
+  it('starts above the floor, eases down and rests exactly on it', () => {
+    expect(settleOffset(0)).toBeCloseTo(SETTLE_DROP_M)
+    const mid = settleOffset(SETTLE_MS / 2)
+    expect(mid).toBeGreaterThan(0)
+    expect(mid).toBeLessThan(SETTLE_DROP_M / 2) // ease-out: most of the fall happens early
+    expect(settleOffset(SETTLE_MS)).toBe(0)
+    expect(settleOffset(10_000)).toBe(0)
+  })
+  it('does not move at all when the user prefers reduced motion', () => {
+    expect(settleOffset(0, true)).toBe(0)
   })
 })

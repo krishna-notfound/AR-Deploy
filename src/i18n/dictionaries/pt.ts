@@ -107,7 +107,8 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'ar.session.trueSize': 'Tamanho real',
   'ar.session.sizeUnverified': 'Tamanho não verificado',
   'ar.session.modelFailed': 'Não foi possível carregar o modelo 3D em RA.',
-  'ar.startFailed': 'Não foi possível iniciar a RA. Permita o acesso à câmara e tente novamente, ou use o visualizador de RA do telemóvel.',
+  'ar.startFailed': 'Não foi possível iniciar a RA neste dispositivo. Pode continuar a explorar o modelo 3D acima.',
+  'ar.precise': 'Posicionamento preciso (beta)',
   'ar.openNative': 'Abrir no visualizador de RA do telemóvel',
 
   'inApp.title': 'Para a melhor experiência de RA, abra esta página no {browser}.',

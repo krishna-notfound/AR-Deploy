@@ -105,7 +105,8 @@ export const en = {
   'ar.session.trueSize': 'True size',
   'ar.session.sizeUnverified': 'Size not verified',
   'ar.session.modelFailed': 'The 3D model could not be loaded in AR.',
-  'ar.startFailed': 'AR could not start. Allow camera access and try again, or use your phone’s AR viewer.',
+  'ar.startFailed': 'AR could not start on this device. You can still explore the 3D model above.',
+  'ar.precise': 'Precise placement (beta)',
   'ar.openNative': 'Open in phone AR viewer',
 
   'inApp.title': 'For the best AR experience, open this page in {browser}.',

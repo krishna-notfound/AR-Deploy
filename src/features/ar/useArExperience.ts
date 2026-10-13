@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { type ArMode, chooseArMode, detectWebXrAr } from './capability'
+import { type ArMode, type ArPreference, chooseArMode, detectWebXrAr } from './capability'
 import { type PlacementState, initialPlacement } from './placement'
 import type { ArSessionController } from './webxrSession'
 
@@ -12,6 +12,22 @@ export interface ArSessionView {
   error: string | null
 }
 
+// Chrome says immersive-ar is supported on phones without ARCore; the session then fails with
+// NotSupportedError. Remember that for a week so the next visit goes straight to the native viewer.
+const UNAVAILABLE_KEY = 'arfurn:webxrUnavailable'
+const UNAVAILABLE_FOR_MS = 7 * 86_400_000
+
+function rememberedUnavailable(): boolean {
+  try {
+    return Date.now() - Number(localStorage.getItem(UNAVAILABLE_KEY) ?? 0) < UNAVAILABLE_FOR_MS
+  } catch {
+    return false
+  }
+}
+
+/** True when the session was ended by the user (back button, cancelled prompt) rather than failing. */
+const isCancel = (err: unknown) => err instanceof DOMException && err.name === 'AbortError'
+
 /**
  * Chooses the AR path for this device and runs our WebXR session when that is the path.
  * Native AR (Quick Look / Scene Viewer) is launched by the caller through <model-viewer>.
@@ -20,16 +36,22 @@ export function useArExperience({
   glbUrl,
   modelState,
   nativeAR,
+  nativeFailed = false,
+  prefer,
   overlayRoot,
   messages,
 }: {
   glbUrl: string | undefined
   modelState: 'none' | 'loading' | 'loaded' | 'error'
   nativeAR: boolean
+  nativeFailed?: boolean
+  prefer?: ArPreference
   overlayRoot: React.RefObject<HTMLDivElement | null>
   messages: { modelFailed: string }
 }) {
   const [webxrAR, setWebxrAR] = useState<boolean | null>(null)
+  const [remembered] = useState(rememberedUnavailable)
+  /** Failed on this page view (drives the "could not start" notice; a remembered failure stays silent). */
   const [webxrFailed, setWebxrFailed] = useState(false)
   const [view, setView] = useState<ArSessionView>({ active: false, state: initialPlacement(), loading: true, error: null })
   const controller = useRef<ArSessionController | null>(null)
@@ -52,16 +74,17 @@ export function useArExperience({
   // Leave the session if the page goes away.
   useEffect(() => () => controller.current?.exit(), [])
 
-  const mode: ArMode = chooseArMode({ hasModel: !!glbUrl, modelState, webxrAR, nativeAR, webxrFailed })
+  const mode: ArMode = chooseArMode({ hasModel: !!glbUrl, modelState, webxrAR, nativeAR, webxrFailed: webxrFailed || remembered, nativeFailed, prefer })
 
   /** Starts our WebXR session. Resolves false when it could not start (the caller then offers the native viewer). */
   const startWebXr = async (): Promise<boolean> => {
     const root = overlayRoot.current
-    if (!glbUrl || !root) return false
-    root.hidden = false // the DOM overlay root must be visible when the session starts
+    if (!glbUrl || !root || controller.current) return false
+    // The DOM overlay root must be visible when the session starts; our controls render into it only once
+    // the session exists, so nothing dead is shown during the camera / ARCore prompts.
+    root.hidden = false
     try {
       const mod = moduleRef.current ?? (await import('./webxrSession'))
-      setView({ active: true, state: initialPlacement(), loading: true, error: null })
       controller.current = await mod.startArSession({
         glbUrl,
         overlayRoot: root,
@@ -75,10 +98,19 @@ export function useArExperience({
           if (error) setWebxrFailed(true)
         },
       })
+      setView((v) => ({ ...v, active: true, error: null }))
       return true
-    } catch {
+    } catch (err) {
       root.hidden = true
       setView((v) => ({ ...v, active: false }))
+      if (isCancel(err)) return false
+      if (err instanceof DOMException && err.name === 'NotSupportedError') {
+        try {
+          localStorage.setItem(UNAVAILABLE_KEY, String(Date.now()))
+        } catch {
+          /* private mode: remembered for this page only */
+        }
+      }
       setWebxrFailed(true)
       return false
     }

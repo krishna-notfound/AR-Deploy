@@ -33,6 +33,9 @@ test('broken model shows a recoverable error', async ({ page }) => {
 })
 
 test('model loads, scale is checked, and AR falls back honestly on desktop', async ({ page }) => {
+  // Two sample models (several MB each) come from raw.githubusercontent.com: the test's budget must cover
+  // both 60 s waits, not Playwright's default 30 s.
+  test.setTimeout(150_000)
   await page.goto('/products/nordhaus/sheen-lounge-chair')
   await expect(page.getByText('True-to-size model')).toBeVisible({ timeout: 60_000 })
   // Desktop Chromium cannot launch AR: the button is not shown, a phone hand-off is offered instead.
@@ -46,7 +49,7 @@ test('model loads, scale is checked, and AR falls back honestly on desktop', asy
 })
 
 // Simulated, not a real device: the browser claims immersive-ar but refuses the session (e.g. camera denied).
-test('WebXR phone: AR start failure is reported and the phone hand-off stays available', async ({ page }) => {
+test('WebXR phone: AR start failure is reported once, with no dead button and the 3D view kept', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'xr', {
       value: {
@@ -62,9 +65,39 @@ test('WebXR phone: AR start failure is reported and the phone hand-off stays ava
   await expect(button).toBeEnabled({ timeout: 60_000 })
   await button.click()
   await expect(page.getByText('AR could not start', { exact: false })).toBeVisible()
-  // Desktop Chromium has no native AR viewer, so only the hand-off is offered, never a dead button.
+  // Desktop Chromium has no native AR viewer: no AR button is left (it would do nothing), the notice stays,
+  // and the visitor is not told to "open this page on a phone" (they may already be on one).
+  await expect(page.getByRole('button', { name: 'View in my home' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Open in phone AR viewer' })).toHaveCount(0)
-  await expect(page.getByText('View in your room on a phone')).toBeVisible()
+  await expect(page.getByText('View in your room on a phone')).toHaveCount(0)
+  await expect(page.getByText('True-to-size model')).toBeVisible()
+})
+
+// ar_activation means "asked for AR on this page view": repeated taps (here: the camera prompt cancelled twice)
+// must not inflate the count.
+test('AR activations are counted once per page view', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'xr', {
+      value: {
+        isSessionSupported: async () => true,
+        requestSession: async () => {
+          throw new DOMException('cancelled', 'AbortError')
+        },
+      },
+    })
+  })
+  await page.goto('/products/nordhaus/sheen-lounge-chair')
+  const button = page.getByRole('button', { name: 'View in my home' })
+  await expect(button).toBeEnabled({ timeout: 60_000 })
+  await button.click()
+  await button.click() // a cancel is not a failure: the button stays
+  const count = () =>
+    page.evaluate(() => {
+      const db = JSON.parse(localStorage.getItem('arfurn:v1:db') ?? '{}') as { events?: { type: string; sample: boolean }[] }
+      return (db.events ?? []).filter((e) => e.type === 'ar_activation' && !e.sample).length
+    })
+  await expect.poll(count).toBe(1)
+  await expect(page.getByText('AR could not start', { exact: false })).toHaveCount(0)
 })
 
 test('switches language between English and Portuguese', async ({ page }) => {

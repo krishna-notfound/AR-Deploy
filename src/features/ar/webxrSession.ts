@@ -6,13 +6,13 @@
 // - Anchors when the browser supports them (keeps the item locked to the floor as tracking refines).
 // - Real scale: glTF units are metres and the model is never scaled.
 // - No occlusion, depth sensing, collision or room measurement: none of that is claimed.
-import { Box3, CanvasTexture, CircleGeometry, DirectionalLight, Group, HemisphereLight, Matrix4, Mesh, MeshBasicMaterial, NeutralToneMapping, PMREMGenerator, PerspectiveCamera, Quaternion, RingGeometry, Scene, Vector3, WebGLRenderer, type Object3D, type Texture } from 'three'
+import { Box3, BufferGeometry, CanvasTexture, CircleGeometry, DirectionalLight, Float32BufferAttribute, Group, HemisphereLight, LineBasicMaterial, LineLoop, Matrix4, Mesh, MeshBasicMaterial, NeutralToneMapping, PMREMGenerator, PerspectiveCamera, Quaternion, RingGeometry, Scene, Vector3, WebGLRenderer, type Object3D, type Texture } from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
-import { type PlacementEvent, type PlacementState, facingYaw, groundOffset, initialPlacement, isUsableHit, placementReducer } from './placement'
+import { type PlacementEvent, type PlacementState, facingYaw, groundOffset, initialPlacement, isUsableHit, placementReducer, settleOffset } from './placement'
 
 export interface ArSessionController {
   place(): void
@@ -42,6 +42,22 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
     domOverlay: { root: opts.overlayRoot },
   })
 
+  // A cancel (back button) or a failure during setup must never leave a live camera session behind.
+  let endedDuringSetup = false
+  const onEarlyEnd = () => (endedDuringSetup = true)
+  session.addEventListener('end', onEarlyEnd)
+  try {
+    return await runSession(session, opts, () => endedDuringSetup)
+  } catch (err) {
+    if (endedDuringSetup) throw new DOMException('The AR session was closed while starting.', 'AbortError')
+    await session.end().catch(() => {})
+    throw err
+  } finally {
+    session.removeEventListener('end', onEarlyEnd)
+  }
+}
+
+async function runSession(session: XRSession, opts: ArSessionOptions, endedDuringSetup: () => boolean): Promise<ArSessionController> {
   // ---- state ----
   let state = initialPlacement()
   let loading = true
@@ -64,7 +80,9 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
   const viewCamera = new PerspectiveCamera(70, 1, 0.01, 50) // pose and projection are replaced by the XR camera
   const scene = new Scene()
   const pmrem = new PMREMGenerator(renderer)
-  const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+  const room = new RoomEnvironment()
+  const envTexture = pmrem.fromScene(room, 0.04).texture
+  room.dispose()
   scene.environment = envTexture
   scene.add(new HemisphereLight(0xffffff, 0x8a8478, 0.6))
   const sun = new DirectionalLight(0xffffff, 0.8)
@@ -78,14 +96,31 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
   const pivot = new Group()
   pivot.visible = false
   scene.add(pivot)
+  // inner holds the model and does the settle drop; the shadow and footprint stay on the floor (pivot).
+  const inner = new Group()
+  pivot.add(inner)
+  let shadow: Mesh | null = null
+  let footprint: LineLoop | null = null
+  let settledAt = -Infinity
+  const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
   const disposables: { dispose(): void }[] = [renderer, pmrem, envTexture]
 
   // ---- WebXR ----
-  await renderer.xr.setSession(session)
-  const refSpace = renderer.xr.getReferenceSpace()!
-  const viewerSpace = await session.requestReferenceSpace('viewer')
-  const hitSource = await session.requestHitTestSource!({ space: viewerSpace })!
+  let refSpace: XRReferenceSpace
+  let hitSource: XRHitTestSource
+  try {
+    await renderer.xr.setSession(session)
+    refSpace = renderer.xr.getReferenceSpace()!
+    const viewerSpace = await session.requestReferenceSpace('viewer')
+    hitSource = (await session.requestHitTestSource?.({ space: viewerSpace }))!
+    if (!hitSource) throw new DOMException('Hit testing is not available.', 'NotSupportedError')
+    if (endedDuringSetup()) throw new DOMException('Ended during setup', 'AbortError')
+  } catch (err) {
+    renderer.setAnimationLoop(null)
+    for (const d of disposables) d.dispose()
+    throw err
+  }
 
   let lastHit: XRHitTestResult | null = null
   const lastHitMatrix = new Matrix4()
@@ -100,7 +135,7 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
 
   const applyYaw = () => (pivot.rotation.y = baseYaw + (state.yawOffsetDeg * Math.PI) / 180)
 
-  const placeAtLastHit = async () => {
+  const placeAtLastHit = () => {
     const wasMoving = state.phase === 'moving'
     const hit = lastHit
     dispatch({ type: 'place', now: performance.now() })
@@ -110,14 +145,28 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
     pivot.position.copy(placedPosition)
     pivot.visible = true
     applyYaw()
-    // Anchor to the surface where supported, so refinements of the floor move the item with it.
+    settledAt = performance.now()
+    // Anchor to the floor where supported, so refinements of the floor move the item with it.
+    // Created in the next animation frame: the anchors spec requires an active XRFrame.
     anchor?.delete()
     anchor = null
-    try {
-      anchor = (await hit.createAnchor?.()) ?? null
-    } catch {
-      anchor = null // fixed position in the local space is still stable on ARCore
-    }
+    pendingAnchor = true
+  }
+
+  let pendingAnchor = false
+  const createAnchorIn = (frame: XRFrame) => {
+    pendingAnchor = false
+    const at = placedPosition.clone()
+    frame
+      .createAnchor?.(new XRRigidTransform({ x: at.x, y: at.y, z: at.z }), refSpace)
+      .then((a) => {
+        // Keep it only if the item is still where it was anchored.
+        if (!ended && state.phase === 'placed' && pivot.position.distanceTo(at) < 0.01) {
+          anchor?.delete()
+          anchor = a
+        } else a.delete()
+      })
+      .catch(() => {}) // anchors are optional: a fixed position in the local space is stable on ARCore
   }
 
   // Screen taps that are not on a control mean "place here" (controls are marked data-xr-control).
@@ -126,12 +175,14 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
   }
   opts.overlayRoot.addEventListener('beforexrselect', onBeforeSelect)
   const onSelect = () => {
-    if (state.phase === 'aiming' || state.phase === 'moving' || state.phase === 'scanning') void placeAtLastHit()
+    if (loading) return
+    if (state.phase === 'aiming' || state.phase === 'moving' || state.phase === 'scanning') placeAtLastHit()
   }
   session.addEventListener('select', onSelect)
 
   renderer.setAnimationLoop((_time, frame) => {
     if (!frame) return
+    if (pendingAnchor) createAnchorIn(frame)
     const pose = frame.getViewerPose(refSpace)
     const lost = !pose || pose.emulatedPosition
     if (lost !== state.trackingLost) dispatch({ type: 'tracking', lost })
@@ -160,6 +211,20 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
     const aiming = state.phase === 'aiming' || state.phase === 'moving'
     reticle.visible = usable && aiming && !loading
     if (reticle.visible) reticle.matrix.copy(lastHitMatrix)
+
+    // Before placing: only the item's true outer footprint (W x D) is drawn where it will stand, facing the
+    // viewer. After placing: the model, which settles onto its shadow (cosmetic, no physics engine).
+    const previewing = state.phase === 'aiming' && usable && !loading
+    if (previewing) {
+      pivot.position.setFromMatrixPosition(lastHitMatrix)
+      baseYaw = facingYaw(camera, pivot.position)
+      applyYaw()
+    }
+    if (state.phase === 'aiming' || state.phase === 'scanning') pivot.visible = previewing
+    inner.visible = state.phase === 'placed' || state.phase === 'moving'
+    if (shadow) shadow.visible = inner.visible
+    if (footprint) footprint.visible = state.phase !== 'placed'
+    inner.position.y = settleOffset(performance.now() - settledAt, reducedMotion)
 
     if (state.phase === 'moving' && usable) {
       // The item follows the reticle while moving ("move the phone and the object follows").
@@ -196,11 +261,13 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
     (gltf) => {
       if (ended) return
       const model: Object3D = gltf.scene
-      const box = new Box3().setFromObject(model)
+      const box = new Box3().setFromObject(model, true) // precise: same box as the viewer's scale check
       const o = groundOffset(box)
       model.position.set(o.x, o.y, o.z)
-      pivot.add(model)
-      pivot.add(makeContactShadow(box.max.x - box.min.x, box.max.z - box.min.z))
+      inner.add(model)
+      shadow = makeContactShadow(box.max.x - box.min.x, box.max.z - box.min.z)
+      footprint = makeFootprint(box.max.x - box.min.x, box.max.z - box.min.z)
+      pivot.add(shadow, footprint)
       loading = false
       opts.onState(state, loading)
     },
@@ -211,7 +278,9 @@ export async function startArSession(opts: ArSessionOptions): Promise<ArSessionC
   )
 
   return {
-    place: () => void placeAtLastHit(),
+    place: () => {
+      if (!loading) placeAtLastHit()
+    },
     move: () => {
       if (state.phase !== 'placed') return
       beforeMove.position.copy(pivot.position)
@@ -247,6 +316,16 @@ function makeReticle(): Mesh {
   ring.matrixAutoUpdate = false
   ring.visible = false
   return ring
+}
+
+/** Outline of the item's outer footprint on the floor (bounding box, not its exact shape). */
+function makeFootprint(width: number, depth: number): LineLoop {
+  const w = width / 2
+  const d = depth / 2
+  const geometry = new BufferGeometry().setAttribute('position', new Float32BufferAttribute([-w, 0, -d, w, 0, -d, w, 0, d, -w, 0, d], 3))
+  const line = new LineLoop(geometry, new LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }))
+  line.position.y = 0.003
+  return line
 }
 
 /** Soft elliptical shadow under the footprint so the item reads as standing on the floor. */

@@ -17,6 +17,7 @@ export function ArSection({
   canOpenNative,
   onActivate,
   onOpenNative,
+  onPrecise,
   onShowTips,
 }: {
   mode: ArMode
@@ -25,6 +26,8 @@ export function ArSection({
   canOpenNative: boolean
   onActivate: () => void
   onOpenNative: () => void
+  /** Starts our WebXR session; offered as a secondary option when the native viewer is the main path. */
+  onPrecise: () => void
   onShowTips?: () => void
 }) {
   const { t } = useI18n()
@@ -50,14 +53,24 @@ export function ArSection({
         <Button variant="brand" size="lg" className="w-full text-base" onClick={mode.mode === 'native' && startFailed ? onOpenNative : onActivate} icon={<Smartphone className="size-5" aria-hidden />}>
           {mode.mode === 'native' && startFailed ? t('ar.openNative') : t('ar.button')}
         </Button>
-        {mode.mode === 'native' && onShowTips && (
-          <button type="button" onClick={onShowTips} className="text-[13px] text-ink-muted underline-offset-2 hover:text-ink hover:underline">
-            {t('ar.tipsLink')}
-          </button>
+        {mode.mode === 'native' && (onShowTips || mode.webxrBeta) && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {onShowTips && (
+              <button type="button" onClick={onShowTips} className="text-[13px] text-ink-muted underline-offset-2 hover:text-ink hover:underline">
+                {t('ar.tipsLink')}
+              </button>
+            )}
+            {mode.webxrBeta && (
+              <button type="button" onClick={onPrecise} className="text-[13px] text-ink-muted underline-offset-2 hover:text-ink hover:underline">
+                {t('ar.precise')}
+              </button>
+            )}
+          </div>
         )}
       </div>
     )
 
+  if (mode.mode === 'none' && mode.reason === 'failed') return failedNotice || null
   if (mode.mode !== 'none' || mode.reason !== 'unsupported') return null
 
   return (

@@ -3,8 +3,8 @@ import { MB, isStaleSessionAsset } from '@/lib/files'
 import { formatFileSize } from '@/lib/format'
 import type { ScaleCheck } from '@/lib/scale'
 
-/** Above this a GLB is slow to open over mobile data (it is downloaded again when AR starts). */
-export const LARGE_MODEL_BYTES = 15 * MB
+/** Google Scene Viewer recommends GLBs of 10 MB or less (larger files are slow and may fail validation above 15 MB). */
+export const LARGE_MODEL_BYTES = 10 * MB
 
 export type ReadinessLevel = 'ready' | 'warning' | 'missing'
 export interface ReadinessItem {
@@ -37,7 +37,7 @@ export function arReadiness({
       key: 'android',
       level: glbLevel,
       label: 'Android AR',
-      detail: glbLevel === 'ready' ? 'Uses the GLB: in-browser AR on ARCore phones, otherwise Scene Viewer.' : glbProblem,
+      detail: glbLevel === 'ready' ? 'Uses the GLB. Opens on Android phones that support Google AR (ARCore); other phones keep the 3D view.' : glbProblem,
     },
     {
       key: 'ios',
@@ -56,14 +56,14 @@ export function arReadiness({
       label: 'True size',
       detail:
         scale.status === 'verified'
-          ? 'The model matches the entered dimensions. AR shows “True size”.'
+          ? `The model matches the entered dimensions. AR shows “True size”.${hasUsdz ? ' Checked on the GLB: the iPhone (USDZ) file is not measured, so it must be exported at the same size.' : ''}`
           : scale.status === 'mismatch'
             ? 'The model does not match the entered dimensions. AR shows “Size not verified”.'
             : 'Not checked yet: needs a loaded model and width, height and depth.',
     },
   ]
   if (hasGlb && glb?.sizeBytes && glb.sizeBytes > LARGE_MODEL_BYTES)
-    items.push({ key: 'size', level: 'warning', label: 'File size', detail: `${formatFileSize(glb.sizeBytes)}: slow to open on mobile data. Aim for under ${formatFileSize(LARGE_MODEL_BYTES)}.` })
+    items.push({ key: 'size', level: 'warning', label: 'File size', detail: `${formatFileSize(glb.sizeBytes)}: slow on mobile data. Google recommends ${formatFileSize(LARGE_MODEL_BYTES)} or less for Android AR.` })
   return items
 }
 
