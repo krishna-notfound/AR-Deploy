@@ -92,3 +92,13 @@ Not decided on the client's behalf. What the platform does today:
 - **Variant** = a named colour swatch (EN/PT name, hex colour) with an optional price difference. Choosing one changes the shown price only. The 3D model, AR model, photos, dimensions and SKU stay the same. The product page opens on the first variant (its price), while the catalog card shows the base price.
 - **Material** = one free-text field per language (e.g. "Solid oak, wool upholstery"), shown under specifications. No structured list, no per-variant material.
 - If the client expects per-variant 3D models or photos, or a materials list, that is a change request.
+
+## Open questions for the client
+
+1. **Variants (A-3):** is a colour swatch with an optional price difference enough, or should a variant change the 3D model/photos, or carry its own size/finish?
+2. **Materials (A-3):** is one free-text material line per language enough, or is a structured list needed?
+3. **Compression (A-2):** may the platform shrink uploaded GLB files (textures to ≤ 2048 px, unused data removed; shape and size unchanged; USDZ untouched)? It stays off until you say yes.
+4. **Owner accounts (A-5 / ADR-0022):** do you want business owners to log in themselves (dashboard, claim links, self-registration as drafts you approve), or will your team manage everything from the admin panel?
+5. **Domain:** which domain should catalogs use (`<business>.<domain>`), and who controls its DNS?
+6. **Sample data:** may the 4 sample businesses (casa-lisboa, nordhaus, atelier-verde, oak-ember) be deleted once your real products are in? Is `digital-heroes-buisness` yours?
+7. **Privacy:** do you need a privacy policy or cookie notice on the public pages for your market? (The platform stores no visitor IP or personal data in analytics.)
