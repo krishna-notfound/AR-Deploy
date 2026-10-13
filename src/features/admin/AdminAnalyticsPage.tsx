@@ -9,7 +9,7 @@ export default function AdminAnalyticsPage() {
   const { list } = useBusinesses()
   return (
     <>
-      <PageHeader title="Analytics" description="Product page views and AR button activations." />
+      <PageHeader title="Analytics" description="Product page views and AR launch attempts." />
       <AnalyticsView
         businessId={businessId}
         businesses={list}

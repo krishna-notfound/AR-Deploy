@@ -1,5 +1,5 @@
 -- Server-side publish rules and account hygiene (audit 2026-10-13: P2-04, P1-08, P3-06).
--- NOT APPLIED to the live project: needs the owner's go-ahead (System_arch/audit/APPROVAL_REQUIRED.md).
+-- Applied to pmnjchhrgvajtjpadpqo on 2026-10-13 with the owner's approval (comment-only update; SQL unchanged).
 -- Verified against all earlier migrations in a disposable Postgres (supabase/tests/migrations.test.ts).
 -- Pre-check on live (read-only, 2026-10-13): 0 of 18 published products lack a gallery image.
 

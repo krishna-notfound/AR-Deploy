@@ -1,5 +1,5 @@
 -- Owner self-registration and business claim links (design approved by the owner, 2026-10-13).
--- NOT APPLIED to the live project. Staging first; production only with explicit approval.
+-- Applied to pmnjchhrgvajtjpadpqo on 2026-10-13 with the owner's approval (comment-only update; SQL unchanged).
 --
 -- Rule: an account proves control of an email inbox, never ownership of a business. Owner links
 -- (business_members rows) are created only by:
