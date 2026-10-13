@@ -54,6 +54,8 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'product.viewPhotos': 'Fotografias',
   'product.mediaLabel': 'Imagens do produto',
   'product.photo': 'Fotografia {n} de {total}',
+  'product.prevPhoto': 'Fotografia anterior',
+  'product.nextPhoto': 'Fotografia seguinte',
   'product.unitToggle': 'Unidades',
   'product.translationFallback': 'Apresentado em inglês',
 

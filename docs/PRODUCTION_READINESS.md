@@ -163,10 +163,21 @@ Deleting needs the owner's separate approval: delete the 4 businesses (products,
 
 **Why Preview is blocked:** Vercel Preview and Production share one value each for `VITE_DATA_MODE`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Pushing the branch triggers a Preview build that reads and writes the live database (page views count as real analytics). A second free Supabase project is not possible while two are active (`pmnjchhrgvajtjpadpqo` and `bothonopxtznzviieoic`). Options: (a) add Preview-only `VITE_DATA_MODE=demo` and empty Supabase values (Preview then runs on built-in sample data; enough to device-test AR, safe for the live database), (b) pause/delete `bothonopxtznzviieoic` and create a staging project, (c) accept Preview on the live database.
 
+## 6f. Client-review completion pass (2026-10-13, local only)
+
+- Onboarding: step 1 display name (optional, Auth metadata, survives refresh), step 2 register a draft business or finish a claim. Sign-up handles projects without email confirmation (session returned → onboarding).
+- Public pages: retry/close/photo labels and error messages localized (EN/PT); catalog card price = price the product page opens with.
+- Editor: variant price differences validated (inline error, save blocked); product slug ≤ 70 enforced; duplicate-slug trimming fixed in both modes.
+- Analytics view: loading and error state for the product list.
+- Not re-run on the live database after this pass (needs new QA users, steps B–D); covered by PGlite + unit + E2E. Re-run the live suite before merging.
+
+Local infrastructure: Docker is not installed, so `supabase start` (local Supabase) is unavailable; database behaviour is tested in PGlite (real Postgres, Supabase auth/storage stubbed), which cannot test Auth emails, Storage file serving or the Edge Function.
+
 ## 7. Change log
 
 | Date | Phase | Change |
 |---|---|---|
+| 2026-10-13 | review pass | Onboarding display name, public i18n, variant/slug validation, analytics states; decisions recorded (no directory, admin approval kept, no date ranges)
 | 2026-10-13 | live A–D | Migrations applied to `pmnjchhrgvajtjpadpqo`, live suite 15/15, QA cleanup verified, sample data identified, release checklist, test plan
 | 2026-10-13 | C/D | AR native-only (ADR-0021), SEC-04/06/08/10 fixed, SEC-05 shown not exploitable, owner registration + claim links (ADR-0022, migration not applied), stale docs corrected, staging runbook. Local commits only
 | 2026-10-13 | 0 | Owner reported live Auth settings; SEC-01 downgraded. Owner self-registration requested (scope change, see PRD X-01)

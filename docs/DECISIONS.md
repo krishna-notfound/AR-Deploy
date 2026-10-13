@@ -10,3 +10,8 @@ Architecture decision records live in `System_arch/decisions/` (index: `System_a
 | 2026-10-13 | A separate free Supabase staging project is approved; production is changed only with per-change approval | Owner | docs/OPERATIONS_RUNBOOK.md |
 | 2026-10-13 | "AR activation" analytics means a launch attempt (one per tap, 2 s guard), never a successful placement | Owner | docs/PRD.md R-29 |
 | 2026-10-13 | No separate staging project: the live project `pmnjchhrgvajtjpadpqo` is used for staging tests until launch, then cleared. Every change there is approved one by one; public sign-ups stay off (test users are created in the dashboard) | Owner | docs/OPERATIONS_RUNBOOK.md |
+| 2026-10-13 | Kept: admin approval before a business goes public, one pending draft per account (ADR-0022); separate per-business catalogs, no cross-business directory; variants stay colour + price until the client answers A-3 | Owner | this file |
+| 2026-10-13 | No new Supabase project, plan upgrade, or pausing/deleting projects without approval; no Preview connected to production | Owner | docs/OPERATIONS_RUNBOOK.md |
+| 2026-10-13 | Onboarding: display name (optional, skippable) stored in the account's own Auth metadata, no new table; then register a draft business or redeem a claim link | Owner (no-migration route) | src/features/auth/DisplayNameStep.tsx |
+| 2026-10-13 | No analytics date-range picker: design/16 explicitly excludes it | Existing spec | System_arch/design/16 |
+| 2026-10-13 | Variant price differences must be whole, non-negative amounts (parser and "+" display already assume this; 0 of 10 live variants negative) | Engineering | src/services/validation.ts |

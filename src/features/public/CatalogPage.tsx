@@ -13,7 +13,7 @@ import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { primaryImage } from '@/lib/product'
+import { initialPrice, primaryImage } from '@/lib/product'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 
@@ -65,7 +65,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
         {notFound ? (
           <PublicMessage icon={Store} title={t('catalog.notFoundTitle')} body={t('catalog.notFoundBody')} />
         ) : (
-          <ErrorState message={business.status === 'error' ? business.error.message : t('common.errorTitle')} onRetry={business.refetch} className="py-24" />
+          <ErrorState message={t('common.errorTitle')} onRetry={business.refetch} retryLabel={t('common.retry')} className="py-24" />
         )}
       </PublicShell>
     )
@@ -120,7 +120,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
         {products.status === 'loading' && !products.data ? (
           <SkeletonGrid />
         ) : products.status === 'error' && !products.data ? (
-          <ErrorState message={products.error.message} onRetry={products.refetch} />
+          <ErrorState message={t('common.errorTitle')} onRetry={products.refetch} retryLabel={t('common.retry')} />
         ) : all.length === 0 ? (
           <PublicMessage icon={Box} title={t('catalog.emptyTitle')} body={t('catalog.emptyBody')} />
         ) : visible.length === 0 ? (
@@ -146,7 +146,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   </div>
                   <div className="mt-4 flex items-start justify-between gap-3">
                     <LocalizedSpan as="h2" text={p.name} className="text-[15px] leading-snug font-medium text-ink group-hover:underline group-hover:underline-offset-4" />
-                    <span className="shrink-0 text-[15px] text-ink tabular-nums">{formatMoney(p.price, p.currency, lang)}</span>
+                    <span className="shrink-0 text-[15px] text-ink tabular-nums">{formatMoney(initialPrice(p), p.currency, lang)}</span>
                   </div>
                   <LocalizedSpan as="p" text={p.shortDescription} className="mt-1 line-clamp-2 text-[13px] leading-5 text-ink-muted" />
                 </Link>

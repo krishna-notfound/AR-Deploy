@@ -20,12 +20,16 @@ export function isValidSlug(slug: string): boolean {
   return SLUG_PATTERN.test(slug)
 }
 
-/** Returns `base`, or `base-2`, `base-3`… until it is not in `taken`. */
-export function uniqueSlug(base: string, taken: Iterable<string>): string {
+/** Database check: product slugs are at most 70 characters. */
+export const PRODUCT_SLUG_MAX = 70
+
+/** Returns `base`, or `base-2`, `base-3`… until it is not in `taken`. The base is trimmed (never ending in '-') so the suffix fits in `maxLength`. */
+export function uniqueSlug(base: string, taken: Iterable<string>, maxLength = Infinity): string {
   const set = new Set(taken)
   const root = base || 'item'
-  if (!set.has(root)) return root
+  const fit = (suffix: string) => root.slice(0, maxLength - suffix.length).replace(/-+$/, '') + suffix
+  if (!set.has(fit(''))) return fit('')
   let n = 2
-  while (set.has(`${root}-${n}`)) n++
-  return `${root}-${n}`
+  while (set.has(fit(`-${n}`))) n++
+  return fit(`-${n}`)
 }

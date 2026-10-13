@@ -42,7 +42,13 @@ export function VariantsEditor({ variants, onChange, currency }: { variants: Pro
                 placeholder={`+ ${currency}`}
                 inputMode="decimal"
                 defaultValue={v.priceDelta ? minorToInput(v.priceDelta) : ''}
-                onBlur={(e) => update(v.id, { priceDelta: parseMoneyInput(e.target.value) || undefined })}
+                aria-invalid={Number.isNaN(v.priceDelta) || undefined}
+                aria-describedby={Number.isNaN(v.priceDelta) ? `${v.id}-delta-error` : undefined}
+                onBlur={(e) => {
+                  // Unparseable or negative text becomes NaN so save validation blocks it instead of silently dropping it.
+                  const delta = e.target.value.trim() ? (parseMoneyInput(e.target.value) ?? NaN) : 0
+                  update(v.id, { priceDelta: delta === 0 ? undefined : delta })
+                }}
               />
               <div className="col-start-3 row-start-1 flex sm:col-start-auto sm:row-start-auto">
                 <IconButton aria-label="Move option up" size="sm" disabled={i === 0} onClick={() => move(i, -1)}>
@@ -55,6 +61,11 @@ export function VariantsEditor({ variants, onChange, currency }: { variants: Pro
                   <Trash2 className="size-4" />
                 </IconButton>
               </div>
+              {Number.isNaN(v.priceDelta) && (
+                <p id={`${v.id}-delta-error`} className="col-span-full text-xs font-medium text-danger">
+                  Enter the price difference as an amount such as 25.00. Negative amounts are not supported.
+                </p>
+              )}
             </li>
           ))}
         </ul>

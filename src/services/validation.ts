@@ -1,6 +1,6 @@
 import type { Business, Product } from '@/domain/types'
 import { isHttpUrl } from '@/lib/files'
-import { isValidSlug } from '@/lib/slug'
+import { PRODUCT_SLUG_MAX, isValidSlug } from '@/lib/slug'
 import { RESERVED_SUBDOMAINS } from '@/tenant/resolveTenant'
 import type { BusinessInput, ProductInput } from './catalogService'
 
@@ -28,6 +28,7 @@ export function validateProductDraft(data: ProductInput, siblings: Product[]): F
   if (!data.businessId) e.businessId = 'Choose the business this product belongs to.'
   if (!data.name.en.trim()) e['name.en'] = 'Product name (English) is required.'
   if (!data.slug) e.slug = 'Product URL slug is required.'
+  else if (data.slug.length > PRODUCT_SLUG_MAX) e.slug = `Use ${PRODUCT_SLUG_MAX} characters or fewer.`
   else if (!isValidSlug(data.slug)) e.slug = 'Use lowercase letters, numbers and single hyphens only.'
   else if (siblings.some((p) => p.slug === data.slug)) e.slug = 'Another product in this catalog already uses this slug.'
   if (!Number.isFinite(data.price) || data.price < 0) e.price = 'Enter a valid price.'
@@ -37,6 +38,7 @@ export function validateProductDraft(data: ProductInput, siblings: Product[]): F
   }
   if (data.cta.url && !isHttpUrl(data.cta.url)) e['cta.url'] = 'Enter a full URL starting with https://'
   if (data.weight && (!Number.isFinite(data.weight.value) || data.weight.value < 0)) e.weight = 'Enter a positive weight.'
+  if (data.variants.some((v) => v.priceDelta !== undefined && !(Number.isInteger(v.priceDelta) && v.priceDelta >= 0))) e.variants = 'Enter each price difference as an amount such as 25.00 (no negatives), or leave it empty.'
   return e
 }
 

@@ -9,6 +9,7 @@ import { InlineNotice } from '@/components/ui/States'
 import { auth } from '@/services'
 import { SiteHeader } from '../marketing/SiteChrome'
 import { pendingClaimToken } from './ClaimPage'
+import { DisplayNameStep } from './DisplayNameStep'
 import { RegisterBusinessForm } from './RegisterBusinessForm'
 
 /** Real sign-in (Supabase mode). In demo mode this route forwards to the demo account picker. */
@@ -16,7 +17,7 @@ export default function LoginPage() {
   useDocumentTitle('Sign in')
   const [params] = useSearchParams()
   const next = params.get('next')
-  const { user, signedInEmail, accountError, logout } = useAccount()
+  const { user, signedInEmail, onboarding, accountError, logout } = useAccount()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -50,12 +51,16 @@ export default function LoginPage() {
             <InlineNotice tone="neutral">
               Signed in as <strong className="font-medium">{signedInEmail}</strong>. This account does not manage a business yet.
             </InlineNotice>
-            {pendingClaimToken() ? (
+            {!onboarding?.displayName && !onboarding?.displayNameSkipped ? (
+              <DisplayNameStep />
+            ) : pendingClaimToken() ? (
               <ButtonLink to="/claim" variant="primary" className="w-full">
                 Finish claiming your business
               </ButtonLink>
             ) : (
               <>
+                <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">Step 2 of 2</p>
+                {onboarding?.displayName && <p className="text-sm">Welcome, {onboarding.displayName}.</p>}
                 <RegisterBusinessForm />
                 <p className="text-sm text-ink-muted">Is your business already listed with us? Ask the platform team for a claim link.</p>
               </>

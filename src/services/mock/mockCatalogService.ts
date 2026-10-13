@@ -3,7 +3,7 @@
 import type { ActivityItem, ActivityKind, Business, BusinessCatalog, ID, Product } from '@/domain/types'
 import { createSessionModelAsset, imageToPersistableDataUrl } from '@/lib/files'
 import { newId } from '@/lib/id'
-import { uniqueSlug } from '@/lib/slug'
+import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { type CatalogService, type Result, fail, ok } from '../catalogService'
 import { summarize } from '../analytics'
@@ -245,7 +245,7 @@ export const mockCatalogService: CatalogService = {
       const src = db.products.find((p) => p.id === id)
       if (!src) return fail('NOT_FOUND', 'Product not found.')
       const taken = db.products.filter((p) => p.businessId === src.businessId).map((p) => p.slug)
-      const slug = uniqueSlug(`${src.slug}-copy`, taken).slice(0, 70)
+      const slug = uniqueSlug(`${src.slug}-copy`, taken, PRODUCT_SLUG_MAX)
       const ts = nowIso()
       const copy: Product = {
         ...clone(src),

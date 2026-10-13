@@ -52,6 +52,8 @@ export const en = {
   'product.viewPhotos': 'Photos',
   'product.mediaLabel': 'Product media',
   'product.photo': 'Photo {n} of {total}',
+  'product.prevPhoto': 'Previous photo',
+  'product.nextPhoto': 'Next photo',
   'product.unitToggle': 'Units',
   'product.translationFallback': 'Shown in English',
 

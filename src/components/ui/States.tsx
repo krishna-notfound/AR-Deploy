@@ -30,7 +30,7 @@ export function EmptyState({
   )
 }
 
-export function ErrorState({ message, onRetry, className }: { message: string; onRetry?: () => void; className?: string }) {
+export function ErrorState({ message, onRetry, retryLabel = 'Try again', className }: { message: string; onRetry?: () => void; retryLabel?: string; className?: string }) {
   return (
     <div role="alert" className={cn('flex flex-col items-center px-6 py-10 text-center', className)}>
       <span className="mb-3 grid size-10 place-items-center rounded-full bg-danger-soft text-danger">
@@ -39,7 +39,7 @@ export function ErrorState({ message, onRetry, className }: { message: string; o
       <p className="max-w-sm text-sm text-ink">{message}</p>
       {onRetry && (
         <Button className="mt-4" size="sm" onClick={onRetry}>
-          Try again
+          {retryLabel}
         </Button>
       )}
     </div>

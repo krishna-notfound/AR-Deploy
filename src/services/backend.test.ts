@@ -225,6 +225,19 @@ describe('toSaveProductArgs', () => {
   })
 })
 
+describe('product draft validation', () => {
+  it('limits slugs to 70 characters and rejects bad variant price differences', async () => {
+    const { validateProductDraft } = await import('./validation')
+    expect(validateProductDraft(sampleProduct({ slug: 'a'.repeat(70) }), []).slug).toBeUndefined()
+    expect(validateProductDraft(sampleProduct({ slug: 'a'.repeat(71) }), []).slug).toMatch(/70 characters/)
+    const variant = (priceDelta?: number) => sampleProduct({ variants: [{ id: 'v', name: { en: 'Oak' }, priceDelta }] })
+    expect(validateProductDraft(variant(2500), []).variants).toBeUndefined()
+    expect(validateProductDraft(variant(undefined), []).variants).toBeUndefined()
+    expect(validateProductDraft(variant(NaN), []).variants).toBeDefined()
+    expect(validateProductDraft(variant(-100), []).variants).toBeDefined()
+  })
+})
+
 function sampleProduct(over: Partial<ProductInput> = {}): ProductInput {
   return {
     businessId: 'b1',

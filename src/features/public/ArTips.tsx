@@ -35,6 +35,7 @@ export function ArTips({ open, onClose, onStart }: { open: boolean; onClose: () 
       }}
       title={t('ar.tipsTitle')}
       size="sm"
+      closeLabel={t('common.close')}
       footer={
         onStart ? (
           <Button

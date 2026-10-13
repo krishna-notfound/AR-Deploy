@@ -38,8 +38,11 @@ export function AnalyticsView({
   const bizMap = useMemo(() => new Map<string, Business>((businesses ?? []).map((b) => [b.id, b])), [businesses])
   const s = summary.data
   const loading = summary.status === 'loading' && !s
+  // Product rows need product names; without them every row would be filtered out as "no products".
+  const productsLoading = products.status === 'loading' && !products.data
 
   if (summary.status === 'error' && !s) return <ErrorState message={summary.error.message} onRetry={summary.refetch} />
+  if (products.status === 'error' && !products.data) return <ErrorState message={products.error.message} onRetry={products.refetch} />
 
   const rows = (s?.byProduct ?? []).filter((r) => productMap.has(r.productId))
   const top = rows.slice(0, 5)
@@ -119,7 +122,7 @@ export function AnalyticsView({
         <Card>
           <CardHeader title="Top-performing products" description="By product page views" />
           <CardBody>
-            {loading ? (
+            {loading || productsLoading ? (
               <Skeleton className="h-40 w-full" />
             ) : top.length === 0 ? (
               <EmptyState icon={BarChart3} title="No product activity yet" body="Views and AR launch attempts appear once products are published and visited." />
@@ -157,7 +160,7 @@ export function AnalyticsView({
           rows={rows}
           columns={columns}
           rowKey={(r) => r.productId}
-          loading={loading}
+          loading={loading || productsLoading}
           caption="Product performance"
           noun="products"
           initialSort={{ key: 'views', dir: 'desc' }}

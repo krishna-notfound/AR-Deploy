@@ -108,6 +108,12 @@ Use **Add Product** in the business dashboard, or **All Products → New** in Su
 - If not, they see **"AR scale unverified"**, and the editor suggests a likely cause, for example the wrong unit.
 - Only the GLB is measured. The USDZ must be exported at the same size.
 
+**Preparing the two files (the platform does not convert between them):**
+- Export the GLB from your 3D tool (e.g. Blender: File → Export → glTF 2.0, format "glTF Binary"), in metres, at real size, with the base of the furniture on the floor.
+- Make the USDZ from that same GLB, e.g. with Apple's free **Reality Converter** (macOS): open the GLB, check the size shown, export USDZ. Upload both to the same product.
+- Keep the GLB under ~10 MB for Google Scene Viewer; very large files load slowly or fail.
+- After uploading, the editor's size check should say the model matches the entered dimensions. If it doesn't, fix the file or the numbers before publishing.
+
 **Saving and publishing**
 - **Save draft** keeps the product hidden.
 - **Preview** opens the product page in a new tab, even for drafts. Previews are not counted in reports.

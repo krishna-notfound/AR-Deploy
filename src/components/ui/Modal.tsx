@@ -53,6 +53,7 @@ export function Modal({
   footer,
   size = 'md',
   dismissible = true,
+  closeLabel = 'Close dialog',
 }: {
   open: boolean
   onClose: () => void
@@ -62,6 +63,7 @@ export function Modal({
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg'
   dismissible?: boolean
+  closeLabel?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -105,7 +107,7 @@ export function Modal({
             )}
           </div>
           {dismissible && (
-            <IconButton aria-label="Close dialog" size="sm" onClick={onClose} className="-mt-1 -mr-2">
+            <IconButton aria-label={closeLabel} size="sm" onClick={onClose} className="-mt-1 -mr-2">
               <X className="size-4" />
             </IconButton>
           )}

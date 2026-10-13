@@ -8,6 +8,9 @@ import { mapDbError } from './supabaseCatalogService'
 export interface SignedInAccount {
   email: string
   user: User | null
+  /** Onboarding step 1 (Auth user metadata, set by the user; grants nothing). Undefined until set or skipped. */
+  displayName?: string
+  displayNameSkipped?: boolean
 }
 
 export interface AuthService {
@@ -24,7 +27,9 @@ export interface AuthService {
    * Creates an account; the user must confirm their email before signing in. Also succeeds for an email that
    * already has an account (Supabase hides which emails exist), so the UI always says "check your email".
    */
-  signUp(email: string, password: string, emailRedirectTo: string): Promise<Result<void>>
+  signUp(email: string, password: string, emailRedirectTo: string): Promise<Result<{ needsConfirmation: boolean }>>
+  /** Saves the display name in the user's own Auth metadata (null = skipped). Reloads the account via the auth listener. */
+  updateDisplayName(name: string | null): Promise<Result<void>>
   /** Registers a NEW business owned by the signed-in, confirmed account. Always a draft until an admin activates it. */
   registerBusiness(name: string, slug: string): Promise<Result<{ businessId: string }>>
   /** Redeems a single-use claim link a platform admin issued; the account becomes an owner of that business. */
@@ -54,11 +59,14 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       ])
       const err = admin.error ?? member.error
       if (err) return mapDbError(err)
-      const base = { id: u.id, name: email || 'Signed-in user', email }
-      if (admin.data) return ok({ email, user: { ...base, role: 'super_admin' } })
+      const meta = (u.user_metadata ?? {}) as { display_name?: unknown; display_name_skipped?: unknown }
+      const displayName = typeof meta.display_name === 'string' && meta.display_name.trim() ? meta.display_name.trim() : undefined
+      const profile = { displayName, displayNameSkipped: meta.display_name_skipped === true }
+      const base = { id: u.id, name: displayName ?? (email || 'Signed-in user'), email }
+      if (admin.data) return ok({ email, ...profile, user: { ...base, role: 'super_admin' } })
       // ponytail: a user in several businesses gets the newest one (e.g. just claimed); add a business switcher when that case is real.
-      if (member.data) return ok({ email, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
-      return ok({ email, user: null })
+      if (member.data) return ok({ email, ...profile, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
+      return ok({ email, ...profile, user: null })
     },
 
     async signInWithPassword(email, password) {
@@ -78,8 +86,15 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
     },
 
     async signUp(email, password, emailRedirectTo) {
-      const { error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo } })
-      return error ? fail('VALIDATION', error.message) : ok(undefined)
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo } })
+      // With email confirmation on (the project setting), no session comes back until the link is opened.
+      return error ? fail('VALIDATION', error.message) : ok({ needsConfirmation: !data.session })
+    },
+
+    async updateDisplayName(name) {
+      const display_name = name?.trim().slice(0, 80) || null
+      const { error } = await sb.auth.updateUser({ data: { display_name, display_name_skipped: display_name === null } })
+      return error ? fail('UNKNOWN', 'Could not save your name. Try again.') : ok(undefined)
     },
 
     async registerBusiness(name, slug) {

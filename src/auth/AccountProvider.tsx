@@ -34,6 +34,8 @@ interface AccountCtx {
   logout: () => void
   /** Supabase mode: email of a signed-in user who has no role yet. */
   signedInEmail?: string
+  /** Supabase mode: onboarding state of a signed-in user who has no role yet. */
+  onboarding?: { displayName?: string; displayNameSkipped: boolean }
   /** Supabase mode: why the account could not be loaded. */
   accountError?: string
 }
@@ -74,7 +76,14 @@ function SupabaseAccountProvider({ auth, children }: { auth: AuthService; childr
   const signInAs = useCallback(() => {}, [])
 
   const value = useMemo<AccountCtx>(() => {
-    const extra = { signInAs, logout, accountError, signedInEmail: account && !account.user ? account.email : undefined }
+    const noRole = !!account && !account.user
+    const extra = {
+      signInAs,
+      logout,
+      accountError,
+      signedInEmail: noRole ? account.email : undefined,
+      onboarding: noRole ? { displayName: account.displayName, displayNameSkipped: !!account.displayNameSkipped } : undefined,
+    }
     if (account === undefined) return { user: undefined, business: null, ...extra }
     const user = account?.user ?? null
     if (!user?.businessId) return { user, business: null, ...extra }

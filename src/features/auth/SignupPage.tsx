@@ -41,7 +41,9 @@ export default function SignupPage() {
     setPending(false)
     if (!res.ok) return setError(res.error.message)
     setError(null)
-    setSent(true)
+    // Projects without email confirmation sign the user in straight away; the auth listener then
+    // reloads the account and the redirect above sends them to onboarding (/login).
+    if (res.data.needsConfirmation) setSent(true)
   }
 
   return (

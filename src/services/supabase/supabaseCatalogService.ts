@@ -18,7 +18,7 @@ import type {
   ProductStatus,
   WeightUnit,
 } from '@/domain/types'
-import { uniqueSlug } from '@/lib/slug'
+import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, isoDay, summarize } from '../analytics'
 import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type Result, type ServiceError, type UploadKind, fail, ok } from '../catalogService'
@@ -566,7 +566,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (!src.ok) return src
         const siblings = await sb.from('products').select('slug').eq('business_id', src.data.businessId).returns<{ slug: string }[]>()
         if (siblings.error) return mapDbError(siblings.error)
-        const slug = uniqueSlug(`${src.data.slug}-copy`, siblings.data.map((s) => s.slug)).slice(0, 70)
+        const slug = uniqueSlug(`${src.data.slug}-copy`, siblings.data.map((s) => s.slug), PRODUCT_SLUG_MAX)
         const name = { en: `${src.data.name.en} (copy)`, ...(src.data.name.pt ? { pt: `${src.data.name.pt} (cópia)` } : {}) }
         // Copies reference the same stored files; nothing is re-uploaded.
         return changed(await saveProduct(null, { ...src.data, slug, name }))

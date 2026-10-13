@@ -73,7 +73,7 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
             }
           />
         ) : (
-          <ErrorState message={res.status === 'error' ? res.error.message : t('common.errorTitle')} onRetry={res.refetch} className="py-24" />
+          <ErrorState message={t('common.errorTitle')} onRetry={res.refetch} retryLabel={t('common.retry')} className="py-24" />
         )}
       </PublicShell>
     )
@@ -311,7 +311,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
       <ArTips open={tipsOpen !== null} onClose={() => setTipsOpen(null)} onStart={tipsOpen === 'before-ar' ? () => void startAR() : undefined} />
 
-      <Modal open={contactOpen} onClose={() => setContactOpen(false)} title={business.name} size="sm">
+      <Modal open={contactOpen} onClose={() => setContactOpen(false)} title={business.name} size="sm" closeLabel={t('common.close')}>
         <ul className="space-y-3 pb-2 text-sm">
           {business.contact.email && (
             <li className="flex items-center gap-3">

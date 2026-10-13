@@ -196,10 +196,10 @@ function Gallery({ images, name }: { images: ProductImage[]; name: string }) {
       <SmartImage src={current?.url} alt={`${name}. ${t('product.photo', { n: idx + 1, total: images.length })}`} className="size-full object-cover" />
       {images.length > 1 && (
         <>
-          <button type="button" aria-label="Previous photo" onClick={() => go(-1)} className="absolute top-1/2 left-3 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-surface/90 shadow-sm hover:bg-surface">
+          <button type="button" aria-label={t('product.prevPhoto')} onClick={() => go(-1)} className="absolute top-1/2 left-3 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-surface/90 shadow-sm hover:bg-surface">
             <ChevronLeft className="size-4" aria-hidden />
           </button>
-          <button type="button" aria-label="Next photo" onClick={() => go(1)} className="absolute top-1/2 right-3 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-surface/90 shadow-sm hover:bg-surface">
+          <button type="button" aria-label={t('product.nextPhoto')} onClick={() => go(1)} className="absolute top-1/2 right-3 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-surface/90 shadow-sm hover:bg-surface">
             <ChevronRight className="size-4" aria-hidden />
           </button>
           <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">

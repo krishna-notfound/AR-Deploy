@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { safeBrandAccent, contrastRatio } from './color'
 import { validateModelFile, validateImageFile } from './files'
 import { convertLength, formatDimensions, formatMoney, parseMoneyInput, toMeters } from './format'
+import { initialPrice } from './product'
 import { checkScale } from './scale'
 import { isValidSlug, slugInput, slugify, uniqueSlug } from './slug'
 import { catalogLocalPath, catalogPublicUrl, productLocalPath, productPublicUrl, shareableCurrentUrl } from './urls'
@@ -24,6 +25,20 @@ describe('slug', () => {
   it('creates unique slugs', () => {
     expect(uniqueSlug('chair', [])).toBe('chair')
     expect(uniqueSlug('chair', ['chair', 'chair-2'])).toBe('chair-3')
+  })
+  it('trims the base before adding the suffix, never leaving a trailing hyphen', () => {
+    const base = 'a'.repeat(66) + '-copy' // 71 characters
+    expect(uniqueSlug(base, [], 70)).toBe('a'.repeat(66) + '-cop')
+    const taken = ['a'.repeat(66) + '-cop']
+    expect(uniqueSlug(base, taken, 70)).toBe('a'.repeat(66) + '-c-2')
+    expect(uniqueSlug('a'.repeat(67) + '-copy', ['a'.repeat(67) + '-co'], 70)).toBe('a'.repeat(67) + '-2')
+  })
+})
+
+describe('initialPrice', () => {
+  it('matches the price the product page opens on (first variant)', () => {
+    expect(initialPrice({ price: 10000, variants: [] })).toBe(10000)
+    expect(initialPrice({ price: 10000, variants: [{ id: 'v1', name: { en: 'Oak' }, priceDelta: 2500 }, { id: 'v2', name: { en: 'Ash' } }] })).toBe(12500)
   })
 })
 
