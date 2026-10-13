@@ -16,8 +16,8 @@ Keep this file short. Detailed tasks live in `tasks/PN-*.md`. Update the row her
 | P7 QA & delivery | [tasks/P7-qa.md](tasks/P7-qa.md) | Mostly done | 8 / 12 | 2026-10-12 |
 | P9 Release | [tasks/P9-release.md](tasks/P9-release.md) | Backend live; Vercel blocked | 6 / 8 | 2026-10-13 |
 | P8 Design + Supabase | [tasks/P8-design-supabase.md](tasks/P8-design-supabase.md) | DB live on `pmnjchhrgvajtjpadpqo`; Vercel launch pending | 12 / 20 | 2026-10-12 |
-| P10 AR Experience 2.0 | [tasks/P10-ar.md](tasks/P10-ar.md) | Built and tested in the browser; real-device pass pending | 8 / 9 | 2026-10-13 |
-| Audit 2026-10-13 | [audit/IMPLEMENTATION_PLAN.md](audit/IMPLEMENTATION_PLAN.md) | Audit done; Stage A (contract fixes) next | 0 / 5 stages | 2026-10-13 |
+| P10 AR Experience 2.0 | [tasks/P10-ar.md](tasks/P10-ar.md) | Hardened after the audit; real-device pass and A-1 pending | 12 / 14 | 2026-10-13 |
+| Audit + functional phase | [audit/IMPLEMENTATION_STATUS.md](audit/IMPLEMENTATION_STATUS.md) | Stage A done; B built (flagged); C migration written and tested, not applied; D and E waiting for approvals or devices | 3 / 5 stages | 2026-10-13 |
 
 ## Conventions (for every task file)
 - `[ ]` todo · `[~]` in progress or partial · `[x]` done · `[!]` blocked (add a reason)

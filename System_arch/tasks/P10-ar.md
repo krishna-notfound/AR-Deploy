@@ -39,5 +39,12 @@ Open the product page with `?ardebug`, and use Chrome remote debugging to read `
 ## Known limitations (do not claim otherwise)
 - No occlusion, depth, lighting estimation, collision or room measurement.
 - Placement is floor-only in every mode, including wall lamps.
-- The GLB downloads again when the session starts; large files are slow over mobile data, and the readiness panel warns above 15 MB.
+- The GLB downloads again when the session starts; large files are slow over mobile data, and the readiness panel warns above 10 MB (Google's recommendation for Scene Viewer).
 - In-app browsers (Instagram, Facebook) usually block WebXR and camera access. The notice suggests opening the page in Chrome or Safari.
+
+## Discovered (audit 2026-10-13)
+- [x] P10-10 Session hardening: setup failure ends the session, cancel vs failure, overlay only with a controller, no placing while the model is loading, anchors inside the frame. Done 2026-10-13: `webxrSession.test.ts`.
+- [x] P10-11 Native failure no longer leaves a dead button; `none/failed` state. Done 2026-10-13: `ar.test.ts`, `ArSection.test.tsx`, e2e.
+- [x] P10-12 `ar_activation` once per page view. Done 2026-10-13: e2e.
+- [x] P10-13 Footprint preview and settle drop (owner request). Done 2026-10-13: `settleOffset` unit test. Not seen on a device.
+- [ ] P10-14 Native-first default: waiting for client approval A-1.

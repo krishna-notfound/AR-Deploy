@@ -20,7 +20,27 @@ On Android Chrome, add `?ardebug` and use remote debugging to read `[ar] session
 | Desktop | Windows / macOS | Chrome | none | 3D view, hand-off QR, admin upload in Supabase mode | Not run — awaiting device | |
 | Desktop | macOS | Safari | none | WebKit rendering of model-viewer | Not run — awaiting device | |
 
-## Evidence: automated checks actually run (2026-10-13, by the QA agent, branch `feature/ar-experience-2`, Node 24.21, Playwright 1.64)
+## Evidence: final code, functional phase (2026-10-13, branch `feature/ar-experience-2`, Node 24.21, Playwright 1.64)
+| Command | Result |
+|---|---|
+| `npx tsc -b` | exit 0 |
+| `npm run lint` | exit 0: 0 errors, advisory warnings only (new ones: intentional render-time ref sync in `ProductFilters.tsx`, test harness globals) |
+| `npx vitest run` | **140 passed, 13 skipped** (14 files). Skipped: `live.integration.test.ts`, which needs `SUPABASE_IT_*` and writes data. Includes 12 PGlite migration and RLS tests and 11 Edge Function handler tests (mocked DB) |
+| `npx playwright test` | **27 passed, 0 failed** (25 desktop, 2 emulated Pixel 7), demo mode, `VITE_MODEL_OPTIMIZATION=on` |
+| `npm run build` (picks up `.env.local`, Supabase mode) | exit 0 |
+| Demo build (`VITE_DATA_MODE=demo …`) | exit 0 |
+| Production guard | `VERCEL_ENV=production` with demo mode: **blocked**; with a secret key: **blocked**; with the valid Supabase config: built; preview with demo: built |
+| CSP report-only check (scripted Chromium against a production build) | 0 violations: landing, catalog, product with 3D, admin editor, analytics. A deliberately broken policy was reported, so the check works |
+| Secret scan of built JS | no `sb_secret_…` or JWT-shaped tokens |
+
+Earlier full runs in this session had failures, all investigated:
+- **Network-bound model tests:** the test budget was shorter than the step waits. Fixed with a 90 s global budget.
+- **A real product-list race:** the search term was lost when a filter changed quickly. Fixed in `ProductFilters.tsx`, with a regression test.
+- **One assertion of copy that was intentionally changed.**
+
+Repeated runs of the affected tests pass.
+
+## Evidence: audit baseline (earlier the same day) (2026-10-13, by the QA agent, branch `feature/ar-experience-2`, Node 24.21, Playwright 1.64)
 | Command | Result |
 |---|---|
 | `npx tsc -b` | exit 0 |

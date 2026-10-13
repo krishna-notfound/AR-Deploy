@@ -36,3 +36,15 @@ Chrome on ARCore phones picks WebXR first. In that mode:
 - **Keep model-viewer WebXR and tune it.** The gesture model can't be changed without forking the library.
 - **Scene Viewer only on Android.** It's reliable, but it leaves the page. Its own gestures are the same drag-or-rotate pattern, and we get no placement metrics.
 - **A native app.** Out of scope (no native app).
+
+## Revision 2026-10-13 (after the audit)
+- **The device-difference finding:** Chrome reports immersive-ar on every Android 7+ phone, ARCore or not (Chromium source), so WebXR-first sends phones without ARCore into a failed start or an ARCore install prompt. Native-first (Scene Viewer, as the contract says) is implemented behind `AR_DEFAULT_PREFERENCE`, which stays `'webxr'` until the client approves (audit APPROVAL_REQUIRED A-1).
+- **Hardening:**
+  - Setup failures end the session.
+  - A cancel isn't a failure.
+  - A `NotSupportedError` failure is remembered for 7 days.
+  - A native `ar-status: failed` removes the dead button.
+  - Anchors are created inside the animation frame.
+  - The bounding box is precise.
+  - Analytics count one `ar_activation` per page view.
+- **Owner request:** a true-footprint preview and a settle-onto-floor drop. Cosmetic, with no fit claims.

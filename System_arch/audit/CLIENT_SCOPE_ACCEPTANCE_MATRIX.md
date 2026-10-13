@@ -6,6 +6,23 @@ How each mode was checked:
 - **Demo mode:** E2E-tested.
 - **Supabase mode:** covered by `src/services/supabase/live.integration.test.ts`. That test is skipped by default and was not run in this audit. It writes data and needs QA accounts; it was last recorded passing in tasks/P9 G1–G4.
 
+## Update after implementation (2026-10-13, functional phase)
+This section overrides the audit rows below.
+
+| # | Requirement | New status | Evidence (tests that ran and passed) |
+|---|---|---|---|
+| A3/A4 | Native AR / Scene Viewer | **Prepared, pending A-1.** <br>• Native-first is implemented but switched off. <br>• Today: a failed WebXR start falls back to the native viewer and is remembered for 7 days (on `NotSupportedError`). <br>• A native failure (`ar-status: failed`) is no longer a dead button. <br>• A user cancel isn't treated as a failure. | `src/features/ar/ar.test.ts` (chooseArMode: 8 cases), `src/features/public/ArSection.test.tsx`, `src/features/ar/webxrSession.test.ts` (setup failure ends the session; cancel = AbortError), e2e `public.spec.ts` (start failure, no dead button) |
+| A5 | Real-world scale | **Improved.** <br>• Mismatches name the cause: axis swap, wrong unit, model in cm/mm, uniform factor. <br>• Tolerance is max(5%, 1 cm). <br>• The WebXR session uses the same precise bounding box. <br>• Still unverified on a device. | `src/lib/lib.test.ts` "checkScale diagnosis" |
+| A13/A14, C8 | Optimized loading / automatic compression | **Built, off until A-2.** Safe optimization in the browser (ADR-0019). <br>• GLBs that require extensions Scene Viewer doesn't support are flagged on upload (always on). <br>• The readiness size warning is now 10 MB. | `modelOptimize.test.ts` (real glTF-Transform), e2e `model-optimize.spec.ts` (real 4096 px texture in Chromium), `lib.test.ts` (extension check) |
+| B3 | Logo | **Fixed.** <br>• SVG is no longer offered (the bucket refuses it). <br>• Logo cleanup only deletes files in the business's own folder (audit P1-07). | `backend.test.ts` "logo cleanup" |
+| B6 | Publish makes the page live | **Fixed.** Publishing under an inactive catalog says it isn't visible yet; "Open product page" opens the preview. | e2e `product-crud.spec.ts` (inactive catalog) |
+| C1 | Secure login / authorization | **Tested; one migration pending (O-1).** The migration links owners only to confirmed emails. RLS tested as `anon` and `authenticated`: drafts hidden, inactive catalogs hidden, no cross-business reads or writes, strangers can't write, admins can. | `supabase/tests/migrations.test.ts` (12 tests, PGlite) |
+| C3 | Publish rules | **Enforced in the DB once O-1 is applied** (at least one gallery image; `published_at` set by the server). The DB error maps to the image field. | `migrations.test.ts`, `backend.test.ts` "database errors" |
+| D2 | AR activations | **Fixed.** Counted once per page view, as an attempt (not a placement). | e2e `public.spec.ts` "counted once per page view" |
+| G | Demo vs production | **Fixed.** A production build refuses demo mode, missing values, non-https URLs and secret keys. Raw DB error text is never shown. | `backend.test.ts` "production build guard"; manual builds: 2 blocked, 2 built |
+| — | Physics (owner request) | **Delivered inside the WebXR session:** a true-footprint outline before placing, and a settle drop onto the shadow (respects reduced motion). No fit claims. | `ar.test.ts` "settleOffset". Rendering on a device is unverified |
+| E2–E4 | Deployment, device tests, guide | **Guide written** (DEPLOYMENT_AND_HANDOVER.md §4). Deployment and device tests are still open (O-5, DEVICE_TEST_MATRIX). | — |
+
 ## A. Public product experience
 | # | Requirement | Evidence | Status | Missing logic | Acceptance test |
 |---|---|---|---|---|---|

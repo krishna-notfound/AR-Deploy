@@ -9,6 +9,19 @@ Read when: writing tests, verifying a task, or doing the QA phase.
 | E2E | Playwright | One spec per group in the brief's §19 list (see `tasks/P7-qa.md`). Projects: desktop 1280×800, Pixel 7, iPhone 14 |
 | Manual | Real devices | AR on iOS and Android, plus in-app browsers. If no device was tested, say so in the report |
 
+## Database tests (ADR-0020)
+`supabase/tests/migrations.test.ts` applies every migration to PGlite (an in-process Postgres) with stand-ins for Supabase's `auth` and `storage` schemas. It checks these rules as `anon` and `authenticated`:
+- publish rules
+- owner linking
+- RLS isolation between businesses
+- anonymous read-only access
+
+It runs in `npm test`. It does not replace the live integration test (`live.integration.test.ts`, which needs the `SUPABASE_IT_*` variables and writes data).
+
+## E2E notes
+- **Model optimization:** E2E runs with `VITE_MODEL_OPTIMIZATION=on` to cover that feature (production default: off).
+- **Network dependency:** sample models load from raw.githubusercontent.com, so model tests depend on the network. Their budgets are sized for that.
+
 ## Definition of done (every task)
 1. `npm run typecheck && npm run lint && npm test && npm run build` all pass.
 2. The touched route has been checked, manually or with Playwright, at desktop **and** mobile widths.
