@@ -5,7 +5,7 @@ This project is a multi-tenant 3D furniture catalog with AR. It has three surfac
 - Business Admin (`/dashboard`, scope pending)
 - Public EN/PT catalog and product pages
 
-It runs in **demo mode** by default (a mock service layer, no setup). A **Supabase mode** is prepared behind the same service interface (`VITE_DATA_MODE=supabase`); its 5 migrations in `supabase/migrations/` and the `track-event` Edge Function are live on project `pmnjchhrgvajtjpadpqo` (2026-10-13). Never re-apply or roll back without the owner's approval. All architecture docs live in `System_arch/`.
+It runs in **demo mode** by default (a mock service layer, no setup). A **Supabase mode** is prepared behind the same service interface (`VITE_DATA_MODE=supabase`); its 7 migrations in `supabase/migrations/` and the `track-event` Edge Function are live on project `pmnjchhrgvajtjpadpqo` (2026-10-13). Never re-apply or roll back without the owner's approval. All architecture docs live in `System_arch/`.
 
 **Start here (2026-10-13):** `System_arch/HANDOFF.md`. Live AR is the original model-viewer flow; don't replace it without a device test.
 

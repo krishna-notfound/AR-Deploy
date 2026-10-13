@@ -1,6 +1,6 @@
 # Production readiness
 
-**Release gate: NOT READY TO SHIP** (2026-10-13). No real-device AR test (native-only change is unverified on a phone), no staging project yet, no domain, sample data in the production DB, branch work not deployed.
+**Release gate: NOT READY TO SHIP** (2026-10-13). Live database migrated and live API tests pass (15/15), but: no real-device AR test (native-only AR unverified on a phone), branch not deployed (Preview shares the live database), no client domain, sample data still in production.
 
 Requirements and their status: [PRD.md](PRD.md). Background and older audits: `System_arch/HANDOFF.md` (authoritative), `System_arch/audit/` (partly stale, see §5).
 
@@ -124,10 +124,50 @@ Known, not fixed (Low):
 - The analytics table shows "no products" if only the product list fails to load.
 - Image uploads are checked by type/extension, not magic bytes (private bucket; logos bucket enforces MIME).
 
+## 6d. Live project work (2026-10-13, owner-approved steps A–D)
+
+| Step | Result |
+|---|---|
+| A | Linked ref re-checked (`pmnjchhrgvajtjpadpqo`); dry run listed only the 2 approved migrations; `supabase db push` applied `20261013093006_publish_rules` and `20261013144121_owner_registration_and_claims`; history 7/7. New functions executable by `authenticated` only (anon gets 42501); `private.business_claims` RLS on, unreadable by API roles; 18 published products / 4 active businesses unchanged; anon catalog read 200. Advisors: no errors; expected WARNs (admin-checked SECURITY DEFINER RPCs), leaked-password protection off. `rls_auto_enable` warning gone |
+| B | 4 QA users created via the Auth admin API (auto-confirmed, random in-memory password never printed or stored); `qa-admin` added to `platform_admins` (service role, not a client field) |
+| C | Live suite 15 passed / 0 failed / 0 skipped |
+| D | Each QA user id re-checked against its email, then deleted. After: 0 QA users, 3 users, 1 platform admin, 2 owner links, 5 businesses, 18 published products (same as before). No QA businesses, products, files, analytics, claims or memberships left |
+
+Left alone (ambiguous, not from the test run): one logo file `business-logos/new/9407d3a5-….png` uploaded 2026-10-13 12:25 UTC from the "new business" form and never attached.
+
+## 6e. Sample data in production (identified, NOT deleted)
+
+| Business | Evidence it is sample data | Rows |
+|---|---|---|
+| `casa-lisboa`, `nordhaus`, `atelier-verde`, `oak-ember` | Demo seed names; backdated `created_at`; Unsplash photos; GitHub-hosted models; owners `@furnish.example` | 21 products, ~17,000 seeded analytics events, 4 logo files, 2 `@furnish.example` owner accounts |
+| `digital-heroes-buisness` | Created 2026-10-13, 0 products, no owner, slug typo: **not** classified, owner to decide | — |
+
+Deleting needs the owner's separate approval: delete the 4 businesses (products, images, models, variants, analytics and memberships cascade), their logo files via the Storage API, and the 2 `@furnish.example` auth users. Only after the real catalog is ready (the live demo uses them today).
+
+## 8. Production release checklist
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Preview validation of this branch on a safe environment | BLOCKED: Preview shares the live database (see below) |
+| 2 | No unresolved Critical/High security findings | OK (none open; SEC list above) |
+| 3 | Rollback verified | OK: `supabase/rollback/20261013_publish_rules_and_claims_rollback.sql` (PGlite-tested); app rollback = Vercel "Promote" previous deployment / revert merge |
+| 4 | QA accounts and test data cleaned | OK (6d) |
+| 5 | Real-device AR: Android Scene Viewer + iOS Quick Look, true size | BLOCKED: no devices |
+| 6 | Merge `chore/production-readiness` → `main` (deploys production) | Needs separate approval, after 1 and 5 |
+| 7 | Production Auth: min password 12, leaked-password protection (if plan allows), sign-ups stay off | Needs separate approval |
+| 8 | Sample data removal (6e) | Needs separate approval, after real catalog exists |
+| 9 | Client domain, wildcard subdomains, SSL, `VITE_ROOT_DOMAIN` | BLOCKED: client domain |
+| 10 | Compression switched on | BLOCKED: client sign-off (A-2) |
+| 11 | Variants/materials meaning confirmed | BLOCKED: client decision (A-3, see PRD) |
+| 12 | Handover docs + walkthrough video | docs in progress; video owner action |
+
+**Why Preview is blocked:** Vercel Preview and Production share one value each for `VITE_DATA_MODE`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Pushing the branch triggers a Preview build that reads and writes the live database (page views count as real analytics). A second free Supabase project is not possible while two are active (`pmnjchhrgvajtjpadpqo` and `bothonopxtznzviieoic`). Options: (a) add Preview-only `VITE_DATA_MODE=demo` and empty Supabase values (Preview then runs on built-in sample data; enough to device-test AR, safe for the live database), (b) pause/delete `bothonopxtznzviieoic` and create a staging project, (c) accept Preview on the live database.
+
 ## 7. Change log
 
 | Date | Phase | Change |
 |---|---|---|
+| 2026-10-13 | live A–D | Migrations applied to `pmnjchhrgvajtjpadpqo`, live suite 15/15, QA cleanup verified, sample data identified, release checklist, test plan
 | 2026-10-13 | C/D | AR native-only (ADR-0021), SEC-04/06/08/10 fixed, SEC-05 shown not exploitable, owner registration + claim links (ADR-0022, migration not applied), stale docs corrected, staging runbook. Local commits only
 | 2026-10-13 | 0 | Owner reported live Auth settings; SEC-01 downgraded. Owner self-registration requested (scope change, see PRD X-01)
 | 2026-10-13 | 0 | Baseline, live read-only audit, PRD and this file created. No code, schema or config changed |

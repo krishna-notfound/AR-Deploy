@@ -7,7 +7,8 @@
   - The owner deploys through their existing project. **Never create another Vercel project or domain.**
 - **Working branch:** `feature/ar-experience-2`, at the same commit as `main`.
 - **Data:** Supabase project `pmnjchhrgvajtjpadpqo`.
-  - 5 migrations are live. A 6th (`20261013093006_publish_rules.sql`) is written and tested but **NOT applied**.
+  - All 7 migrations are live (the last two, `20261013093006_publish_rules` and `20261013144121_owner_registration_and_claims`, applied 2026-10-13 with owner approval; rollback in `supabase/rollback/`). Live API suite 15/15 the same day.
+  - No separate staging project: the owner chose to test on this project, one approved step at a time (`docs/OPERATIONS_RUNBOOK.md`). The repo is linked to it (`supabase/.temp/project-ref`).
   - The Edge Function `track-event` is live.
   - 18 sample products and sample owner accounts are live (`audit/APPROVAL_REQUIRED.md` O-4).
 - **Commits:** author `krishna <krishnagtkr@gmail.com>`, **no Claude co-author line**. Push to `main` only when the owner asks; each push deploys to production.

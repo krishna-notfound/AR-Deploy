@@ -28,8 +28,8 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 | R-05 | 3D fallback when AR unavailable | C | IMPLEMENTED_NOT_VERIFIED | `ArSection.tsx` (copy link, QR), `ProductMedia.tsx` (error, retry, photos) | Device check | Unsupported device shows 3D + explanation, never a dead button | N |
 | R-06 | True real-world size | C | IMPLEMENTED_NOT_VERIFIED | `src/lib/scale.ts` (5% or 1 cm tolerance); editor scale diagnosis | USDZ size never measured; UI text says "within 5%" but code also allows 1 cm; no tape-measure test | Measured AR size matches product dimensions on both platforms | N |
 | R-07 | Name, price, description, dimensions, photos, CTA | C | IMPLEMENTED_NOT_VERIFIED | `ProductPage.tsx` | — | Fields shown from DB in EN and PT | N |
-| R-08 | Materials | C | INCOMPLETE | One localized `material` text field | No structured materials list | Client confirms one text field is enough (A-3) | Y |
-| R-09 | Variants | C | INCOMPLETE | Colour swatch + price (`VariantsEditor.tsx`) | Picking a variant doesn't change model, photos or dimensions | Client confirms swatch + price meaning (A-3) | Y |
+| R-08 | Materials | C | INCOMPLETE (needs client decision) | One localized `material` text field | No structured materials list | Client confirms one text field is enough (A-3) | Y |
+| R-09 | Variants | C | INCOMPLETE (needs client decision) | Colour swatch + price (`VariantsEditor.tsx`) | Picking a variant doesn't change model, photos or dimensions | Client confirms swatch + price meaning (A-3) | Y |
 | R-10 | Responsive, mobile-first | C | IMPLEMENTED_NOT_VERIFIED | e2e `responsive.mobile.spec.ts` (emulated Pixel 7) | No real phones; no accessibility audit | Checked on real iPhone + Android widths | N |
 | R-11 | Portuguese + English with switcher | C | IMPLEMENTED_NOT_VERIFIED | `src/i18n/`, `PublicShell.tsx`; e2e | PT product text depends on data entry | Every public string has PT; switcher persists | N |
 | R-12 | In-app browser notice (Instagram, Facebook, WhatsApp) | C | IMPLEMENTED_NOT_VERIFIED | `src/lib/userAgent.ts`, `InAppNotice.tsx`; e2e Instagram only | Shown on product page only, not the catalog page the QR opens. WhatsApp on Android often uses Custom Tabs (no marker) | Notice appears in all three apps on a real phone | N |
@@ -45,7 +45,7 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 | R-17 | QR → business catalogue URL | C | IMPLEMENTED_NOT_VERIFIED | `CatalogQrPanel.tsx`, `urls.ts` | Path mode uses `window.location.origin`, so a QR made on a preview/localhost URL encodes that origin forever. QRs printed before subdomains go live must be reprinted | QR always encodes the production catalog URL | N |
 | R-18 | Shareable product URLs | C | IMPLEMENTED_NOT_VERIFIED | `urls.ts`; `ShareActions.tsx` | `ShareActions` builds from `window.location.href` (breaks project rule); regex can mangle `?preview=1&lang=pt` | Shared link opens the same product, same language | N |
 | R-19 | Pages generated from saved data | C | VERIFIED (live) | `supabaseCatalogService.ts`; 18 live products | — | — | N |
-| R-20 | Unpublished products not public | C | VERIFIED (live RLS, read-only policy review) | Anon policy on `products` requires `published` + active business; child tables inherit; PGlite RLS tests | Storage read policy doesn't tie `storage_path` to the product's business (SEC-05, latent: 0 media objects today) | Anon API call for a draft returns nothing | N |
+| R-20 | Unpublished products not public | C | VERIFIED (live) | Anon policy on `products` requires `published` + active business; child tables inherit; PGlite RLS tests; Live API suite 15/15 on 2026-10-13 | Storage read policy doesn't tie `storage_path` to the product's business (SEC-05, latent: 0 media objects today) | Anon API call for a draft returns nothing | N |
 
 ## Admin dashboard
 
@@ -53,17 +53,17 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 |---|---|---|---|---|---|---|---|
 | R-21 | Secure team/admin login | C | IMPLEMENTED_NOT_VERIFIED | `services/supabase/auth.ts`; RLS `is_platform_admin()`. Live (owner-reported): sign-ups off, confirm email on, min password 8 | Leaked-password protection OFF (advisor). Min password should be 12 before sign-ups open | Sign-ups off on production; staging tests pass | Y (production auth changes) |
 | R-22 | Create and manage businesses | C | IMPLEMENTED_NOT_VERIFIED | `BusinessForm.tsx`; e2e | — | Create/edit/deactivate on live staging | N |
-| R-23 | Add, edit, publish, unpublish, duplicate, delete products | C | IMPLEMENTED_NOT_VERIFIED | `ProductTable.tsx`; duplicate = draft copy (`save_product.sql`); e2e | Publish rule (needs a gallery image) is UI-only until migration `20261013093006` is applied | All six actions work against real Supabase | Y (O-1) |
+| R-23 | Add, edit, publish, unpublish, duplicate, delete products | C | VERIFIED (live API); UI on emulated browser | `ProductTable.tsx`; duplicate = draft copy (`save_product.sql`); e2e; Live API suite 15/15 on 2026-10-13 | Publish rule (needs a gallery image) is UI-only until migration `20261013093006` is applied | All six actions work against real Supabase | Y (O-1) |
 | R-24 | Product form fields | C | IMPLEMENTED_NOT_VERIFIED | `ProductEditorForm.tsx` | No free-form specs (A-3) | — | Y (A-3) |
 | R-25 | GLB + USDZ upload with format/size validation | C | IMPLEMENTED_NOT_VERIFIED | `src/lib/files.ts`: extension, 50 MB, magic bytes; bucket MIME list + 50 MB | Checks are browser-side; storage trusts declared MIME. Any ZIP passes as USDZ. Image checks have no magic bytes | Bad files rejected with a clear message | N |
 | R-26 | Model preview before publishing | C | IMPLEMENTED_NOT_VERIFIED | `ModelSection.tsx` `ModelPreview`; `?preview=1` | — | Draft previews without being public | N |
-| R-27 | Real persistent backend data | C | VERIFIED (live) | Supabase mode live; build guard `backendConfig.ts` | Live DB holds sample data (4 sample businesses, 18 products, seeded analytics, sample owners). Build guard runs only when `VERCEL_ENV=production` | Sample data removed before handover | Y (O-4) |
+| R-27 | Real persistent backend data | C | VERIFIED (live) | Supabase mode live; build guard `backendConfig.ts`; Live API suite 15/15 on 2026-10-13 | Live DB holds sample data (4 sample businesses, 18 products, seeded analytics, sample owners). Build guard runs only when `VERCEL_ENV=production` | Sample data removed before handover | Y (O-4) |
 
 ## Analytics
 
 | ID | Requirement | Src | Status | Evidence | Gap / risk | Acceptance | Client approval |
 |---|---|---|---|---|---|---|---|
-| R-28 | Product page views | C | VERIFIED (live) | `ProductPage.tsx` once per load → `track-event`; live rows | Rate-limit key may be spoofable (SEC-03); seeded sample analytics mixed in | Counts reconcile with stored events | N |
+| R-28 | Product page views | C | VERIFIED (live) | `ProductPage.tsx` once per load → `track-event`; live rows; Live API suite 15/15 on 2026-10-13 | Rate-limit key may be spoofable (SEC-03); seeded sample analytics mixed in | Counts reconcile with stored events | N |
 | R-29 | AR activation **attempts** | C | IMPLEMENTED_NOT_VERIFIED | Branch: one `ar_activation` event per launch attempt, taps within 2 s ignored (`ProductPage.tsx` `AR_RELAUNCH_MS`); e2e checks one Scene Viewer intent per double tap | The event means "tried to open AR", not success or placement. Dashboard label still says "AR activations" (UI_BACKLOG row 11) | Metric labelled "AR launch attempts"; counts reconcile on staging | N |
 | R-30 | Per-product and per-business totals | C | IMPLEMENTED_NOT_VERIFIED | `product_analytics_daily` view; `AnalyticsView.tsx` | 30-day window only | Totals match raw event counts | N |
 
@@ -81,6 +81,14 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 
 | ID | Item | Status | Note |
 |---|---|---|---|
-| X-01 | Business-owner dashboard `/dashboard`, owner sign-up, draft registration, claim links | IMPLEMENTED_NOT_VERIFIED | Owner-approved scope change (ADR-0022). Migration `20261013144121` not applied anywhere yet; 10 PGlite tests pass; live tests written for staging. Production sign-ups stay off |
+| X-01 | Business-owner dashboard `/dashboard`, owner sign-up, draft registration, claim links | VERIFIED (live API) for registration + claims; `/signup` email flow not tested (production sign-ups off) | Owner-approved scope change (ADR-0022). Migration `20261013144121` applied to `pmnjchhrgvajtjpadpqo` 2026-10-13; PGlite + live API tests pass |
 | X-02 | Physics/fit features (drag, overlap, wall clearance) | OUT_OF_SCOPE | Change request only (A-4) |
 | X-03 | AI photo-to-3D, billing, team roles, fashion | OUT_OF_SCOPE | — |
+
+
+## Variants and materials: current behaviour (for the client to confirm, A-3)
+
+Not decided on the client's behalf. What the platform does today:
+- **Variant** = a named colour swatch (EN/PT name, hex colour) with an optional price difference. Choosing one changes the shown price only. The 3D model, AR model, photos, dimensions and SKU stay the same. The product page opens on the first variant (its price), while the catalog card shows the base price.
+- **Material** = one free-text field per language (e.g. "Solid oak, wool upholstery"), shown under specifications. No structured list, no per-variant material.
+- If the client expects per-variant 3D models or photos, or a materials list, that is a change request.
