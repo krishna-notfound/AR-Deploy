@@ -9,3 +9,4 @@ Architecture decision records live in `System_arch/decisions/` (index: `System_a
 | 2026-10-13 | Production sign-ups stay disabled; email confirmation stays on | Owner | ADR-0022 |
 | 2026-10-13 | A separate free Supabase staging project is approved; production is changed only with per-change approval | Owner | docs/OPERATIONS_RUNBOOK.md |
 | 2026-10-13 | "AR activation" analytics means a launch attempt (one per tap, 2 s guard), never a successful placement | Owner | docs/PRD.md R-29 |
+| 2026-10-13 | No separate staging project: the live project `pmnjchhrgvajtjpadpqo` is used for staging tests until launch, then cleared. Every change there is approved one by one; public sign-ups stay off (test users are created in the dashboard) | Owner | docs/OPERATIONS_RUNBOOK.md |
