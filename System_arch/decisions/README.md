@@ -32,3 +32,5 @@ If a decision is replaced, set the old ADR's status to `Superseded by ADR-NNNN`.
 | [0018](ADR-0018-custom-webxr-placement.md) | Own WebXR placement session (reticle, Place, Rotate, Move, Start over); native viewers otherwise | **Withdrawn** 2026-10-13: original model-viewer AR restored | design/09, 15 |
 | [0019](ADR-0019-model-optimization.md) | Safe in-browser GLB optimization (glTF-Transform, no new glTF extensions), off until client sign-off | Accepted (flagged) | design/15 |
 | [0020](ADR-0020-pglite-migration-tests.md) | SQL migrations and RLS tested in PGlite (dev-only) | Accepted | design/17, 19 |
+| [0021](ADR-0021-native-ar-viewers-only.md) | Native AR viewers only: Scene Viewer (Android), Quick Look (iOS); no WebXR | Accepted 2026-10-13, needs device check before `main` | design/09 |
+| [0022](ADR-0022-owner-registration-and-claim-links.md) | Owner self-registration as drafts, single-use claim links, no ownership by email match | Accepted 2026-10-13 (scope change) | design/19 |

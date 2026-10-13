@@ -1,9 +1,11 @@
+> **Superseded in part (2026-10-13).** AR and analytics statements below are outdated. Current state: System_arch/HANDOFF.md and docs/PRODUCTION_READINESS.md.
+
 # Deployment and handover
 
 The technical details live in `System_arch/design/20-deployment.md` (Vercel settings, DNS and wildcard SSL, Auth URLs, rollback). This file is the delivery checklist plus a guide for the people who will run the platform.
 
 ## 1. Deployment checklist (owner)
-Each step needs explicit approval. Nothing below has been done yet.
+Each step needs explicit approval. ~~Nothing below has been done yet.~~ (2026-10-13: a production Vercel deployment exists, auto-deployed from `main`. Domain, subdomains and SSL are still open.)
 
 1. **Vercel project** from the Git repository. Deploy through Git only: `vercel deploy --prebuilt` would skip the build guard.
 2. **Environment variables:**
@@ -62,7 +64,9 @@ Each step needs explicit approval. Nothing below has been done yet.
 2. The QR code always opens the business's catalog, never a single product.
 3. To share one product, use **Share** on its page.
 
-**Analytics.** These show product page views and "AR activations", meaning visits where someone tapped "View in my home", counted once per page view. They do not count successful placements: the phone's AR viewer doesn't report back.
+**Analytics.** These show product page views and AR launch attempts (labelled "AR activations" on the dashboard).
+- **Product views:** one per page load.
+- **AR launch attempts:** one each time a visitor taps "View in my home" to open AR. Repeat taps within 2 seconds of a launch are ignored, but a visitor who tries again later counts again, so this is not "once per visit". It means someone *tried* to open AR. It does not mean AR opened successfully or the furniture was placed: the phone's AR viewer doesn't report back.
 
 **What customers see.**
 - **iPhone:** "View in my home" opens Apple's AR viewer at real size.

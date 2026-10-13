@@ -1,4 +1,8 @@
+> **Superseded in part (2026-10-13).** AR and analytics statements below are outdated. Current state: System_arch/HANDOFF.md and docs/PRODUCTION_READINESS.md.
+
 # AR compatibility, scale and physics
+
+> **AR (2026-10-13):** the custom WebXR session (`webxrSession.ts`, `chooseArMode`, `placement.ts`, overlay, "Precise placement (beta)", footprint and settle) was removed in f171db3; it does not exist in the code. The owner then chose **native viewers only** on branch `chore/production-readiness` (not yet deployed): `ar-modes="scene-viewer quick-look"`, `ar-scale="fixed"`, `ar-placement="floor"`; Scene Viewer intent `mode=ar_preferred`, `resizable=false`. No WebXR, no custom AR session, no custom physics. The Chromium/ARCore and Scene Viewer findings in §2 remain useful background; §4–§5 describe a path that is no longer planned. No real-device test recorded.
 
 Tags: **VERIFIED** means confirmed from source code or official docs, with the citation. **HYPOTHESIS** means it needs a physical device.
 
@@ -7,7 +11,7 @@ Tags: **VERIFIED** means confirmed from source code or official docs, with the c
 |---|---|---|---|
 | 3D in the browser | model-viewer 4.4 (`components/three/ModelViewer.tsx`) | Always, when there is a GLB | Our page |
 | Native AR | Scene Viewer (Android, Google app), Quick Look (iOS) | `activateAR()`; `ar-modes="scene-viewer quick-look"`, `ar-scale="fixed"`, `ar-placement="floor"` | **The platform's.** The website can set only scale, placement and a few intent parameters |
-| Custom WebXR AR | `src/features/ar/webxrSession.ts` (three 0.183.2) | Chrome on Android when `isSessionSupported('immersive-ar')` | Ours: reticle, Place, Rotate ±15°, Move, Start over |
+| ~~Custom WebXR AR~~ | ~~`src/features/ar/webxrSession.ts` (three 0.183.2)~~ **Removed** (f171db3) | — | — |
 
 ## 2. Root cause: why Android phones behave differently
 1. **Chrome's WebXR check doesn't look at ARCore.** VERIFIED in Chromium main:
@@ -23,13 +27,13 @@ Tags: **VERIFIED** means confirmed from source code or official docs, with the c
    - spawns the item at an arbitrary floor point,
    - turns a one-finger miss into a rotation,
    - has no Done or Reset (ADR-0018).
-6. **This branch makes it worse on phones without ARCore.** Our `chooseArMode` picks WebXR first. Those phones get the failure or install prompt, then the "Allow camera access…" message, which names the wrong cause, and only then the native fallback.
+6. ~~**This branch makes it worse on phones without ARCore.** Our `chooseArMode` picks WebXR first.~~ (Historical: `chooseArMode` was removed in f171db3.) Those phones get the failure or install prompt, then the "Allow camera access…" message, which names the wrong cause, and only then the native fallback.
 
 **Conclusion.** The difference between phones is ARCore certification and installation state, combined with WebXR being chosen first:
 - **Pixel 10a:** certified, with ARCore installed, so it works.
 - **The "incompatible" phone:** not certified.
 
-The fix is to choose **native first** (Scene Viewer handles phones without ARCore), and offer our WebXR session only as an opt-in.
+The fix is to choose **native first** (Scene Viewer handles phones without ARCore)~~, and offer our WebXR session only as an opt-in~~. 2026-10-13: done as native-only on the branch (no WebXR at all); unverified on a device.
 
 ### Other AR defects found
 | ID | Defect | Status |
@@ -56,13 +60,15 @@ The fix is to choose **native first** (Scene Viewer handles phones without ARCor
   5. Variants share one model and one set of dimensions.
 - **Proposed validation (pure functions in `lib/scale.ts`, still never rescaling):**
   - A `reason` field: `axis-swap`, `uniform` (k ≈ 100, 1000, 39.37 or 2.54, each with a named likely cause) or `axis` (one axis off).
-  - Tolerance = max(5%, 1 cm), one global value.
+  - Tolerance = max(5%, 1 cm), one global value. (Implemented in `lib/scale.ts`; UI copy still says "within 5%".)
   - USDZ copy: "checked on the 3D (GLB) file; the iPhone file isn't measured".
   - Later, measure the USDZ with three's `USDLoader`, which is already installed (`metersPerUnit` handling must be added).
 - **Do not stretch axes independently.** Uniform scale is suggested only as a fix for the admin to apply to the file.
 
 ## 4. Physics and placement feasibility
-Native viewers can't take custom behaviour. Everything beyond basic placement works only in our WebXR mode.
+> **Not planned (2026-10-13):** the owner chose native viewers only, with no custom physics. Rows marked "Done" in the Custom WebXR column below referred to the removed session. Kept as feasibility notes only.
+
+Native viewers can't take custom behaviour. Everything beyond basic placement works only in ~~our~~ a custom WebXR mode (none exists now).
 
 | Capability | Native AR | Custom WebXR | Reliability limitations | Phase |
 |---|---|---|---|---|
@@ -104,5 +110,5 @@ Native viewers can't take custom behaviour. Everything beyond basic placement wo
 
 ## 5. Recommended staged approach
 1. **Tier 1 (contract).** Native first. Fix the dead button, URL expiry, analytics counting and wrong copy. Compression that keeps files Scene Viewer-safe. Real-device pass.
-2. **Tier 2 (control).** Our WebXR session as **"Precise placement (beta)"**, a secondary link on Android Chrome only. Session fixes (P2-01) and physics P-A.
-3. **Tier 3 (physics enhancements).** P-B drag, P-C several items with overlap, P-D wall clearance. All need client approval. Ship them behind the beta link and keep claims as estimates.
+2. ~~**Tier 2 (control).** Our WebXR session as **"Precise placement (beta)"**, a secondary link on Android Chrome only. Session fixes (P2-01) and physics P-A.~~ Dropped: session removed; owner chose native-only.
+3. ~~**Tier 3 (physics enhancements).** P-B drag, P-C several items with overlap, P-D wall clearance. All need client approval. Ship them behind the beta link and keep claims as estimates.~~ Dropped for the same reason.

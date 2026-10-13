@@ -1,3 +1,5 @@
+> **Superseded in part (2026-10-13).** AR and analytics statements below are outdated. Current state: System_arch/HANDOFF.md and docs/PRODUCTION_READINESS.md.
+
 # Prioritized issues
 
 **Severity:**
@@ -31,6 +33,8 @@
 - **Scope:** In. It needs a new dependency (`@gltf-transform/core` and `@gltf-transform/functions`, MIT) and therefore **ADR-0019**. **Client:** confirm that "compression" means size optimization that stays compatible with Scene Viewer.
 
 ### P1-02 Android AR defaults to custom WebXR, against the contract, and fails on phones without ARCore
+> **Status 2026-10-13:** the custom WebXR session and `chooseArMode`/`capability.ts`/`useArExperience.ts` were removed (f171db3). On branch `chore/production-readiness` (not yet deployed) AR is native-only, `ar-modes="scene-viewer quick-look"`, with no "Precise placement (beta)" link. The fix below is historical. Pending a real-device check.
+
 - **Requirement:** A4.
 - **Where:** `src/features/ar/capability.ts` `chooseArMode`; `ArSection.tsx`; `useArExperience.ts`.
 - **Repro:** non-ARCore Android with Chrome → tap "View in my home". The session request fails (or the ARCore install prompt says "incompatible"), then "AR could not start. Allow camera access…".
@@ -50,7 +54,7 @@
   1. On Android without the Google app, tap AR. The fallback hash fires `ar-status: failed`.
   2. Tap again: nothing happens, and a second `ar_activation` is recorded.
 - **Root cause:** model-viewer switches to `NONE` mode after a failure; the page never learns this.
-- **Fix:** on `failed`, call `setCanAR(false)` (plus the `nativeFailed` input to `chooseArMode`). The page then shows the honest no-AR state, or WebXR beta if supported.
+- **Fix:** on `failed`, call `setCanAR(false)` ~~(plus the `nativeFailed` input to `chooseArMode`). The page then shows the honest no-AR state, or WebXR beta if supported.~~ (`chooseArMode` and the WebXR beta were removed in f171db3.)
 - **Risk:** low. **Test:** unit test of `chooseArMode` with `nativeFailed`. **Scope:** In.
 
 ### P1-04 Signed media URLs expire after 1 h and are never refreshed
@@ -75,7 +79,7 @@
 
 ### P1-06 Delivery artifacts missing
 - **Requirement:** E2, E3, E4.
-- **What:** no production deployment, domain, wildcard subdomain or SSL; no device tests; no user guide or walkthrough video; no handover document.
+- **What:** ~~no production deployment,~~ (a production Vercel deploy exists, 2026-10-13) no domain, wildcard subdomain or SSL; no device tests; no user guide or walkthrough video; no handover document.
 - **Fix:** follow Stage D of the plan. This is configuration and documentation, not code.
 - **Scope:** In (contracted delivery). Domain purchase and DNS need the owner.
 
@@ -103,14 +107,14 @@
 ## P2: important
 | ID | Issue | Where | Fix | Test | Scope |
 |---|---|---|---|---|---|
-| P2-01 | WebXR session left running after a setup failure; Exit does nothing during the permission prompt; `end` listener attached late; taps place while the model is loading | `webxrSession.ts` start (try/catch → `session.end()`, attach `end` first, `loading` guard on select); `useArExperience.ts` (set `active` only after the controller exists) | as listed | unit tests with a fake `XRSession` | In (beta path) |
-| P2-02 | `ar_activation` counted per tap and twice after a fallback; failed launches counted | `ProductPage.tsx` `recordAr`, `startAR` | `useRef` guard: one per page view. Document: "a tap on View in my home, once per page view"; it is **not** a placement | unit/component test | In |
+| ~~P2-01~~ | ~~WebXR session left running after a setup failure; Exit does nothing during the permission prompt; `end` listener attached late; taps place while the model is loading~~ **Moot:** session removed (f171db3) | ~~`webxrSession.ts`, `useArExperience.ts`~~ | — | — | — |
+| P2-02 | `ar_activation` counted per tap and twice after a fallback; failed launches counted | `ProductPage.tsx` `recordAr`, `startAR` | ~~`useRef` guard: one per page view. Document: "a tap on View in my home, once per page view"~~ **Current (2026-10-13):** one event per AR launch attempt; taps within 2 s of a launch are ignored. Document as "AR launch attempts": someone tried to open AR; it is **not** a successful open or a placement, and **not** once per page view | unit/component test | In |
 | P2-03 | Publishing under a draft or inactive business says "Live at…" but the page shows not found | `useProductActions.tsx`, publish modal, `ProductEditorForm.tsx` | Show "Catalog is not live yet" when the business isn't active | e2e | In |
 | P2-04 | Publish rules enforced in the UI only; `published_at` set by the client | `services/validation.ts`; `*_save_product.sql`; products update policy | Deferred constraint trigger on `products` and `product_images` (ignored when the product is gone), plus a BEFORE trigger for `published_at`. Run the audit query first; map 23514 to VALIDATION | live test | **Owner** (migration) |
 | P2-05 | Analytics visitor key from the first `X-Forwarded-For` entry, probably spoofable (community report) | `supabase/functions/track-event/handler.ts` `clientIp` | Deploy a header-echo build to staging, then key on the platform-appended entry | handler test | **Owner** (redeploy) |
 | P2-06 | SVG logo accepted by the client, rejected by the bucket with a raw error | `lib/files.ts` `LOGO_RULES` | Remove SVG from the allowed types | unit | In |
 | P2-07 | Changing business after uploads on a new product gives a false "not allowed" error and orphaned files | `ProductEditorForm.tsx` business select | Lock the select once media is uploaded, or clear the media with a confirmation | e2e | In |
-| P2-08 | Misleading AR copy: readiness Android text; start-failure cause; size warning 15 MB vs Scene Viewer's 10 MB; iOS "True size" from an unmeasured USDZ | `readiness.ts`, `en.ts`/`pt.ts`, `ArSessionOverlay.tsx` | Fix the copy; `LARGE_MODEL_BYTES = 10 MB`; on iOS show "checked on the 3D file" | unit | In |
+| P2-08 | Misleading AR copy: readiness Android text; start-failure cause; size warning 15 MB vs Scene Viewer's 10 MB; iOS "True size" from an unmeasured USDZ | `readiness.ts`, `en.ts`/`pt.ts`, ~~`ArSessionOverlay.tsx`~~ (removed) | Fix the copy; `LARGE_MODEL_BYTES = 10 MB`; on iOS show "checked on the 3D file" | unit | In |
 | P2-09 | Unit toggle relabels numbers (219 cm becomes 219 in); mismatches not diagnosed | `ProductEditorForm.tsx` unit toggle; `lib/scale.ts` | Convert values on toggle; `checkScale` reason (axis swap, uniform k, wrong unit); tolerance max(5%, 1 cm) | unit | In |
 | P2-10 | Supabase mode shows "demo" wording | `BusinessForm.tsx`, `useBusinessActions.ts`, `useProductActions.tsx`, `ModelSection.tsx` | Mode-aware text | grep test | In |
 | P2-11 | Concurrent edits can delete a file that is still referenced | `updateProduct` (last write wins) | Optimistic lock on `updated_at` in `save_product` | live test | **Owner** (migration) |
@@ -134,8 +138,8 @@ default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob
 | P3-05 | `AccountProvider` load race; a network error is treated as signed out | In |
 | P3-06 | Revoke EXECUTE on `public.rls_auto_enable()` from public, anon and authenticated (advisor warning; not callable as RPC) | Owner (migration) |
 | P3-07 | Image and variant arrays have no length limit in `save_product`; `contact_email` has no format check | Owner (migration) |
-| P3-08 | WebXR: create anchors inside the frame callback (spec compliance); precise `Box3`; dispose `RoomEnvironment` | In |
-| P3-09 | **Physics P-A:** footprint preview and settle-onto-floor (AR_COMPATIBILITY_AND_PHYSICS §4) | Owner decision |
+| ~~P3-08~~ | ~~WebXR: create anchors inside the frame callback (spec compliance); precise `Box3`; dispose `RoomEnvironment`~~ Moot: WebXR session removed | — |
+| ~~P3-09~~ | ~~**Physics P-A:** footprint preview and settle-onto-floor~~ Removed with the WebXR session; owner chose native-only, no custom physics (2026-10-13). P3-10 to P3-12 would need a custom AR session and are not planned | — |
 | P3-10 | **Physics P-B:** drag on the floor | **Client** |
 | P3-11 | **Physics P-C:** several items with overlap warnings | **Client** |
 | P3-12 | **Physics P-D:** wall clearance estimate | **Client**, experimental |

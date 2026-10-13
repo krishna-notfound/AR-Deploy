@@ -1,3 +1,5 @@
+> **Superseded in part (2026-10-13).** AR and analytics statements below are outdated. Current state: System_arch/HANDOFF.md and docs/PRODUCTION_READINESS.md.
+
 # Architecture and data flow (as built, 2026-10-13)
 
 For the design intent, see design/05, 07, 08, 19 and 20. This file records what the code actually does, and where it breaks.
@@ -17,10 +19,7 @@ For the design intent, see design/05, 07, 08, 19 and 20. This file records what 
   - Product media is in the private bucket `product-media/{businessId}/{uuid}.ext`, served through **1-hour** signed URLs (`supabaseCatalogService.ts` `SIGNED_URL_TTL_SECONDS`).
   - Logos are in the public bucket `business-logos`.
 - **Analytics:** `service.recordEvent` → Edge Function `track-event` → `record_event_limited` (30 events per minute per visitor key) → `product_analytics`. Reads go through the security-invoker view `product_analytics_daily`.
-- **AR:** `ProductPage` → `useArExperience` (`chooseArMode`), which leads to one of:
-  - our WebXR session (`features/ar/webxrSession.ts`)
-  - model-viewer `activateAR()` (Scene Viewer / Quick Look)
-  - the hand-off panel
+- **AR:** ~~`ProductPage` → `useArExperience` (`chooseArMode`) → our WebXR session (`features/ar/webxrSession.ts`) / native / hand-off~~ (removed in f171db3). **Current (branch `chore/production-readiness`, not yet deployed):** `ProductPage` → model-viewer `activateAR()` with `ar-modes="scene-viewer quick-look"` (Android: Scene Viewer; iOS: Quick Look); otherwise the 3D viewer plus the phone hand-off panel.
 
 ## Workflow traces
 | Flow | Path (file → function) | Breaks at |
@@ -29,7 +28,7 @@ For the design intent, see design/05, 07, 08, 19 and 20. This file records what 
 | B. Create product | `ProductEditorForm` → `ImageUpload.addFiles` / `ModelSlot.onFile` → `validateModelFile` (magic bytes, 50 MB) → `uploadAsset` (`product-media/{biz}/{uuid}`) → signed URL → `save()` → `createProduct` → RPC `save_product` (always inserts as draft) → `productById` | No compression (P1-01). No upload progress or retry. Switching the business after uploading gives a false "not allowed" error and orphans the files (P2-07) |
 | C. Publish | `onPublish` / `useProductActions.publish` → `publishProduct` → `validateForPublish` (**client-side only**) → `UPDATE status, published_at` | Rule "at least one gallery image" is not enforced in the DB (P2-04). `published_at` is set by the client. Publishing under a draft or inactive business says "Live at…", but RLS hides it (P2-03) |
 | D. Public view | Host or path → `ProductPage` → `getPublicProduct` (business by slug → product by `(business_id, slug)` → status filter → `hydrate` signs media for 1 h) → `localized()` | Signed URLs are never refreshed (P1-04). A signing failure looks like "missing 3D" (P3) |
-| E. AR | `onActivate` → `recordAr()` → WebXR: `startWebXr` → `startArSession` (fetches the GLB **again**); or native: `activateAR()` (Scene Viewer / Quick Look fetch the URL themselves) | Wrong default on Android (P1-02). Dead button after `ar-status: failed` (P1-03). Double counting (P2-02). Session setup failures (P2-01) |
+| E. AR | ~~`onActivate` → `recordAr()` → WebXR: `startWebXr` → `startArSession` (fetches the GLB **again**); or~~ native: `activateAR()` (Scene Viewer / Quick Look fetch the URL themselves). 2026-10-13: native only; one `ar_activation` per launch attempt (taps within 2 s ignored) | ~~Wrong default on Android (P1-02). Double counting (P2-02). Session setup failures (P2-01)~~ (WebXR removed). Dead button after `ar-status: failed` (P1-03). Not verified on a real device |
 | F. Analytics | `ProductPage` effects (view, first interaction, AR) → `recordEvent` (never throws) → `track-event` (UUID and type validation, salted IP hash) → `record_event_limited` (published + active + business match) | Visitor key taken from the first `X-Forwarded-For` entry, probably spoofable (P2-05) |
 | G. Modes | No env → demo. Malformed → config error screen | An empty `VITE_DATA_MODE` in a production build serves demo data on the public pages (P1-05) |
 

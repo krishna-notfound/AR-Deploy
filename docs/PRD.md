@@ -1,6 +1,6 @@
 # Product Requirements: AR Furniture Platform
 
-Last verified against code and the live Supabase project: **2026-10-13** (Phase 0 audit, branch `chore/production-readiness`, base `048cd01`).
+Last verified against code and the live Supabase project: **2026-10-13** (Phase 0 audit; updated after Phase C/D on branch `chore/production-readiness`). Branch changes are **not deployed**; production runs `main` `8026a37`.
 
 This document lists the agreed requirements and where each one stands. Status reflects **evidence**, not code existence:
 
@@ -22,9 +22,9 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 | ID | Requirement | Src | Status | Evidence | Gap / risk | Acceptance | Client approval |
 |---|---|---|---|---|---|---|---|
 | R-01 | Reusable product page | C | IMPLEMENTED_NOT_VERIFIED | `src/features/public/ProductPage.tsx`; `src/app/router.tsx` | No real-device run | Every published product renders from DB data on iPhone + Android | N |
-| R-02 | Interactive 3D viewer (model-viewer) | C | IMPLEMENTED_NOT_VERIFIED | `src/components/three/ModelViewer.tsx` (identical to `a6bc75b`); e2e `tests/e2e/public.spec.ts` | Desktop Chromium only. Listeners not re-attached when `src` changes (SEC-04) | Model loads, rotates, zooms on real phones | N |
+| R-02 | Interactive 3D viewer (model-viewer) | C | IMPLEMENTED_NOT_VERIFIED | `src/components/three/ModelViewer.tsx`; e2e `tests/e2e/public.spec.ts`; unit `src/test/modelViewer.test.tsx` | Desktop Chromium only. Listener bug on model-URL change fixed on branch (SEC-04) | Model loads, rotates, zooms on real phones | N |
 | R-03 | iOS Quick Look handoff | C | IMPLEMENTED_NOT_VERIFIED | `ios-src` in `ModelViewer.tsx`, fed from `ProductMedia.tsx` | Never tested on an iPhone. Without a USDZ, model-viewer converts the GLB at tap time (slow, unverified) | Quick Look opens with the uploaded USDZ on a physical iPhone | N |
-| R-04 | Android AR (Scene Viewer / WebXR) | C | IMPLEMENTED_NOT_VERIFIED | `ar-modes="webxr scene-viewer quick-look"`, `ar-scale="fixed"` | Contract names Scene Viewer; live flow tries in-browser WebXR first (owner-approved, shown to client). "Scene Viewer first" attempt failed on owner's phone, cause undiagnosed | AR opens on a physical ARCore phone; non-ARCore phone gets a useful fallback | Y: confirm current flow is accepted |
+| R-04 | Android AR: Google Scene Viewer | C | IMPLEMENTED_NOT_VERIFIED | Branch `chore/production-readiness`: `ar-modes="scene-viewer quick-look"` (ADR-0021), intent `mode=ar_preferred`, `resizable=false`; e2e on a **simulated** Android user agent. `main` (live) still WebXR-first | An earlier Scene Viewer-first attempt did not open the Google app on the owner's phone (cause undiagnosed). Owner-reported test of the live flow pending details. No physical device available now | Scene Viewer opens at true size on a physical ARCore phone; non-ARCore phone gets Scene Viewer's 3D view or a clear message | N (owner decided native-only 2026-10-13) |
 | R-05 | 3D fallback when AR unavailable | C | IMPLEMENTED_NOT_VERIFIED | `ArSection.tsx` (copy link, QR), `ProductMedia.tsx` (error, retry, photos) | Device check | Unsupported device shows 3D + explanation, never a dead button | N |
 | R-06 | True real-world size | C | IMPLEMENTED_NOT_VERIFIED | `src/lib/scale.ts` (5% or 1 cm tolerance); editor scale diagnosis | USDZ size never measured; UI text says "within 5%" but code also allows 1 cm; no tape-measure test | Measured AR size matches product dimensions on both platforms | N |
 | R-07 | Name, price, description, dimensions, photos, CTA | C | IMPLEMENTED_NOT_VERIFIED | `ProductPage.tsx` | — | Fields shown from DB in EN and PT | N |
@@ -51,7 +51,7 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 
 | ID | Requirement | Src | Status | Evidence | Gap / risk | Acceptance | Client approval |
 |---|---|---|---|---|---|---|---|
-| R-21 | Secure team/admin login | C | REQUIRES_OWNER_APPROVAL | `services/supabase/auth.ts`; RLS `is_platform_admin()` | Live auth settings unknown from code (signup / confirm email / password length). Leaked-password protection OFF (advisor). See SEC-01 | Sign-ups off or invite-only, confirmations on, min length 12 | Y (O-2) |
+| R-21 | Secure team/admin login | C | IMPLEMENTED_NOT_VERIFIED | `services/supabase/auth.ts`; RLS `is_platform_admin()`. Live (owner-reported): sign-ups off, confirm email on, min password 8 | Leaked-password protection OFF (advisor). Min password should be 12 before sign-ups open | Sign-ups off on production; staging tests pass | Y (production auth changes) |
 | R-22 | Create and manage businesses | C | IMPLEMENTED_NOT_VERIFIED | `BusinessForm.tsx`; e2e | — | Create/edit/deactivate on live staging | N |
 | R-23 | Add, edit, publish, unpublish, duplicate, delete products | C | IMPLEMENTED_NOT_VERIFIED | `ProductTable.tsx`; duplicate = draft copy (`save_product.sql`); e2e | Publish rule (needs a gallery image) is UI-only until migration `20261013093006` is applied | All six actions work against real Supabase | Y (O-1) |
 | R-24 | Product form fields | C | IMPLEMENTED_NOT_VERIFIED | `ProductEditorForm.tsx` | No free-form specs (A-3) | — | Y (A-3) |
@@ -64,7 +64,7 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 | ID | Requirement | Src | Status | Evidence | Gap / risk | Acceptance | Client approval |
 |---|---|---|---|---|---|---|---|
 | R-28 | Product page views | C | VERIFIED (live) | `ProductPage.tsx` once per load → `track-event`; live rows | Rate-limit key may be spoofable (SEC-03); seeded sample analytics mixed in | Counts reconcile with stored events | N |
-| R-29 | AR activation **attempts** | C | INCOMPLETE | `ProductPage.tsx`: recorded on every tap before `activateAR()` | Repeat taps inflate; dashboard label says "activations"; several docs wrongly say "once per page view" | Metric labelled "AR attempts", one per launch attempt | N |
+| R-29 | AR activation **attempts** | C | IMPLEMENTED_NOT_VERIFIED | Branch: one `ar_activation` event per launch attempt, taps within 2 s ignored (`ProductPage.tsx` `AR_RELAUNCH_MS`); e2e checks one Scene Viewer intent per double tap | The event means "tried to open AR", not success or placement. Dashboard label still says "AR activations" (UI_BACKLOG row 11) | Metric labelled "AR launch attempts"; counts reconcile on staging | N |
 | R-30 | Per-product and per-business totals | C | IMPLEMENTED_NOT_VERIFIED | `product_analytics_daily` view; `AnalyticsView.tsx` | 30-day window only | Totals match raw event counts | N |
 
 ## Assets, delivery, ownership
@@ -81,6 +81,6 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 
 | ID | Item | Status | Note |
 |---|---|---|---|
-| X-01 | Business-owner dashboard `/dashboard` + owner accounts | REQUIRES_OWNER_APPROVAL | Built and RLS-tested; contract excludes self-service accounts (A-5) |
+| X-01 | Business-owner dashboard `/dashboard`, owner sign-up, draft registration, claim links | IMPLEMENTED_NOT_VERIFIED | Owner-approved scope change (ADR-0022). Migration `20261013144121` not applied anywhere yet; 10 PGlite tests pass; live tests written for staging. Production sign-ups stay off |
 | X-02 | Physics/fit features (drag, overlap, wall clearance) | OUT_OF_SCOPE | Change request only (A-4) |
 | X-03 | AI photo-to-3D, billing, team roles, fashion | OUT_OF_SCOPE | — |

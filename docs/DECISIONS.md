@@ -1,0 +1,11 @@
+# Decisions
+
+Architecture decision records live in `System_arch/decisions/` (index: `System_arch/decisions/README.md`). This file lists the owner-approved scope changes and product decisions taken during the production-readiness programme.
+
+| Date | Decision | Approved by | Record |
+|---|---|---|---|
+| 2026-10-13 | AR uses native viewers only: Google Scene Viewer (Android), Apple Quick Look (iOS/iPadOS), interactive 3D viewer elsewhere. No WebXR, custom AR session or physics | Owner | ADR-0021 |
+| 2026-10-13 | Business owners may self-register; new businesses are drafts until an admin activates them; existing businesses are claimed only via admin-issued single-use links. Scope change: the contract excluded self-service accounts | Owner | ADR-0022 |
+| 2026-10-13 | Production sign-ups stay disabled; email confirmation stays on | Owner | ADR-0022 |
+| 2026-10-13 | A separate free Supabase staging project is approved; production is changed only with per-change approval | Owner | docs/OPERATIONS_RUNBOOK.md |
+| 2026-10-13 | "AR activation" analytics means a launch attempt (one per tap, 2 s guard), never a successful placement | Owner | docs/PRD.md R-29 |

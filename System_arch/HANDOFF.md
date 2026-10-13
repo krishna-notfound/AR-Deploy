@@ -13,11 +13,17 @@
 - **Commits:** author `krishna <krishnagtkr@gmail.com>`, **no Claude co-author line**. Push to `main` only when the owner asks; each push deploys to production.
 
 ## AR: what is live and why (most important)
-**Live AR = the original model-viewer flow**, byte-identical to commit `a6bc75b` on the product page:
+**Branch `chore/production-readiness` (NOT yet deployed): native viewers only.** Owner decision 2026-10-13 (commit c201d91):
+- `ModelViewer.tsx`: `ar-modes="scene-viewer quick-look"`, `ar-scale="fixed"`, `ar-placement="floor"`. Android = Google Scene Viewer (intent `mode=ar_preferred`, so 3D fallback without ARCore; `resizable=false`, true size). iOS/iPadOS = Quick Look. Desktop/unsupported = interactive 3D viewer plus "view on a phone" hand-off (link + QR). No WebXR, no custom AR session, no custom physics.
+- E2E 27/27 on this branch, including a simulated-Android Scene Viewer intent test (simulated user agent, not a real phone).
+- The owner said informally that AR worked on their phone (details pending): **owner-reported, not verified.**
+- **Risk:** the earlier "Scene Viewer first" attempt (8f1ee02, below) failed on the owner's phone, cause undiagnosed. **This change MUST get a real-device check (ARCore Android + iPhone) before any push to `main`.**
+
+**Production (`main`, still live) = the original model-viewer flow**, byte-identical to commit `a6bc75b` on the product page:
 - `src/components/three/ModelViewer.tsx`: `ar-modes="webxr scene-viewer quick-look"`, `ar-scale="fixed"`, `ar-placement="floor"`.
 - The product page's "View in my home" opens the AR tips, then `activateAR()`.
 - Android Chrome on ARCore phones: model-viewer's own in-browser WebXR. Scene Viewer as its fallback. iPhone: Quick Look.
-- **The owner confirmed this flow works and wants it kept.** It was shown to the client.
+- **The owner confirmed this flow works** and it was shown to the client. (Superseded on the branch by the native-only decision above.)
 
 **Tried and rolled back (do not repeat without a device test first):**
 1. **Custom WebXR session** (98c7545, three.js; removed in f171db3). It made AR **laggy**, for these reasons (from the code):
@@ -40,6 +46,8 @@
 - **constraint:** furniture must stay at true size (contract), so no auto-resizing to fit the room;
 - the native viewers (Quick Look, Scene Viewer) already supply floor detection, shadows, smoothing and lighting. Any change must be one small model-viewer attribute, tested on the owner's phone **before** pushing to `main`.
 
+**Analytics meaning:** `view` = once per page load; `model_interaction` = first rotate/zoom per page view; `ar_activation` = one per AR launch attempt (taps within 2 s of a launch ignored). It means "tried to open AR", not "AR opened" or "furniture placed", and it is **not** once per page view. Use the wording "AR launch attempts".
+
 ## Other work done this session (on `main`, live)
 - Production build guard (`src/services/backendConfig.ts`): refuses demo mode, missing or non-https config, and secret keys.
 - Safe DB error messages; logo cleanup limited to the business's own folder; signed media URLs last 12 h (`MEDIA_URL_TTL_SECONDS`).
@@ -56,9 +64,9 @@
   - PGlite migration and RLS tests (`supabase/tests/`, ADR-0020);
   - E2E checks that AR launches through model-viewer with one GLB download;
   - Playwright test budget 90 s (sample models load from raw.githubusercontent.com).
-- Last full run: typecheck and lint pass; vitest 106 passed, 13 skipped (live tests); E2E 27/27 at 8f1ee02. After the revert, the E2E count is 26: the Android Scene Viewer test was reverted too.
+- Last full run: typecheck and lint pass; vitest 106 passed, 13 skipped (live tests); E2E 27/27 at 8f1ee02. After the revert, the E2E count on `main` is 26: the Android Scene Viewer test was reverted too. On `chore/production-readiness` it is 27/27 again (simulated-Android Scene Viewer intent test restored).
 
-**Some audit docs describe the removed custom session** as "done": `audit/IMPLEMENTATION_STATUS.md` (AR rows), `audit/CLIENT_SCOPE_ACCEPTANCE_MATRIX.md` (top update table), `tasks/P10-ar.md`. **This file overrides them.**
+**Older audit docs described the removed custom session** as "done" and AR activations as "once per page view". They now carry a "Superseded in part (2026-10-13)" banner with in-place corrections (`audit/*`, `tasks/P10-ar.md`). **This file overrides them.**
 
 ## Open items (exact steps in `System_arch/audit/APPROVAL_REQUIRED.md`)
 - **O-1:** apply the publish-rules migration (owner approval).

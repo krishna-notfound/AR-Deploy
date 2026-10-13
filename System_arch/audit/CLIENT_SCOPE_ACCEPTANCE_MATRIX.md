@@ -1,6 +1,8 @@
+> **Superseded in part (2026-10-13).** AR and analytics statements below are outdated. Current state: System_arch/HANDOFF.md and docs/PRODUCTION_READINESS.md.
+
 # Client scope acceptance matrix
 
-> **Superseded for AR (2026-10-13):** the custom WebXR session, footprint and settle, native-first and 'Precise placement' described here were removed. Live AR is the original model-viewer flow. See `System_arch/HANDOFF.md`.
+> **AR (2026-10-13):** the custom WebXR session, footprint and settle, "native-first" switch and "Precise placement" described here were removed (f171db3). On branch `chore/production-readiness` (not yet deployed), AR is native viewers only: `ar-modes="scene-viewer quick-look"` (Android: Scene Viewer; iOS: Quick Look; elsewhere: 3D viewer plus phone hand-off). No real-device test recorded.
 
 Status key: **Complete**, **Partial**, **Missing**, **Contradicts contract**, **Unverified** (built, but not proven on a device or against the live backend).
 
@@ -13,16 +15,16 @@ This section overrides the audit rows below.
 
 | # | Requirement | New status | Evidence (tests that ran and passed) |
 |---|---|---|---|
-| A3/A4 | Native AR / Scene Viewer | **Prepared, pending A-1.** <br>• Native-first is implemented but switched off. <br>• Today: a failed WebXR start falls back to the native viewer and is remembered for 7 days (on `NotSupportedError`). <br>• A native failure (`ar-status: failed`) is no longer a dead button. <br>• A user cancel isn't treated as a failure. | `src/features/ar/ar.test.ts` (chooseArMode: 8 cases), `src/features/public/ArSection.test.tsx`, `src/features/ar/webxrSession.test.ts` (setup failure ends the session; cancel = AbortError), e2e `public.spec.ts` (start failure, no dead button) |
-| A5 | Real-world scale | **Improved.** <br>• Mismatches name the cause: axis swap, wrong unit, model in cm/mm, uniform factor. <br>• Tolerance is max(5%, 1 cm). <br>• The WebXR session uses the same precise bounding box. <br>• Still unverified on a device. | `src/lib/lib.test.ts` "checkScale diagnosis" |
+| A3/A4 | Native AR / Scene Viewer | ~~**Prepared, pending A-1.** Native-first implemented but switched off; WebXR fallback; `chooseArMode`, `webxrSession.test.ts`.~~ **2026-10-13 (branch, not deployed):** native viewers only, `ar-modes="scene-viewer quick-look"`; Scene Viewer intent `mode=ar_preferred`, `resizable=false`. **Unverified on a device** (owner reported informally that AR worked on their phone; not a recorded test). | e2e (27 tests) includes a simulated-Android Scene Viewer intent test (simulated user agent, not a real phone) |
+| A5 | Real-world scale | **Improved.** <br>• Mismatches name the cause: axis swap, wrong unit, model in cm/mm, uniform factor. <br>• Tolerance is max(5%, 1 cm) (UI copy says "within 5%"). <br>• ~~The WebXR session uses the same precise bounding box.~~ (session removed) <br>• Still unverified on a device. | `src/lib/lib.test.ts` "checkScale diagnosis" |
 | A13/A14, C8 | Optimized loading / automatic compression | **Built, off until A-2.** Safe optimization in the browser (ADR-0019). <br>• GLBs that require extensions Scene Viewer doesn't support are flagged on upload (always on). <br>• The readiness size warning is now 10 MB. | `modelOptimize.test.ts` (real glTF-Transform), e2e `model-optimize.spec.ts` (real 4096 px texture in Chromium), `lib.test.ts` (extension check) |
 | B3 | Logo | **Fixed.** <br>• SVG is no longer offered (the bucket refuses it). <br>• Logo cleanup only deletes files in the business's own folder (audit P1-07). | `backend.test.ts` "logo cleanup" |
 | B6 | Publish makes the page live | **Fixed.** Publishing under an inactive catalog says it isn't visible yet; "Open product page" opens the preview. | e2e `product-crud.spec.ts` (inactive catalog) |
 | C1 | Secure login / authorization | **Tested; one migration pending (O-1).** The migration links owners only to confirmed emails. RLS tested as `anon` and `authenticated`: drafts hidden, inactive catalogs hidden, no cross-business reads or writes, strangers can't write, admins can. | `supabase/tests/migrations.test.ts` (12 tests, PGlite) |
 | C3 | Publish rules | **Enforced in the DB once O-1 is applied** (at least one gallery image; `published_at` set by the server). The DB error maps to the image field. | `migrations.test.ts`, `backend.test.ts` "database errors" |
-| D2 | AR activations | **Fixed.** Counted once per page view, as an attempt (not a placement). | e2e `public.spec.ts` "counted once per page view" |
+| D2 | AR activations | ~~**Fixed.** Counted once per page view, as an attempt (not a placement).~~ **Corrected 2026-10-13:** one `ar_activation` per AR launch attempt (taps within 2 s of a launch ignored); **not** once per page view. It means "tried to open AR", not a successful open or placement. Recommended label: "AR launch attempts". | e2e `public.spec.ts` |
 | G | Demo vs production | **Fixed.** A production build refuses demo mode, missing values, non-https URLs and secret keys. Raw DB error text is never shown. | `backend.test.ts` "production build guard"; manual builds: 2 blocked, 2 built |
-| — | Physics (owner request) | **Delivered inside the WebXR session:** a true-footprint outline before placing, and a settle drop onto the shadow (respects reduced motion). No fit claims. | `ar.test.ts` "settleOffset". Rendering on a device is unverified |
+| — | Physics (owner request) | ~~**Delivered inside the WebXR session:** a true-footprint outline before placing, and a settle drop onto the shadow.~~ **Removed** with the custom WebXR session (f171db3). Native viewers supply their own floor placement and shadows. | — |
 | E2–E4 | Deployment, device tests, guide | **Guide written** (DEPLOYMENT_AND_HANDOVER.md §4). Deployment and device tests are still open (O-5, DEVICE_TEST_MATRIX). | — |
 
 ## A. Public product experience
@@ -31,13 +33,13 @@ This section overrides the audit rows below.
 | A1 | Reusable product page | `features/public/ProductPage.tsx`; routes in `app/router.tsx` (path and hostname mode) | Complete | — | Two products from different businesses: same layout, each with its own data |
 | A2 | 3D viewer: rotate and zoom | `components/three/ModelViewer.tsx` (model-viewer 4.4); e2e `public.spec.ts` "model loads…" | Complete | — | Drag and pinch on a phone |
 | A3 | Quick Look on iOS | `ModelViewer.tsx` `ios-src`, `ar-modes="scene-viewer quick-look"` | Unverified | Device test. The USDZ is never measured, yet "True size" is shown (P2-08) | iPhone Safari opens Quick Look at true size |
-| A4 | Scene Viewer on Android | `features/ar/capability.ts` `chooseArMode`: WebXR wins whenever `isSessionSupported` is true | **Contradicts contract** | Make native the default (P1-02) | Pixel: Scene Viewer opens. Phone without ARCore: Scene Viewer opens in 3D |
+| A4 | Scene Viewer on Android | ~~`features/ar/capability.ts` `chooseArMode`: WebXR wins whenever `isSessionSupported` is true~~ (removed). Branch: `ar-modes="scene-viewer quick-look"` | ~~**Contradicts contract**~~ Unverified | ~~Make native the default (P1-02)~~ Real-device test | Pixel: Scene Viewer opens. Phone without ARCore: Scene Viewer opens in 3D |
 | A5 | Correct real-world scale | `ar-scale="fixed"`; `lib/scale.ts` `checkScale` (±5%, never rescales); seed GLBs measured and matching (Agent 4) | Partial | Mismatch diagnosis, unit-toggle relabel bug (P2-09), USDZ not measured; device check | Tape-measure a 200 cm sofa in AR |
 | A6 | Name, price, description, specs, dimensions, materials, photos, CTA | `domain/types.ts` Product; `ProductPage.tsx` | Partial | No free-form specifications list (only dimensions, material, weight, category) | Fill every field and check it renders |
 | A7 | Colours / variants | `ProductVariant` (name, colour, SKU, price change) | Partial | A variant never changes the model, photos or dimensions. Agree this with the client (APPROVAL-3) | Pick a variant: the price and swatch change |
 | A8 | 3D fallback without AR | `ArSection.tsx` hand-off (link and QR); e2e | Complete | — | Desktop shows the 3D view and the hand-off |
 | A9 | In-app browser detection (Instagram, Facebook, WhatsApp) | `lib/userAgent.ts`, `InAppNotice.tsx`; e2e (Instagram user agent only) | Unverified | Real in-app browser behaviour; whether intents get through is unknown | Open from each app on both phones |
-| A10 | First-time AR guidance | `ArTips.tsx` (native mode); `ArSessionOverlay.tsx` (WebXR) | Unverified | Device test | Clean phone: guidance shows on the first tap |
+| A10 | First-time AR guidance | `ArTips.tsx`; ~~`ArSessionOverlay.tsx` (WebXR)~~ (removed) | Unverified | Device test | Clean phone: guidance shows on the first tap |
 | A11 | Responsive, mobile-first | e2e `responsive.mobile.spec.ts` | Partial | Accessibility audit (P7-11), real phones | 390 px wide with no horizontal scroll |
 | A12 | PT/EN pages with a switcher | `LanguageSwitcher`, dictionaries, `localized()`; e2e | Complete | — | Switch to PT |
 | A13 | Optimized model loading | Lazy model-viewer, poster, stall timeout, readiness size warning | Partial | Eager loading; the size warning is at 15 MB where Scene Viewer recommends 10 MB | Lighthouse with a 4G profile |
@@ -69,14 +71,14 @@ This section overrides the audit rows below.
 | # | Requirement | Evidence | Status | Missing logic | Acceptance test |
 |---|---|---|---|---|---|
 | D1 | Page views | `ProductPage` → `track-event` → `record_event_limited` | Complete (live per P9) | Rate limit may be spoofable (P2-05) | One visit adds one row |
-| D2 | AR activations | `recordAr()` | Partial | Counted per tap and double-counted after a fallback (P2-02) | One AR attempt per page view adds one row |
+| D2 | AR activations | `recordAr()` | Partial | Counted per tap and double-counted after a fallback (P2-02). 2026-10-13: one per launch attempt, 2 s tap guard | ~~One AR attempt per page view adds one row~~ One launch attempt adds one row |
 | D3 | Per-product and per-business totals | `product_analytics_daily` view | Partial | 30-day window only. Whether sample analytics exist in production is unverified (P2-12) | Totals match the visits made |
 
 ## E. Delivery
 | # | Item | Status | Note |
 |---|---|---|---|
 | E1 | Source, DB and model handover | Partial | No handover document; sample GLBs are hot-linked from GitHub raw |
-| E2 | Deployment, domain, subdomains, SSL | **Missing** | Vercel was blocked by access rights; no domain chosen. Configuration, not code (the CLAUDE.md "never build DNS/SSL" rule means no automation, not "don't configure") |
+| E2 | Deployment, domain, subdomains, SSL | **Partial** (2026-10-13) | ~~Vercel was blocked by access rights;~~ A production Vercel deployment exists (auto-deployed from `main`); no domain chosen. Configuration, not code (the CLAUDE.md "never build DNS/SSL" rule means no automation, not "don't configure") |
 | E3 | Real-device testing on iPhone and Android | **Missing** | DEVICE_TEST_MATRIX.md: every row is "Not run" |
 | E4 | User guide and walkthrough video | **Missing** | — |
 | E5 | 2 revisions, 1 month support | n/a | — |
@@ -87,5 +89,5 @@ This section overrides the audit rows below.
 | Business-owner dashboard `/dashboard` | `features/business/*`, RLS member policies | Live attack surface that the contract excludes ("business self-service"). Keep it disabled (no owner accounts) unless the client approves |
 | Owner management | `BusinessOwnersPanel.tsx`, `*_business_member_admin.sql` (SECURITY DEFINER, reads `auth.users`) | Same. Sample owner accounts exist in seed data: remove them or rotate their passwords before launch |
 | `model_interaction` analytics event | `*_analytics_rate_limit.sql`, ProductPage | Low risk; "advanced analytics" was excluded. Don't show it in client reports |
-| Custom WebXR placement | `src/features/ar/*` (ADR-0018) | Keep it as an opt-in beta, not the default (P1-02) |
+| ~~Custom WebXR placement~~ | ~~`src/features/ar/*` (ADR-0018)~~ | **Removed** (f171db3); ADR-0018 withdrawn |
 | Landing page, demo picker, sample-data generator | ADR-0016/0017 | Low risk |

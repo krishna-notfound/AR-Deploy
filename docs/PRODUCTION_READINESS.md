@@ -1,6 +1,6 @@
 # Production readiness
 
-**Release gate: NOT READY TO SHIP** (2026-10-13). No real-device test, no domain, live auth settings unconfirmed, sample data in the production DB.
+**Release gate: NOT READY TO SHIP** (2026-10-13). No real-device AR test (native-only change is unverified on a phone), no staging project yet, no domain, sample data in the production DB, branch work not deployed.
 
 Requirements and their status: [PRD.md](PRD.md). Background and older audits: `System_arch/HANDOFF.md` (authoritative), `System_arch/audit/` (partly stale, see §5).
 
@@ -54,13 +54,13 @@ No Critical findings. Numbering is stable; later phases append.
 | SEC-01 | Low now, High if sign-ups open | Owner linking trusts any account with a matching email. Live settings (owner-reported 2026-10-13): sign-ups **disabled**, email confirmation **enabled**, min password 8, so not exploitable today. Becomes real if sign-ups are opened without the claim design | `admin_add_business_member`; Auth settings | Owner-registration and claim design (2026-10-13 proposal); apply O-1 migration | Owner (design approval) |
 | SEC-02 | High (release) | No real-device AR test has ever been recorded | `DEVICE_TEST_MATRIX.md` | Phase 1 device session | Owner devices |
 | SEC-03 | Medium | `track-event` rate limit keyed on the first `X-Forwarded-For` entry, probably client-settable | `supabase/functions/track-event/handler.ts` | Observe real headers on a staging project, key on the proxy-added value | Staging project (O-3) |
-| SEC-04 | Medium | `<model-viewer key={src}>` remounts on URL change, but the listener effect depends only on `[ready]` → no load/error/AR events afterwards; stall timer then shows "timed out" | `src/components/three/ModelViewer.tsx` | Add `src` to the effect deps. Doesn't change AR modes or behaviour | Device re-test |
-| SEC-05 | Medium (latent) | Storage read policy exposes any object whose path is referenced by a visible product row; path not tied to the product's business | `20261012192159_storage.sql` | New migration: require `storage_path` to start with `business_id || '/'` | Owner (migration) |
-| SEC-06 | Medium | Signed media URLs (12 h) never refreshed on long-open pages → expired model URL handed to AR | `useRefreshWhenStale` unused (`src/services/hooks.ts`) | Call it from `ProductPage` (after SEC-04) | — |
+| SEC-04 | Medium | `<model-viewer key={src}>` remounts on URL change, but the listener effect depends only on `[ready]` → no load/error/AR events afterwards; stall timer then shows "timed out" | `src/components/three/ModelViewer.tsx` | Add `src` to the effect deps. Doesn't change AR modes or behaviour | FIXED on branch (not deployed): effect deps `[ready, src]`; unit test fails without the fix |
+| SEC-05 | Medium (latent) | Storage read policy exposes any object whose path is referenced by a visible product row; path not tied to the product's business | `20261012192159_storage.sql` | New migration: require `storage_path` to start with `business_id || '/'` | NOT EXPLOITABLE: image/model write policies (`init_schema.sql` 332, 345) require `storage_path` in the product's own business folder; PGlite test proves a cross-business reference is refused. No migration needed |
+| SEC-06 | Medium | Signed media URLs (12 h) never refreshed on long-open pages → expired model URL handed to AR | `useRefreshWhenStale` unused (`src/services/hooks.ts`) | Call it from `ProductPage` (after SEC-04) | FIXED on branch (not deployed): `useRefreshWhenStale` wired into ProductPage (refresh after 6 h on tab return) |
 | SEC-07 | Medium | Path-mode QR codes encode `window.location.origin`; a QR downloaded on a preview URL or localhost is permanently wrong | `src/lib/urls.ts` | Configured public origin; block QR download on non-production origins | — |
-| SEC-08 | Low | AR attempts counted per tap, labelled "activations" | `ProductPage.tsx` | In-flight guard; label "AR attempts" | — |
-| SEC-09 | Low | One AR failure can show two toasts; WebXR → Scene Viewer fallback may show "failed" while AR still opens (unverified) | `ProductPage.tsx` | Single toast source from `ar-status` | Device test |
-| SEC-10 | Low | "Start AR" does nothing if storage is blocked and "don't show again" is ticked | `ArTips.tsx` | try/catch around `localStorage.setItem` | — |
+| SEC-08 | Low | AR attempts counted per tap, labelled "activations" | `ProductPage.tsx` | In-flight guard; label "AR attempts" | FIXED on branch (not deployed): one event per launch attempt, 2 s guard; dashboard label rename still open (UI_BACKLOG 11) |
+| SEC-09 | Low | One AR failure can show two toasts; WebXR → Scene Viewer fallback may show "failed" while AR still opens (unverified; applies to `main` — this branch has no WebXR) | `ProductPage.tsx` | Single toast source from `ar-status` | Device test |
+| SEC-10 | Low | "Start AR" does nothing if storage is blocked and "don't show again" is ticked | `ArTips.tsx` | try/catch around `localStorage.setItem` | FIXED on branch (not deployed): try/catch around `localStorage.setItem` |
 | SEC-11 | Low | Upload checks browser-only; any ZIP passes as USDZ; images have no magic-byte check; bucket allows 50 MB for images | `src/lib/files.ts`, storage bucket | Image magic bytes; accept storage doesn't verify contents (bucket is private) | — |
 | SEC-12 | Low | Password reset redirect `/reset-password` may be missing from the Auth redirect allowlist; set-password form is shown to any signed-in session | `ResetPasswordPage.tsx`, Auth settings | Add URL to allowlist; enable secure password change | Owner (Auth) |
 | SEC-13 | Low | Network error on `getUser()` treated as signed out | `services/supabase/auth.ts` | Distinguish auth vs network errors | — |
@@ -71,7 +71,7 @@ No Critical findings. Numbering is stable; later phases append.
 
 ## 5. Stale documents (would mislead the client)
 
-These describe the removed custom WebXR session or the old analytics behaviour. `System_arch/HANDOFF.md` overrides them.
+These describe the removed custom WebXR session or the old analytics behaviour. `System_arch/HANDOFF.md` overrides them. **2026-10-13:** each now carries a "Superseded in part" banner, with the specific wrong statements struck through and corrected in place.
 
 - `System_arch/audit/DEPLOYMENT_AND_HANDOVER.md`: says AR activations are counted once per page view. **Client-facing.**
 - `System_arch/audit/CLIENT_SCOPE_ACCEPTANCE_MATRIX.md`, `IMPLEMENTATION_STATUS.md`, `tasks/P10-ar.md`: same claim, plus "done" rows for the removed session.
@@ -92,9 +92,22 @@ These describe the removed custom WebXR session or the old analytics behaviour. 
 | 5–7 | Security headers (enforce CSP), performance measurements, analytics reconciliation | — |
 | 8–10 | Full test matrix, release plan, handover docs + user guide, sample-data removal (O-4) | Owner approval per step |
 
+## 6b. Phase C/D results (2026-10-13, branch `chore/production-readiness`, local only)
+
+| Check | Result | Kind |
+|---|---|---|
+| typecheck, lint (0 errors), build | pass | automated |
+| `npm test` (unit + component + PGlite DB) | 118 passed, 13 skipped (live tests) | automated |
+| PGlite DB suite | 22/22, incl. 10 new: draft registration, claim links (admin-only, hashed, single-use, expiring, replaced), no ownership by email match, cross-business storage/analytics/member isolation | automated, disposable Postgres |
+| E2E (Playwright, demo mode) | 27/27; Scene Viewer intent at fixed scale on a **simulated** Android UA; no WebXR even when offered; one launch per double tap | automated, emulated browser |
+| Live integration (staging) | written, **not run**: no staging project yet | BLOCKED |
+| Real-device AR (iOS Quick Look, Android Scene Viewer) | not run | BLOCKED (no devices) |
+| Vercel Preview isolation | not checked (no Vercel access) | BLOCKED (owner) |
+
 ## 7. Change log
 
 | Date | Phase | Change |
 |---|---|---|
+| 2026-10-13 | C/D | AR native-only (ADR-0021), SEC-04/06/08/10 fixed, SEC-05 shown not exploitable, owner registration + claim links (ADR-0022, migration not applied), stale docs corrected, staging runbook. Local commits only
 | 2026-10-13 | 0 | Owner reported live Auth settings; SEC-01 downgraded. Owner self-registration requested (scope change, see PRD X-01)
 | 2026-10-13 | 0 | Baseline, live read-only audit, PRD and this file created. No code, schema or config changed |

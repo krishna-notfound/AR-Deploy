@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Real-API checks against a Supabase project with the migrations applied (design/19 "Tests after migration").
 // Skipped unless SUPABASE_IT_URL, SUPABASE_IT_KEY (publishable) and SUPABASE_IT_PASSWORD are set, and the
-// QA users qa-admin@ / qa-owner-a@ / qa-owner-b@furnish.example exist (qa-admin listed in platform_admins).
+// QA users qa-admin@ / qa-owner-a@ / qa-owner-b@ / qa-newcomer@furnish.example exist (qa-admin listed in platform_admins).
 // Creates two QA businesses and deletes them (and their files) at the end.
 import { type SupabaseClient, createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -235,5 +235,47 @@ describe.skipIf(!enabled)('Supabase live API', { timeout: 30_000 }, () => {
     expect((await fetch(logo.url)).status).toBe(200)
     const svg = await ownerA.svc.uploadAsset({ kind: 'logo', businessId: bizA, file: new File(['<svg/>'], 'x.svg', { type: 'image/svg+xml' }) })
     expect(svg.ok).toBe(false)
+  })
+})
+
+// Owner registration and claim links (20261013144121). Needs a 4th QA user, qa-newcomer@furnish.example:
+// confirmed email, same password, no business. Leaves it without memberships at the end.
+describe.skipIf(!enabled)('Supabase live API: owner registration and claim links', { timeout: 30_000 }, () => {
+  const tag = Math.random().toString(36).slice(2, 8)
+  let admin: Actor, newcomer: Actor
+  let claimable = '', registered = ''
+
+  beforeAll(async () => {
+    ;[admin, newcomer] = await Promise.all([signIn('qa-admin@furnish.example'), signIn('qa-newcomer@furnish.example')])
+    const base = { description: 'QA', contact: { email: 'qa-newcomer@furnish.example' }, status: 'active' as const, branding: { accentColor: '#B4441A' }, defaultCurrency: 'EUR' as const }
+    claimable = must(await admin.svc.createBusiness({ ...base, name: `QA Claim ${tag}`, slug: `qa-claim-${tag}` })).id
+  }, 60_000)
+
+  afterAll(async () => {
+    if (!admin) return
+    for (const id of [claimable, registered].filter(Boolean)) await admin.svc.deleteBusiness(id)
+  }, 60_000)
+
+  it('registers a new business as a draft that the public cannot see', async () => {
+    const auth = createSupabaseAuthService(newcomer.sb)
+    registered = must(await auth.registerBusiness(`QA New ${tag}`, `qa-new-${tag}`)).businessId
+    const mine = must(await newcomer.svc.getBusinessById(registered))
+    expect(mine.status).toBe('draft')
+    expect((await createSupabaseCatalogService(client()).getCatalog(`qa-new-${tag}`)).ok).toBe(false)
+    const second = await auth.registerBusiness(`QA Second ${tag}`, `qa-second-${tag}`)
+    expect(second.ok ? null : second.error.code).toBe('CONFLICT')
+    expect((await newcomer.svc.setBusinessStatus(registered, 'active')).ok).toBe(false) // only an admin approves
+  })
+
+  it('a matching contact email grants nothing; a claim link grants ownership once', async () => {
+    expect((await newcomer.svc.getBusinessById(claimable)).ok).toBe(true) // active, so publicly readable
+    expect((await newcomer.svc.updateBusiness(claimable, { description: 'hijack' })).ok).toBe(false)
+    expect((await newcomer.svc.createBusinessClaim(claimable)).ok).toBe(false) // admin-only
+    const { token } = must(await admin.svc.createBusinessClaim(claimable))
+    const auth = createSupabaseAuthService(newcomer.sb)
+    expect(must(await auth.redeemBusinessClaim(token)).businessId).toBe(claimable)
+    expect((await newcomer.svc.updateBusiness(claimable, { description: 'now an owner' })).ok).toBe(true)
+    const again = await auth.redeemBusinessClaim(token)
+    expect(again.ok ? null : again.error.code).toBe('NOT_FOUND')
   })
 })

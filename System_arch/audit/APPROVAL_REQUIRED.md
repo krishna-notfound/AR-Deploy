@@ -1,3 +1,5 @@
+> **Superseded in part (2026-10-13).** AR and analytics statements below are outdated. Current state: System_arch/HANDOFF.md and docs/PRODUCTION_READINESS.md.
+
 # Approvals required (2026-10-13)
 
 Nothing on this list has been applied, deployed or switched on. Each item is ready, tested as far as stated, and isolated. Approving one doesn't depend on another.
@@ -5,15 +7,17 @@ Nothing on this list has been applied, deployed or switched on. Each item is rea
 ## Client decisions
 | ID | Decision | What is ready | How to switch it on |
 |---|---|---|---|
-| A-1 | **AR default on Android: native Scene Viewer first** (as the contract says) instead of our WebXR session first. With native first, phones without ARCore get Scene Viewer's 3D fallback instead of a failed start; our session is offered as a secondary "Precise placement (beta)" link on phones that report WebXR. | `chooseArMode` `prefer: 'native'`, the beta link and its EN/PT text, unit and component tests (`src/features/ar/ar.test.ts`, `src/features/public/ArSection.test.tsx`) | Change `AR_DEFAULT_PREFERENCE` to `'native'` in `src/features/ar/capability.ts` and update the test "keeps the current WebXR-first default" |
+| ~~A-1~~ | **Superseded (moot) 2026-10-13.** ~~AR default on Android: native Scene Viewer first instead of our WebXR session first, with a "Precise placement (beta)" link.~~ The custom WebXR session, `chooseArMode`, `capability.ts` and the beta link were removed (f171db3). The owner decided **native viewers only** (`ar-modes="scene-viewer quick-look"`) on branch `chore/production-readiness`, not yet deployed; it needs a real-device check before any push to `main`. | — | — |
 | A-2 | **What "automatic model compression" means.** Proposed: size optimization that keeps every model valid for Scene Viewer and Quick Look (texture downscaling to ≤ 2048 px, unused data removed; no Draco, meshopt, WebP or quantization; USDZ uploaded as delivered). See ADR-0019 | The pipeline, worker, upload UI and "upload original" option. Tested: unit tests with real glTF-Transform, plus E2E with a real 4096 px texture in Chromium | Set `VITE_MODEL_OPTIMIZATION=on` in the Vercel production environment, after one device check: a model optimized this way, opened in Scene Viewer and Quick Look |
 | A-3 | **Variants** are colour and price swatches on one 3D model, and the specifications are the fixed fields (dimensions, material, weight, category) | Nothing to build if agreed | — |
 | A-4 | **Physics and fit features beyond the agreement:** drag on the floor, several items with overlap warnings, wall clearance estimate (AR_COMPATIBILITY_AND_PHYSICS §4, P-B to P-D) | Design only | Quote as a change request |
 | A-5 | **Business-owner dashboard (`/dashboard`) and owner management** were built, but the contract excludes self-service accounts | Built and RLS-tested | Either accept it as an addition, or keep it unused (no owner accounts) |
 
-Already delivered without a gate (owner request, inside our existing WebXR session, no fit claims):
-- **Footprint preview:** an outline of the true width × depth on the floor before placing.
-- **Settle:** the item drops onto its shadow when placed, with no motion under reduced-motion settings.
+~~Already delivered without a gate (owner request, inside our existing WebXR session, no fit claims):~~
+- ~~**Footprint preview:** an outline of the true width × depth on the floor before placing.~~
+- ~~**Settle:** the item drops onto its shadow when placed, with no motion under reduced-motion settings.~~
+
+**Correction (2026-10-13):** footprint preview and settle were removed with the custom WebXR session (f171db3). They are not delivered.
 
 ## Owner actions on live systems
 | ID | Action | Evidence it is ready | Exact steps |
@@ -22,6 +26,6 @@ Already delivered without a gate (owner request, inside our existing WebXR sessi
 | O-2 | **Auth settings** (dashboard → Authentication): sign-ups off, email confirmation on, minimum password length 12, leaked-password protection on. Then align `supabase/config.toml` (`enable_signup=false`, `enable_confirmations=true`, `minimum_password_length=12`, `secure_password_change=true`) so `config push` can never weaken production | Read-only checks found 3 users, all confirmed | Dashboard only. Don't run `supabase config push` before `config.toml` is aligned |
 | O-3 | **Analytics rate-limit key.** `track-event` keys visitors on the first `X-Forwarded-For` entry, which a client can probably set (community report, unverified for this project) | Not changed. The real header layout must be observed first | Deploy a temporary header-echo function to a **non-production** project, call it with a forged `X-Forwarded-For`, and see which entry or header (`cf-connecting-ip`, `x-real-ip`) Supabase appends. Then change `clientIp()` in `supabase/functions/track-event/handler.ts`, update `handler.test.ts`, and `npx supabase functions deploy track-event` |
 | O-4 | **Remove sample data from production.** 18 published sample products, their analytics and the seeded owner accounts (`owner.*@furnish.example`) are live | Read-only count, 2026-10-13 | Owner reviews, then deletes the sample businesses (rows cascade) and their storage folders, and deletes the sample auth users in the dashboard. Do this only after the real catalog is ready |
-| O-5 | **Production deployment, domain, wildcard subdomains, SSL** | `vercel.json` with a report-only CSP; production build guard (refuses demo mode, missing values or secret keys) | DEPLOYMENT_AND_HANDOVER.md |
-| O-6 | **Enforce the CSP** (now report-only) | No violations in demo-mode flows on a production build (landing, catalog, product with 3D, admin editor, analytics) | Watch the browser console on the live site, including Supabase mode, iPhone Safari, Scene Viewer launch and WebXR. Then rename the header to `Content-Security-Policy` |
+| O-5 | ~~**Production deployment,**~~ **domain, wildcard subdomains, SSL.** 2026-10-13: a production deploy exists on Vercel (auto-deployed from `main`); only domain, subdomains and SSL are open | `vercel.json` with a report-only CSP; production build guard (refuses demo mode, missing values or secret keys) | DEPLOYMENT_AND_HANDOVER.md |
+| O-6 | **Enforce the CSP** (now report-only) | No violations in demo-mode flows on a production build (landing, catalog, product with 3D, admin editor, analytics) | Watch the browser console on the live site, including Supabase mode, iPhone Safari and Scene Viewer launch ~~and WebXR~~ (no WebXR on the branch). Then rename the header to `Content-Security-Policy` |
 | O-7 | **Run the live integration test** (`src/services/supabase/live.integration.test.ts`). It writes and deletes QA data | Skipped in every run so far (needs `SUPABASE_IT_URL`, `SUPABASE_IT_KEY`, `SUPABASE_IT_PASSWORD` and three QA users) | Against an approved project: `SUPABASE_IT_URL=… SUPABASE_IT_KEY=… SUPABASE_IT_PASSWORD=… npx vitest run src/services/supabase/live.integration.test.ts` |

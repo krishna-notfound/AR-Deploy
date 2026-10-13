@@ -165,7 +165,7 @@ Bundle notes:
 | Subdomains, DNS, SSL | `resolveTenant()` ready; demo URLs only | Wildcard DNS, TLS, hosting |
 | QR codes | Real client-side QR of the catalog URL, PNG download | Works as-is once real URLs exist |
 | Analytics | Seeded sample data + real views and AR taps recorded in this browser | Event ingestion, aggregation, storage |
-| AR | Real model-viewer AR (WebXR, Scene Viewer, Quick Look), shown only when the device supports it | Hosted assets |
+| AR | Real model-viewer AR (WebXR, Scene Viewer, Quick Look), shown only when the device supports it. *2026-10-13: branch `chore/production-readiness` (not yet deployed) drops WebXR: native Scene Viewer / Quick Look only; see `System_arch/HANDOFF.md`* | Hosted assets |
 | i18n | Static EN/PT dictionaries + per-field product translations | CMS/API translation fields |
 
 ## 9. Phase 2: design refinement + Supabase foundation (2026-10-12)
