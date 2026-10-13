@@ -1,5 +1,7 @@
 # Client scope acceptance matrix
 
+> **Superseded for AR (2026-10-13):** the custom WebXR session, footprint and settle, native-first and 'Precise placement' described here were removed. Live AR is the original model-viewer flow. See `System_arch/HANDOFF.md`.
+
 Status key: **Complete**, **Partial**, **Missing**, **Contradicts contract**, **Unverified** (built, but not proven on a device or against the live backend).
 
 How each mode was checked:

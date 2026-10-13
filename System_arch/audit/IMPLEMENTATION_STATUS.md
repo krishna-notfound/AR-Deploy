@@ -1,5 +1,7 @@
 # Implementation status (functional phase, 2026-10-13)
 
+> **Superseded for AR (2026-10-13):** the custom WebXR session, footprint and settle, native-first and 'Precise placement' described here were removed. Live AR is the original model-viewer flow. See `System_arch/HANDOFF.md`.
+
 Branch `feature/ar-experience-2`. Issue IDs refer to PRIORITIZED_ISSUES.md; approvals to APPROVAL_REQUIRED.md.
 
 **Overall:**

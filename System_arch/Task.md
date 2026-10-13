@@ -1,7 +1,9 @@
 # Task dashboard
 Keep this file short. Detailed tasks live in `tasks/PN-*.md`. Update the row here when a phase changes state.
 
-**Current phase:** P9 release. Backend live; Vercel blocked on write access (see tasks/P9-release.md).
+**Read first:** [HANDOFF.md](HANDOFF.md) (2026-10-13): live state, AR decisions, open items.
+
+**Current phase:** Live on Vercel from `main` (original model-viewer AR). Next: real-device tests, approvals (audit/APPROVAL_REQUIRED.md), UI phase.
 **Next action:** [tasks/P9-release.md](tasks/P9-release.md): G6/G7 once Vercel write access exists; then domain, Auth settings, first admin, real-device AR.
 
 | Phase | File | Status | Done / Total | Last update |

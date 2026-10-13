@@ -1,4 +1,6 @@
 # P10 · AR Experience 2.0
+
+> **Superseded for AR (2026-10-13):** the custom WebXR session, footprint and settle, native-first and 'Precise placement' described here were removed. Live AR is the original model-viewer flow. See `System_arch/HANDOFF.md`.
 → design/09, ADR-0018. Branch `feature/ar-experience-2`.
 
 ## Root cause (why controlling was hard on the Pixel 10a)
