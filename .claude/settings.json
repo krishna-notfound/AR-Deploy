@@ -3,6 +3,7 @@
     "superpowers@anthropic-plugin-directory": true,
     "frontend-design@anthropic-plugin-directory": true,
     "code-review-anthropics@anthropic-plugin-directory": true,
-    "ponytail@ponytail": true
+    "ponytail@ponytail": true,
+    "taste-skill@taste-skill": true
   }
 }
