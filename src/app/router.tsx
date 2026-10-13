@@ -13,6 +13,8 @@ const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
 const DemoEntryPage = lazy(() => import('@/features/demo/DemoEntryPage'))
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
+const SignupPage = lazy(() => import('@/features/auth/SignupPage'))
+const ClaimPage = lazy(() => import('@/features/auth/ClaimPage'))
 const NotFoundPage = lazy(() => import('@/features/demo/NotFoundPage'))
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/AdminOverviewPage'))
@@ -105,6 +107,8 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/demo', element: <DemoEntryPage /> },
             { path: '/login', element: <LoginPage /> },
             { path: '/reset-password', element: <ResetPasswordPage /> },
+            { path: '/signup', element: <SignupPage /> },
+            { path: '/claim', element: <ClaimPage /> },
           ],
         },
         adminRoutes,

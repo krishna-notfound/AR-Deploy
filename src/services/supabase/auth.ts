@@ -20,6 +20,15 @@ export interface AuthService {
   requestPasswordReset(email: string, redirectTo: string): Promise<Result<void>>
   /** Sets a new password for the current (e.g. recovery) session. */
   updatePassword(password: string): Promise<Result<void>>
+  /**
+   * Creates an account; the user must confirm their email before signing in. Also succeeds for an email that
+   * already has an account (Supabase hides which emails exist), so the UI always says "check your email".
+   */
+  signUp(email: string, password: string, emailRedirectTo: string): Promise<Result<void>>
+  /** Registers a NEW business owned by the signed-in, confirmed account. Always a draft until an admin activates it. */
+  registerBusiness(name: string, slug: string): Promise<Result<{ businessId: string }>>
+  /** Redeems a single-use claim link a platform admin issued; the account becomes an owner of that business. */
+  redeemBusinessClaim(token: string): Promise<Result<{ businessId: string }>>
   /** Returns an unsubscribe function. */
   onAuthStateChange(listener: () => void): () => void
 }
@@ -64,6 +73,25 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
     async updatePassword(password) {
       const { error } = await sb.auth.updateUser({ password })
       return error ? fail('VALIDATION', error.message) : ok(undefined)
+    },
+
+    async signUp(email, password, emailRedirectTo) {
+      const { error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo } })
+      return error ? fail('VALIDATION', error.message) : ok(undefined)
+    },
+
+    async registerBusiness(name, slug) {
+      const { data, error } = await sb.rpc('register_business', { p_name: name, p_slug: slug })
+      if (error) return mapDbError(error, { conflictField: 'business' })
+      await sb.auth.refreshSession() // fires the auth listener, which reloads the account's new role
+      return ok({ businessId: data as string })
+    },
+
+    async redeemBusinessClaim(token) {
+      const { data, error } = await sb.rpc('redeem_business_claim', { p_token: token })
+      if (error) return mapDbError(error)
+      await sb.auth.refreshSession()
+      return ok({ businessId: data as string })
     },
 
     async signOut() {

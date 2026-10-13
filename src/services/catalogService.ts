@@ -109,6 +109,8 @@ export interface CatalogService {
   /** Links an existing account by email. */
   addBusinessMember(businessId: ID, email: string): Promise<Result<void>>
   removeBusinessMember(businessId: ID, userId: ID): Promise<Result<void>>
+  /** Platform admins: issues a single-use claim link token (7 days) and cancels any unused earlier one. Shown once. */
+  createBusinessClaim(businessId: ID): Promise<Result<{ token: string; expiresAt: string }>>
 
   // files: validate on the client first (lib/files.ts); this only stores them
   uploadAsset(input: { kind: UploadKind; file: File; businessId?: ID }): Promise<Result<UploadedAsset>>

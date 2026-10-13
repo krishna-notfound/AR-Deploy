@@ -21,7 +21,7 @@ import type {
 import { uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, isoDay, summarize } from '../analytics'
-import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type Result, type UploadKind, fail, ok } from '../catalogService'
+import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type Result, type ServiceError, type UploadKind, fail, ok } from '../catalogService'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
@@ -122,12 +122,24 @@ const DB_RULES: Record<string, { field: string; message: string }> = {
   publish_requires_gallery_image: { field: 'images', message: 'Add at least one product image before publishing.' },
 }
 
+/** Stable message keys raised by the account functions (20261013144121_owner_registration_and_claims). */
+const ACCOUNT_RULES: Record<string, ServiceError> = {
+  sign_in_required: { code: 'PERMISSION', message: 'Sign in first.' },
+  email_not_confirmed: { code: 'PERMISSION', message: 'Confirm your email address first: open the link we sent you, then sign in again.' },
+  registration_pending: { code: 'CONFLICT', message: 'Your account already has a business waiting for approval. We will review it shortly.' },
+  slug_taken: { code: 'CONFLICT', message: 'Please fix the highlighted fields.', fieldErrors: { slug: 'This address is already taken. Choose another one.' } },
+  claim_invalid: { code: 'NOT_FOUND', message: 'This claim link is invalid, already used or expired. Ask us for a new one.' },
+  business_not_found: { code: 'NOT_FOUND', message: 'This business no longer exists.' },
+}
+
 /**
  * Maps Postgres/PostgREST/Storage errors to service errors with a message the user can act on.
  * Raw database text (policy, constraint and column names) is never shown; in development it is logged.
  */
 export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictField?: keyof typeof SLUG_TAKEN } = {}): Result<T> {
   if (import.meta.env.DEV) console.error('[supabase]', e.code, e.message)
+  const account = ACCOUNT_RULES[e.message]
+  if (account) return { ok: false, error: account }
   const rule = DB_RULES[e.message]
   if (rule) return fail('VALIDATION', 'Please fix the highlighted fields.', { [rule.field]: rule.message })
   switch (e.code) {
@@ -612,6 +624,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       guard(async () => {
         const { error } = await sb.rpc('admin_add_business_member', { p_business_id: businessId, p_email: email })
         return changed(error ? mapDbError(error) : ok(undefined))
+      }),
+    createBusinessClaim: (businessId) =>
+      guard(async () => {
+        const { data, error } = await sb.rpc('admin_create_business_claim', { p_business_id: businessId })
+        if (error) return mapDbError(error, { notFound: 'This business no longer exists.' })
+        const row = (data as { token: string; expires_at: string }[])[0]
+        return row ? ok({ token: row.token, expiresAt: row.expires_at }) : fail('UNKNOWN', 'No claim link was returned. Try again.')
       }),
     removeBusinessMember: (businessId, userId) =>
       guard(async () => {

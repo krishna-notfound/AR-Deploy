@@ -293,6 +293,10 @@ export type Database = {
     }
     Functions: {
       admin_add_business_member: { Args: { p_business_id: string; p_email: string }; Returns: string }
+      // Hand-added for 20261013144121_owner_registration_and_claims; regenerate with `npm run db:types` once applied.
+      admin_create_business_claim: { Args: { p_business_id: string }; Returns: { token: string; expires_at: string }[] }
+      redeem_business_claim: { Args: { p_token: string }; Returns: string }
+      register_business: { Args: { p_name: string; p_slug: string }; Returns: string }
       admin_list_business_members: {
         Args: { p_business_id: string }
         Returns: { created_at: string; email: string; user_id: string }[]

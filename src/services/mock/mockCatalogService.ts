@@ -339,6 +339,7 @@ export const mockCatalogService: CatalogService = {
   getBusinessMembers: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
   addBusinessMember: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
   removeBusinessMember: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
+  createBusinessClaim: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
 
   // Images become data URLs stored with the demo data; 3D files are session-only blob URLs (ADR-0007).
   uploadAsset: async ({ kind, file }) => {

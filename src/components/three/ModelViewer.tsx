@@ -101,7 +101,8 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       el.removeEventListener('progress', handleProgress)
       el.removeEventListener('ar-status', handleAr)
     }
-  }, [ready])
+    // `src` too: the element below is keyed by src, so a new model URL (e.g. refreshed signed URL) is a new element.
+  }, [ready, src])
 
   if (!ready) return <div className={className} aria-hidden />
 
@@ -125,7 +126,8 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       auto-rotate={autoRotate || undefined}
       auto-rotate-delay={autoRotate ? '0' : undefined}
       rotation-per-second={autoRotate ? '14deg' : undefined}
-      ar-modes="webxr scene-viewer quick-look"
+      // Native viewers only (owner decision 2026-10-13): Scene Viewer on Android, Quick Look on iOS.
+      ar-modes="scene-viewer quick-look"
       ar-scale="fixed"
       ar-placement="floor"
       loading="eager"

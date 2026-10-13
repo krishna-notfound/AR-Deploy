@@ -16,7 +16,8 @@ import { cn } from '@/lib/cn'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
 import { service } from '@/services'
-import { useServiceQuery } from '@/services/hooks'
+import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
+import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { ArSection, arAvailability } from './ArSection'
 import { ArTips, arTipsDismissed } from './ArTips'
 import { DimensionDiagram } from './DimensionDiagram'
@@ -25,6 +26,11 @@ import { type ModelState, ProductMedia } from './ProductMedia'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { ShareButton } from './ShareActions'
+
+/** Ignore AR taps this soon after a launch (double taps, impatient re-taps while the native viewer opens). */
+export const AR_RELAUNCH_MS = 2000
+/** Signed media URLs last MEDIA_URL_TTL_SECONDS; refetch on return to the tab once half of that has passed. */
+const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
 
 export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   const params = useParams()
@@ -38,6 +44,8 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   const wantsPreview = search.get('preview') === '1'
   const canPreview = wantsPreview && !!user
   const res = useServiceQuery(() => service.getPublicProduct(businessSlug, productSlug, { allowDraft: canPreview }), [businessSlug, productSlug, canPreview])
+  // Pages left open (mobile tab restore) must not hand an expired model URL to Scene Viewer / Quick Look.
+  useRefreshWhenStale(res.refetch, MEDIA_REFRESH_MS, res.data)
   const catalogHref = tenantSlug ? '/' : `/catalog/${businessSlug}`
   // A business admin may only preview their own unpublished products.
   const hiddenFromPublic = !!res.data && (res.data.product.status !== 'published' || res.data.business.status !== 'active')
@@ -114,8 +122,14 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const availability = arAvailability(modelState, canAR)
   const additional = product.images.filter((i) => i.kind === 'additional')
 
+  // One launch attempt (and one 'ar_activation' event) per tap; taps within AR_RELAUNCH_MS of a launch are ignored.
+  // The event means "visitor tried to open AR", never "furniture was placed".
+  const lastLaunch = useRef(-Infinity)
   const startAR = async () => {
     setTipsOpen(null)
+    const now = performance.now()
+    if (now - lastLaunch.current < AR_RELAUNCH_MS) return
+    lastLaunch.current = now
     if (!isPreview) void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
     try {
       await viewerRef.current?.activateAR()

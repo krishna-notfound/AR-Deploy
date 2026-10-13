@@ -3,11 +3,13 @@ import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
-import { Button } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
 import { auth } from '@/services'
 import { SiteHeader } from '../marketing/SiteChrome'
+import { pendingClaimToken } from './ClaimPage'
+import { RegisterBusinessForm } from './RegisterBusinessForm'
 
 /** Real sign-in (Supabase mode). In demo mode this route forwards to the demo account picker. */
 export default function LoginPage() {
@@ -41,14 +43,23 @@ export default function LoginPage() {
       <SiteHeader cta={false} />
       <main className="mx-auto max-w-sm px-5 py-16 sm:py-24">
         <h1 className="text-title font-normal">Sign in</h1>
-        <p className="mt-2 text-sm text-ink-muted">For platform admins and business owners with an account.</p>
+        <p className="mt-2 text-sm text-ink-muted">For platform admins and business owners.</p>
 
         {signedInEmail ? (
-          <div className="mt-8 space-y-4">
-            <InlineNotice tone="warning">
-              You are signed in as <strong className="font-medium">{signedInEmail}</strong>, but this account is not linked to the platform team or to a
-              business yet. Ask a platform admin to add it.
+          <div className="mt-8 space-y-6">
+            <InlineNotice tone="neutral">
+              Signed in as <strong className="font-medium">{signedInEmail}</strong>. This account does not manage a business yet.
             </InlineNotice>
+            {pendingClaimToken() ? (
+              <ButtonLink to="/claim" variant="primary" className="w-full">
+                Finish claiming your business
+              </ButtonLink>
+            ) : (
+              <>
+                <RegisterBusinessForm />
+                <p className="text-sm text-ink-muted">Is your business already listed with us? Ask the platform team for a claim link.</p>
+              </>
+            )}
             <Button onClick={logout}>Sign out</Button>
           </div>
         ) : (
@@ -70,6 +81,11 @@ export default function LoginPage() {
             <p className="text-center text-sm">
               <Link to="/reset-password" className="text-accent-ink hover:underline">
                 Forgot your password?
+              </Link>
+            </p>
+            <p className="text-center text-sm">
+              <Link to="/signup" className="text-accent-ink hover:underline">
+                New business owner? Create an account
               </Link>
             </p>
           </form>

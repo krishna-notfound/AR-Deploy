@@ -39,3 +39,8 @@ export function productLocalPath(b: Sluggable, p: ProductSluggable, opts?: { pre
 export function absoluteLocalUrl(path: string): string {
   return `${typeof window !== 'undefined' ? window.location.origin : ''}${path}`
 }
+
+/** Claim link for an existing business. The token rides in the fragment, so it never reaches server or proxy logs. */
+export function claimLinkUrl(token: string): string {
+  return absoluteLocalUrl(`/claim#${token}`)
+}

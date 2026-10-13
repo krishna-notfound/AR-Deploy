@@ -48,9 +48,9 @@ test('model loads, scale is checked, and AR falls back honestly on desktop', asy
   await expect(page.getByText('AR scale unverified')).toBeVisible({ timeout: 60_000 })
 })
 
-// Original AR flow: on a WebXR-capable phone the AR button launches <model-viewer>'s own WebXR,
-// which reuses the model already loaded for the 3D view. Simulated: Chromium with a stubbed navigator.xr.
-test('AR launches through model-viewer and does not download the model again', async ({ page }) => {
+// Native AR only (owner decision 2026-10-13): a browser that offers WebXR must NOT get in-browser AR.
+// Desktop Chromium with a stubbed navigator.xr: no AR button, no XR session requested.
+test('in-browser WebXR is never used, even when the browser offers it', async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as { __xrRequests: number }
     w.__xrRequests = 0
@@ -59,24 +59,58 @@ test('AR launches through model-viewer and does not download the model again', a
         isSessionSupported: async (mode: string) => mode === 'immersive-ar',
         requestSession: async () => {
           w.__xrRequests++
-          throw new DOMException('no camera in CI', 'NotAllowedError')
+          throw new DOMException('not expected', 'NotAllowedError')
         },
         addEventListener() {},
         removeEventListener() {},
       },
     })
   })
-  const glbFetches: string[] = []
-  page.on('request', (r) => {
-    if (r.url().endsWith('.glb')) glbFetches.push(r.url())
-  })
   await page.goto('/products/nordhaus/sheen-lounge-chair')
-  const button = page.getByRole('button', { name: 'View in my home' })
-  await expect(button).toBeEnabled({ timeout: 60_000 })
-  await button.click()
-  await page.getByRole('button', { name: 'Start AR' }).click()
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __xrRequests: number }).__xrRequests)).toBeGreaterThan(0)
-  expect(glbFetches).toHaveLength(1) // the 3D view's download only
+  await expect(page.getByText('True-to-size model')).toBeVisible({ timeout: 60_000 }) // model loaded and measured
+  await expect(page.getByRole('button', { name: 'View in my home' })).toHaveCount(0)
+  await expect(page.getByText('View in your room on a phone')).toBeVisible() // 3D + phone hand-off fallback
+  expect(await page.evaluate(() => (window as unknown as { __xrRequests: number }).__xrRequests)).toBe(0)
+})
+
+// Android (simulated user agent, NOT a real phone): AR hands off to Google Scene Viewer at true size.
+// The intent link is captured instead of leaving the page. Real-device behaviour is tracked in the device matrix.
+test.describe('Android', () => {
+  test.use({ userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36' })
+
+  test('AR opens Google Scene Viewer at fixed real-world scale, once per tap', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { __intents: string[] }
+      w.__intents = []
+      const click = HTMLAnchorElement.prototype.click
+      HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+        if (this.href.startsWith('intent:')) w.__intents.push(this.href)
+        else click.call(this)
+      }
+    })
+    const glbFetches: string[] = []
+    page.on('request', (r) => {
+      if (r.url().endsWith('.glb')) glbFetches.push(r.url())
+    })
+    await page.goto('/products/nordhaus/sheen-lounge-chair')
+    const button = page.getByRole('button', { name: 'View in my home' })
+    await expect(button).toBeEnabled({ timeout: 60_000 })
+    await button.click()
+    await page.getByRole('checkbox').check() // "don't show again", so the next tap launches directly
+    await page.getByRole('button', { name: 'Start AR' }).click()
+    await button.click() // impatient second tap while Scene Viewer opens: ignored
+    const intents = () => page.evaluate(() => (window as unknown as { __intents: string[] }).__intents)
+    await expect.poll(intents).toHaveLength(1)
+    await page.waitForTimeout(500)
+    expect(await intents()).toHaveLength(1)
+    const intent = (await intents())[0]!
+    expect(intent).toContain('arvr.google.com/scene-viewer')
+    expect(intent).toContain('package=com.google.android.googlequicksearchbox')
+    expect(intent).toContain('mode=ar_preferred') // 3D view instead of a failure on phones without ARCore
+    expect(intent).toContain('resizable=false') // true size: no pinch scaling
+    expect(decodeURIComponent(intent)).toContain('SheenChair.glb') // the same model as the 3D view
+    expect(glbFetches).toHaveLength(1) // the page's 3D view only; Scene Viewer downloads its own copy
+  })
 })
 
 test('switches language between English and Portuguese', async ({ page }) => {

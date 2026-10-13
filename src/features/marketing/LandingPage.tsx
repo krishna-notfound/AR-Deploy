@@ -158,7 +158,7 @@ const FACTS = [
   {
     icon: Smartphone,
     title: 'No app to install',
-    body: 'AR opens straight from the product page: Quick Look on iPhone and iPad, Scene Viewer or WebXR on Android.',
+    body: 'AR opens straight from the product page: Quick Look on iPhone and iPad, Google Scene Viewer on Android.',
   },
   {
     icon: Box,

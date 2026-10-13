@@ -51,7 +51,7 @@ No Critical findings. Numbering is stable; later phases append.
 
 | ID | Sev | Finding | Where | Fix (proposed, not applied) | Gate |
 |---|---|---|---|---|---|
-| SEC-01 | High | Owner linking trusts any account with a matching email. If live sign-ups are open and email confirmation is off, a stranger can pre-register an owner's email and be linked as owner. Live auth settings can't be read from code; `supabase/config.toml` has signup on, confirmations off | `admin_add_business_member`; Auth settings | Owner checks dashboard: sign-ups off (or invite-only), confirm email on, min password 12, leaked-password protection on. Then apply O-1 migration | Owner (O-2, O-1) |
+| SEC-01 | Low now, High if sign-ups open | Owner linking trusts any account with a matching email. Live settings (owner-reported 2026-10-13): sign-ups **disabled**, email confirmation **enabled**, min password 8, so not exploitable today. Becomes real if sign-ups are opened without the claim design | `admin_add_business_member`; Auth settings | Owner-registration and claim design (2026-10-13 proposal); apply O-1 migration | Owner (design approval) |
 | SEC-02 | High (release) | No real-device AR test has ever been recorded | `DEVICE_TEST_MATRIX.md` | Phase 1 device session | Owner devices |
 | SEC-03 | Medium | `track-event` rate limit keyed on the first `X-Forwarded-For` entry, probably client-settable | `supabase/functions/track-event/handler.ts` | Observe real headers on a staging project, key on the proxy-added value | Staging project (O-3) |
 | SEC-04 | Medium | `<model-viewer key={src}>` remounts on URL change, but the listener effect depends only on `[ready]` → no load/error/AR events afterwards; stall timer then shows "timed out" | `src/components/three/ModelViewer.tsx` | Add `src` to the effect deps. Doesn't change AR modes or behaviour | Device re-test |
@@ -96,4 +96,5 @@ These describe the removed custom WebXR session or the old analytics behaviour. 
 
 | Date | Phase | Change |
 |---|---|---|
+| 2026-10-13 | 0 | Owner reported live Auth settings; SEC-01 downgraded. Owner self-registration requested (scope change, see PRD X-01)
 | 2026-10-13 | 0 | Baseline, live read-only audit, PRD and this file created. No code, schema or config changed |

@@ -13,6 +13,7 @@ import { useFocusTrap } from '../ui/Modal'
 import { Popover } from '../ui/Menu'
 import { BrandMark, Wordmark } from '../ui/BrandMark'
 import { SmartImage } from '../ui/SmartImage'
+import { InlineNotice } from '../ui/States'
 import { FullPageSpinner } from './FullPageSpinner'
 import type { NavItem } from './nav'
 
@@ -62,12 +63,25 @@ export function DashboardShell({ nav, variant }: { nav: NavItem[]; variant: 'adm
       <div className={cn('transition-[padding] duration-150', collapsed ? 'lg:pl-[68px]' : 'lg:pl-60')}>
         <Topbar onMenu={() => setMobileOpen(true)} variant={variant} />
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1320px] px-4 pt-5 pb-16 outline-none sm:px-6 lg:px-8">
+          {variant === 'business' && <PendingApprovalNotice />}
           <Suspense fallback={<FullPageSpinner />}>
             <Outlet />
           </Suspense>
         </main>
       </div>
     </div>
+  )
+}
+
+/** Self-registered businesses start as drafts until a platform admin activates them. */
+function PendingApprovalNotice() {
+  const { business } = useAccount()
+  if (business?.status !== 'draft') return null
+  return (
+    <InlineNotice tone="warning" className="mb-5">
+      <strong className="font-medium">{business.name} is waiting for approval.</strong> You can add products now. Customers will see your
+      catalog once the platform team activates it.
+    </InlineNotice>
   )
 }
 

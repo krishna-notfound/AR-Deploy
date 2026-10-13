@@ -19,7 +19,12 @@ export function ArTips({ open, onClose, onStart }: { open: boolean; onClose: () 
   const { t } = useI18n()
   const [dontShow, setDontShow] = useState(false)
   const persist = () => {
-    if (dontShow) localStorage.setItem(AR_TIPS_KEY, '1')
+    if (!dontShow) return
+    try {
+      localStorage.setItem(AR_TIPS_KEY, '1')
+    } catch {
+      // Storage blocked (private mode): tips show again next time; AR must still start.
+    }
   }
   return (
     <Modal

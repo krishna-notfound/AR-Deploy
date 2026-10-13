@@ -24,6 +24,8 @@ const SUPABASE_STUBS = `
   create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id),
     name text, owner uuid, metadata jsonb, created_at timestamptz default now());
   alter table storage.objects enable row level security;
+  -- As on Supabase: the API roles hold table grants; RLS policies decide row access.
+  grant select, insert, update, delete on storage.objects to anon, authenticated;
   create function storage.foldername(name text) returns text[] language sql immutable
     as $$ select (string_to_array(name, '/'))[1:cardinality(string_to_array(name, '/')) - 1] $$;
   grant usage on schema storage to anon, authenticated, service_role;
@@ -187,3 +189,130 @@ async function saveDraftAs(uid: string, over: Partial<ProductInput>): Promise<un
   const args = toSaveProductArgs(null, input(over))
   return as(uid, (tx) => tx.query('select public.save_product($1, $2, $3, $4)', [args.p_product, args.p_images, args.p_models, args.p_variants]))
 }
+
+describe('owner registration and claim links (20261013144121_owner_registration_and_claims)', () => {
+  const NEWCOMER = '00000000-0000-0000-0000-0000000000e1'
+  const UNCONFIRMED = '00000000-0000-0000-0000-0000000000e2'
+  const CLAIMER = '00000000-0000-0000-0000-0000000000e3'
+  const CLAIM_BIZ = '10000000-0000-0000-0000-0000000000c1'
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users values ('${NEWCOMER}', 'new@test', now()), ('${UNCONFIRMED}', 'unconfirmed@test', null),
+        ('${CLAIMER}', 'claimer@test', now());
+      -- contact_email equals the claimer's email: must grant nothing on its own.
+      insert into public.businesses (id, name, slug, status, contact_email) values ('${CLAIM_BIZ}', 'Claimable', 'claimable', 'active', 'claimer@test');
+    `)
+  })
+
+  const register = (uid: string, name: string, slug: string) =>
+    as(uid, (tx) => tx.query<{ id: string }>('select public.register_business($1, $2) as id', [name, slug])).then((r) => r.rows[0]!.id)
+  const createClaim = (uid: string, biz: string) =>
+    as(uid, (tx) => tx.query<{ token: string; expires_at: Date }>('select * from public.admin_create_business_claim($1)', [biz])).then((r) => r.rows[0]!)
+  const redeem = (uid: string, token: string) =>
+    as(uid, (tx) => tx.query<{ id: string }>('select public.redeem_business_claim($1) as id', [token])).then((r) => r.rows[0]!.id)
+  const isMember = async (uid: string, biz: string) =>
+    (await db.query('select 1 from public.business_members where user_id = $1 and business_id = $2', [uid, biz])).rows.length === 1
+
+  it('registers a new business as a draft owned by the caller, invisible to the public', async () => {
+    const id = await register(NEWCOMER, 'Newcomer Home', 'newcomer-home')
+    const r = await db.query<{ status: string }>('select status from public.businesses where id = $1', [id])
+    expect(r.rows[0]!.status).toBe('draft')
+    expect(await isMember(NEWCOMER, id)).toBe(true)
+    const anon = await as('', (tx) => tx.query('select 1 from public.businesses where id = $1', [id]), 'anon')
+    expect(anon.rows).toHaveLength(0)
+  })
+
+  it('allows one pending registration per account, and only an admin can activate it', async () => {
+    await expect(register(NEWCOMER, 'Second', 'newcomer-second')).rejects.toThrow('registration_pending')
+    const id = (await db.query<{ id: string }>(`select id from public.businesses where slug = 'newcomer-home'`)).rows[0]!.id
+    await expect(as(NEWCOMER, (tx) => tx.query(`update public.businesses set status = 'active' where id = $1`, [id]))).rejects.toThrow('Only platform admins')
+    await as(ADMIN, (tx) => tx.query(`update public.businesses set status = 'active' where id = $1`, [id])) // admin approval
+    const r = await as('', (tx) => tx.query('select 1 from public.businesses where id = $1', [id]), 'anon')
+    expect(r.rows).toHaveLength(1)
+  })
+
+  it('refuses registration without a confirmed email, with a taken address, a reserved one, or anonymously', async () => {
+    await expect(register(UNCONFIRMED, 'Nope', 'nope-unconfirmed')).rejects.toThrow('email_not_confirmed')
+    await expect(register(CLAIMER, 'Copy', 'claimable')).rejects.toThrow('slug_taken')
+    await expect(register(CLAIMER, 'Admin', 'admin')).rejects.toThrow(/check constraint/)
+    await expect(as('', (tx) => tx.query(`select public.register_business('A', 'anon-biz')`), 'anon')).rejects.toThrow(/permission denied/)
+  })
+
+  it('a matching contact email or name grants no ownership', async () => {
+    expect(await isMember(CLAIMER, CLAIM_BIZ)).toBe(false)
+    const upd = await as(CLAIMER, (tx) => tx.query(`update public.businesses set description = 'hijack' where id = $1`, [CLAIM_BIZ]))
+    expect(upd.affectedRows ?? 0).toBe(0)
+  })
+
+  it('only platform admins issue claim links, and only a hash is stored', async () => {
+    await expect(createClaim(OWNER, CLAIM_BIZ)).rejects.toThrow('Only platform admins')
+    const { token } = await createClaim(ADMIN, CLAIM_BIZ)
+    expect(token).toMatch(/^[0-9a-f]{64}$/)
+    const hashed = await db.query(`select 1 from private.business_claims where token_hash = sha256(convert_to($1, 'UTF8'))`, [token])
+    expect(hashed.rows).toHaveLength(1)
+    const plain = await db.query(`select 1 from private.business_claims c where c::text like '%' || $1 || '%'`, [token])
+    expect(plain.rows).toHaveLength(0)
+    await expect(as(OWNER, (tx) => tx.query('select * from private.business_claims'))).rejects.toThrow(/permission denied/)
+  })
+
+  it('a claim link makes a confirmed account an owner exactly once', async () => {
+    const { token } = await createClaim(ADMIN, CLAIM_BIZ)
+    await expect(redeem(UNCONFIRMED, token)).rejects.toThrow('email_not_confirmed')
+    expect(await redeem(CLAIMER, token)).toBe(CLAIM_BIZ)
+    expect(await isMember(CLAIMER, CLAIM_BIZ)).toBe(true)
+    await expect(redeem(NEWCOMER, token)).rejects.toThrow('claim_invalid') // single use
+    expect(await isMember(NEWCOMER, CLAIM_BIZ)).toBe(false)
+  })
+
+  it('rejects unknown, replaced and expired claim links with the same error', async () => {
+    await expect(redeem(NEWCOMER, 'f'.repeat(64))).rejects.toThrow('claim_invalid')
+    const first = await createClaim(ADMIN, OTHER_BIZ)
+    await createClaim(ADMIN, OTHER_BIZ) // issuing a new link cancels the unused one
+    await expect(redeem(NEWCOMER, first.token)).rejects.toThrow('claim_invalid')
+    const expiring = await createClaim(ADMIN, OTHER_BIZ)
+    await db.query(`update private.business_claims set expires_at = now() - interval '1 second' where token_hash = sha256(convert_to($1, 'UTF8'))`, [expiring.token])
+    await expect(redeem(NEWCOMER, expiring.token)).rejects.toThrow('claim_invalid')
+    expect(await isMember(NEWCOMER, OTHER_BIZ)).toBe(false)
+  })
+})
+
+describe('isolation between businesses (storage, analytics, members)', () => {
+  const objectsVisibleTo = async (uid: string, name: string, role: 'authenticated' | 'anon' = 'authenticated') =>
+    (await as(uid, (tx) => tx.query(`select 1 from storage.objects where bucket_id = 'product-media' and name = $1`, [name]), role)).rows.length
+
+  it("an owner cannot read, delete or plant another business's media", async () => {
+    const path = `${BIZ}/models/secret-draft.glb`
+    await db.query(`insert into storage.objects (bucket_id, name) values ('product-media', $1)`, [path])
+    expect(await objectsVisibleTo(OWNER, path)).toBe(1)
+    expect(await objectsVisibleTo(OTHER_OWNER, path)).toBe(0)
+    expect(await objectsVisibleTo('', path, 'anon')).toBe(0) // not referenced by a published product
+    const del = await as(OTHER_OWNER, (tx) => tx.query(`delete from storage.objects where name = $1`, [path]))
+    expect(del.affectedRows ?? 0).toBe(0)
+    await expect(
+      as(OTHER_OWNER, (tx) => tx.query(`insert into storage.objects (bucket_id, name) values ('product-media', $1)`, [`${BIZ}/models/planted.glb`])),
+    ).rejects.toThrow(/row-level security/)
+  })
+
+  it("an owner cannot expose another business's media by referencing its path from their own product", async () => {
+    const theirs = await as(OTHER_OWNER, async (tx) => {
+      const args = toSaveProductArgs(null, input({ businessId: OTHER_BIZ }))
+      return (await tx.query<{ id: string }>('select public.save_product($1, $2, $3, $4) as id', [args.p_product, args.p_images, args.p_models, args.p_variants])).rows[0]!.id
+    })
+    await expect(
+      as(OTHER_OWNER, (tx) => tx.query(`insert into public.product_images (product_id, storage_path, kind) values ($1, $2, 'gallery')`, [theirs, `${BIZ}/models/secret-draft.glb`])),
+    ).rejects.toThrow(/row-level security/)
+  })
+
+  it("an owner cannot read another business's analytics or members", async () => {
+    const live = await saveDraft()
+    await publish(live)
+    await db.query(`insert into public.product_analytics (product_id, business_id, event_type) values ($1, $2, 'view')`, [live, BIZ])
+    const mine = await as(OWNER, (tx) => tx.query('select 1 from public.product_analytics where business_id = $1', [BIZ]))
+    const theirs = await as(OTHER_OWNER, (tx) => tx.query('select 1 from public.product_analytics where business_id = $1', [BIZ]))
+    expect(mine.rows.length).toBeGreaterThan(0)
+    expect(theirs.rows).toHaveLength(0)
+    const members = await as(OTHER_OWNER, (tx) => tx.query('select 1 from public.business_members where business_id = $1', [BIZ]))
+    expect(members.rows).toHaveLength(0)
+  })
+})
