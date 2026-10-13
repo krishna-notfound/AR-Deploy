@@ -48,3 +48,20 @@ Chrome on ARCore phones picks WebXR first. In that mode:
   - The bounding box is precise.
   - Analytics count one `ar_activation` per page view.
 - **Owner request:** a true-footprint preview and a settle-onto-floor drop. Cosmetic, with no fit claims.
+
+## Revision 2026-10-13 (b): custom session switched OFF, last good AR flow restored
+- **The regression:** AR became slower and less reliable after 98c7545. That commit removed `webxr` from `ar-modes` and routed Android Chrome to our own session. Confirmed in the code:
+  - The session downloads and parses the GLB a **second** time at launch (`webxrSession.ts`, `GLTFLoader.loadAsync`).
+  - It runs a **second** WebGL renderer with antialiasing next to model-viewer's.
+  - It is chosen on every Android 7+ phone, ARCore or not.
+
+  model-viewer's built-in WebXR reuses the model and renderer already on the page.
+- **Decision:**
+  - `ar-modes="webxr scene-viewer quick-look"` again, exactly as in a6bc75b.
+  - `CUSTOM_WEBXR_ENABLED` (`VITE_CUSTOM_WEBXR=on`) is off by default. The session code is kept but never probed or loaded.
+- **Kept from later work, on the model-viewer path:**
+  - no dead button after `ar-status: failed`
+  - one `ar_activation` per page view
+  - refreshed signed URLs
+- **Not kept while the session is off:** the placement controls, footprint preview and settle drop (they live in the custom session).
+- **Before reviving it:** test on a device, reuse model-viewer's loaded scene instead of downloading again, and avoid two live renderers.

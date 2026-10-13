@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AR_DEFAULT_PREFERENCE, chooseArMode } from './capability'
+import { AR_DEFAULT_PREFERENCE, CUSTOM_WEBXR_ENABLED, chooseArMode } from './capability'
 import { ROTATE_STEP_DEG, SETTLE_DROP_M, SETTLE_MS, facingYaw, groundOffset, hintFor, initialPlacement, isUsableHit, placementReducer, settleOffset } from './placement'
 
 describe('chooseArMode', () => {
@@ -38,6 +38,10 @@ describe('chooseArMode', () => {
     expect(chooseArMode({ ...base, webxrAR: true, nativeAR: true, prefer: 'native' })).toEqual({ mode: 'native', webxrBeta: true })
     expect(chooseArMode({ ...base, webxrAR: true, prefer: 'native' })).toEqual({ mode: 'webxr' })
     expect(chooseArMode({ ...base, webxrAR: true, nativeAR: true, webxrFailed: true, prefer: 'native' })).toEqual({ mode: 'native', webxrBeta: false })
+  })
+
+  it('ships with our custom WebXR session off: AR goes through <model-viewer> as in the last good version', () => {
+    expect(CUSTOM_WEBXR_ENABLED).toBe(false)
   })
 
   it('keeps the current WebXR-first default until the client approves a change', () => {

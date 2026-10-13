@@ -10,6 +10,13 @@ export type ArMode =
   | { mode: 'native'; webxrBeta: boolean }
   | { mode: 'none'; reason: 'no-model' | 'model-error' | 'unsupported' | 'failed' }
 
+/**
+ * Our own WebXR session (webxrSession.ts) is OFF: it downloaded and parsed the GLB a second time and ran a
+ * second WebGL renderer next to <model-viewer>, which made AR slower than model-viewer's built-in WebXR.
+ * With it off, every AR launch goes through <model-viewer> as before 98c7545. VITE_CUSTOM_WEBXR=on revives it.
+ */
+export const CUSTOM_WEBXR_ENABLED = import.meta.env.VITE_CUSTOM_WEBXR === 'on'
+
 export type ArPreference = 'webxr' | 'native'
 
 /**

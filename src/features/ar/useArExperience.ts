@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { type ArMode, type ArPreference, chooseArMode, detectWebXrAr } from './capability'
+import { type ArMode, type ArPreference, CUSTOM_WEBXR_ENABLED, chooseArMode, detectWebXrAr } from './capability'
 import { type PlacementState, initialPlacement } from './placement'
 import type { ArSessionController } from './webxrSession'
 
@@ -49,7 +49,8 @@ export function useArExperience({
   overlayRoot: React.RefObject<HTMLDivElement | null>
   messages: { modelFailed: string }
 }) {
-  const [webxrAR, setWebxrAR] = useState<boolean | null>(null)
+  // Custom session off: never probe or preload it; AR goes straight to <model-viewer>.
+  const [webxrAR, setWebxrAR] = useState<boolean | null>(CUSTOM_WEBXR_ENABLED ? null : false)
   const [remembered] = useState(rememberedUnavailable)
   /** Failed on this page view (drives the "could not start" notice; a remembered failure stays silent). */
   const [webxrFailed, setWebxrFailed] = useState(false)
@@ -58,6 +59,7 @@ export function useArExperience({
   const moduleRef = useRef<SessionModule | null>(null)
 
   useEffect(() => {
+    if (!CUSTOM_WEBXR_ENABLED) return
     let alive = true
     void detectWebXrAr().then((ok) => alive && setWebxrAR(ok))
     return () => {

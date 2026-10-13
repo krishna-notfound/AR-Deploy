@@ -50,6 +50,7 @@ test('model loads, scale is checked, and AR falls back honestly on desktop', asy
 
 // Simulated, not a real device: the browser claims immersive-ar but refuses the session (e.g. camera denied).
 test('WebXR phone: AR start failure is reported once, with no dead button and the 3D view kept', async ({ page }) => {
+  test.skip(process.env.VITE_CUSTOM_WEBXR !== 'on', 'custom WebXR session is off (ADR-0018 revision); run with VITE_CUSTOM_WEBXR=on')
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'xr', {
       value: {
@@ -65,10 +66,9 @@ test('WebXR phone: AR start failure is reported once, with no dead button and th
   await expect(button).toBeEnabled({ timeout: 60_000 })
   await button.click()
   await expect(page.getByText('AR could not start', { exact: false })).toBeVisible()
-  // Desktop Chromium has no native AR viewer: no AR button is left (it would do nothing), the notice stays,
-  // and the visitor is not told to "open this page on a phone" (they may already be on one).
-  await expect(page.getByRole('button', { name: 'View in my home' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Open in phone AR viewer' })).toHaveCount(0)
+  // The fallback is <model-viewer>'s own AR (it also sees WebXR here), offered once; the 3D view stays and the
+  // visitor is not told to "open this page on a phone" (they may already be on one).
+  await expect(page.getByRole('button', { name: 'Open in phone AR viewer' })).toBeVisible()
   await expect(page.getByText('View in your room on a phone')).toHaveCount(0)
   await expect(page.getByText('True-to-size model')).toBeVisible()
 })
@@ -76,6 +76,7 @@ test('WebXR phone: AR start failure is reported once, with no dead button and th
 // ar_activation means "asked for AR on this page view": repeated taps (here: the camera prompt cancelled twice)
 // must not inflate the count.
 test('AR activations are counted once per page view', async ({ page }) => {
+  test.skip(process.env.VITE_CUSTOM_WEBXR !== 'on', 'custom WebXR session is off (ADR-0018 revision); run with VITE_CUSTOM_WEBXR=on')
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'xr', {
       value: {
@@ -98,6 +99,40 @@ test('AR activations are counted once per page view', async ({ page }) => {
     })
   await expect.poll(count).toBe(1)
   await expect(page.getByText('AR could not start', { exact: false })).toHaveCount(0)
+})
+
+// Restored flow (as before 98c7545): on a WebXR-capable phone the AR button launches <model-viewer>'s own WebXR,
+// which reuses the model already loaded for the 3D view. Simulated: Chromium with a stubbed navigator.xr.
+test('AR launches through model-viewer and does not download the model again', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __xrRequests: number }
+    w.__xrRequests = 0
+    Object.defineProperty(navigator, 'xr', {
+      value: {
+        isSessionSupported: async (mode: string) => mode === 'immersive-ar',
+        requestSession: async () => {
+          w.__xrRequests++
+          throw new DOMException('no camera in CI', 'NotAllowedError')
+        },
+        addEventListener() {},
+        removeEventListener() {},
+      },
+    })
+  })
+  const glbFetches: string[] = []
+  const sessionChunks: string[] = []
+  page.on('request', (r) => {
+    if (r.url().endsWith('.glb')) glbFetches.push(r.url())
+    if (/webxrSession/.test(r.url())) sessionChunks.push(r.url())
+  })
+  await page.goto('/products/nordhaus/sheen-lounge-chair')
+  const button = page.getByRole('button', { name: 'View in my home' })
+  await expect(button).toBeEnabled({ timeout: 60_000 })
+  await button.click()
+  await page.getByRole('button', { name: 'Start AR' }).click()
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __xrRequests: number }).__xrRequests)).toBeGreaterThan(0)
+  expect(glbFetches).toHaveLength(1) // the 3D view's download only
+  expect(sessionChunks).toHaveLength(0) // our custom session code is never loaded
 })
 
 test('switches language between English and Portuguese', async ({ page }) => {
