@@ -125,8 +125,6 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       auto-rotate={autoRotate || undefined}
       auto-rotate-delay={autoRotate ? '0' : undefined}
       rotation-per-second={autoRotate ? '14deg' : undefined}
-      // Restored to the last known good AR flow (a6bc75b): model-viewer's own WebXR on ARCore phones reuses
-      // the model and renderer already on the page; Scene Viewer / Quick Look otherwise (ADR-0018 revision).
       ar-modes="webxr scene-viewer quick-look"
       ar-scale="fixed"
       ar-placement="floor"

@@ -1,5 +1,5 @@
 # ADR-0018: Our own WebXR placement session where supported; native viewers otherwise
-- **Status:** Accepted (refines ADR-0006)
+- **Status:** Withdrawn 2026-10-13 (see revision c): original model-viewer AR restored
 - **Date:** 2026-10-13
 - **Affects:** design/09-3d-ar.md, design/15-product-editor.md, tasks/P10-ar.md
 
@@ -65,3 +65,6 @@ Chrome on ARCore phones picks WebXR first. In that mode:
   - refreshed signed URLs
 - **Not kept while the session is off:** the placement controls, footprint preview and settle drop (they live in the custom session).
 - **Before reviving it:** test on a device, reuse model-viewer's loaded scene instead of downloading again, and avoid two live renderers.
+
+## Revision 2026-10-13 (c): WITHDRAWN, owner decision
+The owner wants the original AR experience with no new AR buttons. The product page, `ArSection`, `ModelViewer` and the AR text are restored byte-for-byte from a6bc75b. The custom session code (`capability`, `placement`, `webxrSession`, `useArExperience`, `ArSessionOverlay`) and the explicit `three` / `@types/three` dependencies are removed; git history keeps them. Only the admin AR readiness panel (`features/ar/readiness.ts`) remains. Any new AR work is a separate task that starts with a device test.
