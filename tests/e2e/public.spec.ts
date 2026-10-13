@@ -45,6 +45,28 @@ test('model loads, scale is checked, and AR falls back honestly on desktop', asy
   await expect(page.getByText('AR scale unverified')).toBeVisible({ timeout: 60_000 })
 })
 
+// Simulated, not a real device: the browser claims immersive-ar but refuses the session (e.g. camera denied).
+test('WebXR phone: AR start failure is reported and the phone hand-off stays available', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'xr', {
+      value: {
+        isSessionSupported: async (m: string) => m === 'immersive-ar',
+        requestSession: async () => {
+          throw new DOMException('denied', 'NotAllowedError')
+        },
+      },
+    })
+  })
+  await page.goto('/products/nordhaus/sheen-lounge-chair')
+  const button = page.getByRole('button', { name: 'View in my home' })
+  await expect(button).toBeEnabled({ timeout: 60_000 })
+  await button.click()
+  await expect(page.getByText('AR could not start', { exact: false })).toBeVisible()
+  // Desktop Chromium has no native AR viewer, so only the hand-off is offered, never a dead button.
+  await expect(page.getByRole('button', { name: 'Open in phone AR viewer' })).toHaveCount(0)
+  await expect(page.getByText('View in your room on a phone')).toBeVisible()
+})
+
 test('switches language between English and Portuguese', async ({ page }) => {
   await page.goto('/products/atelier-verde/rio-sideboard')
   await expect(page.getByRole('heading', { name: 'Dimensions' })).toBeVisible()

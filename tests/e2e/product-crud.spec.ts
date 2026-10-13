@@ -82,3 +82,13 @@ test('business filter only shows that business’s products', async ({ page }) =
   const count = await rows.count()
   for (let i = 0; i < count; i++) await expect(rows.nth(i)).toContainText('Atelier Verde')
 })
+
+test('product editor shows AR readiness for each platform', async ({ page }) => {
+  await signInAsSuperAdmin(page)
+  await page.goto('/admin/products/prd_sheen_chair/edit')
+  const readiness = page.getByRole('region', { name: 'AR readiness' })
+  await expect(readiness.getByText('Works on every device.')).toBeVisible({ timeout: 60_000 })
+  await expect(readiness.getByText('Android AR')).toBeVisible()
+  await expect(readiness.getByText('iPhone and iPad AR')).toBeVisible()
+  await expect(readiness.getByText('AR shows “True size”', { exact: false })).toBeVisible()
+})

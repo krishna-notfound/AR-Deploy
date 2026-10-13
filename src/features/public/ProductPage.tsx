@@ -1,5 +1,6 @@
 import { ArrowLeft, CheckCircle2, Eye, HelpCircle, Mail, MapPin, Phone, Globe, PackageX } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
@@ -17,7 +18,9 @@ import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { ArSection, arAvailability } from './ArSection'
+import { ArSessionOverlay } from '../ar/ArSessionOverlay'
+import { useArExperience } from '../ar/useArExperience'
+import { ArSection } from './ArSection'
 import { ArTips, arTipsDismissed } from './ArTips'
 import { DimensionDiagram } from './DimensionDiagram'
 import { InAppNotice } from './InAppNotice'
@@ -75,6 +78,8 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   return <ProductView key={res.data.product.id} business={res.data.business} product={res.data.product} catalogHref={catalogHref} isPreview={canPreview && (res.data.product.status !== 'published' || res.data.business.status !== 'active')} />
 }
 
+const fmtNum = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
+
 function ProductView({ business, product, catalogHref, isPreview }: { business: Business; product: Product; catalogHref: string; isPreview: boolean }) {
   const { t, lang, localized } = useI18n()
   const toast = useToast()
@@ -111,12 +116,16 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const variant = product.variants.find((v) => v.id === variantId)
   const price = product.price + (variant?.priceDelta ?? 0)
   const scale = useMemo(() => checkScale(measured, product.dimensions), [measured, product.dimensions])
-  const availability = arAvailability(modelState, canAR)
+  const overlayRoot = useRef<HTMLDivElement>(null)
+  const ar = useArExperience({ glbUrl: product.models.glb?.url, modelState, nativeAR: canAR, overlayRoot, messages: { modelFailed: t('ar.session.modelFailed') } })
+  const arReady = ar.mode.mode === 'webxr' || ar.mode.mode === 'native'
+  const d = product.dimensions
+  const dimsLabel = `W ${fmtNum(d.width)} × D ${fmtNum(d.depth)} × H ${fmtNum(d.height)} ${d.unit}`
   const additional = product.images.filter((i) => i.kind === 'additional')
 
   const startAR = async () => {
     setTipsOpen(null)
-    if (!isPreview) void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
+    recordAr()
     try {
       await viewerRef.current?.activateAR()
     } catch {
@@ -124,7 +133,17 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     }
   }
 
+  const recordAr = () => {
+    if (!isPreview) void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
+  }
+
   const onActivate = () => {
+    if (ar.mode.mode === 'webxr') {
+      // Our session teaches each step in place, so no tips dialog in front of it.
+      recordAr()
+      void ar.startWebXr()
+      return
+    }
     if (arTipsDismissed()) void startAR()
     else setTipsOpen('before-ar')
   }
@@ -177,14 +196,14 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             <LocalizedSpan as="p" text={product.shortDescription} className="mt-3 text-[15px] leading-7 text-ink-muted" />
 
             <div className="mt-6 space-y-3">
-              <ArSection availability={availability} onActivate={onActivate} onShowTips={() => setTipsOpen('info')} />
+              <ArSection mode={ar.mode} startFailed={ar.webxrFailed} canOpenNative={canAR} onActivate={onActivate} onOpenNative={() => void startAR()} onShowTips={() => setTipsOpen('info')} />
               <div className="flex flex-wrap items-center gap-2">
                 {product.cta.url ? (
-                  <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={buttonClasses(availability === 'available' ? 'secondary' : 'brand', 'lg', 'flex-1')}>
+                  <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={buttonClasses(arReady ? 'secondary' : 'brand', 'lg', 'flex-1')}>
                     <LocalizedSpan text={product.cta.label} />
                   </a>
                 ) : hasContact ? (
-                  <Button size="lg" variant={availability === 'available' ? 'secondary' : 'brand'} className="flex-1" onClick={() => setContactOpen(true)}>
+                  <Button size="lg" variant={arReady ? 'secondary' : 'brand'} className="flex-1" onClick={() => setContactOpen(true)}>
                     {t('product.contactStore')}
                   </Button>
                 ) : null}
@@ -297,6 +316,26 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
         )}
       </div>
 
+      {/* WebXR DOM-overlay root: hidden until a session starts, then shown over the camera by the browser. */}
+      <div ref={overlayRoot} hidden className="fixed inset-0 z-50" />
+      {ar.view.active &&
+        overlayRoot.current &&
+        createPortal(
+          <ArSessionOverlay
+            state={ar.view.state}
+            loading={ar.view.loading}
+            error={ar.view.error}
+            dims={dimsLabel}
+            scaleVerified={scale.status === 'verified'}
+            onPlace={() => ar.controller.current?.place()}
+            onMove={() => ar.controller.current?.move()}
+            onCancelMove={() => ar.controller.current?.cancelMove()}
+            onRotate={(dir) => ar.controller.current?.rotate(dir)}
+            onReset={() => ar.controller.current?.reset()}
+            onExit={() => ar.controller.current?.exit()}
+          />,
+          overlayRoot.current,
+        )}
       <ArTips open={tipsOpen !== null} onClose={() => setTipsOpen(null)} onStart={tipsOpen === 'before-ar' ? () => void startAR() : undefined} />
 
       <Modal open={contactOpen} onClose={() => setContactOpen(false)} title={business.name} size="sm">

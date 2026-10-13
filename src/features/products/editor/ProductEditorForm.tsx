@@ -245,7 +245,7 @@ export function ProductEditorForm({
                 label="Business"
                 required
                 error={err('businessId')}
-                hint={isNew ? 'The product is published in this businessâ€™s catalog.' : 'A product stays in the catalog it was created in.'}
+                hint={isNew ? 'The product is published in this business’s catalog.' : 'A product stays in the catalog it was created in.'}
               >
                 <Select
                   value={form.input.businessId}
@@ -255,7 +255,7 @@ export function ProductEditorForm({
                     setInput({ businessId: e.target.value, currency: b?.defaultCurrency ?? form.input.currency })
                   }}
                 >
-                  <option value="">Choose a businessâ€¦</option>
+                  <option value="">Choose a business…</option>
                   {businesses.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
@@ -332,7 +332,7 @@ export function ProductEditorForm({
             />
           </Section>
 
-          <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D modelâ€™s scale.">
+          <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale.">
             <div className="flex flex-wrap items-end gap-4">
               {(['width', 'height', 'depth'] as const).map((k) => (
                 <FormField key={k} label={k[0]!.toUpperCase() + k.slice(1)} error={err(`dimensions.${k}`)} className="w-[calc(50%-0.5rem)] sm:w-32">
@@ -380,7 +380,7 @@ export function ProductEditorForm({
           <Section id="cta" title="Call to action" description="The main button on the product page, for example a contact form or WhatsApp link.">
             <div className="grid items-start gap-4 sm:grid-cols-2 [&>*:last-child]:sm:pt-3">
               <LocalizedField label="Button label" value={form.input.cta.label} onChange={(label) => setInput({ cta: { ...form.input.cta, label } })} maxLength={40} />
-              <FormField label="Button link" optional error={err('cta.url')} hint="If empty, the button shows the storeâ€™s contact details.">
+              <FormField label="Button link" optional error={err('cta.url')} hint="If empty, the button shows the store’s contact details.">
                 <Input type="url" placeholder="https://" value={form.input.cta.url ?? ''} onChange={(e) => setInput({ cta: { ...form.input.cta, url: e.target.value } })} />
               </FormField>
             </div>

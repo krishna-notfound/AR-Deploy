@@ -125,7 +125,9 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       auto-rotate={autoRotate || undefined}
       auto-rotate-delay={autoRotate ? '0' : undefined}
       rotation-per-second={autoRotate ? '14deg' : undefined}
-      ar-modes="webxr scene-viewer quick-look"
+      // Native viewers only: on WebXR-capable phones our own session (features/ar) replaces model-viewer's
+      // built-in WebXR, whose drag/rotate gestures were hard to control (ADR-0018).
+      ar-modes="scene-viewer quick-look"
       ar-scale="fixed"
       ar-placement="floor"
       loading="eager"

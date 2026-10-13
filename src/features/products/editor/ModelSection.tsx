@@ -1,10 +1,11 @@
-import { AlertTriangle, Box, CheckCircle2, FileBox, Info, Link2, Loader2, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Box, CheckCircle2, CircleSlash, FileBox, Info, Link2, Loader2, Trash2, Upload } from 'lucide-react'
 import { useId, useState } from 'react'
 import { AssetStatusBadge, Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
 import { ModelViewer } from '@/components/three/ModelViewer'
+import { type ReadinessItem, arReadiness } from '@/features/ar/readiness'
 import type { Dimensions, ModelAsset, ModelFormat, Product } from '@/domain/types'
 import { service } from '@/services'
 import { MODEL_RULES, isHttpUrl, isStaleSessionAsset, modelAssetFromUrl, validateModelFile } from '@/lib/files'
@@ -42,13 +43,7 @@ export function ModelSection({
           <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange({ ...models, [f]: a })} />
         ))}
       </div>
-      {!models.usdz && models.glb && (
-        <p className="flex items-start gap-2 text-xs text-ink-muted">
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
-          No USDZ file: AR Quick Look on iPhone and iPad may be unavailable or less reliable for this product.
-        </p>
-      )}
-      <ModelPreview glb={models.glb} iosSrc={models.usdz?.url} dimensions={dimensions} poster={poster} name={name} />
+      <ModelPreview glb={models.glb} usdz={models.usdz} dimensions={dimensions} poster={poster} name={name} />
     </div>
   )
 }
@@ -177,7 +172,7 @@ function ModelSlot({
 }
 
 /** Admin 3D preview (no AR) with the measured-vs-entered scale check (ADR-0006). */
-export function ModelPreview({ glb, iosSrc, dimensions, poster, name }: { glb?: ModelAsset; iosSrc?: string; dimensions: Dimensions; poster?: string; name: string }) {
+export function ModelPreview({ glb, usdz, dimensions, poster, name }: { glb?: ModelAsset; usdz?: ModelAsset; dimensions: Dimensions; poster?: string; name: string }) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [progress, setProgress] = useState(0)
   const [measured, setMeasured] = useState<{ x: number; y: number; z: number } | null>(null)
@@ -185,6 +180,7 @@ export function ModelPreview({ glb, iosSrc, dimensions, poster, name }: { glb?: 
   const stale = isStaleSessionAsset(glb)
   // Recomputed live, so editing the dimensions updates the check immediately.
   const scale: ScaleCheck = checkScale(measured, dimensions)
+  const readiness = <ArReadiness items={arReadiness({ glb, usdz, preview: state, scale })} />
 
   if (!glb || stale) {
     return (
@@ -194,6 +190,7 @@ export function ModelPreview({ glb, iosSrc, dimensions, poster, name }: { glb?: 
         <p className="mt-1 max-w-sm text-xs text-ink-muted">
           Add a GLB model to show the 3D viewer and the “View in my home” button. Without one, customers see the photo gallery only.
         </p>
+        {readiness}
       </div>
     )
   }
@@ -204,7 +201,7 @@ export function ModelPreview({ glb, iosSrc, dimensions, poster, name }: { glb?: 
         <ModelViewer
           key={`${glb.url}-${attempt}`}
           src={glb.url}
-          iosSrc={iosSrc}
+          iosSrc={usdz?.url}
           poster={poster}
           alt={`3D model of ${name}`}
           className="absolute inset-0"
@@ -241,7 +238,38 @@ export function ModelPreview({ glb, iosSrc, dimensions, poster, name }: { glb?: 
         )}
       </div>
       {state === 'loaded' && <ScaleReport scale={scale} />}
+      {readiness}
     </div>
+  )
+}
+
+const LEVEL_ICON = {
+  ready: <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />,
+  warning: <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />,
+  missing: <CircleSlash className="mt-0.5 size-4 shrink-0 text-ink-faint" aria-hidden />,
+}
+const LEVEL_TEXT = { ready: 'Ready', warning: 'Needs attention', missing: 'Not available' }
+
+/** What customers get on each platform, so the admin knows before publishing (ADR-0018). */
+function ArReadiness({ items }: { items: ReadinessItem[] }) {
+  return (
+    <section aria-label="AR readiness" className="mt-4 w-full rounded-[var(--radius-card)] border border-line p-4 text-left">
+      <h4 className="text-sm font-semibold">AR readiness</h4>
+      <ul className="mt-3 space-y-2.5">
+        {items.map((i) => (
+          <li key={i.key} className="flex items-start gap-2.5 text-xs">
+            {LEVEL_ICON[i.level]}
+            <div>
+              <p className="font-medium text-ink">
+                {i.label}
+                <span className="sr-only"> ({LEVEL_TEXT[i.level]})</span>
+              </p>
+              <p className="mt-0.5 text-ink-muted">{i.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
