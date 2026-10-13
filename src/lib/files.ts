@@ -12,9 +12,10 @@ export const IMAGE_RULES = {
   maxPersistBytes: 1.5 * MB,
 }
 
+// No SVG: the business-logos bucket refuses it (SVG can carry scripts; supabase/migrations storage).
 export const LOGO_RULES = {
-  accept: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
-  extensions: ['.jpg', '.jpeg', '.png', '.webp', '.svg'],
+  accept: ['image/jpeg', 'image/png', 'image/webp'],
+  extensions: ['.jpg', '.jpeg', '.png', '.webp'],
   maxBytes: 2 * MB,
 }
 
@@ -69,6 +70,27 @@ export async function validateModelFile(file: File, format: ModelFormat): Promis
       message: `${file.name} does not look like a valid ${format.toUpperCase()} file (header check failed).`,
     }
   return { ok: true }
+}
+
+/**
+ * glTF extensions Google Scene Viewer documents as supported (developers.google.com/ar/develop/scene-viewer).
+ * A GLB that *requires* any other extension (Draco, meshopt, KTX2, WebP, quantization...) may render in our
+ * 3D viewer but fail in Android AR.
+ */
+export const SCENE_VIEWER_EXTENSIONS = ['KHR_materials_unlit', 'KHR_texture_transform', 'KHR_materials_pbrSpecularGlossiness']
+
+/** Required glTF extensions of a GLB that Scene Viewer does not support. Empty when none or unreadable. */
+export async function unsupportedForSceneViewer(file: Blob): Promise<string[]> {
+  try {
+    const head = new DataView((await readHeader(file, 20)).buffer)
+    if (head.byteLength < 20 || head.getUint32(0, true) !== 0x46546c67 || head.getUint32(16, true) !== 0x4e4f534a) return []
+    const jsonLength = head.getUint32(12, true)
+    const json = JSON.parse(new TextDecoder().decode(await readHeader(file.slice(20), jsonLength))) as { extensionsRequired?: unknown }
+    const required = Array.isArray(json.extensionsRequired) ? json.extensionsRequired.filter((x): x is string => typeof x === 'string') : []
+    return required.filter((x) => !SCENE_VIEWER_EXTENSIONS.includes(x))
+  } catch {
+    return []
+  }
 }
 
 export function readAsDataUrl(file: Blob): Promise<string> {

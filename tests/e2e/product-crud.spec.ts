@@ -92,3 +92,12 @@ test('product editor shows AR readiness for each platform', async ({ page }) => 
   await expect(readiness.getByText('iPhone and iPad AR')).toBeVisible()
   await expect(readiness.getByText('AR shows “True size”', { exact: false })).toBeVisible()
 })
+
+test('publishing under an inactive catalog says it is not visible yet (no false "live" claim)', async ({ page }) => {
+  await signInAsSuperAdmin(page)
+  await page.goto('/admin/products/prd_desk/edit') // Oak & Ember: catalog inactive
+  await page.getByRole('button', { name: 'Unpublish' }).click()
+  await confirmDialog(page, 'Unpublish')
+  await page.getByRole('button', { name: 'Publish' }).click()
+  await expect(page.getByText('The catalog is not active yet', { exact: false }).first()).toBeVisible()
+})

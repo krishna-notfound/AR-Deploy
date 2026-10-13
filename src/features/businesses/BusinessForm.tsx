@@ -76,7 +76,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
     if (!business) {
       toast.success(
         intent === 'draft' ? 'Business saved as draft' : 'Business created',
-        'Catalog configured in the demo. A real subdomain and SSL certificate require backend setup.',
+        PUBLIC_URLS_ARE_LIVE ? `Catalog address: ${catalogPublicUrl(res.data)}` : 'Demo address only: a real subdomain and SSL certificate need deployment setup.',
       )
       skipBlock.current = true
     } else toast.success('Changes saved')

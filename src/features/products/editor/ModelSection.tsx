@@ -8,9 +8,10 @@ import { ModelViewer } from '@/components/three/ModelViewer'
 import { type ReadinessItem, arReadiness } from '@/features/ar/readiness'
 import type { Dimensions, ModelAsset, ModelFormat, Product } from '@/domain/types'
 import { service } from '@/services'
-import { MODEL_RULES, isHttpUrl, isStaleSessionAsset, modelAssetFromUrl, validateModelFile } from '@/lib/files'
+import { MODEL_RULES, isHttpUrl, isStaleSessionAsset, modelAssetFromUrl, unsupportedForSceneViewer, validateModelFile } from '@/lib/files'
 import { formatFileSize } from '@/lib/format'
-import { type ScaleCheck, checkScale } from '@/lib/scale'
+import { type ScaleCheck, type ScaleMismatchReason, checkScale } from '@/lib/scale'
+import { MODEL_OPTIMIZATION_ENABLED, optimizeModel } from './modelOptimizeClient'
 
 const FORMAT_INFO: Record<ModelFormat, { title: string; use: string }> = {
   glb: { title: 'GLB model', use: 'Used for the interactive 3D viewer on every device and for AR on Android (Scene Viewer).' },
@@ -36,7 +37,7 @@ export function ModelSection({
     <div className="space-y-5">
       <InlineNotice icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
         Upload the files your 3D artist delivered. <strong className="font-medium">GLB</strong> powers the 3D viewer and Android AR.{' '}
-        <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. Files are not converted, compressed or processed in this demo.
+        <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are optimized for size before upload; USDZ files are stored as uploaded. Nothing is converted.' : 'Files are stored as uploaded: they are not converted or compressed.'}
       </InlineNotice>
       <div className="grid gap-4 lg:grid-cols-2">
         {(['glb', 'usdz'] as const).map((f) => (
@@ -61,19 +62,43 @@ function ModelSlot({
 }) {
   const id = useId()
   const [error, setError] = useState<string | null>(null)
-  const [checking, setChecking] = useState(false)
+  /** Non-blocking: the file works in the 3D viewer but may not open in Android AR (Scene Viewer). */
+  const [arWarning, setArWarning] = useState<string | null>(null)
+  const [checking, setChecking] = useState<false | 'checking' | 'optimizing'>(false)
+  /** Result of the size optimization, and the untouched file so the admin can upload it instead. */
+  const [optimizeNote, setOptimizeNote] = useState<{ text: string; original?: File } | null>(null)
   const [urlDraft, setUrlDraft] = useState('')
   const info = FORMAT_INFO[format]
   const stale = isStaleSessionAsset(asset)
 
-  const onFile = async (file: File) => {
-    setChecking(true)
-    const check = await validateModelFile(file, format)
-    const res = check.ok ? await service.uploadAsset({ kind: format, file, businessId }) : null
+  const onFile = async (original: File, opts: { keepOriginal?: boolean } = {}) => {
+    setChecking('checking')
+    const check = await validateModelFile(original, format)
+    if (!check.ok) {
+      setChecking(false)
+      return setError(check.message)
+    }
+    let file = original
+    if (MODEL_OPTIMIZATION_ENABLED && format === 'glb' && !opts.keepOriginal) {
+      setChecking('optimizing')
+      const r = await optimizeModel(original)
+      file = r.file
+      setOptimizeNote(
+        r.optimized
+          ? { text: `Optimized for faster loading: ${formatFileSize(r.originalBytes)} → ${formatFileSize(r.outputBytes)} (textures above 2048 px reduced, unused data removed; size and shape unchanged).`, original }
+          : { text: r.reason ?? 'Kept the original file.' },
+      )
+    } else setOptimizeNote(opts.keepOriginal ? { text: 'Original file uploaded, not optimized.' } : null)
+    const res = await service.uploadAsset({ kind: format, file, businessId })
     setChecking(false)
-    if (!check.ok) return setError(check.message)
-    if (!res?.ok) return setError(res?.error.message ?? 'Upload failed.')
+    if (!res.ok) return setError(res.error.message)
     setError(null)
+    const unsupported = format === 'glb' ? await unsupportedForSceneViewer(file) : []
+    setArWarning(
+      unsupported.length
+        ? `This GLB requires ${unsupported.join(', ')}, which Google Scene Viewer does not support. It works in the 3D viewer, but Android AR may fail. Ask for a file exported without it.`
+        : null,
+    )
     const { url, storagePath, status } = res.data
     onChange({ format, url, fileName: file.name, sizeBytes: file.size, status, ...(storagePath ? { storagePath } : {}) })
   }
@@ -129,7 +154,7 @@ function ModelSlot({
           className="inline-flex h-8 w-fit cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[13px] font-medium hover:bg-subtle focus-within:outline-2 focus-within:outline-accent"
         >
           {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Upload className="size-4" aria-hidden />}
-          {checking ? 'Checking file…' : asset ? `Replace .${format} file` : `Upload .${format} file`}
+          {checking === 'optimizing' ? 'Optimizing model…' : checking ? 'Checking file…' : asset ? `Replace .${format} file` : `Upload .${format} file`}
           <input
             id={id}
             type="file"
@@ -162,6 +187,17 @@ function ModelSlot({
         </div>
         <p className="text-[11px] text-ink-faint">Max {formatFileSize(MODEL_RULES[format].maxBytes)}. The file header is checked to confirm the format.</p>
       </div>
+      {optimizeNote && asset && (
+        <p className="mt-2 text-xs text-ink-muted">
+          {optimizeNote.text}{' '}
+          {optimizeNote.original && (
+            <button type="button" className="font-medium text-ink underline underline-offset-2" onClick={() => void onFile(optimizeNote.original!, { keepOriginal: true })}>
+              Upload the original instead
+            </button>
+          )}
+        </p>
+      )}
+      {arWarning && asset && <p className="mt-2 text-xs text-warning">{arWarning}</p>}
       {error && (
         <p role="alert" className="mt-2 text-xs font-medium text-danger">
           {error}
@@ -273,6 +309,13 @@ function ArReadiness({ items }: { items: ReadinessItem[] }) {
   )
 }
 
+const MISMATCH_HINT: Record<ScaleMismatchReason, (k?: number) => string> = {
+  'axis-swap': () => 'Likely cause: width and depth are swapped. The model is turned 90°; re-export it with its front facing forward (+Z).',
+  'wrong-unit': () => 'Likely cause: the numbers are in the other unit. Check the centimetres / inches switch.',
+  'model-units': (k) => `Likely cause: the file is not in metres (about ${k && k >= 1 ? Math.round(k) : `1/${Math.round(1 / (k ?? 1))}`}× too ${k && k >= 1 ? 'large' : 'small'}). Re-export it in metres.`,
+  uniform: (k) => `The model is about ${k?.toFixed(2)}× the entered size on every axis. Check the file's export scale or the dimensions.`,
+}
+
 function ScaleReport({ scale }: { scale: ScaleCheck }) {
   const m = (v: number) => `${Math.round(v * 100)} cm`
   if (scale.status === 'unknown')
@@ -291,6 +334,7 @@ function ScaleReport({ scale }: { scale: ScaleCheck }) {
           Model measures W × H × D {sizes(scale.measured)}. Entered {sizes(scale.expected)}.
           {scale.status === 'mismatch' && ' The model is never rescaled automatically. Fix the model file or the dimensions.'}
         </p>
+        {scale.status === 'mismatch' && scale.reason && <p className="mt-0.5 text-ink">{MISMATCH_HINT[scale.reason](scale.factor)}</p>}
       </div>
     </div>
   )

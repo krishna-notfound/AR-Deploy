@@ -83,6 +83,9 @@ export function ProductEditorForm({
 
   const dirty = JSON.stringify(form) !== snapshot
   const business = businesses.find((b) => b.id === form.input.businessId) ?? fixedBusiness
+  // Files uploaded to Storage live under {businessId}/: switching business would make the save fail
+  // (storage-folder check) and orphan the files, so the choice is locked once files are stored.
+  const hasStoredUploads = form.input.images.some((i) => i.storagePath) || !!form.input.models.glb?.storagePath || !!form.input.models.usdz?.storagePath
   const base = scope === 'admin' ? '/admin/products' : '/dashboard/products'
 
   // ---- unsaved-changes guard ----
@@ -245,11 +248,17 @@ export function ProductEditorForm({
                 label="Business"
                 required
                 error={err('businessId')}
-                hint={isNew ? 'The product is published in this business’s catalog.' : 'A product stays in the catalog it was created in.'}
+                hint={
+                  !isNew
+                    ? 'A product stays in the catalog it was created in.'
+                    : hasStoredUploads
+                      ? 'Uploaded files are stored in this business’s folder. Remove them to choose another business.'
+                      : 'The product is published in this business’s catalog.'
+                }
               >
                 <Select
                   value={form.input.businessId}
-                  disabled={!isNew}
+                  disabled={!isNew || hasStoredUploads}
                   onChange={(e) => {
                     const b = businesses.find((x) => x.id === e.target.value)
                     setInput({ businessId: e.target.value, currency: b?.defaultCurrency ?? form.input.currency })
@@ -332,7 +341,7 @@ export function ProductEditorForm({
             />
           </Section>
 
-          <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale.">
+          <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale. The unit switch says which unit the numbers are in; it does not convert them.">
             <div className="flex flex-wrap items-end gap-4">
               {(['width', 'height', 'depth'] as const).map((k) => (
                 <FormField key={k} label={k[0]!.toUpperCase() + k.slice(1)} error={err(`dimensions.${k}`)} className="w-[calc(50%-0.5rem)] sm:w-32">
@@ -417,12 +426,16 @@ export function ProductEditorForm({
         open={publishedOpen && !!product && !!business}
         onClose={() => setPublishedOpen(false)}
         title="Product published"
-        description="It now appears in the business catalog."
+        description={
+          business?.status === 'active'
+            ? 'It now appears in the business catalog.'
+            : 'The catalog is not active yet: customers will see this product once the business is activated.'
+        }
         footer={
           <>
             <Button onClick={() => setPublishedOpen(false)}>Keep editing</Button>
             {product && business && (
-              <Button variant="primary" icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(productLocalPath(business, product), '_blank', 'noopener')}>
+              <Button variant="primary" icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(productLocalPath(business, product, { preview: business.status !== 'active' }), '_blank', 'noopener')}>
                 Open product page
               </Button>
             )}

@@ -1,3 +1,4 @@
+import type { Dimensions } from '@/domain/types'
 import { describe, expect, it } from 'vitest'
 import { safeBrandAccent, contrastRatio } from './color'
 import { validateModelFile, validateImageFile } from './files'
@@ -107,5 +108,61 @@ describe('file validation', () => {
     expect((await validateModelFile(fakeGlb, 'glb')).ok).toBe(false)
     expect((await validateModelFile(usdz, 'usdz')).ok).toBe(true)
     expect((await validateModelFile(realGlb, 'usdz')).ok).toBe(false)
+  })
+})
+
+describe('checkScale diagnosis', () => {
+  const dims: Dimensions = { width: 200, height: 80, depth: 90, unit: 'cm' }
+  const reason = (m: { x: number; y: number; z: number }, d = dims) => {
+    const r = checkScale(m, d)
+    return r.status === 'mismatch' ? r.reason : r.status
+  }
+  it('spots width and depth swapped (model turned 90°)', () => {
+    expect(reason({ x: 0.9, y: 0.8, z: 2.0 })).toBe('axis-swap')
+  })
+  it('spots numbers entered in the other unit', () => {
+    expect(reason({ x: 2.0, y: 0.8, z: 0.9 }, { ...dims, unit: 'in' })).toBe('wrong-unit')
+  })
+  it('spots a model authored in centimetres or millimetres', () => {
+    expect(reason({ x: 200, y: 80, z: 90 })).toBe('model-units')
+    expect(reason({ x: 2000, y: 800, z: 900 })).toBe('model-units')
+  })
+  it('reports a uniform scale error with its factor, and leaves odd shapes undiagnosed', () => {
+    const r = checkScale({ x: 3, y: 1.2, z: 1.35 }, dims)
+    expect(r.status === 'mismatch' && r.reason === 'uniform' && Math.round(r.factor! * 10) / 10).toBe(1.5)
+    expect(reason({ x: 2.0, y: 1.6, z: 0.9 })).toBeUndefined()
+  })
+  it('allows at least 1 cm on small items', () => {
+    expect(checkScale({ x: 0.108, y: 0.1, z: 0.1 }, { width: 10, height: 10, depth: 10, unit: 'cm' }).status).toBe('verified')
+  })
+})
+
+describe('GLB required extensions (Scene Viewer compatibility)', () => {
+  /** Minimal GLB: 12-byte header + one JSON chunk. */
+  function glb(json: object): File {
+    let text = JSON.stringify(json)
+    while (text.length % 4) text += ' '
+    const body = new TextEncoder().encode(text)
+    const buf = new ArrayBuffer(20 + body.length)
+    const v = new DataView(buf)
+    v.setUint32(0, 0x46546c67, true) // "glTF"
+    v.setUint32(4, 2, true)
+    v.setUint32(8, buf.byteLength, true)
+    v.setUint32(12, body.length, true)
+    v.setUint32(16, 0x4e4f534a, true) // "JSON"
+    new Uint8Array(buf, 20).set(body)
+    return new File([buf], 'm.glb')
+  }
+
+  it('lists required extensions Scene Viewer does not support', async () => {
+    const { unsupportedForSceneViewer } = await import('./files')
+    const f = glb({ asset: { version: '2.0' }, extensionsRequired: ['KHR_draco_mesh_compression', 'KHR_texture_transform'] })
+    expect(await unsupportedForSceneViewer(f)).toEqual(['KHR_draco_mesh_compression'])
+  })
+
+  it('is empty for plain files and never throws on malformed input', async () => {
+    const { unsupportedForSceneViewer } = await import('./files')
+    expect(await unsupportedForSceneViewer(glb({ asset: { version: '2.0' } }))).toEqual([])
+    expect(await unsupportedForSceneViewer(new File([new Uint8Array([1, 2, 3])], 'x.glb'))).toEqual([])
   })
 })

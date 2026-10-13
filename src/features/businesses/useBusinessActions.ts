@@ -23,12 +23,12 @@ export function useBusinessActions() {
       if (!ok) return
       const r = await service.setBusinessStatus(b.id, active ? 'active' : 'inactive')
       if (!r.ok) return toast.error('Could not update catalog status', r.error.message)
-      toast.success(active ? 'Catalog activated' : 'Catalog deactivated', 'Status changed in the demo.')
+      toast.success(active ? 'Catalog activated' : 'Catalog deactivated')
     },
     async remove(b: Business, productCount: number, opts?: { after?: string }) {
       const ok = await confirm({
         title: `Delete ${b.name}?`,
-        body: `This permanently deletes the business, its catalog and ${productCount} product${productCount === 1 ? '' : 's'} from the demo. Printed QR codes will stop working. This cannot be undone.`,
+        body: `This permanently deletes the business, its catalog and ${productCount} product${productCount === 1 ? '' : 's'}. Printed QR codes will stop working. This cannot be undone.`,
         confirmLabel: 'Delete business',
         destructive: true,
       })

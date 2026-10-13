@@ -19,6 +19,9 @@
     "db:sample-logos": "node scripts/sample-data/upload-logos.mjs"
   },
   "dependencies": {
+    "@gltf-transform/core": "4.5.1",
+    "@gltf-transform/extensions": "4.5.1",
+    "@gltf-transform/functions": "4.5.1",
     "@google/model-viewer": "^4.4.0",
     "@supabase/supabase-js": "2.117.3",
     "lucide-react": "^1.55.0",
@@ -30,6 +33,7 @@
     "three": "0.183.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.9",
     "@playwright/test": "^1.64.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",

@@ -19,7 +19,7 @@ test('create, edit, deactivate and delete a business', async ({ page }) => {
   await page.getByRole('button', { name: 'Create business' }).click()
 
   await expectToast(page, 'Business created')
-  await expect(page.getByText(/real subdomain and SSL certificate require backend setup/i)).toBeVisible()
+  await expect(page.getByText(/real subdomain and SSL certificate need deployment setup/i)).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: 'Lumen Home Studio' })).toBeVisible()
 
   // Edit

@@ -34,7 +34,9 @@ export function useProductActions(scope: EditorScope) {
     async publish(p: Product, business?: Business) {
       const r = await service.publishProduct(p.id)
       if (!r.ok) return toast.error('Cannot publish yet', describeErrors(r.error))
-      toast.success('Published', business ? `Live at ${PUBLIC_URLS_ARE_LIVE ? '' : 'the demo URL '}${productPublicUrl(business, p)}` : undefined)
+      if (business && business.status !== 'active')
+        toast.success('Published', 'The catalog is not active yet: customers will see this product once the business is activated.')
+      else toast.success('Published', business ? `Live at ${PUBLIC_URLS_ARE_LIVE ? '' : 'the demo URL '}${productPublicUrl(business, p)}` : undefined)
       return r.data
     },
     async unpublish(p: Product) {
@@ -52,7 +54,7 @@ export function useProductActions(scope: EditorScope) {
     async remove(p: Product, opts?: { after?: string }) {
       const ok = await confirm({
         title: `Delete “${p.name.en}”?`,
-        body: 'This permanently removes the product, its images and its analytics from the demo. This cannot be undone.',
+        body: 'This permanently removes the product, its images and its analytics. This cannot be undone.',
         confirmLabel: 'Delete product',
         destructive: true,
       })

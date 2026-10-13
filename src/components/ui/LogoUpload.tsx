@@ -63,7 +63,7 @@ export function LogoUpload({
           )}
         </div>
       </div>
-      <p className="mt-2 text-xs text-ink-muted">Square image works best. PNG, JPG, WebP or SVG up to 2 MB.</p>
+      <p className="mt-2 text-xs text-ink-muted">Square image works best. PNG, JPG or WebP up to 2 MB.</p>
       {error && (
         <p role="alert" className="mt-1 text-xs font-medium text-danger">
           {error}
