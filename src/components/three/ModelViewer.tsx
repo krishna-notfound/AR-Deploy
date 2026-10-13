@@ -125,7 +125,10 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       auto-rotate={autoRotate || undefined}
       auto-rotate-delay={autoRotate ? '0' : undefined}
       rotation-per-second={autoRotate ? '14deg' : undefined}
-      ar-modes="webxr scene-viewer quick-look"
+      // Order = priority. Android: Google Scene Viewer (Google's own AR: floor/wall detection, smooth gestures,
+      // lighting, true size via ar-scale="fixed"; falls back to its 3D view on phones without ARCore).
+      // In-browser WebXR only if Scene Viewer cannot open (Google app missing). iPhone: AR Quick Look.
+      ar-modes="scene-viewer webxr quick-look"
       ar-scale="fixed"
       ar-placement="floor"
       loading="eager"
