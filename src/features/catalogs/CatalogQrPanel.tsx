@@ -10,7 +10,7 @@ import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessCatalog } from '@/domain/types'
 import { downloadDataUrl } from '@/lib/download'
-import { PUBLIC_URLS_ARE_LIVE, absoluteLocalUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, PUBLIC_URLS_ARE_TEMPORARY, absoluteLocalUrl } from '@/lib/urls'
 import { useQrCode } from '@/lib/useQrCode'
 
 /**
@@ -47,6 +47,11 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
             </div>
             {!PUBLIC_URLS_ARE_LIVE && (
               <p className="mt-1.5 text-xs text-ink-muted">Demo URL. The subdomain is not live until DNS and hosting are set up with the backend.</p>
+            )}
+            {PUBLIC_URLS_ARE_TEMPORARY && (
+              <p className="mt-1.5 text-xs font-medium text-warning">
+                This is a preview or local address. QR codes and links made here point to it: download QR codes for print from the production site.
+              </p>
             )}
           </div>
 

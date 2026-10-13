@@ -15,6 +15,12 @@ export const PUBLIC_URL_MODE: 'subdomain' | 'path' | 'demo' = ROOT ? 'subdomain'
 /** False only for demo placeholder URLs, which the UI must label as such. */
 export const PUBLIC_URLS_ARE_LIVE = PUBLIC_URL_MODE !== 'demo'
 
+/**
+ * Path-mode URLs embed this deployment's own address. On a preview deployment or a laptop that address is
+ * temporary, so QR codes and links copied there would point to the wrong site once printed or shared.
+ */
+export const PUBLIC_URLS_ARE_TEMPORARY = PUBLIC_URL_MODE === 'path' && __DEPLOY_ENV__ !== 'production'
+
 export const ROOT_DOMAIN: string = ROOT || 'example.com'
 
 /** Public catalog URL. Used by QR codes and "Copy catalog URL". */
@@ -43,4 +49,11 @@ export function absoluteLocalUrl(path: string): string {
 /** Claim link for an existing business. The token rides in the fragment, so it never reaches server or proxy logs. */
 export function claimLinkUrl(token: string): string {
   return absoluteLocalUrl(`/claim#${token}`)
+}
+
+/** The current page's URL for sharing: the draft-preview flag is dropped, every other query parameter kept. */
+export function shareableCurrentUrl(): string {
+  const u = new URL(window.location.href)
+  u.searchParams.delete('preview')
+  return u.toString()
 }

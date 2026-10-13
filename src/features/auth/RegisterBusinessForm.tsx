@@ -6,11 +6,12 @@ import { InlineNotice } from '@/components/ui/States'
 import { isValidSlug, slugify } from '@/lib/slug'
 import { catalogPublicUrl } from '@/lib/urls'
 import { auth } from '@/services'
+import { RESERVED_SUBDOMAINS } from '@/tenant/resolveTenant'
 
 /**
  * Registers a NEW business for the signed-in account. The database makes it a draft that only a platform
  * admin can activate (register_business), so nothing here is a security boundary.
- * On success the account reloads with its new role and the login page forwards to the dashboard.
+ * On success the page reloads into the dashboard, where the draft shows a "waiting for approval" notice.
  */
 export function RegisterBusinessForm() {
   const [name, setName] = useState('')
@@ -28,10 +29,11 @@ export function RegisterBusinessForm() {
     e.preventDefault()
     if (!name.trim()) return setError('Enter your business name.')
     if (!isValidSlug(address)) return setSlugError('Use lowercase letters, numbers and single hyphens.')
+    if (RESERVED_SUBDOMAINS.has(address)) return setSlugError('This address is reserved by the platform. Choose another.')
     setPending(true)
     const res = await authService.registerBusiness(name.trim(), address)
     setPending(false)
-    if (res.ok) return
+    if (res.ok) return window.location.assign('/dashboard') // full load: the account is re-read with its new business
     setSlugError(res.error.fieldErrors?.slug ?? null)
     setError(res.error.fieldErrors?.slug ? null : res.error.message)
   }

@@ -1,6 +1,6 @@
 import { BadgeCheck } from 'lucide-react'
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Navigate } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
@@ -11,36 +11,41 @@ import { SiteHeader } from '../marketing/SiteChrome'
 
 const PENDING_CLAIM_KEY = 'arfurn:pendingClaim'
 const TOKEN = /^[0-9a-f]{64}$/
+const PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000 // same as the link's server-side expiry
 let pendingFromHash: string | null = null
 
 /**
- * Moves a claim token from the URL fragment into this tab's session storage and strips it from the address
- * bar, so it survives the sign-in / sign-up detour but is not left in history or copied along with the URL.
+ * Moves a claim token from the URL fragment into localStorage and strips it from the address bar. localStorage
+ * (not sessionStorage) because the email-confirmation link opens in a new tab. The token is single-use and
+ * expires server-side, and is removed here once redeemed or after 7 days.
  */
 function captureClaimToken(): void {
   const fromHash = window.location.hash.slice(1)
   if (!TOKEN.test(fromHash)) return
+  pendingFromHash = fromHash
   try {
-    sessionStorage.setItem(PENDING_CLAIM_KEY, fromHash)
+    localStorage.setItem(PENDING_CLAIM_KEY, JSON.stringify({ token: fromHash, savedAt: Date.now() }))
   } catch {
-    // Storage blocked: the token is still read from the hash below, it just won't survive a detour.
+    // Storage blocked: the token still works in this page, it just won't survive a detour.
   }
   history.replaceState(null, '', window.location.pathname + window.location.search)
-  pendingFromHash = fromHash
 }
 
 export function pendingClaimToken(): string | null {
   try {
-    return sessionStorage.getItem(PENDING_CLAIM_KEY) ?? pendingFromHash
+    const saved = JSON.parse(localStorage.getItem(PENDING_CLAIM_KEY) ?? 'null') as { token?: string; savedAt?: number } | null
+    if (saved?.token && TOKEN.test(saved.token) && Date.now() - (saved.savedAt ?? 0) < PENDING_TTL_MS) return saved.token
+    if (saved) localStorage.removeItem(PENDING_CLAIM_KEY)
   } catch {
-    return pendingFromHash
+    // unreadable: fall back to this page's token
   }
+  return pendingFromHash
 }
 
 function clearClaimToken(): void {
   pendingFromHash = null
   try {
-    sessionStorage.removeItem(PENDING_CLAIM_KEY)
+    localStorage.removeItem(PENDING_CLAIM_KEY)
   } catch {
     // nothing stored
   }
@@ -50,7 +55,6 @@ function clearClaimToken(): void {
 export default function ClaimPage() {
   useDocumentTitle('Claim your business')
   captureClaimToken()
-  const navigate = useNavigate()
   const { user, signedInEmail } = useAccount()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -68,7 +72,7 @@ export default function ClaimPage() {
     setPending(false)
     if (!res.ok) return setError(res.error.message)
     clearClaimToken()
-    navigate('/dashboard', { replace: true })
+    window.location.assign('/dashboard') // full load: the account is re-read with its new business
   }
 
   return (

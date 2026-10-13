@@ -101,6 +101,8 @@ export interface ProductRow {
   product_models?: ModelRow[]
   product_variants?: VariantRow[]
 }
+const DAILY_PAGE = 1000
+
 export interface DailyRow {
   business_id: string
   product_id: string
@@ -401,16 +403,26 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     const since = isoDay(new Date(Date.now() - 29 * 86_400_000))
     let bq = sb.from('businesses').select('id')
     let pq = sb.from('products').select('id, business_id, status')
-    let dq = sb.from('product_analytics_daily').select('*').gte('day', since)
+    // One row per product per day: past the API's row cap (max_rows 1000) after ~33 products with daily traffic, so page it.
+    const daily = async (): Promise<{ data: DailyRow[] | null; error: DbError | null }> => {
+      const rows: DailyRow[] = []
+      for (let from = 0; ; from += DAILY_PAGE) {
+        let q = sb.from('product_analytics_daily').select('*').gte('day', since).order('day').order('product_id').range(from, from + DAILY_PAGE - 1)
+        if (businessId) q = q.eq('business_id', businessId)
+        const { data, error } = await q.returns<DailyRow[]>()
+        if (error) return { data: null, error }
+        rows.push(...data)
+        if (data.length < DAILY_PAGE) return { data: rows, error: null }
+      }
+    }
     if (businessId) {
       bq = bq.eq('id', businessId)
       pq = pq.eq('business_id', businessId)
-      dq = dq.eq('business_id', businessId)
     }
     const [b, p, d] = await Promise.all([
       bq.returns<{ id: string }[]>(),
       pq.returns<{ id: string; business_id: string; status: ProductStatus }[]>(),
-      dq.returns<DailyRow[]>(),
+      daily(),
     ])
     const err = b.error ?? p.error ?? d.error
     if (err) return mapDbError(err)

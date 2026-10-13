@@ -62,7 +62,7 @@ export default function AdminOverviewPage() {
               { label: 'Published', value: formatNumber(s?.totals.published ?? 0) },
               { label: 'Drafts', value: formatNumber(s?.totals.drafts ?? 0) },
               { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
-              { label: 'AR activations', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
+              { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
             ]}
             footer={
               s?.isSample ? (
@@ -74,7 +74,7 @@ export default function AdminOverviewPage() {
           />
 
           <Card>
-            <CardHeader title="Product views and AR activations" description="All businesses, last 30 days" actions={<Link to="/admin/analytics" className="text-[13px] font-medium text-accent-ink hover:underline">Open analytics</Link>} />
+            <CardHeader title="Product views and AR launch attempts" description="All businesses, last 30 days" actions={<Link to="/admin/analytics" className="text-[13px] font-medium text-accent-ink hover:underline">Open analytics</Link>} />
             <CardBody>{s ? <ActivityTrend data={s.series} compact /> : <Skeleton className="h-32 w-full" />}</CardBody>
           </Card>
 

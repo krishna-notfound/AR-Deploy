@@ -5,6 +5,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { useQrCode } from '@/lib/useQrCode'
 import { CopyLink } from './ShareActions'
 import type { ModelState } from './ProductMedia'
+import { shareableCurrentUrl } from '@/lib/urls'
 
 export type ArAvailability = 'none' | 'checking' | 'available' | 'unavailable'
 
@@ -66,7 +67,7 @@ export function ArSection({ availability, onActivate, onShowTips }: { availabili
 /** QR of the current product page, for handing off to a phone (separate from the catalog QR rule). */
 function PageQr() {
   const { t } = useI18n()
-  const url = window.location.href.replace(/[?&]preview=1/, '')
+  const url = shareableCurrentUrl()
   const qr = useQrCode(url, 360)
   return (
     <div className="mt-4 flex items-center gap-4 border-t border-line pt-4">

@@ -1,6 +1,6 @@
 // Real authentication (Supabase mode only). The demo account picker never touches this.
 // Roles come from tables users cannot write to (platform_admins, business_members): see supabase/migrations.
-import type { Session, SupabaseClient } from '@supabase/supabase-js'
+import { type Session, type SupabaseClient, isAuthRetryableFetchError } from '@supabase/supabase-js'
 import type { User } from '@/domain/types'
 import { type Result, fail, ok } from '../catalogService'
 import { mapDbError } from './supabaseCatalogService'
@@ -43,18 +43,20 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
     async getCurrentUser() {
       // getUser() validates the token with the Auth server instead of trusting local storage.
       const { data, error } = await sb.auth.getUser()
+      // A network failure is not "signed out": report it, so the visitor is not bounced to the login form.
+      if (error && isAuthRetryableFetchError(error)) return fail('UNKNOWN', 'Could not reach the sign-in service. Check your connection and try again.')
       if (error || !data.user) return ok(null)
       const u = data.user
       const email = u.email ?? ''
       const [admin, member] = await Promise.all([
         sb.from('platform_admins').select('user_id').eq('user_id', u.id).maybeSingle(),
-        sb.from('business_members').select('business_id').eq('user_id', u.id).order('created_at').limit(1).maybeSingle<{ business_id: string }>(),
+        sb.from('business_members').select('business_id').eq('user_id', u.id).order('created_at', { ascending: false }).limit(1).maybeSingle<{ business_id: string }>(),
       ])
       const err = admin.error ?? member.error
       if (err) return mapDbError(err)
       const base = { id: u.id, name: email || 'Signed-in user', email }
       if (admin.data) return ok({ email, user: { ...base, role: 'super_admin' } })
-      // ponytail: a user in several businesses gets the first one; add a business switcher when that case is real.
+      // ponytail: a user in several businesses gets the newest one (e.g. just claimed); add a business switcher when that case is real.
       if (member.data) return ok({ email, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
       return ok({ email, user: null })
     },
@@ -83,14 +85,12 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
     async registerBusiness(name, slug) {
       const { data, error } = await sb.rpc('register_business', { p_name: name, p_slug: slug })
       if (error) return mapDbError(error, { conflictField: 'business' })
-      await sb.auth.refreshSession() // fires the auth listener, which reloads the account's new role
       return ok({ businessId: data as string })
     },
 
     async redeemBusinessClaim(token) {
       const { data, error } = await sb.rpc('redeem_business_claim', { p_token: token })
       if (error) return mapDbError(error)
-      await sb.auth.refreshSession()
       return ok({ businessId: data as string })
     },
 

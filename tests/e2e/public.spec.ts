@@ -135,11 +135,13 @@ test('inactive catalogs and unknown products show friendly states', async ({ pag
   await expect(page.getByText('Catalog not found')).toBeVisible()
 })
 
-test('in-app browser notice appears for Instagram', async ({ browser }) => {
+test('in-app browser notice appears for Instagram, on the catalog (QR landing) and product pages', async ({ browser }) => {
   const ctx = await browser.newContext({
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 300.0.0.0',
   })
   const page = await ctx.newPage()
+  await page.goto('/catalog/nordhaus')
+  await expect(page.getByText(/open this page in Safari/)).toBeVisible()
   await page.goto('/products/nordhaus/fjord-shell-chair')
   await expect(page.getByText(/open this page in Safari/)).toBeVisible()
   await page.getByRole('button', { name: 'Dismiss' }).click()

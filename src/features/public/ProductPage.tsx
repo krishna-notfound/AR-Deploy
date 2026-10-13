@@ -21,7 +21,6 @@ import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { ArSection, arAvailability } from './ArSection'
 import { ArTips, arTipsDismissed } from './ArTips'
 import { DimensionDiagram } from './DimensionDiagram'
-import { InAppNotice } from './InAppNotice'
 import { type ModelState, ProductMedia } from './ProductMedia'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
@@ -152,7 +151,6 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
   return (
     <PublicShell business={business} catalogHref={catalogHref}>
-      <InAppNotice />
       {isPreview && (
         <div className="border-b border-warning/30 bg-warning-soft">
           <p className="mx-auto flex max-w-[1240px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-8">
@@ -266,7 +264,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             </section>
 
             <dl className="mt-6 divide-y divide-line border-y border-line text-sm">
-              {product.material.en && (
+              {localized(product.material) && (
                 <div className="flex justify-between gap-6 py-3">
                   <dt className="text-ink-muted">{t('product.material')}</dt>
                   <dd className="text-right">
@@ -284,7 +282,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
               )}
             </dl>
 
-            {product.description.en && (
+            {localized(product.description) && (
               <section className="mt-8" aria-labelledby="desc-h">
                 <h2 id="desc-h" className="text-sm font-semibold">
                   {t('product.description')}
@@ -318,7 +316,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           {business.contact.email && (
             <li className="flex items-center gap-3">
               <Mail className="size-4 text-ink-muted" aria-hidden />
-              <a className="text-[var(--brand-accent)] underline" href={`mailto:${business.contact.email}?subject=${encodeURIComponent(name)}`}>
+              <a className="min-w-0 break-all text-[var(--brand-accent)] underline" href={`mailto:${business.contact.email}?subject=${encodeURIComponent(name)}`}>
                 {business.contact.email}
               </a>
             </li>
@@ -334,7 +332,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           {business.contact.website && (
             <li className="flex items-center gap-3">
               <Globe className="size-4 text-ink-muted" aria-hidden />
-              <a className="text-[var(--brand-accent)] underline" href={business.contact.website} target="_blank" rel="noopener noreferrer">
+              <a className="min-w-0 break-all text-[var(--brand-accent)] underline" href={business.contact.website} target="_blank" rel="noopener noreferrer">
                 {business.contact.website.replace(/^https?:\/\//, '')}
               </a>
             </li>

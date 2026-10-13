@@ -5,6 +5,7 @@ import { SmartImage } from '@/components/ui/SmartImage'
 import type { Business, Lang } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { safeBrandAccent } from '@/lib/color'
+import { InAppNotice } from './InAppNotice'
 
 export function LanguageSwitcher() {
   const { lang, setLang, t } = useI18n()
@@ -43,6 +44,8 @@ export function PublicShell({ business, catalogHref, children }: { business?: Bu
           </div>
         </div>
       </header>
+      {/* Catalog (where QR codes land) and product pages: AR may be limited in Instagram/Facebook/WhatsApp browsers. */}
+      <InAppNotice />
       <div className="flex-1">{children}</div>
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-2 px-5 py-8 text-xs text-ink-muted sm:px-8">

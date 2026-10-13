@@ -4,6 +4,8 @@ Environments, how to set up staging, and the rules that keep production safe. De
 
 ## Environments
 
+> **Current setup (owner decision 2026-10-13):** there is no separate staging project. Tests run on the live project `pmnjchhrgvajtjpadpqo`, one approved step at a time (below), and it is cleaned before launch. Vercel Preview and Production share the same `VITE_*` values (one value each, targets `production,preview`), so preview deploys also use the live database. The table shows the intended split if a staging project is added later.
+
 | | Local | Staging | Production |
 |---|---|---|---|
 | Supabase project | none (demo mode) or staging | staging project (ref: _to be recorded_) | `pmnjchhrgvajtjpadpqo` |
@@ -18,7 +20,20 @@ Rules:
 - The Supabase MCP server connected to Claude Code points at **production**: read-only use only.
 - Never put a secret / `service_role` key in a `VITE_*` variable or a committed file.
 
-## Staging setup (one-time)
+## Testing on the live project (current)
+
+Repo linked to `pmnjchhrgvajtjpadpqo` (`cat supabase/.temp/project-ref`). Each step needs the owner's explicit OK.
+
+| Step | Command / action | Expected outcome | Undo |
+|---|---|---|---|
+| A | `npx supabase db push --dry-run`, then `npx supabase db push` | Dry run lists only `20261013093006_publish_rules.sql` and `20261013144121_owner_registration_and_claims.sql`; afterwards `npx supabase migration list` shows 7 local = 7 remote; Advisors → Security: no new errors | `supabase/rollback/20261013_publish_rules_and_claims_rollback.sql` in the SQL editor (keeps business data) |
+| B | 🔑 Dashboard → Authentication → Users → Add user (auto-confirm), one long throwaway password: `qa-admin@`, `qa-owner-a@`, `qa-owner-b@`, `qa-newcomer@furnish.example`; then SQL `insert into public.platform_admins (user_id) select id from auth.users where email = 'qa-admin@furnish.example';` | 4 confirmed users; 1 extra platform admin | Step D |
+| C | `SUPABASE_IT_URL=https://pmnjchhrgvajtjpadpqo.supabase.co SUPABASE_IT_KEY=<publishable key> SUPABASE_IT_PASSWORD=<QA password> npx vitest run src/services/supabase/live.integration.test.ts` (password typed in your own terminal) | 15 passed, 0 skipped; afterwards `select count(*) from businesses where slug like 'qa-%'` = 0 | Tests delete their own businesses and files |
+| D | 🔑 Delete the 4 QA users in the dashboard | `select count(*) from auth.users where email like 'qa-%@furnish.example'` = 0; `platform_admins` row removed by cascade | — |
+
+Public sign-ups stay **off** for these tests; the `/signup` page itself is tested only once sign-ups are approved (needs custom SMTP for real owners).
+
+## Separate staging project (optional, if created later)
 
 🔑 = owner action in a dashboard or own terminal. Everything else can be run by the developer.
 

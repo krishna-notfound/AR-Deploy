@@ -329,7 +329,7 @@ function ScaleReport({ scale }: { scale: ScaleCheck }) {
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
       )}
       <div>
-        <p className="font-medium text-ink">{scale.status === 'verified' ? 'Scale verified: the model matches the entered dimensions (within 5%).' : 'AR scale unverified: the model does not match the entered dimensions.'}</p>
+        <p className="font-medium text-ink">{scale.status === 'verified' ? 'Scale verified: the model matches the entered dimensions (within 5%, or 1 cm for small pieces).' : 'AR scale unverified: the model does not match the entered dimensions.'}</p>
         <p className="mt-0.5 text-ink-muted">
           Model measures W × H × D {sizes(scale.measured)}. Entered {sizes(scale.expected)}.
           {scale.status === 'mismatch' && ' The model is never rescaled automatically. Fix the model file or the dimensions.'}

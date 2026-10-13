@@ -115,6 +115,8 @@ begin
   if not private.caller_email_confirmed() then
     raise exception 'email_not_confirmed' using errcode = '42501';
   end if;
+  -- Serialise registrations per account so two parallel calls cannot both pass the one-draft check.
+  perform pg_advisory_xact_lock(hashtext('register_business:' || v_uid::text));
   if exists (
     select 1 from public.business_members m join public.businesses b on b.id = m.business_id
     where m.user_id = v_uid and b.status = 'draft'

@@ -7,6 +7,7 @@ import { adminNav, businessNav } from '@/components/layout/nav'
 import { LanguageProvider } from '@/i18n/LanguageProvider'
 import { type Tenant, resolveTenant } from '@/tenant/resolveTenant'
 import { RootLayout } from './RootLayout'
+import { RouteError } from './RouteError'
 
 // Lazy route modules per surface so public pages never load admin code.
 const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
@@ -99,6 +100,7 @@ function pathModeRoutes(): RouteObject[] {
   return [
     {
       element: <RootLayout />,
+      errorElement: <RouteError />,
       children: [
         {
           element: <Standalone />,
@@ -131,6 +133,7 @@ function hostnameModeRoutes(slug: string): RouteObject[] {
   return [
     {
       element: <RootLayout />,
+      errorElement: <RouteError />,
       children: [
         {
           element: <PublicLayout />,

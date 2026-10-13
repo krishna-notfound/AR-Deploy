@@ -18,6 +18,8 @@ export default defineConfig(({ mode, command }) => {
   return {
     server: { allowedHosts },
     preview: { allowedHosts },
+    // Which Vercel environment built this bundle ('production' | 'preview' | 'development'), 'local' elsewhere.
+    define: { __DEPLOY_ENV__: JSON.stringify(process.env.VERCEL_ENV ?? 'local') },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

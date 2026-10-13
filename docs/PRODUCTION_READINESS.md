@@ -104,6 +104,25 @@ These describe the removed custom WebXR session or the old analytics behaviour. 
 | Real-device AR (iOS Quick Look, Android Scene Viewer) | not run | BLOCKED (no devices) |
 | Vercel Preview isolation | not checked (no Vercel access) | BLOCKED (owner) |
 
+## 6c. Contract review fixes (2026-10-13, local only)
+
+Fixed (smallest change each, tests added where logic changed):
+- Route error page instead of React Router's raw error; reload once when an old build's page chunk is gone after a deploy (`vite:preloadError`); `vercel.json` no longer rewrites missing `/assets/*` to `index.html`.
+- Slug fields accept hyphens while typing (`slugInput`).
+- Platform/business analytics page past the API's 1000-row cap.
+- Claim flow: pending link survives the email-confirmation tab (localStorage, 7 days); full reload into the dashboard after claim/registration; account opens its newest business.
+- Registration form checks reserved addresses; `register_business` serialised per account (advisory lock) so parallel calls can't create two drafts.
+- Portuguese-only material/description now shown; long contact emails/URLs wrap at 360 px.
+- In-app browser notice on the catalog page too (QR landing); share links keep `?lang=` when dropping `?preview=`; AR metric labelled "AR launch attempts"; scale copy says "5% or 1 cm"; network errors no longer look like "signed out"; QR panel warns on preview/local addresses (SEC-07).
+
+Known, not fixed (Low):
+- Some public UI strings are English-only: "Try again", "Close dialog", photo button labels, raw service error text.
+- Negative or invalid variant price differences are dropped silently.
+- The catalog card shows the base price; the product page opens on the first variant's price.
+- Product slugs of 66–70+ characters aren't length-checked in the editor (the DB rejects them with a generic message).
+- The analytics table shows "no products" if only the product list fails to load.
+- Image uploads are checked by type/extension, not magic bytes (private bucket; logos bucket enforces MIME).
+
 ## 7. Change log
 
 | Date | Phase | Change |

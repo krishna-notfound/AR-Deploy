@@ -76,7 +76,7 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'ar.failed': 'Não foi possível iniciar a RA neste dispositivo. Pode continuar a explorar o modelo 3D.',
   'ar.checking': 'A verificar o suporte de RA…',
   'ar.scaleVerified': 'Modelo à escala real',
-  'ar.scaleVerifiedHelp': 'O modelo 3D corresponde às dimensões indicadas (margem de 5%), por isso aparece em tamanho real na sua divisão.',
+  'ar.scaleVerifiedHelp': 'O modelo 3D corresponde às dimensões indicadas (margem de 5%, ou 1 cm em peças pequenas), por isso aparece em tamanho real na sua divisão.',
   'ar.scaleUnverified': 'Escala de RA não verificada',
   'ar.scaleUnverifiedHelp': 'O modelo 3D não corresponde às dimensões indicadas. Use as dimensões acima como referência.',
   'ar.modelMeasures': 'O modelo mede {size}',

@@ -1,6 +1,6 @@
 // Chart components. Palette validated with the dataviz validator (light mode):
 // views #2E8B6A, AR #D07A1F — lightness, chroma, CVD (ΔE 8.7), normal-vision and contrast all PASS.
-// Views and AR activations have different magnitudes, so they are drawn as two small
+// Views and AR launch attempts have different magnitudes, so they are drawn as two small
 // multiples sharing the x-axis, never on a dual axis.
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { DailyPoint } from '@/domain/types'
@@ -8,7 +8,7 @@ import { formatCompact, formatNumber } from '@/lib/format'
 
 export const SERIES = {
   views: { color: '#2E8B6A', label: 'Product views' },
-  ar: { color: '#D07A1F', label: 'AR activations' },
+  ar: { color: '#D07A1F', label: 'AR launch attempts' },
 } as const
 
 const AXIS = { stroke: '#cfccc5', fontSize: 11, tick: { fill: '#6e6a63' } }
@@ -121,7 +121,7 @@ export function SeriesTable({ data }: { data: DailyPoint[] }) {
   return (
     <div className="max-h-64 overflow-auto rounded-lg border border-line">
       <table className="w-full text-xs">
-        <caption className="sr-only">Daily product views and AR activations</caption>
+        <caption className="sr-only">Daily product views and AR launch attempts</caption>
         <thead className="sticky top-0 bg-surface">
           <tr className="text-left text-ink-muted">
             <th scope="col" className="px-3 py-2 font-medium">
@@ -131,7 +131,7 @@ export function SeriesTable({ data }: { data: DailyPoint[] }) {
               Views
             </th>
             <th scope="col" className="px-3 py-2 text-right font-medium">
-              AR activations
+              AR launch attempts
             </th>
           </tr>
         </thead>

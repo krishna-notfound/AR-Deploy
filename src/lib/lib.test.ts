@@ -4,12 +4,17 @@ import { safeBrandAccent, contrastRatio } from './color'
 import { validateModelFile, validateImageFile } from './files'
 import { convertLength, formatDimensions, formatMoney, parseMoneyInput, toMeters } from './format'
 import { checkScale } from './scale'
-import { isValidSlug, slugify, uniqueSlug } from './slug'
-import { catalogLocalPath, catalogPublicUrl, productLocalPath, productPublicUrl } from './urls'
+import { isValidSlug, slugInput, slugify, uniqueSlug } from './slug'
+import { catalogLocalPath, catalogPublicUrl, productLocalPath, productPublicUrl, shareableCurrentUrl } from './urls'
 import { detectInAppBrowser } from './userAgent'
 import { resolveTenant } from '@/tenant/resolveTenant'
 
 describe('slug', () => {
+  it('keeps hyphens while typing, so "modern-sofa" can be typed', () => {
+    expect(slugInput('Modern-')).toBe('modern-')
+    expect(slugInput('modern-sofa')).toBe('modern-sofa')
+    expect(slugInput('Sofá Grande')).toBe('sof-grande')
+  })
   it('slugifies accents and punctuation', () => {
     expect(slugify('Sofá Glam — Veludo!')).toBe('sofa-glam-veludo')
     expect(isValidSlug('modern-sofa')).toBe(true)
@@ -45,6 +50,13 @@ describe('urls', () => {
     expect(productPublicUrl(b, p)).toBe('https://casa-lisboa.example.com/products/modern-sofa')
     expect(catalogLocalPath(b)).toBe('/catalog/casa-lisboa')
     expect(productLocalPath(b, p, { preview: true })).toBe('/products/casa-lisboa/modern-sofa?preview=1')
+  })
+  it('drops only the preview flag from shared links', () => {
+    history.replaceState(null, '', '/products/casa-lisboa/modern-sofa?preview=1&lang=pt')
+    expect(shareableCurrentUrl()).toBe(`${location.origin}/products/casa-lisboa/modern-sofa?lang=pt`)
+    history.replaceState(null, '', '/products/casa-lisboa/modern-sofa?lang=pt&preview=1')
+    expect(shareableCurrentUrl()).toBe(`${location.origin}/products/casa-lisboa/modern-sofa?lang=pt`)
+    history.replaceState(null, '', '/')
   })
 })
 

@@ -9,7 +9,7 @@ import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { type Business, type BusinessStatus, CURRENCIES, type Currency } from '@/domain/types'
-import { slugify } from '@/lib/slug'
+import { slugInput, slugify } from '@/lib/slug'
 import { PUBLIC_URLS_ARE_LIVE, PUBLIC_URL_MODE, ROOT_DOMAIN, catalogPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import type { BusinessInput } from '@/services/catalogService'
@@ -174,7 +174,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                       value={data.slug}
                       onChange={(e) => {
                         setSlugTouched(true)
-                        set({ slug: slugify(e.target.value) || e.target.value.toLowerCase() })
+                        set({ slug: slugInput(e.target.value) })
                       }}
                     />
                   </InputAddon>

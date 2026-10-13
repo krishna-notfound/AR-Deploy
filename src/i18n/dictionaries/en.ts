@@ -74,7 +74,7 @@ export const en = {
   'ar.failed': 'AR could not start on this device. You can still explore the 3D model.',
   'ar.checking': 'Checking AR support…',
   'ar.scaleVerified': 'True-to-size model',
-  'ar.scaleVerifiedHelp': 'The 3D model matches the listed dimensions within 5%, so it appears at real size in your room.',
+  'ar.scaleVerifiedHelp': 'The 3D model matches the listed dimensions within 5% (or 1 cm for small pieces), so it appears at real size in your room.',
   'ar.scaleUnverified': 'AR scale unverified',
   'ar.scaleUnverifiedHelp': 'The 3D model does not match the listed dimensions. Use the dimensions above as the reference.',
   'ar.modelMeasures': 'Model measures {size}',

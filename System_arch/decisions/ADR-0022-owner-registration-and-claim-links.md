@@ -11,7 +11,7 @@ An account proves control of an email inbox, never ownership of a business. Owne
 
 ## Consequences
 - Good: no ownership by name or email match; admin approval gate before anything is public; tested in PGlite and (when available) on staging.
-- Trade-off: claim links are only as safe as the channel the admin sends them through; a pending-claim token lives in one browser tab (sessionStorage), so confirming the email in another tab means reopening the link.
+- Trade-off: claim links are only as safe as the channel the admin sends them through; a pending-claim token is kept in this browser's localStorage for up to 7 days (removed once redeemed), so it survives the email-confirmation tab; the account opens its newest business after a claim.
 
 ## Alternatives rejected
 - Auto-link by matching the business contact email: contact emails are public and often shared.

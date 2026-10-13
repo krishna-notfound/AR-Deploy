@@ -5,7 +5,7 @@ import { formatNumber } from '@/lib/format'
 import { Button } from '../ui/Button'
 import { SERIES, SeriesTable, TrendChart } from './Charts'
 
-/** Views and AR activations as two aligned small multiples, with a table view. */
+/** Views and AR launch attempts as two aligned small multiples, with a table view. */
 export function ActivityTrend({ data, compact }: { data: DailyPoint[]; compact?: boolean }) {
   const [showTable, setShowTable] = useState(false)
   const views = data.reduce((s, d) => s + d.views, 0)

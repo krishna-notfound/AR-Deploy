@@ -18,7 +18,7 @@ import { useServiceQuery } from '@/services/hooks'
 import { primaryImage } from '@/lib/product'
 
 /**
- * Shared analytics: product views and AR activations only (design/16).
+ * Shared analytics: product views and AR launch attempts only (design/16).
  * With businessId it is scoped to one business; otherwise platform-wide with an optional filter.
  */
 export function AnalyticsView({
@@ -66,7 +66,7 @@ export function AnalyticsView({
       ? [{ key: 'business', header: 'Business', sortValue: (r: ProductAnalytics) => bizMap.get(r.businessId)?.name ?? '', cell: (r: ProductAnalytics) => <span className="text-ink-muted">{bizMap.get(r.businessId)?.name}</span> } satisfies Column<ProductAnalytics>]
       : []),
     { key: 'views', header: 'Views', align: 'right', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
-    { key: 'ar', header: 'AR activations', align: 'right', sortValue: (r) => r.arActivations, cell: (r) => formatNumber(r.arActivations) },
+    { key: 'ar', header: 'AR launch attempts', align: 'right', sortValue: (r) => r.arActivations, cell: (r) => formatNumber(r.arActivations) },
     { key: 'rate', header: 'AR rate', align: 'right', sortValue: (r) => r.arRate, cell: (r) => (r.views ? formatPercent(r.arRate) : '—') },
   ]
 
@@ -93,13 +93,13 @@ export function AnalyticsView({
           { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0) },
           { label: 'AR button activations', value: formatNumber(s?.totals.arActivations ?? 0) },
           { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Visitors who turned or zoomed a model' },
-          { label: 'AR activation rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : '—', hint: 'Activations per product view' },
+          { label: 'AR launch rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : '—', hint: 'Activations per product view' },
           { label: 'Published products', value: formatNumber(s?.totals.published ?? 0) },
         ]}
       />
 
       <Card>
-        <CardHeader title="Views and AR activations" description="Daily totals, last 30 days" actions={!onBusinessChange && s?.isSample ? <SampleDataTag /> : undefined} />
+        <CardHeader title="Views and AR launch attempts" description="Daily totals, last 30 days" actions={!onBusinessChange && s?.isSample ? <SampleDataTag /> : undefined} />
         <CardBody>{loading || !s ? <Skeleton className="h-40 w-full" /> : <ActivityTrend data={s.series} />}</CardBody>
       </Card>
 
@@ -122,7 +122,7 @@ export function AnalyticsView({
             {loading ? (
               <Skeleton className="h-40 w-full" />
             ) : top.length === 0 ? (
-              <EmptyState icon={BarChart3} title="No product activity yet" body="Views and AR activations appear once products are published and visited." />
+              <EmptyState icon={BarChart3} title="No product activity yet" body="Views and AR launch attempts appear once products are published and visited." />
             ) : (
               <ol className="space-y-3">
                 {top.map((r, i) => {

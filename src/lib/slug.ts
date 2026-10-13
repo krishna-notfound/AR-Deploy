@@ -11,6 +11,11 @@ export function slugify(input: string): string {
     .replace(/-+$/g, '')
 }
 
+/** While typing: lowercase, invalid characters become '-', but a trailing '-' is kept so "modern-" can become "modern-sofa". Validated on save. */
+export function slugInput(input: string): string {
+  return input.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-{2,}/g, '-')
+}
+
 export function isValidSlug(slug: string): boolean {
   return SLUG_PATTERN.test(slug)
 }

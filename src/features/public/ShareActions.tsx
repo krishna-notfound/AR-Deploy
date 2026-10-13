@@ -3,6 +3,7 @@ import { Button, type ButtonSize } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { copyText } from '@/lib/clipboard'
+import { shareableCurrentUrl } from '@/lib/urls'
 
 /** Copies the URL of the page the customer is on. */
 export function CopyLink({ size = 'md' }: { size?: ButtonSize }) {
@@ -13,7 +14,7 @@ export function CopyLink({ size = 'md' }: { size?: ButtonSize }) {
       size={size}
       icon={<Copy className="size-4" aria-hidden />}
       onClick={async () => {
-        const ok = await copyText(window.location.href.replace(/[?&]preview=1/, ''))
+        const ok = await copyText(shareableCurrentUrl())
         if (ok) toast.success(t('product.linkCopied'))
         else toast.error(t('product.copyFailed'))
       }}
@@ -28,7 +29,7 @@ export function ShareButton({ title }: { title: string }) {
   const { t } = useI18n()
   const toast = useToast()
   const onShare = async () => {
-    const url = window.location.href.replace(/[?&]preview=1/, '')
+    const url = shareableCurrentUrl()
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({ title, url })

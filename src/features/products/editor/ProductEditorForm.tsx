@@ -12,7 +12,7 @@ import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
 import { type Business, CATEGORIES, CURRENCIES, type Category, type Currency, type Product, type ProductStatus } from '@/domain/types'
 import { cn } from '@/lib/cn'
-import { slugify } from '@/lib/slug'
+import { slugInput, slugify } from '@/lib/slug'
 import { PUBLIC_URLS_ARE_LIVE, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import { primaryImage } from '@/lib/product'
@@ -290,7 +290,7 @@ export function ProductEditorForm({
               hint={business ? `${PUBLIC_URLS_ARE_LIVE ? 'URL' : 'Demo URL'}: ${productPublicUrl(business, { slug: form.input.slug || 'product-name' })}` : 'Lowercase letters, numbers and hyphens.'}
             >
               <InputAddon addon="/products/">
-                <Input value={form.input.slug} onChange={(e) => setForm((f) => ({ ...f, slugTouched: true, input: { ...f.input, slug: slugify(e.target.value) || e.target.value.toLowerCase() } }))} />
+                <Input value={form.input.slug} onChange={(e) => setForm((f) => ({ ...f, slugTouched: true, input: { ...f.input, slug: slugInput(e.target.value) } }))} />
               </InputAddon>
             </FormField>
             <LocalizedField label="Short description" value={form.input.shortDescription} onChange={(shortDescription) => setInput({ shortDescription })} maxLength={160} hint="One sentence shown under the price." />
