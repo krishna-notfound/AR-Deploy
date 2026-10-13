@@ -1,6 +1,7 @@
 # Handoff: read this first in a new session (2026-10-13)
 
 ## Where things stand
+- **Production-readiness programme (started 2026-10-13):** status, findings (SEC-xx) and release gate in `docs/PRODUCTION_READINESS.md`; requirements (R-xx) in `docs/PRD.md`. Branch `chore/production-readiness`.
 - **Live:** Vercel project `ar-deploy` (team `track0`), auto-deployed from `main` on GitHub `krishna-notfound/AR-Deploy`. `main` is at `8026a37`.
   - **Use the production URL from the Vercel dashboard.** `ar-deploy.vercel.app` is someone else's site. `ar-deploy-track0.vercel.app` is the team alias and sits behind Vercel login.
   - The owner deploys through their existing project. **Never create another Vercel project or domain.**
