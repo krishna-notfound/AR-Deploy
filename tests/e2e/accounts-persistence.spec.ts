@@ -38,6 +38,9 @@ test('business settings: slug read-only, edits persist after reload', async ({ p
 
 test('corrupt stored data is reset safely', async ({ page: first, context }) => {
   await first.goto('/demo')
+  // The demo store saves 200 ms after a change (src/services/mock/store.ts). Let any save from page load land
+  // first, otherwise it can overwrite the corrupt value below and no reset happens (seen once as a flaky failure).
+  await first.evaluate(() => new Promise((r) => setTimeout(r, 400)))
   await first.evaluate(() => localStorage.setItem('arfurn:v1:db', '{"schemaVersion":1,"businesses":[{"bad":true}]'))
   // Close without running unload handlers (the app flushes good data on unload).
   await first.close({ runBeforeUnload: false })

@@ -69,3 +69,48 @@ Public sign-ups stay **off** for these tests; the `/signup` page itself is teste
 ## Production changes
 
 Every production change (migration, auth setting, Edge Function deploy, env var, push to `main`) needs the owner's explicit approval of a written plan: exact change, target, risk, rollback, and the staging evidence. Pending items and their rollback steps: `System_arch/audit/APPROVAL_REQUIRED.md` and [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
+
+## Staging: what is needed (status 2026-10-13)
+
+A client-review environment needs its own Supabase project. Today none exists:
+- `pmnjchhrgvajtjpadpqo` = production (live site).
+- `bothonopxtznzviieoic` = **another live application** (read-only check 2026-10-13: 8 users, 5 stores, 14 products, profiles, try-on assets). Not usable for staging.
+- The free plan allows 2 active projects, both used.
+
+Ways to get one (owner decides; none is done automatically):
+1. **Client-owned Supabase account** (recommended for handover anyway): the client creates a free organization, invites the developer, and creates `ar-furniture-staging` there. Later, production can move to the client the same way.
+2. **Supabase Pro** on the current organization (paid; allows more projects and branching).
+
+Once the ref exists, follow "Separate staging project" below, then point Vercel **Preview** at it:
+- Edit `VITE_DATA_MODE`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` so their target is **Production only** (values unchanged).
+- Add the same three names for **Preview** with the staging values (`VITE_DATA_MODE=supabase`).
+- Check: `vercel api "/v10/projects/ar-deploy/env?teamId=track0"` lists each name twice (production / preview). After a preview deploy, DevTools → Network shows requests to the staging ref only.
+- If Preview values are missing, the app shows a configuration error instead of falling back to production or demo data (`src/services/backendConfig.ts`).
+
+## Deploying
+
+- **Production** = push/merge to `main` of `krishna-notfound/AR-Deploy`; Vercel builds `ar-deploy` automatically. Needs the owner's approval each time.
+- Before merging: `npm run typecheck && npm run lint && npm test && npm run build && npm run test:e2e`, the live suite against staging (or the approved live run), and the device checklist in `docs/TEST_PLAN.md`.
+- Database changes go first (`npx supabase db push` to the verified target), app second. Every migration so far is additive, so the old app keeps working against the new schema.
+- After deploying: open the production URL, a catalog, a product (3D loads), sign in as admin, check the dashboard; check the commit SHA in Vercel → Deployments.
+
+## Rollback
+
+| What | How | Data effect |
+|---|---|---|
+| App | Vercel → Deployments → previous production deployment → **Instant Rollback** (or revert the merge commit on `main`) | none |
+| Migrations `20261013093006` + `20261013144121` | Run `supabase/rollback/20261013_publish_rules_and_claims_rollback.sql` in the SQL editor (tested in PGlite) | drops claim links; keeps businesses, products and owner links |
+| Earlier migrations | `supabase/rollback/20261012_p8_rollback.sql` | **destructive** (drops all tables): backup first |
+| Data | Supabase → Database → Backups (daily on paid plans; on Free take a manual dump: `npx supabase db dump --data-only -f backup.sql`) | — |
+
+## Custom domain and business subdomains (when the client's domain is available)
+
+Nothing below is done until the client provides the domain and approves each step.
+
+1. **Vercel → ar-deploy → Domains:** add `<domain>`, `www.<domain>` (redirect to apex) and `*.<domain>`. Wildcard certificates need the domain's **nameservers moved to Vercel** (`ns1.vercel-dns.com`, `ns2.vercel-dns.com`); with external DNS, Vercel cannot issue a wildcard certificate. Move any existing email (MX), SPF/DKIM and other records into Vercel DNS first.
+2. **Env:** `VITE_ROOT_DOMAIN=<domain>` for Production → redeploy. Then `https://<slug>.<domain>` shows that business's catalog and `/products/<slug>` its products; the apex serves the landing page, `/login`, `/admin`, `/dashboard`. Reserved subdomains (`www`, `admin`, `app`, `api`, `demo`, `login`, `mail`, `assets`, `static`, `cdn`) are never business addresses.
+3. **Supabase → Authentication → URL Configuration:** Site URL `https://<domain>`; redirect URLs `https://<domain>/login`, `https://<domain>/reset-password`, `https://<domain>/claim`.
+4. **Email (before production sign-ups):** custom SMTP (e.g. Resend) with SPF/DKIM records on the sending domain; Supabase → Authentication → SMTP.
+5. **QR codes:** download them again after step 2 (path-mode QR codes point to the Vercel address).
+6. **Check:** HTTPS on apex, `www` and two business subdomains; unknown subdomain shows "catalog not found"; product pages and AR from a subdomain.
+7. **Undo:** remove `VITE_ROOT_DOMAIN` and redeploy (back to `/catalog/<slug>` URLs).
