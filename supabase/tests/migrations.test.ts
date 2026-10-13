@@ -316,3 +316,22 @@ describe('isolation between businesses (storage, analytics, members)', () => {
     expect(members.rows).toHaveLength(0)
   })
 })
+
+describe('rollback script for 20261013093006 + 20261013144121', () => {
+  it('removes the new rules and functions, restores owner linking, and keeps business data', async () => {
+    const fresh = await PGlite.create()
+    await fresh.exec(SUPABASE_STUBS + 'create schema supabase_migrations; create table supabase_migrations.schema_migrations (version text primary key);')
+    for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()) await fresh.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
+    await fresh.exec(`insert into supabase_migrations.schema_migrations values ('20261013093006'), ('20261013144121');
+      insert into public.businesses (name, slug) values ('Kept', 'kept');`)
+    await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261013_publish_rules_and_claims_rollback.sql'), 'utf8'))
+    const left = await fresh.query<{ n: number }>(`select count(*)::int as n from pg_proc where proname in
+      ('register_business', 'redeem_business_claim', 'admin_create_business_claim', 'assert_publishable', 'products_set_published_at')`)
+    expect(left.rows[0]!.n).toBe(0)
+    expect((await fresh.query(`select 1 from pg_tables where schemaname = 'private' and tablename = 'business_claims'`)).rows).toHaveLength(0)
+    expect((await fresh.query(`select 1 from pg_proc where proname = 'admin_add_business_member'`)).rows).toHaveLength(1)
+    expect((await fresh.query(`select 1 from public.businesses where slug = 'kept'`)).rows).toHaveLength(1)
+    expect((await fresh.query('select 1 from supabase_migrations.schema_migrations')).rows).toHaveLength(0)
+    await fresh.close()
+  }, 60_000)
+})
