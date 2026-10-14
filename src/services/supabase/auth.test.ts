@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AuthRetryableFetchError } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
-import { createSupabaseAuthService } from './auth'
+import { authMessage, createSupabaseAuthService } from './auth'
 
 /** Just enough of supabase-js for getCurrentUser: auth.getUser and the two role lookups. */
 function stub(getUser: () => unknown, roles: { admin?: boolean; businessId?: string } = {}) {
@@ -35,5 +35,13 @@ describe('Supabase auth: getCurrentUser', () => {
   it('treats a network failure as an error, not as signed out', async () => {
     const r = await createSupabaseAuthService(stub(() => ({ data: { user: null }, error: new AuthRetryableFetchError('offline', 0) }))).getCurrentUser()
     expect(r.ok).toBe(false)
+  })
+})
+
+describe('authMessage', () => {
+  it('turns project-setting errors into plain words and keeps unknown messages', () => {
+    expect(authMessage({ code: 'signup_disabled', message: 'Signups not allowed for this instance' })).toBe('New accounts are not open yet. Ask the platform team for access.')
+    expect(authMessage({ code: 'invalid_credentials', message: 'Invalid login credentials' })).toBe('Wrong email or password.')
+    expect(authMessage({ message: 'Something else' })).toBe('Something else')
   })
 })

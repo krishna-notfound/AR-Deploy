@@ -13,6 +13,26 @@ export interface SignedInAccount {
   displayNameSkipped?: boolean
 }
 
+
+/**
+ * Supabase Auth error codes the owner can act on, in plain words. Covers the project settings this app can meet:
+ * sign-ups switched off, the built-in email sender (it only mails the project's team, a few per hour),
+ * unconfirmed accounts and rate limits. Anything else keeps Supabase's own message.
+ */
+const AUTH_MESSAGES: Record<string, string> = {
+  signup_disabled: 'New accounts are not open yet. Ask the platform team for access.',
+  email_not_confirmed: 'This account has not confirmed its email address yet. Ask the platform team for help.',
+  email_address_not_authorized: 'We cannot send email to this address yet (the email service is not set up). Ask the platform team for access.',
+  over_email_send_rate_limit: 'Too many emails were sent just now. Wait a few minutes and try again.',
+  over_request_rate_limit: 'Too many attempts. Wait a minute and try again.',
+  invalid_credentials: 'Wrong email or password.',
+  weak_password: 'Choose a stronger password.',
+  email_address_invalid: 'Enter a valid email address.',
+}
+export function authMessage(error: { code?: string; message: string }): string {
+  return (error.code && AUTH_MESSAGES[error.code]) || error.message
+}
+
 export interface AuthService {
   getSession(): Promise<Result<Session | null>>
   /** null when signed out; `user` is null when signed in but not given a role yet. */
@@ -71,24 +91,24 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
 
     async signInWithPassword(email, password) {
       const { error } = await sb.auth.signInWithPassword({ email, password })
-      return error ? fail('PERMISSION', error.message) : ok(undefined)
+      return error ? fail('PERMISSION', authMessage(error)) : ok(undefined)
     },
 
     async requestPasswordReset(email, redirectTo) {
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo })
       // Rate limits and delivery problems are reported; "unknown email" is not distinguishable by design.
-      return error ? fail('UNKNOWN', error.message) : ok(undefined)
+      return error ? fail('UNKNOWN', authMessage(error)) : ok(undefined)
     },
 
     async updatePassword(password) {
       const { error } = await sb.auth.updateUser({ password })
-      return error ? fail('VALIDATION', error.message) : ok(undefined)
+      return error ? fail('VALIDATION', authMessage(error)) : ok(undefined)
     },
 
     async signUp(email, password, emailRedirectTo) {
       const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo } })
       // With email confirmation on (the project setting), no session comes back until the link is opened.
-      return error ? fail('VALIDATION', error.message) : ok({ needsConfirmation: !data.session })
+      return error ? fail('VALIDATION', authMessage(error)) : ok({ needsConfirmation: !data.session })
     },
 
     async updateDisplayName(name) {
