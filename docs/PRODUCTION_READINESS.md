@@ -173,6 +173,14 @@ Deleting needs the owner's separate approval: delete the 4 businesses (products,
 
 Local infrastructure: Docker is not installed, so `supabase start` (local Supabase) is unavailable; database behaviour is tested in PGlite (real Postgres, Supabase auth/storage stubbed), which cannot test Auth emails, Storage file serving or the Edge Function.
 
+## 6g. Client preview deployment (2026-10-14, owner-approved)
+
+- Branch `chore/production-readiness` pushed to GitHub (`677ad00`); Vercel built a **Preview** (READY): `ar-deploy-git-chore-production-readiness-track0.vercel.app` (branch alias) / `ar-deploy-4s0as2pew-track0.vercel.app` (deployment). Production unchanged (`main` `8026a37`, `ar-deploy-sage.vercel.app`).
+- **Not isolated:** Preview uses the same `VITE_*` values as Production, so it reads and writes the live Supabase project `pmnjchhrgvajtjpadpqo` (verified: the public production bundle calls only that project, contains only the publishable key, no secret patterns).
+- **Access:** preview URLs are behind Vercel Authentication (`ssoProtection: all_except_custom_domains`, HTTP 302 to Vercel login). The client needs a Vercel share link, or the owner disables Vercel Authentication for previews.
+- Checks before deploy: typecheck, lint, build, 128 unit/DB tests (15 live skipped), 27/27 E2E (demo mode).
+- Not yet verified on the preview: page rendering, sign-up, onboarding, uploads (no access + no approved test writes).
+
 ## 7. Change log
 
 | Date | Phase | Change |
