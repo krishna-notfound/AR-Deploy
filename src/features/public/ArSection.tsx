@@ -2,9 +2,11 @@ import { Info, Loader2, QrCode, Smartphone } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { cn } from '@/lib/cn'
 import { useQrCode } from '@/lib/useQrCode'
 import { CopyLink } from './ShareActions'
 import type { ModelState } from './ProductMedia'
+import { TAP_TARGET } from './tapTarget'
 import { shareableCurrentUrl } from '@/lib/urls'
 
 export type ArAvailability = 'none' | 'checking' | 'available' | 'unavailable'
@@ -36,7 +38,7 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
 
   if (availability === 'available')
     return (
-      <button type="button" onClick={onShowTips} className="text-[13px] text-ink-muted underline-offset-2 hover:text-ink hover:underline">
+      <button type="button" onClick={onShowTips} className={cn(TAP_TARGET, 'text-[13px] text-ink-muted underline-offset-2 hover:text-ink hover:underline')}>
         {t('ar.tipsLink')}
       </button>
     )

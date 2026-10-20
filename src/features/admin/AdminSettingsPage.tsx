@@ -7,9 +7,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Switch } from '@/components/ui/Form'
 import { useToast } from '@/components/ui/ToastProvider'
-import { backend, isDemoMode, service } from '@/services'
-import { MODEL_CREDITS, PHOTO_CREDIT } from '@/services/mock/credits'
-import { FAIL_RATE_KEY } from '@/services/mock/mockCatalogService'
+import { FAIL_RATE_KEY, MODEL_CREDITS, PHOTO_CREDIT, backend, isDemoMode, service } from '@/services'
 
 const CAPABILITIES: [string, string, string][] = [
   ['Login and accounts', 'Mock account selector, stored in this browser', 'Auth provider, sessions, server-side authorization'],

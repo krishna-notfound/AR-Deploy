@@ -157,7 +157,7 @@ export interface CatalogService {
   /** Creates or links the business's single owner and emails a Supabase Auth invitation link. */
   provisionOwner(input: { businessId: ID; email: string; language: Lang; applicationId?: ID }): Promise<Result<ProvisionOutcome>>
   /** New invitation link for an owner who has not completed onboarding yet (cooldown and limits apply). */
-  resendOwnerInvitation(businessId: ID): Promise<Result<ProvisionOutcome>>
+  resendOwnerInvitation(businessId: ID, language: Lang): Promise<Result<ProvisionOutcome>>
 
   // business applications: anyone may submit; everything else is for platform admins
   submitApplication(input: ApplicationInput): Promise<Result<{ id: ID; reference: string }>>

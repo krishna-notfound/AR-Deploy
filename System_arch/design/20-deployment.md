@@ -53,7 +53,7 @@ Project `pmnjchhrgvajtjpadpqo`. Replace `furnish.app` with the real domain.
 | # | Dashboard page | Setting | Value |
 |---|---|---|---|
 | 1 | Authentication → URL Configuration (`/dashboard/project/_/auth/url-configuration`) | Site URL | `https://furnish.app` |
-| 2 | same page | Redirect URLs (exact entries) | `https://furnish.app/login`, `https://www.furnish.app/login`. For Vercel previews add `https://*-track0.vercel.app/**`. For local work add `http://localhost:5173/**`. |
+| 2 | same page | Redirect URLs (exact entries) | `https://furnish.app/login`, `https://www.furnish.app/login` (plus `/reset-password` and `/accept-invite`). **No wildcards on `vercel.app`:** anyone can create a Vercel project whose hostname matches `*-track0.vercel.app`, and an attacker-started password reset would then deliver the victim's tokens to that page (SEC-21). For Previews, add exact URLs of one stable branch alias (`https://ar-deploy-git-<branch>-track0.vercel.app/login` etc.), and only on a non-production Supabase project. Keep `localhost` entries off the production project. |
 | 3 | Authentication → Sign In / Providers (`/auth/providers`) | Allow new users to sign up | **Off**. Accounts are created by a platform admin; a stray sign-up has no role and sees only public data, but shouldn't exist. |
 | 4 | same page → Email provider | Confirm email | On (default). Minimum password length **12**; require lower, upper, digits. |
 | 5 | same page → Email provider | Prevent use of leaked passwords (HaveIBeenPwned) | **On**. Requires the **Pro plan or above**; on Free it is unavailable. Treat that as a launch decision. |

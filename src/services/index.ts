@@ -32,5 +32,11 @@ export const service: CatalogService = SUPABASE_BUILD
 export const auth: AuthService | null = SUPABASE_BUILD && backend.mode === 'supabase' ? createSupabaseAuthService(getSupabaseClient(backend)) : null
 
 export { backend, isDemoMode } from './backend'
-export type { AuthService, SignedInAccount } from './supabase/auth'
+export type { AuthError, AuthResult, AuthService, SignedInAccount } from './supabase/auth'
 export type { CatalogService, Result, ServiceError, BusinessInput, ProductInput, ProductQuery } from './catalogService'
+
+// Demo-mode helpers the UI needs (failure injection, sample-data credits, store notices), re-exported here so
+// components never import services/mock/* directly.
+export { FAIL_RATE_KEY } from './mock/mockCatalogService'
+export { MODEL_CREDITS, PHOTO_CREDIT } from './mock/credits'
+export { store as demoStore } from './mock/store'

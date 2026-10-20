@@ -47,8 +47,8 @@ Public sign-ups stay **off** for these tests; the `/signup` page itself is teste
    ```
 3. **Apply migrations to staging.** `npx supabase db push` (after re-checking step 2's ref). Then check the advisors in the dashboard (Advisors → Security / Performance).
 4. 🔑 **Auth settings (staging dashboard → Authentication).**
-   - Sign In / Providers → Email: allow new users to sign up **on**, confirm email **on**, minimum password length **12**, secure password change **on**.
-   - URL Configuration → Site URL `http://localhost:5173`; Redirect URLs: `http://localhost:5173/**` and the Vercel Preview pattern (check the exact preview hostname in Vercel, e.g. `https://ar-deploy-*-track0.vercel.app/**`).
+   - Sign In / Providers → Email: allow new users to sign up **off** (owners are invited, ADR-0024; open sign-ups let anyone pre-register an owner's email, SEC-20), confirm email **on**, minimum password length **12**, secure password change **on**.
+   - URL Configuration → Site URL `http://localhost:5173`; Redirect URLs: `http://localhost:5173/**` and exact entries for one stable Preview branch alias (`https://ar-deploy-git-<branch>-track0.vercel.app/login`, `/reset-password`, `/accept-invite`). Never a wildcard such as `https://ar-deploy-*-track0.vercel.app/**`: any Vercel user can claim a matching hostname and receive reset or invite tokens (SEC-21, design/20).
    - Emails: the built-in sender only delivers to members of your Supabase team, a few per hour. Enough for testing with your own address; real owners need custom SMTP (e.g. Resend) before production sign-ups.
 5. 🔑 **QA users (staging dashboard → Authentication → Users → Add user, "auto confirm").** Same password for all: `qa-admin@furnish.example`, `qa-owner-a@furnish.example`, `qa-owner-b@furnish.example`, `qa-newcomer@furnish.example`. Then in the SQL editor: `insert into public.platform_admins (user_id) select id from auth.users where email = 'qa-admin@furnish.example';`
 6. **Synthetic data.** `npm run db:sample-sql`, then run the generated SQL in the staging SQL editor (sample businesses, products, analytics).

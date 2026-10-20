@@ -24,6 +24,7 @@ import type {
   ProductStatus,
   WeightUnit,
 } from '@/domain/types'
+import { localDayBounds } from '@/lib/format'
 import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, isoDay, summarize } from '../analytics'
@@ -435,6 +436,11 @@ const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string 
   not_configured: { code: 'CONFIG', message: 'This feature is not configured on the server yet.' },
   duplicate_application: { code: 'CONFLICT', message: 'An application for this business from this email is already being reviewed.' },
   email_is_admin: { code: 'CONFLICT', message: 'This email belongs to a platform admin. Invite the business owner’s own address.' },
+  email_owns_business: { code: 'CONFLICT', message: 'This email already owns another business. Each owner account manages one business; use a different address.' },
+  account_not_invited: {
+    code: 'CONFLICT',
+    message: 'An account with this email already exists but was not created by an invitation, so it cannot be made owner. Use a different address, or remove that account in Supabase Auth first.',
+  },
   invalid_request: { code: 'VALIDATION', message: 'Check the details and try again.' },
 }
 
@@ -799,8 +805,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       }),
     provisionOwner: ({ businessId, email, language, applicationId }) =>
       guard(async () => changed(await invokeFunction<ProvisionOutcome>(PROVISION_OWNER_FUNCTION, { action: 'provision', businessId, email, language, applicationId }))),
-    resendOwnerInvitation: (businessId) =>
-      guard(async () => changed(await invokeFunction<ProvisionOutcome>(PROVISION_OWNER_FUNCTION, { action: 'resend', businessId }))),
+    resendOwnerInvitation: (businessId, language) =>
+      guard(async () => changed(await invokeFunction<ProvisionOutcome>(PROVISION_OWNER_FUNCTION, { action: 'resend', businessId, language }))),
 
     // ---------------- business applications ----------------
     submitApplication: (input) => guard(() => invokeFunction<{ id: string; reference: string }>(SUBMIT_APPLICATION_FUNCTION, input)),
@@ -811,8 +817,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const from = ((q.page ?? 1) - 1) * size
         let query = sb.from('business_applications').select('*', { count: 'exact' }).order('created_at', { ascending: false })
         if (q.status) query = query.eq('status', q.status)
-        if (q.from) query = query.gte('created_at', `${q.from}T00:00:00`)
-        if (q.to) query = query.lte('created_at', `${q.to}T23:59:59.999`)
+        if (q.from) query = query.gte('created_at', localDayBounds(q.from).start)
+        if (q.to) query = query.lt('created_at', localDayBounds(q.to).end)
         const term = q.search?.replace(/[",()\\%*]/g, ' ').trim()
         if (term) {
           const like = `"%${term}%"`

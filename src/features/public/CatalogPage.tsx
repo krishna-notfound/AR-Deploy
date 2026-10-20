@@ -2,7 +2,7 @@ import { Box, PauseCircle, SearchX, Store } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { Button } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { SkeletonGrid } from '@/components/ui/Skeleton'
@@ -16,6 +16,7 @@ import { useServiceQuery } from '@/services/hooks'
 import { initialPrice, primaryImage } from '@/lib/product'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
+import { TAP_TARGET } from './tapTarget'
 
 export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const params = useParams()
@@ -27,8 +28,10 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
 
   const business = useServiceQuery(() => service.getBusinessBySlug(slug), [slug])
   const b = business.data
+  // Until there is an active business the query stays pending: a placeholder [] would read as "No products yet"
+  // (and "0 products") for the first frame after the business arrives (COR-37).
   const products = useServiceQuery(
-    () => (b && b.status === 'active' ? service.getProducts({ businessId: b.id, status: 'published' }) : Promise.resolve({ ok: true as const, data: [] as Product[] })),
+    () => (b && b.status === 'active' ? service.getProducts({ businessId: b.id, status: 'published' }) : new Promise<never>(() => {})),
     [b?.id, b?.status],
   )
 
@@ -63,7 +66,19 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
     return (
       <PublicShell>
         {notFound ? (
-          <PublicMessage icon={Store} title={t('catalog.notFoundTitle')} body={t('catalog.notFoundBody')} />
+          <PublicMessage
+            icon={Store}
+            title={t('catalog.notFoundTitle')}
+            body={t('catalog.notFoundBody')}
+            action={
+              // On a business subdomain "/" is this missing catalogue, so the way out is only offered on the platform domain.
+              tenantSlug ? undefined : (
+                <ButtonLink to="/" variant="primary">
+                  {t('catalog.goHome')}
+                </ButtonLink>
+              )
+            }
+          />
         ) : (
           <ErrorState message={t('common.errorTitle')} onRetry={business.refetch} retryLabel={t('common.retry')} className="py-24" />
         )}
@@ -87,7 +102,10 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
           <div className="min-w-0">
             <p className="text-eyebrow text-ink-muted">{t('catalog.eyebrow')}</p>
             <h1 className="mt-4 text-headline">{b.name}</h1>
-            <p className="mt-3 text-label text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
+            {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
+            {products.status === 'success' && (
+              <p className="mt-3 text-label text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
+            )}
           </div>
         </div>
         {b.description && <p className="max-w-xl text-[15px] leading-7 text-ink-muted">{b.description}</p>}
@@ -96,7 +114,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
       <div className="sticky top-16 z-20 border-y border-line bg-canvas/95 backdrop-blur-sm sm:top-20">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-8 sm:px-10">
           {categories.length > 1 && (
-            <div role="group" aria-label={t('catalog.categories')} className="-mx-5 flex gap-7 overflow-x-auto px-5 sm:mx-0 sm:px-0">
+            <div role="group" aria-label={t('catalog.categories')} className="-mx-5 -my-2 flex gap-7 overflow-x-auto px-5 py-2 sm:mx-0 sm:px-0">
               {(['', ...categories] as const).map((c) => (
                 <button
                   key={c || 'all'}
@@ -104,6 +122,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   aria-pressed={cat === c}
                   onClick={() => setParam('category', c)}
                   className={cn(
+                    TAP_TARGET,
                     'shrink-0 border-b py-2 text-label transition-colors',
                     cat === c ? 'border-ink text-ink' : 'border-transparent text-ink-muted hover:text-ink',
                   )}

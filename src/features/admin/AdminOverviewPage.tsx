@@ -1,4 +1,4 @@
-import { Building2, PackagePlus, Plus, QrCode } from 'lucide-react'
+import { Building2, Inbox, PackagePlus, Plus, QrCode } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -13,6 +13,7 @@ import { formatNumber, formatRelative } from '@/lib/format'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ActivityList } from '../shared/ActivityList'
+import { applicationsAdminPath, businessAdminPath } from '@/lib/urls'
 import { primaryImage } from '@/lib/product'
 import { useBusinesses } from '../products/useCatalogData'
 
@@ -48,6 +49,8 @@ export default function AdminOverviewPage() {
         }
       />
 
+      <PendingApplications />
+
       {summary.status === 'error' && !s ? (
         <Card>
           <ErrorState message={summary.error.message} onRetry={summary.refetch} />
@@ -82,7 +85,9 @@ export default function AdminOverviewPage() {
             <Card>
               <CardHeader title="Top-performing products" description="By views, last 30 days" />
               <CardBody>
-                {!s || products.status === 'loading' ? (
+                {products.status === 'error' && !products.data ? (
+                  <ErrorState message={products.error.message} onRetry={products.refetch} />
+                ) : !s || products.status === 'loading' ? (
                   <SkeletonRows rows={4} />
                 ) : top.length === 0 ? (
                   <EmptyState title="No product activity yet" />
@@ -123,6 +128,8 @@ export default function AdminOverviewPage() {
               <CardBody>
                 {products.status === 'loading' && !products.data ? (
                   <SkeletonRows rows={4} />
+                ) : products.status === 'error' && !products.data ? (
+                  <ErrorState message={products.error.message} onRetry={products.refetch} />
                 ) : recentProducts.length === 0 ? (
                   <EmptyState
                     title="No products yet"
@@ -158,6 +165,8 @@ export default function AdminOverviewPage() {
               <CardBody>
                 {bizQuery.status === 'loading' && !bizQuery.data ? (
                   <SkeletonRows rows={3} />
+                ) : bizQuery.status === 'error' && !bizQuery.data ? (
+                  <ErrorState message={bizQuery.error.message} onRetry={bizQuery.refetch} />
                 ) : recentBusinesses.length === 0 ? (
                   <EmptyState icon={Building2} title="No businesses yet" />
                 ) : (
@@ -166,7 +175,7 @@ export default function AdminOverviewPage() {
                       <li key={b.id} className="flex items-center gap-3 py-2.5">
                         <SmartImage src={b.logoUrl} alt="" className="size-10 rounded-lg object-contain" />
                         <div className="min-w-0 flex-1">
-                          <Link to={`/admin/businesses/${b.id}`} className="block truncate text-sm font-medium hover:underline">
+                          <Link to={businessAdminPath(b.id)} className="block truncate text-sm font-medium hover:underline">
                             {b.name}
                           </Link>
                           <p className="text-xs text-ink-muted">Created {formatRelative(b.createdAt)}</p>
@@ -182,5 +191,46 @@ export default function AdminOverviewPage() {
         </div>
       )}
     </>
+  )
+}
+
+/** Applications waiting for a decision (submitted or under review), so new submissions are seen without opening Applications. */
+function PendingApplications() {
+  const q = useServiceQuery(async () => {
+    const [submitted, reviewing] = await Promise.all([service.getApplications({ status: 'submitted', pageSize: 1 }), service.getApplications({ status: 'under_review', pageSize: 1 })])
+    if (!submitted.ok) return submitted
+    if (!reviewing.ok) return reviewing
+    return { ok: true as const, data: { submitted: submitted.data.total, underReview: reviewing.data.total } }
+  }, [])
+  const total = q.data ? q.data.submitted + q.data.underReview : 0
+  return (
+    <Card className="mb-6">
+      {q.status === 'loading' && !q.data ? (
+        <div className="p-4">
+          <SkeletonRows rows={1} />
+        </div>
+      ) : q.status === 'error' && !q.data ? (
+        <ErrorState message={`Could not load applications. ${q.error.message}`} onRetry={q.refetch} className="py-6" />
+      ) : (
+        <div className="flex flex-wrap items-center gap-3 p-4">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-subtle text-ink-muted">
+            <Inbox className="size-5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[15px] font-semibold text-ink">
+              {total === 0 ? 'No applications awaiting review' : `${formatNumber(total)} application${total === 1 ? '' : 's'} awaiting review`}
+            </h2>
+            {total > 0 && q.data && (
+              <p className="text-xs text-ink-muted">
+                {formatNumber(q.data.submitted)} new · {formatNumber(q.data.underReview)} under review
+              </p>
+            )}
+          </div>
+          <ButtonLink to={applicationsAdminPath(q.data && q.data.submitted > 0 ? 'submitted' : q.data && q.data.underReview > 0 ? 'under_review' : undefined)} size="sm" variant={total > 0 ? 'primary' : 'secondary'}>
+            {total > 0 ? 'Review applications' : 'View applications'}
+          </ButtonLink>
+        </div>
+      )}
+    </Card>
   )
 }

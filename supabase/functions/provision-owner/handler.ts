@@ -20,7 +20,11 @@ export interface ProvisionDeps {
   isPlatformAdmin(userId: string): Promise<boolean>
   getBusiness(id: string): Promise<{ id: string; name: string } | null>
   getOwner(businessId: string): Promise<{ userId: string; email: string; acceptedAt: string | null } | null>
-  userIdByEmail(email: string): Promise<string | null>
+  /**
+   * The account already registered for this email, if any. `invited` is true when Supabase Auth created it through an
+   * invitation (auth.users.invited_at); `ownsBusiness` when it is already a member of a business.
+   */
+  accountByEmail(email: string): Promise<{ id: string; invited: boolean; ownsBusiness: boolean } | null>
   /** auth.admin.generateLink; 'invite' creates the account, 'magiclink' signs an existing one in. */
   generateLink(type: 'invite' | 'magiclink', email: string, redirectTo: string): Promise<LinkResult>
   linkOwner(businessId: string, userId: string, actorId: string, applicationId: string | null): Promise<'linked' | 'already_linked' | 'business_has_owner'>
@@ -65,8 +69,13 @@ export async function handleProvisionOwner(req: Request, deps: ProvisionDeps): P
     if (owner && owner.email.toLowerCase() !== email) return reply(409, { error: 'business_has_owner' })
     if (owner) return resend(req, deps, { actorId, business, owner, lang, applicationId })
 
-    const existingId = await deps.userIdByEmail(email)
-    if (existingId && (await deps.isPlatformAdmin(existingId))) return reply(409, { error: 'email_is_admin' })
+    const existing = await deps.accountByEmail(email)
+    if (existing && (await deps.isPlatformAdmin(existing.id))) return reply(409, { error: 'email_is_admin' })
+    // The dashboard serves one business per owner, and complete_owner_onboarding expects a single pending membership.
+    if (existing?.ownsBusiness) return reply(409, { error: 'email_owns_business' })
+    // An account this platform did not invite was registered by someone else (or before sign-ups were closed). Linking
+    // it would hand the business to whoever set its password, so it is refused rather than reused (SEC-20).
+    if (existing && !existing.invited) return reply(409, { error: 'account_not_invited' })
     const redirect = landingUrl(deps, req, lang)
     if (!redirect) return reply(503, { error: 'not_configured' })
     const link = await createLink(deps, email, redirect)

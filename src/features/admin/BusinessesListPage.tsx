@@ -13,6 +13,7 @@ import { SmartImage } from '@/components/ui/SmartImage'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { Business, BusinessCatalog, BusinessStatus } from '@/domain/types'
 import { formatDate, formatNumber } from '@/lib/format'
+import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
 import { isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useBusinessActions } from '../businesses/useBusinessActions'
@@ -51,8 +52,8 @@ export default function BusinessesListPage() {
   }, [catalogs.data, analytics.data, q, status])
 
   const menu = (b: Business, count: number): (MenuItem | 'separator')[] => [
-    { label: 'Edit details', icon: <Pencil />, onSelect: () => navigate(`/admin/businesses/${b.id}`) },
-    { label: 'Open catalog', icon: <ExternalLink />, onSelect: () => window.open(`/catalog/${b.slug}`, '_blank', 'noopener') },
+    { label: 'Edit details', icon: <Pencil />, onSelect: () => navigate(businessAdminPath(b.id)) },
+    { label: 'Open catalog', icon: <ExternalLink />, onSelect: () => window.open(catalogLocalPath(b), '_blank', 'noopener') },
     { label: 'View products', icon: <Package />, onSelect: () => navigate(`/admin/products?business=${b.id}`) },
     { label: 'View QR code', icon: <QrCode />, onSelect: () => navigate(`/admin/catalogs?business=${b.id}`) },
     b.status === 'active'
@@ -71,7 +72,7 @@ export default function BusinessesListPage() {
         <div className="flex items-center gap-3">
           <SmartImage src={r.catalog.business.logoUrl} alt="" className="size-10 shrink-0 rounded-lg object-contain" />
           <div className="min-w-0">
-            <Link to={`/admin/businesses/${r.catalog.business.id}`} className="block truncate font-medium hover:underline">
+            <Link to={businessAdminPath(r.catalog.business.id)} className="block truncate font-medium hover:underline">
               {r.catalog.business.name}
             </Link>
             <span className="block truncate text-xs text-ink-muted">{r.catalog.catalogUrl.replace('https://', '')}</span>
@@ -150,7 +151,7 @@ export default function BusinessesListPage() {
               <div className="flex items-center gap-3">
                 <SmartImage src={r.catalog.business.logoUrl} alt="" className="size-11 shrink-0 rounded-lg object-contain" />
                 <div className="min-w-0 flex-1">
-                  <Link to={`/admin/businesses/${r.catalog.business.id}`} className="block truncate text-sm font-medium">
+                  <Link to={businessAdminPath(r.catalog.business.id)} className="block truncate text-sm font-medium">
                     {r.catalog.business.name}
                   </Link>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">

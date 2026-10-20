@@ -1,6 +1,7 @@
 import { Inbox } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { FormField, Input, Select } from '@/components/ui/Form'
 import { Pagination } from '@/components/ui/Pagination'
@@ -40,7 +41,7 @@ export default function ApplicationsPage() {
 
   return (
     <>
-      <PageHeader title="Applications" description="Businesses that applied to join Sanctus. Review each one before it can be approved." />
+      <PageHeader title="Applications" description="Businesses that applied to join Sanctus. Approving one creates its business as a draft; then invite the owner." />
       <Card className="mb-5 p-4">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto_auto] md:items-end">
           <FormField label="Search">
@@ -66,12 +67,21 @@ export default function ApplicationsPage() {
       </Card>
 
       <Card>
+        <h2 className="sr-only">Results</h2>
         {q.status === 'loading' && !q.data ? (
           <div className="p-5">
             <SkeletonRows rows={5} />
           </div>
         ) : q.status === 'error' && !q.data ? (
           <ErrorState message={q.error.message} onRetry={q.refetch} className="py-16" />
+        ) : !q.data?.items.length && (q.data?.total ?? 0) > 0 ? (
+          <EmptyState
+            icon={Inbox}
+            title="No applications on this page"
+            body={`There are ${q.data?.total} applications, but page ${page} is past the last page.`}
+            action={<Button onClick={() => setParam('page', '')}>Go to the first page</Button>}
+            className="py-16"
+          />
         ) : !q.data?.items.length ? (
           <EmptyState
             icon={Inbox}

@@ -33,7 +33,7 @@ function deps(over: Partial<ProvisionDeps> = {}) {
     isPlatformAdmin: async (id) => id === 'admin-id',
     getBusiness: async (id) => (id === BIZ ? { id, name: 'Casa Lisboa' } : null),
     getOwner: async () => owner,
-    userIdByEmail: async (e) => (e === 'admin@platform.test' ? 'admin-id' : null),
+    accountByEmail: async (e) => (e === 'admin@platform.test' ? { id: 'admin-id', invited: false, ownsBusiness: false } : null),
     generateLink: async (type, email, redirectTo) => (links.push({ type, email, redirectTo }), { ok: true, url: LINK, userId: 'new-user' }),
     linkOwner: async (_b, userId) => {
       if (owner && owner.userId !== userId) return 'business_has_owner'
@@ -96,8 +96,25 @@ describe('provision-owner', () => {
     expect((await handleProvisionOwner(post({ action: 'other', businessId: BIZ }), d)).status).toBe(400)
   })
 
-  it('falls back to a sign-in link when the account is already confirmed', async () => {
+  it('refuses an existing account it did not invite (pre-registered email), without creating a link', async () => {
+    const { d, links } = deps({ accountByEmail: async () => ({ id: 'squatter', invited: false, ownsBusiness: false }) })
+    const res = await handleProvisionOwner(post(provision()), d)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'account_not_invited' })
+    expect(links).toHaveLength(0)
+  })
+
+  it('refuses an email that already owns another business', async () => {
+    const { d, links } = deps({ accountByEmail: async () => ({ id: 'owner-b', invited: true, ownsBusiness: true }) })
+    const res = await handleProvisionOwner(post(provision()), d)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'email_owns_business' })
+    expect(links).toHaveLength(0)
+  })
+
+  it('falls back to a sign-in link when the invited account is already confirmed', async () => {
     const { d, links } = deps({
+      accountByEmail: async () => ({ id: 'existing', invited: true, ownsBusiness: false }),
       generateLink: async (type, email, redirectTo) => {
         links.push({ type, email, redirectTo })
         return type === 'invite' ? { ok: false, error: 'already registered' } : { ok: true, url: LINK, userId: 'existing' }
@@ -156,6 +173,14 @@ describe('provision-owner', () => {
     expect(await (await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), d)).json()).toEqual({ error: 'no_owner' })
     setOwner({ userId: 'u1', email: 'owner@shop.test', acceptedAt: '2026-10-19T00:00:00Z' })
     expect(await (await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), d)).json()).toEqual({ error: 'already_accepted' })
+  })
+
+  it('resends in the requested language (link and template)', async () => {
+    const { d, setOwner, links, logs } = deps()
+    setOwner({ userId: 'u1', email: 'owner@shop.test', acceptedAt: null })
+    await handleProvisionOwner(post({ action: 'resend', businessId: BIZ, language: 'pt' }), d)
+    expect(links[0]!.redirectTo).toBe('https://preview.example.app/accept-invite?lang=pt')
+    expect(logs[0]!.subject).toMatch(/^Novo link de convite/)
   })
 
   it('treats provisioning the same owner again as a resend', async () => {

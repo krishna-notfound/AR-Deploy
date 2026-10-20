@@ -23,7 +23,8 @@ export function ImageUpload({
   businessId,
 }: {
   images: ProductImage[]
-  onChange: (images: ProductImage[]) => void
+  /** Receives an updater, so uploads that finish later never overwrite changes made meanwhile. */
+  onChange: (update: (images: ProductImage[]) => ProductImage[]) => void
   kind: ProductImage['kind']
   label: string
   allowPrimary?: boolean
@@ -35,9 +36,16 @@ export function ImageUpload({
   const [errors, setErrors] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const own = images.filter((i) => i.kind === kind)
-  const others = images.filter((i) => i.kind !== kind)
+  /** Applies a change to this kind's images in the latest list, keeping every other kind as it is. */
+  const update = (fn: (mine: ProductImage[]) => ProductImage[]) =>
+    onChange((latest) => {
+      const next = fn(latest.filter((i) => i.kind === kind))
+      if (allowPrimary && next.length && !next.some((i) => i.isPrimary) && next[0]) next[0] = { ...next[0], isPrimary: true }
+      return [...latest.filter((i) => i.kind !== kind), ...next]
+    })
 
   const addFiles = async (files: FileList | File[]) => {
+    if (busy) return
     const list = [...files]
     const errs: string[] = []
     const added: ProductImage[] = []
@@ -62,19 +70,11 @@ export function ImageUpload({
     }
     setBusy(false)
     setErrors(errs)
-    if (added.length) {
-      const next = [...own, ...added]
-      if (allowPrimary && !next.some((i) => i.isPrimary) && next[0]) next[0] = { ...next[0], isPrimary: true }
-      onChange([...others, ...next])
-    }
+    if (added.length) update((mine) => [...mine, ...added])
   }
 
-  const setPrimary = (id: string) => onChange([...others, ...own.map((i) => ({ ...i, isPrimary: i.id === id }))])
-  const remove = (id: string) => {
-    const rest = own.filter((i) => i.id !== id)
-    if (allowPrimary && rest.length && !rest.some((i) => i.isPrimary) && rest[0]) rest[0] = { ...rest[0], isPrimary: true }
-    onChange([...others, ...rest])
-  }
+  const setPrimary = (id: string) => update((mine) => mine.map((i) => ({ ...i, isPrimary: i.id === id })))
+  const remove = (id: string) => update((mine) => mine.filter((i) => i.id !== id))
 
   return (
     <div>
@@ -102,7 +102,7 @@ export function ImageUpload({
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault()
-            if (e.dataTransfer.files.length) void addFiles(e.dataTransfer.files)
+            if (!busy && e.dataTransfer.files.length) void addFiles(e.dataTransfer.files)
           }}
           className={cn(
             'flex aspect-square cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong text-center text-xs text-ink-muted transition-colors hover:border-accent hover:text-accent-ink focus-within:border-accent',
@@ -116,6 +116,7 @@ export function ImageUpload({
             id={inputId}
             type="file"
             multiple
+            disabled={busy}
             accept={IMAGE_RULES.accept.join(',')}
             aria-label={label}
             className="sr-only"

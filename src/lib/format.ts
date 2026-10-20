@@ -76,3 +76,11 @@ export function formatDimensions(d: Dimensions, displayUnit: LengthUnit = d.unit
   }
   return `W ${f(d.width)} × H ${f(d.height)} × D ${f(d.depth)} ${displayUnit}`
 }
+
+/** UTC instants bounding a calendar day (YYYY-MM-DD) in the viewer's time zone, for date-range filters. */
+export function localDayBounds(day: string): { start: string; end: string } {
+  const start = new Date(`${day}T00:00:00`)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return { start: start.toISOString(), end: end.toISOString() }
+}

@@ -94,6 +94,12 @@ describe('templates', () => {
     for (const kind of ['owner_invitation', 'invitation_resend', 'application_confirmation', 'admin_notification', 'test'] as const)
       for (const lang of ['en', 'pt'] as const) expect(renderEmail(kind, lang, { businessName: 'B', actionUrl: 'https://x.test' }).subject.length).toBeGreaterThan(3)
   })
+  it('puts no applicant-supplied text into the confirmation sent to the typed-in address', () => {
+    for (const lang of ['en', 'pt'] as const) {
+      const e = renderEmail('application_confirmation', lang, { businessName: 'Win a prize at evil.example' })
+      expect(`${e.subject}${e.html}${e.text}`).not.toContain('evil.example')
+    }
+  })
 })
 
 describe('send-test-email handler', () => {

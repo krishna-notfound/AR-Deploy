@@ -2,6 +2,7 @@
 // Demo persistence only (localStorage). NOT a backend.
 import type { ActivityItem, ActivityKind, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product } from '@/domain/types'
 import { createSessionModelAsset, imageToPersistableDataUrl } from '@/lib/files'
+import { localDayBounds } from '@/lib/format'
 import { newId } from '@/lib/id'
 import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
@@ -384,6 +385,8 @@ export const mockCatalogService: CatalogService = {
       if (!EMAIL.test(addr)) return fail('VALIDATION', 'Enter a valid email address.', { email: 'Enter a valid email address.' })
       const existing = db.owners?.[businessId]
       if (existing && existing.email !== addr) return fail('CONFLICT', 'This business already has an owner. Remove them first to invite someone else.')
+      if (Object.entries(db.owners ?? {}).some(([id, o]) => id !== businessId && o.email === addr))
+        return fail('CONFLICT', 'This email already owns another business. Each owner account manages one business; use a different address.')
       let outcome!: ProvisionOutcome
       store.update((d) => {
         if (!existing) {
@@ -467,7 +470,7 @@ export const mockCatalogService: CatalogService = {
       store.update((d) => {
         ;(d.applications ??= []).unshift(app)
         audit(d, { eventType: 'application_submitted', applicationId: app.id, toStatus: 'submitted' })
-        demoEmail(d, { kind: 'application_confirmation', recipient: app.applicantEmail, subject: `We received ${app.businessName}`, applicationId: app.id, workflow: `application:${app.id}:confirmation` })
+        demoEmail(d, { kind: 'application_confirmation', recipient: app.applicantEmail, subject: 'We received your application', applicationId: app.id, workflow: `application:${app.id}:confirmation` })
         demoEmail(d, { kind: 'admin_notification', recipient: 'platform admins', subject: `New business awaiting review: ${app.businessName}`, applicationId: app.id, workflow: `application:${app.id}:admin_notification` })
       })
       return ok({ id: app.id, reference: app.reference })
@@ -478,8 +481,8 @@ export const mockCatalogService: CatalogService = {
       const term = q.search?.trim().toLowerCase()
       const list = (store.get().applications ?? [])
         .filter((a) => !q.status || a.status === q.status)
-        .filter((a) => !q.from || a.createdAt.slice(0, 10) >= q.from)
-        .filter((a) => !q.to || a.createdAt.slice(0, 10) <= q.to)
+        .filter((a) => !q.from || a.createdAt >= localDayBounds(q.from).start)
+        .filter((a) => !q.to || a.createdAt < localDayBounds(q.to).end)
         .filter((a) => !term || [a.businessName, a.applicantName, a.applicantEmail, a.reference, a.id].some((f) => f.toLowerCase().includes(term)))
       return ok(page(list, q.page, q.pageSize))
     }),

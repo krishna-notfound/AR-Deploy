@@ -57,16 +57,18 @@ const COPY: Record<EmailKind, Record<EmailLang, (d: TemplateData) => Copy>> = {
       note: 'Apenas o link mais recente funciona.',
     }),
   },
+  // Goes to an address typed into a public form, so it carries no applicant-supplied text: anything inserted here
+  // would let the form send arbitrary content to arbitrary inboxes (SEC-23).
   application_confirmation: {
-    en: (d) => ({
-      subject: `We received ${d.businessName ?? 'your application'}`,
+    en: () => ({
+      subject: 'We received your application',
       heading: 'Thank you, your application is with us',
-      body: `The Sanctus team reviews every business before its catalogue goes public. We will email you when ${d.businessName ?? 'your business'} has been reviewed.`,
+      body: 'The Sanctus team reviews every business before its catalogue goes public. We will email you when your application has been reviewed. If you did not apply, you can ignore this email.',
     }),
-    pt: (d) => ({
-      subject: `Recebemos ${d.businessName ?? 'sua candidatura'}`,
+    pt: () => ({
+      subject: 'Recebemos sua candidatura',
       heading: 'Obrigado, recebemos sua candidatura',
-      body: `A equipe Sanctus analisa cada empresa antes de o catálogo ficar público. Enviaremos um e-mail quando ${d.businessName ?? 'sua empresa'} for analisada.`,
+      body: 'A equipe Sanctus analisa cada empresa antes de o catálogo ficar público. Enviaremos um e-mail quando sua candidatura for analisada. Se você não se candidatou, pode ignorar este e-mail.',
     }),
   },
   admin_notification: {

@@ -240,9 +240,16 @@ describe('business applications and owner access (demo, ADR-0024)', () => {
     const other = await svc.provisionOwner({ businessId: 'biz_casa', email: 'someone@else.test', language: 'en' })
     expect(other.ok === false && other.error.code).toBe('CONFLICT')
     expect(unwrap(await svc.getBusinessMembers('biz_casa')).map((m) => m.email)).toEqual(['owner@casa.test'])
-    const tooSoon = await svc.resendOwnerInvitation('biz_casa')
+    const tooSoon = await svc.resendOwnerInvitation('biz_casa', 'en')
     expect(tooSoon.ok === false && tooSoon.error.code).toBe('RATE_LIMITED')
     const attempts = unwrap(await svc.getEmailAttempts({ businessId: 'biz_casa' }))
     expect(attempts.every((e) => e.status === 'blocked')).toBe(true)
+  })
+
+  it('refuses to make one email the owner of a second business', async () => {
+    unwrap(await svc.provisionOwner({ businessId: 'biz_casa', email: 'owner@casa.test', language: 'en' }))
+    const second = await svc.provisionOwner({ businessId: 'biz_nord', email: 'Owner@Casa.test', language: 'en' })
+    expect(second.ok === false && second.error.code).toBe('CONFLICT')
+    expect(unwrap(await svc.getBusinessMembers('biz_nord'))).toEqual([])
   })
 })

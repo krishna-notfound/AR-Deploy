@@ -2,6 +2,7 @@ import { LogIn } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
+import { useLeaveAccount } from '@/auth/RequireRole'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
@@ -15,7 +16,8 @@ export default function LoginPage() {
   useDocumentTitle('Sign in')
   const [params] = useSearchParams()
   const next = params.get('next')
-  const { user, signedInEmail, accountError, logout } = useAccount()
+  const { user, signedInEmail, accountError } = useAccount()
+  const leave = useLeaveAccount()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +55,7 @@ export default function LoginPage() {
               Business owners get access by invitation from the Sanctus team after their application is approved. If you applied, we will email you
               when it has been reviewed.
             </p>
-            <Button onClick={logout}>Sign out</Button>
+            <Button onClick={() => void leave({ signOut: true })}>Sign out</Button>
           </div>
         ) : (
           <form onSubmit={submit} className="mt-8 space-y-4" noValidate>

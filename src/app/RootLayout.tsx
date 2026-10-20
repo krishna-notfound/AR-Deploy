@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { Outlet, ScrollRestoration } from 'react-router'
 import { useToast } from '@/components/ui/ToastProvider'
-import { isDemoMode } from '@/services'
-import { store } from '@/services/mock/store'
+import { demoStore as store, isDemoMode } from '@/services'
 
 /** Root route: scroll restoration + demo storage notices. */
 export function RootLayout() {

@@ -38,7 +38,8 @@ export function FormField({
   hint?: ReactNode
   error?: string
   required?: boolean
-  optional?: boolean
+  /** Marks the field optional; pass the translated word on public pages (dashboards are English-only). */
+  optional?: boolean | string
   children: ReactNode
   className?: string
   id?: string
@@ -57,7 +58,7 @@ export function FormField({
           <label htmlFor={id} className="text-[13px] font-medium text-ink">
             {label}
             {required && <span className="text-danger"> *</span>}
-            {optional && <span className="font-normal text-ink-faint"> (optional)</span>}
+            {optional && <span className="font-normal text-ink-faint"> ({typeof optional === 'string' ? optional : 'optional'})</span>}
           </label>
           {aside}
         </div>

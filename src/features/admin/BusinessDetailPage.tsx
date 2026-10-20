@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { Tabs } from '@/components/ui/Tabs'
 import { Package } from 'lucide-react'
+import { catalogLocalPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
@@ -53,7 +54,8 @@ export default function BusinessDetailPage() {
     )
   }
 
-  const productCount = products.data?.length ?? 0
+  // Undefined until the products (or the catalogue summary) have loaded: never show or confirm "0 products" for an unknown count.
+  const productCount = products.data?.length ?? catalog.data?.totalProductCount
   const bizMap = new Map([[b.id, b]])
 
   return (
@@ -69,7 +71,7 @@ export default function BusinessDetailPage() {
         }
         actions={
           <>
-            <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(`/catalog/${b.slug}`, '_blank', 'noopener')}>
+            <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b), '_blank', 'noopener')}>
               Open catalog
             </Button>
             <Button icon={<Power className="size-4" aria-hidden />} onClick={() => void actions.setActive(b, b.status !== 'active')}>
@@ -98,7 +100,7 @@ export default function BusinessDetailPage() {
         className="mb-6"
         tabs={[
           { value: 'details', label: 'Details' },
-          { value: 'products', label: 'Products', badge: <span className="rounded-full bg-subtle px-1.5 text-xs text-ink-muted tabular-nums">{productCount}</span> },
+          { value: 'products', label: 'Products', badge: productCount === undefined ? undefined : <span className="rounded-full bg-subtle px-1.5 text-xs text-ink-muted tabular-nums">{productCount}</span> },
           { value: 'owners', label: 'Owner & history' },
           { value: 'qr', label: 'Catalog & QR' },
         ]}
@@ -112,25 +114,29 @@ export default function BusinessDetailPage() {
               Add product
             </ButtonLink>
           </div>
-          <ProductTable
-            scope="admin"
-            products={products.data ?? []}
-            businesses={bizMap}
-            stats={stats.map}
-            loading={products.status === 'loading' && !products.data}
-            empty={
-              <EmptyState
-                icon={Package}
-                title="No products yet"
-                body="Add the first product to this catalog."
-                action={
-                  <ButtonLink to={`/admin/products/new?business=${b.id}`} variant="primary">
-                    Add product
-                  </ButtonLink>
-                }
-              />
-            }
-          />
+          {products.status === 'error' && !products.data ? (
+            <ErrorState message={`Could not load this catalog’s products. ${products.error.message}`} onRetry={products.refetch} />
+          ) : (
+            <ProductTable
+              scope="admin"
+              products={products.data ?? []}
+              businesses={bizMap}
+              stats={stats.map}
+              loading={products.status === 'loading' && !products.data}
+              empty={
+                <EmptyState
+                  icon={Package}
+                  title="No products yet"
+                  body="Add the first product to this catalog."
+                  action={
+                    <ButtonLink to={`/admin/products/new?business=${b.id}`} variant="primary">
+                      Add product
+                    </ButtonLink>
+                  }
+                />
+              }
+            />
+          )}
         </Card>
       )}
       {tab === 'owners' && (
@@ -142,7 +148,16 @@ export default function BusinessDetailPage() {
           </div>
         </div>
       )}
-      {tab === 'qr' && (catalog.data ? <CatalogQrPanel catalog={catalog.data} productsLink={`/admin/products?business=${b.id}`} /> : <FullPageSpinner />)}
+      {tab === 'qr' &&
+        (catalog.data ? (
+          <CatalogQrPanel catalog={catalog.data} productsLink={`/admin/products?business=${b.id}`} />
+        ) : catalog.status === 'error' ? (
+          <Card>
+            <ErrorState message={`Could not load the catalog. ${catalog.error.message}`} onRetry={catalog.refetch} />
+          </Card>
+        ) : (
+          <FullPageSpinner />
+        ))}
     </>
   )
 }

@@ -22,7 +22,8 @@ import { emailReason } from '../applications/labels'
 export function BusinessOwnersPanel({ business, applicationId, defaultEmail, defaultLanguage = 'en' }: { business: Business; applicationId?: ID; defaultEmail?: string; defaultLanguage?: Lang }) {
   const members = useServiceQuery(() => service.getBusinessMembers(business.id), [business.id])
   const provision = useServiceMutation((email: string, language: Lang) => service.provisionOwner({ businessId: business.id, email, language, applicationId }))
-  const resend = useServiceMutation(() => service.resendOwnerInvitation(business.id))
+  const resend = useServiceMutation((language: Lang) => service.resendOwnerInvitation(business.id, language))
+  const removal = useServiceMutation((userId: ID) => service.removeBusinessMember(business.id, userId))
   const confirm = useConfirm()
   const toast = useToast()
   const [email, setEmail] = useState(defaultEmail ?? '')
@@ -59,7 +60,7 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
     if (!owner) return
     const ok = await confirm({ title: `Send a new invitation to ${owner.email}?`, body: 'Earlier invitation links stop working once a new one is used.', confirmLabel: 'Resend invitation' })
     if (!ok) return
-    const res = await resend.mutate()
+    const res = await resend.mutate(language)
     if (!res.ok) return toast.error('Invitation not resent', res.error.message)
     report(res.data, 'New invitation created')
   }
@@ -72,8 +73,8 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
       confirmLabel: 'Remove owner',
       destructive: true,
     })
-    if (!ok) return
-    const res = await service.removeBusinessMember(business.id, owner.userId)
+    if (!ok || removal.pending) return
+    const res = await removal.mutate(owner.userId)
     if (res.ok) {
       toast.success('Owner removed')
       members.refetch()
@@ -109,15 +110,23 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
                 ) : (
                   <Badge tone="warning">Invitation pending</Badge>
                 )}
-                <IconButton aria-label={`Remove ${owner.email}`} onClick={() => void remove()}>
+                <IconButton aria-label={`Remove ${owner.email}`} disabled={removal.pending} onClick={() => void remove()}>
                   <Trash2 className="size-4" aria-hidden />
                 </IconButton>
               </div>
             </div>
             {!owner.acceptedAt && (
-              <Button loading={resend.pending} icon={<RefreshCw className="size-4" aria-hidden />} onClick={() => void doResend()}>
-                Resend invitation
-              </Button>
+              <div className="flex flex-wrap items-end gap-3">
+                <FormField label="Email language">
+                  <Select value={language} onChange={(e) => setLanguage(e.target.value as Lang)}>
+                    <option value="en">English</option>
+                    <option value="pt">Português</option>
+                  </Select>
+                </FormField>
+                <Button loading={resend.pending} icon={<RefreshCw className="size-4" aria-hidden />} onClick={() => void doResend()}>
+                  Resend invitation
+                </Button>
+              </div>
             )}
           </div>
         ) : (

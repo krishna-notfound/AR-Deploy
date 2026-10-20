@@ -25,10 +25,12 @@ export function useBusinessActions() {
       if (!r.ok) return toast.error('Could not update catalog status', r.error.message)
       toast.success(active ? 'Catalog activated' : 'Catalog deactivated')
     },
-    async remove(b: Business, productCount: number, opts?: { after?: string }) {
+    /** `productCount` is undefined when the products could not be counted; the dialog then says "all of its products", never a wrong number. */
+    async remove(b: Business, productCount: number | undefined, opts?: { after?: string }) {
+      const products = productCount === undefined ? 'all of its products' : `${productCount} product${productCount === 1 ? '' : 's'}`
       const ok = await confirm({
         title: `Delete ${b.name}?`,
-        body: `This permanently deletes the business, its catalog and ${productCount} product${productCount === 1 ? '' : 's'}. Printed QR codes will stop working. This cannot be undone.`,
+        body: `This permanently deletes the business, its catalog and ${products}. Printed QR codes will stop working. This cannot be undone.`,
         confirmLabel: 'Delete business',
         destructive: true,
       })

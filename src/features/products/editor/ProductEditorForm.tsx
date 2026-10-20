@@ -1,5 +1,5 @@
 import { AlertCircle, ExternalLink, Eye, EyeOff, Save, Trash2 } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useBlocker, useLocation, useNavigate } from 'react-router'
 import { type Crumb, PageHeader } from '@/components/layout/PageHeader'
 import { ProductStatusBadge } from '@/components/ui/Badge'
@@ -15,9 +15,10 @@ import { cn } from '@/lib/cn'
 import { PRODUCT_SLUG_MAX, slugInput, slugify } from '@/lib/slug'
 import { PUBLIC_URLS_ARE_LIVE, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
+import { validateForPublish } from '@/services/validation'
 import { primaryImage } from '@/lib/product'
 import { type EditorScope, editPath, useProductActions } from '../useProductActions'
-import { type EditorForm, emptyForm, formFromProduct, toInput } from './formModel'
+import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput } from './formModel'
 import { LocalizedField } from './LocalizedField'
 import { ModelSection } from './ModelSection'
 import { VariantsEditor } from './VariantsEditor'
@@ -43,6 +44,39 @@ const FIELD_SECTION: Record<string, (typeof SECTIONS)[number]['id']> = {
   variants: 'specs',
   'cta.url': 'cta',
 }
+
+type Errors = Record<string, string>
+/** Router state handed to the edit route after a new product's first save. */
+type NavState = { justPublished?: boolean; publishErrors?: Errors } | null
+
+const DIMS = ['width', 'height', 'depth'] as const
+
+/** The form value behind an error key, to tell which flagged fields the user has changed. */
+function fieldValue(f: EditorForm, key: string): string {
+  if (key === 'price') return f.priceText
+  if (key === 'weight') return `${f.weightText} ${f.input.weight?.unit ?? ''}`
+  if (key === 'name.en') return f.input.name.en
+  if (key === 'cta.url') return f.input.cta.url ?? ''
+  if (key.startsWith('dimensions.')) return f.dims[key.slice(11) as (typeof DIMS)[number]] ?? ''
+  if (key === 'images') return JSON.stringify(f.input.images.filter((i) => i.kind === 'gallery').map((i) => i.id))
+  if (key === 'variants') return JSON.stringify(f.input.variants)
+  if (key === 'businessId' || key === 'slug') return f.input[key]
+  return ''
+}
+
+/** Every client-side rule in one pass: `errors` block saving, `publish` only block publishing. */
+function checkForm(f: EditorForm) {
+  const { input, errors } = toInput(f)
+  if (!input.businessId) errors.businessId = 'Choose the business this product belongs to.'
+  if (!input.name.en) errors['name.en'] = 'Product name (English) is required.'
+  if (!input.slug) errors.slug = 'Product URL slug is required.'
+  const publish: Errors = {}
+  for (const [k, msg] of Object.entries(validateForPublish(input as Product))) if (!errors[k]) publish[k] = msg
+  return { input, errors, publish }
+}
+
+/** Identical messages (the three dimensions) count and show once. */
+const issueCount = (e: Errors) => new Set(Object.values(e)).size
 
 export function ProductEditorForm({
   scope,
@@ -75,11 +109,17 @@ export function ProductEditorForm({
 
   const [form, setForm] = useState<EditorForm>(initialForm)
   const [snapshot, setSnapshot] = useState(() => JSON.stringify(initialForm))
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState<null | 'save' | 'publish' | 'unpublish' | 'preview'>(null)
-  const [publishedOpen, setPublishedOpen] = useState(() => (location.state as { justPublished?: boolean } | null)?.justPublished === true)
+  const navState = location.state as NavState
+  const [errors, setErrors] = useState<Errors>(() => navState?.publishErrors ?? {})
+  const [busy, setBusy] = useState<null | 'save' | 'publish' | 'unpublish' | 'preview' | 'delete'>(null)
+  const [publishedOpen, setPublishedOpen] = useState(() => navState?.justPublished === true)
+  /** The last saved version: its slug drives the published dialog and Preview after a slug change. */
+  const [latest, setLatest] = useState<Product | null>(product)
+  const [pendingUnit, setPendingUnit] = useState<'cm' | 'in' | null>(null)
   const skipBlock = useRef(false)
   const summaryRef = useRef<HTMLDivElement>(null)
+  const prevForm = useRef(form)
+  const dimErrId = useId()
 
   const dirty = JSON.stringify(form) !== snapshot
   const business = businesses.find((b) => b.id === form.input.businessId) ?? fixedBusiness
@@ -98,24 +138,44 @@ export function ProductEditorForm({
   }, [dirty])
 
   useEffect(() => {
-    if (publishedOpen) window.history.replaceState({ ...window.history.state, usr: null }, '')
-  }, [publishedOpen])
+    if (!navState) return
+    window.history.replaceState({ ...window.history.state, usr: null }, '')
+    if (navState.publishErrors) requestAnimationFrame(() => summaryRef.current?.focus())
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A flagged field is checked again as soon as it changes, so a fixed value loses its error straight away.
+  useEffect(() => {
+    const prev = prevForm.current
+    prevForm.current = form
+    if (prev === form) return
+    setErrors((current) => {
+      const changed = Object.keys(current).filter((k) => k in FIELD_SECTION && fieldValue(prev, k) !== fieldValue(form, k))
+      if (!changed.length) return current
+      const now = checkForm(form)
+      const next = { ...current }
+      for (const k of changed) {
+        const msg = now.errors[k] ?? (now.publish[k] === current[k] ? now.publish[k] : undefined)
+        if (msg) next[k] = msg
+        else delete next[k]
+      }
+      return next
+    })
+  }, [form])
 
   // ---- field helpers ----
   const setInput = (patch: Partial<EditorForm['input']>) => setForm((f) => ({ ...f, input: { ...f.input, ...patch } }))
   const err = (k: string) => errors[k]
+  const updateImages = (update: (images: EditorForm['input']['images']) => EditorForm['input']['images']) =>
+    setForm((f) => ({ ...f, input: { ...f.input, images: update(f.input.images) } }))
 
-  const showErrors = (e: Record<string, string>) => {
+  const showErrors = (e: Errors) => {
     setErrors(e)
     requestAnimationFrame(() => summaryRef.current?.focus())
   }
 
   /** Saves (create or update). Returns the saved product or null. */
   const save = async (): Promise<Product | null> => {
-    const { input, errors: local } = toInput(form)
-    if (!input.businessId) local.businessId = 'Choose the business this product belongs to.'
-    if (!input.name.en) local['name.en'] = 'Product name (English) is required.'
-    if (!input.slug) local.slug = 'Product URL slug is required.'
+    const { input, errors: local } = checkForm(form)
     if (Object.keys(local).length) {
       showErrors(local)
       return null
@@ -128,10 +188,11 @@ export function ProductEditorForm({
     }
     setErrors({})
     setSnapshot(JSON.stringify(form))
+    setLatest(res.data)
     return res.data
   }
 
-  const goToEdit = (p: Product, state?: unknown) => {
+  const goToEdit = (p: Product, state?: NavState) => {
     skipBlock.current = true
     navigate(editPath(scope, p), { replace: true, state })
   }
@@ -145,31 +206,41 @@ export function ProductEditorForm({
     if (isNew) goToEdit(saved)
   }
 
+  /** Lists every missing requirement at once; a new product's draft keeps them across the redirect. */
+  const publishBlocked = (e: Errors, saved?: Product) => {
+    showErrors(e)
+    const n = issueCount(e)
+    toast.error('Cannot publish yet', n === 1 ? 'Fix the issue listed at the top of the form.' : `Fix the ${n} issues listed at the top of the form.`)
+    if (isNew && saved) goToEdit(saved, { publishErrors: e })
+  }
+
   const onPublish = async () => {
+    const check = checkForm(form)
+    if (Object.keys(check.errors).length) return publishBlocked({ ...check.errors, ...check.publish })
     setBusy('publish')
-    const saved = dirty || isNew ? await save() : product
+    const saved = dirty || isNew ? await save() : latest
     if (!saved) return setBusy(null)
+    if (Object.keys(check.publish).length) {
+      setBusy(null)
+      return publishBlocked(check.publish, saved)
+    }
     const res = await service.publishProduct(saved.id)
     setBusy(null)
-    if (!res.ok) {
-      showErrors(res.error.fieldErrors ?? { _: res.error.message })
-      toast.error('Cannot publish yet', 'Complete the highlighted fields first.')
-      if (isNew) goToEdit(saved)
-      return
-    }
-    if (isNew) goToEdit(saved, { justPublished: true })
+    if (!res.ok) return publishBlocked(res.error.fieldErrors ?? { _: res.error.message }, saved)
+    setLatest(res.data)
+    if (isNew) goToEdit(res.data, { justPublished: true })
     else setPublishedOpen(true)
   }
 
   const onUnpublish = async () => {
-    if (!product) return
+    if (!latest) return
     setBusy('unpublish')
-    await actions.unpublish({ ...product, status: currentStatus })
+    await actions.unpublish({ ...latest, status: currentStatus })
     setBusy(null)
   }
 
   const onPreview = async () => {
-    let target = product
+    let target = latest
     if (dirty || isNew) {
       setBusy('preview')
       target = await save()
@@ -183,13 +254,39 @@ export function ProductEditorForm({
   }
 
   const onDelete = async () => {
-    if (!product) return
+    if (!latest || busy) return
+    setBusy('delete')
     skipBlock.current = true
-    const deleted = await actions.remove(product, { after: base })
-    if (!deleted) skipBlock.current = false
+    const deleted = await actions.remove(latest, { after: base })
+    if (!deleted) {
+      skipBlock.current = false
+      setBusy(null)
+    }
   }
 
+  // Values are stored in the chosen unit, so switching with values entered asks whether to convert them.
+  const unit = form.input.dimensions.unit
+  const onUnit = (next: 'cm' | 'in') => {
+    if (next === unit) return
+    if (DIMS.some((k) => form.dims[k].trim())) return setPendingUnit(next)
+    setInput({ dimensions: { ...form.input.dimensions, unit: next } })
+  }
+  const applyUnit = (convert: boolean) => {
+    const next = pendingUnit
+    if (!next) return
+    setForm((f) => ({
+      ...f,
+      dims: convert ? convertDims(f.dims, f.input.dimensions.unit, next) : f.dims,
+      input: { ...f.input, dimensions: { ...f.input.dimensions, unit: next } },
+    }))
+    setPendingUnit(null)
+  }
+  const dimsText = (d: EditorForm['dims'], u: string) => `${DIMS.map((k) => d[k].trim() || '–').join(' × ')} ${u}`
+
   const errorList = Object.entries(errors)
+  /** One summary line per distinct message, linked to the first field that has it. */
+  const issues = [...errorList.reduce((m, [k, msg]) => (m.has(msg) ? m : m.set(msg, k)), new Map<string, string>())]
+  const dimError = DIMS.map((k) => err(`dimensions.${k}`)).find(Boolean)
   const poster = primaryImage({ images: form.input.images } as Product)?.url
 
   return (
@@ -206,7 +303,7 @@ export function ProductEditorForm({
         }
         actions={
           !isNew && (
-            <Button variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={onDelete} className="text-danger hover:bg-danger-soft">
+            <Button variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={onDelete} loading={busy === 'delete'} disabled={!!busy} className="text-danger hover:bg-danger-soft">
               Delete
             </Button>
           )
@@ -233,9 +330,9 @@ export function ProductEditorForm({
         <div className="min-w-0 space-y-6 pb-28">
           {errorList.length > 0 && (
             <div ref={summaryRef} tabIndex={-1} role="alert" className="rounded-[var(--radius-card)] border border-danger/30 bg-danger-soft px-4 py-3 outline-none">
-              <p className="text-sm font-semibold text-danger">Fix {errorList.length === 1 ? 'this issue' : `these ${errorList.length} issues`} to continue</p>
+              <p className="text-sm font-semibold text-danger">Fix {issues.length === 1 ? 'this issue' : `these ${issues.length} issues`} to continue</p>
               <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-[13px] text-danger">
-                {errorList.map(([k, msg]) => (
+                {issues.map(([msg, k]) => (
                   <li key={k}>{FIELD_SECTION[k] ? <a href={`#${FIELD_SECTION[k]}`} className="underline">{msg}</a> : msg}</li>
                 ))}
               </ul>
@@ -322,11 +419,11 @@ export function ProductEditorForm({
           </Section>
 
           <Section id="images" title="Images" description="Product photos for the gallery. At least one is required to publish." error={err('images')}>
-            <ImageUpload label="Upload product images" kind="gallery" businessId={form.input.businessId} images={form.input.images} onChange={(images) => setInput({ images })} />
+            <ImageUpload label="Upload product images" kind="gallery" businessId={form.input.businessId} images={form.input.images} onChange={updateImages} />
             <div className="border-t border-line pt-5">
               <h3 className="mb-1 text-sm font-semibold">Additional photos</h3>
               <p className="mb-3 text-xs text-ink-muted">Room shots, details and close-ups shown lower on the product page.</p>
-              <ImageUpload label="Upload additional photos" kind="additional" businessId={form.input.businessId} allowPrimary={false} images={form.input.images} onChange={(images) => setInput({ images })} />
+              <ImageUpload label="Upload additional photos" kind="additional" businessId={form.input.businessId} allowPrimary={false} images={form.input.images} onChange={updateImages} />
             </div>
           </Section>
 
@@ -334,33 +431,51 @@ export function ProductEditorForm({
             <ModelSection
               businessId={form.input.businessId}
               models={form.input.models}
-              onChange={(models) => setInput({ models })}
+              onChange={(format, asset) => setForm((f) => ({ ...f, input: { ...f.input, models: { ...f.input.models, [format]: asset } } }))}
               dimensions={toInput(form).input.dimensions}
               poster={poster}
               name={form.input.name.en || 'product'}
             />
           </Section>
 
-          <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale. The unit switch says which unit the numbers are in; it does not convert them.">
-            <div className="flex flex-wrap items-end gap-4">
-              {(['width', 'height', 'depth'] as const).map((k) => (
-                <FormField key={k} label={k[0]!.toUpperCase() + k.slice(1)} error={err(`dimensions.${k}`)} className="w-[calc(50%-0.5rem)] sm:w-32">
-                  <InputAddon side="right" addon={form.input.dimensions.unit}>
-                    <Input inputMode="decimal" value={form.dims[k]} onChange={(e) => setForm((f) => ({ ...f, dims: { ...f.dims, [k]: e.target.value } }))} />
-                  </InputAddon>
-                </FormField>
-              ))}
-              <div className="pb-1">
-                <SegmentedControl
-                  label="Dimension unit"
-                  value={form.input.dimensions.unit}
-                  onChange={(unit) => setInput({ dimensions: { ...form.input.dimensions, unit } })}
-                  options={[
-                    { value: 'cm', label: 'Centimetres' },
-                    { value: 'in', label: 'Inches' },
-                  ]}
-                />
+          <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale.">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium">Measured in</span>
+              <SegmentedControl
+                label="Dimension unit"
+                value={unit}
+                onChange={onUnit}
+                options={[
+                  { value: 'cm', label: 'Centimetres' },
+                  { value: 'in', label: 'Inches' },
+                ]}
+              />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-end gap-4">
+                {DIMS.map((k) => {
+                  // The shared dimension message is shown once under the row, not under each field.
+                  const e = err(`dimensions.${k}`)
+                  const shared = !!e && e === dimError
+                  return (
+                    <FormField key={k} label={k[0]!.toUpperCase() + k.slice(1)} error={shared ? undefined : e} className="w-[calc(50%-0.5rem)] sm:w-32">
+                      <InputAddon side="right" addon={unit}>
+                        <Input
+                          inputMode="decimal"
+                          {...(shared ? { 'aria-invalid': true, 'aria-describedby': dimErrId } : {})}
+                          value={form.dims[k]}
+                          onChange={(ev) => setForm((f) => ({ ...f, dims: { ...f.dims, [k]: ev.target.value } }))}
+                        />
+                      </InputAddon>
+                    </FormField>
+                  )
+                })}
               </div>
+              {dimError && (
+                <p id={dimErrId} className="mt-1.5 text-xs font-medium text-danger">
+                  {dimError}
+                </p>
+              )}
             </div>
             <div className="grid items-start gap-4 sm:grid-cols-[1fr_14rem] [&>*:last-child]:sm:pt-3">
               <LocalizedField label="Material" value={form.input.material} onChange={(material) => setInput({ material })} placeholder="e.g. Solid oak, linen upholstery" />
@@ -423,7 +538,7 @@ export function ProductEditorForm({
       </div>
 
       <Modal
-        open={publishedOpen && !!product && !!business}
+        open={publishedOpen && !!latest && !!business}
         onClose={() => setPublishedOpen(false)}
         title="Product published"
         description={
@@ -434,29 +549,45 @@ export function ProductEditorForm({
         footer={
           <>
             <Button onClick={() => setPublishedOpen(false)}>Keep editing</Button>
-            {product && business && (
-              <Button variant="primary" icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(productLocalPath(business, product, { preview: business.status !== 'active' }), '_blank', 'noopener')}>
+            {latest && business && (
+              <Button variant="primary" icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(productLocalPath(business, latest, { preview: business.status !== 'active' }), '_blank', 'noopener')}>
                 Open product page
               </Button>
             )}
           </>
         }
       >
-        {product && business && (
+        {latest && business && (
           <div>
             <p className="text-[13px] font-medium">Product URL</p>
             <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
-              <code className="min-w-0 flex-1 truncate text-[13px]">{productPublicUrl(business, product)}</code>
-              <CopyButton text={productPublicUrl(business, product)} label="Copy" toastTitle="Product URL copied" />
+              <code className="min-w-0 flex-1 truncate text-[13px]">{productPublicUrl(business, latest)}</code>
+              <CopyButton text={productPublicUrl(business, latest)} label="Copy" toastTitle="Product URL copied" />
             </div>
             {!PUBLIC_URLS_ARE_LIVE && (
               <p className="mt-2 text-xs text-ink-muted">
-                Demo URL built from the business and product slugs. The domain itself is not configured yet. In this demo the page opens at {productLocalPath(business, product)}.
+                Demo URL built from the business and product slugs. The domain itself is not configured yet. In this demo the page opens at {productLocalPath(business, latest)}.
               </p>
             )}
           </div>
         )}
       </Modal>
+
+      <Modal
+        open={!!pendingUnit}
+        onClose={() => setPendingUnit(null)}
+        title={`Switch to ${pendingUnit === 'in' ? 'inches' : 'centimetres'}?`}
+        description={`The dimensions are ${dimsText(form.dims, unit)}. Convert them, or keep the numbers if they were already measured in ${pendingUnit === 'in' ? 'inches' : 'centimetres'}.`}
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => applyUnit(false)}>Keep the numbers</Button>
+            <Button variant="primary" onClick={() => applyUnit(true)} data-autofocus>
+              Convert to {pendingUnit ? dimsText(convertDims(form.dims, unit, pendingUnit), pendingUnit) : ''}
+            </Button>
+          </>
+        }
+      />
 
       <Modal
         open={blocker.state === 'blocked'}

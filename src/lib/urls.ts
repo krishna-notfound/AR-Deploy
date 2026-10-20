@@ -52,6 +52,9 @@ export const APPLY_PATH = '/apply'
 export const ACCEPT_INVITE_PATH = '/accept-invite'
 
 export const applicationAdminPath = (id: string) => `/admin/applications/${id}`
+/** The applications list, optionally filtered by status (e.g. the overview's "awaiting review" link). */
+export const applicationsAdminPath = (status?: string) => `/admin/applications${status ? `?status=${encodeURIComponent(status)}` : ''}`
+export const businessAdminPath = (id: string) => `/admin/businesses/${id}`
 
 /** The current page's URL for sharing: the draft-preview flag is dropped, every other query parameter kept. */
 export function shareableCurrentUrl(): string {

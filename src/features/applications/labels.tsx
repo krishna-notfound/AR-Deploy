@@ -63,6 +63,7 @@ const EVENT_LABEL: Record<string, string> = {
   application_status_changed: 'Status changed',
   business_created: 'Business created',
   business_status_changed: 'Catalogue status changed',
+  business_slug_changed: 'Catalogue address changed',
   business_deleted: 'Business deleted',
   owner_provisioned: 'Owner provisioned',
   owner_removed: 'Owner removed',

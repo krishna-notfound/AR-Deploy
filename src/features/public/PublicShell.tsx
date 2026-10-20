@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { safeBrandAccent } from '@/lib/color'
 import { InAppNotice } from './InAppNotice'
+import { TAP_TARGET } from './tapTarget'
 
 /** "EN / PT" as in the reference header: a two-option radio group styled as spaced text. */
 export function LanguageSwitcher({ className }: { className?: string }) {
@@ -27,7 +28,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
             aria-checked={lang === l}
             lang={l}
             onClick={() => setLang(l)}
-            className={cn('py-2 transition-opacity', lang === l ? 'opacity-100' : 'opacity-60 hover:opacity-90')}
+            className={cn(TAP_TARGET, 'py-2 transition-opacity', lang === l ? 'opacity-100' : 'opacity-60 hover:opacity-90')}
           >
             {l.toUpperCase()}
           </button>

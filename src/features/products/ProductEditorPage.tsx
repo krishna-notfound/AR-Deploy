@@ -30,11 +30,13 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
   // Keep the initially loaded product stable while the user edits (store refetches are ignored).
   const initial = useMemo(() => product.data, [product.data?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (product.status === 'loading' && !product.data) return <FullPageSpinner />
-  if (product.status === 'error' && product.error.code !== 'NOT_FOUND') return <ErrorState message={product.error.message} onRetry={product.refetch} />
+  // Right after a new product's first save the id changes one render before the new query starts.
+  const stale = productId && product.status === 'success' && product.data?.id !== productId
+  if ((product.status === 'loading' && !product.data) || stale) return <FullPageSpinner />
+  // A failed background refresh keeps the loaded product, so the form (and unsaved edits) stays mounted.
+  if (product.status === 'error' && product.error.code !== 'NOT_FOUND' && !product.data) return <ErrorState message={product.error.message} onRetry={product.refetch} />
 
-  const notFound =
-    (productId && (product.status === 'error' || !product.data)) || (scope === 'business' && product.data && product.data.businessId !== ownBusiness?.id)
+  const notFound = (productId && !product.data) || (scope === 'business' && product.data && product.data.businessId !== ownBusiness?.id)
   if (notFound) {
     return (
       <>
@@ -67,6 +69,8 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
   }
 
   if (scope === 'admin' && businesses.query.status === 'loading' && !businesses.query.data) return <FullPageSpinner />
+  if (scope === 'admin' && businesses.query.status === 'error' && !businesses.query.data)
+    return <ErrorState message={`The businesses could not be loaded. ${businesses.query.error.message}`} onRetry={businesses.query.refetch} />
 
   return (
     <ProductEditorForm

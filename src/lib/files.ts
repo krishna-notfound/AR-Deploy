@@ -108,10 +108,6 @@ export function readAsDataUrl(file: Blob): Promise<string> {
  */
 export async function imageToPersistableDataUrl(file: File, maxDim = 1600): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
   try {
-    if (file.type === 'image/svg+xml') {
-      const url = await readAsDataUrl(file)
-      return url.length <= IMAGE_RULES.maxPersistBytes ? { ok: true, url } : { ok: false, message: `${file.name} is too large to store in the demo.` }
-    }
     const original = await readAsDataUrl(file)
     if (original.length <= IMAGE_RULES.maxPersistBytes && file.size < 400 * 1024) return { ok: true, url: original }
     const img = await loadImage(original)

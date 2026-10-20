@@ -7,7 +7,7 @@ export function PublicMessage({ icon: Icon, title, body, action }: { icon: Lucid
       <span className="grid size-12 place-items-center rounded-full bg-subtle text-ink-muted">
         <Icon className="size-5" aria-hidden />
       </span>
-      <h1 className="mt-4 text-xl font-semibold">{title}</h1>
+      <h1 className="mt-5 text-title">{title}</h1>
       <p className="mt-2 text-sm leading-6 text-ink-muted">{body}</p>
       {action && <div className="mt-6">{action}</div>}
     </div>

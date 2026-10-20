@@ -1,5 +1,5 @@
-import { Building2, Check, Eye, FileX, X } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowDown, Building2, Check, Eye, FileX, X } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
@@ -13,6 +13,7 @@ import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessApplication, ReviewAction } from '@/domain/types'
 import { formatDateTime } from '@/lib/format'
+import { businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { availableActions } from '@/services/applicationRules'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
@@ -58,6 +59,25 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const toast = useToast()
   const review = useServiceMutation((action: ReviewAction, reason?: string) => service.reviewApplication(app.id, action, reason))
   const business = useServiceQuery(() => (app.businessId ? service.getBusinessById(app.businessId) : Promise.resolve({ ok: true as const, data: null })), [app.businessId])
+  // The owner invitation is the step after approval: it lives in the last card, so point to it at the top of the page.
+  const members = useServiceQuery(() => (app.businessId ? service.getBusinessMembers(app.businessId) : Promise.resolve({ ok: true as const, data: [] })), [app.businessId])
+  const needsOwner = app.status === 'approved' && !!business.data && members.status === 'success' && members.data.length === 0
+  const ownerRef = useRef<HTMLDivElement | null>(null)
+  // Set on approval; the owner card mounts once the new business has loaded and then scrolls into view.
+  const revealOwner = useRef(false)
+  const goToOwner = () => {
+    const el = ownerRef.current
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    ;(el.querySelector<HTMLElement>('input, button') ?? el).focus({ preventScroll: true })
+  }
+  const attachOwner = (el: HTMLDivElement | null) => {
+    ownerRef.current = el
+    if (el && revealOwner.current) {
+      revealOwner.current = false
+      requestAnimationFrame(goToOwner)
+    }
+  }
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState<string | null>(null)
@@ -71,7 +91,10 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
     }
     setRejectOpen(false)
     onChanged()
-    toast.success(action === 'approve' ? 'Application approved' : action === 'reject' ? 'Application rejected' : 'Marked as under review')
+    if (action === 'approve') {
+      toast.success('Application approved', 'Next: invite the owner so they can set up the catalogue.')
+      revealOwner.current = true
+    } else toast.success(action === 'reject' ? 'Application rejected' : 'Marked as under review')
   }
 
   const approve = async () => {
@@ -119,6 +142,18 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
+          {needsOwner && (
+            <InlineNotice tone="info">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  <strong className="font-medium">Next step: invite the owner.</strong> The business is created as a draft. The owner gets an email link to set a password and manage the catalogue.
+                </span>
+                <Button size="sm" icon={<ArrowDown className="size-4" aria-hidden />} onClick={goToOwner}>
+                  Go to owner invitation
+                </Button>
+              </div>
+            </InlineNotice>
+          )}
           {app.status === 'rejected' && app.decisionReason && (
             <InlineNotice tone="warning">
               <strong className="font-medium">Rejected</strong>
@@ -171,7 +206,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               <CardHeader
                 title="Business record"
                 actions={
-                  <ButtonLink to={`/admin/businesses/${app.businessId}`} size="sm" icon={<Building2 className="size-4" aria-hidden />}>
+                  <ButtonLink to={businessAdminPath(app.businessId)} size="sm" icon={<Building2 className="size-4" aria-hidden />}>
                     Open business
                   </ButtonLink>
                 }
@@ -179,7 +214,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               <CardBody>
                 {business.data ? (
                   <p className="flex flex-wrap items-center gap-2 text-sm">
-                    <Link to={`/admin/businesses/${business.data.id}`} className="font-medium text-ink hover:underline">
+                    <Link to={businessAdminPath(business.data.id)} className="font-medium text-ink hover:underline">
                       {business.data.name}
                     </Link>
                     <BusinessStatusBadge status={business.data.status} />
@@ -193,7 +228,11 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               </CardBody>
             </Card>
           )}
-          {business.data && <BusinessOwnersPanel business={business.data} applicationId={app.id} defaultEmail={app.applicantEmail} defaultLanguage={app.language} />}
+          {business.data && (
+            <div ref={attachOwner} tabIndex={-1} className="scroll-mt-24 outline-none">
+              <BusinessOwnersPanel business={business.data} applicationId={app.id} defaultEmail={app.applicantEmail} defaultLanguage={app.language} />
+            </div>
+          )}
         </div>
         <div className="space-y-6">
           <AuditTimeline applicationId={app.id} businessId={app.businessId} />

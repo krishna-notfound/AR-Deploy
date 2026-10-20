@@ -11,7 +11,8 @@ import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { SiteFooter, SiteHeader } from './SiteChrome'
+import { TAP_TARGET } from '../public/tapTarget'
+import { SectionLink, SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
 
 // Photography: crops of the client's reference boards (AI-generated, temporary) and licensed Pexels photos; provenance in design/21.
 const IMG = (name: string) => `/images/sanctus/${name}.webp`
@@ -31,6 +32,7 @@ export default function LandingPage() {
   useDocumentTitle(t('landing.title'))
   const [params] = useSearchParams()
   const links = useLandingLinks()
+  useSectionScroll(links.settled)
   // Old links sent people to "/?next=…" for the account picker, which now lives at /demo.
   if (params.has('next')) return <Navigate to={`/demo?${params.toString()}`} replace />
   return (
@@ -71,8 +73,9 @@ function useLandingLinks() {
     return {
       catalog: items[0] ? catalogOf(items[0].business) : undefined,
       category: byCategory,
+      settled: products.status !== 'loading' && catalogs.status !== 'loading',
     }
-  }, [products.data, catalogs.data])
+  }, [products.data, products.status, catalogs.data, catalogs.status])
 }
 
 /** A heading set on two lines as in the reference, read as one sentence by screen readers. */
@@ -84,6 +87,7 @@ function TwoLines({ a, b }: { a: string; b: string }) {
   )
 }
 
+/** `to`: another page; `href`: a section of this page ("/#colecoes"). */
 function ArrowLink({ to, href, children, className }: { to?: string; href?: string; children: ReactNode; className?: string }) {
   const inner = (
     <>
@@ -93,15 +97,15 @@ function ArrowLink({ to, href, children, className }: { to?: string; href?: stri
   )
   if (to)
     return (
-      <Link to={to} className={cn(arrowLinkClasses, className)}>
+      <Link to={to} className={cn(arrowLinkClasses, TAP_TARGET, className)}>
         {inner}
       </Link>
     )
   if (href)
     return (
-      <a href={href} className={cn(arrowLinkClasses, className)}>
+      <SectionLink href={href} className={cn(arrowLinkClasses, TAP_TARGET, className)}>
         {inner}
-      </a>
+      </SectionLink>
     )
   return null
 }
@@ -127,7 +131,7 @@ function Hero() {
         </h1>
         <p className="mt-6 max-w-[19rem] text-[15px] leading-7 font-light text-chalk/90">{t('landing.hero.body')}</p>
         <span className="mt-10 block h-px w-12 bg-chalk/60" aria-hidden />
-        <ArrowLink href="#colecoes" className="mt-6 self-start border-chalk/70 text-chalk hover:text-limestone">
+        <ArrowLink href="/#colecoes" className="mt-6 self-start border-chalk/70 text-chalk hover:text-limestone">
           {t('landing.hero.cta')}
         </ArrowLink>
       </div>
@@ -193,7 +197,7 @@ function AboutAndProjects({ catalogHref }: { catalogHref?: string }) {
           <TwoLines a={t('landing.about.title1')} b={t('landing.about.title2')} />
         </h2>
         <p className="mt-6 max-w-md text-[14px] leading-7 text-ink-muted">{t('landing.about.body')}</p>
-        <ArrowLink href="#manifesto" className="mt-8 self-start text-ink">
+        <ArrowLink href="/#manifesto" className="mt-8 self-start text-ink">
           {t('landing.about.cta')}
         </ArrowLink>
       </div>

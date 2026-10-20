@@ -17,6 +17,7 @@ const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage')
 const AcceptInvitePage = lazy(() => import('@/features/auth/AcceptInvitePage'))
 const ApplyPage = lazy(() => import('@/features/apply/ApplyPage'))
 const NotFoundPage = lazy(() => import('@/features/demo/NotFoundPage'))
+const PublicNotFoundPage = lazy(() => import('@/features/marketing/PublicNotFoundPage'))
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/AdminOverviewPage'))
 const BusinessesListPage = lazy(() => import('@/features/admin/BusinessesListPage'))
@@ -126,9 +127,9 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/accept-invite', element: <AcceptInvitePage /> },
             { path: '/catalog/:businessSlug', element: <CatalogPage /> },
             { path: '/products/:businessSlug/:productSlug', element: <ProductPage /> },
+            { path: '*', element: <PublicNotFoundPage /> },
           ],
         },
-        { element: <Standalone />, children: [{ path: '*', element: <NotFoundPage /> }] },
       ],
     },
   ]
@@ -146,9 +147,9 @@ function hostnameModeRoutes(slug: string): RouteObject[] {
           children: [
             { path: '/', element: <CatalogPage tenantSlug={slug} /> },
             { path: '/products/:productSlug', element: <ProductPage tenantSlug={slug} /> },
+            { path: '*', element: <PublicNotFoundPage tenant /> },
           ],
         },
-        { element: <Standalone />, children: [{ path: '*', element: <NotFoundPage /> }] },
       ],
     },
   ]

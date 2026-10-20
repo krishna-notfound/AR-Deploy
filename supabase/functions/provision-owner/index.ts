@@ -34,10 +34,16 @@ Deno.serve((req) =>
       if (u.error) throw new Error(`owner lookup failed: ${u.error.message}`)
       return { userId: m.data.user_id, email: u.data.user.email ?? '', acceptedAt: m.data.accepted_at }
     },
-    async userIdByEmail(email) {
+    async accountByEmail(email) {
       const { data, error } = await admin.rpc('service_user_id_by_email', { p_email: email })
       if (error) throw new Error(`user lookup failed: ${error.message}`)
-      return (data as string | null) ?? null
+      const id = (data as string | null) ?? null
+      if (!id) return null
+      const u = await admin.auth.admin.getUserById(id)
+      if (u.error) throw new Error(`user lookup failed: ${u.error.message}`)
+      const m = await admin.from('business_members').select('id', { count: 'exact', head: true }).eq('user_id', id)
+      if (m.error) throw new Error(`membership lookup failed: ${m.error.message}`)
+      return { id, invited: !!u.data.user.invited_at, ownsBusiness: (m.count ?? 0) > 0 }
     },
     async generateLink(type, email, redirectTo) {
       const { data, error } = await admin.auth.admin.generateLink({ type, email, options: { redirectTo } })

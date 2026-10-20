@@ -1,7 +1,7 @@
 // Who is using the dashboards. Demo mode: a mock account picker (NOT authentication).
 // Supabase mode: the real Supabase Auth session, with the role read from platform_admins / business_members.
 // Either way this only drives navigation; access control is enforced by RLS in the database.
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { Business, ID, User } from '@/domain/types'
 import { type AuthService, type SignedInAccount, auth, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
@@ -10,6 +10,9 @@ import { SUPER_ADMIN, businessAdminFor } from './accounts'
 export const ACCOUNT_KEY = 'arfurn:account'
 
 export type Session = { role: 'super_admin' } | { role: 'business_admin'; businessId: ID }
+
+/** `signedOut` false: the session is still active. `error`: what to tell the user (also when signed out on this device only). */
+export type LogoutResult = { signedOut: boolean; error?: string }
 
 function readSession(): Session | null {
   try {
@@ -27,17 +30,18 @@ function readSession(): Session | null {
 }
 
 interface AccountCtx {
-  /** null = signed out; undefined = still resolving */
+  /** null = signed out; undefined = still resolving (or failed to load: see accountError) */
   user: User | null | undefined
   business: Business | null
   signInAs: (s: Session) => void
-  logout: () => void
-  /** Supabase mode: email of a signed-in user who has no role yet. */
+  /** Resolves once the session has ended (or could not be ended). */
+  logout: () => Promise<LogoutResult>
+  /** Supabase mode: email of a signed-in user who has no role (or no business) yet. */
   signedInEmail?: string
-  /** Supabase mode: onboarding state of a signed-in user who has no role yet. */
-  onboarding?: { displayName?: string; displayNameSkipped: boolean }
-  /** Supabase mode: why the account could not be loaded. */
+  /** Why the account or its business could not be loaded. A user who was already signed in stays signed in. */
   accountError?: string
+  /** Loads the account and its business again (after accountError). */
+  retry: () => void
 }
 
 const Ctx = createContext<AccountCtx | null>(null)
@@ -50,49 +54,65 @@ function useBusiness(businessId: ID | null) {
   return useServiceQuery(() => (businessId ? service.getBusinessById(businessId) : Promise.resolve({ ok: true as const, data: null })), [businessId])
 }
 
-function SupabaseAccountProvider({ auth, children }: { auth: AuthService; children: ReactNode }) {
+export function SupabaseAccountProvider({ auth, children }: { auth: AuthService; children: ReactNode }) {
   const [account, setAccount] = useState<SignedInAccount | null | undefined>(undefined)
   const [accountError, setAccountError] = useState<string | undefined>()
   const businessId = account?.user?.businessId ?? null
   const biz = useBusiness(businessId)
+  const bizRef = useRef(biz)
+  useEffect(() => {
+    bizRef.current = biz
+  })
+  const loadId = useRef(0)
+
+  const load = useCallback(() => {
+    const id = ++loadId.current
+    void auth.getCurrentUser().then((r) => {
+      if (id !== loadId.current) return
+      // No session is ok(null). A failed lookup (network blip on TOKEN_REFRESHED, database error) keeps the account we had.
+      if (r.ok) setAccount(r.data)
+      setAccountError(r.ok ? undefined : r.error.message)
+    })
+    // Signing in again keeps the same business id, so a failed business lookup has to be retried here.
+    if (bizRef.current.status === 'error') bizRef.current.refetch()
+  }, [auth])
 
   useEffect(() => {
-    let alive = true
-    const load = () =>
-      void auth.getCurrentUser().then((r) => {
-        if (!alive) return
-        setAccount(r.ok ? r.data : null)
-        setAccountError(r.ok ? undefined : r.error.message)
-      })
+    const ids = loadId
     load()
     const off = auth.onAuthStateChange(load)
     return () => {
-      alive = false
+      ids.current++ // drop a lookup still in flight
       off()
     }
-  }, [auth])
+  }, [auth, load])
 
-  const logout = useCallback(() => void auth.signOut(), [auth])
+  const logout = useCallback(async (): Promise<LogoutResult> => {
+    const global = await auth.signOut()
+    const local = global.ok ? global : await auth.signOut('local')
+    if (!local.ok) return { signedOut: false, error: 'Could not sign out. Check your connection and try again.' }
+    loadId.current++ // a lookup still in flight must not bring the old account back
+    setAccount(null)
+    setAccountError(undefined)
+    return global.ok ? { signedOut: true } : { signedOut: true, error: 'Signed out on this device only. Other devices stay signed in until their session expires.' }
+  }, [auth])
   const signInAs = useCallback(() => {}, [])
 
   const value = useMemo<AccountCtx>(() => {
     const noRole = !!account && !account.user
-    const extra = {
-      signInAs,
-      logout,
-      accountError,
-      signedInEmail: noRole ? account.email : undefined,
-      onboarding: noRole ? { displayName: account.displayName, displayNameSkipped: !!account.displayNameSkipped } : undefined,
-    }
-    if (account === undefined) return { user: undefined, business: null, ...extra }
+    const base = { business: null, signInAs, logout, retry: load, accountError, signedInEmail: noRole ? account.email : undefined }
+    if (account === undefined) return { ...base, user: undefined }
     const user = account?.user ?? null
-    if (!user?.businessId) return { user, business: null, ...extra }
+    if (!user?.businessId) return { ...base, user }
     // Until the query for *this* business settles, the account is still loading (a stale result from the
     // previous business id must not read as "signed out" and bounce the user to /login).
     const business = biz.data?.id === user.businessId ? biz.data : null
-    if (!business) return { user: biz.status === 'error' ? null : undefined, business: null, ...extra }
-    return { user, business, ...extra }
-  }, [account, accountError, biz.data, biz.status, signInAs, logout])
+    if (business) return { ...base, user, business }
+    if (biz.status !== 'error') return { ...base, user: undefined }
+    // Only a missing business means "no business"; any other failure is reported with a retry.
+    if (biz.error.code === 'NOT_FOUND') return { ...base, user: null, signedInEmail: account?.email }
+    return { ...base, user: undefined, accountError: biz.error.message }
+  }, [account, accountError, biz.data, biz.status, biz.error, signInAs, logout, load])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
@@ -101,29 +121,40 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(readSession)
   const businessId = session?.role === 'business_admin' ? session.businessId : null
   const biz = useBusiness(businessId)
+  const { refetch: refetchBusiness } = biz
+  const bizFailed = biz.status === 'error'
 
-  const signInAs = useCallback((s: Session) => {
-    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(s))
-    setSession(s)
-  }, [])
+  const signInAs = useCallback(
+    (s: Session) => {
+      localStorage.setItem(ACCOUNT_KEY, JSON.stringify(s))
+      setSession(s)
+      // Same business after a failed lookup: the query deps do not change, so load it again.
+      if (s.role === 'business_admin' && s.businessId === businessId && bizFailed) refetchBusiness()
+    },
+    [businessId, bizFailed, refetchBusiness],
+  )
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async (): Promise<LogoutResult> => {
     localStorage.removeItem(ACCOUNT_KEY)
     setSession(null)
+    return { signedOut: true }
   }, [])
 
   // A business admin whose business was deleted is signed out.
   useEffect(() => {
-    if (businessId && biz.status === 'error' && biz.error.code === 'NOT_FOUND') logout()
+    if (businessId && biz.status === 'error' && biz.error.code === 'NOT_FOUND') void logout()
   }, [businessId, biz.status, biz.error, logout])
 
   const value = useMemo<AccountCtx>(() => {
-    if (!session) return { user: null, business: null, signInAs, logout }
-    if (session.role === 'super_admin') return { user: SUPER_ADMIN, business: null, signInAs, logout }
+    const base = { business: null, signInAs, logout, retry: refetchBusiness }
+    if (!session) return { ...base, user: null }
+    if (session.role === 'super_admin') return { ...base, user: SUPER_ADMIN }
     const business = biz.data?.id === businessId ? biz.data : null
-    if (!business) return { user: biz.status === 'error' ? null : undefined, business: null, signInAs, logout }
-    return { user: businessAdminFor(business), business, signInAs, logout }
-  }, [session, businessId, biz.data, biz.status, signInAs, logout])
+    if (business) return { ...base, user: businessAdminFor(business), business }
+    if (biz.status !== 'error') return { ...base, user: undefined }
+    if (biz.error.code === 'NOT_FOUND') return { ...base, user: null }
+    return { ...base, user: undefined, accountError: biz.error.message }
+  }, [session, businessId, biz.data, biz.status, biz.error, signInAs, logout, refetchBusiness])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

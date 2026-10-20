@@ -25,6 +25,7 @@ import { type MediaMode, type ModelState, ProductMedia, initialMediaMode, usable
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { ShareButton } from './ShareActions'
+import { TAP_TARGET } from './tapTarget'
 
 /** Ignore AR taps this soon after a launch (double taps, impatient re-taps while the native viewer opens). */
 export const AR_RELAUNCH_MS = 2000
@@ -42,7 +43,13 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   // Draft preview: only with ?preview=1 AND a signed-in demo admin (UX rule, not security).
   const wantsPreview = search.get('preview') === '1'
   const canPreview = wantsPreview && !!user
-  const res = useServiceQuery(() => service.getPublicProduct(businessSlug, productSlug, { allowDraft: canPreview }), [businessSlug, productSlug, canPreview])
+  // While the account is still loading, a preview request waits: asking without allowDraft would answer
+  // "Product not available" for a draft and only then switch to the preview (COR-09).
+  const accountPending = wantsPreview && user === undefined
+  const res = useServiceQuery(
+    () => (accountPending ? new Promise<never>(() => {}) : service.getPublicProduct(businessSlug, productSlug, { allowDraft: canPreview })),
+    [businessSlug, productSlug, canPreview, accountPending],
+  )
   // Pages left open (mobile tab restore) must not hand an expired model URL to Scene Viewer / Quick Look.
   useRefreshWhenStale(res.refetch, MEDIA_REFRESH_MS, res.data)
   const catalogHref = tenantSlug ? '/' : `/catalog/${businessSlug}`
@@ -121,6 +128,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const variant = product.variants.find((v) => v.id === variantId)
   const price = product.price + (variant?.priceDelta ?? 0)
   const scale = useMemo(() => checkScale(measured, product.dimensions), [measured, product.dimensions])
+  const separateUsdz = !!usableModels(product).usdz
   const availability = arAvailability(modelState, canAR)
   const additional = product.images.filter((i) => i.kind === 'additional')
 
@@ -157,7 +165,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   }
 
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
-  const textAction = 'inline-flex items-center border-b border-current pb-1 text-label text-ink transition-colors hover:text-accent-ink'
+  const textAction = cn(TAP_TARGET, 'inline-flex items-center border-b border-current pb-1 text-label text-ink transition-colors hover:text-accent-ink')
 
   return (
     <PublicShell business={business} catalogHref={catalogHref}>
@@ -171,7 +179,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
       )}
 
       <div className="mx-auto max-w-[1320px] px-5 pt-6 pb-20 sm:px-10 sm:pt-8">
-        <Link to={catalogHref} className="inline-flex items-center gap-2 py-1 text-label text-ink-muted hover:text-ink">
+        <Link to={catalogHref} className={cn(TAP_TARGET, 'inline-flex items-center gap-2 py-1 text-label text-ink-muted hover:text-ink')}>
           <ArrowLeft className="size-3.5" strokeWidth={1.5} aria-hidden />
           {t('nav.backToCatalog', { name: business.name })}
         </Link>
@@ -281,16 +289,19 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                 <h2 id="dims-h" className="text-eyebrow text-ink">
                   {t('product.dimensions')}
                 </h2>
-                <SegmentedControl
-                  size="sm"
-                  label={t('product.unitToggle')}
-                  value={unit}
-                  onChange={setUnit}
-                  options={[
-                    { value: 'cm', label: 'cm' },
-                    { value: 'in', label: 'in' },
-                  ]}
-                />
+                {/* Hit areas grown to 44px tall on the small control; its look is unchanged. */}
+                <span className="[&_button]:relative [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-2 [&_button]:before:content-['']">
+                  <SegmentedControl
+                    size="sm"
+                    label={t('product.unitToggle')}
+                    value={unit}
+                    onChange={setUnit}
+                    options={[
+                      { value: 'cm', label: 'cm' },
+                      { value: 'in', label: 'in' },
+                    ]}
+                  />
+                </span>
               </div>
               <div className="mt-4 grid items-center gap-4 sm:grid-cols-[1fr_auto]">
                 <DimensionDiagram dims={product.dimensions} unit={unit} />
@@ -305,7 +316,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                   ))}
                 </dl>
               </div>
-              {scale.status !== 'unknown' && modelState === 'loaded' && <ScaleNote verified={scale.status === 'verified'} measured={scale.measured} unit={unit} />}
+              {scale.status !== 'unknown' && modelState === 'loaded' && <ScaleNote verified={scale.status === 'verified'} separateUsdz={separateUsdz} measured={scale.measured} unit={unit} />}
             </section>
 
             {(localized(product.material) || product.weight) && (
@@ -396,8 +407,20 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   )
 }
 
-function ScaleNote({ verified, measured, unit }: { verified: boolean; measured: MeasuredSize; unit: LengthUnit }) {
+/**
+ * Copy for the scale note. Only the GLB is measured. Without a USDZ, iPhone Quick Look gets a file generated from
+ * that GLB, so "true to size" holds for both AR viewers; an uploaded USDZ is never measured, so the claim is
+ * limited to the 3D model (COR-10).
+ */
+export function scaleNoteKeys(verified: boolean, separateUsdz: boolean) {
+  if (!verified) return { title: 'ar.scaleUnverified', help: 'ar.scaleUnverifiedHelp' } as const
+  if (separateUsdz) return { title: 'ar.scaleVerifiedModel', help: 'ar.scaleVerifiedUsdzHelp' } as const
+  return { title: 'ar.scaleVerified', help: 'ar.scaleVerifiedHelp' } as const
+}
+
+function ScaleNote({ verified, separateUsdz, measured, unit }: { verified: boolean; separateUsdz: boolean; measured: MeasuredSize; unit: LengthUnit }) {
   const { t } = useI18n()
+  const keys = scaleNoteKeys(verified, separateUsdz)
   const toUnit = (m: number) => {
     const v = unit === 'cm' ? m * 100 : (m * 100) / 2.54
     return Math.round(v)
@@ -407,9 +430,9 @@ function ScaleNote({ verified, measured, unit }: { verified: boolean; measured: 
     <div className={cn('mt-4 flex items-start gap-2.5 px-3 py-2.5 text-[13px]', verified ? 'bg-success-soft text-success' : 'bg-subtle text-ink-muted')}>
       {verified ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden /> : <HelpCircle className="mt-0.5 size-4 shrink-0" aria-hidden />}
       <div>
-        <p className="font-medium">{verified ? t('ar.scaleVerified') : t('ar.scaleUnverified')}</p>
+        <p className="font-medium">{t(keys.title)}</p>
         <p className="mt-0.5 opacity-90">
-          {verified ? t('ar.scaleVerifiedHelp') : t('ar.scaleUnverifiedHelp')} {!verified && t('ar.modelMeasures', { size })}
+          {t(keys.help)} {!verified && t('ar.modelMeasures', { size })}
         </p>
       </div>
     </div>

@@ -2,25 +2,26 @@
 // Roles come from tables users cannot write to (platform_admins, business_members): see supabase/migrations.
 import { type Session, type SupabaseClient, isAuthRetryableFetchError } from '@supabase/supabase-js'
 import type { User } from '@/domain/types'
-import { type Result, fail, ok } from '../catalogService'
+import { type Result, type ServiceError, type ServiceErrorCode, fail, ok } from '../catalogService'
 import { mapDbError } from './supabaseCatalogService'
 
 export interface SignedInAccount {
   email: string
   user: User | null
-  /** Onboarding step 1 (Auth user metadata, set by the user; grants nothing). Undefined until set or skipped. */
-  displayName?: string
-  displayNameSkipped?: boolean
 }
 
+/** An auth failure with Supabase's error code (or 'network') as `reason`, so public pages can word it in the visitor's language. */
+export interface AuthError extends ServiceError {
+  reason?: string
+}
+export type AuthResult<T> = { ok: true; data: T } | { ok: false; error: AuthError }
 
 /**
  * Supabase Auth error codes the owner can act on, in plain words. Covers the project settings this app can meet:
- * sign-ups switched off, the built-in email sender (it only mails the project's team, a few per hour),
- * unconfirmed accounts and rate limits. Anything else keeps Supabase's own message.
+ * the built-in email sender (it only mails the project's team, a few per hour), unconfirmed accounts and rate limits.
+ * Anything else keeps Supabase's own message.
  */
 const AUTH_MESSAGES: Record<string, string> = {
-  signup_disabled: 'New accounts are not open yet. Ask the platform team for access.',
   email_not_confirmed: 'This account has not confirmed its email address yet. Ask the platform team for help.',
   email_address_not_authorized: 'We cannot send email to this address yet (the email service is not set up). Ask the platform team for access.',
   over_email_send_rate_limit: 'Too many emails were sent just now. Wait a few minutes and try again.',
@@ -33,18 +34,26 @@ export function authMessage(error: { code?: string; message: string }): string {
   return (error.code && AUTH_MESSAGES[error.code]) || error.message
 }
 
+function authFail(code: ServiceErrorCode, error: { code?: string; message: string }): AuthResult<never> {
+  return { ok: false, error: { code, message: authMessage(error), reason: isAuthRetryableFetchError(error) ? 'network' : error.code } }
+}
+
 export interface AuthService {
   getSession(): Promise<Result<Session | null>>
   /** null when signed out; `user` is null when signed in but not given a role yet. */
   getCurrentUser(): Promise<Result<SignedInAccount | null>>
-  signInWithPassword(email: string, password: string): Promise<Result<void>>
-  signOut(): Promise<Result<void>>
+  signInWithPassword(email: string, password: string): Promise<AuthResult<void>>
+  /** 'global' (default) ends every session of the user; 'local' only this browser's. */
+  signOut(scope?: 'global' | 'local'): Promise<Result<void>>
   /** Sends a reset link. Succeeds whether or not the email has an account (no account enumeration). */
-  requestPasswordReset(email: string, redirectTo: string): Promise<Result<void>>
-  /** Sets a new password for the current (e.g. recovery) session. */
-  updatePassword(password: string): Promise<Result<void>>
-  /** Saves the display name in the user's own Auth metadata (null = skipped). Reloads the account via the auth listener. */
-  updateDisplayName(name: string | null): Promise<Result<void>>
+  requestPasswordReset(email: string, redirectTo: string): Promise<AuthResult<void>>
+  /**
+   * Sets a new password for the current (e.g. recovery or invitation) session, then signs out the user's other sessions.
+   * Re-entering the current password counts as success.
+   */
+  updatePassword(password: string): Promise<AuthResult<void>>
+  /** Saves the display name in the user's own Auth metadata. Reloads the account via the auth listener. */
+  updateDisplayName(name: string): Promise<Result<void>>
   /** An invited owner finished onboarding (password set): records acceptance and returns their business id. */
   completeOwnerOnboarding(): Promise<Result<{ businessId: string | null }>>
   /** Returns an unsubscribe function. */
@@ -61,8 +70,8 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
     async getCurrentUser() {
       // getUser() validates the token with the Auth server instead of trusting local storage.
       const { data, error } = await sb.auth.getUser()
-      // A network failure is not "signed out": report it, so the visitor is not bounced to the login form.
-      if (error && isAuthRetryableFetchError(error)) return fail('UNKNOWN', 'Could not reach the sign-in service. Check your connection and try again.')
+      // A network or server failure is not "signed out": report it, so the visitor is not bounced to the login form.
+      if (error && (isAuthRetryableFetchError(error) || (error.status ?? 0) >= 500)) return fail('UNKNOWN', 'Could not reach the sign-in service. Check your connection and try again.')
       if (error || !data.user) return ok(null)
       const u = data.user
       const email = u.email ?? ''
@@ -72,35 +81,38 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       ])
       const err = admin.error ?? member.error
       if (err) return mapDbError(err)
-      const meta = (u.user_metadata ?? {}) as { display_name?: unknown; display_name_skipped?: unknown }
+      const meta = (u.user_metadata ?? {}) as { display_name?: unknown }
       const displayName = typeof meta.display_name === 'string' && meta.display_name.trim() ? meta.display_name.trim() : undefined
-      const profile = { displayName, displayNameSkipped: meta.display_name_skipped === true }
       const base = { id: u.id, name: displayName ?? (email || 'Signed-in user'), email }
-      if (admin.data) return ok({ email, ...profile, user: { ...base, role: 'super_admin' } })
+      if (admin.data) return ok({ email, user: { ...base, role: 'super_admin' } })
       // A business has exactly one owner (ADR-0024); a user owning several businesses gets the newest one until a switcher exists.
-      if (member.data) return ok({ email, ...profile, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
-      return ok({ email, ...profile, user: null })
+      if (member.data) return ok({ email, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
+      return ok({ email, user: null })
     },
 
     async signInWithPassword(email, password) {
       const { error } = await sb.auth.signInWithPassword({ email, password })
-      return error ? fail('PERMISSION', authMessage(error)) : ok(undefined)
+      return error ? authFail('PERMISSION', error) : ok(undefined)
     },
 
     async requestPasswordReset(email, redirectTo) {
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo })
       // Rate limits and delivery problems are reported; "unknown email" is not distinguishable by design.
-      return error ? fail('UNKNOWN', authMessage(error)) : ok(undefined)
+      return error ? authFail('UNKNOWN', error) : ok(undefined)
     },
 
     async updatePassword(password) {
       const { error } = await sb.auth.updateUser({ password })
-      return error ? fail('VALIDATION', authMessage(error)) : ok(undefined)
+      // Supabase refuses an unchanged password: the account already has the password the user chose.
+      if (error && error.code !== 'same_password') return authFail('VALIDATION', error)
+      // Sessions opened before the password was set (e.g. on another device) end now. If this fails the user is not blocked.
+      await sb.auth.signOut({ scope: 'others' }).catch(() => undefined)
+      return ok(undefined)
     },
 
     async updateDisplayName(name) {
-      const display_name = name?.trim().slice(0, 80) || null
-      const { error } = await sb.auth.updateUser({ data: { display_name, display_name_skipped: display_name === null } })
+      const display_name = name.trim().slice(0, 80) || null
+      const { error } = await sb.auth.updateUser({ data: { display_name } })
       return error ? fail('UNKNOWN', 'Could not save your name. Try again.') : ok(undefined)
     },
 
@@ -110,8 +122,8 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       return ok({ businessId: (data as string | null) ?? null })
     },
 
-    async signOut() {
-      const { error } = await sb.auth.signOut()
+    async signOut(scope = 'global') {
+      const { error } = await sb.auth.signOut({ scope })
       return error ? fail('UNKNOWN', error.message) : ok(undefined)
     },
 

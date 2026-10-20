@@ -9,6 +9,7 @@ import { type ReadinessItem, arReadiness } from '@/features/ar/readiness'
 import type { Dimensions, ModelAsset, ModelFormat, Product } from '@/domain/types'
 import { service } from '@/services'
 import { MODEL_RULES, isHttpUrl, isStaleSessionAsset, modelAssetFromUrl, unsupportedForSceneViewer, validateModelFile } from '@/lib/files'
+import { cn } from '@/lib/cn'
 import { formatFileSize } from '@/lib/format'
 import { type ScaleCheck, type ScaleMismatchReason, checkScale } from '@/lib/scale'
 import { MODEL_OPTIMIZATION_ENABLED, optimizeModel } from './modelOptimizeClient'
@@ -27,7 +28,8 @@ export function ModelSection({
   businessId,
 }: {
   models: Product['models']
-  onChange: (m: Product['models']) => void
+  /** One format at a time, so the caller merges it into its latest state and parallel uploads both land. */
+  onChange: (format: ModelFormat, asset: ModelAsset | undefined) => void
   dimensions: Dimensions
   poster?: string
   name: string
@@ -41,7 +43,7 @@ export function ModelSection({
       </InlineNotice>
       <div className="grid gap-4 lg:grid-cols-2">
         {(['glb', 'usdz'] as const).map((f) => (
-          <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange({ ...models, [f]: a })} />
+          <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange(f, a)} />
         ))}
       </div>
       <ModelPreview glb={models.glb} usdz={models.usdz} dimensions={dimensions} poster={poster} name={name} />
@@ -72,6 +74,7 @@ function ModelSlot({
   const stale = isStaleSessionAsset(asset)
 
   const onFile = async (original: File, opts: { keepOriginal?: boolean } = {}) => {
+    if (checking) return
     setChecking('checking')
     const check = await validateModelFile(original, format)
     if (!check.ok) {
@@ -134,7 +137,7 @@ function ModelSlot({
               <AssetStatusBadge status={stale ? 'missing' : asset.status} />
             </p>
           </div>
-          <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={() => onChange(undefined)} aria-label={`Remove ${format.toUpperCase()} file`}>
+          <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} disabled={!!checking} onClick={() => onChange(undefined)} aria-label={`Remove ${format.toUpperCase()} file`}>
             Remove
           </Button>
         </div>
@@ -151,7 +154,10 @@ function ModelSlot({
       <div className="mt-3 flex flex-col gap-2">
         <label
           htmlFor={id}
-          className="inline-flex h-8 w-fit cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[13px] font-medium hover:bg-subtle focus-within:outline-2 focus-within:outline-accent"
+          className={cn(
+            'inline-flex h-8 w-fit items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[13px] font-medium focus-within:outline-2 focus-within:outline-accent',
+            checking ? 'cursor-wait opacity-60' : 'cursor-pointer hover:bg-subtle',
+          )}
         >
           {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Upload className="size-4" aria-hidden />}
           {checking === 'optimizing' ? 'Optimizing model…' : checking ? 'Checking file…' : asset ? `Replace .${format} file` : `Upload .${format} file`}
@@ -159,6 +165,7 @@ function ModelSlot({
             id={id}
             type="file"
             accept={MODEL_RULES[format].extension}
+            disabled={!!checking}
             className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0]
@@ -172,6 +179,7 @@ function ModelSlot({
             aria-label={`${format.toUpperCase()} model URL`}
             placeholder={`Or paste a .${format} URL`}
             value={urlDraft}
+            disabled={!!checking}
             onChange={(e) => setUrlDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -181,7 +189,7 @@ function ModelSlot({
             }}
             className="h-8 text-[13px]"
           />
-          <Button size="sm" onClick={onUrl} disabled={!urlDraft.trim()} icon={<Link2 className="size-4" aria-hidden />}>
+          <Button size="sm" onClick={onUrl} disabled={!!checking || !urlDraft.trim()} icon={<Link2 className="size-4" aria-hidden />}>
             Link
           </Button>
         </div>
@@ -191,7 +199,7 @@ function ModelSlot({
         <p className="mt-2 text-xs text-ink-muted">
           {optimizeNote.text}{' '}
           {optimizeNote.original && (
-            <button type="button" className="font-medium text-ink underline underline-offset-2" onClick={() => void onFile(optimizeNote.original!, { keepOriginal: true })}>
+            <button type="button" disabled={!!checking} className="font-medium text-ink underline underline-offset-2" onClick={() => void onFile(optimizeNote.original!, { keepOriginal: true })}>
               Upload the original instead
             </button>
           )}

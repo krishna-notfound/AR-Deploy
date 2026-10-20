@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useBlocker } from 'react-router'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FormField, Input, InputAddon, Select, Textarea } from '@/components/ui/Form'
 import { LogoUpload } from '@/components/ui/LogoUpload'
 import { Modal } from '@/components/ui/Modal'
@@ -25,6 +26,17 @@ function toInput(b: Business | null): BusinessInput {
     : { name: '', slug: '', logoUrl: undefined, description: '', contact: {}, status: 'draft', branding: { accentColor: ACCENTS[0]! }, defaultCurrency: 'EUR' }
 }
 
+const OWNER_FIELDS: (keyof BusinessInput)[] = ['name', 'logoUrl', 'description', 'contact']
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+
+/**
+ * The fields of `next` that differ from `base`. Edits send only these, so a value the form never touched
+ * (e.g. the status just changed from the page header) is never written back stale.
+ */
+export function changedBusinessFields(next: BusinessInput, base: BusinessInput, fields: (keyof BusinessInput)[] = Object.keys(next) as (keyof BusinessInput)[]): Partial<BusinessInput> {
+  return Object.fromEntries(fields.filter((k) => !same(next[k], base[k])).map((k) => [k, next[k]])) as Partial<BusinessInput>
+}
+
 /**
  * Shared business profile form.
  * - create/edit: Super Admin (slug, status, branding editable)
@@ -32,6 +44,7 @@ function toInput(b: Business | null): BusinessInput {
  */
 export function BusinessForm({ business, mode, onSaved }: { business: Business | null; mode: BusinessFormMode; onSaved?: (b: Business) => void }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [data, setData] = useState<BusinessInput>(() => toInput(business))
   const [snapshot, setSnapshot] = useState(() => JSON.stringify(toInput(business)))
   const [slugTouched, setSlugTouched] = useState(mode !== 'create')
@@ -41,11 +54,14 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
   const dirty = JSON.stringify(data) !== snapshot
 
   useEffect(() => {
-    if (business && !dirty) {
-      const next = toInput(business)
-      setData(next)
-      setSnapshot(JSON.stringify(next))
-    }
+    if (!business) return
+    const next = toInput(business)
+    const base = JSON.parse(snapshot) as BusinessInput
+    // Keep the user's unsaved edits, but take the stored value for every field they have not touched
+    // (e.g. a status change made from the page header), so the form never shows or resends a stale value.
+    // Decided inside the updater, against the latest state, so a keystroke between render and effect is never lost.
+    setData((d) => ({ ...d, ...changedBusinessFields(next, base, (Object.keys(next) as (keyof BusinessInput)[]).filter((k) => same(d[k], base[k]))) }))
+    setSnapshot(JSON.stringify(next))
   }, [business?.updatedAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const blocker = useBlocker(({ currentLocation, nextLocation }) => !skipBlock.current && dirty && currentLocation.pathname !== nextLocation.pathname)
@@ -60,10 +76,26 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
       contact: Object.fromEntries(Object.entries(data.contact).map(([k, v]) => [k, v?.trim() || undefined])) as BusinessInput['contact'],
       status: intent === 'draft' ? 'draft' : intent === 'create' ? 'active' : data.status,
     }
+    const patch = business ? changedBusinessFields(payload, JSON.parse(snapshot) as BusinessInput, mode === 'owner' ? OWNER_FIELDS : undefined) : null
+    if (business && patch?.slug !== undefined && patch.slug !== business.slug) {
+      const ok = await confirm({
+        title: 'Change the catalog address?',
+        body: (
+          <>
+            <p>
+              The catalog moves from <strong className="font-medium text-ink break-all">{catalogPublicUrl(business)}</strong> to{' '}
+              <strong className="font-medium text-ink break-all">{catalogPublicUrl({ slug: patch.slug })}</strong>.
+            </p>
+            <p className="mt-2">Printed QR codes and shared links to the old address will stop working. You will need to print new QR codes.</p>
+          </>
+        ),
+        confirmLabel: 'Change address',
+        destructive: true,
+      })
+      if (!ok) return
+    }
     setBusy(intent)
-    const res = business
-      ? await service.updateBusiness(business.id, mode === 'owner' ? { name: payload.name, logoUrl: payload.logoUrl, description: payload.description, contact: payload.contact } : payload)
-      : await service.createBusiness(payload)
+    const res = business && patch ? await service.updateBusiness(business.id, patch) : await service.createBusiness(payload)
     setBusy(null)
     if (!res.ok) {
       setErrors(res.error.fieldErrors ?? {})

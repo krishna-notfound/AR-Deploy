@@ -22,4 +22,8 @@
 - [!] D2 · Edge Function secrets and Auth redirect URLs on the client project: needs the org Admin role (Developer gets 403)
 - [ ] Sub-project 3 · Variant media: per-variant photos and GLB/USDZ (migration 9, needs approval)
 - [ ] Sub-project 4 · EN/PT everywhere (auth pages, dashboards), language persistence
+- [x] Full audit and hardening pass, 2026-10-20 (`nextlevel/ULTRAREVIEW_PRODUCTION_READINESS.md`):
+  - Fixed SEC-20/21/23/26, 16 of 17 P2 correctness defects, UX-01 and 12 UX P2s, with regression tests.
+  - Results: 215 unit, 25 PGlite, 31 e2e.
+  - Open: B1–B8 client access items, SEC-22 header test, migrations for COR-05/07/16 and SEC-27 (owner approval), UX-10/UX-11 decisions.
 - [ ] Sub-project 5 · Product QR codes; ops pack (client Supabase setup, Vercel env, redirect URLs, Resend checklist, DNS, asset/testing guide)

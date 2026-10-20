@@ -55,6 +55,17 @@ const num = (s: string) => {
   return Number.isFinite(v) ? v : NaN
 }
 
+/** Converts the entered dimensions between units (one decimal, as saved). Text that is not a number is left as typed. */
+export function convertDims(dims: EditorForm['dims'], from: 'cm' | 'in', to: 'cm' | 'in'): EditorForm['dims'] {
+  if (from === to) return dims
+  const factor = to === 'in' ? 1 / 2.54 : 2.54
+  const conv = (s: string) => {
+    const v = num(s.trim())
+    return s.trim() === '' || !Number.isFinite(v) ? s : String(Math.round(v * factor * 10) / 10)
+  }
+  return { width: conv(dims.width), height: conv(dims.height), depth: conv(dims.depth) }
+}
+
 /** Converts raw text fields to typed values. Returns client-side field errors. */
 export function toInput(form: EditorForm): { input: ProductInput; errors: Record<string, string> } {
   const errors: Record<string, string> = {}

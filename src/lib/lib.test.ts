@@ -2,7 +2,7 @@ import type { Dimensions } from '@/domain/types'
 import { describe, expect, it } from 'vitest'
 import { safeBrandAccent, contrastRatio } from './color'
 import { validateModelFile, validateImageFile } from './files'
-import { convertLength, formatDimensions, formatMoney, parseMoneyInput, toMeters } from './format'
+import { convertLength, formatDimensions, formatMoney, localDayBounds, parseMoneyInput, toMeters } from './format'
 import { initialPrice } from './product'
 import { checkScale } from './scale'
 import { isValidSlug, slugInput, slugify, uniqueSlug } from './slug'
@@ -191,5 +191,15 @@ describe('GLB required extensions (Scene Viewer compatibility)', () => {
     const { unsupportedForSceneViewer } = await import('./files')
     expect(await unsupportedForSceneViewer(glb({ asset: { version: '2.0' } }))).toEqual([])
     expect(await unsupportedForSceneViewer(new File([new Uint8Array([1, 2, 3])], 'x.glb'))).toEqual([])
+  })
+})
+
+describe('localDayBounds', () => {
+  it('spans the calendar day in the local time zone, not UTC', () => {
+    const { start, end } = localDayBounds('2026-10-20')
+    expect(new Date(start).getHours()).toBe(0)
+    expect(new Date(start).getDate()).toBe(20)
+    expect(new Date(end).getDate()).toBe(21)
+    expect(new Date(end).getHours()).toBe(0)
   })
 })

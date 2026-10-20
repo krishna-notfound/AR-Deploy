@@ -1,8 +1,8 @@
 import { Bell, ChevronsLeft, ChevronsRight, LogOut, Menu, Repeat, X } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
-import { SIGN_IN_PATH } from '@/auth/RequireRole'
+import { useLeaveAccount } from '@/auth/RequireRole'
 import { initials } from '@/auth/accounts'
 import { cn } from '@/lib/cn'
 import { formatRelative } from '@/lib/format'
@@ -89,7 +89,7 @@ function Brand({ collapsed, variant }: { collapsed?: boolean; variant: 'admin' |
   const { business } = useAccount()
   if (variant === 'business' && business) {
     return (
-      <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5">
+      <Link to="/dashboard" aria-label={collapsed ? `${business.name}, business dashboard` : undefined} className="flex min-w-0 items-center gap-2.5">
         <SmartImage src={business.logoUrl} alt="" className="size-8 shrink-0 rounded-lg object-contain" />
         {!collapsed && (
           <span className="min-w-0">
@@ -101,15 +101,14 @@ function Brand({ collapsed, variant }: { collapsed?: boolean; variant: 'admin' |
     )
   }
   return (
-    <Link to="/admin" className="flex items-center gap-2.5">
+    <Link to="/admin" aria-label={collapsed ? 'Sanctus platform admin' : undefined} className="flex items-center gap-2.5">
       {collapsed ? <BrandMark className="text-ink" /> : <Wordmark sub="Platform admin" className="text-ink" />}
     </Link>
   )
 }
 
 function SidebarContent({ nav, variant, collapsed, onNavigate }: { nav: NavItem[]; variant: 'admin' | 'business'; collapsed?: boolean; onNavigate?: () => void }) {
-  const { logout } = useAccount()
-  const navigate = useNavigate()
+  const leave = useLeaveAccount()
   return (
     <>
       <div className={cn('flex h-16 items-center border-b border-line', collapsed ? 'justify-center px-2' : 'px-4')}>
@@ -142,10 +141,7 @@ function SidebarContent({ nav, variant, collapsed, onNavigate }: { nav: NavItem[
           <li>
             <button
               type="button"
-              onClick={() => {
-                logout()
-                navigate(SIGN_IN_PATH)
-              }}
+              onClick={() => void leave({ signOut: true })}
               title={collapsed ? 'Logout' : undefined}
               className={cn(
                 'flex h-9 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-ink-muted hover:bg-subtle hover:text-ink',
@@ -252,8 +248,8 @@ function Notifications({ variant }: { variant: 'admin' | 'business' }) {
 }
 
 function ProfileMenu() {
-  const { user, logout } = useAccount()
-  const navigate = useNavigate()
+  const { user } = useAccount()
+  const leave = useLeaveAccount()
   if (!user) return null
   return (
     <Popover
@@ -273,7 +269,8 @@ function ProfileMenu() {
             type="button"
             onClick={() => {
               close()
-              navigate(SIGN_IN_PATH)
+              // Supabase mode: the sign-in page sends a signed-in user straight back, so end the session first.
+              void leave({ signOut: !isDemoMode })
             }}
             className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm hover:bg-subtle"
           >
@@ -283,8 +280,7 @@ function ProfileMenu() {
             type="button"
             onClick={() => {
               close()
-              logout()
-              navigate(SIGN_IN_PATH)
+              void leave({ signOut: true })
             }}
             className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm hover:bg-subtle"
           >

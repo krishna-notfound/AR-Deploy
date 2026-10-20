@@ -1,6 +1,6 @@
-import { ArrowLeft, ArrowRight, Check, CircleCheck, Pencil, RotateCw, Send } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CircleCheck, Copy, Pencil, RotateCw, Send } from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Button, arrowLinkClasses } from '@/components/ui/Button'
 import { Checkbox, FormField, Input, Select, Textarea } from '@/components/ui/Form'
@@ -9,13 +9,14 @@ import type { ApplicationInput, Lang } from '@/domain/types'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { service } from '@/services'
+import { isDemoMode, service } from '@/services'
 import { APPLICATION_STEPS, MODEL_READINESS, PHOTO_READINESS, PRODUCT_COUNT_RANGES, validateApplication } from '../../../supabase/functions/_shared/application.ts'
 import { SiteFooter, SiteHeader } from '../marketing/SiteChrome'
 
 type Step = keyof typeof APPLICATION_STEPS
 const STEPS = Object.keys(APPLICATION_STEPS) as Step[]
 const DRAFT_KEY = 'sanctus:apply:draft'
+/** The confirmation of a sent application, kept for this tab only so a reload still shows the reference. */
 const CATEGORY_KEYS = ['furniture', 'lighting', 'decor', 'fashion', 'jewellery', 'electronics', 'industrial', 'other'] as const
 
 type Draft = Omit<ApplicationInput, 'category'> & { categoryKey: string; categoryOther: string }
@@ -53,6 +54,19 @@ function loadDraft(): { draft: Draft; step: Step } | null {
   }
 }
 
+type Done = { reference: string; email: string }
+
+/**
+ * The confirmation lives in the history entry's state: a reload of the success page keeps it, while opening /apply
+ * again (a link, a new visit) starts a fresh form.
+ */
+function doneFrom(state: unknown): Done | null {
+  const v = (state as { applyDone?: Partial<Done> } | null)?.applyDone
+  return v && typeof v.reference === 'string' ? { reference: v.reference, email: typeof v.email === 'string' ? v.email : '' } : null
+}
+
+const isStep = (v: string | null): v is Step => !!v && (STEPS as string[]).includes(v)
+
 const toInput = (d: Draft): ApplicationInput => {
   const { categoryKey, categoryOther, ...rest } = d
   return { ...rest, category: categoryKey === 'other' ? categoryOther : categoryKey }
@@ -63,13 +77,32 @@ export default function ApplyPage() {
   useDocumentTitle(t('apply.title'))
   const [initial] = useState(loadDraft)
   const [draft, setDraft] = useState<Draft>(() => initial?.draft ?? empty(lang))
-  const [step, setStep] = useState<Step>(() => initial?.step ?? 'business')
+  // The step lives in the URL (?step=), one history entry per step, so the browser Back button goes to the previous step.
+  const [params, setParams] = useSearchParams()
+  const urlStep = params.get('step')
+  const step: Step = isStep(urlStep) ? urlStep : 'business'
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [done, setDone] = useState<{ reference: string } | null>(null)
+  const location = useLocation()
+  const [done, setDone] = useState<Done | null>(() => doneFrom(location.state))
   const [honeypot, setHoneypot] = useState('')
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const shownStep = useRef(step)
+
+  // A refresh (or coming back to /apply in this tab) resumes the saved step without adding a history entry.
+  useEffect(() => {
+    if (!isStep(urlStep) && initial && initial.step !== 'business') setParams({ step: initial.step }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Every step change (the wizard's buttons or the browser's Back/Forward) moves focus to the step heading.
+  useEffect(() => {
+    if (shownStep.current === step) return
+    shownStep.current = step
+    setSubmitError(null)
+    requestAnimationFrame(() => headingRef.current?.focus())
+  }, [step])
 
   useEffect(() => {
     if (done) return
@@ -105,9 +138,7 @@ export default function ApplyPage() {
   }
 
   const go = (to: Step) => {
-    setStep(to)
-    setSubmitError(null)
-    requestAnimationFrame(() => headingRef.current?.focus())
+    if (to !== step) setParams(to === 'business' ? {} : { step: to })
   }
 
   const next = (e: FormEvent) => {
@@ -138,7 +169,9 @@ export default function ApplyPage() {
       } catch {
         // ignore
       }
-      setDone({ reference: res.data.reference })
+      const confirmation = { reference: res.data.reference, email: draft.applicantEmail.trim() }
+      setDone(confirmation)
+      setParams({}, { replace: true, state: { applyDone: confirmation } })
       window.scrollTo({ top: 0 })
       return
     }
@@ -157,7 +190,15 @@ export default function ApplyPage() {
       <SiteHeader />
       <main className="mx-auto max-w-[1100px] px-5 py-12 sm:px-10 sm:py-16">
         {done ? (
-          <Success reference={done.reference} />
+          <Success
+            done={done}
+            onRestart={() => {
+              setParams({}, { replace: true, state: null })
+              setDraft(empty(lang))
+              setErrors({})
+              setDone(null)
+            }}
+          />
         ) : (
           <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-16">
             <aside>
@@ -188,7 +229,7 @@ export default function ApplyPage() {
                     <FormField label={t('apply.f.businessName')} required error={errors.businessName}>
                       <Input value={draft.businessName} maxLength={80} autoComplete="organization" onChange={(e) => set('businessName', e.target.value)} />
                     </FormField>
-                    <FormField label={t('apply.f.website')} optional hint={t('apply.f.website.hint')} error={errors.website}>
+                    <FormField label={t('apply.f.website')} optional={t('apply.optional')} hint={t('apply.f.website.hint')} error={errors.website}>
                       <Input value={draft.website} inputMode="url" autoComplete="url" placeholder="www.example.com" onChange={(e) => set('website', e.target.value)} />
                     </FormField>
                     <FormField label={t('apply.f.category')} required error={errors.category && draft.categoryKey !== 'other' ? errors.category : undefined}>
@@ -229,7 +270,7 @@ export default function ApplyPage() {
                       <FormField label={t('apply.f.applicantName')} required error={errors.applicantName}>
                         <Input value={draft.applicantName} maxLength={120} autoComplete="name" onChange={(e) => set('applicantName', e.target.value)} />
                       </FormField>
-                      <FormField label={t('apply.f.applicantRole')} optional error={errors.applicantRole}>
+                      <FormField label={t('apply.f.applicantRole')} optional={t('apply.optional')} error={errors.applicantRole}>
                         <Input value={draft.applicantRole} maxLength={80} autoComplete="organization-title" onChange={(e) => set('applicantRole', e.target.value)} />
                       </FormField>
                     </div>
@@ -237,7 +278,7 @@ export default function ApplyPage() {
                       <FormField label={t('apply.f.applicantEmail')} required hint={t('apply.f.applicantEmail.hint')} error={errors.applicantEmail}>
                         <Input type="email" value={draft.applicantEmail} maxLength={320} autoComplete="email" onChange={(e) => set('applicantEmail', e.target.value)} />
                       </FormField>
-                      <FormField label={t('apply.f.applicantPhone')} optional error={errors.applicantPhone}>
+                      <FormField label={t('apply.f.applicantPhone')} optional={t('apply.optional')} error={errors.applicantPhone}>
                         <Input type="tel" value={draft.applicantPhone} maxLength={50} autoComplete="tel" onChange={(e) => set('applicantPhone', e.target.value)} />
                       </FormField>
                     </div>
@@ -268,7 +309,7 @@ export default function ApplyPage() {
                       onChange={(v) => set('modelReadiness', v)}
                       error={errors.modelReadiness}
                     />
-                    <FormField label={t('apply.f.notes')} optional error={errors.notes}>
+                    <FormField label={t('apply.f.notes')} optional={t('apply.optional')} error={errors.notes}>
                       <Textarea rows={3} maxLength={1000} value={draft.notes} onChange={(e) => set('notes', e.target.value)} />
                     </FormField>
                   </>
@@ -288,7 +329,7 @@ export default function ApplyPage() {
                 )}
               </div>
 
-              {Object.keys(errors).length > 0 && step !== 'review' && (
+              {step !== 'review' && (APPLICATION_STEPS[step] as readonly string[]).some((f) => errors[f]) && (
                 <p role="alert" className="mt-6 text-[13px] text-danger">
                   {t('apply.fixFields')}
                 </p>
@@ -437,17 +478,52 @@ function Review({ draft, onEdit }: { draft: Draft; onEdit: (s: Step) => void }) 
   )
 }
 
-function Success({ reference }: { reference: string }) {
+function Success({ done, onRestart }: { done: Done; onRestart: () => void }) {
   const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(done.reference)
+      setCopied(true)
+    } catch {
+      setCopied(false)
+    }
+  }
   return (
-    <div className="mx-auto max-w-xl py-10 text-center" role="status">
-      <CircleCheck className="mx-auto size-10 text-success" strokeWidth={1.4} aria-hidden />
-      <h1 className="mt-6 text-headline">{t('apply.done.title')}</h1>
-      <p className="mt-5 text-[15px] leading-7 text-ink-muted">{t('apply.done.body')}</p>
-      <p className="mt-6 text-label text-ink">{t('apply.done.reference', { ref: reference })}</p>
-      <Link to="/" className={cn(arrowLinkClasses, 'mt-10 text-ink')}>
-        {t('apply.done.home')} <ArrowRight className="size-3.5" aria-hidden />
-      </Link>
+    <div className="mx-auto max-w-xl py-10 text-center">
+      <div role="status">
+        <CircleCheck className="mx-auto size-10 text-success" strokeWidth={1.4} aria-hidden />
+        <h1 className="mt-6 text-headline">{t('apply.done.title')}</h1>
+        <p className="mt-5 text-[15px] leading-7 text-ink-muted">{t('apply.done.body')}</p>
+      </div>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <p className="text-label text-ink">{t('apply.done.reference', { ref: done.reference })}</p>
+        <Button size="sm" onClick={() => void copy()} icon={copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}>
+          {copied ? t('apply.done.copied') : t('apply.done.copy')}
+        </Button>
+      </div>
+      <p className="mt-2 text-[13px] text-ink-muted">{t('apply.done.keepReference')}</p>
+      <div className="mt-8 border border-line bg-surface p-6 text-left">
+        <h2 className="font-display text-[1.4rem] leading-tight font-normal">{t('apply.done.nextTitle')}</h2>
+        <ol className="mt-4 list-decimal space-y-2 pl-5 text-[15px] leading-7 text-ink-body">
+          <li>{t('apply.done.next1')}</li>
+          <li>{done.email ? t('apply.done.next2', { email: done.email }) : t('apply.done.next2NoEmail')}</li>
+          <li>{t('apply.done.next3')}</li>
+        </ol>
+        {isDemoMode && (
+          <InlineNotice tone="neutral" className="mt-5">
+            {t('apply.done.demo')}
+          </InlineNotice>
+        )}
+      </div>
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
+        <Link to="/" className={cn(arrowLinkClasses, 'text-ink')}>
+          {t('apply.done.home')} <ArrowRight className="size-3.5" aria-hidden />
+        </Link>
+        <button type="button" onClick={onRestart} className="text-sm text-ink-muted underline-offset-4 hover:underline">
+          {t('apply.done.another')}
+        </button>
+      </div>
     </div>
   )
 }
