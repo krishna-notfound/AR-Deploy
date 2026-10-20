@@ -42,6 +42,8 @@ Every file here is small on purpose. **Don't read whole folders.** Pick the file
 | Deployment, Vercel, domains, env vars | `design/20-deployment.md`, then `../docs/OPERATIONS_RUNBOOK.md` |
 | Sanctus references → pages, transcribed copy, asset provenance | `design/21-sanctus-reference-map.md` |
 | Briefs for replacing the temporary Sanctus photos | `design/22-sanctus-image-briefs.md` |
+| Email (Resend): sending, logging, test sender limits, domain/DNS steps | `design/23-email.md` |
+| Business applications, admin review, owner invitations, audit trail | `design/24-applications.md` |
 
 ## Release and operations (`docs/`, outside this folder)
 | Need | Read |

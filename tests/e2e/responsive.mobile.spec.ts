@@ -21,3 +21,15 @@ test('public product page fits a phone screen without horizontal scroll', async 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(1)
 })
+
+test('the business application wizard fits a phone and shows its step counter', async ({ page }) => {
+  await page.goto('/apply?lang=pt')
+  await expect(page.getByRole('heading', { level: 1, name: 'Candidatura de empresa' })).toBeVisible()
+  await expect(page.getByText('Passo 1 de 5')).toBeVisible()
+  // The anti-spam field is invisible to people and to screen readers.
+  await expect(page.getByRole('textbox', { name: /fax/i })).toHaveCount(0)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  expect(overflow).toBeLessThanOrEqual(1)
+  await page.getByRole('button', { name: 'Abrir menu' }).or(page.getByRole('button', { name: /menu/i })).first().click()
+  await expect(page.getByRole('dialog').getByRole('link', { name: 'Candidatar empresa' })).toBeVisible()
+})

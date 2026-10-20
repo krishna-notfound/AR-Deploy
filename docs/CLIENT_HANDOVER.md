@@ -3,7 +3,7 @@
 Written for the people who will run the platform day to day. No technical knowledge needed.
 Last checked against the code: 2026-10-13.
 
-> **Which version this guide describes.** It describes the release that is ready but **not yet published** to the live website. The live site still runs an earlier version. Until the release goes out, these items are missing or different there: claim links, the sign-up page, the "AR launch attempts" wording, the QR warning on preview addresses, and the Android AR behaviour (the older version tries an in-browser AR mode first). The database is already up to date.
+> **Which version this guide describes.** It describes the release that is ready but **not yet published** to the live website. The live site still runs an earlier version. Until the release goes out, these items are missing or different there: business applications and owner invitations, the "AR launch attempts" wording, the QR warning on preview addresses, and the Android AR behaviour (the older version tries an in-browser AR mode first). The database is already up to date.
 
 ---
 
@@ -28,21 +28,19 @@ The public pages pick English or Portuguese from the visitor's phone or browser 
 - **Sign in:** go to `/login` and enter your email and password.
 - **Forgot your password:** use the "Forgot your password?" link on the sign-in page (or go to `/reset-password`). Enter your email and you'll get a reset link. Open it and choose a new password of at least 12 characters.
 
-**Public sign-up is currently OFF on the live site.** Business owners get access in one of two ways:
+**There is no public sign-up.** Businesses apply, and the Sanctus team decides:
 
-1. **The platform admin adds them.** Open **Businesses**, pick the business, open the **Owners** tab, then use **Add owner by email**. The person must already have an account and must have confirmed their email.
-2. **A claim link.** On the same **Owners** tab, click **Create claim link**. The link:
-   - works once and is valid for 7 days;
-   - is shown only once, so copy it straight away. Creating a new link cancels the old one;
-   - should only be sent to a contact you have checked yourself, for example by phone.
+1. **A business applies** at `/apply` ("Apply as a business" in the header and footer). The form has five short steps in English or Portuguese. Applying creates no account. The applicant gets a reference and a confirmation email.
+2. **Review it** in **Applications**. Search by business, applicant, email or reference, and filter by status or date. Open an application to read the answers, then **Start review**, **Approve** or **Reject** (a rejection needs a reason, which is kept in the history). A rejected application can be reopened.
+3. **Approving creates the business as a draft.** Customers can't see it until you set it to **Active** on the business page.
+4. **Invite the owner.** On the approved application (or the business's **Owner & history** tab), check the email (it's prefilled with the applicant's) and click **Invite owner**. Each business has exactly **one** owner. The owner receives a link to set their password. The link is never shown to you, so nobody can copy it.
+5. **Resend invitation** if the owner lost the email or the link expired (wait a minute between attempts; at most 10). Every attempt and its email outcome is listed under **Emails**.
 
-   The owner opens the link, signs in, and the business is added to their account.
+The **Audit log** shows who did what and when (approvals, rejections, invitations, owner removals, status changes). Entries can't be edited or deleted.
 
-> While sign-up is off, the owner can't create an account through the website. A platform admin has to create it first in the Supabase dashboard (Authentication, Users). Ask your technical contact to do this.
+An email shows **Accepted by Resend** when the provider took it. It shows **Delivered** only when Resend confirms delivery. **Not sent** means it was stopped before sending, and the reason is shown next to it (for example, the email service is not configured yet).
 
-**Owners who register a new business themselves** (once sign-up is switched on) start with a **draft** business. It stays hidden from customers until a platform admin sets it to **Active**.
-
-To remove an owner, use the remove (bin) icon next to their email on the **Owners** tab.
+To remove an owner, use the remove (bin) icon next to their email on the **Owner & history** tab.
 
 ---
 
@@ -183,7 +181,7 @@ Your own previews are not counted. To protect against spam, each visitor can sen
 - **Material is a single text field** per language. There is no material picker.
 - **Model compression is off** (see section 5).
 - **Sample data is still in the live database** (4 sample businesses with their products and seeded report numbers). It will be removed, with your approval, once the real catalog is ready.
-- **Public sign-up is off.** Email sending for real owners needs an email service (for example Resend) that isn't set up yet.
+- **Public sign-up is off by design.** Businesses apply, and owners are invited. Until the client's email domain is verified in Resend, invitation and confirmation emails reach only the Resend account owner; other recipients are listed as "Not sent".
 
 ---
 
@@ -207,7 +205,7 @@ Record these on screen, with a narrator:
 - [ ] Sign in, and use the password reset.
 - [ ] Super Admin tour: Overview, Businesses, All Products, Analytics, Catalogs & QR Codes.
 - [ ] Create a business: address, logo, accent colour, contact details, draft vs active.
-- [ ] Owners tab: add an owner by email; create a claim link (and show that it appears only once).
+- [ ] Apply as a business (`/apply`), then approve the application in **Applications**, invite the owner, and show the **Emails** and **Audit log** history.
 - [ ] Add a product: EN/PT text, price, category, dimensions and unit, material, options, photos.
 - [ ] Upload GLB and USDZ files; read the AR readiness panel and the size check.
 - [ ] Preview, publish, unpublish, duplicate, delete.

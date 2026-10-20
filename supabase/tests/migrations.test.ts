@@ -15,7 +15,7 @@ const MIGRATIONS = join(__dirname, '..', 'migrations')
 const SUPABASE_STUBS = `
   create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
   create schema auth;
-  create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz);
+  create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, last_sign_in_at timestamptz);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   grant usage on schema auth to anon, authenticated, service_role;
   create schema storage;
@@ -130,17 +130,6 @@ describe('publish rules (20261013093006_publish_rules)', () => {
   })
 })
 
-describe('owner linking (admin_add_business_member)', () => {
-  it('refuses an account that has not confirmed its email', async () => {
-    await expect(as(ADMIN, (tx) => tx.query(`select public.admin_add_business_member($1, 'stranger@test')`, [BIZ]))).rejects.toThrow('not confirmed')
-  })
-
-  it('links a confirmed account, and is still admin-only', async () => {
-    await as(ADMIN, (tx) => tx.query(`select public.admin_add_business_member($1, 'owner@test')`, [BIZ]))
-    await expect(as(OWNER, (tx) => tx.query(`select public.admin_add_business_member($1, 'owner@test')`, [BIZ]))).rejects.toThrow('Only platform admins')
-  })
-})
-
 describe('access control (RLS, as the Data API roles)', () => {
   const DENIED = /permission denied|row-level security/
   const visibleTo = async (uid: string, id: string, role: 'authenticated' | 'anon' = 'authenticated') =>
@@ -190,93 +179,6 @@ async function saveDraftAs(uid: string, over: Partial<ProductInput>): Promise<un
   return as(uid, (tx) => tx.query('select public.save_product($1, $2, $3, $4)', [args.p_product, args.p_images, args.p_models, args.p_variants]))
 }
 
-describe('owner registration and claim links (20261013144121_owner_registration_and_claims)', () => {
-  const NEWCOMER = '00000000-0000-0000-0000-0000000000e1'
-  const UNCONFIRMED = '00000000-0000-0000-0000-0000000000e2'
-  const CLAIMER = '00000000-0000-0000-0000-0000000000e3'
-  const CLAIM_BIZ = '10000000-0000-0000-0000-0000000000c1'
-
-  beforeAll(async () => {
-    await db.exec(`
-      insert into auth.users values ('${NEWCOMER}', 'new@test', now()), ('${UNCONFIRMED}', 'unconfirmed@test', null),
-        ('${CLAIMER}', 'claimer@test', now());
-      -- contact_email equals the claimer's email: must grant nothing on its own.
-      insert into public.businesses (id, name, slug, status, contact_email) values ('${CLAIM_BIZ}', 'Claimable', 'claimable', 'active', 'claimer@test');
-    `)
-  })
-
-  const register = (uid: string, name: string, slug: string) =>
-    as(uid, (tx) => tx.query<{ id: string }>('select public.register_business($1, $2) as id', [name, slug])).then((r) => r.rows[0]!.id)
-  const createClaim = (uid: string, biz: string) =>
-    as(uid, (tx) => tx.query<{ token: string; expires_at: Date }>('select * from public.admin_create_business_claim($1)', [biz])).then((r) => r.rows[0]!)
-  const redeem = (uid: string, token: string) =>
-    as(uid, (tx) => tx.query<{ id: string }>('select public.redeem_business_claim($1) as id', [token])).then((r) => r.rows[0]!.id)
-  const isMember = async (uid: string, biz: string) =>
-    (await db.query('select 1 from public.business_members where user_id = $1 and business_id = $2', [uid, biz])).rows.length === 1
-
-  it('registers a new business as a draft owned by the caller, invisible to the public', async () => {
-    const id = await register(NEWCOMER, 'Newcomer Home', 'newcomer-home')
-    const r = await db.query<{ status: string }>('select status from public.businesses where id = $1', [id])
-    expect(r.rows[0]!.status).toBe('draft')
-    expect(await isMember(NEWCOMER, id)).toBe(true)
-    const anon = await as('', (tx) => tx.query('select 1 from public.businesses where id = $1', [id]), 'anon')
-    expect(anon.rows).toHaveLength(0)
-  })
-
-  it('allows one pending registration per account, and only an admin can activate it', async () => {
-    await expect(register(NEWCOMER, 'Second', 'newcomer-second')).rejects.toThrow('registration_pending')
-    const id = (await db.query<{ id: string }>(`select id from public.businesses where slug = 'newcomer-home'`)).rows[0]!.id
-    await expect(as(NEWCOMER, (tx) => tx.query(`update public.businesses set status = 'active' where id = $1`, [id]))).rejects.toThrow('Only platform admins')
-    await as(ADMIN, (tx) => tx.query(`update public.businesses set status = 'active' where id = $1`, [id])) // admin approval
-    const r = await as('', (tx) => tx.query('select 1 from public.businesses where id = $1', [id]), 'anon')
-    expect(r.rows).toHaveLength(1)
-  })
-
-  it('refuses registration without a confirmed email, with a taken address, a reserved one, or anonymously', async () => {
-    await expect(register(UNCONFIRMED, 'Nope', 'nope-unconfirmed')).rejects.toThrow('email_not_confirmed')
-    await expect(register(CLAIMER, 'Copy', 'claimable')).rejects.toThrow('slug_taken')
-    await expect(register(CLAIMER, 'Admin', 'admin')).rejects.toThrow(/check constraint/)
-    await expect(as('', (tx) => tx.query(`select public.register_business('A', 'anon-biz')`), 'anon')).rejects.toThrow(/permission denied/)
-  })
-
-  it('a matching contact email or name grants no ownership', async () => {
-    expect(await isMember(CLAIMER, CLAIM_BIZ)).toBe(false)
-    const upd = await as(CLAIMER, (tx) => tx.query(`update public.businesses set description = 'hijack' where id = $1`, [CLAIM_BIZ]))
-    expect(upd.affectedRows ?? 0).toBe(0)
-  })
-
-  it('only platform admins issue claim links, and only a hash is stored', async () => {
-    await expect(createClaim(OWNER, CLAIM_BIZ)).rejects.toThrow('Only platform admins')
-    const { token } = await createClaim(ADMIN, CLAIM_BIZ)
-    expect(token).toMatch(/^[0-9a-f]{64}$/)
-    const hashed = await db.query(`select 1 from private.business_claims where token_hash = sha256(convert_to($1, 'UTF8'))`, [token])
-    expect(hashed.rows).toHaveLength(1)
-    const plain = await db.query(`select 1 from private.business_claims c where c::text like '%' || $1 || '%'`, [token])
-    expect(plain.rows).toHaveLength(0)
-    await expect(as(OWNER, (tx) => tx.query('select * from private.business_claims'))).rejects.toThrow(/permission denied/)
-  })
-
-  it('a claim link makes a confirmed account an owner exactly once', async () => {
-    const { token } = await createClaim(ADMIN, CLAIM_BIZ)
-    await expect(redeem(UNCONFIRMED, token)).rejects.toThrow('email_not_confirmed')
-    expect(await redeem(CLAIMER, token)).toBe(CLAIM_BIZ)
-    expect(await isMember(CLAIMER, CLAIM_BIZ)).toBe(true)
-    await expect(redeem(NEWCOMER, token)).rejects.toThrow('claim_invalid') // single use
-    expect(await isMember(NEWCOMER, CLAIM_BIZ)).toBe(false)
-  })
-
-  it('rejects unknown, replaced and expired claim links with the same error', async () => {
-    await expect(redeem(NEWCOMER, 'f'.repeat(64))).rejects.toThrow('claim_invalid')
-    const first = await createClaim(ADMIN, OTHER_BIZ)
-    await createClaim(ADMIN, OTHER_BIZ) // issuing a new link cancels the unused one
-    await expect(redeem(NEWCOMER, first.token)).rejects.toThrow('claim_invalid')
-    const expiring = await createClaim(ADMIN, OTHER_BIZ)
-    await db.query(`update private.business_claims set expires_at = now() - interval '1 second' where token_hash = sha256(convert_to($1, 'UTF8'))`, [expiring.token])
-    await expect(redeem(NEWCOMER, expiring.token)).rejects.toThrow('claim_invalid')
-    expect(await isMember(NEWCOMER, OTHER_BIZ)).toBe(false)
-  })
-})
-
 describe('isolation between businesses (storage, analytics, members)', () => {
   const objectsVisibleTo = async (uid: string, name: string, role: 'authenticated' | 'anon' = 'authenticated') =>
     (await as(uid, (tx) => tx.query(`select 1 from storage.objects where bucket_id = 'product-media' and name = $1`, [name]), role)).rows.length
@@ -317,11 +219,184 @@ describe('isolation between businesses (storage, analytics, members)', () => {
   })
 })
 
+describe('email log (20261020084414_email_log)', () => {
+  const insertAsService = (status: string, recipient = 'delivered@resend.dev') =>
+    db.transaction(async (tx) => {
+      await tx.exec('set local role service_role')
+      return tx.query<{ id: string }>(`insert into public.email_log (kind, recipient, subject, status) values ('test', $1, 'Test', $2) returning id`, [recipient, status])
+    })
+
+  it('only the service role writes; only platform admins read', async () => {
+    await insertAsService('accepted')
+    expect((await as(ADMIN, (tx) => tx.query('select * from public.email_log'))).rows.length).toBeGreaterThan(0)
+    expect((await as(OWNER, (tx) => tx.query('select * from public.email_log'))).rows).toHaveLength(0)
+    await expect(as(STRANGER, (tx) => tx.query('select * from public.email_log'), 'anon')).rejects.toThrow(/permission denied/)
+    await expect(as(ADMIN, (tx) => tx.query(`insert into public.email_log (kind, recipient, subject, status) values ('test', 'x@y.z', 'T', 'accepted')`))).rejects.toThrow(/permission denied/)
+    await expect(as(OWNER, (tx) => tx.query(`update public.email_log set status = 'delivered'`))).rejects.toThrow(/permission denied/)
+  })
+
+  it('accepts only known statuses, so "delivered" cannot be written as free text', async () => {
+    await expect(insertAsService('queued')).rejects.toThrow(/check constraint/)
+    await expect(insertAsService('accepted', 'x')).rejects.toThrow(/check constraint/)
+  })
+})
+
+describe('applications, review, one owner, audit (20261020091428_applications_and_owner_access)', () => {
+  const NEW_OWNER = '00000000-0000-0000-0000-0000000000f1'
+  const SECOND = '00000000-0000-0000-0000-0000000000f2'
+  const asService = <T,>(fn: (tx: Transaction) => Promise<T>) =>
+    db.transaction(async (tx) => {
+      await tx.exec('set local role service_role')
+      return fn(tx)
+    })
+  const submit = (name = 'Casa Teste', key = crypto.randomUUID()) =>
+    asService((tx) =>
+      tx.query<{ id: string }>(
+        `insert into public.business_applications (business_name, applicant_name, applicant_email, country, city, category, submission_key, answers)
+         values ($1, 'Ana Lima', 'ana@example.test', 'Portugal', 'Lisboa', 'Lighting', $2, '{"description":"Hand-made lamps"}') returning id`,
+        [name, key],
+      ),
+    ).then((r) => r.rows[0]!.id)
+  const review = (uid: string, id: string, action: string, reason: string | null = null) =>
+    as(uid, (tx) => tx.query<{ status: string; business_id: string | null; reviewed_by: string }>('select * from public.admin_review_application($1, $2, $3)', [id, action, reason])).then(
+      (r) => r.rows[0]!,
+    )
+
+  beforeAll(async () => {
+    await db.exec(`insert into auth.users values ('${NEW_OWNER}', 'invitee@test', null), ('${SECOND}', 'second@test', now());`)
+  })
+
+  it('removes self-registration, claim links and the old link-by-email function', async () => {
+    const left = await db.query<{ n: number }>(`select count(*)::int as n from pg_proc where proname in
+      ('register_business', 'redeem_business_claim', 'admin_create_business_claim', 'admin_add_business_member', 'caller_email_confirmed')`)
+    expect(left.rows[0]!.n).toBe(0)
+  })
+
+  it('applications are private: only the service role inserts, only platform admins read', async () => {
+    const id = await submit()
+    expect((await as(ADMIN, (tx) => tx.query('select 1 from public.business_applications where id = $1', [id]))).rows).toHaveLength(1)
+    expect((await as(OWNER, (tx) => tx.query('select 1 from public.business_applications'))).rows).toHaveLength(0)
+    await expect(as('', (tx) => tx.query('select 1 from public.business_applications'), 'anon')).rejects.toThrow(/permission denied/)
+    await expect(
+      as(
+        OWNER,
+        (tx) => tx.query(`insert into public.business_applications (business_name, applicant_name, applicant_email, country, city, category, submission_key) values ('X X', 'Y Y', 'y@t.co', 'PT', 'L', 'Decor', gen_random_uuid())`),
+      ),
+    ).rejects.toThrow(/permission denied/)
+    await expect(as(ADMIN, (tx) => tx.query(`update public.business_applications set status = 'approved' where id = $1`, [id]))).rejects.toThrow(/permission denied/)
+  })
+
+  it('the same submission key creates one application (duplicate submissions)', async () => {
+    const key = crypto.randomUUID()
+    await submit('Dup Biz', key)
+    await expect(submit('Dup Biz', key)).rejects.toThrow(/duplicate key/)
+  })
+
+  it('only platform admins review; approval creates one private draft business and is idempotent', async () => {
+    const id = await submit('Atelier Ção')
+    await expect(review(OWNER, id, 'approve')).rejects.toThrow(/platform_admin_only/)
+    expect((await review(ADMIN, id, 'start_review')).status).toBe('under_review')
+    const approved = await review(ADMIN, id, 'approve')
+    expect(approved.status).toBe('approved')
+    expect(approved.reviewed_by).toBe(ADMIN)
+    const again = await review(ADMIN, id, 'approve')
+    expect(again.business_id).toBe(approved.business_id)
+    const biz = await db.query<{ slug: string; status: string; contact_email: string | null; description: string }>('select * from public.businesses where id = $1', [approved.business_id])
+    expect(biz.rows[0]).toMatchObject({ slug: 'atelier-cao', status: 'draft', contact_email: null, description: 'Hand-made lamps' })
+    expect((await as('', (tx) => tx.query('select 1 from public.businesses where id = $1', [approved.business_id]), 'anon')).rows).toHaveLength(0)
+    await expect(review(ADMIN, id, 'reject', 'Too late')).rejects.toThrow(/invalid_transition/)
+    const events = await db.query<{ event_type: string; actor_id: string; from_status: string | null; to_status: string | null }>(
+      'select event_type, actor_id, from_status, to_status from public.audit_events where application_id = $1 order by created_at, event_type',
+      [id],
+    )
+    expect(events.rows.map((e) => [e.event_type, e.from_status, e.to_status])).toEqual(
+      expect.arrayContaining([
+        ['application_status_changed', 'submitted', 'under_review'],
+        ['business_created', null, null],
+        ['application_status_changed', 'under_review', 'approved'],
+      ]),
+    )
+    expect(events.rows.every((e) => e.actor_id === ADMIN)).toBe(true)
+  })
+
+  it('rejection needs a reason, keeps the answers and creates no business; it can be reopened', async () => {
+    const id = await submit('No Biz')
+    await expect(review(ADMIN, id, 'reject')).rejects.toThrow(/reason_required/)
+    const rejected = await review(ADMIN, id, 'reject', 'Outside our scope')
+    expect(rejected).toMatchObject({ status: 'rejected', business_id: null })
+    const row = await db.query<{ answers: { description: string }; decision_reason: string }>('select * from public.business_applications where id = $1', [id])
+    expect(row.rows[0]).toMatchObject({ answers: { description: 'Hand-made lamps' }, decision_reason: 'Outside our scope' })
+    expect((await review(ADMIN, id, 'start_review')).status).toBe('under_review')
+  })
+
+  it('exactly one owner per business; provisioning helpers are server-only', async () => {
+    const id = await submit('Owner Biz')
+    const biz = (await review(ADMIN, id, 'approve')).business_id!
+    const link = (uid: string) => asService((tx) => tx.query<{ r: string }>('select public.service_link_owner($1, $2, $3, $4) as r', [biz, uid, ADMIN, id])).then((r) => r.rows[0]!.r)
+    expect(await link(NEW_OWNER)).toBe('linked')
+    expect(await link(NEW_OWNER)).toBe('already_linked')
+    await expect(link(SECOND)).rejects.toThrow(/business_has_owner/)
+    await expect(db.query(`insert into public.business_members (business_id, user_id) values ($1, $2)`, [biz, SECOND])).rejects.toThrow(/duplicate key/)
+    await expect(as(ADMIN, (tx) => tx.query('select public.service_link_owner($1, $2, $3)', [biz, SECOND, ADMIN]))).rejects.toThrow(/permission denied/)
+    await expect(as(ADMIN, (tx) => tx.query(`select public.service_user_id_by_email('owner@test')`))).rejects.toThrow(/permission denied/)
+    expect((await asService((tx) => tx.query<{ id: string }>(`select public.service_user_id_by_email(' OWNER@test ') as id`))).rows[0]!.id).toBe(OWNER)
+
+    // The invited owner finishes onboarding; acceptance is recorded once, by the owner themselves.
+    expect((await as(NEW_OWNER, (tx) => tx.query<{ b: string }>('select public.complete_owner_onboarding() as b'))).rows[0]!.b).toBe(biz)
+    const member = await db.query<{ accepted_at: Date | null; invited_at: Date | null }>('select accepted_at, invited_at from public.business_members where business_id = $1', [biz])
+    expect(member.rows[0]!.accepted_at).not.toBeNull()
+    expect(member.rows[0]!.invited_at).not.toBeNull()
+    const owners = await as(ADMIN, (tx) => tx.query<{ email: string; accepted_at: Date | null }>('select * from public.admin_list_business_members($1)', [biz]))
+    expect(owners.rows).toHaveLength(1)
+    expect(owners.rows[0]!.email).toBe('invitee@test')
+
+    // Actor emails for the audit log: platform admins only.
+    const emails = await as(ADMIN, (tx) => tx.query<{ id: string; email: string }>('select * from public.admin_user_emails($1)', [[NEW_OWNER]]))
+    expect(emails.rows).toEqual([{ id: NEW_OWNER, email: 'invitee@test' }])
+    await expect(as(OWNER, (tx) => tx.query('select * from public.admin_user_emails($1)', [[NEW_OWNER]]))).rejects.toThrow(/platform_admin_only/)
+    await expect(as(OWNER, (tx) => tx.query('select * from public.admin_user_emails($1)', [[NEW_OWNER]]), 'anon')).rejects.toThrow(/permission denied/)
+  })
+
+  it('the audit trail is append-only and readable by platform admins only', async () => {
+    await asService((tx) => tx.query(`insert into public.audit_events (event_type) values ('invitation_requested')`))
+    await expect(asService((tx) => tx.query(`update public.audit_events set event_type = 'x_x_x'`))).rejects.toThrow(/permission denied/)
+    await expect(asService((tx) => tx.query('delete from public.audit_events'))).rejects.toThrow(/permission denied/)
+    await expect(as(ADMIN, (tx) => tx.query(`insert into public.audit_events (event_type) values ('forged_event')`))).rejects.toThrow(/permission denied/)
+    expect((await as(ADMIN, (tx) => tx.query('select 1 from public.audit_events'))).rows.length).toBeGreaterThan(0)
+    expect((await as(OWNER, (tx) => tx.query('select 1 from public.audit_events'))).rows).toHaveLength(0)
+  })
+
+  it('records who changed a catalogue status', async () => {
+    await as(ADMIN, (tx) => tx.query(`update public.businesses set status = 'inactive' where id = $1`, [OTHER_BIZ]))
+    const ev = await db.query<{ actor_id: string; from_status: string; to_status: string }>(
+      `select actor_id, from_status, to_status from public.audit_events where business_id = $1 and event_type = 'business_status_changed'`,
+      [OTHER_BIZ],
+    )
+    expect(ev.rows[0]).toEqual({ actor_id: ADMIN, from_status: 'active', to_status: 'inactive' })
+    await as(ADMIN, (tx) => tx.query(`update public.businesses set status = 'active' where id = $1`, [OTHER_BIZ]))
+  })
+
+  it('records each provider event once and never moves an email status backwards', async () => {
+    await asService((tx) => tx.query(`insert into public.email_log (kind, recipient, subject, status, provider_message_id) values ('test', 'delivered@resend.dev', 'T', 'accepted', 'msg-wh-1')`))
+    const event = (svix: string, type: string) =>
+      asService((tx) => tx.query<{ r: boolean }>('select public.service_record_email_event($1, $2, $3) as r', [svix, 'msg-wh-1', type])).then((r) => r.rows[0]!.r)
+    const status = async () => (await db.query<{ status: string }>(`select status from public.email_log where provider_message_id = 'msg-wh-1'`)).rows[0]!.status
+    expect(await event('svix-1', 'email.delivered')).toBe(true)
+    expect(await event('svix-1', 'email.delivered')).toBe(false)
+    expect(await status()).toBe('delivered')
+    expect(await event('svix-2', 'email.sent')).toBe(true)
+    expect(await status()).toBe('delivered')
+    await expect(as(ADMIN, (tx) => tx.query(`select public.service_record_email_event('x', 'msg-wh-1', 'email.bounced')`))).rejects.toThrow(/permission denied/)
+  })
+})
+
 describe('rollback script for 20261013093006 + 20261013144121', () => {
   it('removes the new rules and functions, restores owner linking, and keeps business data', async () => {
     const fresh = await PGlite.create()
     await fresh.exec(SUPABASE_STUBS + 'create schema supabase_migrations; create table supabase_migrations.schema_migrations (version text primary key);')
-    for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()) await fresh.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
+    // The state this script rolls back: migrations up to 20261013144121 (later ones are not part of it).
+    for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql') && n.slice(0, 14) <= '20261013144121').sort())
+      await fresh.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
     await fresh.exec(`insert into supabase_migrations.schema_migrations values ('20261013093006'), ('20261013144121');
       insert into public.businesses (name, slug) values ('Kept', 'kept');`)
     await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261013_publish_rules_and_claims_rollback.sql'), 'utf8'))

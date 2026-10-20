@@ -1,4 +1,4 @@
-import type { ActivityItem, AnalyticsEvent, Business, Product } from '@/domain/types'
+import type { ActivityItem, AnalyticsEvent, AuditEvent, Business, BusinessApplication, EmailAttempt, ID, Product } from '@/domain/types'
 import type { DailyStat } from '../analytics'
 
 export type { DailyStat }
@@ -15,6 +15,12 @@ export interface Db {
   /** Seeded sample data (sample: true). */
   dailyStats: DailyStat[]
   activity: ActivityItem[]
+  // Added with the application workflow (ADR-0024). Optional so demo data saved earlier stays valid.
+  applications?: BusinessApplication[]
+  audit?: AuditEvent[]
+  emails?: EmailAttempt[]
+  /** Demo owners: there are no real accounts in demo mode, so only the invitation state is kept. */
+  owners?: Record<ID, { email: string; invitedAt: string; acceptedAt?: string }>
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)

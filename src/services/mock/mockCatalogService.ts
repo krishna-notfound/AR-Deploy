@@ -1,11 +1,13 @@
 // Mock implementation of CatalogService. Simulates latency, never throws, returns copies.
 // Demo persistence only (localStorage). NOT a backend.
-import type { ActivityItem, ActivityKind, Business, BusinessCatalog, ID, Product } from '@/domain/types'
+import type { ActivityItem, ActivityKind, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product } from '@/domain/types'
 import { createSessionModelAsset, imageToPersistableDataUrl } from '@/lib/files'
 import { newId } from '@/lib/id'
-import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
+import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
-import { type CatalogService, type Result, fail, ok } from '../catalogService'
+import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
+import { MAX_INVITATION_ATTEMPTS, RESEND_COOLDOWN_SECONDS, applyReview } from '../applicationRules'
+import { type CatalogService, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
 import { summarize } from '../analytics'
 import type { Db } from './db'
 import { createSeed } from './seed'
@@ -13,8 +15,29 @@ import { store } from './store'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const FAIL_RATE_KEY = 'arfurn:debug:failRate'
-const OWNERS_DEMO_MESSAGE =
-  'Owner accounts exist only with the Supabase backend. In this demo, open a business dashboard from the demo account picker instead.'
+/** Demo actor for audit entries (the demo account picker is not authentication). */
+const DEMO_ADMIN = { id: 'demo-super-admin', email: 'Demo Super Admin' }
+const PAGE_SIZE = 20
+
+function audit(db: Db, e: Omit<AuditEvent, 'id' | 'createdAt' | 'metadata'> & { metadata?: Record<string, unknown> }): void {
+  ;(db.audit ??= []).unshift({ id: newId('aud'), createdAt: nowIso(), metadata: {}, ...e })
+}
+
+/** Demo mode never sends email: each attempt is logged as blocked ("demo_mode"), so the history stays honest. */
+function demoEmail(db: Db, e: Pick<EmailAttempt, 'kind' | 'recipient' | 'subject'> & { applicationId?: ID; businessId?: ID; workflow?: string }): EmailAttempt {
+  const prior = (db.emails ?? []).filter((x) => e.workflow && x.workflow === e.workflow).length
+  const ts = nowIso()
+  const attempt: EmailAttempt = { id: newId('eml'), createdAt: ts, updatedAt: ts, status: 'blocked', error: 'demo_mode', attempt: prior + 1, ...e }
+  ;(db.emails ??= []).unshift(attempt)
+  return attempt
+}
+
+/** Application and/or business scope: with both, entries of either match (an application and the business it created). */
+const matchesScope = (e: { applicationId?: ID; businessId?: ID }, q: { applicationId?: ID; businessId?: ID }) =>
+  (!q.applicationId && !q.businessId) || (!!q.applicationId && e.applicationId === q.applicationId) || (!!q.businessId && e.businessId === q.businessId)
+
+const page = <T>(items: T[], p = 1, size = PAGE_SIZE) => ({ items: items.slice((p - 1) * size, p * size), total: items.length })
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
 function failRate(): number {
   try {
@@ -335,11 +358,207 @@ export const mockCatalogService: CatalogService = {
       return ok(items.slice(0, opts.limit ?? 10))
     }),
 
-  // Demo accounts are not real users, so owner management exists only in Supabase mode.
-  getBusinessMembers: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
-  addBusinessMember: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
-  removeBusinessMember: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
-  createBusinessClaim: async () => fail('UNSUPPORTED', OWNERS_DEMO_MESSAGE),
+  // ---------------- owners (demo: invitation state only; there are no real accounts in demo mode) ----------------
+  getBusinessMembers: (businessId) =>
+    run(() => {
+      const o = store.get().owners?.[businessId]
+      return ok(o ? [{ userId: `demo-owner-${businessId}`, email: o.email, addedAt: o.invitedAt, invitedAt: o.invitedAt, acceptedAt: o.acceptedAt }] : [])
+    }),
+
+  removeBusinessMember: (businessId) =>
+    run(() => {
+      if (!store.get().owners?.[businessId]) return fail('NOT_FOUND', 'This owner was not found.')
+      store.update((d) => {
+        delete d.owners![businessId]
+        audit(d, { eventType: 'owner_removed', actorId: DEMO_ADMIN.id, businessId })
+      })
+      return ok(undefined)
+    }),
+
+  provisionOwner: ({ businessId, email, applicationId }) =>
+    run(() => {
+      const db = store.get()
+      const business = db.businesses.find((b) => b.id === businessId)
+      if (!business) return fail('NOT_FOUND', 'Business not found.')
+      const addr = email.trim().toLowerCase()
+      if (!EMAIL.test(addr)) return fail('VALIDATION', 'Enter a valid email address.', { email: 'Enter a valid email address.' })
+      const existing = db.owners?.[businessId]
+      if (existing && existing.email !== addr) return fail('CONFLICT', 'This business already has an owner. Remove them first to invite someone else.')
+      let outcome!: ProvisionOutcome
+      store.update((d) => {
+        if (!existing) {
+          ;(d.owners ??= {})[businessId] = { email: addr, invitedAt: nowIso() }
+          audit(d, { eventType: 'owner_provisioned', actorId: DEMO_ADMIN.id, businessId, applicationId })
+        }
+        const sent = demoEmail(d, {
+          kind: existing ? 'invitation_resend' : 'owner_invitation',
+          recipient: addr,
+          subject: `You're invited to manage ${business.name} on Sanctus`,
+          businessId,
+          applicationId,
+          workflow: `invite:${businessId}`,
+        })
+        audit(d, { eventType: existing ? 'invitation_resent' : 'invitation_requested', actorId: DEMO_ADMIN.id, businessId, applicationId, metadata: { attempt: sent.attempt, email_status: sent.status } })
+        outcome = { owner: existing ? 'already_linked' : 'linked', email: { status: sent.status, error: sent.error, attempt: sent.attempt } }
+      })
+      return ok(outcome)
+    }),
+
+  resendOwnerInvitation: (businessId) =>
+    run(() => {
+      const db = store.get()
+      const business = db.businesses.find((b) => b.id === businessId)
+      const owner = db.owners?.[businessId]
+      if (!business || !owner) return fail('NOT_FOUND', 'This business has no invited owner yet.')
+      if (owner.acceptedAt) return fail('CONFLICT', 'The owner has already accepted the invitation and can sign in.')
+      const attempts = (db.emails ?? []).filter((e) => e.workflow === `invite:${businessId}`)
+      if (attempts.length >= MAX_INVITATION_ATTEMPTS) return fail('RATE_LIMITED', 'Too many invitations were sent for this business. Contact the owner directly.')
+      const last = attempts[0]
+      if (last && Date.now() - Date.parse(last.createdAt) < RESEND_COOLDOWN_SECONDS * 1000)
+        return fail('RATE_LIMITED', `Wait ${RESEND_COOLDOWN_SECONDS} seconds between invitations.`)
+      let outcome!: ProvisionOutcome
+      store.update((d) => {
+        const sent = demoEmail(d, { kind: 'invitation_resend', recipient: owner.email, subject: `New invitation link for ${business.name}`, businessId, workflow: `invite:${businessId}` })
+        audit(d, { eventType: 'invitation_resent', actorId: DEMO_ADMIN.id, businessId, metadata: { attempt: sent.attempt, email_status: sent.status } })
+        outcome = { owner: 'already_linked', email: { status: sent.status, error: sent.error, attempt: sent.attempt } }
+      })
+      return ok(outcome)
+    }),
+
+  // ---------------- business applications ----------------
+  submitApplication: (input) =>
+    run(() => {
+      const v = validateApplication(input)
+      if (!v.ok) return fail('VALIDATION', 'Please fix the highlighted fields.', v.errors)
+      const a = v.value
+      const db = store.get()
+      const dup = (db.applications ?? []).find((x) => (x as BusinessApplication & { submissionKey?: string }).submissionKey === a.submissionKey)
+      if (dup) return ok({ id: dup.id, reference: dup.reference })
+      const open = (db.applications ?? []).find(
+        (x) => (x.status === 'submitted' || x.status === 'under_review') && x.applicantEmail.toLowerCase() === a.applicantEmail.toLowerCase() && x.businessName.toLowerCase() === a.businessName.toLowerCase(),
+      )
+      if (open) return fail('CONFLICT', 'An application for this business from this email is already being reviewed.')
+      const ts = nowIso()
+      const app: BusinessApplication & { submissionKey: string } = {
+        id: newId('app'),
+        reference: Math.random().toString(36).slice(2, 10).toUpperCase().padEnd(8, '0'),
+        status: 'submitted',
+        businessName: a.businessName,
+        applicantName: a.applicantName,
+        applicantEmail: a.applicantEmail,
+        applicantPhone: a.applicantPhone ?? undefined,
+        website: a.website ?? undefined,
+        country: a.country,
+        city: a.city,
+        category: a.category,
+        language: a.language,
+        answers: {
+          description: a.description,
+          applicantRole: a.applicantRole ?? undefined,
+          productCount: a.productCount,
+          photoReadiness: a.photoReadiness,
+          modelReadiness: a.modelReadiness,
+          notes: a.notes ?? undefined,
+        },
+        submissionKey: a.submissionKey,
+        createdAt: ts,
+        updatedAt: ts,
+      }
+      store.update((d) => {
+        ;(d.applications ??= []).unshift(app)
+        audit(d, { eventType: 'application_submitted', applicationId: app.id, toStatus: 'submitted' })
+        demoEmail(d, { kind: 'application_confirmation', recipient: app.applicantEmail, subject: `We received ${app.businessName}`, applicationId: app.id, workflow: `application:${app.id}:confirmation` })
+        demoEmail(d, { kind: 'admin_notification', recipient: 'platform admins', subject: `New business awaiting review: ${app.businessName}`, applicationId: app.id, workflow: `application:${app.id}:admin_notification` })
+      })
+      return ok({ id: app.id, reference: app.reference })
+    }),
+
+  getApplications: (q = {}) =>
+    run(() => {
+      const term = q.search?.trim().toLowerCase()
+      const list = (store.get().applications ?? [])
+        .filter((a) => !q.status || a.status === q.status)
+        .filter((a) => !q.from || a.createdAt.slice(0, 10) >= q.from)
+        .filter((a) => !q.to || a.createdAt.slice(0, 10) <= q.to)
+        .filter((a) => !term || [a.businessName, a.applicantName, a.applicantEmail, a.reference, a.id].some((f) => f.toLowerCase().includes(term)))
+      return ok(page(list, q.page, q.pageSize))
+    }),
+
+  getApplication: (id) =>
+    run(() => {
+      const a = store.get().applications?.find((x) => x.id === id)
+      return a ? ok(a) : fail('NOT_FOUND', 'Application not found.')
+    }),
+
+  reviewApplication: (id, action, reason) =>
+    run(() => {
+      const db = store.get()
+      const current = db.applications?.find((x) => x.id === id)
+      if (!current) return fail('NOT_FOUND', 'Application not found.')
+      const t = applyReview(current.status, action, reason)
+      if (!t.ok)
+        return t.reason === 'reason_required'
+          ? fail('VALIDATION', 'Give a reason for the rejection.', { reason: 'Give a reason for the rejection.' })
+          : fail('CONFLICT', 'This application can no longer change to that status.')
+      if (t.noop) return ok(current)
+      let next!: BusinessApplication
+      store.update((d) => {
+        let businessId = current.businessId
+        if (t.status === 'approved') {
+          const ts = nowIso()
+          const business: Business = {
+            id: newId('biz'),
+            name: current.businessName,
+            slug: uniqueSlug(slugify(current.businessName), d.businesses.map((b) => b.slug), 55),
+            description: current.answers.description ?? '',
+            contact: {},
+            status: 'draft',
+            branding: { accentColor: '#7A5C45' },
+            defaultCurrency: 'EUR',
+            createdAt: ts,
+            updatedAt: ts,
+          }
+          d.businesses.push(business)
+          businessId = business.id
+          logActivity(d, 'business_created', `Business “${business.name}” was created from an approved application`, { businessId })
+          audit(d, { eventType: 'business_created', actorId: DEMO_ADMIN.id, applicationId: id, businessId, metadata: { source: 'application' } })
+        }
+        const decided = t.status === 'approved' || t.status === 'rejected'
+        next = {
+          ...current,
+          status: t.status,
+          businessId,
+          reviewedBy: DEMO_ADMIN.id,
+          reviewedAt: nowIso(),
+          updatedAt: nowIso(),
+          decisionReason: decided ? reason?.trim() || undefined : current.decisionReason,
+        }
+        d.applications = d.applications!.map((a) => (a.id === id ? next : a))
+        audit(d, {
+          eventType: 'application_status_changed',
+          actorId: DEMO_ADMIN.id,
+          applicationId: id,
+          businessId,
+          fromStatus: current.status,
+          toStatus: t.status,
+          metadata: reason?.trim() ? { reason: reason.trim() } : {},
+        })
+      })
+      return ok(next)
+    }),
+
+  getAuditEvents: (q = {}) =>
+    run(() => {
+      const term = q.search?.trim().toLowerCase().replace(/\s+/g, '_')
+      const list = (store.get().audit ?? [])
+        .filter((e) => matchesScope(e, q))
+        .filter((e) => !term || e.eventType.includes(term))
+        .map((e) => ({ ...e, actorEmail: e.actorId === DEMO_ADMIN.id ? DEMO_ADMIN.email : undefined }))
+      return ok(page(list, q.page, q.pageSize))
+    }),
+
+  getEmailAttempts: (q) =>
+    run(() => ok((store.get().emails ?? []).filter((e) => matchesScope(e, q)))),
 
   // Images become data URLs stored with the demo data; 3D files are session-only blob URLs (ADR-0007).
   uploadAsset: async ({ kind, file }) => {

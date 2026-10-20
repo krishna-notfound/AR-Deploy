@@ -12,6 +12,8 @@ import { Package } from 'lucide-react'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
+import { AuditTimeline } from '../applications/AuditTimeline'
+import { EmailActivity } from '../applications/EmailActivity'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 import { useBusinessActions } from '../businesses/useBusinessActions'
 import { CatalogQrPanel } from '../catalogs/CatalogQrPanel'
@@ -97,7 +99,7 @@ export default function BusinessDetailPage() {
         tabs={[
           { value: 'details', label: 'Details' },
           { value: 'products', label: 'Products', badge: <span className="rounded-full bg-subtle px-1.5 text-xs text-ink-muted tabular-nums">{productCount}</span> },
-          { value: 'owners', label: 'Owners' },
+          { value: 'owners', label: 'Owner & history' },
           { value: 'qr', label: 'Catalog & QR' },
         ]}
       />
@@ -131,7 +133,15 @@ export default function BusinessDetailPage() {
           />
         </Card>
       )}
-      {tab === 'owners' && <BusinessOwnersPanel business={b} />}
+      {tab === 'owners' && (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <BusinessOwnersPanel business={b} />
+          <div className="space-y-6">
+            <AuditTimeline businessId={b.id} />
+            <EmailActivity businessId={b.id} />
+          </div>
+        </div>
+      )}
       {tab === 'qr' && (catalog.data ? <CatalogQrPanel catalog={catalog.data} productsLink={`/admin/products?business=${b.id}`} /> : <FullPageSpinner />)}
     </>
   )

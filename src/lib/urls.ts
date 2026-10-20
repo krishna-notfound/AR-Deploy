@@ -46,10 +46,12 @@ export function absoluteLocalUrl(path: string): string {
   return `${typeof window !== 'undefined' ? window.location.origin : ''}${path}`
 }
 
-/** Claim link for an existing business. The token rides in the fragment, so it never reaches server or proxy logs. */
-export function claimLinkUrl(token: string): string {
-  return absoluteLocalUrl(`/claim#${token}`)
-}
+/** Public "Apply as a business" wizard. */
+export const APPLY_PATH = '/apply'
+/** Where owner invitation links land (the provision-owner Edge Function builds the absolute URL from APP_BASE_URL). */
+export const ACCEPT_INVITE_PATH = '/accept-invite'
+
+export const applicationAdminPath = (id: string) => `/admin/applications/${id}`
 
 /** The current page's URL for sharing: the draft-preview flag is dropped, every other query parameter kept. */
 export function shareableCurrentUrl(): string {

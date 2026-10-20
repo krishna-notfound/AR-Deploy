@@ -3,21 +3,19 @@ import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
-import { Button, ButtonLink } from '@/components/ui/Button'
+import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
 import { auth } from '@/services'
+import { APPLY_PATH } from '@/lib/urls'
 import { SiteHeader } from '../marketing/SiteChrome'
-import { pendingClaimToken } from './ClaimPage'
-import { DisplayNameStep } from './DisplayNameStep'
-import { RegisterBusinessForm } from './RegisterBusinessForm'
 
 /** Real sign-in (Supabase mode). In demo mode this route forwards to the demo account picker. */
 export default function LoginPage() {
   useDocumentTitle('Sign in')
   const [params] = useSearchParams()
   const next = params.get('next')
-  const { user, signedInEmail, onboarding, accountError, logout } = useAccount()
+  const { user, signedInEmail, accountError, logout } = useAccount()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -49,22 +47,12 @@ export default function LoginPage() {
         {signedInEmail ? (
           <div className="mt-8 space-y-6">
             <InlineNotice tone="neutral">
-              Signed in as <strong className="font-medium">{signedInEmail}</strong>. This account does not manage a business yet.
+              Signed in as <strong className="font-medium">{signedInEmail}</strong>. This account does not manage a business.
             </InlineNotice>
-            {!onboarding?.displayName && !onboarding?.displayNameSkipped ? (
-              <DisplayNameStep />
-            ) : pendingClaimToken() ? (
-              <ButtonLink to="/claim" variant="primary" className="w-full">
-                Finish claiming your business
-              </ButtonLink>
-            ) : (
-              <>
-                <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">Step 2 of 2</p>
-                {onboarding?.displayName && <p className="text-sm">Welcome, {onboarding.displayName}.</p>}
-                <RegisterBusinessForm />
-                <p className="text-sm text-ink-muted">Is your business already listed with us? Ask the platform team for a claim link.</p>
-              </>
-            )}
+            <p className="text-sm text-ink-muted">
+              Business owners get access by invitation from the Sanctus team after their application is approved. If you applied, we will email you
+              when it has been reviewed.
+            </p>
             <Button onClick={logout}>Sign out</Button>
           </div>
         ) : (
@@ -89,8 +77,8 @@ export default function LoginPage() {
               </Link>
             </p>
             <p className="text-center text-sm">
-              <Link to="/signup" className="text-accent-ink hover:underline">
-                New business owner? Create an account
+              <Link to={APPLY_PATH} className="text-accent-ink hover:underline">
+                New to Sanctus? Apply as a business
               </Link>
             </p>
           </form>

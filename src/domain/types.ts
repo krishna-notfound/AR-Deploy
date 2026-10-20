@@ -192,3 +192,83 @@ export interface ActivityItem {
   businessId?: ID
   productId?: ID
 }
+
+// ---------------- business applications & owner onboarding (ADR-0024, design/24) ----------------
+
+export type ApplicationStatus = 'submitted' | 'under_review' | 'approved' | 'rejected'
+export const APPLICATION_STATUSES: readonly ApplicationStatus[] = ['submitted', 'under_review', 'approved', 'rejected']
+export type ReviewAction = 'start_review' | 'approve' | 'reject'
+
+/** What the public wizard submits. Validated by supabase/functions/_shared/application.ts (client and server). */
+export interface ApplicationInput {
+  businessName: string
+  website?: string
+  description: string
+  category: string
+  country: string
+  city: string
+  applicantName: string
+  applicantRole?: string
+  applicantEmail: string
+  applicantPhone?: string
+  language: Lang
+  productCount: string
+  photoReadiness: string
+  modelReadiness: string
+  notes?: string
+  consent: boolean
+  /** One per wizard session: retries and double clicks create one application. */
+  submissionKey: string
+}
+
+export interface BusinessApplication {
+  id: ID
+  reference: string
+  status: ApplicationStatus
+  businessName: string
+  applicantName: string
+  applicantEmail: string
+  applicantPhone?: string
+  website?: string
+  country: string
+  city: string
+  category: string
+  language: Lang
+  answers: { description?: string; applicantRole?: string; productCount?: string; photoReadiness?: string; modelReadiness?: string; notes?: string }
+  decisionReason?: string
+  reviewedBy?: ID
+  reviewedAt?: ISODate
+  businessId?: ID
+  createdAt: ISODate
+  updatedAt: ISODate
+}
+
+export interface AuditEvent {
+  id: ID
+  createdAt: ISODate
+  eventType: string
+  actorId?: ID
+  applicationId?: ID
+  businessId?: ID
+  fromStatus?: string
+  toStatus?: string
+  metadata: Record<string, unknown>
+}
+
+export type EmailAttemptStatus = 'blocked' | 'failed' | 'accepted' | 'sent' | 'delivered' | 'delayed' | 'bounced' | 'complained'
+
+export interface EmailAttempt {
+  id: ID
+  createdAt: ISODate
+  updatedAt: ISODate
+  kind: string
+  recipient: string
+  subject: string
+  status: EmailAttemptStatus
+  providerMessageId?: string
+  error?: string
+  applicationId?: ID
+  businessId?: ID
+  workflow?: string
+  attempt: number
+}

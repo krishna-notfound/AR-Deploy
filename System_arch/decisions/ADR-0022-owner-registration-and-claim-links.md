@@ -1,5 +1,5 @@
 # ADR-0022: Owner self-registration, draft businesses and claim links
-- **Status:** Accepted (owner-approved scope change, 2026-10-13); migration applied to staging only once staging exists
+- **Status:** Superseded by ADR-0024 (2026-10-20): self-registration and claim links were removed by migration 20261020091428
 - **Date:** 2026-10-13
 - **Affects:** design/19-supabase.md, supabase/migrations/20261013144121_owner_registration_and_claims.sql, src/features/auth/
 

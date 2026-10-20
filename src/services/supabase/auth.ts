@@ -43,17 +43,10 @@ export interface AuthService {
   requestPasswordReset(email: string, redirectTo: string): Promise<Result<void>>
   /** Sets a new password for the current (e.g. recovery) session. */
   updatePassword(password: string): Promise<Result<void>>
-  /**
-   * Creates an account; the user must confirm their email before signing in. Also succeeds for an email that
-   * already has an account (Supabase hides which emails exist), so the UI always says "check your email".
-   */
-  signUp(email: string, password: string, emailRedirectTo: string): Promise<Result<{ needsConfirmation: boolean }>>
   /** Saves the display name in the user's own Auth metadata (null = skipped). Reloads the account via the auth listener. */
   updateDisplayName(name: string | null): Promise<Result<void>>
-  /** Registers a NEW business owned by the signed-in, confirmed account. Always a draft until an admin activates it. */
-  registerBusiness(name: string, slug: string): Promise<Result<{ businessId: string }>>
-  /** Redeems a single-use claim link a platform admin issued; the account becomes an owner of that business. */
-  redeemBusinessClaim(token: string): Promise<Result<{ businessId: string }>>
+  /** An invited owner finished onboarding (password set): records acceptance and returns their business id. */
+  completeOwnerOnboarding(): Promise<Result<{ businessId: string | null }>>
   /** Returns an unsubscribe function. */
   onAuthStateChange(listener: () => void): () => void
 }
@@ -84,7 +77,7 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       const profile = { displayName, displayNameSkipped: meta.display_name_skipped === true }
       const base = { id: u.id, name: displayName ?? (email || 'Signed-in user'), email }
       if (admin.data) return ok({ email, ...profile, user: { ...base, role: 'super_admin' } })
-      // ponytail: a user in several businesses gets the newest one (e.g. just claimed); add a business switcher when that case is real.
+      // A business has exactly one owner (ADR-0024); a user owning several businesses gets the newest one until a switcher exists.
       if (member.data) return ok({ email, ...profile, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
       return ok({ email, ...profile, user: null })
     },
@@ -105,28 +98,16 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       return error ? fail('VALIDATION', authMessage(error)) : ok(undefined)
     },
 
-    async signUp(email, password, emailRedirectTo) {
-      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo } })
-      // With email confirmation on (the project setting), no session comes back until the link is opened.
-      return error ? fail('VALIDATION', authMessage(error)) : ok({ needsConfirmation: !data.session })
-    },
-
     async updateDisplayName(name) {
       const display_name = name?.trim().slice(0, 80) || null
       const { error } = await sb.auth.updateUser({ data: { display_name, display_name_skipped: display_name === null } })
       return error ? fail('UNKNOWN', 'Could not save your name. Try again.') : ok(undefined)
     },
 
-    async registerBusiness(name, slug) {
-      const { data, error } = await sb.rpc('register_business', { p_name: name, p_slug: slug })
-      if (error) return mapDbError(error, { conflictField: 'business' })
-      return ok({ businessId: data as string })
-    },
-
-    async redeemBusinessClaim(token) {
-      const { data, error } = await sb.rpc('redeem_business_claim', { p_token: token })
+    async completeOwnerOnboarding() {
+      const { data, error } = await sb.rpc('complete_owner_onboarding')
       if (error) return mapDbError(error)
-      return ok({ businessId: data as string })
+      return ok({ businessId: (data as string | null) ?? null })
     },
 
     async signOut() {

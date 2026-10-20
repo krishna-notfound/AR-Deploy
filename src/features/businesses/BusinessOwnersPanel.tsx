@@ -1,154 +1,149 @@
-import { Link2, Trash2, UserPlus, Users } from 'lucide-react'
+import { MailPlus, RefreshCw, Trash2, UserCheck, UserPlus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
+import { Badge } from '@/components/ui/Badge'
 import { Button, IconButton } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
-import { CopyButton } from '@/components/ui/CopyButton'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { FormField, Input } from '@/components/ui/Form'
+import { FormField, Input, Select } from '@/components/ui/Form'
 import { SkeletonRows } from '@/components/ui/Skeleton'
-import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
+import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { Business } from '@/domain/types'
+import type { Business, ID, Lang } from '@/domain/types'
 import { formatDate } from '@/lib/format'
-import { claimLinkUrl } from '@/lib/urls'
 import { service } from '@/services'
+import type { ProvisionOutcome } from '@/services/catalogService'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
+import { emailReason } from '../applications/labels'
 
 /**
- * Platform admins link Supabase Auth accounts to a business as its owners.
- * Authorization is enforced in the database (admin-only functions and policies), not here.
+ * The business's single owner (ADR-0024): invite, resend the invitation, or remove.
+ * Authorization is enforced by the provision-owner Edge Function and the database, not by this panel.
  */
-export function BusinessOwnersPanel({ business }: { business: Business }) {
+export function BusinessOwnersPanel({ business, applicationId, defaultEmail, defaultLanguage = 'en' }: { business: Business; applicationId?: ID; defaultEmail?: string; defaultLanguage?: Lang }) {
   const members = useServiceQuery(() => service.getBusinessMembers(business.id), [business.id])
-  const add = useServiceMutation((email: string) => service.addBusinessMember(business.id, email))
+  const provision = useServiceMutation((email: string, language: Lang) => service.provisionOwner({ businessId: business.id, email, language, applicationId }))
+  const resend = useServiceMutation(() => service.resendOwnerInvitation(business.id))
   const confirm = useConfirm()
   const toast = useToast()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(defaultEmail ?? '')
+  const [language, setLanguage] = useState<Lang>(defaultLanguage)
   const [error, setError] = useState<string | null>(null)
+  const owner = members.data?.[0]
 
-  if (members.status === 'error' && members.error.code === 'UNSUPPORTED') {
-    return (
-      <Card>
-        <CardHeader title="Owners" />
-        <CardBody>
-          <InlineNotice>{members.error.message}</InlineNotice>
-        </CardBody>
-      </Card>
-    )
+  // The owner record exists either way; the toast says exactly what happened to the email.
+  const report = (o: ProvisionOutcome, what: string) => {
+    const reason = emailReason(o.email.error)
+    if (o.email.status === 'accepted' || o.email.status === 'sent' || o.email.status === 'delivered')
+      toast.success(what, 'Resend accepted the invitation email. Delivery is confirmed only when its status shows “Delivered”.')
+    else toast.error(`${what}, but the invitation email was not sent`, reason ?? 'Use “Resend invitation” to try again.')
   }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const value = email.trim()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return setError('Enter a valid email address.')
-    const res = await add.mutate(value)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) return setError('Enter a valid email address.')
+    const ok = await confirm({
+      title: `Invite ${value} as the owner?`,
+      body: `They become the only owner of ${business.name} and receive a link to set their password.`,
+      confirmLabel: 'Invite owner',
+    })
+    if (!ok) return
+    const res = await provision.mutate(value, language)
     if (!res.ok) return setError(res.error.message)
     setError(null)
-    setEmail('')
-    toast.success('Owner added', `${value} can now manage ${business.name}.`)
+    members.refetch()
+    report(res.data, 'Owner provisioned')
   }
 
-  const remove = async (userId: string, memberEmail: string) => {
+  const doResend = async () => {
+    if (!owner) return
+    const ok = await confirm({ title: `Send a new invitation to ${owner.email}?`, body: 'Earlier invitation links stop working once a new one is used.', confirmLabel: 'Resend invitation' })
+    if (!ok) return
+    const res = await resend.mutate()
+    if (!res.ok) return toast.error('Invitation not resent', res.error.message)
+    report(res.data, 'New invitation created')
+  }
+
+  const remove = async () => {
+    if (!owner) return
     const ok = await confirm({
-      title: `Remove ${memberEmail}?`,
-      body: `They will no longer be able to manage ${business.name}. Their account is not deleted.`,
+      title: `Remove ${owner.email}?`,
+      body: `They will no longer be able to manage ${business.name}. Their account is not deleted. You can then invite another owner.`,
       confirmLabel: 'Remove owner',
       destructive: true,
     })
     if (!ok) return
-    const res = await service.removeBusinessMember(business.id, userId)
-    if (res.ok) toast.success('Owner removed')
-    else toast.error('Could not remove owner', res.error.message)
+    const res = await service.removeBusinessMember(business.id, owner.userId)
+    if (res.ok) {
+      toast.success('Owner removed')
+      members.refetch()
+    } else toast.error('Could not remove owner', res.error.message)
   }
 
   return (
     <Card>
-      <CardHeader title="Owners" description="Accounts that can manage this business in the Business Admin dashboard." />
+      <CardHeader title="Owner" description="Each business has exactly one owner, invited by a platform admin." />
       <CardBody className="space-y-5">
         {members.status === 'loading' && !members.data ? (
           <SkeletonRows rows={2} />
-        ) : members.status === 'error' ? (
+        ) : members.status === 'error' && !members.data ? (
           <ErrorState message={members.error.message} onRetry={members.refetch} />
-        ) : !members.data?.length ? (
-          <EmptyState icon={Users} title="No owners yet" body="Add the email of an existing account to give it access to this business." className="py-6" />
-        ) : (
-          <ul className="divide-y divide-line border-y border-line">
-            {(members.data ?? []).map((m) => (
-              <li key={m.userId} className="flex items-center justify-between gap-3 py-3">
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-ink">{m.email}</span>
-                  <span className="block text-xs text-ink-muted">Added {formatDate(m.addedAt)}</span>
-                </span>
-                <IconButton aria-label={`Remove ${m.email}`} onClick={() => void remove(m.userId, m.email)}>
+        ) : owner ? (
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3 border-y border-line py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-ink">{owner.email}</p>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  {owner.acceptedAt
+                    ? `Active since ${formatDate(owner.acceptedAt)}`
+                    : owner.invitedAt
+                      ? `Invited ${formatDate(owner.invitedAt)} · has not set a password yet`
+                      : `Added ${formatDate(owner.addedAt)}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {owner.acceptedAt ? (
+                  <Badge tone="success">
+                    <UserCheck className="size-3" aria-hidden /> Active
+                  </Badge>
+                ) : (
+                  <Badge tone="warning">Invitation pending</Badge>
+                )}
+                <IconButton aria-label={`Remove ${owner.email}`} onClick={() => void remove()}>
                   <Trash2 className="size-4" aria-hidden />
                 </IconButton>
-              </li>
-            ))}
-          </ul>
+              </div>
+            </div>
+            {!owner.acceptedAt && (
+              <Button loading={resend.pending} icon={<RefreshCw className="size-4" aria-hidden />} onClick={() => void doResend()}>
+                Resend invitation
+              </Button>
+            )}
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-4" noValidate>
+            <InlineNotice tone="neutral">No owner yet. Invite the person who will manage this catalogue.</InlineNotice>
+            <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+              <FormField label="Owner email" error={error ?? undefined} required>
+                <Input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </FormField>
+              <FormField label="Email language">
+                <Select value={language} onChange={(e) => setLanguage(e.target.value as Lang)}>
+                  <option value="en">English</option>
+                  <option value="pt">Português</option>
+                </Select>
+              </FormField>
+            </div>
+            <Button type="submit" variant="primary" loading={provision.pending} icon={<UserPlus className="size-4" aria-hidden />} disabled={!email.trim()}>
+              Invite owner
+            </Button>
+            <p className="flex items-start gap-1.5 text-xs text-ink-muted">
+              <MailPlus className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              The invitation link is created by Supabase Auth and sent by email; it is never shown here.
+            </p>
+          </form>
         )}
-
-        <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-end" noValidate>
-          <FormField
-            label="Add owner by email"
-            hint="The account must already exist and have confirmed its email. For someone without an account, use a claim link below."
-            error={error ?? undefined}
-            className="flex-1"
-          >
-            <Input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </FormField>
-          <Button type="submit" variant="primary" loading={add.pending} icon={<UserPlus className="size-4" aria-hidden />} disabled={!email.trim()}>
-            Add owner
-          </Button>
-        </form>
-        <ClaimLinkSection business={business} />
       </CardBody>
     </Card>
-  )
-}
-
-/**
- * Single-use claim link for an owner who has no access yet (20261013144121_owner_registration_and_claims).
- * Only a hash is stored server-side, so the link can be shown once; creating a new one cancels the old one.
- */
-function ClaimLinkSection({ business }: { business: Business }) {
-  const create = useServiceMutation(() => service.createBusinessClaim(business.id))
-  const confirm = useConfirm()
-  const toast = useToast()
-  const [link, setLink] = useState<{ url: string; expiresAt: string } | null>(null)
-
-  const issue = async () => {
-    const ok = await confirm({
-      title: 'Create a claim link?',
-      body: `Whoever opens this link while signed in becomes an owner of ${business.name}. Any unused earlier link stops working.`,
-      confirmLabel: 'Create link',
-    })
-    if (!ok) return
-    const res = await create.mutate()
-    if (!res.ok) return toast.error('Could not create a claim link', res.error.message)
-    setLink({ url: claimLinkUrl(res.data.token), expiresAt: res.data.expiresAt })
-  }
-
-  return (
-    <div className="space-y-3 border-t border-line pt-5">
-      <div>
-        <h3 className="text-sm font-medium text-ink">Claim link</h3>
-        <p className="mt-1 text-xs text-ink-muted">
-          For an owner who has no access yet. Send it only to a contact you have verified yourself, for example by phone. Single use, valid for 7 days.
-        </p>
-      </div>
-      {link ? (
-        <div className="space-y-2">
-          <Input readOnly aria-label="Claim link" value={link.url} onFocus={(e) => e.currentTarget.select()} />
-          <div className="flex flex-wrap items-center gap-3">
-            <CopyButton text={link.url} />
-            <span className="text-xs text-ink-muted">Shown only once. Expires {formatDate(link.expiresAt)}.</span>
-          </div>
-        </div>
-      ) : (
-        <Button loading={create.pending} icon={<Link2 className="size-4" aria-hidden />} onClick={() => void issue()}>
-          Create claim link
-        </Button>
-      )}
-    </div>
   )
 }

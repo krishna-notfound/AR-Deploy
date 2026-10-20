@@ -1,7 +1,7 @@
 // Compile-time check: every column the service reads must exist in the generated schema types.
 // A failure here means a migration renamed/dropped a column or the row types are out of date.
 import type { Database } from './database.types'
-import type { BusinessRow, DailyRow, ImageRow, ModelRow, ProductRow, VariantRow } from './supabaseCatalogService'
+import type { ApplicationRow, AuditRow, BusinessRow, DailyRow, EmailRow, ImageRow, ModelRow, ProductRow, VariantRow } from './supabaseCatalogService'
 
 type T = Database['public']['Tables']
 type Missing<Hand, Gen> = Exclude<keyof Hand, keyof Gen>
@@ -14,4 +14,7 @@ export const schemaMatches: [
   Ok<Missing<ModelRow, T['product_models']['Row']>>,
   Ok<Missing<VariantRow, T['product_variants']['Row']>>,
   Ok<Missing<DailyRow, Database['public']['Views']['product_analytics_daily']['Row']>>,
-] = [true, true, true, true, true, true]
+  Ok<Missing<ApplicationRow, T['business_applications']['Row']>>,
+  Ok<Missing<AuditRow, T['audit_events']['Row']>>,
+  Ok<Missing<EmailRow, T['email_log']['Row']>>,
+] = [true, true, true, true, true, true, true, true, true]

@@ -153,19 +153,13 @@ describe.skipIf(!enabled)('Supabase live API', { timeout: 30_000 }, () => {
     expect(s.ok).toBe(false)
   })
 
-  it('platform admin manages owners; owners cannot manage owners', async () => {
+  it('platform admin sees owners; owners cannot see or manage owners', async () => {
     const list = must(await admin.svc.getBusinessMembers(bizA))
     expect(list.map((m) => m.email)).toEqual(['qa-owner-a@furnish.example'])
     expect((await ownerA.svc.getBusinessMembers(bizA)).ok === false).toBe(true)
-    expect((await ownerA.svc.addBusinessMember(bizB, 'qa-owner-a@furnish.example')).ok).toBe(false)
-    const unknown = await admin.svc.addBusinessMember(bizA, 'nobody-here@furnish.example')
-    expect(unknown.ok === false && unknown.error.code).toBe('NOT_FOUND')
-    // Linking owner B to A gives B access to A's draft; removing it takes access away again.
-    must(await admin.svc.addBusinessMember(bizA, 'qa-owner-b@furnish.example'))
-    expect((await ownerB.svc.getProductById(draftA.id)).ok).toBe(true)
-    const bId = (await ownerB.sb.auth.getUser()).data.user!.id
-    must(await admin.svc.removeBusinessMember(bizA, bId))
     expect((await ownerB.svc.getProductById(draftA.id)).ok).toBe(false)
+    const r = await ownerA.svc.provisionOwner({ businessId: bizB, email: 'qa-owner-a@furnish.example', language: 'en' })
+    expect(r.ok).toBe(false)
   })
 
   it('publishes, then the public can see the product and fetch its files via signed URLs', async () => {
@@ -238,44 +232,27 @@ describe.skipIf(!enabled)('Supabase live API', { timeout: 30_000 }, () => {
   })
 })
 
-// Owner registration and claim links (20261013144121). Needs a 4th QA user, qa-newcomer@furnish.example:
-// confirmed email, same password, no business. Leaves it without memberships at the end.
-describe.skipIf(!enabled)('Supabase live API: owner registration and claim links', { timeout: 30_000 }, () => {
-  const tag = Math.random().toString(36).slice(2, 8)
+// Access model (20261020091428): no self-registration or claim links; applications and audit are admin-only.
+// Needs a 4th QA user, qa-newcomer@furnish.example: confirmed email, same password, no business.
+describe.skipIf(!enabled)('Supabase live API: applications and owner access', { timeout: 30_000 }, () => {
   let admin: Actor, newcomer: Actor
-  let claimable = '', registered = ''
 
   beforeAll(async () => {
     ;[admin, newcomer] = await Promise.all([signIn('qa-admin@furnish.example'), signIn('qa-newcomer@furnish.example')])
-    const base = { description: 'QA', contact: { email: 'qa-newcomer@furnish.example' }, status: 'active' as const, branding: { accentColor: '#B4441A' }, defaultCurrency: 'EUR' as const }
-    claimable = must(await admin.svc.createBusiness({ ...base, name: `QA Claim ${tag}`, slug: `qa-claim-${tag}` })).id
   }, 60_000)
 
-  afterAll(async () => {
-    if (!admin) return
-    for (const id of [claimable, registered].filter(Boolean)) await admin.svc.deleteBusiness(id)
-  }, 60_000)
-
-  it('registers a new business as a draft that the public cannot see', async () => {
-    const auth = createSupabaseAuthService(newcomer.sb)
-    registered = must(await auth.registerBusiness(`QA New ${tag}`, `qa-new-${tag}`)).businessId
-    const mine = must(await newcomer.svc.getBusinessById(registered))
-    expect(mine.status).toBe('draft')
-    expect((await createSupabaseCatalogService(client()).getCatalog(`qa-new-${tag}`)).ok).toBe(false)
-    const second = await auth.registerBusiness(`QA Second ${tag}`, `qa-second-${tag}`)
-    expect(second.ok ? null : second.error.code).toBe('CONFLICT')
-    expect((await newcomer.svc.setBusinessStatus(registered, 'active')).ok).toBe(false) // only an admin approves
+  it('self-registration and claim links are gone', async () => {
+    for (const fn of ['register_business', 'redeem_business_claim', 'admin_create_business_claim', 'admin_add_business_member']) {
+      const { error } = await newcomer.sb.rpc(fn, {})
+      expect(error).not.toBeNull()
+    }
   })
 
-  it('a matching contact email grants nothing; a claim link grants ownership once', async () => {
-    expect((await newcomer.svc.getBusinessById(claimable)).ok).toBe(true) // active, so publicly readable
-    expect((await newcomer.svc.updateBusiness(claimable, { description: 'hijack' })).ok).toBe(false)
-    expect((await newcomer.svc.createBusinessClaim(claimable)).ok).toBe(false) // admin-only
-    const { token } = must(await admin.svc.createBusinessClaim(claimable))
-    const auth = createSupabaseAuthService(newcomer.sb)
-    expect(must(await auth.redeemBusinessClaim(token)).businessId).toBe(claimable)
-    expect((await newcomer.svc.updateBusiness(claimable, { description: 'now an owner' })).ok).toBe(true)
-    const again = await auth.redeemBusinessClaim(token)
-    expect(again.ok ? null : again.error.code).toBe('NOT_FOUND')
+  it('applications and the audit trail are visible to platform admins only', async () => {
+    expect(must(await newcomer.svc.getApplications()).total).toBe(0)
+    expect(must(await newcomer.svc.getAuditEvents()).total).toBe(0)
+    expect(must(await admin.svc.getApplications()).total).toBeGreaterThanOrEqual(0)
+    const r = await newcomer.svc.reviewApplication('00000000-0000-0000-0000-000000000000', 'approve')
+    expect(r.ok === false && r.error.code).toBe('PERMISSION')
   })
 })

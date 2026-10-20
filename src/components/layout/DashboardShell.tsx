@@ -73,13 +73,13 @@ export function DashboardShell({ nav, variant }: { nav: NavItem[]; variant: 'adm
   )
 }
 
-/** Self-registered businesses start as drafts until a platform admin activates them. */
+/** Approved applications become draft businesses; the catalogue is private until a platform admin activates it (ADR-0024). */
 function PendingApprovalNotice() {
   const { business } = useAccount()
   if (business?.status !== 'draft') return null
   return (
     <InlineNotice tone="warning" className="mb-5">
-      <strong className="font-medium">{business.name} is waiting for approval.</strong> You can add products now. Customers will see your
+      <strong className="font-medium">{business.name} is not public yet.</strong> You can add products now. Customers will see your
       catalog once the platform team activates it.
     </InlineNotice>
   )

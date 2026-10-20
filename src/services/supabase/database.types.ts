@@ -1,19 +1,182 @@
-// Generated from the live schema of pmnjchhrgvajtjpadpqo on 2026-10-13 after migration 20261012200813 (Supabase type generator).
+// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-20 after migration 20261020091428 (Supabase type generator).
 // Only `Json` and `Database` are kept; regenerate with `npm run db:types` after any migration.
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: '14.18'
   }
   public: {
     Tables: {
-      business_members: {
-        Row: { business_id: string; created_at: string; id: string; role: string; user_id: string }
-        Insert: { business_id: string; created_at?: string; id?: string; role?: string; user_id: string }
-        Update: { business_id?: string; created_at?: string; id?: string; role?: string; user_id?: string }
+      audit_events: {
+        Row: {
+          actor_id: string | null
+          application_id: string | null
+          business_id: string | null
+          created_at: string
+          event_type: string
+          from_status: string | null
+          id: string
+          metadata: Json
+          to_status: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          application_id?: string | null
+          business_id?: string | null
+          created_at?: string
+          event_type: string
+          from_status?: string | null
+          id?: string
+          metadata?: Json
+          to_status?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          application_id?: string | null
+          business_id?: string | null
+          created_at?: string
+          event_type?: string
+          from_status?: string | null
+          id?: string
+          metadata?: Json
+          to_status?: string | null
+        }
         Relationships: [
-          { foreignKeyName: 'business_members_business_id_fkey'; columns: ['business_id']; isOneToOne: false; referencedRelation: 'businesses'; referencedColumns: ['id'] },
+          {
+            foreignKeyName: 'audit_events_application_id_fkey'
+            columns: ['application_id']
+            isOneToOne: false
+            referencedRelation: 'business_applications'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'audit_events_business_id_fkey'
+            columns: ['business_id']
+            isOneToOne: false
+            referencedRelation: 'businesses'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      business_applications: {
+        Row: {
+          answers: Json
+          applicant_email: string
+          applicant_name: string
+          applicant_phone: string | null
+          business_id: string | null
+          business_name: string
+          category: string
+          city: string
+          country: string
+          created_at: string
+          decision_reason: string | null
+          id: string
+          language: string
+          reference: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submission_key: string
+          submitter_hash: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          answers?: Json
+          applicant_email: string
+          applicant_name: string
+          applicant_phone?: string | null
+          business_id?: string | null
+          business_name: string
+          category: string
+          city: string
+          country: string
+          created_at?: string
+          decision_reason?: string | null
+          id?: string
+          language?: string
+          reference?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submission_key: string
+          submitter_hash?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          answers?: Json
+          applicant_email?: string
+          applicant_name?: string
+          applicant_phone?: string | null
+          business_id?: string | null
+          business_name?: string
+          category?: string
+          city?: string
+          country?: string
+          created_at?: string
+          decision_reason?: string | null
+          id?: string
+          language?: string
+          reference?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submission_key?: string
+          submitter_hash?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'business_applications_business_id_fkey'
+            columns: ['business_id']
+            isOneToOne: true
+            referencedRelation: 'businesses'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      business_members: {
+        Row: {
+          accepted_at: string | null
+          business_id: string
+          created_at: string
+          id: string
+          invited_at: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          business_id: string
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          role?: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          business_id?: string
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'business_members_business_id_fkey'
+            columns: ['business_id']
+            isOneToOne: false
+            referencedRelation: 'businesses'
+            referencedColumns: ['id']
+          },
         ]
       }
       businesses: {
@@ -67,16 +230,112 @@ export type Database = {
         }
         Relationships: []
       }
+      email_log: {
+        Row: {
+          application_id: string | null
+          attempt: number
+          business_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          kind: string
+          provider: string
+          provider_message_id: string | null
+          recipient: string
+          status: string
+          subject: string
+          triggered_by: string | null
+          updated_at: string
+          workflow: string | null
+        }
+        Insert: {
+          application_id?: string | null
+          attempt?: number
+          business_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind: string
+          provider?: string
+          provider_message_id?: string | null
+          recipient: string
+          status: string
+          subject: string
+          triggered_by?: string | null
+          updated_at?: string
+          workflow?: string | null
+        }
+        Update: {
+          application_id?: string | null
+          attempt?: number
+          business_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind?: string
+          provider?: string
+          provider_message_id?: string | null
+          recipient?: string
+          status?: string
+          subject?: string
+          triggered_by?: string | null
+          updated_at?: string
+          workflow?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'email_log_application_id_fkey'
+            columns: ['application_id']
+            isOneToOne: false
+            referencedRelation: 'business_applications'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'email_log_business_id_fkey'
+            columns: ['business_id']
+            isOneToOne: false
+            referencedRelation: 'businesses'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       platform_admins: {
-        Row: { created_at: string; user_id: string }
-        Insert: { created_at?: string; user_id: string }
-        Update: { created_at?: string; user_id?: string }
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
         Relationships: []
       }
       product_analytics: {
-        Row: { business_id: string; created_at: string; event_type: string; id: string; product_id: string }
-        Insert: { business_id: string; created_at?: string; event_type: string; id?: string; product_id: string }
-        Update: { business_id?: string; created_at?: string; event_type?: string; id?: string; product_id?: string }
+        Row: {
+          business_id: string
+          created_at: string
+          event_type: string
+          id: string
+          product_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          product_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          product_id?: string
+        }
         Relationships: [
           {
             foreignKeyName: 'product_analytics_product_id_business_id_fkey'
@@ -122,7 +381,13 @@ export type Database = {
           url?: string | null
         }
         Relationships: [
-          { foreignKeyName: 'product_images_product_id_fkey'; columns: ['product_id']; isOneToOne: false; referencedRelation: 'products'; referencedColumns: ['id'] },
+          {
+            foreignKeyName: 'product_images_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
         ]
       }
       product_models: {
@@ -154,7 +419,13 @@ export type Database = {
           url?: string | null
         }
         Relationships: [
-          { foreignKeyName: 'product_models_product_id_fkey'; columns: ['product_id']; isOneToOne: false; referencedRelation: 'products'; referencedColumns: ['id'] },
+          {
+            foreignKeyName: 'product_models_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
         ]
       }
       product_variants: {
@@ -189,7 +460,13 @@ export type Database = {
           sort_order?: number
         }
         Relationships: [
-          { foreignKeyName: 'product_variants_product_id_fkey'; columns: ['product_id']; isOneToOne: false; referencedRelation: 'products'; referencedColumns: ['id'] },
+          {
+            foreignKeyName: 'product_variants_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
         ]
       }
       products: {
@@ -266,7 +543,13 @@ export type Database = {
           width?: number
         }
         Relationships: [
-          { foreignKeyName: 'products_business_id_fkey'; columns: ['business_id']; isOneToOne: false; referencedRelation: 'businesses'; referencedColumns: ['id'] },
+          {
+            foreignKeyName: 'products_business_id_fkey'
+            columns: ['business_id']
+            isOneToOne: false
+            referencedRelation: 'businesses'
+            referencedColumns: ['id']
+          },
         ]
       }
     }
@@ -292,27 +575,101 @@ export type Database = {
       }
     }
     Functions: {
-      admin_add_business_member: { Args: { p_business_id: string; p_email: string }; Returns: string }
-      // Hand-added for 20261013144121_owner_registration_and_claims; regenerate with `npm run db:types` once applied.
-      admin_create_business_claim: { Args: { p_business_id: string }; Returns: { token: string; expires_at: string }[] }
-      redeem_business_claim: { Args: { p_token: string }; Returns: string }
-      register_business: { Args: { p_name: string; p_slug: string }; Returns: string }
       admin_list_business_members: {
         Args: { p_business_id: string }
-        Returns: { created_at: string; email: string; user_id: string }[]
+        Returns: {
+          accepted_at: string
+          created_at: string
+          email: string
+          invited_at: string
+          last_sign_in_at: string
+          user_id: string
+        }[]
       }
+      admin_review_application: {
+        Args: { p_action: string; p_application_id: string; p_reason?: string }
+        Returns: {
+          answers: Json
+          applicant_email: string
+          applicant_name: string
+          applicant_phone: string | null
+          business_id: string | null
+          business_name: string
+          category: string
+          city: string
+          country: string
+          created_at: string
+          decision_reason: string | null
+          id: string
+          language: string
+          reference: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submission_key: string
+          submitter_hash: string | null
+          updated_at: string
+          website: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'business_applications'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_user_emails: {
+        Args: { p_ids: string[] }
+        Returns: {
+          email: string
+          id: string
+        }[]
+      }
+      complete_owner_onboarding: { Args: never; Returns: string }
       is_business_member: { Args: { bid: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       record_event_limited: {
-        Args: { p_business_id: string; p_event_type: string; p_product_id: string; p_visitor_key: string }
+        Args: {
+          p_business_id: string
+          p_event_type: string
+          p_product_id: string
+          p_visitor_key: string
+        }
         Returns: string
       }
       save_product: {
-        Args: { p_images: Json; p_models: Json; p_product: Json; p_variants: Json }
+        Args: {
+          p_images: Json
+          p_models: Json
+          p_product: Json
+          p_variants: Json
+        }
         Returns: string
       }
+      service_link_owner: {
+        Args: {
+          p_actor: string
+          p_application_id?: string
+          p_business_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      service_record_email_event: {
+        Args: {
+          p_event_type: string
+          p_provider_message_id: string
+          p_svix_id: string
+        }
+        Returns: boolean
+      }
+      service_user_id_by_email: { Args: { p_email: string }; Returns: string }
     }
-    Enums: { [_ in never]: never }
-    CompositeTypes: { [_ in never]: never }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }

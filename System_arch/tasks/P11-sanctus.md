@@ -14,7 +14,11 @@
 - Note: AR on real phones was not tested in this sub-project (no device). The launch code path is unchanged; the Android intent e2e test passes.
 
 ## Next
-- [ ] Sub-project 2 · Access model: approval states, one owner per business, admin-created owners (Edge Function), self-service removed, configurable categories (migration 8, needs approval)
+- [x] Sub-project 2 · Access model: applications with approval states, one owner per business, admin-created owners (Edge Function), self-service removed — done 2026-10-20: ADR-0024, design/24, migration 20261020091428 applied to the client project, 3 Edge Functions deployed; email needs the Resend secrets (org Admin). Configurable categories moved to Discovered D1.
+
+## Discovered
+- [ ] D1 · Configurable product categories per business (split from sub-project 2)
+- [!] D2 · Edge Function secrets and Auth redirect URLs on the client project: needs the org Admin role (Developer gets 403)
 - [ ] Sub-project 3 · Variant media: per-variant photos and GLB/USDZ (migration 9, needs approval)
 - [ ] Sub-project 4 · EN/PT everywhere (auth pages, dashboards), language persistence
 - [ ] Sub-project 5 · Product QR codes; ops pack (client Supabase setup, Vercel env, redirect URLs, Resend checklist, DNS, asset/testing guide)

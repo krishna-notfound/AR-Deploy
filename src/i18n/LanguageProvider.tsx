@@ -6,6 +6,9 @@ import { type Vars, pickLocalized, translate } from './translate'
 export const LANG_KEY = 'arfurn:lang'
 
 function initialLang(): Lang {
+  // An explicit ?lang= (e.g. from an owner invitation link) wins for this visit.
+  const fromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null
+  if (fromUrl === 'en' || fromUrl === 'pt') return fromUrl
   try {
     const stored = sessionStorage.getItem(LANG_KEY)
     if (stored === 'en' || stored === 'pt') return stored

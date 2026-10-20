@@ -14,8 +14,8 @@ const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
 const DemoEntryPage = lazy(() => import('@/features/demo/DemoEntryPage'))
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
-const SignupPage = lazy(() => import('@/features/auth/SignupPage'))
-const ClaimPage = lazy(() => import('@/features/auth/ClaimPage'))
+const AcceptInvitePage = lazy(() => import('@/features/auth/AcceptInvitePage'))
+const ApplyPage = lazy(() => import('@/features/apply/ApplyPage'))
 const NotFoundPage = lazy(() => import('@/features/demo/NotFoundPage'))
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/AdminOverviewPage'))
@@ -26,6 +26,9 @@ const AdminProductsPage = lazy(() => import('@/features/admin/AdminProductsPage'
 const AdminAnalyticsPage = lazy(() => import('@/features/admin/AdminAnalyticsPage'))
 const AdminCatalogsPage = lazy(() => import('@/features/admin/AdminCatalogsPage'))
 const AdminSettingsPage = lazy(() => import('@/features/admin/AdminSettingsPage'))
+const ApplicationsPage = lazy(() => import('@/features/admin/ApplicationsPage'))
+const ApplicationDetailPage = lazy(() => import('@/features/admin/ApplicationDetailPage'))
+const AuditLogPage = lazy(() => import('@/features/admin/AuditLogPage'))
 const ProductEditorPage = lazy(() => import('@/features/products/ProductEditorPage'))
 
 const BusinessOverviewPage = lazy(() => import('@/features/business/BusinessOverviewPage'))
@@ -64,6 +67,8 @@ const adminRoutes: RouteObject = {
   ),
   children: [
     { index: true, element: <AdminOverviewPage /> },
+    { path: 'applications', element: <ApplicationsPage /> },
+    { path: 'applications/:applicationId', element: <ApplicationDetailPage /> },
     { path: 'businesses', element: <BusinessesListPage /> },
     { path: 'businesses/new', element: <BusinessCreatePage /> },
     { path: 'businesses/:businessId', element: <BusinessDetailPage /> },
@@ -72,6 +77,7 @@ const adminRoutes: RouteObject = {
     { path: 'products/:productId/edit', element: <ProductEditorPage scope="admin" /> },
     { path: 'analytics', element: <AdminAnalyticsPage /> },
     { path: 'catalogs', element: <AdminCatalogsPage /> },
+    { path: 'activity', element: <AuditLogPage /> },
     { path: 'settings', element: <AdminSettingsPage /> },
     { path: '*', element: <NotFoundPage inShell /> },
   ],
@@ -108,8 +114,6 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/demo', element: <DemoEntryPage /> },
             { path: '/login', element: <LoginPage /> },
             { path: '/reset-password', element: <ResetPasswordPage /> },
-            { path: '/signup', element: <SignupPage /> },
-            { path: '/claim', element: <ClaimPage /> },
           ],
         },
         adminRoutes,
@@ -118,6 +122,8 @@ function pathModeRoutes(): RouteObject[] {
           element: <PublicLayout />,
           children: [
             { path: '/', element: <LandingPage /> },
+            { path: '/apply', element: <ApplyPage /> },
+            { path: '/accept-invite', element: <AcceptInvitePage /> },
             { path: '/catalog/:businessSlug', element: <CatalogPage /> },
             { path: '/products/:businessSlug/:productSlug', element: <ProductPage /> },
           ],

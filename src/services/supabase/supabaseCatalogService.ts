@@ -3,12 +3,18 @@
 // Every failure is returned as an error Result. Nothing falls back to demo data.
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
+  ApplicationStatus,
+  AuditEvent,
   Business,
+  BusinessApplication,
   BusinessCatalog,
   BusinessStatus,
   Category,
   Currency,
+  EmailAttempt,
+  EmailAttemptStatus,
   ID,
+  Lang,
   LengthUnit,
   LocalizedText,
   ModelAsset,
@@ -21,7 +27,7 @@ import type {
 import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, isoDay, summarize } from '../analytics'
-import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type Result, type ServiceError, type UploadKind, fail, ok } from '../catalogService'
+import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok } from '../catalogService'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
@@ -124,13 +130,11 @@ const DB_RULES: Record<string, { field: string; message: string }> = {
   publish_requires_gallery_image: { field: 'images', message: 'Add at least one product image before publishing.' },
 }
 
-/** Stable message keys raised by the account functions (20261013144121_owner_registration_and_claims). */
+/** Stable message keys raised by the database functions (20261020091428_applications_and_owner_access). */
 const ACCOUNT_RULES: Record<string, ServiceError> = {
   sign_in_required: { code: 'PERMISSION', message: 'Sign in first.' },
-  email_not_confirmed: { code: 'PERMISSION', message: 'Confirm your email address first: open the link we sent you, then sign in again.' },
-  registration_pending: { code: 'CONFLICT', message: 'Your account already has a business waiting for approval. We will review it shortly.' },
-  slug_taken: { code: 'CONFLICT', message: 'Please fix the highlighted fields.', fieldErrors: { slug: 'This address is already taken. Choose another one.' } },
-  claim_invalid: { code: 'NOT_FOUND', message: 'This claim link is invalid, already used or expired. Ask us for a new one.' },
+  platform_admin_only: { code: 'PERMISSION', message: 'Only platform admins can do this.' },
+  application_not_found: { code: 'NOT_FOUND', message: 'Application not found.' },
   business_not_found: { code: 'NOT_FOUND', message: 'This business no longer exists.' },
 }
 
@@ -299,6 +303,141 @@ const isBlobOrDataUrl = (u: string) => u.startsWith('blob:') || u.startsWith('da
 
 const UPLOAD_CONTENT_TYPE: Partial<Record<UploadKind, string>> = { glb: 'model/gltf-binary', usdz: 'model/vnd.usdz+zip' }
 
+// ---------------- applications, audit, email log (20261020091428_applications_and_owner_access) ----------------
+
+const SUBMIT_APPLICATION_FUNCTION = 'submit-application'
+const PROVISION_OWNER_FUNCTION = 'provision-owner'
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export interface ApplicationRow {
+  id: string
+  reference: string
+  status: ApplicationStatus
+  business_name: string
+  applicant_name: string
+  applicant_email: string
+  applicant_phone: string | null
+  website: string | null
+  country: string
+  city: string
+  category: string
+  language: Lang
+  answers: BusinessApplication['answers'] | null
+  decision_reason: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  business_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AuditRow {
+  id: string
+  created_at: string
+  event_type: string
+  actor_id: string | null
+  application_id: string | null
+  business_id: string | null
+  from_status: string | null
+  to_status: string | null
+  metadata: Record<string, unknown> | null
+}
+
+export interface EmailRow {
+  id: string
+  created_at: string
+  updated_at: string
+  kind: string
+  recipient: string
+  subject: string
+  status: EmailAttemptStatus
+  provider_message_id: string | null
+  error: string | null
+  application_id: string | null
+  business_id: string | null
+  workflow: string | null
+  attempt: number
+}
+
+/** Application and/or business scope: with both, rows of either match (an application and the business it created). */
+function scoped<Q extends { eq(c: string, v: string): Q; or(f: string): Q }>(query: Q, s: { applicationId?: string; businessId?: string }): Q {
+  const ids = [s.applicationId, s.businessId].filter((x): x is string => !!x)
+  if (!ids.every((x) => UUID_PATTERN.test(x))) return query.eq('id', '00000000-0000-0000-0000-000000000000')
+  if (s.applicationId && s.businessId) return query.or(`application_id.eq.${s.applicationId},business_id.eq.${s.businessId}`)
+  if (s.applicationId) return query.eq('application_id', s.applicationId)
+  if (s.businessId) return query.eq('business_id', s.businessId)
+  return query
+}
+
+const toApplication = (r: ApplicationRow): BusinessApplication => ({
+  id: r.id,
+  reference: r.reference,
+  status: r.status,
+  businessName: r.business_name,
+  applicantName: r.applicant_name,
+  applicantEmail: r.applicant_email,
+  applicantPhone: r.applicant_phone ?? undefined,
+  website: r.website ?? undefined,
+  country: r.country,
+  city: r.city,
+  category: r.category,
+  language: r.language,
+  answers: r.answers ?? {},
+  decisionReason: r.decision_reason ?? undefined,
+  reviewedBy: r.reviewed_by ?? undefined,
+  reviewedAt: r.reviewed_at ?? undefined,
+  businessId: r.business_id ?? undefined,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+})
+
+const toAuditEvent = (r: AuditRow): AuditEvent => ({
+  id: r.id,
+  createdAt: r.created_at,
+  eventType: r.event_type,
+  actorId: r.actor_id ?? undefined,
+  applicationId: r.application_id ?? undefined,
+  businessId: r.business_id ?? undefined,
+  fromStatus: r.from_status ?? undefined,
+  toStatus: r.to_status ?? undefined,
+  metadata: r.metadata ?? {},
+})
+
+const toEmailAttempt = (r: EmailRow): EmailAttempt => ({
+  id: r.id,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  kind: r.kind,
+  recipient: r.recipient,
+  subject: r.subject,
+  status: r.status,
+  providerMessageId: r.provider_message_id ?? undefined,
+  error: r.error ?? undefined,
+  applicationId: r.application_id ?? undefined,
+  businessId: r.business_id ?? undefined,
+  workflow: r.workflow ?? undefined,
+  attempt: r.attempt,
+})
+
+/** Edge Function error bodies → service errors. Function messages are written for people; codes map to plain text. */
+const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string }> = {
+  invalid_application: { code: 'VALIDATION', message: 'Please fix the highlighted fields.' },
+  rate_limited: { code: 'RATE_LIMITED', message: 'Too many requests. Wait a little and try again.' },
+  not_signed_in: { code: 'PERMISSION', message: 'Sign in again to continue.' },
+  platform_admin_only: { code: 'PERMISSION', message: 'Only platform admins can do this.' },
+  business_not_found: { code: 'NOT_FOUND', message: 'This business no longer exists.' },
+  business_has_owner: { code: 'CONFLICT', message: 'This business already has an owner. Remove them first to invite someone else.' },
+  no_owner: { code: 'NOT_FOUND', message: 'This business has no invited owner yet.' },
+  already_accepted: { code: 'CONFLICT', message: 'The owner has already accepted the invitation and can sign in.' },
+  cooldown: { code: 'RATE_LIMITED', message: 'Wait a minute between invitations.' },
+  too_many_attempts: { code: 'RATE_LIMITED', message: 'Too many invitations were sent for this business. Contact the owner directly.' },
+  invite_link_failed: { code: 'UNKNOWN', message: 'Supabase could not create the invitation link. Check the Auth settings and try again.' },
+  not_configured: { code: 'CONFIG', message: 'This feature is not configured on the server yet.' },
+  duplicate_application: { code: 'CONFLICT', message: 'An application for this business from this email is already being reviewed.' },
+  email_is_admin: { code: 'CONFLICT', message: 'This email belongs to a platform admin. Invite the business owner’s own address.' },
+  invalid_request: { code: 'VALIDATION', message: 'Check the details and try again.' },
+}
+
 export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService {
   const listeners = new Set<() => void>()
   /** Notify open queries after a successful write. */
@@ -313,6 +452,17 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     } catch (err) {
       return fail('UNKNOWN', `Could not reach Supabase: ${err instanceof Error ? err.message : String(err)}`)
     }
+  }
+
+  /** Calls an Edge Function; its JSON error body ({ error, fields }) becomes a service error. */
+  async function invokeFunction<T>(name: string, body: unknown): Promise<Result<T>> {
+    const { data, error } = await sb.functions.invoke(name, { body: body as Record<string, unknown> })
+    if (!error) return ok(data as T)
+    const res = (error as { context?: Response }).context
+    const payload = res && typeof res.json === 'function' ? ((await res.json().catch(() => ({}))) as { error?: string; message?: string; fields?: Record<string, string> }) : {}
+    const known = payload.error ? FUNCTION_ERRORS[payload.error] : undefined
+    if (known) return fail(known.code, payload.message ?? known.message, payload.fields)
+    return fail('UNKNOWN', 'The request could not be completed. Try again in a moment.')
   }
 
   async function hydrate(rows: ProductRow[]): Promise<Product[]> {
@@ -629,26 +779,98 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       guard(async () => {
         const { data, error } = await sb.rpc('admin_list_business_members', { p_business_id: businessId })
         if (error) return mapDbError(error)
-        const rows = (data ?? []) as { user_id: string; email: string; created_at: string }[]
-        return ok(rows.map((r) => ({ userId: r.user_id, email: r.email, addedAt: r.created_at })))
-      }),
-    addBusinessMember: (businessId, email) =>
-      guard(async () => {
-        const { error } = await sb.rpc('admin_add_business_member', { p_business_id: businessId, p_email: email })
-        return changed(error ? mapDbError(error) : ok(undefined))
-      }),
-    createBusinessClaim: (businessId) =>
-      guard(async () => {
-        const { data, error } = await sb.rpc('admin_create_business_claim', { p_business_id: businessId })
-        if (error) return mapDbError(error, { notFound: 'This business no longer exists.' })
-        const row = (data as { token: string; expires_at: string }[])[0]
-        return row ? ok({ token: row.token, expiresAt: row.expires_at }) : fail('UNKNOWN', 'No claim link was returned. Try again.')
+        const rows = (data ?? []) as { user_id: string; email: string; created_at: string; invited_at: string | null; accepted_at: string | null; last_sign_in_at: string | null }[]
+        return ok(
+          rows.map((r) => ({
+            userId: r.user_id,
+            email: r.email,
+            addedAt: r.created_at,
+            invitedAt: r.invited_at ?? undefined,
+            acceptedAt: r.accepted_at ?? undefined,
+            lastSignInAt: r.last_sign_in_at ?? undefined,
+          })),
+        )
       }),
     removeBusinessMember: (businessId, userId) =>
       guard(async () => {
         const { data, error } = await sb.from('business_members').delete().eq('business_id', businessId).eq('user_id', userId).select('id')
         if (error) return mapDbError(error)
         return changed(data.length ? ok(undefined) : fail('NOT_FOUND', 'This owner was not found, or your account cannot remove owners.'))
+      }),
+    provisionOwner: ({ businessId, email, language, applicationId }) =>
+      guard(async () => changed(await invokeFunction<ProvisionOutcome>(PROVISION_OWNER_FUNCTION, { action: 'provision', businessId, email, language, applicationId }))),
+    resendOwnerInvitation: (businessId) =>
+      guard(async () => changed(await invokeFunction<ProvisionOutcome>(PROVISION_OWNER_FUNCTION, { action: 'resend', businessId }))),
+
+    // ---------------- business applications ----------------
+    submitApplication: (input) => guard(() => invokeFunction<{ id: string; reference: string }>(SUBMIT_APPLICATION_FUNCTION, input)),
+
+    getApplications: (q = {}) =>
+      guard(async () => {
+        const size = q.pageSize ?? 20
+        const from = ((q.page ?? 1) - 1) * size
+        let query = sb.from('business_applications').select('*', { count: 'exact' }).order('created_at', { ascending: false })
+        if (q.status) query = query.eq('status', q.status)
+        if (q.from) query = query.gte('created_at', `${q.from}T00:00:00`)
+        if (q.to) query = query.lte('created_at', `${q.to}T23:59:59.999`)
+        const term = q.search?.replace(/[",()\\%*]/g, ' ').trim()
+        if (term) {
+          const like = `"%${term}%"`
+          const ors = [`business_name.ilike.${like}`, `applicant_name.ilike.${like}`, `applicant_email.ilike.${like}`, `reference.ilike.${like}`]
+          if (UUID_PATTERN.test(term)) ors.push(`id.eq.${term}`)
+          query = query.or(ors.join(','))
+        }
+        const { data, error, count } = await query.range(from, from + size - 1).returns<ApplicationRow[]>()
+        if (error) return mapDbError(error)
+        return ok({ items: (data ?? []).map(toApplication), total: count ?? 0 })
+      }),
+
+    getApplication: (id) =>
+      guard(async () => {
+        if (!UUID_PATTERN.test(id)) return fail('NOT_FOUND', 'Application not found.')
+        const { data, error } = await sb.from('business_applications').select('*').eq('id', id).maybeSingle<ApplicationRow>()
+        if (error) return mapDbError(error)
+        return data ? ok(toApplication(data)) : fail('NOT_FOUND', 'Application not found.')
+      }),
+
+    reviewApplication: (id, action, reason) =>
+      guard(async () => {
+        const { data, error } = await sb.rpc('admin_review_application', { p_application_id: id, p_action: action, p_reason: reason ?? null })
+        if (error) {
+          if (error.message === 'reason_required') return fail('VALIDATION', 'Give a reason for the rejection.', { reason: 'Give a reason for the rejection.' })
+          if (error.message === 'invalid_transition') return fail('CONFLICT', 'This application can no longer change to that status.')
+          return mapDbError(error, { notFound: 'Application not found.' })
+        }
+        return changed(ok(toApplication(data as ApplicationRow)))
+      }),
+
+    getAuditEvents: (q = {}) =>
+      guard(async () => {
+        const size = q.pageSize ?? 20
+        const from = ((q.page ?? 1) - 1) * size
+        let query = sb.from('audit_events').select('*', { count: 'exact' }).order('created_at', { ascending: false })
+        query = scoped(query, q)
+        const term = q.search?.trim().toLowerCase().replace(/[^a-z_ ]/g, '').replace(/\s+/g, '_')
+        if (term) query = query.ilike('event_type', `%${term}%`)
+        const { data, error, count } = await query.range(from, from + size - 1).returns<AuditRow[]>()
+        if (error) return mapDbError(error)
+        const rows = data ?? []
+        const actorIds = [...new Set(rows.map((r) => r.actor_id).filter((x): x is string => !!x))]
+        const emails = new Map<string, string>()
+        if (actorIds.length) {
+          const r = await sb.rpc('admin_user_emails', { p_ids: actorIds })
+          for (const u of (r.data ?? []) as { id: string; email: string }[]) emails.set(u.id, u.email)
+        }
+        return ok({ items: rows.map((r) => ({ ...toAuditEvent(r), actorEmail: r.actor_id ? emails.get(r.actor_id) : undefined })), total: count ?? 0 })
+      }),
+
+    getEmailAttempts: (q) =>
+      guard(async () => {
+        let query = sb.from('email_log').select('*').order('created_at', { ascending: false }).limit(100)
+        query = scoped(query, q)
+        const { data, error } = await query.returns<EmailRow[]>()
+        if (error) return mapDbError(error)
+        return ok((data ?? []).map(toEmailAttempt))
       }),
 
     // ---------------- files ----------------

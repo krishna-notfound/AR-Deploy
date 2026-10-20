@@ -3,14 +3,22 @@ import type {
   ActivityItem,
   AnalyticsEventType,
   AnalyticsSummary,
+  ApplicationInput,
+  ApplicationStatus,
   AssetStatus,
+  AuditEvent,
   Business,
+  BusinessApplication,
   BusinessCatalog,
   BusinessStatus,
   Category,
+  EmailAttempt,
+  EmailAttemptStatus,
   ID,
+  Lang,
   Product,
   ProductStatus,
+  ReviewAction,
 } from '@/domain/types'
 
 export type ServiceErrorCode =
@@ -72,6 +80,45 @@ export interface BusinessMember {
   userId: ID
   email: string
   addedAt: string
+  /** Set when a platform admin provisioned the owner through an invitation. */
+  invitedAt?: string
+  /** Set when the owner completed onboarding (set a password from the invitation). */
+  acceptedAt?: string
+  lastSignInAt?: string
+}
+
+export interface Page<T> {
+  items: T[]
+  total: number
+}
+
+export interface ApplicationQuery {
+  /** Business name, applicant name or email, or the application reference/id. */
+  search?: string
+  status?: ApplicationStatus
+  /** Inclusive dates (YYYY-MM-DD) on the submission date. */
+  from?: string
+  to?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface AuditQuery {
+  applicationId?: ID
+  businessId?: ID
+  /** Matches the event type. */
+  search?: string
+  page?: number
+  pageSize?: number
+}
+
+/** An audit entry with the acting account's email resolved (platform admins only). */
+export type AuditEntry = AuditEvent & { actorEmail?: string }
+
+export interface ProvisionOutcome {
+  owner: 'linked' | 'already_linked'
+  /** The invitation email attempt, as recorded in the email log. Not proof of delivery. */
+  email: { status: EmailAttemptStatus; error?: string; attempt: number }
 }
 
 export interface CatalogService {
@@ -104,13 +151,22 @@ export interface CatalogService {
   recordEvent(e: { productId: ID; businessId: ID; type: AnalyticsEventType }): Promise<Result<void>>
   getRecentActivity(opts?: { businessId?: ID; limit?: number }): Promise<Result<ActivityItem[]>>
 
-  // business owners (platform admins only; enforced by the database)
+  // business owners (platform admins only; enforced by the database and the Edge Functions)
   getBusinessMembers(businessId: ID): Promise<Result<BusinessMember[]>>
-  /** Links an existing account by email. */
-  addBusinessMember(businessId: ID, email: string): Promise<Result<void>>
   removeBusinessMember(businessId: ID, userId: ID): Promise<Result<void>>
-  /** Platform admins: issues a single-use claim link token (7 days) and cancels any unused earlier one. Shown once. */
-  createBusinessClaim(businessId: ID): Promise<Result<{ token: string; expiresAt: string }>>
+  /** Creates or links the business's single owner and emails a Supabase Auth invitation link. */
+  provisionOwner(input: { businessId: ID; email: string; language: Lang; applicationId?: ID }): Promise<Result<ProvisionOutcome>>
+  /** New invitation link for an owner who has not completed onboarding yet (cooldown and limits apply). */
+  resendOwnerInvitation(businessId: ID): Promise<Result<ProvisionOutcome>>
+
+  // business applications: anyone may submit; everything else is for platform admins
+  submitApplication(input: ApplicationInput): Promise<Result<{ id: ID; reference: string }>>
+  getApplications(query?: ApplicationQuery): Promise<Result<Page<BusinessApplication>>>
+  getApplication(id: ID): Promise<Result<BusinessApplication>>
+  /** Status transition through the database (approve creates the draft business in the same transaction). */
+  reviewApplication(id: ID, action: ReviewAction, reason?: string): Promise<Result<BusinessApplication>>
+  getAuditEvents(query?: AuditQuery): Promise<Result<Page<AuditEntry>>>
+  getEmailAttempts(query: { applicationId?: ID; businessId?: ID }): Promise<Result<EmailAttempt[]>>
 
   // files: validate on the client first (lib/files.ts); this only stores them
   uploadAsset(input: { kind: UploadKind; file: File; businessId?: ID }): Promise<Result<UploadedAsset>>

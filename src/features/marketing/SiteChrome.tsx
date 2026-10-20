@@ -6,6 +6,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useMaybeI18n } from '@/i18n/LanguageProvider'
 import { type Vars, translate } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
+import { APPLY_PATH } from '@/lib/urls'
 import { isDemoMode } from '@/services'
 import { LanguageSwitcher } from '../public/PublicShell'
 
@@ -57,6 +58,11 @@ export function SiteHeader({ variant = 'solid', cta = true }: { variant?: 'overl
         <div className="ml-auto flex items-center gap-4 lg:ml-0">
           {hasLang && <LanguageSwitcher />}
           {cta && (
+            <Link to={APPLY_PATH} className="hidden border-b border-current pb-0.5 text-label opacity-90 hover:opacity-100 sm:inline">
+              {t('site.apply')}
+            </Link>
+          )}
+          {cta && (
             <Link to={accountHref} aria-label={accountLabel} title={accountLabel} className="grid size-9 place-items-center opacity-90 hover:opacity-100">
               <UserRound className="size-[18px]" strokeWidth={1.4} aria-hidden />
             </Link>
@@ -92,9 +98,14 @@ export function SiteHeader({ variant = 'solid', cta = true }: { variant?: 'overl
           <div className="mt-10 border-t border-chalk/20 pt-6">
             {hasLang && <LanguageSwitcher />}
             {cta && (
-              <Link to={accountHref} className="mt-4 block py-1 text-label">
-                {accountLabel}
-              </Link>
+              <>
+                <Link to={APPLY_PATH} className="mt-4 block py-1 text-label">
+                  {t('site.apply')}
+                </Link>
+                <Link to={accountHref} className="mt-4 block py-1 text-label">
+                  {accountLabel}
+                </Link>
+              </>
             )}
           </div>
         </div>
@@ -123,7 +134,10 @@ export function SiteFooter() {
             ))}
           </ul>
         </nav>
-        <p className="text-label text-ink-muted lg:ml-auto">{t('site.rights', { year: YEAR })}</p>
+        <Link to={APPLY_PATH} className="text-label text-ink hover:underline lg:ml-auto">
+          {t('site.apply')}
+        </Link>
+        <p className="text-label text-ink-muted">{t('site.rights', { year: YEAR })}</p>
       </div>
       <div className="border-t border-line">
         {/* Contact details are shown only once the client supplies real ones (no placeholder addresses in production). */}

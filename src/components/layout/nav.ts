@@ -1,6 +1,8 @@
 import {
   BarChart3,
   Building2,
+  ClipboardList,
+  History,
   LayoutDashboard,
   type LucideIcon,
   Package,
@@ -20,10 +22,12 @@ export interface NavItem {
 
 export const adminNav: NavItem[] = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/admin/applications', label: 'Applications', icon: ClipboardList },
   { to: '/admin/businesses', label: 'Businesses', icon: Building2 },
   { to: '/admin/products', label: 'All Products', icon: Package },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/admin/catalogs', label: 'Catalogs & QR Codes', icon: QrCode },
+  { to: '/admin/activity', label: 'Audit log', icon: History },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

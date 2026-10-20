@@ -417,3 +417,19 @@ enabled = true
 # is off; the function validates input and rate-limits per hashed visitor (design/20).
 [functions.track-event]
 verify_jwt = false
+
+# Admin-only email test (design/23-email.md). Callers send their user access token; the handler also checks platform_admins.
+[functions.send-test-email]
+verify_jwt = true
+
+# Public business application (ADR-0024): anonymous visitors apply; the handler validates and rate-limits.
+[functions.submit-application]
+verify_jwt = false
+
+# Owner invitations (ADR-0024): platform admins only, re-checked in the handler.
+[functions.provision-owner]
+verify_jwt = true
+
+# Resend delivery events: authenticated by the svix signature (RESEND_WEBHOOK_SECRET), not a Supabase JWT.
+[functions.resend-webhook]
+verify_jwt = false

@@ -36,6 +36,11 @@ export function formatDate(iso: string, lang: Lang = 'en'): string {
   )
 }
 
+/** Date and time, e.g. "20 Oct 2026, 14:05" (admin history views). */
+export function formatDateTime(iso: string, lang: Lang = 'en'): string {
+  return new Intl.DateTimeFormat(CURRENCY_LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+}
+
 export function formatRelative(iso: string, now: Date = new Date()): string {
   const diffSec = Math.round((new Date(iso).getTime() - now.getTime()) / 1000)
   const abs = Math.abs(diffSec)

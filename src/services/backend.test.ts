@@ -290,9 +290,9 @@ describe('storage path helpers', () => {
     expect(logoPath(undefined)).toBeNull()
   })
 
-  it('demo mode reports owner management as unavailable instead of faking it', async () => {
-    const res = await mockCatalogService.getBusinessMembers('biz_casa')
-    expect(res.ok === false && res.error.code).toBe('UNSUPPORTED')
+  it('demo mode keeps owner management session-only and never claims an email was sent', async () => {
+    const res = await mockCatalogService.provisionOwner({ businessId: 'biz_casa', email: 'owner@demo.test', language: 'en' })
+    expect(res.ok && res.data.email).toMatchObject({ status: 'blocked', error: 'demo_mode' })
   })
 })
 

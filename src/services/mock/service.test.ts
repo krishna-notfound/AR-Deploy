@@ -175,3 +175,74 @@ describe('persistence', () => {
     expect(isValidDb({ ...createSeed(), schemaVersion: 99 })).toBe(false)
   })
 })
+
+describe('business applications and owner access (demo, ADR-0024)', () => {
+  const application = (over: Record<string, unknown> = {}) => ({
+    businessName: 'Atelier Norte',
+    website: 'atelier-norte.example',
+    description: 'Solid oak furniture made in Porto.',
+    category: 'furniture',
+    country: 'Portugal',
+    city: 'Porto',
+    applicantName: 'Rita Sousa',
+    applicantRole: '',
+    applicantEmail: 'rita@atelier.test',
+    applicantPhone: '',
+    language: 'pt' as const,
+    productCount: '11-50',
+    photoReadiness: 'all',
+    modelReadiness: 'none',
+    notes: '',
+    consent: true,
+    submissionKey: crypto.randomUUID(),
+    ...over,
+  })
+
+  it('validates with the shared rules and stores nothing on error', async () => {
+    const r = await svc.submitApplication(application({ applicantEmail: 'x', consent: false }))
+    expect(r.ok === false && r.error.fieldErrors).toEqual({ applicantEmail: 'invalid_email', consent: 'consent_required' })
+    expect(unwrap(await svc.getApplications()).total).toBe(0)
+  })
+
+  it('is idempotent per submission key and refuses a second open application', async () => {
+    const input = application()
+    const a = unwrap(await svc.submitApplication(input))
+    expect(unwrap(await svc.submitApplication(input))).toEqual(a)
+    const dup = await svc.submitApplication(application({ businessName: 'ATELIER NORTE' }))
+    expect(dup.ok === false && dup.error.code).toBe('CONFLICT')
+    expect(unwrap(await svc.getApplications()).total).toBe(1)
+    const emails = unwrap(await svc.getEmailAttempts({ applicationId: a.id }))
+    expect(emails.map((e) => [e.kind, e.status])).toEqual(
+      expect.arrayContaining([
+        ['application_confirmation', 'blocked'],
+        ['admin_notification', 'blocked'],
+      ]),
+    )
+  })
+
+  it('reviews through the lifecycle, approving into a private draft business', async () => {
+    const { id } = unwrap(await svc.submitApplication(application()))
+    const rejectNoReason = await svc.reviewApplication(id, 'reject')
+    expect(rejectNoReason.ok === false && rejectNoReason.error.fieldErrors?.reason).toBeTruthy()
+    unwrap(await svc.reviewApplication(id, 'start_review'))
+    const approved = unwrap(await svc.reviewApplication(id, 'approve'))
+    expect(approved.status).toBe('approved')
+    const biz = unwrap(await svc.getBusinessById(approved.businessId!))
+    expect(biz).toMatchObject({ name: 'Atelier Norte', status: 'draft', slug: 'atelier-norte' })
+    const bad = await svc.reviewApplication(id, 'reject', 'too late')
+    expect(bad.ok).toBe(false)
+    const events = unwrap(await svc.getAuditEvents({ applicationId: id })).items.map((e) => e.eventType)
+    expect(events).toEqual(expect.arrayContaining(['application_submitted', 'application_status_changed', 'business_created']))
+  })
+
+  it('keeps one owner per business with resend cooldown', async () => {
+    unwrap(await svc.provisionOwner({ businessId: 'biz_casa', email: 'Owner@Casa.test', language: 'en' }))
+    const other = await svc.provisionOwner({ businessId: 'biz_casa', email: 'someone@else.test', language: 'en' })
+    expect(other.ok === false && other.error.code).toBe('CONFLICT')
+    expect(unwrap(await svc.getBusinessMembers('biz_casa')).map((m) => m.email)).toEqual(['owner@casa.test'])
+    const tooSoon = await svc.resendOwnerInvitation('biz_casa')
+    expect(tooSoon.ok === false && tooSoon.error.code).toBe('RATE_LIMITED')
+    const attempts = unwrap(await svc.getEmailAttempts({ businessId: 'biz_casa' }))
+    expect(attempts.every((e) => e.status === 'blocked')).toBe(true)
+  })
+})
