@@ -1,5 +1,5 @@
 import { arReadiness } from '@/features/ar/readiness'
-import type { Product } from '@/domain/types'
+import type { Product, ProductModels, ProductVariant } from '@/domain/types'
 
 /**
  * One-word AR readiness for product lists (DUX-05), derived from the editor's `arReadiness()` so the list and
@@ -26,9 +26,20 @@ export const AR_READINESS_HINT: Record<ProductArReadiness, string> = {
   'photos-only': 'No 3D model: customers see photos only, without 3D or AR.',
 }
 
-export function productArReadiness(p: Pick<Product, 'models'>): ProductArReadiness {
+const RANK: ProductArReadiness[] = ['ready', 'android-only', 'android-blocked', 'photos-only']
+
+/**
+ * The best readiness over the product's own files and each variant's: a product whose models live only on its
+ * finishes still has 3D and AR on its page, so it is never listed as photos only.
+ */
+export function productArReadiness(p: Pick<Product, 'models'> & { variants?: ProductVariant[] }): ProductArReadiness {
+  const sets = [p.models, ...(p.variants ?? []).map((v) => v.models).filter((m): m is ProductModels => !!m)]
+  return sets.map(modelsReadiness).sort((a, b) => RANK.indexOf(a) - RANK.indexOf(b))[0] ?? 'photos-only'
+}
+
+function modelsReadiness(models: ProductModels): ProductArReadiness {
   // The list cannot load each model, so the GLB is taken as loading; the editor does the real check.
-  const items = arReadiness({ glb: p.models.glb, usdz: p.models.usdz, preview: 'loaded', scale: { status: 'unknown' } })
+  const items = arReadiness({ glb: models.glb, usdz: models.usdz, preview: 'loaded', scale: { status: 'unknown' } })
   const viewer = items.find((i) => i.key === 'viewer')?.level
   const ios = items.find((i) => i.key === 'ios')?.level
   const android = items.find((i) => i.key === 'android')?.level
@@ -38,4 +49,4 @@ export function productArReadiness(p: Pick<Product, 'models'>): ProductArReadine
 }
 
 /** Whether a product has a usable 3D model (so AR attempts can exist at all). */
-export const hasArModel = (p: Pick<Product, 'models'>) => productArReadiness(p) !== 'photos-only'
+export const hasArModel = (p: Pick<Product, 'models'> & { variants?: ProductVariant[] }) => productArReadiness(p) !== 'photos-only'

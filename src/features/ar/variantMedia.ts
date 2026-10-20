@@ -36,3 +36,8 @@ export function variantMedia(product: Pick<Product, 'images' | 'models'>, varian
 export function pickVariant(variants: ProductVariant[], id: string | null | undefined): ProductVariant | undefined {
   return variants.find((v) => v.id === id) ?? variants[0]
 }
+
+/** Whether any finish of the product (the product itself or one of its variants) has a GLB the page can show. */
+export function hasAny3d(product: Pick<Product, 'models'> & { variants?: ProductVariant[] }): boolean {
+  return !!usableModel(product.models.glb) || (product.variants ?? []).some((v) => !!usableModel(v.models?.glb))
+}

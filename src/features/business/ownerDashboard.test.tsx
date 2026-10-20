@@ -97,6 +97,10 @@ describe('AR readiness in the product list (DUX-05)', () => {
     expect(productArReadiness({ models: { glb, usdz: { ...glb, url: 'x.usdz', fileName: 'x.usdz' } } })).toBe('ready')
     // A GLB Scene Viewer cannot open is never presented as Android-ready.
     expect(productArReadiness({ models: { glb: { ...glb, requiredExtensions: ['EXT_texture_webp'] } } })).toBe('android-blocked')
+    // Models only on the finishes (QA journey bug): the page has 3D and AR, so the list must not say "Photos only".
+    const variant = { id: 'v1', name: { en: 'Sheen' } }
+    expect(productArReadiness({ models: {}, variants: [{ ...variant, models: { glb } }] })).toBe('android-only')
+    expect(productArReadiness({ models: {}, variants: [variant] })).toBe('photos-only')
   })
 
   it('labels each product and filters by readiness', async () => {

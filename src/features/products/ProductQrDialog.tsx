@@ -47,7 +47,7 @@ function PublishedProductQr({ product: p, business: b }: { product: Product; bus
   const download = () => {
     if (!qr.url) return
     downloadDataUrl(qr.url, file)
-    toast.success('QR code downloaded', `${file} (1024 × 1024 px)`)
+    toast.success('QR code downloaded', `${file} (about 1000 px, print quality)`)
   }
 
   return (

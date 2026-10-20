@@ -151,3 +151,8 @@ model-viewer {
   --poster-color: transparent;
   --progress-bar-color: transparent;
 }
+/* Keyboard focus ring for the 3D viewer, drawn inside because its frames clip overflow (see ModelViewer.tsx). */
+model-viewer:focus:not([data-pointer-focus]) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}

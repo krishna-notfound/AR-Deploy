@@ -54,9 +54,10 @@ afterEach(() => {
 })
 
 describe('product page: variants switch photos, 3D model and AR target', () => {
-  it("switches the photo, the GLB and the iPhone file together, and never offers AR for the previous variant's file", async () => {
+  it("switches the photo, the GLB and the iPhone file together, and never offers AR for the previous variant's file", { timeout: 20_000 }, async () => {
     openApp('/products/nordhaus/sheen-lounge-chair')
-    await screen.findByRole('heading', { name: 'Sheen Lounge Chair', level: 1 })
+    // The lazy product page can take longer than the default 1 s to appear on a fully loaded test run.
+    await screen.findByRole('heading', { name: 'Sheen Lounge Chair', level: 1 }, { timeout: 10_000 })
     const first = await viewerFor(/SheenChair\.glb$/)
     expect(first.getAttribute('ios-src')).toBeNull() // no variant GLB is ever paired with another file's USDZ
     loaded(first, true)

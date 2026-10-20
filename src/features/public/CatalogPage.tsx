@@ -16,6 +16,7 @@ import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { initialPrice, primaryImage } from '@/lib/product'
 import { catalogLocalPath, productLocalPath, tenantCatalogPath, tenantProductPath } from '@/lib/urls'
+import { hasAny3d } from '@/features/ar/variantMedia'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { TAP_TARGET } from './tapTarget'
@@ -179,7 +180,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                 <Link to={productHref(p)} className="group block focus-visible:outline-offset-4">
                   <div className="relative overflow-hidden bg-subtle">
                     <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
-                    {p.models.glb && (
+                    {hasAny3d(p) && (
                       <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 bg-canvas/90 px-2.5 py-1.5 text-[10px] font-medium tracking-[0.16em] text-ink uppercase">
                         <Box className="size-3" strokeWidth={1.5} aria-hidden />
                         {t('catalog.has3d')}

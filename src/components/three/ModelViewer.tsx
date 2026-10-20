@@ -143,6 +143,10 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       loading="eager"
       reveal="auto"
       className={className}
+      // Focus lands inside the element's shadow tree, so it never matches :focus-visible. Mark pointer focus so the
+      // CSS ring (index.css) shows for keyboard users only.
+      onPointerDown={(e: { currentTarget: HTMLElement }) => e.currentTarget.setAttribute('data-pointer-focus', '')}
+      onBlur={(e: { currentTarget: HTMLElement }) => e.currentTarget.removeAttribute('data-pointer-focus')}
     >
       {/* AR is launched by our own button via activateAR(); hide the built-in one. */}
       <span slot="ar-button" hidden />

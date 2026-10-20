@@ -86,7 +86,8 @@ export default function BusinessOverviewPage() {
               )}
             </CardBody>
           </Card>
-          <div className="grid gap-6 lg:grid-cols-2">
+          {/* Grid items default to min-width: auto, so a long product name would widen the card past a phone screen. */}
+          <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
             <Card>
               <CardHeader title="Recent products" actions={<Link to={myProductsPath()} className={headerLink}>All products</Link>} />
               <CardBody>

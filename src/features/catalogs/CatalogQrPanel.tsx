@@ -32,7 +32,7 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
   const download = () => {
     if (!qr.url) return
     downloadDataUrl(qr.url, `${b.slug}-catalog-qr.png`)
-    toast.success('QR code downloaded', `${b.slug}-catalog-qr.png (1024 × 1024 px)`)
+    toast.success('QR code downloaded', `${b.slug}-catalog-qr.png (about 1000 px, print quality)`)
   }
 
   return (
