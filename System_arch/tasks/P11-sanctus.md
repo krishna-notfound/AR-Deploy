@@ -15,6 +15,7 @@
 
 ## Next
 - [x] Sub-project 2 · Access model: applications with approval states, one owner per business, admin-created owners (Edge Function), self-service removed — done 2026-10-20: ADR-0024, design/24, migration 20261020091428 applied to the client project, 3 Edge Functions deployed; email needs the Resend secrets (org Admin). Configurable categories moved to Discovered D1.
+  - Preview QA 2026-10-20 on `71aed48` (Supabase mode, client project): 13/13 browser checks passed (wizard validation, stored application with reference, 409 duplicate, admin search, reject needs a reason, review → approve into a draft, owner invited, resend cooldown 429, audit log, mobile PT layout). The database confirmed the row, draft business, one owner, 6 audit events and 3 emails logged `blocked: email_not_configured`. Anonymous REST reads and writes of applications, audit and email_log were denied. QA record: application `539123DE` ("QA Preview Atelier …", applicant `delivered+qa…@resend.dev`).
 
 ## Discovered
 - [ ] D1 · Configurable product categories per business (split from sub-project 2)
