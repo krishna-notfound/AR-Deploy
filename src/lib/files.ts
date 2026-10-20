@@ -1,4 +1,4 @@
-// Client-side file validation. Real checks only: MIME/extension, size, and magic bytes.
+// Client-side file validation. Real checks only: MIME/extension, size, and file structure.
 import type { ModelAsset, ModelFormat } from '@/domain/types'
 import { formatFileSize } from './format'
 
@@ -52,23 +52,68 @@ async function readHeader(file: Blob, length: number): Promise<Uint8Array> {
   )
 }
 
-/** GLB files start with ASCII "glTF"; USDZ files are zip archives ("PK\x03\x04"). */
+const GLB_MAGIC = 0x46546c67 // "glTF"
+const CHUNK_JSON = 0x4e4f534a
+const CHUNK_BIN = 0x004e4942
+const ZIP_LOCAL = 0x04034b50
+const ZIP_END = 0x06054b50
+
+/** The GLB's JSON chunk, or a reason it is not a well-formed glTF 2.0 binary. Reads the header and JSON only. */
+async function readGlb(file: Blob): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; problem: string }> {
+  if (file.size < 20) return { ok: false, problem: 'header check failed' }
+  const head = new DataView((await readHeader(file, 20)).buffer)
+  if (head.getUint32(0, true) !== GLB_MAGIC) return { ok: false, problem: 'header check failed' }
+  if (head.getUint32(4, true) !== 2) return { ok: false, problem: 'it is not glTF 2.0' }
+  const declared = head.getUint32(8, true)
+  if (declared !== file.size) return { ok: false, problem: `it declares ${formatFileSize(declared)} but the file is ${formatFileSize(file.size)}, so it is cut off or damaged` }
+  const jsonLength = head.getUint32(12, true)
+  if (head.getUint32(16, true) !== CHUNK_JSON || jsonLength === 0 || 20 + jsonLength > file.size) return { ok: false, problem: 'its JSON chunk is missing or damaged' }
+  let json: Record<string, unknown>
+  try {
+    json = JSON.parse(new TextDecoder().decode(await readHeader(file.slice(20, 20 + jsonLength), jsonLength))) as Record<string, unknown>
+  } catch {
+    return { ok: false, problem: 'its JSON chunk cannot be read' }
+  }
+  const version = (json.asset as { version?: unknown } | undefined)?.version
+  if (typeof version !== 'string' || !version.startsWith('2.')) return { ok: false, problem: 'it is not glTF 2.0' }
+  const next = 20 + jsonLength
+  if (next < file.size) {
+    if (next + 8 > file.size) return { ok: false, problem: 'its binary chunk is damaged' }
+    const bin = new DataView((await readHeader(file.slice(next, next + 8), 8)).buffer)
+    if (bin.getUint32(4, true) !== CHUNK_BIN || next + 8 + bin.getUint32(0, true) > file.size) return { ok: false, problem: 'its binary chunk is damaged' }
+  }
+  return { ok: true, json }
+}
+
+/** USDZ = an uncompressed zip whose first file is the USD scene (Apple's USDZ rules). Reads two small slices. */
+async function usdzProblem(file: Blob): Promise<string | null> {
+  if (file.size < 52) return 'header check failed'
+  const head = new DataView((await readHeader(file, 30)).buffer)
+  if (head.getUint32(0, true) !== ZIP_LOCAL) return 'header check failed'
+  const nameLength = head.getUint16(26, true)
+  const name = new TextDecoder().decode(await readHeader(file.slice(30, 30 + nameLength), nameLength)).toLowerCase()
+  if (!/\.usd[ac]?$/.test(name)) return 'it does not start with a USD scene (.usdc or .usda file)'
+  if (head.getUint16(8, true) !== 0) return 'its contents are compressed (USDZ must store files uncompressed)'
+  const tailStart = Math.max(0, file.size - (22 + 0xffff))
+  const tail = await readHeader(file.slice(tailStart), file.size - tailStart)
+  const view = new DataView(tail.buffer)
+  for (let i = tail.length - 22; i >= 0; i--) if (view.getUint32(i, true) === ZIP_END) return null
+  return 'the end of the archive is missing, so it is cut off or damaged'
+}
+
+/**
+ * Format check before upload: extension, size and structure (cheap, client-side; the server checks size and type only).
+ * GLB: glTF 2.0 header, declared length = file size, JSON chunk (asset.version 2.x) and binary chunk inside the file.
+ * USDZ: zip whose first entry is a .usdc/.usda scene, stored uncompressed, with an end-of-archive record.
+ */
 export async function validateModelFile(file: File, format: ModelFormat): Promise<FileCheck> {
   const rule = MODEL_RULES[format]
   if (extOf(file.name) !== rule.extension)
     return { ok: false, message: `${file.name}: expected a ${rule.extension} file.` }
   if (file.size > rule.maxBytes)
     return { ok: false, message: `${file.name} is ${formatFileSize(file.size)}. Maximum is ${formatFileSize(rule.maxBytes)}.` }
-  const head = await readHeader(file, 4)
-  const magic =
-    format === 'glb'
-      ? head[0] === 0x67 && head[1] === 0x6c && head[2] === 0x54 && head[3] === 0x46
-      : head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04
-  if (!magic)
-    return {
-      ok: false,
-      message: `${file.name} does not look like a valid ${format.toUpperCase()} file (header check failed).`,
-    }
+  const problem = format === 'glb' ? await readGlb(file).then((r) => (r.ok ? null : r.problem)) : await usdzProblem(file)
+  if (problem) return { ok: false, message: `${file.name} does not look like a valid ${format.toUpperCase()} file: ${problem}. Export it again.` }
   return { ok: true }
 }
 
@@ -79,18 +124,69 @@ export async function validateModelFile(file: File, format: ModelFormat): Promis
  */
 export const SCENE_VIEWER_EXTENSIONS = ['KHR_materials_unlit', 'KHR_texture_transform', 'KHR_materials_pbrSpecularGlossiness']
 
+/** The GLB's `extensionsRequired` (empty when none), or undefined when the file cannot be read. */
+export async function readRequiredExtensions(file: Blob): Promise<string[] | undefined> {
+  try {
+    const r = await readGlb(file)
+    if (!r.ok) return undefined
+    return Array.isArray(r.json.extensionsRequired) ? r.json.extensionsRequired.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return undefined
+  }
+}
+
+/** Required extensions Scene Viewer does not support. */
+export function sceneViewerUnsupported(required: readonly string[] | undefined): string[] {
+  return (required ?? []).filter((x) => !SCENE_VIEWER_EXTENSIONS.includes(x))
+}
+
+/**
+ * The `extensionsRequired` of a linked GLB, reading only its header and JSON chunk from the stream (the rest of the
+ * download is cancelled). Undefined when the link cannot be read here (CORS, network, not a GLB).
+ */
+export async function fetchRequiredExtensions(url: string): Promise<string[] | undefined> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok || !res.body) return undefined
+    const reader = res.body.getReader()
+    const parts: Uint8Array[] = []
+    let size = 0
+    let need = 20
+    while (size < need) {
+      const { done, value } = await reader.read()
+      if (done) break
+      parts.push(value)
+      size += value.length
+      if (need === 20 && size >= 20) {
+        const head = new DataView(concat(parts, 20).buffer)
+        if (head.getUint32(0, true) !== GLB_MAGIC || head.getUint32(16, true) !== CHUNK_JSON) break
+        need = 20 + head.getUint32(12, true)
+      }
+    }
+    void reader.cancel().catch(() => {})
+    if (size < need || need === 20) return undefined
+    const json = JSON.parse(new TextDecoder().decode(concat(parts, need).subarray(20))) as { extensionsRequired?: unknown }
+    return Array.isArray(json.extensionsRequired) ? json.extensionsRequired.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return undefined
+  }
+}
+
+function concat(parts: Uint8Array[], length: number): Uint8Array {
+  const out = new Uint8Array(length)
+  let at = 0
+  for (const p of parts) {
+    if (at >= length) break
+    const take = p.subarray(0, length - at)
+    out.set(take, at)
+    at += take.length
+  }
+  return out
+}
+
 /** Required glTF extensions of a GLB that Scene Viewer does not support. Empty when none or unreadable. */
 export async function unsupportedForSceneViewer(file: Blob): Promise<string[]> {
-  try {
-    const head = new DataView((await readHeader(file, 20)).buffer)
-    if (head.byteLength < 20 || head.getUint32(0, true) !== 0x46546c67 || head.getUint32(16, true) !== 0x4e4f534a) return []
-    const jsonLength = head.getUint32(12, true)
-    const json = JSON.parse(new TextDecoder().decode(await readHeader(file.slice(20), jsonLength))) as { extensionsRequired?: unknown }
-    const required = Array.isArray(json.extensionsRequired) ? json.extensionsRequired.filter((x): x is string => typeof x === 'string') : []
-    return required.filter((x) => !SCENE_VIEWER_EXTENSIONS.includes(x))
-  } catch {
-    return []
-  }
+  return sceneViewerUnsupported(await readRequiredExtensions(file))
 }
 
 export function readAsDataUrl(file: Blob): Promise<string> {
@@ -154,6 +250,15 @@ export function isStaleSessionAsset(asset: ModelAsset | undefined): boolean {
 export function modelAssetFromUrl(url: string, format: ModelFormat): ModelAsset {
   const fileName = decodeURIComponent(url.split('?')[0]?.split('/').pop() || `model.${format}`)
   return { format, url, fileName, status: 'valid' }
+}
+
+/** Model links must be https: Scene Viewer opens them with scheme=https and an http file is mixed content (AR-09). */
+export function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:'
+  } catch {
+    return false
+  }
 }
 
 export function isHttpUrl(value: string): boolean {

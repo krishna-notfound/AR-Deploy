@@ -68,7 +68,7 @@ export function DropdownMenu({
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'inline-flex size-8 items-center justify-center rounded-[var(--radius-control)] text-ink-muted hover:bg-subtle hover:text-ink',
+          'inline-flex size-8 items-center justify-center rounded-[var(--radius-control)] text-ink-muted hover:bg-subtle hover:text-ink pointer-coarse:size-11',
           triggerClassName,
         )}
       >

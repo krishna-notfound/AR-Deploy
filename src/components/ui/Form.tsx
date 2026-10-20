@@ -197,6 +197,7 @@ export function SegmentedControl<T extends string>({
           className={cn(
             'rounded-[6px] font-medium transition-colors',
             size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-[13px]',
+            'pointer-coarse:h-10 pointer-coarse:min-w-10', // 44px with the track's padding on touch screens (DUX-10)
             value === o.value ? 'bg-surface text-ink shadow-[var(--shadow-card)]' : 'text-ink-muted hover:text-ink',
           )}
         >

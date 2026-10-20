@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
-import { type RecordResult, type TrackEventDeps, handleTrackEvent, visitorKey } from './handler'
+import { type RecordResult, type TrackEventDeps, handleTrackEvent, visitorKey, visitorNetwork } from './handler'
 
 const P = '11111111-1111-4111-8111-111111111111'
 const B = '22222222-2222-4222-8222-222222222222'
@@ -51,6 +51,15 @@ describe('track-event handler', () => {
     expect(await visitorKey('198.51.100.9', 's', NOW)).not.toBe(a)
     expect(await visitorKey('203.0.113.7', 's', new Date('2026-10-14T10:00:00Z'))).not.toBe(a)
     expect(await visitorKey('203.0.113.7', 'other-salt', NOW)).not.toBe(a)
+  })
+
+  it('treats every address in one IPv6 /64 as the same visitor (OWN-04)', async () => {
+    expect(visitorNetwork('2001:db8:abcd:12:1::7')).toBe('2001:db8:abcd:12::/64')
+    expect(visitorNetwork('2001:0db8:abcd:0012:ffff:1:2:3')).toBe('2001:db8:abcd:12::/64')
+    expect(visitorNetwork('2001:db8::1')).toBe('2001:db8:0:0::/64')
+    expect(visitorNetwork('203.0.113.7')).toBe('203.0.113.7')
+    expect(await visitorKey('2001:db8:abcd:12::1', 's', NOW)).toBe(await visitorKey('2001:db8:abcd:12:9:8:7:6', 's', NOW))
+    expect(await visitorKey('2001:db8:abcd:12::1', 's', NOW)).not.toBe(await visitorKey('2001:db8:abcd:13::1', 's', NOW))
   })
 
   it('returns 429 with Retry-After once the database reports the limit', async () => {

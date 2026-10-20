@@ -5,6 +5,7 @@ import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
 import { initials } from '@/auth/accounts'
 import { cn } from '@/lib/cn'
+import { catalogLocalPath } from '@/lib/urls'
 import { formatRelative } from '@/lib/format'
 import { isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
@@ -63,7 +64,7 @@ export function DashboardShell({ nav, variant }: { nav: NavItem[]; variant: 'adm
       <div className={cn('transition-[padding] duration-150', collapsed ? 'lg:pl-[68px]' : 'lg:pl-60')}>
         <Topbar onMenu={() => setMobileOpen(true)} variant={variant} />
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1320px] px-4 pt-5 pb-16 outline-none sm:px-6 lg:px-8">
-          {variant === 'business' && <PendingApprovalNotice />}
+          {variant === 'business' && <CatalogStatusNotice />}
           <Suspense fallback={<FullPageSpinner />}>
             <Outlet />
           </Suspense>
@@ -73,14 +74,32 @@ export function DashboardShell({ nav, variant }: { nav: NavItem[]; variant: 'adm
   )
 }
 
-/** Approved applications become draft businesses; the catalogue is private until a platform admin activates it (ADR-0024). */
-function PendingApprovalNotice() {
+/**
+ * Every owner page says when customers cannot see the catalogue (DUX-01). Approved applications become draft
+ * businesses that stay private until a platform admin activates them (ADR-0024); a platform admin can also pause
+ * (inactivate) an active catalogue.
+ */
+export function CatalogStatusNotice() {
   const { business } = useAccount()
-  if (business?.status !== 'draft') return null
+  if (!business || business.status === 'active') return null
+  const preview = (
+    <a href={catalogLocalPath(business, { preview: true })} target="_blank" rel="noopener" className="font-medium underline underline-offset-2">
+      Preview your catalog
+    </a>
+  )
   return (
     <InlineNotice tone="warning" className="mb-5">
-      <strong className="font-medium">{business.name} is not public yet.</strong> You can add products now. Customers will see your
-      catalog once the platform team activates it.
+      {business.status === 'draft' ? (
+        <>
+          <strong className="font-medium">{business.name} is not public yet.</strong> You can add products now. Customers will see your
+          catalog once the platform team activates it. {preview}
+        </>
+      ) : (
+        <>
+          <strong className="font-medium">Your catalog is paused.</strong> Customers who scan your QR code or open your links see “catalog
+          unavailable”. Contact the platform team to reactivate it. {preview}
+        </>
+      )}
     </InlineNotice>
   )
 }
@@ -184,7 +203,8 @@ function Topbar({ onMenu, variant }: { onMenu: () => void; variant: 'admin' | 'b
         <Brand variant={variant} collapsed />
       </div>
       <div className="ml-auto flex items-center gap-1.5">
-        <span className="hidden rounded-full border border-line-strong px-2.5 py-1 text-[11px] font-medium text-ink-muted sm:inline">{isDemoMode ? 'Demo mode' : 'Supabase'}</span>
+        {/* Honest labelling in the demo; a production owner has no use for the data source's name (DUX-08). */}
+        {isDemoMode && <span className="hidden rounded-full border border-line-strong px-2.5 py-1 text-[11px] font-medium text-ink-muted sm:inline">Demo mode</span>}
         <Notifications variant={variant} />
         <ProfileMenu />
       </div>
@@ -254,7 +274,7 @@ function ProfileMenu() {
   return (
     <Popover
       label="Account menu"
-      triggerClassName="grid size-9 place-items-center rounded-full bg-ink text-xs font-semibold text-white hover:opacity-90"
+      triggerClassName="grid size-9 place-items-center rounded-full bg-ink text-xs font-semibold text-white hover:opacity-90 pointer-coarse:size-11"
       trigger={initials(user.name)}
       panelClassName="w-64"
     >
@@ -263,7 +283,8 @@ function ProfileMenu() {
           <div className="border-b border-line px-4 pt-2 pb-3">
             <p className="truncate text-sm font-medium">{user.name}</p>
             <p className="truncate text-xs text-ink-muted">{user.email}</p>
-            <p className="mt-1.5 text-[11px] text-ink-faint">{user.role === 'super_admin' ? 'Super Admin' : 'Business Admin'} · {isDemoMode ? 'demo account' : 'Supabase account'}</p>
+            <p className="mt-1.5 text-[11px] text-ink-faint">{user.role === 'super_admin' ? 'Super Admin' : 'Business Admin'}
+              {isDemoMode && ' · demo account'}</p>
           </div>
           <button
             type="button"

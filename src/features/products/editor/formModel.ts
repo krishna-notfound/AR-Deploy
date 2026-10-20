@@ -55,9 +55,14 @@ const num = (s: string) => {
   return Number.isFinite(v) ? v : NaN
 }
 
-/** Converts the entered dimensions between units (one decimal, as saved). Text that is not a number is left as typed. */
-export function convertDims(dims: EditorForm['dims'], from: 'cm' | 'in', to: 'cm' | 'in'): EditorForm['dims'] {
+/**
+ * Converts the entered dimensions between units (one decimal, as saved). Text that is not a number is left as typed.
+ * `before` holds the values from before the previous conversion: converting straight back restores them exactly
+ * instead of compounding the rounding (83 cm → 32.7 in → 83 cm, not 83.1 cm; AR-10).
+ */
+export function convertDims(dims: EditorForm['dims'], from: 'cm' | 'in', to: 'cm' | 'in', before?: { unit: 'cm' | 'in'; dims: EditorForm['dims'] }): EditorForm['dims'] {
   if (from === to) return dims
+  if (before && before.unit === to && JSON.stringify(convertDims(before.dims, before.unit, from)) === JSON.stringify(dims)) return before.dims
   const factor = to === 'in' ? 1 / 2.54 : 2.54
   const conv = (s: string) => {
     const v = num(s.trim())
@@ -88,7 +93,8 @@ export function toInput(form: EditorForm): { input: ProductInput; errors: Record
   const cleanVariants = form.input.variants
     .filter((v) => v.name.en.trim())
     .map((v) => ({ ...v, name: { en: v.name.en.trim(), ...(v.name.pt?.trim() ? { pt: v.name.pt.trim() } : {}) } }))
-  if (form.input.variants.some((v) => !v.name.en.trim() && (v.name.pt || v.sku))) errors.variants = 'Every option needs an English name.'
+  // An unnamed option is dropped on save, so one with anything entered (including its own files) must be named.
+  if (form.input.variants.some((v) => !v.name.en.trim() && (v.name.pt || v.sku || v.images?.length || v.models?.glb || v.models?.usdz))) errors.variants = 'Every option needs an English name.'
   return {
     input: {
       ...form.input,

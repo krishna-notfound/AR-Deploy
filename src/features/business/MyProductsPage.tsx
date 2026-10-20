@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { ProductFilterBar, applyProductFilters, useProductFilterParams } from '../products/ProductFilters'
+import { CLEARED_PRODUCT_FILTERS, ProductFilterBar, applyProductFilters, hasProductFilters, useProductFilterParams } from '../products/ProductFilters'
 import { ProductTable } from '../products/ProductTable'
 import { useProductStats } from '../products/useCatalogData'
 
@@ -19,7 +19,7 @@ export default function MyProductsPage() {
   const stats = useProductStats(business.id)
   const bizMap = useMemo(() => new Map([[business.id, business]]), [business])
   const filtered = useMemo(() => applyProductFilters(products.data ?? [], { ...filters, business: '' }), [products.data, filters])
-  const hasFilters = !!(filters.q || filters.status || filters.category)
+  const hasFilters = hasProductFilters({ ...filters, business: '' })
 
   return (
     <>
@@ -47,7 +47,7 @@ export default function MyProductsPage() {
             onPageChange={(page) => update({ page })}
             empty={
               hasFilters ? (
-                <EmptyState title="No products match these filters" action={<Button onClick={() => update({ q: '', status: '', category: '' })}>Clear filters</Button>} />
+                <EmptyState title="No products match these filters" action={<Button onClick={() => update(CLEARED_PRODUCT_FILTERS)}>Clear filters</Button>} />
               ) : (
                 <EmptyState
                   icon={Package}

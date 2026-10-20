@@ -1,5 +1,5 @@
 # ADR-0005: The QR code encodes the catalog URL
-- **Status:** Accepted
+- **Status:** Accepted (amended by ADR-0025: a separate, labelled per-product QR code exists; this catalogue QR rule is unchanged)
 - **Date:** 2026-10-12
 - **Affects:** design/08-tenancy-urls.md, design/12-features-admin.md
 

@@ -127,14 +127,14 @@ describe('file validation', () => {
     expect(validateImageFile(big).ok).toBe(false)
     expect(validateImageFile(new File(['x'], 'ok.png', { type: 'image/png' })).ok).toBe(true)
   })
-  it('checks GLB and USDZ magic bytes', async () => {
-    const realGlb = new File([new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0])], 'chair.glb')
+  it('rejects files that only carry the magic bytes (structure checks: modelFiles.test.ts)', async () => {
+    const stubGlb = new File([new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0])], 'chair.glb')
     const fakeGlb = new File(['not a model'], 'chair.glb')
-    const usdz = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0])], 'chair.usdz')
-    expect((await validateModelFile(realGlb, 'glb')).ok).toBe(true)
+    const stubUsdz = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0])], 'chair.usdz')
+    expect((await validateModelFile(stubGlb, 'glb')).ok).toBe(false)
     expect((await validateModelFile(fakeGlb, 'glb')).ok).toBe(false)
-    expect((await validateModelFile(usdz, 'usdz')).ok).toBe(true)
-    expect((await validateModelFile(realGlb, 'usdz')).ok).toBe(false)
+    expect((await validateModelFile(stubUsdz, 'usdz')).ok).toBe(false)
+    expect((await validateModelFile(stubGlb, 'usdz')).ok).toBe(false)
   })
 })
 

@@ -1,14 +1,14 @@
 import { AlertTriangle, Box, CheckCircle2, CircleSlash, FileBox, Info, Link2, Loader2, Trash2, Upload } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { AssetStatusBadge, Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
-import { ModelViewer } from '@/components/three/ModelViewer'
-import { type ReadinessItem, arReadiness } from '@/features/ar/readiness'
-import type { Dimensions, ModelAsset, ModelFormat, Product } from '@/domain/types'
+import { MODEL_STALL_TIMEOUT_MS, ModelViewer } from '@/components/three/ModelViewer'
+import { type ReadinessItem, arReadiness, sceneViewerWarning } from '@/features/ar/readiness'
+import type { Dimensions, ModelAsset, ModelFormat, ProductModels } from '@/domain/types'
 import { service } from '@/services'
-import { MODEL_RULES, isHttpUrl, isStaleSessionAsset, modelAssetFromUrl, unsupportedForSceneViewer, validateModelFile } from '@/lib/files'
+import { MODEL_RULES, fetchRequiredExtensions, isHttpsUrl, isStaleSessionAsset, modelAssetFromUrl, readRequiredExtensions, sceneViewerUnsupported, validateModelFile } from '@/lib/files'
 import { cn } from '@/lib/cn'
 import { formatFileSize } from '@/lib/format'
 import { type ScaleCheck, type ScaleMismatchReason, checkScale } from '@/lib/scale'
@@ -19,6 +19,10 @@ const FORMAT_INFO: Record<ModelFormat, { title: string; use: string }> = {
   usdz: { title: 'USDZ model', use: 'Used for AR on iPhone and iPad (AR Quick Look).' },
 }
 
+/**
+ * GLB + USDZ slots with the 3D preview, scale check and AR readiness. Used for the product and, with
+ * context="variant", for each colour or option (upload only: variant files are always stored owner uploads).
+ */
 export function ModelSection({
   models,
   onChange,
@@ -26,27 +30,32 @@ export function ModelSection({
   poster,
   name,
   businessId,
+  context = 'product',
 }: {
-  models: Product['models']
+  models: ProductModels
   /** One format at a time, so the caller merges it into its latest state and parallel uploads both land. */
   onChange: (format: ModelFormat, asset: ModelAsset | undefined) => void
   dimensions: Dimensions
   poster?: string
   name: string
   businessId?: string
+  context?: 'product' | 'variant'
 }) {
   return (
     <div className="space-y-5">
-      <InlineNotice icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
-        Upload the files your 3D artist delivered. <strong className="font-medium">GLB</strong> powers the 3D viewer and Android AR.{' '}
-        <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are optimized for size before upload; USDZ files are stored as uploaded. Nothing is converted.' : 'Files are stored as uploaded: they are not converted or compressed.'}
-      </InlineNotice>
-      <div className="grid gap-4 lg:grid-cols-2">
+      {context === 'product' && (
+        <InlineNotice icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
+          Upload the files your 3D artist delivered. <strong className="font-medium">GLB</strong> powers the 3D viewer and Android AR.{' '}
+          <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are optimized for size before upload; USDZ files are stored as uploaded. Nothing is converted.' : 'Files are stored as uploaded: they are not converted or compressed.'}
+        </InlineNotice>
+      )}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {(['glb', 'usdz'] as const).map((f) => (
-          <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange(f, a)} />
+          <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange(f, a)} allowLink={context === 'product'} />
         ))}
       </div>
-      <ModelPreview glb={models.glb} usdz={models.usdz} dimensions={dimensions} poster={poster} name={name} />
+      {/* Keyed by the GLB: a replaced file never shows the previous file's measurement or readiness (AR-07). */}
+      <ModelPreview key={models.glb?.url ?? 'none'} glb={models.glb} usdz={models.usdz} dimensions={dimensions} poster={poster} name={name} context={context} />
     </div>
   )
 }
@@ -56,16 +65,16 @@ function ModelSlot({
   asset,
   onChange,
   businessId,
+  allowLink,
 }: {
   format: ModelFormat
   asset?: ModelAsset
   onChange: (a: ModelAsset | undefined) => void
   businessId?: string
+  allowLink: boolean
 }) {
   const id = useId()
   const [error, setError] = useState<string | null>(null)
-  /** Non-blocking: the file works in the 3D viewer but may not open in Android AR (Scene Viewer). */
-  const [arWarning, setArWarning] = useState<string | null>(null)
   const [checking, setChecking] = useState<false | 'checking' | 'optimizing'>(false)
   /** Result of the size optimization, and the untouched file so the admin can upload it instead. */
   const [optimizeNote, setOptimizeNote] = useState<{ text: string; original?: File } | null>(null)
@@ -96,24 +105,28 @@ function ModelSlot({
     setChecking(false)
     if (!res.ok) return setError(res.error.message)
     setError(null)
-    const unsupported = format === 'glb' ? await unsupportedForSceneViewer(file) : []
-    setArWarning(
-      unsupported.length
-        ? `This GLB requires ${unsupported.join(', ')}, which Google Scene Viewer does not support. It works in the 3D viewer, but Android AR may fail. Ask for a file exported without it.`
-        : null,
-    )
+    // Stored with the asset so the Android AR warning and readiness survive a reload (AR-01/02).
+    const requiredExtensions = format === 'glb' ? await readRequiredExtensions(file) : undefined
     const { url, storagePath, status } = res.data
-    onChange({ format, url, fileName: file.name, sizeBytes: file.size, status, ...(storagePath ? { storagePath } : {}) })
+    onChange({ format, url, fileName: file.name, sizeBytes: file.size, status, ...(storagePath ? { storagePath } : {}), ...(requiredExtensions ? { requiredExtensions } : {}) })
   }
 
-  const onUrl = () => {
+  const onUrl = async () => {
     const url = urlDraft.trim()
-    if (!isHttpUrl(url)) return setError('Enter a full URL starting with https://')
+    if (checking) return
+    if (!isHttpsUrl(url)) return setError('Enter a full URL starting with https://')
     if (!url.toLowerCase().split('?')[0]?.endsWith(`.${format}`)) return setError(`The URL should point to a .${format} file.`)
     setError(null)
+    setChecking('checking')
+    // Reads only the header of a linked GLB; when the host does not allow it, the 3D preview checks it on load.
+    const requiredExtensions = format === 'glb' ? await fetchRequiredExtensions(url) : undefined
+    setChecking(false)
     setUrlDraft('')
-    onChange(modelAssetFromUrl(url, format))
+    onChange({ ...modelAssetFromUrl(url, format), ...(requiredExtensions ? { requiredExtensions } : {}) })
   }
+
+  /** Non-blocking: the file works in the 3D viewer but may not open in Android AR (Scene Viewer). */
+  const unsupported = format === 'glb' ? sceneViewerUnsupported(asset?.requiredExtensions) : []
 
   return (
     <div className="rounded-[var(--radius-card)] border border-line p-4">
@@ -174,6 +187,7 @@ function ModelSlot({
             }}
           />
         </label>
+        {allowLink && (
         <div className="flex gap-2">
           <Input
             aria-label={`${format.toUpperCase()} model URL`}
@@ -184,16 +198,17 @@ function ModelSlot({
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
-                onUrl()
+                void onUrl()
               }
             }}
             className="h-8 text-[13px]"
           />
-          <Button size="sm" onClick={onUrl} disabled={!!checking || !urlDraft.trim()} icon={<Link2 className="size-4" aria-hidden />}>
+          <Button size="sm" onClick={() => void onUrl()} disabled={!!checking || !urlDraft.trim()} icon={<Link2 className="size-4" aria-hidden />}>
             Link
           </Button>
         </div>
-        <p className="text-[11px] text-ink-faint">Max {formatFileSize(MODEL_RULES[format].maxBytes)}. The file header is checked to confirm the format.</p>
+        )}
+        <p className="text-[11px] text-ink-faint">Max {formatFileSize(MODEL_RULES[format].maxBytes)}. The file structure is checked to confirm the format.</p>
       </div>
       {optimizeNote && asset && (
         <p className="mt-2 text-xs text-ink-muted">
@@ -205,7 +220,7 @@ function ModelSlot({
           )}
         </p>
       )}
-      {arWarning && asset && <p className="mt-2 text-xs text-warning">{arWarning}</p>}
+      {unsupported.length > 0 && asset && <p className="mt-2 text-xs text-warning">{sceneViewerWarning(unsupported)}</p>}
       {error && (
         <p role="alert" className="mt-2 text-xs font-medium text-danger">
           {error}
@@ -216,25 +231,50 @@ function ModelSlot({
 }
 
 /** Admin 3D preview (no AR) with the measured-vs-entered scale check (ADR-0006). */
-export function ModelPreview({ glb, usdz, dimensions, poster, name }: { glb?: ModelAsset; usdz?: ModelAsset; dimensions: Dimensions; poster?: string; name: string }) {
+export function ModelPreview({
+  glb,
+  usdz,
+  dimensions,
+  poster,
+  name,
+  context = 'product',
+}: {
+  glb?: ModelAsset
+  usdz?: ModelAsset
+  dimensions: Dimensions
+  poster?: string
+  name: string
+  context?: 'product' | 'variant'
+}) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [progress, setProgress] = useState(0)
   const [measured, setMeasured] = useState<{ x: number; y: number; z: number } | null>(null)
+  /** Read from the loaded file, so linked and older models get the Scene Viewer check too (AR-02). */
+  const [detected, setDetected] = useState<string[] | undefined>(undefined)
   const [attempt, setAttempt] = useState(0)
   const stale = isStaleSessionAsset(glb)
   // Recomputed live, so editing the dimensions updates the check immediately.
   const scale: ScaleCheck = checkScale(measured, dimensions)
-  const readiness = <ArReadiness items={arReadiness({ glb, usdz, preview: state, scale })} />
+  const readiness = <ArReadiness items={arReadiness({ glb, usdz, preview: state, scale, requiredExtensions: detected })} />
+
+  // No progress for the whole window: treat it as failed rather than keep an endless "Checking" verdict.
+  useEffect(() => {
+    if (state !== 'loading' || !glb || stale) return
+    const timer = setTimeout(() => setState('error'), MODEL_STALL_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [state, progress, attempt, glb, stale])
 
   if (!glb || stale) {
     return (
       <div className="flex flex-col items-center rounded-[var(--radius-card)] bg-canvas px-6 py-10 text-center">
         <Box className="size-6 text-ink-faint" aria-hidden />
-        <p className="mt-3 text-sm font-medium">No 3D preview yet</p>
+        <p className="mt-3 text-sm font-medium">{context === 'variant' ? 'No 3D model for this option' : 'No 3D preview yet'}</p>
         <p className="mt-1 max-w-sm text-xs text-ink-muted">
-          Add a GLB model to show the 3D viewer and the “View in AR” button. Without one, customers see the photo gallery only.
+          {context === 'variant'
+            ? 'Customers who pick this option see the product’s main 3D model, with a note that this finish may look different. Upload a GLB (and a USDZ for iPhone) made for this option to show it in 3D and AR.'
+            : 'Add a GLB model to show the 3D viewer and the “View in AR” button. Without one, customers see the photo gallery only.'}
         </p>
-        {readiness}
+        {context === 'product' || usdz ? readiness : null}
       </div>
     )
   }
@@ -250,9 +290,10 @@ export function ModelPreview({ glb, usdz, dimensions, poster, name }: { glb?: Mo
           alt={`3D model of ${name}`}
           className="absolute inset-0"
           onProgress={setProgress}
-          onLoad={({ dimensions: d }) => {
+          onLoad={({ dimensions: d, requiredExtensions }) => {
             setState('loaded')
             setMeasured(d)
+            setDetected(requiredExtensions)
           }}
           onError={() => setState('error')}
         />
@@ -272,6 +313,7 @@ export function ModelPreview({ glb, usdz, dimensions, poster, name }: { glb?: Mo
                 className="mt-3"
                 onClick={() => {
                   setState('loading')
+                  setProgress(0)
                   setAttempt((a) => a + 1)
                 }}
               >

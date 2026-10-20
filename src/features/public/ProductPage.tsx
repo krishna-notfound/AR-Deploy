@@ -9,19 +9,23 @@ import { Modal } from '@/components/ui/Modal'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { ModelViewerHandle } from '@/components/three/ModelViewer'
+import type { ModelLoadInfo, ModelViewerHandle } from '@/components/three/ModelViewer'
 import type { Business, LengthUnit, Product } from '@/domain/types'
+import { pickVariant, variantMedia } from '@/features/ar/variantMedia'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { sceneViewerUnsupported } from '@/lib/files'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
+import { VARIANT_PARAM, withVariantParam } from '@/lib/urls'
+import { isAndroid } from '@/lib/userAgent'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { ArSection, arAvailability } from './ArSection'
 import { ArTips, arTipsDismissed } from './ArTips'
 import { DimensionDiagram } from './DimensionDiagram'
-import { type MediaMode, type ModelState, ProductMedia, initialMediaMode, usableModels } from './ProductMedia'
+import { type MediaMode, type ModelState, ProductMedia, initialMediaMode } from './ProductMedia'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { ShareButton } from './ShareActions'
@@ -31,6 +35,17 @@ import { TAP_TARGET } from './tapTarget'
 export const AR_RELAUNCH_MS = 2000
 /** Signed media URLs last MEDIA_URL_TTL_SECONDS; refetch on return to the tab once half of that has passed. */
 const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
+
+/** What the page knows about the model on the stage. Keyed by its GLB URL: another variant's model starts afresh. */
+interface ModelInfo {
+  key: string
+  state: ModelState
+  canAR: boolean
+  measured: MeasuredSize | null
+  /** extensionsRequired of the loaded file (undefined until loaded). */
+  required?: string[]
+}
+const freshModel = (key: string): ModelInfo => ({ key, state: key ? 'loading' : 'none', canAR: false, measured: null })
 
 export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   const params = useParams()
@@ -94,16 +109,37 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const toast = useToast()
   const viewerRef = useRef<ModelViewerHandle>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const [mode, setMode] = useState<MediaMode>(() => initialMediaMode(product))
-  const [modelState, setModelState] = useState<ModelState>(usableModels(product).glb ? 'loading' : 'none')
-  const [canAR, setCanAR] = useState(false)
-  const [measured, setMeasured] = useState<MeasuredSize | null>(null)
+  const [search, setSearch] = useSearchParams()
+  // ?variant=<id> opens the page on that finish (shared links, QR codes); unknown ids fall back to the first.
+  const [variantId, setVariantId] = useState(() => pickVariant(product.variants, search.get(VARIANT_PARAM))?.id)
+  const variant = product.variants.find((v) => v.id === variantId)
+  // Photos, 3D model and AR target of the selected variant, never a mix of two sources.
+  const media = useMemo(() => variantMedia(product, variant), [product, variant])
+  const modelKey = media.models.glb?.url ?? ''
+  const [mode, setMode] = useState<MediaMode>(() => initialMediaMode(media))
+  const [storedModel, setModel] = useState<ModelInfo>(() => freshModel(modelKey))
+  // A variant switch resets loading, AR and scale state, so "View in AR" never opens the previous file.
+  const model = storedModel.key === modelKey ? storedModel : freshModel(modelKey)
+  if (model !== storedModel) setModel(model)
+  const { state: modelState, canAR, measured } = model
   const [tipsOpen, setTipsOpen] = useState<null | 'before-ar' | 'info'>(null)
   const [unit, setUnit] = useState<LengthUnit>(product.dimensions.unit)
-  const [variantId, setVariantId] = useState(product.variants[0]?.id)
   const [contactOpen, setContactOpen] = useState(false)
   const name = localized(product.name)
-  const has3d = modelState !== 'none'
+  const has3d = modelState === 'loading' || modelState === 'loaded'
+  const setCanAR = (value: boolean) => setModel((m) => (m.key === modelKey ? { ...m, canAR: value } : m))
+
+  const selectVariant = (id: string) => {
+    setVariantId(id)
+    setSearch((prev) => withVariantParam(prev, id), { replace: true, preventScrollReset: true })
+  }
+
+  const onModelState = (url: string, s: ModelState, info?: ModelLoadInfo) =>
+    setModel((m) => {
+      if (m.key !== url) return m // a late report about another variant's model
+      if (info) return { ...m, state: s, canAR: info.canActivateAR, measured: info.dimensions, required: info.requiredExtensions }
+      return s === 'loaded' ? { ...m, state: s } : { ...m, state: s, canAR: false, measured: null }
+    })
 
   // Record one product view per page load (StrictMode-safe via ref).
   const recorded = useRef(false)
@@ -125,11 +161,13 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     document.title = `${name} · ${business.name}`
   }, [name, business.name])
 
-  const variant = product.variants.find((v) => v.id === variantId)
   const price = product.price + (variant?.priceDelta ?? 0)
+  // Scale is checked per model: a variant's file is measured on its own, never credited with another's verdict.
   const scale = useMemo(() => checkScale(measured, product.dimensions), [measured, product.dimensions])
-  const separateUsdz = !!usableModels(product).usdz
-  const availability = arAvailability(modelState, canAR)
+  const separateUsdz = !!media.models.usdz
+  // Android hands the GLB to Scene Viewer, which cannot open files that require unsupported extensions (AR-01).
+  const modelUnsupported = isAndroid() && sceneViewerUnsupported(model.required ?? media.models.glb?.requiredExtensions).length > 0
+  const availability = arAvailability(modelState, canAR, modelUnsupported)
   const additional = product.images.filter((i) => i.kind === 'additional')
 
   const open3d = () => {
@@ -142,6 +180,12 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const lastLaunch = useRef(-Infinity)
   const startAR = async () => {
     setTipsOpen(null)
+    // The viewer can lose AR after a failed hand-off (e.g. the Google app is missing): no dead button, no event (AR-04).
+    if (!viewerRef.current?.canActivateAR()) {
+      setCanAR(false)
+      toast.error(t('ar.failed'))
+      return
+    }
     const now = performance.now()
     if (now - lastLaunch.current < AR_RELAUNCH_MS) return
     lastLaunch.current = now
@@ -190,20 +234,24 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             <div className="flex flex-col gap-5 lg:flex-row lg:gap-8">
               <div className="min-w-0 flex-1">
                 <ProductMedia
-                  product={product}
+                  name={name}
+                  gallery={media.gallery}
+                  models={media.models}
                   mode={mode}
                   onModeChange={setMode}
                   viewerRef={viewerRef}
-                  onArStatus={(s) => s === 'failed' && toast.error(t('ar.failed'))}
-                  onInteract={onModelInteract}
-                  onModelState={(s, info) => {
-                    setModelState(s)
-                    if (info) {
-                      setCanAR(info.canActivateAR)
-                      setMeasured(info.dimensions)
-                    }
+                  onArStatus={(s) => {
+                    if (s !== 'failed') return
+                    toast.error(t('ar.failed'))
+                    // model-viewer turns AR off after a failed hand-off; follow it so the button goes away (AR-04).
+                    setCanAR(viewerRef.current?.canActivateAR() ?? false)
                   }}
+                  onInteract={onModelInteract}
+                  onModelState={onModelState}
                 />
+                {media.fallback && has3d && variant && (
+                  <p className="mt-3 text-center text-xs text-ink-muted">{t('ar.variantFallback', { name: localized(variant.name) })}</p>
+                )}
               </div>
               {(has3d || availability === 'available') && (
                 <ul className="flex justify-center gap-10 lg:flex-col lg:justify-start lg:gap-8 lg:pt-10">
@@ -246,7 +294,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                       aria-checked={v.id === variantId}
                       aria-label={localized(v.name) + (v.priceDelta ? ` +${formatMoney(v.priceDelta, product.currency, lang)}` : '')}
                       title={localized(v.name)}
-                      onClick={() => setVariantId(v.id)}
+                      onClick={() => selectVariant(v.id)}
                       className={cn('grid size-10 place-items-center rounded-full border transition-colors', v.id === variantId ? 'border-ink' : 'border-transparent hover:border-line-strong')}
                     >
                       <span className="size-8 rounded-full ring-1 ring-black/10" style={{ background: v.colorHex ?? 'var(--color-limestone)' }} aria-hidden />
@@ -263,9 +311,10 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             )}
 
             <div className="mt-8 flex flex-col gap-5">
-              {has3d && (
+              {/* Only for a model that loaded; "AR" only where AR can open (AR-08). */}
+              {modelState === 'loaded' && (
                 <button type="button" onClick={open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch bg-ink px-8 text-label text-chalk transition-colors hover:bg-umber sm:self-start">
-                  {t('product.view3dAr')}
+                  {availability === 'available' ? t('product.view3dAr') : t('product.view3d')}
                   <Box className="size-4" strokeWidth={1.4} aria-hidden />
                 </button>
               )}

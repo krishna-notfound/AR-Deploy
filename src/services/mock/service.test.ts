@@ -121,6 +121,28 @@ describe('products', () => {
     expect(a.images[0]?.id).not.toBe(b.images[0]?.id)
   })
 
+  it('demo variants carry their own photos and models; duplicates and saves keep them', async () => {
+    const src = unwrap(await svc.getProductById('prd_sheen_chair'))
+    const damask = src.variants[1]!
+    expect(damask.models?.glb?.url).toMatch(/ChairDamaskPurplegold\.glb$/)
+    expect(damask.images?.[0]?.isPrimary).toBe(true)
+    const copy = unwrap(await svc.duplicateProduct(src.id))
+    expect(copy.variants[1]!.id).not.toBe(damask.id)
+    expect(copy.variants[1]!.models?.glb?.url).toBe(damask.models?.glb?.url)
+    expect(copy.variants[1]!.images?.[0]?.url).toBe(damask.images?.[0]?.url)
+    // A save keeps variant ids and media, and leaves one primary photo per variant.
+    const extra = { id: 'img_x', url: 'data:image/png;base64,AAA', isPrimary: true, kind: 'gallery' as const }
+    const saved = unwrap(await svc.updateProduct(src.id, { variants: src.variants.map((v, i) => (i === 1 ? { ...v, images: [...(v.images ?? []), extra] } : v)) }))
+    expect(saved.variants.map((v) => v.id)).toEqual(src.variants.map((v) => v.id))
+    expect(saved.variants[1]!.images?.filter((i) => i.isPrimary)).toHaveLength(1)
+  })
+
+  it('caps options and photos per option like the database', async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({ id: `v${i}`, name: { en: `V${i}` } }))
+    const res = await svc.createProduct(draftInput({ slug: 'too-many', variants: many }))
+    expect(res.ok === false && res.error.fieldErrors?.variants).toMatch(/50/)
+  })
+
   it('filters by business, status and search', async () => {
     const all = unwrap(await svc.getProducts())
     const nord = unwrap(await svc.getProducts({ businessId: 'biz_nord' }))

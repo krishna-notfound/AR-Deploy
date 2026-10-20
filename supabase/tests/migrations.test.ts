@@ -219,6 +219,141 @@ describe('isolation between businesses (storage, analytics, members)', () => {
   })
 })
 
+describe('variant media (20261020143507_variant_media)', () => {
+  const DENIED = /permission denied|row-level security/
+  const uuid = () => crypto.randomUUID()
+  const img = (biz: string, ext = 'png') => `${biz}/${uuid()}.${ext}`
+  const photo = (path: string) => ({ id: 'vi', url: '', storagePath: path, isPrimary: true, kind: 'gallery' as const })
+  const glbAsset = (path: string, requiredExtensions?: string[]) => ({ format: 'glb' as const, url: '', fileName: 'v.glb', status: 'valid' as const, storagePath: path, ...(requiredExtensions ? { requiredExtensions } : {}) })
+  type V = ProductInput['variants'][number]
+  const variant = (over: Partial<V> = {}): V => ({ id: 'var_new', name: { en: 'Oak' }, ...over })
+
+  /** save_product as `uid` (default the owner); returns the product id. */
+  async function save(over: Partial<ProductInput>, id: string | null = null, uid = OWNER): Promise<string> {
+    const args = toSaveProductArgs(id, input(over))
+    const r = await as(uid, (tx) => tx.query<{ id: string }>('select public.save_product($1, $2, $3, $4) as id', [args.p_product, args.p_images, args.p_models, args.p_variants]))
+    return r.rows[0]!.id
+  }
+  const variantsOf = async (productId: string) =>
+    (await db.query<{ id: string; en: string }>(`select id, name->>'en' as en from public.product_variants where product_id = $1 order by sort_order`, [productId])).rows
+  const countMedia = async (productId: string, uid = '', role: 'authenticated' | 'anon' = 'anon') =>
+    as(
+      uid,
+      async (tx) => {
+        const r = await tx.query<{ i: number; m: number }>(
+          `select (select count(*)::int from public.product_variant_images where product_id = $1) as i,
+                  (select count(*)::int from public.product_variant_models where product_id = $1) as m`,
+          [productId],
+        )
+        return r.rows[0]!
+      },
+      role,
+    )
+
+  it("an owner attaches photos and models of their own business to a variant; ids stay stable across saves", async () => {
+    const path = img(BIZ)
+    const model = img(BIZ, 'glb')
+    const id = await save({ variants: [variant({ images: [photo(path)], models: { glb: glbAsset(model, ['KHR_texture_transform', 'EXT_texture_webp']) } })] })
+    const [first] = await variantsOf(id)
+    expect(await countMedia(id, OWNER, 'authenticated')).toEqual({ i: 1, m: 1 })
+    const stored = await db.query<{ required_extensions: string[] }>('select required_extensions from public.product_variant_models where variant_id = $1', [first!.id])
+    expect(stored.rows[0]!.required_extensions).toEqual(['KHR_texture_transform', 'EXT_texture_webp'])
+
+    // Saving again with the stored id keeps the variant (and so any link to it) and replaces its media.
+    const second = img(BIZ, 'webp')
+    await save({ variants: [variant({ id: first!.id, name: { en: 'Oak (renamed)' }, images: [photo(path), photo(second)] })] }, id)
+    const after = await variantsOf(id)
+    expect(after).toEqual([{ id: first!.id, en: 'Oak (renamed)' }])
+    expect(await countMedia(id, OWNER, 'authenticated')).toEqual({ i: 2, m: 0 })
+  })
+
+  it("refuses another business's folder, traversal or sub-folder paths and a model in a photo slot", async () => {
+    const id = await save({ variants: [variant()] })
+    const [v] = await variantsOf(id)
+    for (const bad of [img(OTHER_BIZ), `${BIZ}/../${OTHER_BIZ}/x.png`, `${BIZ}/sub/${uuid()}.png`, img(BIZ, 'glb')])
+      await expect(save({ variants: [variant({ id: v!.id, images: [photo(bad)] })] }, id)).rejects.toThrow(DENIED)
+    await expect(save({ variants: [variant({ id: v!.id, models: { glb: glbAsset(img(OTHER_BIZ, 'glb')) } })] }, id)).rejects.toThrow(DENIED)
+    await expect(save({ variants: [variant({ id: v!.id, models: { glb: glbAsset(img(BIZ, 'png')) } })] }, id)).rejects.toThrow(DENIED)
+  })
+
+  it("cannot reference another product's variant", async () => {
+    const theirs = await save({ businessId: OTHER_BIZ, variants: [variant({ name: { en: 'Theirs' } })] }, null, OTHER_OWNER)
+    const [their] = await variantsOf(theirs)
+    // save_product ignores a foreign id: the owner gets a new variant, the other one is untouched.
+    const mine = await save({ variants: [variant({ id: their!.id, name: { en: 'Hijack' }, images: [photo(img(BIZ))] })] })
+    const [own] = await variantsOf(mine)
+    expect(own!.id).not.toBe(their!.id)
+    expect(await variantsOf(theirs)).toEqual([{ id: their!.id, en: 'Theirs' }])
+    // Direct API writes: a foreign variant paired with an own product breaks the composite FK; a foreign product is RLS.
+    await expect(
+      as(OWNER, (tx) => tx.query('insert into public.product_variant_images (variant_id, product_id, storage_path) values ($1, $2, $3)', [their!.id, mine, img(BIZ)])),
+    ).rejects.toThrow(/foreign key/)
+    await expect(
+      as(OWNER, (tx) => tx.query('insert into public.product_variant_images (variant_id, product_id, storage_path) values ($1, $2, $3)', [their!.id, theirs, img(OTHER_BIZ)])),
+    ).rejects.toThrow(DENIED)
+    // No UPDATE grant: rows can never be re-pointed. Visitors cannot write at all.
+    await expect(as(OWNER, (tx) => tx.query('update public.product_variant_images set product_id = $1 where product_id = $2', [theirs, mine]))).rejects.toThrow(/permission denied/)
+    await expect(
+      as('', (tx) => tx.query('insert into public.product_variant_images (variant_id, product_id, storage_path) values ($1, $2, $3)', [own!.id, mine, img(BIZ)]), 'anon'),
+    ).rejects.toThrow(/permission denied/)
+    expect(await countMedia(mine, OTHER_OWNER, 'authenticated')).toEqual({ i: 0, m: 0 }) // a draft of another business
+  })
+
+  it('the public sees variant media (rows and files) only for published products of active businesses', async () => {
+    const path = img(BIZ)
+    await db.query(`insert into storage.objects (bucket_id, name) values ('product-media', $1)`, [path])
+    const fileVisible = async () => (await as('', (tx) => tx.query(`select 1 from storage.objects where bucket_id = 'product-media' and name = $1`, [path]), 'anon')).rows.length
+    const id = await save({ variants: [variant({ images: [photo(path)] })] })
+    expect(await countMedia(id)).toEqual({ i: 0, m: 0 })
+    expect(await fileVisible()).toBe(0)
+    await publish(id)
+    expect(await countMedia(id)).toEqual({ i: 1, m: 0 })
+    expect(await fileVisible()).toBe(1)
+    await db.query(`update public.businesses set status = 'inactive' where id = $1`, [BIZ])
+    try {
+      expect(await countMedia(id)).toEqual({ i: 0, m: 0 })
+      expect(await fileVisible()).toBe(0)
+    } finally {
+      await db.query(`update public.businesses set status = 'active' where id = $1`, [BIZ])
+    }
+    // Removing the variant deletes its media rows, and the file is no longer readable through it.
+    await save({ variants: [] }, id)
+    expect(await countMedia(id, OWNER, 'authenticated')).toEqual({ i: 0, m: 0 })
+    expect(await fileVisible()).toBe(0)
+  })
+
+  it('caps variants and photos per variant', async () => {
+    const many = Array.from({ length: 51 }, (_, i) => variant({ id: `var_${i}`, name: { en: `V${i}` } }))
+    await expect(save({ variants: many })).rejects.toThrow('too_many_variants')
+    const photos = Array.from({ length: 21 }, () => photo(img(BIZ)))
+    await expect(save({ variants: [variant({ images: photos })] })).rejects.toThrow('too_many_variant_images')
+  })
+
+  it("stores the product GLB's required extensions (Scene Viewer warning survives a reload)", async () => {
+    const id = await save({ models: { glb: { format: 'glb', url: 'https://x.test/a.glb', fileName: 'a.glb', status: 'valid', requiredExtensions: ['EXT_texture_webp'] } } })
+    const r = await db.query<{ required_extensions: string[] }>('select required_extensions from public.product_models where product_id = $1', [id])
+    expect(r.rows[0]!.required_extensions).toEqual(['EXT_texture_webp'])
+  })
+
+  it('a product can never move to another business, not even by a platform admin (OWN-01)', async () => {
+    const SECOND = '10000000-0000-0000-0000-000000000003'
+    await db.exec(`insert into public.businesses (id, name, slug, status) values ('${SECOND}', 'Second', 'second', 'active') on conflict do nothing`)
+    const id = await save({})
+    await expect(as(OWNER, (tx) => tx.query('update public.products set business_id = $2 where id = $1', [id, SECOND]))).rejects.toThrow(/product_business_immutable|row-level security/)
+    await expect(as(ADMIN, (tx) => tx.query('update public.products set business_id = $2 where id = $1', [id, SECOND]))).rejects.toThrow('product_business_immutable')
+    const r = await db.query<{ business_id: string }>('select business_id from public.products where id = $1', [id])
+    expect(r.rows[0]!.business_id).toBe(BIZ)
+  })
+
+  it('grants: visitors read only, owners read/insert/delete (no update), anon cannot run save_product', async () => {
+    const g = await db.query<{ g: string }>(`select string_agg(grantee || ':' || privilege_type, ' ' order by grantee, privilege_type) as g
+      from information_schema.role_table_grants where table_name = 'product_variant_models' and grantee in ('anon', 'authenticated')`)
+    expect(g.rows[0]!.g).toBe('anon:SELECT authenticated:DELETE authenticated:INSERT authenticated:SELECT')
+    const args = toSaveProductArgs(null, input())
+    await expect(as('', (tx) => tx.query('select public.save_product($1, $2, $3, $4)', [args.p_product, args.p_images, args.p_models, args.p_variants]), 'anon')).rejects.toThrow(/permission denied/)
+  })
+})
+
 describe('email log (20261020084414_email_log)', () => {
   const insertAsService = (status: string, recipient = 'delivered@resend.dev') =>
     db.transaction(async (tx) => {

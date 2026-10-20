@@ -220,7 +220,7 @@ describe('toSaveProductArgs', () => {
     )
     expect(args.p_images[0]).toMatchObject({ url: null, storage_path: 'b1/a.jpg', is_primary: true, sort_order: 0 })
     expect(args.p_images[1]).toMatchObject({ url: 'https://cdn.example/y.jpg', storage_path: null, kind: 'additional' })
-    expect(args.p_models).toEqual([{ url: null, storage_path: 'b1/m.glb', format: 'glb', file_name: 'm.glb', size_bytes: null }])
+    expect(args.p_models).toEqual([{ url: null, storage_path: 'b1/m.glb', format: 'glb', file_name: 'm.glb', size_bytes: null, required_extensions: null }])
     expect(args.p_product).toMatchObject({ id: null, business_id: 'b1', price: 12000, dimension_unit: 'cm' })
   })
 })

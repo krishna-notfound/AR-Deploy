@@ -3,23 +3,35 @@ import { useSearchParams } from 'react-router'
 import { Select } from '@/components/ui/Form'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { type Business, CATEGORIES, type Category, type Product, type ProductStatus } from '@/domain/types'
+import { type ProductArReadiness, productArReadiness } from './productReadiness'
+
+const AR_FILTERS: readonly ProductArReadiness[] = ['ready', 'android-only', 'android-blocked', 'photos-only']
 
 export interface ProductFilterState {
   q: string
   business: string
   status: '' | ProductStatus
   category: '' | Category
+  /** 3D / AR readiness (DUX-05). */
+  ar: '' | ProductArReadiness
   page: number
 }
+
+/** Every filter off (page is reset by any update). */
+export const CLEARED_PRODUCT_FILTERS = { q: '', business: '', status: '', category: '', ar: '' } as const satisfies Partial<ProductFilterState>
+
+export const hasProductFilters = (f: ProductFilterState) => !!(f.q || f.business || f.status || f.category || f.ar)
 
 function readFilters(params: URLSearchParams): ProductFilterState {
   const status = params.get('status')
   const category = params.get('category')
+  const ar = params.get('ar')
   return {
     q: params.get('q') ?? '',
     business: params.get('business') ?? '',
     status: status === 'draft' || status === 'published' ? status : '',
     category: CATEGORIES.includes(category as Category) ? (category as Category) : '',
+    ar: AR_FILTERS.includes(ar as ProductArReadiness) ? (ar as ProductArReadiness) : '',
     page: Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1),
   }
 }
@@ -58,6 +70,7 @@ export function applyProductFilters(products: Product[], f: ProductFilterState):
       (!f.business || p.businessId === f.business) &&
       (!f.status || p.status === f.status) &&
       (!f.category || p.category === f.category) &&
+      (!f.ar || productArReadiness(p) === f.ar) &&
       (!term || p.name.en.toLowerCase().includes(term) || (p.name.pt ?? '').toLowerCase().includes(term) || p.slug.includes(term)),
   )
 }
@@ -98,8 +111,15 @@ export function ProductFilterBar({
           </option>
         ))}
       </Select>
-      {(state.q || state.business || state.status || state.category) && (
-        <button type="button" onClick={() => update({ q: '', business: '', status: '', category: '' })} className="text-[13px] font-medium text-accent-ink hover:underline sm:ml-1">
+      <Select aria-label="Filter by 3D and AR" value={state.ar} onChange={(e) => update({ ar: e.target.value as ProductFilterState['ar'] })} className="sm:w-48">
+        <option value="">All 3D / AR</option>
+        <option value="ready">AR ready</option>
+        <option value="android-only">Needs iPhone file (USDZ)</option>
+        <option value="android-blocked">Android AR blocked</option>
+        <option value="photos-only">No 3D model</option>
+      </Select>
+      {hasProductFilters(state) && (
+        <button type="button" onClick={() => update(CLEARED_PRODUCT_FILTERS)} className="min-h-10 text-[13px] font-medium text-accent-ink hover:underline sm:ml-1">
           Clear filters
         </button>
       )}

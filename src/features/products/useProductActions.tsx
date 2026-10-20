@@ -71,7 +71,15 @@ export function useProductActions(scope: EditorScope) {
     async copyUrl(p: Product, business: Business | undefined) {
       if (!business) return
       const ok = await copyText(productPublicUrl(business, p))
-      if (ok) toast.success('Product URL copied', PUBLIC_URLS_ARE_LIVE ? undefined : 'This is a demo URL. The real domain is configured with the backend.')
+      // A copied link must not look ready to share when customers would get "not available" (DUX-09).
+      const caveat =
+        p.status !== 'published'
+          ? 'This link works once the product is published.'
+          : business.status !== 'active'
+            ? 'This link works once your catalog is activated.'
+            : undefined
+      const demo = PUBLIC_URLS_ARE_LIVE ? undefined : 'Example address for this demo.'
+      if (ok) toast.success('Product URL copied', [caveat, demo].filter(Boolean).join(' ') || undefined)
       else toast.error('Copy failed', 'Your browser blocked clipboard access.')
     },
     openPreview(p: Product, business: Business | undefined) {

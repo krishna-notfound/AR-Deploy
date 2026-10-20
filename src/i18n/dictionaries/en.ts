@@ -23,6 +23,7 @@ export const en = {
   'catalog.inactiveBody': 'The store has paused its online catalog. Please contact them directly.',
   'catalog.has3d': 'View in 3D',
   'catalog.eyebrow': 'Collection',
+  'catalog.previewBanner': 'Preview. Customers cannot see this catalog until it is activated.',
 
   'category.sofa': 'Sofas',
   'category.chair': 'Chairs',
@@ -89,6 +90,8 @@ export const en = {
   'ar.scaleUnverified': 'AR scale unverified',
   'ar.scaleUnverifiedHelp': 'The 3D model does not match the listed dimensions. Use the dimensions above as the reference.',
   'ar.modelMeasures': 'Model measures {size}',
+  'ar.modelUnsupported': 'AR is not available for this model on Android. You can still explore it in 3D.',
+  'ar.variantFallback': 'The 3D view and AR show the standard model. The {name} finish may look different.',
 
   'ar.tipsTitle': 'Placing the piece in your space',
   'ar.tip1': 'Point your camera at the floor.',

@@ -1,6 +1,6 @@
 # 08 · Multi-tenant resolution, URLs & QR rule
 Read when: building URLs, QR codes, copy/share links, or the subdomain logic.
-Decision: [ADR-0005](../decisions/ADR-0005-qr-encodes-catalog-url.md)
+Decision: [ADR-0005](../decisions/ADR-0005-qr-encodes-catalog-url.md), amended by [ADR-0025](../decisions/ADR-0025-product-qr-and-owner-catalog-preview.md)
 
 ## resolveTenant (`src/tenant/resolveTenant.ts`)
 ```ts
@@ -14,8 +14,10 @@ Returns hostname mode when `VITE_ROOT_DOMAIN` is set, the hostname is `{slug}.{r
 |---|---|---|
 | `catalogPublicUrl(b)` | `https://{b.slug}.{ROOT}` | QR code, "Copy catalog URL" (labelled Demo URL) |
 | `productPublicUrl(b, p)` | `https://{b.slug}.{ROOT}/products/{p.slug}` | Publish dialog, "Copy product URL" in admin |
-| `catalogLocalPath(b)` | `/catalog/{slug}` | "Open catalog preview" |
-| `productLocalPath(b, p)` | `/products/{bSlug}/{pSlug}` | "Open preview" |
+| `catalogLocalPath(b, { preview? })` | `/catalog/{slug}` (`?preview=1` for the owner preview of a non-active catalogue, ADR-0025) | "Open catalog" / "Preview catalog (not public yet)" |
+| `productLocalPath(b, p, { preview? })` | `/products/{bSlug}/{pSlug}` | "Open preview" |
+| `tenantCatalogPath()` / `tenantProductPath(p)` | `/`, `/products/{pSlug}` on a business subdomain | Public catalogue links |
+| `myProductsPath({ status?, ar? })` | `/dashboard/products?…` | Overview "Next steps" links |
 
 `ROOT = import.meta.env.VITE_ROOT_DOMAIN ?? 'example.com'`.
 Share and copy actions on **public** pages use `window.location.href`.
@@ -24,3 +26,9 @@ Share and copy actions on **public** pages use `window.location.href`.
 - The catalog QR code **always** encodes `catalogPublicUrl(business)`, never a product URL, so it stays valid as products change.
 - An optional toggle, "Encode local preview URL (for testing on this network)", switches it to `origin + catalogLocalPath`. The toggle is off by default.
 - Download as PNG at 1024 px, named `{slug}-catalog-qr.png`.
+- The "Encode local preview URL" toggle is shown only on demo or temporary (preview/local) hosts, never in production.
+
+## Product QR (ADR-0025)
+- A separate "Product QR code" dialog (product row menu, shared `ProductTable`) encodes `productPublicUrl(b, p)`. It never replaces the catalogue QR.
+- Published products only; a draft shows "Not public yet" and no code. A published product of a non-active business gets the code with a "Not public yet" warning.
+- PNG at 1024 px, named `{business}-{product}-qr.png`.

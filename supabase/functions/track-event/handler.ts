@@ -34,9 +34,22 @@ export function clientIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
 }
 
-/** SHA-256 hex of ip|utc-date|salt. Changes daily; the raw IP cannot be recovered without the salt. */
+/**
+ * The part of an address that identifies one connection: IPv4 as is, IPv6 by its /64 prefix. A single home or
+ * phone connection owns a whole /64, so hashing full IPv6 addresses would give one visitor unlimited keys (OWN-04).
+ */
+export function visitorNetwork(ip: string): string {
+  if (!ip.includes(':')) return ip
+  const [head = '', tail = ''] = ip.toLowerCase().split('::')
+  const left = head ? head.split(':') : []
+  const right = tail ? tail.split(':') : []
+  const groups = ip.includes('::') ? [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right] : left
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':')}::/64`
+}
+
+/** SHA-256 hex of network|utc-date|salt. Changes daily; the raw IP cannot be recovered without the salt. */
 export async function visitorKey(ip: string, salt: string, now: Date): Promise<string> {
-  const data = new TextEncoder().encode(`${ip}|${now.toISOString().slice(0, 10)}|${salt}`)
+  const data = new TextEncoder().encode(`${visitorNetwork(ip)}|${now.toISOString().slice(0, 10)}|${salt}`)
   const digest = await crypto.subtle.digest('SHA-256', data)
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }

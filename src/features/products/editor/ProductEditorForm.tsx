@@ -116,6 +116,8 @@ export function ProductEditorForm({
   /** The last saved version: its slug drives the published dialog and Preview after a slug change. */
   const [latest, setLatest] = useState<Product | null>(product)
   const [pendingUnit, setPendingUnit] = useState<'cm' | 'in' | null>(null)
+  /** The dimensions before the last conversion, so converting back restores them exactly (AR-10). */
+  const [dimsBefore, setDimsBefore] = useState<{ unit: 'cm' | 'in'; dims: EditorForm['dims'] } | undefined>(undefined)
   const skipBlock = useRef(false)
   const summaryRef = useRef<HTMLDivElement>(null)
   const prevForm = useRef(form)
@@ -125,7 +127,11 @@ export function ProductEditorForm({
   const business = businesses.find((b) => b.id === form.input.businessId) ?? fixedBusiness
   // Files uploaded to Storage live under {businessId}/: switching business would make the save fail
   // (storage-folder check) and orphan the files, so the choice is locked once files are stored.
-  const hasStoredUploads = form.input.images.some((i) => i.storagePath) || !!form.input.models.glb?.storagePath || !!form.input.models.usdz?.storagePath
+  const hasStoredUploads =
+    form.input.images.some((i) => i.storagePath) ||
+    !!form.input.models.glb?.storagePath ||
+    !!form.input.models.usdz?.storagePath ||
+    form.input.variants.some((v) => v.images?.some((i) => i.storagePath) || !!v.models?.glb?.storagePath || !!v.models?.usdz?.storagePath)
   const base = scope === 'admin' ? '/admin/products' : '/dashboard/products'
 
   // ---- unsaved-changes guard ----
@@ -274,9 +280,11 @@ export function ProductEditorForm({
   const applyUnit = (convert: boolean) => {
     const next = pendingUnit
     if (!next) return
+    const before = dimsBefore
+    setDimsBefore(convert ? { unit: form.input.dimensions.unit, dims: form.dims } : undefined)
     setForm((f) => ({
       ...f,
-      dims: convert ? convertDims(f.dims, f.input.dimensions.unit, next) : f.dims,
+      dims: convert ? convertDims(f.dims, f.input.dimensions.unit, next, before) : f.dims,
       input: { ...f.input, dimensions: { ...f.input.dimensions, unit: next } },
     }))
     setPendingUnit(null)
@@ -427,7 +435,7 @@ export function ProductEditorForm({
             </div>
           </Section>
 
-          <Section id="models" title="3D models" description="Optional. Products without a model show photos only.">
+          <Section id="models" title="3D models" description="Optional. Products without a model show photos only. Colours and options can have their own photos and models (under Colours and variants).">
             <ModelSection
               businessId={form.input.businessId}
               models={form.input.models}
@@ -497,7 +505,14 @@ export function ProductEditorForm({
             <div>
               <h3 className="mb-1 text-sm font-semibold">Colours and variants</h3>
               {err('variants') && <p className="mb-2 text-xs font-medium text-danger">{err('variants')}</p>}
-              <VariantsEditor variants={form.input.variants} onChange={(variants) => setInput({ variants })} currency={form.input.currency} />
+              <VariantsEditor
+                variants={form.input.variants}
+                onChange={(update) => setForm((f) => ({ ...f, input: { ...f.input, variants: update(f.input.variants) } }))}
+                currency={form.input.currency}
+                businessId={form.input.businessId}
+                dimensions={toInput(form).input.dimensions}
+                poster={poster}
+              />
             </div>
           </Section>
 
@@ -583,7 +598,7 @@ export function ProductEditorForm({
           <>
             <Button onClick={() => applyUnit(false)}>Keep the numbers</Button>
             <Button variant="primary" onClick={() => applyUnit(true)} data-autofocus>
-              Convert to {pendingUnit ? dimsText(convertDims(form.dims, unit, pendingUnit), pendingUnit) : ''}
+              Convert to {pendingUnit ? dimsText(convertDims(form.dims, unit, pendingUnit, dimsBefore), pendingUnit) : ''}
             </Button>
           </>
         }

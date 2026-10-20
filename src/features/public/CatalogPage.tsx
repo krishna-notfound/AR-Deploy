@@ -1,6 +1,7 @@
-import { Box, PauseCircle, SearchX, Store } from 'lucide-react'
+import { Box, Eye, PauseCircle, SearchX, Store } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
+import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { SearchInput } from '@/components/ui/SearchInput'
@@ -14,6 +15,7 @@ import { formatMoney } from '@/lib/format'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { initialPrice, primaryImage } from '@/lib/product'
+import { catalogLocalPath, productLocalPath, tenantCatalogPath, tenantProductPath } from '@/lib/urls'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { TAP_TARGET } from './tapTarget'
@@ -26,13 +28,23 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const q = search.get('q') ?? ''
   const cat = (CATEGORIES as readonly string[]).includes(search.get('category') ?? '') ? (search.get('category') as Category) : ''
 
+  const { user } = useAccount()
+
   const business = useServiceQuery(() => service.getBusinessBySlug(slug), [slug])
   const b = business.data
-  // Until there is an active business the query stays pending: a placeholder [] would read as "No products yet"
+  // Owner preview of a catalogue that is not active yet (DUX-02): only with ?preview=1 AND a signed-in owner of
+  // this business or a platform admin. A UX rule, not security: in Supabase mode RLS only returns a non-active
+  // business and its products to its members and platform admins; anonymous visitors get "not found".
+  const wantsPreview = search.get('preview') === '1'
+  // While the account loads, a preview request waits instead of flashing "catalog unavailable" (as COR-09).
+  const accountPending = wantsPreview && user === undefined
+  const isPreview = !!b && b.status !== 'active' && wantsPreview && !!user && (user.role === 'super_admin' || user.businessId === b.id)
+  const showCatalog = !!b && (b.status === 'active' || isPreview)
+  // Until there is a business to show the query stays pending: a placeholder [] would read as "No products yet"
   // (and "0 products") for the first frame after the business arrives (COR-37).
   const products = useServiceQuery(
-    () => (b && b.status === 'active' ? service.getProducts({ businessId: b.id, status: 'published' }) : new Promise<never>(() => {})),
-    [b?.id, b?.status],
+    () => (b && showCatalog ? service.getProducts({ businessId: b.id, status: 'published' }) : new Promise<never>(() => {})),
+    [b?.id, showCatalog],
   )
 
   useEffect(() => {
@@ -51,10 +63,12 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const term = q.trim().toLowerCase()
   const visible = all.filter((p) => (!cat || p.category === cat) && (!term || localized(p.name).toLowerCase().includes(term) || p.name.en.toLowerCase().includes(term)))
 
-  const productHref = (p: Product) => (tenantSlug ? `/products/${p.slug}` : `/products/${slug}/${p.slug}`)
-  const catalogHref = tenantSlug ? '/' : `/catalog/${slug}`
+  const productHref = (p: Product) => (tenantSlug ? tenantProductPath(p, { preview: isPreview }) : productLocalPath({ slug }, p, { preview: isPreview }))
+  const catalogHref = tenantSlug ? tenantCatalogPath({ preview: isPreview }) : catalogLocalPath({ slug }, { preview: isPreview })
+  // Clearing the search and category keeps the preview flag.
+  const clearFilters = () => setSearch(isPreview ? { preview: '1' } : {}, { replace: true })
 
-  if (business.status === 'loading' && !b)
+  if ((business.status === 'loading' && !b) || (b && b.status !== 'active' && accountPending))
     return (
       <PublicShell>
         <FullPageSpinner label={t('common.loading')} />
@@ -86,7 +100,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
     )
   }
 
-  if (b.status !== 'active') {
+  if (!showCatalog) {
     return (
       <PublicShell business={b} catalogHref={catalogHref}>
         <PublicMessage icon={PauseCircle} title={t('catalog.inactiveTitle')} body={t('catalog.inactiveBody')} />
@@ -96,6 +110,14 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
 
   return (
     <PublicShell business={b} catalogHref={catalogHref}>
+      {isPreview && (
+        <div className="border-b border-warning/30 bg-warning-soft" role="status">
+          <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-10">
+            <Eye className="size-4 shrink-0" aria-hidden />
+            {t('catalog.previewBanner')}
+          </p>
+        </div>
+      )}
       <section className="mx-auto grid max-w-[1320px] gap-8 px-5 pt-14 pb-10 sm:px-10 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-end lg:gap-16">
         <div className="flex items-start gap-5">
           {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
@@ -148,7 +170,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
             icon={SearchX}
             title={t('catalog.noResultsTitle')}
             body={t('catalog.noResultsBody')}
-            action={<Button onClick={() => setSearch({}, { replace: true })}>{t('catalog.clearFilters')}</Button>}
+            action={<Button onClick={clearFilters}>{t('catalog.clearFilters')}</Button>}
           />
         ) : (
           <ul className="grid grid-cols-1 gap-x-6 gap-y-14 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

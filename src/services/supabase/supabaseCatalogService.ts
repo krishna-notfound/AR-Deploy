@@ -21,7 +21,9 @@ import type {
   ModelFormat,
   Product,
   ProductImage,
+  ProductModels,
   ProductStatus,
+  ProductVariant,
   WeightUnit,
 } from '@/domain/types'
 import { localDayBounds } from '@/lib/format'
@@ -37,7 +39,7 @@ export const TRACK_EVENT_FUNCTION = 'track-event'
 // 12 h: anonymous visitors can already sign any published product's media (storage policy), so a longer
 // lifetime only widens the window in which a just-unpublished file stays reachable by an old link.
 const SIGNED_URL_TTL_SECONDS = MEDIA_URL_TTL_SECONDS
-const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*)'
+const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*, product_variant_images(*), product_variant_models(*))'
 
 // Hand-written row shapes matching supabase/migrations; schemaDrift.check.ts compares them with the
 // schema is applied (`npm run db:types`, see design/19-supabase.md).
@@ -72,6 +74,21 @@ export interface ModelRow {
   storage_path: string | null
   file_name: string
   size_bytes: number | null
+  required_extensions: string[] | null
+}
+export interface VariantImageRow {
+  id: string
+  storage_path: string
+  alt: string | null
+  is_primary: boolean
+  sort_order: number
+}
+export interface VariantModelRow {
+  format: ModelFormat
+  storage_path: string
+  file_name: string
+  size_bytes: number | null
+  required_extensions: string[] | null
 }
 export interface VariantRow {
   id: string
@@ -80,6 +97,8 @@ export interface VariantRow {
   sku: string | null
   price_delta: number | null
   sort_order: number
+  product_variant_images?: VariantImageRow[]
+  product_variant_models?: VariantModelRow[]
 }
 export interface ProductRow {
   id: string
@@ -129,6 +148,8 @@ const SLUG_TAKEN = {
 /** Rules raised by our own triggers (supabase/migrations), keyed by their exception message. */
 const DB_RULES: Record<string, { field: string; message: string }> = {
   publish_requires_gallery_image: { field: 'images', message: 'Add at least one product image before publishing.' },
+  too_many_variants: { field: 'variants', message: 'Use 50 colours or options or fewer.' },
+  too_many_variant_images: { field: 'variants', message: 'Each colour or option can have up to 20 photos.' },
 }
 
 /** Stable message keys raised by the database functions (20261020091428_applications_and_owner_access). */
@@ -206,12 +227,13 @@ function fromBusinessInput(d: Partial<BusinessInput>): Partial<BusinessRow> {
   return row
 }
 
-function toProduct(r: ProductRow, signed: Map<string, string>): Product {
-  const resolve = (x: { url: string | null; storage_path: string | null }) => (x.storage_path ? (signed.get(x.storage_path) ?? '') : (x.url ?? ''))
-  const models: Product['models'] = {}
-  for (const m of r.product_models ?? []) {
+type Resolve = (x: { url?: string | null; storage_path: string | null }) => string
+
+function toModels(rows: (ModelRow | VariantModelRow)[], resolve: Resolve): ProductModels {
+  const models: ProductModels = {}
+  for (const m of rows) {
     const url = resolve(m)
-    const asset: ModelAsset = {
+    models[m.format] = {
       format: m.format,
       url,
       fileName: m.file_name,
@@ -219,9 +241,31 @@ function toProduct(r: ProductRow, signed: Map<string, string>): Product {
       status: url ? 'valid' : 'invalid',
       validationMessage: url ? undefined : 'A download link for this file could not be created.',
       storagePath: m.storage_path ?? undefined,
+      ...(m.required_extensions ? { requiredExtensions: m.required_extensions } : {}),
     }
-    models[m.format] = asset
   }
+  return models
+}
+
+function toVariant(v: VariantRow, resolve: Resolve): ProductVariant {
+  const images = [...(v.product_variant_images ?? [])]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((i): ProductImage => ({ id: i.id, url: resolve(i), alt: i.alt ?? undefined, isPrimary: i.is_primary, kind: 'gallery', storagePath: i.storage_path }))
+  const models = toModels(v.product_variant_models ?? [], resolve)
+  return {
+    id: v.id,
+    name: v.name,
+    colorHex: v.color_hex ?? undefined,
+    sku: v.sku ?? undefined,
+    priceDelta: v.price_delta ?? undefined,
+    ...(images.length ? { images } : {}),
+    ...(models.glb || models.usdz ? { models } : {}),
+  }
+}
+
+function toProduct(r: ProductRow, signed: Map<string, string>): Product {
+  const resolve: Resolve = (x) => (x.storage_path ? (signed.get(x.storage_path) ?? '') : (x.url ?? ''))
+  const models = toModels(r.product_models ?? [], resolve)
   return {
     id: r.id,
     businessId: r.business_id,
@@ -241,7 +285,7 @@ function toProduct(r: ProductRow, signed: Map<string, string>): Product {
     weight: r.weight_value != null && r.weight_unit ? { value: Number(r.weight_value), unit: r.weight_unit } : undefined,
     variants: [...(r.product_variants ?? [])]
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map((v) => ({ id: v.id, name: v.name, colorHex: v.color_hex ?? undefined, sku: v.sku ?? undefined, priceDelta: v.price_delta ?? undefined })),
+      .map((v) => toVariant(v, resolve)),
     cta: { label: r.cta_label, url: r.cta_url ?? undefined },
     status: r.status,
     publishedAt: r.published_at ?? undefined,
@@ -275,16 +319,32 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
       weight_unit: p.weight?.unit ?? null,
     },
     p_images: normalizeImages(p.images).map((img, i) => ({ ...stored(img), alt: img.alt ?? null, is_primary: img.isPrimary, kind: img.kind, sort_order: i })),
-    p_models: Object.values(p.models)
-      .filter((m): m is ModelAsset => !!m)
-      .map((m) => ({ ...stored(m), format: m.format, file_name: m.fileName, size_bytes: m.sizeBytes ?? null })),
-    p_variants: p.variants.map((v, i) => ({ name: v.name, color_hex: v.colorHex ?? null, sku: v.sku ?? null, price_delta: v.priceDelta ?? null, sort_order: i })),
+    p_models: modelList(p.models).map((m) => ({ ...stored(m), format: m.format, file_name: m.fileName, size_bytes: m.sizeBytes ?? null, required_extensions: m.requiredExtensions ?? null })),
+    // Variant ids are sent so they stay stable (save_product honours only ids of this product's own variants).
+    // Variant media is always an owner upload: its rows carry the storage path only.
+    p_variants: p.variants.map((v, i) => ({
+      id: v.id,
+      name: v.name,
+      color_hex: v.colorHex ?? null,
+      sku: v.sku ?? null,
+      price_delta: v.priceDelta ?? null,
+      sort_order: i,
+      images: normalizeImages(v.images ?? [])
+        .filter((img) => img.storagePath)
+        .map((img) => ({ storage_path: img.storagePath, alt: img.alt ?? null, is_primary: img.isPrimary })),
+      models: modelList(v.models)
+        .filter((m) => m.storagePath)
+        .map((m) => ({ format: m.format, storage_path: m.storagePath, file_name: m.fileName, size_bytes: m.sizeBytes ?? null, required_extensions: m.requiredExtensions ?? null })),
+    })),
   }
 }
 
-/** Storage paths a product points at (images + models). */
-export function mediaPaths(p: Pick<Product, 'images' | 'models'>): string[] {
-  return [...p.images.map((i) => i.storagePath), p.models.glb?.storagePath, p.models.usdz?.storagePath].filter((x): x is string => !!x)
+const modelList = (m: ProductModels | undefined): ModelAsset[] => [m?.glb, m?.usdz].filter((x): x is ModelAsset => !!x)
+
+/** Storage paths a product points at: its images and models and every variant's photos and models. */
+export function mediaPaths(p: Pick<Product, 'images' | 'models' | 'variants'>): string[] {
+  const own = (images: ProductImage[] = [], models?: ProductModels) => [...images.map((i) => i.storagePath), ...modelList(models).map((m) => m.storagePath)]
+  return [...own(p.images, p.models), ...p.variants.flatMap((v) => own(v.images, v.models))].filter((x): x is string => !!x)
 }
 
 /** Object path of a logo stored in our public bucket, or null for external URLs. */
@@ -303,6 +363,10 @@ export function ownedLogoPath(url: string | undefined, businessId: ID): string |
 const isBlobOrDataUrl = (u: string) => u.startsWith('blob:') || u.startsWith('data:')
 
 const UPLOAD_CONTENT_TYPE: Partial<Record<UploadKind, string>> = { glb: 'model/gltf-binary', usdz: 'model/vnd.usdz+zip' }
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp']
+const IMAGE_EXT_BY_TYPE: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
+/** Every table whose rows may reference a product-media file. */
+const MEDIA_TABLES = ['product_images', 'product_models', 'product_variant_images', 'product_variant_models'] as const
 
 // ---------------- applications, audit, email log (20261020091428_applications_and_owner_access) ----------------
 
@@ -474,7 +538,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
   async function hydrate(rows: ProductRow[]): Promise<Product[]> {
     const paths = new Set<string>()
     for (const r of rows) {
-      for (const x of [...(r.product_images ?? []), ...(r.product_models ?? [])]) if (x.storage_path) paths.add(x.storage_path)
+      const variantMedia = (r.product_variants ?? []).flatMap((v) => [...(v.product_variant_images ?? []), ...(v.product_variant_models ?? [])])
+      for (const x of [...(r.product_images ?? []), ...(r.product_models ?? []), ...variantMedia]) if (x.storage_path) paths.add(x.storage_path)
     }
     const signed = new Map<string, string>()
     if (paths.size) {
@@ -521,19 +586,19 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
   }
 
   /**
-   * Best-effort removal of product-media files no product references any more (after delete or
-   * replace). Runs with the caller's storage policies (own folder / admin). Cross-business references
-   * are impossible (RLS), so the caller can see every row that could still point at the file.
+   * Best-effort removal of product-media files no product or variant references any more (after delete or
+   * replace). Runs with the caller's storage policies (own folder / admin). Cross-business references are
+   * impossible (RLS checks the path folder, and products cannot change business since 20261020143507_variant_media),
+   * so the caller sees every row that could still point at the file, including a duplicate's variant media.
    */
   async function removeUnreferencedMedia(paths: string[]): Promise<void> {
     const unique = [...new Set(paths)]
     if (!unique.length) return
-    const [img, mdl] = await Promise.all([
-      sb.from('product_images').select('storage_path').in('storage_path', unique).returns<{ storage_path: string }[]>(),
-      sb.from('product_models').select('storage_path').in('storage_path', unique).returns<{ storage_path: string }[]>(),
-    ])
-    if (img.error || mdl.error) return // keep files when unsure
-    const stillUsed = new Set([...img.data, ...mdl.data].map((r) => r.storage_path))
+    const refs = await Promise.all(
+      MEDIA_TABLES.map((table) => sb.from(table).select('storage_path').in('storage_path', unique).returns<{ storage_path: string }[]>()),
+    )
+    if (refs.some((r) => r.error)) return // keep files when unsure
+    const stillUsed = new Set(refs.flatMap((r) => r.data ?? []).map((r) => r.storage_path))
     const orphans = unique.filter((p) => !stillUsed.has(p))
     if (orphans.length) await sb.storage.from(MEDIA_BUCKET).remove(orphans)
   }
@@ -549,6 +614,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     const errors = validateProductDraft(input, [])
     const local = [...input.images.map((i) => i.url), input.models.glb?.url ?? '', input.models.usdz?.url ?? '']
     if (local.some(isBlobOrDataUrl)) errors.images = 'Some files were not uploaded to storage. Remove them and upload again.'
+    const variantFiles = input.variants.flatMap((v) => [...(v.images ?? []), ...modelList(v.models)])
+    if (variantFiles.some((f) => !f.storagePath)) errors.variants = 'Some colour or option files were not uploaded to storage. Remove them and upload again.'
     if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
     const { data, error } = await sb.rpc('save_product', toSaveProductArgs(id, input))
     if (error) return mapDbError(error, { conflictField: 'product', notFound: 'Product not found.' })
@@ -884,7 +951,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       guard(async () => {
         const bucket = kind === 'logo' ? LOGO_BUCKET : MEDIA_BUCKET
         if (!businessId && kind !== 'logo') return fail('VALIDATION', 'Choose the business before uploading files.')
-        const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() : 'bin'
+        const named = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() : 'bin'
+        // Images keep a known extension: the variant-media path rule accepts png, jpg/jpeg and webp only.
+        const ext = kind === 'image' && !IMAGE_EXTENSIONS.includes(named) ? (IMAGE_EXT_BY_TYPE[file.type] ?? named) : named
         // Path convention (design/19): {business_id}/{uuid}.{ext}; logos for a business not yet created go under new/.
         const path = `${businessId ?? 'new'}/${crypto.randomUUID()}.${ext}`
         // supabase-js sends a File with its own type (browsers report '' for .glb/.usdz, stored as

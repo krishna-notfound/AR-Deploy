@@ -10,19 +10,24 @@ import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessCatalog } from '@/domain/types'
 import { downloadDataUrl } from '@/lib/download'
-import { PUBLIC_URLS_ARE_LIVE, PUBLIC_URLS_ARE_TEMPORARY, absoluteLocalUrl } from '@/lib/urls'
+import { PUBLIC_URL_MODE, PUBLIC_URLS_ARE_LIVE, PUBLIC_URLS_ARE_TEMPORARY, absoluteLocalUrl, catalogLocalPath } from '@/lib/urls'
 import { useQrCode } from '@/lib/useQrCode'
 
+/** The "encode local URL" switch is for testing on a phone: offered on demo and temporary hosts, never in production (DUX-08). */
+export const LOCAL_QR_SWITCH = PUBLIC_URL_MODE === 'demo' || PUBLIC_URLS_ARE_TEMPORARY
+
 /**
- * Catalog URL + QR code. The QR always encodes the CATALOG URL (never a product), so it
- * stays valid as products are added or removed (ADR-0005).
+ * Catalog URL + QR code. This QR always encodes the CATALOG URL (never a product), so it
+ * stays valid as products are added or removed (ADR-0005). Per-product QR codes are separate (ADR-0025).
  */
 export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCatalog; productsLink: string }) {
   const toast = useToast()
-  const [useLocal, setUseLocal] = useState(false)
+  const [localSwitch, setUseLocal] = useState(false)
+  const useLocal = LOCAL_QR_SWITCH && localSwitch
   const target = useLocal ? absoluteLocalUrl(catalog.localPath) : catalog.catalogUrl
   const qr = useQrCode(target)
   const b = catalog.business
+  const isPublic = b.status === 'active'
 
   const download = () => {
     if (!qr.url) return
@@ -32,8 +37,9 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
 
   return (
     <Card className="overflow-hidden">
-      <div className="grid md:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="space-y-5 p-5 sm:p-6">
+      {/* grid-cols-1 + min-w-0: an implicit auto track grew to the URL's width and clipped the column on phones (DUX-03). */}
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-5 p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold">{b.name}</h2>
             <BusinessStatusBadge status={b.status} />
@@ -46,7 +52,7 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
               <CopyButton text={catalog.catalogUrl} label="Copy URL" toastTitle="Catalog URL copied" />
             </div>
             {!PUBLIC_URLS_ARE_LIVE && (
-              <p className="mt-1.5 text-xs text-ink-muted">Demo URL. The subdomain is not live until DNS and hosting are set up with the backend.</p>
+              <p className="mt-1.5 text-xs text-ink-muted">Example address for this demo. Your real address is set up by the platform team.</p>
             )}
             {PUBLIC_URLS_ARE_TEMPORARY && (
               <p className="mt-1.5 text-xs font-medium text-warning">
@@ -56,8 +62,8 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalog.localPath, '_blank', 'noopener')}>
-              Open catalog preview
+            <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b, { preview: !isPublic }), '_blank', 'noopener')}>
+              {isPublic ? 'Open catalog' : 'Preview catalog (not public yet)'}
             </Button>
             <ButtonLink to={productsLink} icon={<Package className="size-4" aria-hidden />}>
               View products
@@ -75,14 +81,15 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
             </div>
           </dl>
 
-          {b.status !== 'active' && (
+          {!isPublic && (
             <InlineNotice tone="warning" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
-              This catalog is {b.status}. Customers who scan the QR code will see “catalog unavailable” until it is activated.
+              This catalog is {b.status === 'draft' ? 'not public yet' : 'paused'}. Customers who scan the QR code will see “catalog unavailable” until it
+              is activated.
             </InlineNotice>
           )}
         </div>
 
-        <div className="flex flex-col items-center border-t border-line bg-canvas p-6 md:border-t-0 md:border-l">
+        <div className="flex min-w-0 flex-col items-center border-t border-line bg-canvas p-6 md:border-t-0 md:border-l">
           <div className="w-full max-w-[220px] rounded-xl bg-white p-3 shadow-[var(--shadow-card)]">
             {qr.url ? (
               <img src={qr.url} alt={`QR code linking to ${target}`} className="aspect-square w-full" />
@@ -99,9 +106,11 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
           <Button variant="primary" className="mt-4" onClick={download} disabled={!qr.url} icon={<Download className="size-4" aria-hidden />}>
             Download PNG
           </Button>
-          <div className="mt-5 w-full border-t border-line pt-4">
-            <Switch checked={useLocal} onChange={setUseLocal} label="Encode local preview URL" description="For testing on a phone on this network. Leave off for print." />
-          </div>
+          {LOCAL_QR_SWITCH && (
+            <div className="mt-5 w-full border-t border-line pt-4">
+              <Switch checked={localSwitch} onChange={setUseLocal} label="Encode local preview URL" description="For testing on a phone on this network. Leave off for print." />
+            </div>
+          )}
         </div>
       </div>
     </Card>

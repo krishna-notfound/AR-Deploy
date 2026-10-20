@@ -2,7 +2,7 @@ import { BarChart3 } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
-import { HorizontalBars } from '@/components/charts/Charts'
+import { HorizontalBars, SERIES } from '@/components/charts/Charts'
 import { SampleDataTag } from '@/components/ui/Badge'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { type Column, DataTable } from '@/components/ui/DataTable'
@@ -16,6 +16,12 @@ import { formatNumber, formatPercent } from '@/lib/format'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { primaryImage } from '@/lib/product'
+import { hasArModel } from '../products/productReadiness'
+
+/** Stored AR launch attempts for a product, or null when it has no 3D model and none were recorded (shown as "—"). */
+function arAttempts(p: Product | undefined, r: ProductAnalytics): number | null {
+  return !r.arActivations && p && !hasArModel(p) ? null : r.arActivations
+}
 
 /**
  * Shared analytics: product views and AR launch attempts only (design/16).
@@ -69,8 +75,23 @@ export function AnalyticsView({
       ? [{ key: 'business', header: 'Business', sortValue: (r: ProductAnalytics) => bizMap.get(r.businessId)?.name ?? '', cell: (r: ProductAnalytics) => <span className="text-ink-muted">{bizMap.get(r.businessId)?.name}</span> } satisfies Column<ProductAnalytics>]
       : []),
     { key: 'views', header: 'Views', align: 'right', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
-    { key: 'ar', header: 'AR launch attempts', align: 'right', sortValue: (r) => r.arActivations, cell: (r) => formatNumber(r.arActivations) },
-    { key: 'rate', header: 'AR rate', align: 'right', sortValue: (r) => r.arRate, cell: (r) => (r.views ? formatPercent(r.arRate) : '—') },
+    {
+      key: 'ar',
+      header: 'AR launch attempts',
+      align: 'right',
+      sortValue: (r) => arAttempts(productMap.get(r.productId), r) ?? -1,
+      cell: (r) => {
+        const n = arAttempts(productMap.get(r.productId), r)
+        return n === null ? <span title="No 3D model">—</span> : formatNumber(n)
+      },
+    },
+    {
+      key: 'rate',
+      header: 'AR rate',
+      align: 'right',
+      sortValue: (r) => (arAttempts(productMap.get(r.productId), r) === null ? -1 : r.arRate),
+      cell: (r) => (arAttempts(productMap.get(r.productId), r) === null ? <span title="No 3D model">—</span> : r.views ? formatPercent(r.arRate) : '—'),
+    },
   ]
 
   return (
@@ -93,12 +114,22 @@ export function AnalyticsView({
       <StatGroup
         loading={loading}
         stats={[
-          { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0) },
-          { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0) },
-          { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Visitors who turned or zoomed a model' },
-          { label: 'AR launch rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : '—', hint: 'Activations per product view' },
-          { label: 'Published products', value: formatNumber(s?.totals.published ?? 0) },
+          { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+          { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
+          // The seeded sample data has no 3D interactions: "0" next to thousands of views would read as broken tracking.
+          s?.isSample && !s.totals.modelInteractions
+            ? { label: '3D interactions', value: '—', hint: 'Not in the sample data' }
+            : { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Times a visitor turned or zoomed a 3D model' },
+          { label: 'AR launch rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : '—', hint: 'AR launch attempts per product page view' },
+          { label: 'Published products', value: formatNumber(s?.totals.published ?? 0), hint: 'Current' },
         ]}
+        footer={
+          s?.isSample && !onBusinessChange ? (
+            <span className="flex items-center gap-2">
+              <SampleDataTag /> Includes seeded sample data. Not live production analytics.
+            </span>
+          ) : undefined
+        }
       />
 
       <Card>
@@ -130,6 +161,7 @@ export function AnalyticsView({
               <ol className="space-y-3">
                 {top.map((r, i) => {
                   const p = productMap.get(r.productId)
+                  const attempts = arAttempts(p, r)
                   const max = top[0]?.views || 1
                   return (
                     <li key={r.productId} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3">
@@ -137,13 +169,13 @@ export function AnalyticsView({
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{p?.name.en}</p>
                         <div className="mt-1 h-1.5 rounded-full bg-subtle">
-                          <div className="h-full rounded-full bg-[#2E8B6A]" style={{ width: `${(r.views / max) * 100}%` }} />
+                          <div className="h-full rounded-full" style={{ width: `${(r.views / max) * 100}%`, backgroundColor: SERIES.views.color }} />
                         </div>
                       </div>
                       <span className="text-right text-xs text-ink-muted tabular-nums">
                         {formatNumber(r.views)} views
                         <br />
-                        {formatNumber(r.arActivations)} AR
+                        {attempts === null ? 'No 3D model' : `${formatNumber(attempts)} AR attempts`}
                       </span>
                     </li>
                   )
@@ -169,7 +201,8 @@ export function AnalyticsView({
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="min-w-0 truncate font-medium">{productMap.get(r.productId)?.name.en}</span>
               <span className="shrink-0 text-xs text-ink-muted tabular-nums">
-                {formatNumber(r.views)} views · {formatNumber(r.arActivations)} AR
+                {formatNumber(r.views)} views
+                {arAttempts(productMap.get(r.productId), r) === null ? ' · no 3D model' : ` · ${formatNumber(r.arActivations)} AR attempts`}
               </span>
             </div>
           )}

@@ -22,7 +22,8 @@ const variants: Record<ButtonVariant, string> = {
 
 // lg is the editorial call-to-action of the references: spaced uppercase label on a square button.
 const sizes: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-[13px]',
+  // Touch screens get 44px-tall small buttons (DUX-10); desktop density is unchanged.
+  sm: 'h-8 px-3 text-[13px] pointer-coarse:h-11',
   md: 'h-10 px-4 text-sm',
   lg: 'h-12 px-6 text-label uppercase',
 }
@@ -79,7 +80,7 @@ export function IconButton({ variant = 'ghost', size = 'md', className, type = '
       className={cn(
         'inline-flex shrink-0 items-center justify-center rounded-[var(--radius-control)] text-ink-muted transition-colors hover:text-ink disabled:opacity-50',
         variant === 'ghost' ? 'hover:bg-subtle' : 'border border-line-strong bg-surface hover:bg-subtle',
-        size === 'sm' ? 'size-8' : 'size-10',
+        size === 'sm' ? 'size-8 pointer-coarse:size-11' : 'size-10',
         className,
       )}
       {...rest}

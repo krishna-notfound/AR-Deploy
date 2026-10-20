@@ -12,6 +12,16 @@ export function loadModelViewer(): Promise<unknown> {
 
 export type ArStatus = 'not-presenting' | 'session-started' | 'object-placed' | 'failed'
 
+/** A model that makes no download progress for this long is treated as failed (no endless spinner). */
+export const MODEL_STALL_TIMEOUT_MS = 45_000
+
+export interface ModelLoadInfo {
+  canActivateAR: boolean
+  dimensions: MeasuredSize | null
+  /** The loaded glTF's `extensionsRequired` (empty when none); undefined when the viewer does not expose it. */
+  requiredExtensions?: string[]
+}
+
 export interface ModelViewerHandle {
   activateAR: () => Promise<void>
   canActivateAR: () => boolean
@@ -28,7 +38,7 @@ export interface ModelViewerProps {
   /** Slow turntable until the visitor interacts (marketing stage). */
   autoRotate?: boolean
   className?: string
-  onLoad?: (info: { canActivateAR: boolean; dimensions: MeasuredSize | null }) => void
+  onLoad?: (info: ModelLoadInfo) => void
   onError?: () => void
   onProgress?: (p: number) => void
   onArStatus?: (s: ArStatus) => void
@@ -73,7 +83,7 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
   useEffect(() => {
     const el = elRef.current
     if (!ready || !el) return
-    const handleLoad = () => cbs.current.onLoad?.({ canActivateAR: !!el.canActivateAR, dimensions: readDims(el) })
+    const handleLoad = () => cbs.current.onLoad?.({ canActivateAR: !!el.canActivateAR, dimensions: readDims(el), requiredExtensions: readRequired(el) })
     const handleError = () => cbs.current.onError?.()
     const handleProgress = (e: Event) => {
       const p = (e as CustomEvent<{ totalProgress?: number }>).detail?.totalProgress
@@ -140,6 +150,16 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
     </model-viewer>
   )
 })
+
+function readRequired(el: ModelViewerElement): string[] | undefined {
+  try {
+    const json = el.originalGltfJson as { extensionsRequired?: unknown } | null | undefined
+    if (!json) return undefined
+    return Array.isArray(json.extensionsRequired) ? json.extensionsRequired.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return undefined
+  }
+}
 
 function readDims(el: ModelViewerElement | null): MeasuredSize | null {
   if (!el || !el.loaded) return null

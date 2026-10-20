@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   type LucideIcon,
   Package,
-  PackagePlus,
   QrCode,
   Settings,
   Store,
@@ -33,8 +32,9 @@ export const adminNav: NavItem[] = [
 
 export const businessNav: NavItem[] = [
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/dashboard/products', label: 'My Products', icon: Package, end: true },
-  { to: '/dashboard/products/new', label: 'Add Product', icon: PackagePlus },
+  // Not `end`: the product editor (/dashboard/products/:id/edit and /new) keeps "My Products" active (DUX-11).
+  // "Add product" is an action, not a place: it is the primary button on Overview and My Products.
+  { to: '/dashboard/products', label: 'My Products', icon: Package },
   { to: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/dashboard/catalog', label: 'My Catalog & QR', icon: Store },
   { to: '/dashboard/settings', label: 'Business Settings', icon: Settings },

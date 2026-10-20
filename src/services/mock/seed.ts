@@ -1,5 +1,5 @@
 // SAMPLE DATA for the demo. Not real businesses, prices, or analytics.
-// 3D models: Khronos glTF-Sample-Assets (CC BY 4.0). See src/services/mock/credits.ts.
+// 3D models: Khronos glTF-Sample-Assets (CC BY 4.0 and CC0, creators named). See src/services/mock/credits.ts.
 // Photos: Unsplash (Unsplash License).
 import type {
   Business,
@@ -97,13 +97,22 @@ function images(primary: string, gallery: string[] = [], additional: string[] = 
   return [mk(primary, true, 'gallery'), ...gallery.map((u) => mk(u, false, 'gallery')), ...additional.map((u) => mk(u, false, 'additional'))]
 }
 
-function glb(url: string): ModelAsset {
-  return { format: 'glb', url, fileName: decodeURIComponent(url.split('/').pop() ?? 'model.glb'), status: 'valid' }
+/** `requiredExtensions` is the file's glTF extensionsRequired, as the editor records it on upload. */
+function glb(url: string, requiredExtensions?: string[]): ModelAsset {
+  return { format: 'glb', url, fileName: decodeURIComponent(url.split('/').pop() ?? 'model.glb'), status: 'valid', ...(requiredExtensions ? { requiredExtensions } : {}) }
 }
 
 let varCounter = 0
-function variant(en: string, pt: string | undefined, colorHex: string, priceDelta = 0): ProductVariant {
-  return { id: `var_${++varCounter}`, name: L(en, pt), colorHex, priceDelta: priceDelta || undefined }
+/** `media`: the option's own photo and GLB (sample per-variant media); without it the product's are shown. */
+function variant(en: string, pt: string | undefined, colorHex: string, priceDelta = 0, media?: { photo: string; glb: string; required: string[] }): ProductVariant {
+  const id = `var_${++varCounter}`
+  return {
+    id,
+    name: L(en, pt),
+    colorHex,
+    priceDelta: priceDelta || undefined,
+    ...(media ? { images: [{ id: `${id}_img_1`, url: media.photo, alt: en, isPrimary: true, kind: 'gallery' as const }], models: { glb: glb(media.glb, media.required) } } : {}),
+  }
 }
 
 interface ProductSeed {
@@ -118,6 +127,8 @@ interface ProductSeed {
   currency: Currency
   images: ProductImage[]
   glb?: string
+  /** The GLB's extensionsRequired (checked with glTF-Transform for the sample files). */
+  glbRequired?: string[]
   dimensions: Dimensions
   material: LocalizedText
   weightKg?: number
@@ -205,6 +216,7 @@ export function createSeed(now: number = Date.now()): Db {
       currency: 'EUR',
       images: images(POSTER.glamVelvetSofa, [], [PHOTO.cushions, PHOTO.greySofaRoom], 'Curved velvet sofa'),
       glb: SAMPLE_MODELS.glamVelvetSofa,
+      glbRequired: ['KHR_texture_transform'],
       // Matches the measured model size (verified in model-viewer).
       dimensions: { width: 219, height: 79, depth: 102, unit: 'cm' },
       material: L('Velvet upholstery, hardwood frame', 'Estofo em veludo, estrutura em madeira maciça'),
@@ -229,6 +241,8 @@ export function createSeed(now: number = Date.now()): Db {
       currency: 'EUR',
       images: images(POSTER.sheenWoodLeatherSofa, [], [], 'Carved leather sofa'),
       glb: SAMPLE_MODELS.sheenWoodLeatherSofa,
+      // Requires EXT_texture_webp, which Scene Viewer does not support: Android visitors are not offered AR.
+      glbRequired: ['KHR_texture_transform', 'EXT_texture_webp'],
       dimensions: { width: 273, height: 112, depth: 92, unit: 'cm' },
       material: L('Full-grain leather, carved hardwood', 'Pele flor integral, madeira maciça entalhada'),
       weightKg: 85,
@@ -326,10 +340,16 @@ export function createSeed(now: number = Date.now()): Db {
       currency: 'EUR',
       images: images(POSTER.sheenChair, [], [PHOTO.loungeInterior], 'Sheen lounge chair'),
       glb: SAMPLE_MODELS.sheenChair,
+      glbRequired: ['KHR_texture_transform'],
       dimensions: { width: 83, height: 69, depth: 57, unit: 'cm' },
       material: L('Sheen woven fabric, solid ash', 'Tecido acetinado, freixo maciço'),
       weightKg: 18,
-      variants: [variant('Tangerine Velvet', 'Veludo Tangerina', '#E8572A'), variant('Peacock Velvet', 'Veludo Pavão', '#1F5F6B', 6000)],
+      // Per-variant media: the same Wayfair chair shell in two upholsteries (bounding boxes within 2 mm), each
+      // with its own photo and GLB, so both verify against 83 × 69 × 57 cm.
+      variants: [
+        variant('Mango Velvet', 'Veludo Manga', '#E8872A', 0, { photo: POSTER.sheenChair, glb: SAMPLE_MODELS.sheenChair, required: ['KHR_texture_transform'] }),
+        variant('Purple-Gold Damask', 'Damasco Roxo e Dourado', '#5B3A6B', 6000, { photo: POSTER.chairDamask, glb: SAMPLE_MODELS.chairDamask, required: [] }),
+      ],
       ctaUrl: 'https://nordhaus.example/visit',
       status: 'published',
       createdDaysAgo: 55,
@@ -349,6 +369,7 @@ export function createSeed(now: number = Date.now()): Db {
       currency: 'EUR',
       images: images(POSTER.barnLamp, [], [PHOTO.pendantLamp], 'Copper barn wall lamp'),
       glb: SAMPLE_MODELS.barnLamp,
+      glbRequired: [],
       dimensions: { width: 19, height: 26, depth: 23, unit: 'cm' },
       material: L('Brushed copper-finish steel', 'Aço com acabamento em cobre escovado'),
       weightKg: 2,
@@ -453,6 +474,7 @@ export function createSeed(now: number = Date.now()): Db {
       currency: 'BRL',
       images: images(POSTER.chairDamask, [], [], 'Damask accent chair'),
       glb: SAMPLE_MODELS.chairDamask,
+      glbRequired: [],
       // Deliberately does NOT match the model (≈ 83 × 69 × 57 cm) to demonstrate "AR scale unverified".
       dimensions: { width: 60, height: 100, depth: 60, unit: 'cm' },
       material: L('Damask upholstery, jatobá wood', 'Estofo em damasco, madeira de jatobá'),
@@ -475,6 +497,7 @@ export function createSeed(now: number = Date.now()): Db {
       currency: 'BRL',
       images: images(POSTER.punctualLamp, [], [], 'Tulip floor lamp'),
       glb: SAMPLE_MODELS.punctualLamp,
+      glbRequired: [],
       dimensions: { width: 113, height: 186, depth: 72, unit: 'cm' },
       material: L('Bronze-finish metal, frosted glass', 'Metal com acabamento em bronze, vidro fosco'),
       status: 'published',
@@ -594,7 +617,7 @@ export function createSeed(now: number = Date.now()): Db {
       price: s.price,
       currency: s.currency,
       images: s.images,
-      models: s.glb ? { glb: glb(s.glb) } : {},
+      models: s.glb ? { glb: glb(s.glb, s.glbRequired) } : {},
       dimensions: s.dimensions,
       material: s.material,
       weight: s.weightKg ? { value: s.weightKg, unit: 'kg' } : undefined,

@@ -2,37 +2,41 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Hand, Maximize } from 'lucide
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { SmartImage } from '@/components/ui/SmartImage'
-import { type ArStatus, ModelViewer, type ModelViewerHandle } from '@/components/three/ModelViewer'
-import type { Product, ProductImage } from '@/domain/types'
+import { type ArStatus, MODEL_STALL_TIMEOUT_MS, type ModelLoadInfo, ModelViewer, type ModelViewerHandle } from '@/components/three/ModelViewer'
+import type { ProductImage, ProductModels } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { isStaleSessionAsset } from '@/lib/files'
-import type { MeasuredSize } from '@/lib/scale'
+
+export { MODEL_STALL_TIMEOUT_MS }
 
 export type ModelState = 'none' | 'loading' | 'loaded' | 'error'
 export type MediaMode = '3d' | 'photos'
 
-/** A model that makes no download progress for this long is treated as failed (no endless spinner). */
-export const MODEL_STALL_TIMEOUT_MS = 45_000
-
 /** The product page opens on the standard photograph; 3D only when there is no photo to show. */
-export function initialMediaMode(product: Product): MediaMode {
-  return product.images.some((i) => i.kind === 'gallery') || !usableModels(product).glb ? 'photos' : '3d'
+export function initialMediaMode(media: { gallery: ProductImage[]; models: ProductModels }): MediaMode {
+  return media.gallery.length || !media.models.glb ? 'photos' : '3d'
 }
 
-export function usableModels(product: Product) {
-  return {
-    glb: product.models.glb && !isStaleSessionAsset(product.models.glb) ? product.models.glb : undefined,
-    usdz: product.models.usdz && !isStaleSessionAsset(product.models.usdz) ? product.models.usdz : undefined,
-  }
+const primaryIndex = (images: ProductImage[]) => Math.max(0, images.findIndex((i) => i.isPrimary))
+
+interface Load {
+  url: string
+  state: ModelState
+  progress: number
+  attempt: number
+  timedOut: boolean
 }
+const freshLoad = (url: string): Load => ({ url, state: url ? 'loading' : 'none', progress: 0, attempt: 0, timedOut: false })
 
 /**
  * Photo stage with thumbnails; the 3D viewer is mounted behind it from the start (hidden until chosen) so the
- * AR capability check and the scale check run while the visitor looks at the photograph.
+ * AR capability check and the scale check run while the visitor looks at the photograph. A new GLB (another
+ * variant) starts a new load: nothing measured or reported for the previous file carries over.
  */
 export function ProductMedia({
-  product,
+  name,
+  gallery,
+  models,
   mode,
   onModeChange,
   viewerRef,
@@ -40,22 +44,32 @@ export function ProductMedia({
   onArStatus,
   onInteract,
 }: {
-  product: Product
+  name: string
+  gallery: ProductImage[]
+  /** One GLB/USDZ pair from one source (see variantMedia). */
+  models: ProductModels
   mode: MediaMode
   onModeChange: (m: MediaMode) => void
   viewerRef: Ref<ModelViewerHandle>
-  onModelState: (s: ModelState, info?: { canActivateAR: boolean; dimensions: MeasuredSize | null }) => void
+  /** `url` is the GLB the state belongs to, so a late report about a previous model can be ignored. */
+  onModelState: (url: string, s: ModelState, info?: ModelLoadInfo) => void
   onArStatus: (s: ArStatus) => void
   onInteract?: () => void
 }) {
-  const { t, localized } = useI18n()
-  const { glb, usdz } = usableModels(product)
-  const gallery = product.images.filter((i) => i.kind === 'gallery')
-  const [photoIdx, setPhotoIdx] = useState(Math.max(0, gallery.findIndex((i) => i.isPrimary)))
-  const [state, setState] = useState<ModelState>(glb ? 'loading' : 'none')
-  const [progress, setProgress] = useState(0)
-  const [attempt, setAttempt] = useState(0)
-  const [timedOut, setTimedOut] = useState(false)
+  const { t } = useI18n()
+  const { glb, usdz } = models
+  const glbUrl = glb?.url ?? ''
+
+  // Photo index and model load are tied to what they show; a variant switch starts both afresh.
+  const galleryKey = gallery.map((i) => i.id).join('|')
+  const [photo, setPhoto] = useState({ key: galleryKey, idx: primaryIndex(gallery) })
+  const photoIdx = photo.key === galleryKey ? photo.idx : primaryIndex(gallery)
+  const setPhotoIdx = (idx: number) => setPhoto({ key: galleryKey, idx })
+  const [stored, setLoad] = useState<Load>(() => freshLoad(glbUrl))
+  const load = stored.url === glbUrl ? stored : freshLoad(glbUrl)
+  if (stored !== load) setLoad(load)
+  const { state, progress, attempt, timedOut } = load
+
   const innerRef = useRef<ModelViewerHandle>(null)
   useImperativeHandle(viewerRef, () => ({
     activateAR: () => innerRef.current?.activateAR() ?? Promise.resolve(),
@@ -63,12 +77,11 @@ export function ProductMedia({
     getDimensions: () => innerRef.current?.getDimensions() ?? null,
     resetCamera: () => innerRef.current?.resetCamera(),
   }))
-  const name = localized(product.name)
   const poster = gallery.find((i) => i.isPrimary)?.url ?? gallery[0]?.url
 
-  const update = (s: ModelState, info?: { canActivateAR: boolean; dimensions: MeasuredSize | null }) => {
-    setState(s)
-    onModelState(s, info)
+  const update = (s: ModelState, info?: ModelLoadInfo, patch: Partial<Load> = {}) => {
+    setLoad((l) => (l.url === glbUrl ? { ...l, ...patch, state: s } : l))
+    onModelState(glbUrl, s, info)
   }
   const updateRef = useRef(update)
   updateRef.current = update
@@ -76,12 +89,11 @@ export function ProductMedia({
   // Restart the stall timer on every progress tick; fail only when nothing has arrived for the whole window.
   useEffect(() => {
     if (state !== 'loading') return
-    const timer = setTimeout(() => {
-      setTimedOut(true)
-      updateRef.current('error')
-    }, MODEL_STALL_TIMEOUT_MS)
+    const timer = setTimeout(() => updateRef.current('error', undefined, { timedOut: true }), MODEL_STALL_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [state, progress, attempt])
+  }, [state, progress, attempt, glbUrl])
+
+  const retry = () => update('loading', undefined, { timedOut: false, progress: 0, attempt: attempt + 1 })
 
   const showPhoto = (i: number) => {
     setPhotoIdx(i)
@@ -94,15 +106,16 @@ export function ProductMedia({
         {glb && (
           <div className={cn('absolute inset-0', mode !== '3d' && 'invisible')} aria-hidden={mode !== '3d'}>
             <ModelViewer
-              key={attempt}
+              key={`${glbUrl}#${attempt}`}
               ref={innerRef}
               src={glb.url}
+              // Only the USDZ that belongs to this GLB; none means iPhone generates one from this GLB.
               iosSrc={usdz?.url}
               poster={poster}
               alt={t('product.view3d') + ': ' + name}
               ar
               className="absolute inset-0"
-              onProgress={setProgress}
+              onProgress={(p) => setLoad((l) => (l.url === glbUrl ? { ...l, progress: p } : l))}
               onLoad={(info) => update('loaded', info)}
               onError={() => update('error')}
               onArStatus={onArStatus}
@@ -139,15 +152,7 @@ export function ProductMedia({
                   <p className="mt-2 text-sm font-medium">{t('viewer.errorTitle')}</p>
                   <p className="mt-1 text-[13px] text-ink-muted">{timedOut ? t('viewer.timeout') : t('viewer.errorBody')}</p>
                   <div className="mt-4 flex justify-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setTimedOut(false)
-                        setProgress(0)
-                        setAttempt((a) => a + 1)
-                        update('loading')
-                      }}
-                    >
+                    <Button size="sm" onClick={retry}>
                       {t('viewer.retry')}
                     </Button>
                     {gallery.length > 0 && (
@@ -161,7 +166,7 @@ export function ProductMedia({
             )}
           </div>
         )}
-        {mode === 'photos' && <Gallery images={gallery} name={name} idx={photoIdx} onIdx={setPhotoIdx} />}
+        {mode === 'photos' && <Gallery images={gallery} name={name} idx={Math.min(photoIdx, Math.max(0, gallery.length - 1))} onIdx={setPhotoIdx} />}
       </div>
 
       {gallery.length > 1 && (
@@ -182,6 +187,16 @@ export function ProductMedia({
         </ul>
       )}
       {!glb && <p className="mt-3 text-center text-xs text-ink-muted">{t('viewer.unavailable')}</p>}
+      {/* A failed model is reported here too while the photos are shown: the 3D call to action is gone (AR-08). */}
+      {glb && state === 'error' && mode !== '3d' && (
+        <p className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs text-ink-muted" role="status">
+          <AlertTriangle className="size-3.5 text-warning" aria-hidden />
+          <span>{t('viewer.errorTitle')}</span>
+          <button type="button" onClick={retry} className="font-medium text-ink underline underline-offset-2">
+            {t('viewer.retry')}
+          </button>
+        </p>
+      )}
     </div>
   )
 }

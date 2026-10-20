@@ -25,6 +25,7 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'catalog.inactiveBody': 'A loja suspendeu o catálogo online. Contacte-a diretamente.',
   'catalog.has3d': 'Ver em 3D',
   'catalog.eyebrow': 'Coleção',
+  'catalog.previewBanner': 'Pré-visualização. Os clientes só veem este catálogo depois de ativado.',
 
   'category.sofa': 'Sofás',
   'category.chair': 'Cadeiras',
@@ -91,6 +92,8 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'ar.scaleUnverified': 'Escala de RA não verificada',
   'ar.scaleUnverifiedHelp': 'O modelo 3D não corresponde às dimensões indicadas. Use as dimensões acima como referência.',
   'ar.modelMeasures': 'O modelo mede {size}',
+  'ar.modelUnsupported': 'A RA não está disponível para este modelo em Android. Pode continuar a explorá-lo em 3D.',
+  'ar.variantFallback': 'A vista 3D e a RA mostram o modelo padrão. O acabamento {name} pode ter um aspeto diferente.',
 
   'ar.tipsTitle': 'Colocar a peça no seu espaço',
   'ar.tip1': 'Aponte a câmara para o chão.',

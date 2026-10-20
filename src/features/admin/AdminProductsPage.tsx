@@ -9,7 +9,7 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { ProductFilterBar, applyProductFilters, useProductFilterParams } from '../products/ProductFilters'
+import { CLEARED_PRODUCT_FILTERS, ProductFilterBar, applyProductFilters, hasProductFilters, useProductFilterParams } from '../products/ProductFilters'
 import { ProductTable } from '../products/ProductTable'
 import { useBusinesses, useProductStats } from '../products/useCatalogData'
 
@@ -23,7 +23,7 @@ export default function AdminProductsPage() {
   const [pick, setPick] = useState('')
 
   const filtered = useMemo(() => applyProductFilters(products.data ?? [], filters), [products.data, filters])
-  const hasFilters = !!(filters.q || filters.business || filters.status || filters.category)
+  const hasFilters = hasProductFilters(filters)
 
   const addProduct = () => {
     if (filters.business) return navigate(`/admin/products/new?business=${filters.business}`)
@@ -60,7 +60,7 @@ export default function AdminProductsPage() {
                 <EmptyState
                   title="No products match these filters"
                   body="Try another search, business or status."
-                  action={<Button onClick={() => update({ q: '', business: '', status: '', category: '' })}>Clear filters</Button>}
+                  action={<Button onClick={() => update(CLEARED_PRODUCT_FILTERS)}>Clear filters</Button>}
                 />
               ) : (
                 <EmptyState icon={Package} title="No products yet" body="Add the first product to a business catalog." action={<Button variant="primary" onClick={addProduct}>Add product</Button>} />

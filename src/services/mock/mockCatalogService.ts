@@ -13,7 +13,7 @@ import { summarize } from '../analytics'
 import type { Db } from './db'
 import { createSeed } from './seed'
 import { store } from './store'
-import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
+import { normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const FAIL_RATE_KEY = 'arfurn:debug:failRate'
 /** Demo actor for audit entries (the demo account picker is not authentication). */
@@ -229,6 +229,7 @@ export const mockCatalogService: CatalogService = {
       const product: Product = {
         ...data,
         images: normalizeImages(data.images),
+        variants: normalizeVariants(data.variants),
         id: newId('prd'),
         status: 'draft',
         createdAt: ts,
@@ -248,6 +249,7 @@ export const mockCatalogService: CatalogService = {
       if (!current) return fail('NOT_FOUND', 'Product not found.')
       const next: Product = { ...current, ...data, id, businessId: current.businessId, status: current.status, updatedAt: nowIso() }
       next.images = normalizeImages(next.images)
+      next.variants = normalizeVariants(next.variants)
       const siblings = db.products.filter((p) => p.businessId === current.businessId && p.id !== id)
       const errors = validateProductDraft(next, siblings)
       if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
@@ -277,7 +279,8 @@ export const mockCatalogService: CatalogService = {
         slug,
         name: { en: `${src.name.en} (copy)`, ...(src.name.pt ? { pt: `${src.name.pt} (cópia)` } : {}) },
         images: src.images.map((img) => ({ ...img, id: newId('img') })),
-        variants: src.variants.map((v) => ({ ...v, id: newId('var') })),
+        // Variant photos and models are copied with the option (same files, new ids).
+        variants: clone(src.variants).map((v) => ({ ...v, id: newId('var'), ...(v.images ? { images: v.images.map((img) => ({ ...img, id: newId('img') })) } : {}) })),
         status: 'draft',
         publishedAt: undefined,
         createdAt: ts,

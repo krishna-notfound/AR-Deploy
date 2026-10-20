@@ -54,6 +54,31 @@ function renderNew() {
 }
 
 const summary = () => screen.getByText(/to continue$/).closest('[role="alert"]') as HTMLElement
+
+/** Smallest well-formed files the upload check accepts: a glTF 2.0 binary and a stored zip led by a .usdc scene. */
+function glbFile(name: string): File {
+  const json = new TextEncoder().encode(JSON.stringify({ asset: { version: '2.0' } }).padEnd(28, ' '))
+  const v = new DataView(new ArrayBuffer(20 + json.length))
+  v.setUint32(0, 0x46546c67, true)
+  v.setUint32(4, 2, true)
+  v.setUint32(8, 20 + json.length, true)
+  v.setUint32(12, json.length, true)
+  v.setUint32(16, 0x4e4f534a, true)
+  new Uint8Array(v.buffer, 20).set(json)
+  return new File([v.buffer], name)
+}
+function usdzFile(name: string): File {
+  const entry = new TextEncoder().encode('chair.usdc')
+  const bytes = new Uint8Array(30 + entry.length + 16 + 22)
+  const v = new DataView(bytes.buffer)
+  v.setUint32(0, 0x04034b50, true)
+  v.setUint32(18, 16, true)
+  v.setUint32(22, 16, true)
+  v.setUint16(26, entry.length, true)
+  bytes.set(entry, 30)
+  v.setUint32(30 + entry.length + 16, 0x06054b50, true)
+  return new File([bytes], name)
+}
 const DIM_MSG = 'Dimensions must be greater than zero to publish.'
 
 /** uploadAsset calls that stay pending until the test resolves them, in any order. */
@@ -118,8 +143,8 @@ describe('product editor: uploads and units', () => {
     const user = userEvent.setup()
     const resolveUpload = deferUploads()
     renderNew()
-    await user.upload(screen.getByLabelText('Upload .glb file'), new File([new Uint8Array([0x67, 0x6c, 0x54, 0x46])], 'chair.glb'))
-    await user.upload(screen.getByLabelText('Upload .usdz file'), new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'chair.usdz'))
+    await user.upload(screen.getByLabelText('Upload .glb file'), glbFile('chair.glb'))
+    await user.upload(screen.getByLabelText('Upload .usdz file'), usdzFile('chair.usdz'))
     await resolveUpload('chair.usdz')
     await resolveUpload('chair.glb')
     expect(await screen.findByText('chair.glb')).toBeInTheDocument()
@@ -148,5 +173,48 @@ describe('product editor: uploads and units', () => {
     await user.click(within(dialog).getByRole('button', { name: /^Convert to 32.7/ }))
     expect(screen.getByLabelText('Width')).toHaveValue('32.7')
     expect(screen.getByRole('radio', { name: 'Inches' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('converting back to the original unit restores the exact numbers (AR-10)', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    await user.type(screen.getByLabelText('Width'), '83')
+    await user.click(screen.getByRole('radio', { name: 'Inches' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Switch to inches?' })).getByRole('button', { name: /^Convert to/ }))
+    await user.click(screen.getByRole('radio', { name: 'Centimetres' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Switch to centimetres?' })).getByRole('button', { name: /^Convert to/ }))
+    expect(screen.getByLabelText('Width')).toHaveValue('83')
+  })
+})
+
+describe('product editor: per-variant photos and 3D', () => {
+  it('uploads a GLB for one option with the shared model slots (upload only) and reports it per option', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    await user.click(screen.getByRole('button', { name: 'Add colour or option' }))
+    await user.type(screen.getByLabelText('Option name (English)'), 'Walnut')
+    const toggle = screen.getByRole('button', { name: /Photos and 3D for Walnut/ })
+    expect(toggle).toHaveTextContent('uses the product’s photos and model')
+    await user.click(toggle)
+    const panel = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(within(panel).getByText('No 3D model for this option')).toBeInTheDocument()
+    expect(within(panel).queryByPlaceholderText(/paste a/)).toBeNull() // variant files are owner uploads only
+    expect(within(panel).getByText(/customers who pick this option see the product’s photos/)).toBeInTheDocument()
+
+    const uploads = screen.getAllByLabelText('Upload .glb file')
+    expect(uploads).toHaveLength(2) // the product's slot and this option's slot
+    await user.upload(within(panel).getByLabelText('Upload .glb file'), glbFile('walnut.glb'))
+    expect(await within(panel).findByText('walnut.glb')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '1 of 1 option have their own 3D model' })).toBeInTheDocument()
+    expect(toggle).toHaveTextContent('own GLB')
+    // The product's own model slot is untouched.
+    expect(screen.getAllByText('No GLB file yet.')).toHaveLength(1)
+  })
+
+  it('rejects a renamed file that only starts with the GLB magic bytes (AR-03)', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    await user.upload(screen.getByLabelText('Upload .glb file'), new File([new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0])], 'stub.glb'))
+    expect(await screen.findByText(/stub\.glb does not look like a valid GLB file/)).toBeInTheDocument()
   })
 })

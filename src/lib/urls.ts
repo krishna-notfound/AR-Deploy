@@ -33,9 +33,34 @@ export function productPublicUrl(b: Sluggable, p: ProductSluggable): string {
   return PUBLIC_URL_MODE === 'path' ? absoluteLocalUrl(productLocalPath(b, p)) : `${catalogPublicUrl(b)}/products/${p.slug}`
 }
 
-/** Local route that works in this running app. */
-export function catalogLocalPath(b: Sluggable): string {
-  return `/catalog/${b.slug}`
+/** Query parameter that opens a product page on one colour or option (`?variant=<id>`; ids stay stable across saves). */
+export const VARIANT_PARAM = 'variant'
+
+/** The product page's query with the chosen variant set (or removed), every other parameter kept (preview, ...). */
+export function withVariantParam(search: URLSearchParams, variantId: string | undefined): URLSearchParams {
+  const next = new URLSearchParams(search)
+  if (variantId) next.set(VARIANT_PARAM, variantId)
+  else next.delete(VARIANT_PARAM)
+  return next
+}
+
+/**
+ * Local route that works in this running app. `preview` asks for the owner preview of a catalogue that is not
+ * active yet: only a signed-in owner of that business (or a platform admin) gets it; everyone else still sees
+ * "catalog unavailable", and in Supabase mode RLS is the real gate.
+ */
+export function catalogLocalPath(b: Sluggable, opts?: { preview?: boolean }): string {
+  return `/catalog/${b.slug}${opts?.preview ? '?preview=1' : ''}`
+}
+
+/** Catalogue route on a business's own subdomain. */
+export function tenantCatalogPath(opts?: { preview?: boolean }): string {
+  return opts?.preview ? '/?preview=1' : '/'
+}
+
+/** Product route on a business's own subdomain (the catalogue there is "/"). */
+export function tenantProductPath(p: ProductSluggable, opts?: { preview?: boolean }): string {
+  return `/products/${p.slug}${opts?.preview ? '?preview=1' : ''}`
 }
 
 export function productLocalPath(b: Sluggable, p: ProductSluggable, opts?: { preview?: boolean }): string {
@@ -55,6 +80,13 @@ export const applicationAdminPath = (id: string) => `/admin/applications/${id}`
 /** The applications list, optionally filtered by status (e.g. the overview's "awaiting review" link). */
 export const applicationsAdminPath = (status?: string) => `/admin/applications${status ? `?status=${encodeURIComponent(status)}` : ''}`
 export const businessAdminPath = (id: string) => `/admin/businesses/${id}`
+/** The owner's product list, optionally filtered (the filters are the list's own URL parameters). */
+export function myProductsPath(filter?: { status?: 'draft' | 'published'; ar?: 'ready' | 'android-only' | 'android-blocked' | 'photos-only' }): string {
+  const q = new URLSearchParams()
+  if (filter?.status) q.set('status', filter.status)
+  if (filter?.ar) q.set('ar', filter.ar)
+  return `/dashboard/products${q.toString() ? `?${q.toString()}` : ''}`
+}
 
 /** The current page's URL for sharing: the draft-preview flag is dropped, every other query parameter kept. */
 export function shareableCurrentUrl(): string {

@@ -1,14 +1,34 @@
-import { Copy, CopyPlus, ExternalLink, Eye, EyeOff, MoreHorizontal, Pencil, Trash2, Box } from 'lucide-react'
+import { Copy, CopyPlus, ExternalLink, Eye, EyeOff, MoreHorizontal, Pencil, QrCode, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
-import { ProductStatusBadge } from '@/components/ui/Badge'
+import { Badge, ProductStatusBadge, type Tone } from '@/components/ui/Badge'
 import { type Column, DataTable } from '@/components/ui/DataTable'
 import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { Thumb } from '@/components/ui/SmartImage'
 import type { Business, Product, ProductAnalytics } from '@/domain/types'
 import { formatDate, formatMoney, formatNumber } from '@/lib/format'
+import { primaryImage } from '@/lib/product'
+import { AR_READINESS_HINT, AR_READINESS_LABEL, type ProductArReadiness, hasArModel, productArReadiness } from './productReadiness'
+import { ProductQrDialog } from './ProductQrDialog'
 import { editPath, type EditorScope, useProductActions } from './useProductActions'
 
-import { primaryImage } from '@/lib/product'
+const readinessTone: Record<ProductArReadiness, Tone> = { ready: 'success', 'android-only': 'warning', 'android-blocked': 'warning', 'photos-only': 'neutral' }
+
+/** AR readiness from the stored model files (DUX-05); the editor's 3D section has the full check. */
+export function ArReadinessPill({ product }: { product: Product }) {
+  const r = productArReadiness(product)
+  return (
+    <span title={AR_READINESS_HINT[r]}>
+      <Badge tone={readinessTone[r]}>{AR_READINESS_LABEL[r]}</Badge>
+      <span className="sr-only">. {AR_READINESS_HINT[r]}</span>
+    </span>
+  )
+}
+
+/** Stored AR launch attempts, or "—" when the product has no 3D model and none were ever recorded (DUX-07). */
+export function arAttemptsText(p: Product, attempts: number | undefined): string {
+  return !attempts && !hasArModel(p) ? '—' : formatNumber(attempts ?? 0)
+}
 
 /**
  * Shared product table for Super Admin ("admin" scope shows the business column)
@@ -34,6 +54,7 @@ export function ProductTable({
   onPageChange?: (p: number) => void
 }) {
   const actions = useProductActions(scope)
+  const [qrFor, setQrFor] = useState<Product | null>(null)
 
   const menuItems = (p: Product): (MenuItem | 'separator')[] => {
     const b = businesses.get(p.businessId)
@@ -41,6 +62,7 @@ export function ProductTable({
       { label: 'Edit', icon: <Pencil />, onSelect: () => actions.edit(p) },
       { label: p.status === 'published' ? 'Open product page' : 'Preview draft', icon: <ExternalLink />, onSelect: () => actions.openPreview(p, b) },
       { label: 'Copy product URL', icon: <Copy />, onSelect: () => void actions.copyUrl(p, b) },
+      { label: p.status === 'published' ? 'Product QR code' : 'Product QR code (not public yet)', icon: <QrCode />, onSelect: () => setQrFor(p) },
       { label: 'Duplicate', icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) },
       p.status === 'published'
         ? { label: 'Unpublish', icon: <EyeOff />, onSelect: () => void actions.unpublish(p) }
@@ -57,13 +79,9 @@ export function ProductTable({
         <Link to={editPath(scope, p)} className="block truncate font-medium text-ink hover:underline">
           {p.name.en}
         </Link>
-        <span className="flex items-center gap-1.5 text-xs text-ink-muted">
+        <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
           <span className="capitalize">{p.category}</span>
-          {p.models.glb && (
-            <span className="inline-flex items-center gap-0.5" title="Has a 3D model">
-              · <Box className="size-3" aria-hidden /> 3D
-            </span>
-          )}
+          <ArReadinessPill product={p} />
         </span>
       </div>
     </div>
@@ -86,8 +104,8 @@ export function ProductTable({
     { key: 'views', header: 'Views', cell: (p) => formatNumber(stats.get(p.id)?.views ?? 0), sortValue: (p) => stats.get(p.id)?.views ?? 0, align: 'right', priority: 'low' },
     {
       key: 'ar',
-      header: 'AR',
-      cell: (p) => formatNumber(stats.get(p.id)?.arActivations ?? 0),
+      header: 'AR attempts',
+      cell: (p) => <span title={hasArModel(p) ? 'AR launch attempts, not confirmed AR sessions' : 'No 3D model'}>{arAttemptsText(p, stats.get(p.id)?.arActivations)}</span>,
       sortValue: (p) => stats.get(p.id)?.arActivations ?? 0,
       align: 'right',
       priority: 'low',
@@ -103,35 +121,41 @@ export function ProductTable({
   ]
 
   return (
-    <DataTable
-      rows={products}
-      columns={columns}
-      rowKey={(p) => p.id}
-      loading={loading}
-      empty={empty}
-      caption="Products"
-      noun="products"
-      initialSort={{ key: 'updated', dir: 'desc' }}
-      page={page}
-      onPageChange={onPageChange}
-      mobileRow={(p) => (
-        <div className="flex items-start gap-3">
-          <Thumb src={primaryImage(p)?.url} alt="" size="lg" />
-          <div className="min-w-0 flex-1">
-            <Link to={editPath(scope, p)} className="block truncate text-sm font-medium hover:underline">
-              {p.name.en}
-            </Link>
-            {scope === 'admin' && <p className="truncate text-xs text-ink-muted">{businesses.get(p.businessId)?.name}</p>}
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
-              <ProductStatusBadge status={p.status} />
-              <span className="font-medium text-ink">{formatMoney(p.price, p.currency)}</span>
-              <span>{formatNumber(stats.get(p.id)?.views ?? 0)} views</span>
-              <span>{formatNumber(stats.get(p.id)?.arActivations ?? 0)} AR</span>
+    <>
+      <DataTable
+        rows={products}
+        columns={columns}
+        rowKey={(p) => p.id}
+        loading={loading}
+        empty={empty}
+        caption="Products"
+        noun="products"
+        initialSort={{ key: 'updated', dir: 'desc' }}
+        page={page}
+        onPageChange={onPageChange}
+        mobileRow={(p) => (
+          <div className="flex items-start gap-3">
+            <Thumb src={primaryImage(p)?.url} alt="" size="lg" />
+            <div className="min-w-0 flex-1">
+              <Link to={editPath(scope, p)} className="block truncate text-sm font-medium hover:underline">
+                {p.name.en}
+              </Link>
+              {scope === 'admin' && <p className="truncate text-xs text-ink-muted">{businesses.get(p.businessId)?.name}</p>}
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+                <ProductStatusBadge status={p.status} />
+                <span className="font-medium text-ink">{formatMoney(p.price, p.currency)}</span>
+                <span>{formatNumber(stats.get(p.id)?.views ?? 0)} views</span>
+                {hasArModel(p) || stats.get(p.id)?.arActivations ? <span>{formatNumber(stats.get(p.id)?.arActivations ?? 0)} AR attempts</span> : null}
+              </div>
+              <div className="mt-1.5">
+                <ArReadinessPill product={p} />
+              </div>
             </div>
+            <DropdownMenu label={`Actions for ${p.name.en}`} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menuItems(p)} />
           </div>
-          <DropdownMenu label={`Actions for ${p.name.en}`} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menuItems(p)} />
-        </div>
-      )}
-    />
+        )}
+      />
+      <ProductQrDialog product={qrFor} business={qrFor ? businesses.get(qrFor.businessId) : undefined} onClose={() => setQrFor(null)} />
+    </>
   )
 }

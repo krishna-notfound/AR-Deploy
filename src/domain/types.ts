@@ -70,7 +70,11 @@ export interface ModelAsset {
   validationMessage?: string
   /** Object path in Supabase Storage (private bucket); `url` is then a short-lived signed URL. */
   storagePath?: string
+  /** GLB only: the file's glTF `extensionsRequired`, read when uploaded or loaded. Undefined = not checked yet. */
+  requiredExtensions?: string[]
 }
+
+export type ProductModels = { glb?: ModelAsset; usdz?: ModelAsset }
 
 export interface Dimensions {
   width: number
@@ -86,6 +90,10 @@ export interface ProductVariant {
   sku?: string
   /** Minor units, added to the base price. */
   priceDelta?: number
+  /** Own gallery photos (owner uploads). Empty: the product's photos are shown. */
+  images?: ProductImage[]
+  /** Own 3D files. Without a GLB the product's model is shown (never this variant's USDZ with another GLB). */
+  models?: ProductModels
 }
 
 export interface Product {
@@ -100,7 +108,7 @@ export interface Product {
   price: number
   currency: Currency
   images: ProductImage[]
-  models: { glb?: ModelAsset; usdz?: ModelAsset }
+  models: ProductModels
   dimensions: Dimensions
   material: LocalizedText
   weight?: { value: number; unit: WeightUnit }

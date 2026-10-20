@@ -1,4 +1,4 @@
-import { Info, Loader2, QrCode, Smartphone } from 'lucide-react'
+import { Box, Info, Loader2, QrCode, Smartphone } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useI18n } from '@/i18n/LanguageProvider'
@@ -9,11 +9,13 @@ import type { ModelState } from './ProductMedia'
 import { TAP_TARGET } from './tapTarget'
 import { shareableCurrentUrl } from '@/lib/urls'
 
-export type ArAvailability = 'none' | 'checking' | 'available' | 'unavailable'
+/** 'model-unsupported': this phone's AR viewer cannot open this model (Android + a GLB Scene Viewer does not support). */
+export type ArAvailability = 'none' | 'checking' | 'available' | 'unavailable' | 'model-unsupported'
 
-export function arAvailability(model: ModelState, canActivateAR: boolean): ArAvailability {
+export function arAvailability(model: ModelState, canActivateAR: boolean, modelUnsupported = false): ArAvailability {
   if (model === 'none' || model === 'error') return 'none'
   if (model === 'loading') return 'checking'
+  if (modelUnsupported) return 'model-unsupported'
   return canActivateAR ? 'available' : 'unavailable'
 }
 
@@ -33,6 +35,14 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
       <p className="flex items-center gap-2 text-[13px] text-ink-muted" role="status">
         <Loader2 className="size-4 animate-spin" aria-hidden />
         {t('ar.checking')}
+      </p>
+    )
+
+  if (availability === 'model-unsupported')
+    return (
+      <p className="flex items-start gap-2 text-[13px] text-ink-muted">
+        <Box className="mt-0.5 size-4 shrink-0" strokeWidth={1.4} aria-hidden />
+        {t('ar.modelUnsupported')}
       </p>
     )
 

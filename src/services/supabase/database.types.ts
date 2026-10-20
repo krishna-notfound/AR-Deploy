@@ -1,4 +1,4 @@
-// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-20 after migration 20261020091428 (Supabase type generator).
+// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-20 after migration 20261020143507 (Supabase type generator).
 // Only `Json` and `Database` are kept; regenerate with `npm run db:types` after any migration.
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
@@ -396,6 +396,7 @@ export type Database = {
           file_name: string
           format: string
           product_id: string
+          required_extensions: string[] | null
           size_bytes: number | null
           storage_path: string | null
           url: string | null
@@ -405,6 +406,7 @@ export type Database = {
           file_name: string
           format: string
           product_id: string
+          required_extensions?: string[] | null
           size_bytes?: number | null
           storage_path?: string | null
           url?: string | null
@@ -414,6 +416,7 @@ export type Database = {
           file_name?: string
           format?: string
           product_id?: string
+          required_extensions?: string[] | null
           size_bytes?: number | null
           storage_path?: string | null
           url?: string | null
@@ -425,6 +428,88 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'products'
             referencedColumns: ['id']
+          },
+        ]
+      }
+      product_variant_images: {
+        Row: {
+          alt: string | null
+          created_at: string
+          id: string
+          is_primary: boolean
+          product_id: string
+          sort_order: number
+          storage_path: string
+          variant_id: string
+        }
+        Insert: {
+          alt?: string | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          product_id: string
+          sort_order?: number
+          storage_path: string
+          variant_id: string
+        }
+        Update: {
+          alt?: string | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          product_id?: string
+          sort_order?: number
+          storage_path?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'product_variant_images_variant_id_product_id_fkey'
+            columns: ['variant_id', 'product_id']
+            isOneToOne: false
+            referencedRelation: 'product_variants'
+            referencedColumns: ['id', 'product_id']
+          },
+        ]
+      }
+      product_variant_models: {
+        Row: {
+          created_at: string
+          file_name: string
+          format: string
+          product_id: string
+          required_extensions: string[] | null
+          size_bytes: number | null
+          storage_path: string
+          variant_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          format: string
+          product_id: string
+          required_extensions?: string[] | null
+          size_bytes?: number | null
+          storage_path: string
+          variant_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          format?: string
+          product_id?: string
+          required_extensions?: string[] | null
+          size_bytes?: number | null
+          storage_path?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'product_variant_models_variant_id_product_id_fkey'
+            columns: ['variant_id', 'product_id']
+            isOneToOne: false
+            referencedRelation: 'product_variants'
+            referencedColumns: ['id', 'product_id']
           },
         ]
       }
