@@ -75,6 +75,8 @@ export default function BusinessOverviewPage() {
               <CardBody>
                 {products.status === 'loading' && !products.data ? (
                   <SkeletonRows rows={4} />
+                ) : products.status === 'error' && !products.data ? (
+                  <ErrorState message="Your products could not be loaded." onRetry={products.refetch} />
                 ) : recent.length === 0 ? (
                   <EmptyState
                     icon={Package}

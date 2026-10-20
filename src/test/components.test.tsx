@@ -5,6 +5,7 @@ import { ConfirmProvider, useConfirm } from '@/components/ui/ConfirmProvider'
 import { LanguageProvider, useI18n } from '@/i18n/LanguageProvider'
 import { LanguageSwitcher } from '@/features/public/PublicShell'
 import { service } from '@/services'
+import { fail, ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
 
 beforeEach(async () => {
@@ -57,6 +58,24 @@ describe('useServiceQuery', () => {
     })
     await screen.findByText('count:8')
   })
+
+  // Regression (QA #1): the catalogue resolved a placeholder [] before its business loaded; when the real
+  // query then failed, the old [] survived and the page said "No products yet" instead of showing an error.
+  it('never carries an earlier result into a new query (deps change)', async () => {
+    function Products({ businessId }: { businessId: string | null }) {
+      const q = useServiceQuery<string[]>(
+        async () => (businessId ? fail<string[]>('UNKNOWN', 'offline') : ok<string[]>([])),
+        [businessId],
+      )
+      const view = q.status === 'error' && !q.data ? 'error' : q.data?.length === 0 ? 'empty' : q.status
+      return <p>{view}</p>
+    }
+    const { rerender } = render(<Products businessId={null} />)
+    await screen.findByText('empty')
+    rerender(<Products businessId="biz_nord" />)
+    await screen.findByText('error')
+    expect(screen.queryByText('empty')).toBeNull()
+  })
 })
 
 describe('LanguageSwitcher', () => {
@@ -73,9 +92,9 @@ describe('LanguageSwitcher', () => {
         <Label />
       </LanguageProvider>,
     )
-    expect(screen.getByText('View in my home')).toBeInTheDocument()
+    expect(screen.getByText('View in AR')).toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: 'PT' }))
-    expect(screen.getByText('Ver na minha casa')).toBeInTheDocument()
+    expect(screen.getByText('Ver em AR')).toBeInTheDocument()
     expect(sessionStorage.getItem('arfurn:lang')).toBe('pt')
     expect(document.documentElement.lang).toBe('pt-PT')
   })

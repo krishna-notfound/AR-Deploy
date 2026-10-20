@@ -81,22 +81,22 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
 
   return (
     <PublicShell business={b} catalogHref={catalogHref}>
-      <section className="mx-auto max-w-[1240px] px-5 pt-12 pb-8 sm:px-8 sm:pt-16">
-        <div className="flex items-center gap-4">
-          <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 rounded-[var(--radius-card)] object-contain sm:size-16" />
+      <section className="mx-auto grid max-w-[1320px] gap-8 px-5 pt-14 pb-10 sm:px-10 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-end lg:gap-16">
+        <div className="flex items-start gap-5">
+          {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
           <div className="min-w-0">
-            <h1 className="text-headline font-light">{b.name}</h1>
-            <p className="mt-1 text-sm text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
+            <p className="text-eyebrow text-ink-muted">{t('catalog.eyebrow')}</p>
+            <h1 className="mt-4 text-headline">{b.name}</h1>
+            <p className="mt-3 text-label text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
           </div>
         </div>
-        {b.description && <p className="mt-6 max-w-2xl text-lead text-ink-muted">{b.description}</p>}
+        {b.description && <p className="max-w-xl text-[15px] leading-7 text-ink-muted">{b.description}</p>}
       </section>
 
-      <div className="sticky top-16 z-20 border-y border-line bg-canvas/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1240px] flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:px-8">
-          <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('catalog.searchLabel')} placeholder={t('catalog.searchPlaceholder')} className="sm:w-72" />
+      <div className="sticky top-16 z-20 border-y border-line bg-canvas/95 backdrop-blur-sm sm:top-20">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-8 sm:px-10">
           {categories.length > 1 && (
-            <div role="group" aria-label={t('catalog.categories')} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:px-0">
+            <div role="group" aria-label={t('catalog.categories')} className="-mx-5 flex gap-7 overflow-x-auto px-5 sm:mx-0 sm:px-0">
               {(['', ...categories] as const).map((c) => (
                 <button
                   key={c || 'all'}
@@ -104,8 +104,8 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   aria-pressed={cat === c}
                   onClick={() => setParam('category', c)}
                   className={cn(
-                    'h-8 shrink-0 rounded-full border px-3.5 text-[13px] font-medium transition-colors',
-                    cat === c ? 'border-[var(--brand-accent)] bg-[var(--brand-accent)] text-white' : 'border-line-strong bg-surface text-ink-muted hover:text-ink',
+                    'shrink-0 border-b py-2 text-label transition-colors',
+                    cat === c ? 'border-ink text-ink' : 'border-transparent text-ink-muted hover:text-ink',
                   )}
                 >
                   {c ? t(`category.${c}`) : t('catalog.allCategories')}
@@ -113,10 +113,11 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
               ))}
             </div>
           )}
+          <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('catalog.searchLabel')} placeholder={t('catalog.searchPlaceholder')} className="sm:ml-auto sm:w-72" />
         </div>
       </div>
 
-      <section className="mx-auto max-w-[1240px] px-5 py-10 sm:px-8 sm:py-14" aria-live="polite">
+      <section className="mx-auto max-w-[1320px] px-5 py-12 sm:px-10 sm:py-16" aria-live="polite">
         {products.status === 'loading' && !products.data ? (
           <SkeletonGrid />
         ) : products.status === 'error' && !products.data ? (
@@ -131,22 +132,23 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
             action={<Button onClick={() => setSearch({}, { replace: true })}>{t('catalog.clearFilters')}</Button>}
           />
         ) : (
-          <ul className="grid grid-cols-1 gap-x-6 gap-y-12 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-x-6 gap-y-14 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visible.map((p) => (
               <li key={p.id}>
-                <Link to={productHref(p)} className="group block rounded-[var(--radius-card)] focus-visible:outline-offset-4">
-                  <div className="relative overflow-hidden rounded-[var(--radius-card)] bg-subtle">
-                    <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/3] w-full transition-transform duration-500 group-hover:scale-[1.02]" />
+                <Link to={productHref(p)} className="group block focus-visible:outline-offset-4">
+                  <div className="relative overflow-hidden bg-subtle">
+                    <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
                     {p.models.glb && (
-                      <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-surface/90 px-2.5 py-1 text-xs text-ink">
-                        <Box className="size-3" aria-hidden />
+                      <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 bg-canvas/90 px-2.5 py-1.5 text-[10px] font-medium tracking-[0.16em] text-ink uppercase">
+                        <Box className="size-3" strokeWidth={1.5} aria-hidden />
                         {t('catalog.has3d')}
                       </span>
                     )}
                   </div>
-                  <div className="mt-4 flex items-start justify-between gap-3">
-                    <LocalizedSpan as="h2" text={p.name} className="text-[15px] leading-snug font-medium text-ink group-hover:underline group-hover:underline-offset-4" />
-                    <span className="shrink-0 text-[15px] text-ink tabular-nums">{formatMoney(initialPrice(p), p.currency, lang)}</span>
+                  <p className="mt-4 text-eyebrow text-ink-muted">{t(`category.${p.category}`)}</p>
+                  <div className="mt-1.5 flex items-baseline justify-between gap-3">
+                    <LocalizedSpan as="h2" text={p.name} className="font-display text-[1.4rem] leading-snug font-normal text-ink" />
+                    <span className="shrink-0 text-[14px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(initialPrice(p), p.currency, lang)}</span>
                   </div>
                   <LocalizedSpan as="p" text={p.shortDescription} className="mt-1 line-clamp-2 text-[13px] leading-5 text-ink-muted" />
                 </Link>

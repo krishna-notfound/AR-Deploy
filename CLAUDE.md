@@ -7,9 +7,24 @@ This project is a multi-tenant 3D furniture catalog with AR. It has three surfac
 
 It runs in **demo mode** by default (a mock service layer, no setup). A **Supabase mode** is prepared behind the same service interface (`VITE_DATA_MODE=supabase`); its 7 migrations in `supabase/migrations/` and the `track-event` Edge Function are live on project `pmnjchhrgvajtjpadpqo` (2026-10-13). Never re-apply or roll back without the owner's approval. All architecture docs live in `System_arch/`.
 
-**Start here (2026-10-13):** `System_arch/HANDOFF.md`. Live AR is the original model-viewer flow; don't replace it without a device test.
+**Start here:** `System_arch/HANDOFF.md` (live state, AR, accounts, gotchas), then `docs/PRODUCTION_READINESS.md` (release gate). Live AR is **native only** (`scene-viewer quick-look`, ADR-0021, owner decision): never re-add WebXR or change AR modes without the owner's go-ahead and a device test.
 
-**Status (2026-10-12):** P0–P8 done. P8 added the editorial redesign, the landing page at `/` (demo picker moved to `/demo`) and the Supabase foundation. Open follow-ups are in `System_arch/tasks/P7-qa.md` and `P8-design-supabase.md` under "Discovered". See `DELIVERY_REPORT.md`.
+**Status:** production is live from `main` (GitHub default branch). Do feature work on branches cut from `main`; pushing to `main` deploys production, so do it only when the owner asks. The phase table is in `System_arch/Task.md`. The release gate, open findings and next steps are in `docs/PRODUCTION_READINESS.md`.
+
+## Where to look (open only what the task needs)
+| Topic | File |
+|---|---|
+| Index of all architecture docs | `System_arch/README.md` |
+| Live state, accounts, gotchas | `System_arch/HANDOFF.md` |
+| Requirements matrix, client questions | `docs/PRD.md` |
+| Environments, migrations, rollback, domain | `docs/OPERATIONS_RUNBOOK.md`, `System_arch/design/20-deployment.md` |
+| Tests: automated vs real device | `docs/TEST_PLAN.md` |
+| Security boundaries and open items | `docs/SECURITY_REVIEW.md` |
+| Client user guide | `docs/CLIENT_HANDOVER.md` |
+| ADRs | `System_arch/decisions/README.md` (owner scope decisions: `docs/DECISIONS.md`) |
+| Supabase schema and RLS | `System_arch/design/19-supabase.md`, `supabase/migrations/` |
+
+`System_arch/audit/` is a historical 2026-10-13 snapshot (every file is marked "superseded in part"). Don't treat it as current.
 
 ## Session start (keep context small)
 1. Read `System_arch/Task.md` to find the current phase and the next task.
@@ -32,8 +47,8 @@ It runs in **demo mode** by default (a mock service layer, no setup). A **Supaba
   - The role guard is not a security boundary.
 - Components get data only through `src/services` (`service`, `auth`, hooks). Never import `services/mock/*` or `services/supabase/*` into the UI.
 - URLs are built only in `src/lib/urls.ts`. The catalog QR code always encodes the **catalog** URL.
-- The admin and business dashboards and the landing page are English-only. Tenant catalog and product pages use `t()` and `localized()`.
-- Design tokens live in `src/index.css` (ADR-0014). Use `accent-ink` for orange text and `accent-bright` only under dark text. The primary button is charcoal.
+- The admin and business dashboards are English-only. The landing page, tenant catalog and product pages use `t()` and `localized()` (landing copy is the client's reference text, design/21).
+- Design tokens live in `src/index.css` (ADR-0023, Sanctus palette from the client's brand board). Use `accent-ink` for bronze text and `accent-bright` only under dark text. The primary button is obsidian. Headings use the serif through `text-display`/`text-headline`/`text-title` or `font-display`.
 - Shared features (ProductEditor, ProductTable, CatalogQrPanel, AnalyticsView, BusinessForm) are never duplicated per dashboard.
 - No dead buttons. Every data view has loading, empty and error states.
 - No new dependency without a new ADR in `System_arch/decisions/`.

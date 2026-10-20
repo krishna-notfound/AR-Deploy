@@ -11,7 +11,9 @@ export type QueryResult<T> = QueryState<T> & { refetch: () => void; refreshing: 
 
 /**
  * Runs a service call and re-runs it whenever deps change or the data store changes.
- * After the first load, background refetches keep the previous data visible.
+ * A deps change is a new query: it starts empty, so an earlier result (e.g. a placeholder `[]` while a parent
+ * record loads) can never be shown as the answer to the new one. `refetch` and background refreshes of the
+ * same query keep the previous data visible while they run.
  */
 export function useServiceQuery<T>(fn: () => Promise<Result<T>>, deps: readonly unknown[]): QueryResult<T> {
   const [state, setState] = useState<QueryState<T>>({ status: 'loading' })
@@ -20,10 +22,10 @@ export function useServiceQuery<T>(fn: () => Promise<Result<T>>, deps: readonly 
   fnRef.current = fn
   const requestId = useRef(0)
 
-  const execute = useCallback((background: boolean) => {
+  const execute = useCallback((mode: 'new' | 'refetch' | 'background') => {
     const id = ++requestId.current
-    if (background) setRefreshing(true)
-    else setState((s) => ({ status: 'loading', data: s.data }))
+    if (mode === 'background') setRefreshing(true)
+    else setState((s) => ({ status: 'loading', data: mode === 'new' ? undefined : s.data }))
     fnRef
       .current()
       .then((res) => {
@@ -36,13 +38,13 @@ export function useServiceQuery<T>(fn: () => Promise<Result<T>>, deps: readonly 
   }, [])
 
   useEffect(() => {
-    execute(false)
+    execute('new')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 
-  useEffect(() => service.subscribe(() => execute(true)), [execute])
+  useEffect(() => service.subscribe(() => execute('background')), [execute])
 
-  const refetch = useCallback(() => execute(false), [execute])
+  const refetch = useCallback(() => execute('refetch'), [execute])
   return { ...state, refetch, refreshing }
 }
 

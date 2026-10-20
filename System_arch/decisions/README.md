@@ -34,3 +34,4 @@ If a decision is replaced, set the old ADR's status to `Superseded by ADR-NNNN`.
 | [0020](ADR-0020-pglite-migration-tests.md) | SQL migrations and RLS tested in PGlite (dev-only) | Accepted | design/17, 19 |
 | [0021](ADR-0021-native-ar-viewers-only.md) | Native AR viewers only: Scene Viewer (Android), Quick Look (iOS); no WebXR | Accepted 2026-10-13, needs device check before `main` | design/09 |
 | [0022](ADR-0022-owner-registration-and-claim-links.md) | Owner self-registration as drafts, single-use claim links, no ownership by email match | Accepted 2026-10-13 (scope change) | design/19 |
+| [0023](ADR-0023-sanctus-brand-from-client-references.md) | Sanctus brand and UI recreated from the client references (palette, Cormorant Garamond + Jost, traced logo, photo-first product page) | Accepted 2026-10-20 | design/11, 21 |

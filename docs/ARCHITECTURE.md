@@ -57,7 +57,7 @@ The catalog QR always encodes `catalogPublicUrl`. Claim links are `/claim#<token
   - `view`: one per page load;
   - `ar_activation`: one launch attempt per tap, with a 2 s re-tap guard; not proof of placement;
   - `model_interaction`: the first rotate or zoom per page view.
-- The live site (`main` at `8026a37`) still runs the older `webxr scene-viewer quick-look` modes. ADR-0021 ships when this branch is merged.
+- Live since 2026-10-14 (`main` `3ada1b9`): native only, `scene-viewer quick-look` (ADR-0021). Before that, production ran `webxr scene-viewer quick-look`.
 
 ## Deployment
 - Vercel project `ar-deploy` (team `track0`), auto-deployed from `main` of `krishna-notfound/AR-Deploy`.

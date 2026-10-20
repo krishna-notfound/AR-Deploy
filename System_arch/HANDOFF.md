@@ -1,26 +1,40 @@
-# Handoff: read this first in a new session (2026-10-13)
+# Handoff: read this first in a new session (updated 2026-10-20)
+
+## Next session: start here (2026-10-20)
+1. **The client now has Supabase Pro.** Next job: set up their **staging** and **production** projects. Follow `docs/OPERATIONS_RUNBOOK.md` ("Separate staging project", then "Deploying"). First ask the owner for the project refs and to be invited. Never reuse `pmnjchhrgvajtjpadpqo` (previous demo) or `bothonopxtznzviieoic` (Shringaar) for this.
+2. **Uncommitted changes on `main`:** doc and index edits from 2026-10-20, plus 6 project skills removed from `.claude/skills/`. Before committing, ask the owner which commit email to use: the personal Gmail must stay private and the repo is public (memory `commit-identity`).
+3. **Client proposal:** the finished files are on the owner's Desktop (`AR Furniture - Proposal and User Guide …`). Source and rebuild steps: `~/Documents/AR-Furniture-Proposal-source/README.md`.
+4. **Context clean-up done 2026-10-20:**
+   - ponytail and taste-skill plugins disabled in `.claude/settings.json`;
+   - 6 irrelevant skills moved out (write-swift, animate-expo, animation-vocabulary, find-animation-opportunities, improve-animations, apple-design);
+   - Resend MCP removed.
+
+   Everything is backed up in `~/.claude/backups/2026-10-20-kb-audit/`. To restore, copy back, or re-add Resend with `claude mcp add --transport http resend https://mcp.resend.com/mcp`.
 
 ## Where things stand
-- **Production-readiness programme (started 2026-10-13):** status, findings (SEC-xx) and release gate in `docs/PRODUCTION_READINESS.md`; requirements (R-xx) in `docs/PRD.md`. Branch `chore/production-readiness`.
-- **Live:** Vercel project `ar-deploy` (team `track0`), auto-deployed from `main` on GitHub `krishna-notfound/AR-Deploy`. `main` is at `8026a37`.
+- **Production-readiness programme (started 2026-10-13):** status, findings (SEC-xx) and release gate in `docs/PRODUCTION_READINESS.md`; requirements (R-xx) in `docs/PRD.md`. Find any other doc through `System_arch/README.md`.
+- **Live:** Vercel project `ar-deploy` (team `track0`), auto-deployed from `main` on GitHub `krishna-notfound/AR-Deploy` (public repo). `main` is at `3ada1b9` (2026-10-14); production URL `ar-deploy-sage.vercel.app`.
   - **Use the production URL from the Vercel dashboard.** `ar-deploy.vercel.app` is someone else's site. `ar-deploy-track0.vercel.app` is the team alias and sits behind Vercel login.
   - The owner deploys through their existing project. **Never create another Vercel project or domain.**
-- **Working branch:** `feature/ar-experience-2`, at the same commit as `main`.
+- **Branches:** `main` is the GitHub default and base branch (set by the owner 2026-10-14). Do feature work on short-lived branches cut from `main`. `chore/production-readiness` and `feature/design-supabase-foundation` still exist on GitHub, identical to `main`.
 - **Data:** Supabase project `pmnjchhrgvajtjpadpqo`.
   - All 7 migrations are live (the last two, `20261013093006_publish_rules` and `20261013144121_owner_registration_and_claims`, applied 2026-10-13 with owner approval; rollback in `supabase/rollback/`). Live API suite 15/15 the same day.
   - No separate staging project: the owner chose to test on this project, one approved step at a time (`docs/OPERATIONS_RUNBOOK.md`). The repo is linked to it (`supabase/.temp/project-ref`).
   - The Edge Function `track-event` is live.
-  - 18 sample products and sample owner accounts are live (`audit/APPROVAL_REQUIRED.md` O-4).
-- **Commits:** author `krishna <krishnagtkr@gmail.com>`, **no Claude co-author line**. Push to `main` only when the owner asks; each push deploys to production.
+  - 18 sample products and sample owner accounts are live (`docs/PRODUCTION_READINESS.md`, sample-data section).
+  - Accounts: the owner's platform admin is `admin@furnish.example` (renamed from a personal email). Client demo logins, with passwords printed in the client proposal: `demo.admin@furnish.example`, `owner.nordhaus@furnish.example`, `owner.casa@furnish.example`. Rotate them after the review.
+  - Auth: production sign-ups are ON with email confirmation required. There is no custom SMTP, so outside users can't confirm.
+  - Never touch Supabase project `bothonopxtznzviieoic`: it is the live Shringaar app (local backup in the owner's Backups folder).
+- **Commits:** author `krishna` (local git identity; do not publish personal emails), **no Claude co-author line**. Push to `main` only when the owner asks; each push deploys to production.
 
 ## AR: what is live and why (most important)
-**Branch `chore/production-readiness` (NOT yet deployed): native viewers only.** Owner decision 2026-10-13 (commit c201d91):
+**LIVE on `main` since 2026-10-14: native viewers only.** Owner decision 2026-10-13 (ADR-0021, commit c201d91), confirmed again on 2026-10-20 ("native only, no WebXR"):
 - `ModelViewer.tsx`: `ar-modes="scene-viewer quick-look"`, `ar-scale="fixed"`, `ar-placement="floor"`. Android = Google Scene Viewer (intent `mode=ar_preferred`, so 3D fallback without ARCore; `resizable=false`, true size). iOS/iPadOS = Quick Look. Desktop/unsupported = interactive 3D viewer plus "view on a phone" hand-off (link + QR). No WebXR, no custom AR session, no custom physics.
 - E2E 27/27 on this branch, including a simulated-Android Scene Viewer intent test (simulated user agent, not a real phone).
 - The owner said informally that AR worked on their phone (details pending): **owner-reported, not verified.**
 - **Risk:** the earlier "Scene Viewer first" attempt (8f1ee02, below) failed on the owner's phone, cause undiagnosed. **This change MUST get a real-device check (ARCore Android + iPhone) before any push to `main`.**
 
-**Production (`main`, still live) = the original model-viewer flow**, byte-identical to commit `a6bc75b` on the product page:
+**Before 2026-10-14, production (`8026a37`) ran the original model-viewer flow**, byte-identical to commit `a6bc75b`. This is history, not live:
 - `src/components/three/ModelViewer.tsx`: `ar-modes="webxr scene-viewer quick-look"`, `ar-scale="fixed"`, `ar-placement="floor"`.
 - The product page's "View in my home" opens the AR tips, then `activateAR()`.
 - Android Chrome on ARCore phones: model-viewer's own in-browser WebXR. Scene Viewer as its fallback. iPhone: Quick Look.

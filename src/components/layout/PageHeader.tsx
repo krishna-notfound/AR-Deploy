@@ -45,7 +45,7 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <h1 className="text-[22px] leading-tight font-medium tracking-[-0.02em] text-ink sm:text-title">{title}</h1>
+          <h1 className="font-display text-[26px] leading-tight font-normal text-ink sm:text-title">{title}</h1>
           {description && <p className="mt-1 max-w-2xl text-sm text-ink-muted">{description}</p>}
           {meta && <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div>}
         </div>
@@ -57,6 +57,6 @@ export function PageHeader({
 
 export function useDocumentTitle(title?: string) {
   useEffect(() => {
-    if (title) document.title = `${title} · Furnish AR`
+    if (title) document.title = `${title} · Sanctus`
   }, [title])
 }

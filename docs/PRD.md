@@ -1,6 +1,6 @@
 # Product Requirements: AR Furniture Platform
 
-Last verified against code and the live Supabase project: **2026-10-13** (Phase 0 audit; updated after Phase C/D on branch `chore/production-readiness`). Branch changes are **not deployed**; production runs `main` `8026a37`.
+Last verified against code and the live Supabase project: **2026-10-13**; branch work merged and live on `main` `3ada1b9` since 2026-10-14 (native-only AR, 7 migrations). Client Supabase Pro obtained 2026-10-20.
 
 This document lists the agreed requirements and where each one stands. Status reflects **evidence**, not code existence:
 

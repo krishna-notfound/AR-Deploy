@@ -65,6 +65,11 @@ export function useI18n(): LangCtx {
   return ctx
 }
 
+/** For chrome shared with English-only pages (sign-in, demo picker): null outside a LanguageProvider. */
+export function useMaybeI18n(): LangCtx | null {
+  return useContext(Ctx)
+}
+
 /** Renders localized product text and marks English fallbacks with lang="en". */
 export function LocalizedSpan({ text, as: Tag = 'span', className }: { text: LocalizedText | undefined; as?: 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'div'; className?: string }) {
   const { localizedMeta, lang } = useI18n()

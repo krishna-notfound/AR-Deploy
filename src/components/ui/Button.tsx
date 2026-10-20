@@ -10,19 +10,21 @@ const base =
   'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55 select-none'
 
 const variants: Record<ButtonVariant, string> = {
-  // Charcoal is the default action; orange is kept for the one action that matters most on a screen (e.g. AR).
-  primary: 'bg-ink text-white hover:bg-[#2e2e2e]',
-  accent: 'bg-accent-bright text-ink hover:bg-accent',
+  // Obsidian is the default action (the references' dark, square button); bronze marks the one action that matters most.
+  primary: 'bg-ink text-chalk hover:bg-umber',
+  accent: 'bg-accent-bright text-ink hover:bg-limestone',
+  // White, not chalk: safeBrandAccent guarantees 4.5:1 against white only.
   brand: 'bg-[var(--brand-accent)] text-white hover:brightness-110',
-  secondary: 'bg-surface text-ink border border-line-strong hover:border-ink-faint hover:bg-subtle',
+  secondary: 'bg-surface text-ink border border-line-strong hover:border-ink hover:bg-subtle',
   ghost: 'text-ink hover:bg-subtle',
   danger: 'bg-danger text-white hover:brightness-110',
 }
 
+// lg is the editorial call-to-action of the references: spaced uppercase label on a square button.
 const sizes: Record<ButtonSize, string> = {
   sm: 'h-8 px-3 text-[13px]',
   md: 'h-10 px-4 text-sm',
-  lg: 'h-12 px-5 text-[15px]',
+  lg: 'h-12 px-6 text-label uppercase',
 }
 
 export function buttonClasses(variant: ButtonVariant = 'secondary', size: ButtonSize = 'md', className?: string) {
@@ -65,6 +67,10 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'ghost' | 'secondary'
   size?: 'sm' | 'md'
 }
+
+/** The references' text link: spaced uppercase label, hairline underline, trailing arrow ("EXPLORAR COLEÇÕES →"). */
+export const arrowLinkClasses =
+  'group/arrow inline-flex items-center gap-3 border-b border-current pb-1.5 text-label uppercase transition-colors hover:text-accent-ink'
 
 export function IconButton({ variant = 'ghost', size = 'md', className, type = 'button', ...rest }: IconButtonProps) {
   return (

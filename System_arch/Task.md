@@ -1,9 +1,9 @@
 # Task dashboard
 Keep this file short. Detailed tasks live in `tasks/PN-*.md`. Update the row here when a phase changes state.
 
-**Read first:** [HANDOFF.md](HANDOFF.md) (2026-10-13): live state, AR decisions, open items.
+**Read first:** [HANDOFF.md](HANDOFF.md) (updated 2026-10-20): live state, AR decisions, open items. Release status lives in `../docs/PRODUCTION_READINESS.md`.
 
-**Current phase:** Live on Vercel from `main` (original model-viewer AR). Next: real-device tests, approvals (audit/APPROVAL_REQUIRED.md), UI phase.
+**Current phase:** Live on Vercel from `main` `3ada1b9` (native-only AR, ADR-0021). Production-readiness programme: client review on demo logins, then client-owned Supabase Pro (see `../docs/PRODUCTION_READINESS.md`, section 8).
 **Next action:** [tasks/P9-release.md](tasks/P9-release.md): G6/G7 once Vercel write access exists; then domain, Auth settings, first admin, real-device AR.
 
 | Phase | File | Status | Done / Total | Last update |
@@ -20,6 +20,7 @@ Keep this file short. Detailed tasks live in `tasks/PN-*.md`. Update the row her
 | P8 Design + Supabase | [tasks/P8-design-supabase.md](tasks/P8-design-supabase.md) | DB live on `pmnjchhrgvajtjpadpqo`; Vercel launch pending | 12 / 20 | 2026-10-12 |
 | P10 AR Experience 2.0 | [tasks/P10-ar.md](tasks/P10-ar.md) | Hardened after the audit; real-device pass and A-1 pending | 12 / 14 | 2026-10-13 |
 | Audit + functional phase | [audit/IMPLEMENTATION_STATUS.md](audit/IMPLEMENTATION_STATUS.md) | Stage A done; B built (flagged); C migration written and tested, not applied; D and E waiting for approvals or devices | 3 / 5 stages | 2026-10-13 |
+| P11 Sanctus alignment | [tasks/P11-sanctus.md](tasks/P11-sanctus.md) | Sub-project 1 (brand and design system) done on its branch; 2–5 next | 1 / 5 sub-projects | 2026-10-20 |
 
 ## Conventions (for every task file)
 - `[ ]` todo · `[~]` in progress or partial · `[x]` done · `[!]` blocked (add a reason)

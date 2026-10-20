@@ -102,7 +102,7 @@ function Brand({ collapsed, variant }: { collapsed?: boolean; variant: 'admin' |
   }
   return (
     <Link to="/admin" className="flex items-center gap-2.5">
-      {collapsed ? <BrandMark className="text-ink" /> : <Wordmark sub="Platform admin" />}
+      {collapsed ? <BrandMark className="text-ink" /> : <Wordmark sub="Platform admin" className="text-ink" />}
     </Link>
   )
 }

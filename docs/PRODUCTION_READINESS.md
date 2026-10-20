@@ -1,6 +1,6 @@
 # Production readiness
 
-**Release gate: NOT READY TO SHIP** (2026-10-13). Live database migrated and live API tests pass (15/15), but: no real-device AR test (native-only AR unverified on a phone), branch not deployed (Preview shares the live database), no client domain, sample data still in production.
+**Release gate: NOT READY TO SHIP** (updated 2026-10-20). Everything below is merged and live on `main` (`3ada1b9`, 2026-10-14), including native-only AR. Remaining: the client's acceptance test on their own devices; the client's Supabase Pro (obtained 2026-10-20, to be set up as staging and production per `OPERATIONS_RUNBOOK.md`); domain and SSL; custom SMTP; sample-data removal; client answers in `PRD.md`. Wherever this file says "on branch" or "not deployed", the change is now live.
 
 Requirements and their status: [PRD.md](PRD.md). Background and older audits: `System_arch/HANDOFF.md` (authoritative), `System_arch/audit/` (partly stale, see §5).
 

@@ -5,8 +5,8 @@ import { pickLocalized, translate } from './translate'
 
 describe('i18n', () => {
   it('translates and interpolates', () => {
-    expect(translate('en', 'ar.button')).toBe('View in my home')
-    expect(translate('pt', 'ar.button')).toBe('Ver na minha casa')
+    expect(translate('en', 'ar.button')).toBe('View in AR')
+    expect(translate('pt', 'ar.button')).toBe('Ver em AR')
     expect(translate('pt', 'nav.backToCatalog', { name: 'Casa' })).toBe('Voltar a Casa')
   })
 

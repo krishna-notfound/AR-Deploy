@@ -224,7 +224,7 @@ export function ModelPreview({ glb, usdz, dimensions, poster, name }: { glb?: Mo
         <Box className="size-6 text-ink-faint" aria-hidden />
         <p className="mt-3 text-sm font-medium">No 3D preview yet</p>
         <p className="mt-1 max-w-sm text-xs text-ink-muted">
-          Add a GLB model to show the 3D viewer and the “View in my home” button. Without one, customers see the photo gallery only.
+          Add a GLB model to show the 3D viewer and the “View in AR” button. Without one, customers see the photo gallery only.
         </p>
         {readiness}
       </div>

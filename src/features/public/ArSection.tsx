@@ -16,10 +16,11 @@ export function arAvailability(model: ModelState, canActivateAR: boolean): ArAva
 }
 
 /**
- * "View in my home" — shown only when model-viewer reports canActivateAR (a real capability
- * check). Otherwise explains how to use AR on a phone. Never fakes AR.
+ * AR status beside the product actions. The "View in AR" button itself lives in the product page's action rail and
+ * is shown only when model-viewer reports canActivateAR (a real capability check). Here: the check in progress,
+ * AR tips, or how to use AR on a phone. Never fakes AR.
  */
-export function ArSection({ availability, onActivate, onShowTips }: { availability: ArAvailability; onActivate: () => void; onShowTips: () => void }) {
+export function ArSection({ availability, onShowTips }: { availability: ArAvailability; onShowTips: () => void }) {
   const { t } = useI18n()
   const [showQr, setShowQr] = useState(false)
 
@@ -27,27 +28,23 @@ export function ArSection({ availability, onActivate, onShowTips }: { availabili
 
   if (availability === 'checking')
     return (
-      <Button variant="brand" size="lg" className="w-full" disabled icon={<Loader2 className="size-5 animate-spin" aria-hidden />}>
+      <p className="flex items-center gap-2 text-[13px] text-ink-muted" role="status">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
         {t('ar.checking')}
-      </Button>
+      </p>
     )
 
   if (availability === 'available')
     return (
-      <div>
-        <Button variant="brand" size="lg" className="w-full text-base" onClick={onActivate} icon={<Smartphone className="size-5" aria-hidden />}>
-          {t('ar.button')}
-        </Button>
-        <button type="button" onClick={onShowTips} className="mt-2 text-[13px] text-ink-muted underline-offset-2 hover:text-ink hover:underline">
-          {t('ar.tipsLink')}
-        </button>
-      </div>
+      <button type="button" onClick={onShowTips} className="text-[13px] text-ink-muted underline-offset-2 hover:text-ink hover:underline">
+        {t('ar.tipsLink')}
+      </button>
     )
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
+    <div className="border border-line bg-surface p-4">
       <div className="flex gap-3">
-        <Smartphone className="mt-0.5 size-5 shrink-0 text-[var(--brand-accent)]" aria-hidden />
+        <Smartphone className="mt-0.5 size-5 shrink-0 text-accent" strokeWidth={1.5} aria-hidden />
         <div className="min-w-0">
           <p className="text-sm font-semibold">{t('ar.unsupportedTitle')}</p>
           <p className="mt-0.5 text-[13px] leading-5 text-ink-muted">{t('ar.unsupportedBody')}</p>
@@ -71,7 +68,7 @@ function PageQr() {
   const qr = useQrCode(url, 360)
   return (
     <div className="mt-4 flex items-center gap-4 border-t border-line pt-4">
-      {qr.url ? <img src={qr.url} alt={t('ar.qrHint')} className="size-28 rounded-md" /> : <div className="size-28 animate-shimmer rounded-md bg-subtle" />}
+      {qr.url ? <img src={qr.url} alt={t('ar.qrHint')} className="size-28" /> : <div className="size-28 animate-shimmer bg-subtle" />}
       <p className="flex items-start gap-1.5 text-xs leading-5 text-ink-muted">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         {t('ar.qrHint')}

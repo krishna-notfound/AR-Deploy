@@ -1,9 +1,9 @@
-import { ArrowLeft, CheckCircle2, Eye, HelpCircle, Mail, MapPin, Phone, Globe, PackageX } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Box, CheckCircle2, Eye, Globe, HelpCircle, Images, Mail, MapPin, PackageX, Phone } from 'lucide-react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { Button, ButtonLink, buttonClasses } from '@/components/ui/Button'
+import { ButtonLink } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { SmartImage } from '@/components/ui/SmartImage'
@@ -21,7 +21,7 @@ import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { ArSection, arAvailability } from './ArSection'
 import { ArTips, arTipsDismissed } from './ArTips'
 import { DimensionDiagram } from './DimensionDiagram'
-import { type ModelState, ProductMedia } from './ProductMedia'
+import { type MediaMode, type ModelState, ProductMedia, initialMediaMode, usableModels } from './ProductMedia'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { ShareButton } from './ShareActions'
@@ -86,7 +86,9 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const { t, lang, localized } = useI18n()
   const toast = useToast()
   const viewerRef = useRef<ModelViewerHandle>(null)
-  const [modelState, setModelState] = useState<ModelState>(product.models.glb ? 'loading' : 'none')
+  const stageRef = useRef<HTMLDivElement>(null)
+  const [mode, setMode] = useState<MediaMode>(() => initialMediaMode(product))
+  const [modelState, setModelState] = useState<ModelState>(usableModels(product).glb ? 'loading' : 'none')
   const [canAR, setCanAR] = useState(false)
   const [measured, setMeasured] = useState<MeasuredSize | null>(null)
   const [tipsOpen, setTipsOpen] = useState<null | 'before-ar' | 'info'>(null)
@@ -94,6 +96,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const [variantId, setVariantId] = useState(product.variants[0]?.id)
   const [contactOpen, setContactOpen] = useState(false)
   const name = localized(product.name)
+  const has3d = modelState !== 'none'
 
   // Record one product view per page load (StrictMode-safe via ref).
   const recorded = useRef(false)
@@ -121,14 +124,20 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const availability = arAvailability(modelState, canAR)
   const additional = product.images.filter((i) => i.kind === 'additional')
 
+  const open3d = () => {
+    setMode('3d')
+    stageRef.current?.scrollIntoView({ block: 'nearest' })
+  }
+
   // One launch attempt (and one 'ar_activation' event) per tap; taps within AR_RELAUNCH_MS of a launch are ignored.
-  // The event means "visitor tried to open AR", never "furniture was placed".
+  // The event means "visitor tried to open AR", never "the piece was placed".
   const lastLaunch = useRef(-Infinity)
   const startAR = async () => {
     setTipsOpen(null)
     const now = performance.now()
     if (now - lastLaunch.current < AR_RELAUNCH_MS) return
     lastLaunch.current = now
+    setMode('3d') // if AR cannot start, the visitor is left on the 3D model rather than a photo
     if (!isPreview) void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
     try {
       await viewerRef.current?.activateAR()
@@ -148,92 +157,128 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   }
 
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
+  const textAction = 'inline-flex items-center border-b border-current pb-1 text-label text-ink transition-colors hover:text-accent-ink'
 
   return (
     <PublicShell business={business} catalogHref={catalogHref}>
       {isPreview && (
         <div className="border-b border-warning/30 bg-warning-soft">
-          <p className="mx-auto flex max-w-[1240px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-8">
+          <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-10">
             <Eye className="size-4 shrink-0" aria-hidden />
             {t('product.draftPreview')}
           </p>
         </div>
       )}
 
-      <div className="mx-auto max-w-[1240px] px-5 pt-6 pb-20 sm:px-8">
-        <Link to={catalogHref} className="inline-flex items-center gap-1.5 text-[13px] text-ink-muted hover:text-ink">
-          <ArrowLeft className="size-4" aria-hidden />
+      <div className="mx-auto max-w-[1320px] px-5 pt-6 pb-20 sm:px-10 sm:pt-8">
+        <Link to={catalogHref} className="inline-flex items-center gap-2 py-1 text-label text-ink-muted hover:text-ink">
+          <ArrowLeft className="size-3.5" strokeWidth={1.5} aria-hidden />
           {t('nav.backToCatalog', { name: business.name })}
         </Link>
 
-        <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-16">
-          <div className="lg:sticky lg:top-24 lg:self-start">
-            <ProductMedia
-              product={product}
-              viewerRef={viewerRef}
-              onArStatus={(s) => s === 'failed' && toast.error(t('ar.failed'))}
-              onInteract={onModelInteract}
-              onModelState={(s, info) => {
-                setModelState(s)
-                if (info) {
-                  setCanAR(info.canActivateAR)
-                  setMeasured(info.dimensions)
-                }
-              }}
-            />
+        <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.7fr)] lg:gap-14">
+          {/* Stage + 3D/AR rail (reference: centre stage, round actions on the right). Shown first on phones. */}
+          <div ref={stageRef} className="scroll-mt-24 lg:sticky lg:top-28 lg:order-2 lg:self-start">
+            <div className="flex flex-col gap-5 lg:flex-row lg:gap-8">
+              <div className="min-w-0 flex-1">
+                <ProductMedia
+                  product={product}
+                  mode={mode}
+                  onModeChange={setMode}
+                  viewerRef={viewerRef}
+                  onArStatus={(s) => s === 'failed' && toast.error(t('ar.failed'))}
+                  onInteract={onModelInteract}
+                  onModelState={(s, info) => {
+                    setModelState(s)
+                    if (info) {
+                      setCanAR(info.canActivateAR)
+                      setMeasured(info.dimensions)
+                    }
+                  }}
+                />
+              </div>
+              {(has3d || availability === 'available') && (
+                <ul className="flex justify-center gap-10 lg:flex-col lg:justify-start lg:gap-8 lg:pt-10">
+                  {has3d && (
+                    <li>
+                      <RailAction
+                        mark={mode === '3d' ? <Images className="size-4" strokeWidth={1.4} aria-hidden /> : '3D'}
+                        label={mode === '3d' ? t('product.viewPhotos') : t('product.view3d')}
+                        pressed={mode === '3d'}
+                        onClick={() => (mode === '3d' ? setMode('photos') : open3d())}
+                      />
+                    </li>
+                  )}
+                  {availability === 'available' && (
+                    <li>
+                      <RailAction mark="AR" label={t('ar.button')} onClick={onActivate} />
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
           </div>
 
-          <div className="min-w-0">
-            <LocalizedSpan as="h1" text={product.name} className="text-[2rem] leading-[1.08] font-light tracking-[-0.03em] text-balance text-ink sm:text-[2.6rem]" />
-            <p className="mt-3 text-xl text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
-            <LocalizedSpan as="p" text={product.shortDescription} className="mt-3 text-[15px] leading-7 text-ink-muted" />
-
-            <div className="mt-6 space-y-3">
-              <ArSection availability={availability} onActivate={onActivate} onShowTips={() => setTipsOpen('info')} />
-              <div className="flex flex-wrap items-center gap-2">
-                {product.cta.url ? (
-                  <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={buttonClasses(availability === 'available' ? 'secondary' : 'brand', 'lg', 'flex-1')}>
-                    <LocalizedSpan text={product.cta.label} />
-                  </a>
-                ) : hasContact ? (
-                  <Button size="lg" variant={availability === 'available' ? 'secondary' : 'brand'} className="flex-1" onClick={() => setContactOpen(true)}>
-                    {t('product.contactStore')}
-                  </Button>
-                ) : null}
-                <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
-              </div>
-            </div>
+          <div className="min-w-0 lg:order-1">
+            <LocalizedSpan as="h1" text={product.name} className="font-display text-[2.4rem] leading-[1.05] font-normal text-balance text-ink sm:text-[2.9rem]" />
+            <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
+            <LocalizedSpan as="p" text={product.shortDescription} className="mt-4 max-w-md text-[15px] leading-7 text-ink-muted" />
 
             {product.variants.length > 0 && (
               <section className="mt-8" aria-labelledby="variants-h">
-                <h2 id="variants-h" className="text-sm font-semibold">
+                <h2 id="variants-h" className="text-eyebrow text-ink">
                   {t('product.colors')}
                 </h2>
-                <div role="radiogroup" aria-labelledby="variants-h" className="mt-3 flex flex-wrap gap-2">
+                <div role="radiogroup" aria-labelledby="variants-h" className="mt-3 flex flex-wrap gap-3">
                   {product.variants.map((v) => (
                     <button
                       key={v.id}
                       type="button"
                       role="radio"
                       aria-checked={v.id === variantId}
+                      aria-label={localized(v.name) + (v.priceDelta ? ` +${formatMoney(v.priceDelta, product.currency, lang)}` : '')}
+                      title={localized(v.name)}
                       onClick={() => setVariantId(v.id)}
-                      className={cn(
-                        'inline-flex h-10 items-center gap-2 rounded-full border px-3 pr-4 text-[13px] transition-colors',
-                        v.id === variantId ? 'border-ink bg-surface font-medium' : 'border-line-strong bg-surface text-ink-muted hover:text-ink',
-                      )}
+                      className={cn('grid size-10 place-items-center rounded-full border transition-colors', v.id === variantId ? 'border-ink' : 'border-transparent hover:border-line-strong')}
                     >
-                      <span className="size-5 rounded-full ring-1 ring-black/10" style={{ background: v.colorHex ?? '#ddd' }} aria-hidden />
-                      <LocalizedSpan text={v.name} />
-                      {v.priceDelta ? <span className="text-ink-faint tabular-nums">+{formatMoney(v.priceDelta, product.currency, lang)}</span> : null}
+                      <span className="size-8 rounded-full ring-1 ring-black/10" style={{ background: v.colorHex ?? 'var(--color-limestone)' }} aria-hidden />
                     </button>
                   ))}
                 </div>
+                {variant && (
+                  <p className="mt-2 text-[13px] text-ink-muted">
+                    <LocalizedSpan text={variant.name} />
+                    {variant.priceDelta ? <span className="ml-2 text-ink-faint tabular-nums">+{formatMoney(variant.priceDelta, product.currency, lang)}</span> : null}
+                  </p>
+                )}
               </section>
             )}
 
-            <section className="mt-8 rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-labelledby="dims-h">
+            <div className="mt-8 flex flex-col gap-5">
+              {has3d && (
+                <button type="button" onClick={open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch bg-ink px-8 text-label text-chalk transition-colors hover:bg-umber sm:self-start">
+                  {t('product.view3dAr')}
+                  <Box className="size-4" strokeWidth={1.4} aria-hidden />
+                </button>
+              )}
+              <ArSection availability={availability} onShowTips={() => setTipsOpen('info')} />
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                {product.cta.url ? (
+                  <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={textAction}>
+                    <LocalizedSpan text={product.cta.label} />
+                  </a>
+                ) : hasContact ? (
+                  <button type="button" className={textAction} onClick={() => setContactOpen(true)}>
+                    {t('product.contactStore')}
+                  </button>
+                ) : null}
+                <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
+              </div>
+            </div>
+
+            <section className="mt-10 border-t border-line pt-6" aria-labelledby="dims-h">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 id="dims-h" className="text-sm font-semibold">
+                <h2 id="dims-h" className="text-eyebrow text-ink">
                   {t('product.dimensions')}
                 </h2>
                 <SegmentedControl
@@ -253,7 +298,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                   {(['width', 'height', 'depth'] as const).map((k) => (
                     <div key={k} className="sm:flex sm:items-baseline sm:justify-between sm:gap-6">
                       <dt className="text-xs text-ink-muted">{t(`product.${k}`)}</dt>
-                      <dd className="font-semibold tabular-nums">
+                      <dd className="font-medium tabular-nums">
                         {fmtLen(product.dimensions[k])} {unit}
                       </dd>
                     </div>
@@ -263,45 +308,47 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
               {scale.status !== 'unknown' && modelState === 'loaded' && <ScaleNote verified={scale.status === 'verified'} measured={scale.measured} unit={unit} />}
             </section>
 
-            <dl className="mt-6 divide-y divide-line border-y border-line text-sm">
-              {localized(product.material) && (
-                <div className="flex justify-between gap-6 py-3">
-                  <dt className="text-ink-muted">{t('product.material')}</dt>
-                  <dd className="text-right">
-                    <LocalizedSpan text={product.material} />
-                  </dd>
-                </div>
-              )}
-              {product.weight && (
-                <div className="flex justify-between gap-6 py-3">
-                  <dt className="text-ink-muted">{t('product.weight')}</dt>
-                  <dd className="tabular-nums">
-                    {product.weight.value} {product.weight.unit}
-                  </dd>
-                </div>
-              )}
-            </dl>
+            {(localized(product.material) || product.weight) && (
+              <dl className="mt-6 space-y-5 border-t border-line pt-6">
+                {localized(product.material) && (
+                  <div>
+                    <dt className="text-eyebrow text-ink">{t('product.material')}</dt>
+                    <dd className="mt-1.5 text-[14px] text-ink-muted">
+                      <LocalizedSpan text={product.material} />
+                    </dd>
+                  </div>
+                )}
+                {product.weight && (
+                  <div>
+                    <dt className="text-eyebrow text-ink">{t('product.weight')}</dt>
+                    <dd className="mt-1.5 text-[14px] text-ink-muted tabular-nums">
+                      {product.weight.value} {product.weight.unit}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            )}
 
             {localized(product.description) && (
-              <section className="mt-8" aria-labelledby="desc-h">
-                <h2 id="desc-h" className="text-sm font-semibold">
+              <section className="mt-6 border-t border-line pt-6" aria-labelledby="desc-h">
+                <h2 id="desc-h" className="text-eyebrow text-ink">
                   {t('product.description')}
                 </h2>
-                <LocalizedSpan as="p" text={product.description} className="mt-2 max-w-prose text-[15px] leading-7 whitespace-pre-line text-ink-muted" />
+                <LocalizedSpan as="p" text={product.description} className="mt-3 max-w-prose text-[15px] leading-7 whitespace-pre-line text-ink-muted" />
               </section>
             )}
           </div>
         </div>
 
         {additional.length > 0 && (
-          <section className="mt-14" aria-labelledby="more-h">
-            <h2 id="more-h" className="text-lg font-semibold">
+          <section className="mt-16" aria-labelledby="more-h">
+            <h2 id="more-h" className="text-eyebrow text-ink">
               {t('product.morePhotos')}
             </h2>
-            <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <ul className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {additional.map((img) => (
                 <li key={img.id}>
-                  <SmartImage src={img.url} alt={img.alt || name} className="aspect-[4/3] w-full rounded-[var(--radius-card)]" />
+                  <SmartImage src={img.url} alt={img.alt || name} className="aspect-[4/3] w-full" />
                 </li>
               ))}
             </ul>
@@ -357,7 +404,7 @@ function ScaleNote({ verified, measured, unit }: { verified: boolean; measured: 
   }
   const size = `${toUnit(measured.x)} × ${toUnit(measured.y)} × ${toUnit(measured.z)} ${unit}`
   return (
-    <div className={cn('mt-4 flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-[13px]', verified ? 'bg-success-soft text-success' : 'bg-subtle text-ink-muted')}>
+    <div className={cn('mt-4 flex items-start gap-2.5 px-3 py-2.5 text-[13px]', verified ? 'bg-success-soft text-success' : 'bg-subtle text-ink-muted')}>
       {verified ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden /> : <HelpCircle className="mt-0.5 size-4 shrink-0" aria-hidden />}
       <div>
         <p className="font-medium">{verified ? t('ar.scaleVerified') : t('ar.scaleUnverified')}</p>
@@ -366,5 +413,23 @@ function ScaleNote({ verified, measured, unit }: { verified: boolean; measured: 
         </p>
       </div>
     </div>
+  )
+}
+
+/** A round action of the reference's right-hand rail ("3D · Visualizar em 3D", "AR · Ver em AR"). */
+function RailAction({ mark, label, onClick, pressed }: { mark: ReactNode; label: string; onClick: () => void; pressed?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} className="group flex w-24 flex-col items-center gap-2.5 text-center">
+      <span
+        className={cn(
+          'grid size-12 place-items-center rounded-full border text-[11px] font-medium tracking-[0.08em] transition-colors',
+          pressed ? 'border-ink bg-ink text-chalk' : 'border-ink/70 text-ink group-hover:bg-ink group-hover:text-chalk',
+        )}
+        aria-hidden
+      >
+        {mark}
+      </span>
+      <span className="text-[12px] leading-4 text-ink-body">{label}</span>
+    </button>
   )
 }

@@ -105,7 +105,6 @@ function pathModeRoutes(): RouteObject[] {
         {
           element: <Standalone />,
           children: [
-            { path: '/', element: <LandingPage /> },
             { path: '/demo', element: <DemoEntryPage /> },
             { path: '/login', element: <LoginPage /> },
             { path: '/reset-password', element: <ResetPasswordPage /> },
@@ -118,6 +117,7 @@ function pathModeRoutes(): RouteObject[] {
         {
           element: <PublicLayout />,
           children: [
+            { path: '/', element: <LandingPage /> },
             { path: '/catalog/:businessSlug', element: <CatalogPage /> },
             { path: '/products/:businessSlug/:productSlug', element: <ProductPage /> },
           ],
@@ -128,7 +128,7 @@ function pathModeRoutes(): RouteObject[] {
   ]
 }
 
-/** Business subdomain mode (e.g. casa-lisboa.furnish.app): catalog at "/", products at "/products/:slug". */
+/** Business subdomain mode (e.g. casa-lisboa.sanctus.app): catalog at "/", products at "/products/:slug". */
 function hostnameModeRoutes(slug: string): RouteObject[] {
   return [
     {

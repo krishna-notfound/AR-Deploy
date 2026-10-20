@@ -1,7 +1,7 @@
 # 19 · Supabase backend (foundation)
 Decisions: ADR-0015 (dual mode), ADR-0016 (routes). This file is the setup guide.
 
-## Status (2026-10-13, later): 5 migrations + Edge Function live on `pmnjchhrgvajtjpadpqo`
+## Status (2026-10-20): 7 migrations + Edge Function live on `pmnjchhrgvajtjpadpqo` (previous demo project). The client now has Supabase Pro; staging and production move there (`docs/OPERATIONS_RUNBOOK.md`).
 - **Migrations:** `20261012192143_init_schema`, `20261012192159_storage`, `20261012192454_save_product`, `20261012200810_analytics_rate_limit`, `20261012200813_business_member_admin`.
 - **Edge Function:** `track-event` (version 1, ACTIVE).
 - **Live suite:** 13/13.
@@ -140,7 +140,7 @@ Who can do what:
   - Damask Accent Chair has a scale mismatch (AR scale unverified)
   - Rio Sideboard has no Portuguese (fallback)
 - **Accounts:**
-  - `krishnagtkr@gmail.com`: platform admin
+  - `admin@furnish.example`: platform admin (login email changed 2026-10-14)
   - `owner.casa@furnish.example` → Casa Lisboa
   - `owner.nordhaus@furnish.example` → Nordhaus
   - Passwords were given to the owner in chat and are never stored in the repo. Change them via `/reset-password` while signed in.
