@@ -20,7 +20,14 @@
 ## Discovered
 - [ ] D1 · Configurable product categories per business (split from sub-project 2)
 - [!] D2 · Edge Function secrets and Auth redirect URLs on the client project: needs the org Admin role (Developer gets 403)
-- [ ] Sub-project 3 · Variant media: per-variant photos and GLB/USDZ (migration 9, needs approval)
+- [x] Sub-project 3 · Variant media: per-variant photos and GLB/USDZ. Done 2026-10-20:
+  - Migration `20261020143507_variant_media.sql`, approved by the owner and applied to the client dev project.
+  - Editor and public page switching per variant.
+  - QA on the Preview: `docs/SANCTUS_3D_AR_QA_REPORT.md`.
+- [x] Owner dashboard pass, 2026-10-20 (ADR-0025: product QR and owner catalogue preview):
+  - Next steps, status notices, AR readiness, analytics wording and mobile fixes.
+  - QA business and journeys: `docs/SANCTUS_BUSINESS_DASHBOARD_AUDIT.md`, `docs/SANCTUS_DASHBOARD_TEST_RESULTS.md`, `docs/QA_BUSINESS_MANUAL_CLEANUP.md`.
+  - Open: DUX-06 (publish checklist before the first attempt), real-device AR, Auth URL settings (Admin).
 - [ ] Sub-project 4 · EN/PT everywhere (auth pages, dashboards), language persistence
 - [x] Full audit and hardening pass, 2026-10-20 (`nextlevel/ULTRAREVIEW_PRODUCTION_READINESS.md`):
   - Fixed SEC-20/21/23/26, 16 of 17 P2 correctness defects, UX-01 and 12 UX P2s, with regression tests.
