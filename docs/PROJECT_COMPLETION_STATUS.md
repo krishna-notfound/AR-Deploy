@@ -36,7 +36,7 @@ This is the single place for **what is done, what is blocked and what decides th
 | # | Blocker | Needed from | Exact input |
 |---|---|---|---|
 | B1 | ~~Auth Site URL and redirects~~ **Done 2026-10-24** | n/a | n/a |
-| B2 | Leaked-password protection (the rest of B2 is done). Not settable from the CLI, and may need the Pro plan. | Owner, in the dashboard | Authentication → Attack Protection → "Prevent use of leaked passwords" |
+| B2 | ~~Leaked-password protection~~ **Done 2026-10-24** (`password_hibp_enabled = true`, set through the Supabase Management API) | n/a | n/a |
 | B3 | ~~Resend key and webhook~~ **Done 2026-10-24** (temporary key; the old exposed "Sanctus server (Edge Functions)" key was revoked 2026-10-24). Still open: the real sender address and admin inbox (client decision). | Owner and client | n/a |
 | B4 | Sending domain | Client (DNS) | Verify a domain in Resend. Until then, mail only reaches the Resend account's own address. |
 | B5 | Webhook **done**. Still open: Supabase Auth SMTP through Resend, so password-reset and Auth emails reach real people. It needs a verified sending domain (B4). | After B4 | Auth → SMTP: `smtp.resend.com:465`, user `resend`, password = an API key, sender on the verified domain |
