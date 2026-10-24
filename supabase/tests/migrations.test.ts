@@ -525,6 +525,250 @@ describe('applications, review, one owner, audit (20261020091428_applications_an
   })
 })
 
+describe('security hardening (20261024065538_security_hardening)', () => {
+  const DENIED = /permission denied|row-level security/
+  const HB = '10000000-0000-0000-0000-0000000000b1'
+  const HOWNER = '00000000-0000-0000-0000-0000000000b1'
+  const uuid = () => crypto.randomUUID()
+  const asService = <T,>(fn: (tx: Transaction) => Promise<T>) =>
+    db.transaction(async (tx) => {
+      await tx.exec('set local role service_role')
+      return fn(tx)
+    })
+  const biz = async () => (await db.query<Record<string, unknown>>('select * from public.businesses where id = $1', [HB])).rows[0]!
+  const rpc = (uid: string, args: ReturnType<typeof toSaveProductArgs>) =>
+    as(uid, (tx) => tx.query<{ id: string }>('select public.save_product($1, $2, $3, $4) as id', [args.p_product, args.p_images, args.p_models, args.p_variants])).then(
+      (r) => r.rows[0]!.id,
+    )
+  const photo = (storagePath: string) => ({ id: 'p1', url: '', storagePath, isPrimary: true, kind: 'gallery' as const })
+  const model = (m: { storagePath?: string; url?: string }) => ({
+    glb: { format: 'glb' as const, url: m.url ?? '', fileName: 'a.glb', status: 'valid' as const, ...(m.storagePath ? { storagePath: m.storagePath } : {}) },
+  })
+  const httpImage = [{ id: 'h', url: 'http://img.test/a.jpg', isPrimary: true, kind: 'gallery' as const }]
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users values ('${HOWNER}', 'hardening-owner@test', now());
+      insert into public.businesses (id, name, slug, status, logo_url) values ('${HB}', 'Hardened', 'hardened', 'active', 'https://cdn.test/logo.png');
+      insert into public.business_members (business_id, user_id) values ('${HB}', '${HOWNER}');
+    `)
+  })
+
+  describe('SEC-27 / OWN-06: owner columns, timestamps, https URLs', () => {
+    it('an owner edits name, logo, description and contact fields of their business', async () => {
+      await as(HOWNER, (tx) =>
+        tx.query(
+          `update public.businesses set name = 'Hardened Co', logo_url = 'https://cdn.test/new.png', description = 'Hand-made',
+             contact_email = 'shop@test', contact_phone = '+351 1', contact_website = 'https://shop.test', contact_address = 'Lisboa' where id = $1`,
+          [HB],
+        ),
+      )
+      expect(await biz()).toMatchObject({ name: 'Hardened Co', logo_url: 'https://cdn.test/new.png', description: 'Hand-made', contact_address: 'Lisboa' })
+    })
+
+    it('an owner cannot change status, slug, accent colour or currency (unchanged values in the payload are fine)', async () => {
+      const ownerSet = (sql: string) => as(HOWNER, (tx) => tx.query(`update public.businesses set ${sql} where id = $1`, [HB]))
+      await expect(ownerSet(`status = 'inactive'`)).rejects.toThrow(/Only platform admins/)
+      await expect(ownerSet(`slug = 'renamed'`)).rejects.toThrow(/Only platform admins/)
+      await expect(ownerSet(`accent_color = '#000000'`)).rejects.toThrow(/business_field_admin_only/)
+      await expect(ownerSet(`default_currency = 'USD'`)).rejects.toThrow(/business_field_admin_only/)
+      await ownerSet(`slug = 'hardened', status = 'active', accent_color = accent_color, description = 'Same values re-sent'`)
+      expect((await biz()).description).toBe('Same values re-sent')
+    })
+
+    it('no API role writes ids or timestamps, platform admins included; admins still manage admin fields', async () => {
+      for (const uid of [HOWNER, ADMIN]) {
+        for (const set of [`created_at = '2000-01-01'`, `updated_at = '2000-01-01'`, 'id = gen_random_uuid()'])
+          await expect(as(uid, (tx) => tx.query(`update public.businesses set ${set} where id = $1`, [HB]))).rejects.toThrow(/permission denied/)
+      }
+      await as(ADMIN, (tx) => tx.query(`update public.businesses set accent_color = '#112233', default_currency = 'BRL', status = 'inactive' where id = $1`, [HB]))
+      expect(await biz()).toMatchObject({ accent_color: '#112233', default_currency: 'BRL', status: 'inactive' })
+      await as(ADMIN, (tx) => tx.query(`update public.businesses set status = 'active' where id = $1`, [HB]))
+      await expect(as('', (tx) => tx.query(`update public.businesses set name = 'x' where id = $1`, [HB]), 'anon')).rejects.toThrow(/permission denied/)
+    })
+
+    it('logo_url must be https, for owners and admins alike', async () => {
+      for (const uid of [HOWNER, ADMIN])
+        await expect(as(uid, (tx) => tx.query(`update public.businesses set logo_url = 'http://tracker.test/p.png' where id = $1`, [HB]))).rejects.toThrow(
+          /businesses_logo_url_https/,
+        )
+      await as(HOWNER, (tx) => tx.query(`update public.businesses set logo_url = null where id = $1`, [HB]))
+      expect((await biz()).logo_url).toBeNull()
+    })
+
+    it('products: no back-dated created_at, a draft keeps its published_at, publishing still stamps it', async () => {
+      const id = await saveDraft()
+      for (const uid of [OWNER, ADMIN])
+        await expect(as(uid, (tx) => tx.query(`update public.products set created_at = '2000-01-01' where id = $1`, [id]))).rejects.toThrow(/permission denied/)
+      await as(OWNER, (tx) => tx.query(`update public.products set published_at = '2000-01-01' where id = $1`, [id]))
+      const draft = await db.query<{ published_at: Date | null }>('select published_at from public.products where id = $1', [id])
+      expect(draft.rows[0]!.published_at).toBeNull()
+      await publish(id)
+      const live = await db.query<{ published_at: Date }>('select published_at from public.products where id = $1', [id])
+      expect(live.rows[0]!.published_at.getFullYear()).toBeGreaterThan(2000)
+    })
+
+    it('product image and model URLs must be https (or a same-origin /path)', async () => {
+      await expect(saveDraftAs(OWNER, { images: httpImage })).rejects.toThrow(/product_images_url_https/)
+      await expect(saveDraftAs(ADMIN, { images: httpImage })).rejects.toThrow(/product_images_url_https/)
+      await expect(saveDraftAs(OWNER, { models: model({ url: 'http://cdn.test/a.glb' }) })).rejects.toThrow(/product_models_url_https/)
+      await saveDraftAs(OWNER, { images: [{ id: 'h', url: '/demo/a.jpg', isPrimary: true, kind: 'gallery' }], models: model({ url: 'https://cdn.test/a.glb' }) })
+    })
+  })
+
+  describe('OWN-02: exact storage_path shape for product images and models', () => {
+    it('accepts <business>/<uuid>.<ext> uploads of the own business', async () => {
+      await saveDraftAs(OWNER, { images: [photo(`${BIZ}/${uuid()}.webp`)], models: model({ storagePath: `${BIZ}/${uuid()}.glb` }) })
+      await saveDraftAs(ADMIN, { images: [photo(`${BIZ}/${uuid()}.jpeg`)], models: model({ storagePath: `${BIZ}/${uuid()}.usdz` }) })
+    })
+
+    it('refuses traversal, sub-folders, odd names and a model in a photo slot, for owners and admins', async () => {
+      const bad = [`${BIZ}/../${OTHER_BIZ}/x.png`, `${BIZ}/sub/${uuid()}.png`, `${BIZ}/draft.png`, `${BIZ}/${uuid()}.glb`, `${BIZ}/${uuid()}.svg`]
+      for (const p of bad) {
+        await expect(saveDraftAs(OWNER, { images: [photo(p)] })).rejects.toThrow(DENIED)
+        await expect(saveDraftAs(ADMIN, { images: [photo(p)] })).rejects.toThrow(DENIED)
+      }
+      await expect(saveDraftAs(OWNER, { models: model({ storagePath: `${BIZ}/${uuid()}.png` }) })).rejects.toThrow(DENIED)
+      await expect(saveDraftAs(OWNER, { models: model({ storagePath: `${OTHER_BIZ}/${uuid()}.glb` }) })).rejects.toThrow(DENIED)
+    })
+  })
+
+  describe('OWN-03: integrity rules', () => {
+    it('refuses a whitespace-only English name, on create and on direct update', async () => {
+      await expect(saveDraftAs(OWNER, { name: { en: ' \t ' } })).rejects.toThrow(/products_name_en_not_blank/)
+      const id = await saveDraft()
+      await expect(as(OWNER, (tx) => tx.query(`update public.products set name = '{"en":"   "}' where id = $1`, [id]))).rejects.toThrow(/products_name_en_not_blank/)
+    })
+
+    it('refuses a negative variant price difference; zero and positive are fine', async () => {
+      await expect(saveDraftAs(OWNER, { variants: [{ id: 'v', name: { en: 'Oak' }, priceDelta: -1000 }] })).rejects.toThrow(/product_variants_price_delta_nonneg/)
+      await saveDraftAs(OWNER, { variants: [{ id: 'v1', name: { en: 'Oak' }, priceDelta: 0 }, { id: 'v2', name: { en: 'Walnut' }, priceDelta: 2500 }] })
+    })
+
+    it('allows at most one primary image per product and per variant (the editor sends one)', async () => {
+      const args = toSaveProductArgs(
+        null,
+        input({ images: [{ id: 'a', url: 'https://img.test/a.jpg', isPrimary: true, kind: 'gallery' }, { id: 'b', url: 'https://img.test/b.jpg', isPrimary: false, kind: 'gallery' }] }),
+      )
+      await rpc(OWNER, args)
+      const two = { ...args, p_product: { ...args.p_product, slug: `p-${uuid().slice(0, 6)}` }, p_images: args.p_images.map((i) => ({ ...i, is_primary: true })) }
+      await expect(rpc(OWNER, two)).rejects.toThrow(/product_images_one_primary_idx/)
+      const v = toSaveProductArgs(null, input({ variants: [{ id: 'v', name: { en: 'Oak' }, images: [photo(`${BIZ}/${uuid()}.png`), { ...photo(`${BIZ}/${uuid()}.png`), id: 'p2', isPrimary: false }] }] }))
+      await rpc(OWNER, v)
+      const twoV = {
+        ...v,
+        p_product: { ...v.p_product, slug: `p-${uuid().slice(0, 6)}` },
+        p_variants: v.p_variants.map((x) => ({ ...x, images: x.images.map((i) => ({ ...i, is_primary: true })) })),
+      }
+      await expect(rpc(OWNER, twoV)).rejects.toThrow(/product_variant_images_one_primary_idx/)
+    })
+  })
+
+  describe('OWN-04: AR and 3D events need a model', () => {
+    const key = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('')
+    const record = (product: string, type: string) =>
+      asService((tx) => tx.query<{ r: string }>('select public.record_event_limited($1, $2, $3, $4) as r', [key(), product, BIZ, type])).then((r) => r.rows[0]!.r)
+
+    it('refuses ar_activation and model_interaction for a product without a model; views still count', async () => {
+      const id = await saveDraft()
+      await publish(id)
+      expect(await record(id, 'view')).toBe('recorded')
+      expect(await record(id, 'ar_activation')).toBe('invalid')
+      expect(await record(id, 'model_interaction')).toBe('invalid')
+    })
+
+    it('records them when the product or one of its variants has a model', async () => {
+      const withModel = await saveDraft({ models: model({ storagePath: `${BIZ}/${uuid()}.glb` }) })
+      await publish(withModel)
+      expect(await record(withModel, 'ar_activation')).toBe('recorded')
+      const variantOnly = await saveDraft({ variants: [{ id: 'v', name: { en: 'Oak' }, models: model({ storagePath: `${BIZ}/${uuid()}.glb` }) }] })
+      await publish(variantOnly)
+      expect(await record(variantOnly, 'model_interaction')).toBe('recorded')
+    })
+
+    it('keeps its grants: only the service role may call it', async () => {
+      const call = `select public.record_event_limited('${'a'.repeat(64)}', gen_random_uuid(), gen_random_uuid(), 'view')`
+      await expect(as(OWNER, (tx) => tx.query(call))).rejects.toThrow(/permission denied/)
+      await expect(as('', (tx) => tx.query(call), 'anon')).rejects.toThrow(/permission denied/)
+    })
+  })
+
+  describe('COR-05: catalogue address changes are audited', () => {
+    const slugEvents = async () =>
+      (
+        await db.query<{ actor_id: string; metadata: { from: string; to: string } }>(
+          `select actor_id, metadata from public.audit_events where business_id = $1 and event_type = 'business_slug_changed' order by created_at, id`,
+          [HB],
+        )
+      ).rows
+
+    it('records who changed the slug, from and to; nothing when the slug is unchanged', async () => {
+      const before = (await slugEvents()).length
+      await as(ADMIN, (tx) => tx.query(`update public.businesses set description = 'no slug change', slug = slug where id = $1`, [HB]))
+      expect(await slugEvents()).toHaveLength(before)
+      await as(ADMIN, (tx) => tx.query(`update public.businesses set slug = 'hardened-new', status = 'inactive' where id = $1`, [HB]))
+      const ev = await slugEvents()
+      expect(ev).toHaveLength(before + 1)
+      expect(ev.at(-1)).toEqual({ actor_id: ADMIN, metadata: { from: 'hardened', to: 'hardened-new' } })
+      const status = await db.query(`select 1 from public.audit_events where business_id = $1 and event_type = 'business_status_changed' and to_status = 'inactive'`, [HB])
+      expect(status.rows.length).toBeGreaterThan(0)
+      await as(ADMIN, (tx) => tx.query(`update public.businesses set slug = 'hardened', status = 'active' where id = $1`, [HB]))
+    })
+  })
+
+  describe('COR-16: onboarding with several pending memberships', () => {
+    it('accepts every pending membership once and returns the newest business', async () => {
+      const U = '00000000-0000-0000-0000-0000000000b2'
+      const [A, B] = ['10000000-0000-0000-0000-0000000000b2', '10000000-0000-0000-0000-0000000000b3']
+      await db.exec(`
+        insert into auth.users values ('${U}', 'two-invites@test', now());
+        insert into public.businesses (id, name, slug) values ('${A}', 'First', 'first-invite'), ('${B}', 'Second', 'second-invite');
+        insert into public.business_members (business_id, user_id, invited_at, created_at)
+          values ('${A}', '${U}', now(), now() - interval '1 day'), ('${B}', '${U}', now(), now());
+      `)
+      const onboard = () => as(U, (tx) => tx.query<{ b: string }>('select public.complete_owner_onboarding() as b')).then((r) => r.rows[0]!.b)
+      expect(await onboard()).toBe(B)
+      const members = await db.query<{ accepted_at: Date | null }>('select accepted_at from public.business_members where user_id = $1', [U])
+      expect(members.rows.every((m) => m.accepted_at !== null)).toBe(true)
+      const audit = async () => (await db.query(`select 1 from public.audit_events where actor_id = $1 and event_type = 'owner_onboarding_completed'`, [U])).rows.length
+      expect(await audit()).toBe(2)
+      expect(await onboard()).toBe(B)
+      expect(await audit()).toBe(2)
+      await expect(as('', (tx) => tx.query('select public.complete_owner_onboarding()'))).rejects.toThrow(/sign_in_required/)
+    })
+  })
+})
+
+describe('rollback script for 20261024065538_security_hardening', () => {
+  it('restores the previous grants, policies and functions and keeps business data', async () => {
+    const fresh = await PGlite.create()
+    await fresh.exec(SUPABASE_STUBS + 'create schema supabase_migrations; create table supabase_migrations.schema_migrations (version text primary key);')
+    for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql') && n.slice(0, 14) <= '20261024065538').sort())
+      await fresh.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
+    await fresh.exec(`insert into supabase_migrations.schema_migrations values ('20261024065538');
+      insert into public.businesses (name, slug) values ('Kept', 'kept');`)
+    await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261024_security_hardening_rollback.sql'), 'utf8'))
+    const q = async (sql: string) => (await fresh.query<Record<string, unknown>>(sql)).rows
+    expect(
+      await q(`select conname from pg_constraint where conname in ('businesses_logo_url_https', 'product_images_url_https',
+        'product_models_url_https', 'products_name_en_not_blank', 'product_variants_price_delta_nonneg')`),
+    ).toHaveLength(0)
+    expect(await q(`select 1 from pg_indexes where indexname in ('product_images_one_primary_idx', 'product_variant_images_one_primary_idx')`)).toHaveLength(0)
+    expect(
+      await q(`select 1 where has_table_privilege('authenticated', 'public.businesses', 'UPDATE') and has_table_privilege('authenticated', 'public.products', 'UPDATE')`),
+    ).toHaveLength(1)
+    for (const policy of ['Members and admins write images', 'Members and admins write models'])
+      expect((await q(`select with_check as c from pg_policies where policyname = '${policy}'`))[0]!.c).toMatch(/split_part/)
+    expect(
+      await q(`select 1 from pg_proc where proname in ('record_event_limited', 'audit_business_change', 'guard_business_admin_fields', 'complete_owner_onboarding')
+        and (prosrc like '%product_variant_models%' or prosrc like '%business_slug_changed%' or prosrc like '%business_field_admin_only%' or prosrc like '%with accepted%')`),
+    ).toHaveLength(0)
+    expect(await q(`select 1 from public.businesses where slug = 'kept'`)).toHaveLength(1)
+    expect(await q('select 1 from supabase_migrations.schema_migrations')).toHaveLength(0)
+    await fresh.close()
+  }, 60_000)
+})
+
 describe('rollback script for 20261013093006 + 20261013144121', () => {
   it('removes the new rules and functions, restores owner linking, and keeps business data', async () => {
     const fresh = await PGlite.create()
