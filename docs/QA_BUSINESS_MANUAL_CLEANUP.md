@@ -45,6 +45,13 @@ The business has no logo in `business-logos`, unless one is added later.
 - **Audit log** (`audit_events`): `application_submitted`, the status changes, `business_created`, `invitation_requested`, onboarding and the product events, all for this business and application.
 - **Email log** (`email_log`): applicant confirmation, admin notification and owner invitation, all `blocked: email_not_configured`. No email was sent.
 
+**Email test records (2026-10-24):**
+- Application **ABE43EC0**, "QA Email Test Atelier", applicant `delivered+qa-email-test@resend.dev`, status submitted.
+- Its `email_log` rows: confirmation and admin notification, both delivered.
+- A delivered `invitation_resend` email-log row for "QA Preview Atelier 10201001".
+
+To remove the application, run the same SQL as in step 4 below, with reference `ABE43EC0` and its applicant email.
+
 **Older QA records, not covered here:** "QA Preview Atelier 10201001", "QA Muse Studio", "QA Muse Atelier" and "idk". They predate this procedure; leave them alone unless the owner says otherwise.
 
 ## 2. Safe manual deletion sequence

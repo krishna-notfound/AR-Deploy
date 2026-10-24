@@ -23,13 +23,13 @@ This is the single place for **what is done, what is blocked and what decides th
 | Security hardening migration `20261024065538` | Owner column allow-list, https media, path shape, AR events need a model, slug audit, safe onboarding | `8df5b42` | Pre-check clean, then applied to zggyl on 2026-10-24. Live checks passed afterwards (owner product save, settings save, unpublish and re-publish, view and AR attempt 204). Generated types unchanged, no new advisor findings. |
 | Auth settings (zggyl) | Site URL = Preview; exact redirects for `/login`, `/reset-password` and `/accept-invite` (plus localhost for dev); public sign-up refused (`signup_disabled` verified); minimum password length 12 | n/a | Verified by sign-in (200) and a sign-up probe (422) |
 | Email functions redeployed | `submit-application`, `provision-owner`, `send-test-email` | n/a | Preflight 204 |
+| Email delivery (Resend) | All secrets set: a new sending-only key "Sanctus server 2026-10-24" (temporary, the owner will replace it), the test sender `onboarding@resend.dev`, the Preview as `APP_BASE_URL`, a test admin inbox, and the signed webhook | n/a | 2026-10-24 on the Preview: applicant confirmation, admin notification and owner invitation all reached **delivered** through the signed webhook (`email_log`, application `ABE43EC0` and business "QA Preview Atelier 10201001") |
 | Public Preview | Vercel protection off (owner request, 2026-10-22). `main` and production unchanged. | n/a | https://ar-deploy-git-feature-sanctus-brand-design-system-track0.vercel.app opens with no login |
 
 ## 2. Implemented, but not yet verified externally
 
 | Item | Status | Why not verified |
 |---|---|---|
-| Email sending | Settings EMAIL_FROM (Resend test sender), APP_BASE_URL (Preview) and ADMIN_NOTIFICATION_EMAIL (Resend test inbox) are set | Waiting for the new `RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET` (B3) |
 
 ## 3. Blocked (exact missing input)
 
@@ -37,10 +37,10 @@ This is the single place for **what is done, what is blocked and what decides th
 |---|---|---|---|
 | B1 | ~~Auth Site URL and redirects~~ **Done 2026-10-24** | n/a | n/a |
 | B2 | Leaked-password protection (the rest of B2 is done). Not settable from the CLI, and may need the Pro plan. | Owner, in the dashboard | Authentication → Attack Protection → "Prevent use of leaked passwords" |
-| B3 | New Resend key and webhook secret | Owner (2 minutes at resend.com) | Create a key named "Sanctus server" with **Sending access** and add `RESEND_API_KEY_NEW=` to `.env.qa`. Create a webhook to `https://zggylkbgajamhriebdrg.supabase.co/functions/v1/resend-webhook` (events: sent, delivered, delivery_delayed, bounced, complained) and add `RESEND_WEBHOOK_SECRET=` to `.env.qa`. The orchestrator then loads both without printing them and revokes the old key. Real sender address and admin inbox: client decision. |
+| B3 | ~~Resend key and webhook~~ **Done 2026-10-24** (temporary key; also revoke the old "Sanctus server (Edge Functions)" key once confirmed). Still open: the real sender address and admin inbox (client decision). | Owner and client | n/a |
 | B4 | Sending domain | Client (DNS) | Verify a domain in Resend. Until then, mail only reaches the Resend account's own address. |
-| B5 | Resend webhook and Supabase Auth SMTP | After B3 and B4 | Webhook pointed at `…/functions/v1/resend-webhook`, and SMTP through Resend for Auth emails such as password reset |
-| B6 | Real email tests: application confirmation, invitation, password recovery | After B1 to B5 | n/a |
+| B5 | Webhook **done**. Still open: Supabase Auth SMTP through Resend, so password-reset and Auth emails reach real people. It needs a verified sending domain (B4). | After B4 | Auth → SMTP: `smtp.resend.com:465`, user `resend`, password = an API key, sender on the verified domain |
+| B6 | Application, admin and invitation emails **delivered** (test inboxes). Still open: password-recovery email (Supabase Auth mailer until B5), and delivery to real inboxes (needs B4). | After B4 and B5 | n/a |
 | B7 | **Meshy-generated model** for the end-to-end model test | Owner | The actual GLB (and USDZ if available) file. No Meshy model exists in the repo or `AR-attachment/`. |
 | B8 | Real-device AR: Scene Viewer, Quick Look, true scale | A person with an ARCore Android phone and an iPhone | Steps are in `docs/SANCTUS_3D_AR_QA_REPORT.md`, section 7 |
 | B9 | ~~Push and check embedding on the Preview~~ **Done 2026-10-24** | n/a | n/a |
