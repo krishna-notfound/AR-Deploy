@@ -289,7 +289,7 @@ export function ProductEditorForm({
     }))
     setPendingUnit(null)
   }
-  const dimsText = (d: EditorForm['dims'], u: string) => `${DIMS.map((k) => d[k].trim() || '–').join(' × ')} ${u}`
+  const dimsText = (d: EditorForm['dims'], u: string) => `${DIMS.map((k) => d[k].trim() || '?').join(' × ')} ${u}`
 
   const errorList = Object.entries(errors)
   /** One summary line per distinct message, linked to the first field that has it. */

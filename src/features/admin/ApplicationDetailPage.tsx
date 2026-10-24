@@ -1,3 +1,4 @@
+import { scrollBehavior } from '@/lib/motion'
 import { ArrowDown, Building2, Check, Eye, FileX, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
@@ -68,7 +69,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const goToOwner = () => {
     const el = ownerRef.current
     if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
     ;(el.querySelector<HTMLElement>('input, button') ?? el).focus({ preventScroll: true })
   }
   const attachOwner = (el: HTMLDivElement | null) => {

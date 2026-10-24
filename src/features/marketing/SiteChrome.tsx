@@ -1,3 +1,4 @@
+import { reducedMotion } from '@/lib/motion'
 import { Menu, UserRound, X } from 'lucide-react'
 import { type ComponentProps, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigationType } from 'react-router'
@@ -22,7 +23,6 @@ const NAV: { key: TranslationKey; href: string }[] = [
 
 const YEAR = new Date().getFullYear()
 
-const reducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /**
  * A link to a landing-page section ("/#sobre"). It goes through the router, whose ScrollRestoration scrolls the

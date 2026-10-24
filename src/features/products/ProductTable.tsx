@@ -25,9 +25,9 @@ export function ArReadinessPill({ product }: { product: Product }) {
   )
 }
 
-/** Stored AR launch attempts, or "—" when the product has no 3D model and none were ever recorded (DUX-07). */
+/** Stored AR launch attempts, or "No 3D" when the product has no 3D model and none were ever recorded (DUX-07). */
 export function arAttemptsText(p: Product, attempts: number | undefined): string {
-  return !attempts && !hasArModel(p) ? '—' : formatNumber(attempts ?? 0)
+  return !attempts && !hasArModel(p) ? 'No 3D' : formatNumber(attempts ?? 0)
 }
 
 /**

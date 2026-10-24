@@ -18,7 +18,7 @@ import { useServiceQuery } from '@/services/hooks'
 import { primaryImage } from '@/lib/product'
 import { hasArModel } from '../products/productReadiness'
 
-/** Stored AR launch attempts for a product, or null when it has no 3D model and none were recorded (shown as "—"). */
+/** Stored AR launch attempts for a product, or null when it has no 3D model and none were recorded (shown as "No 3D"). */
 function arAttempts(p: Product | undefined, r: ProductAnalytics): number | null {
   return !r.arActivations && p && !hasArModel(p) ? null : r.arActivations
 }
@@ -82,7 +82,7 @@ export function AnalyticsView({
       sortValue: (r) => arAttempts(productMap.get(r.productId), r) ?? -1,
       cell: (r) => {
         const n = arAttempts(productMap.get(r.productId), r)
-        return n === null ? <span title="No 3D model">—</span> : formatNumber(n)
+        return n === null ? <span className="text-ink-faint">No 3D</span> : formatNumber(n)
       },
     },
     {
@@ -90,7 +90,7 @@ export function AnalyticsView({
       header: 'AR rate',
       align: 'right',
       sortValue: (r) => (arAttempts(productMap.get(r.productId), r) === null ? -1 : r.arRate),
-      cell: (r) => (arAttempts(productMap.get(r.productId), r) === null ? <span title="No 3D model">—</span> : r.views ? formatPercent(r.arRate) : '—'),
+      cell: (r) => (arAttempts(productMap.get(r.productId), r) === null ? <span className="text-ink-faint">No 3D</span> : r.views ? formatPercent(r.arRate) : 'No views'),
     },
   ]
 
@@ -118,9 +118,9 @@ export function AnalyticsView({
           { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
           // The seeded sample data has no 3D interactions: "0" next to thousands of views would read as broken tracking.
           s?.isSample && !s.totals.modelInteractions
-            ? { label: '3D interactions', value: '—', hint: 'Not in the sample data' }
+            ? { label: '3D interactions', value: 'Not recorded', hint: 'Not in the sample data' }
             : { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Times a visitor turned or zoomed a 3D model' },
-          { label: 'AR launch rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : '—', hint: 'AR launch attempts per product page view' },
+          { label: 'AR launch rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : 'No views yet', hint: 'AR launch attempts per product page view' },
           { label: 'Published products', value: formatNumber(s?.totals.published ?? 0), hint: 'Current' },
         ]}
         footer={

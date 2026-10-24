@@ -120,12 +120,12 @@ describe('AR readiness in the product list (DUX-05)', () => {
 })
 
 describe('analytics labels (DUX-07)', () => {
-  it('says "attempts", never "activations", and shows "—" for products without a 3D model', async () => {
+  it('says "attempts", never "activations", and shows "No 3D" (not a number or a dash) for products without a 3D model', async () => {
     openApp('/dashboard/analytics', asOwner('biz_casa'))
     expect(await screen.findByText('AR launch attempts per product page view')).toBeInTheDocument()
     const table = await screen.findByRole('table', { name: 'Product performance' })
     const row = (await within(table).findByRole('link', { name: 'Atlantic Round Dining Table' })).closest('tr') as HTMLElement
-    expect(within(row).getAllByTitle('No 3D model')).toHaveLength(2)
+    expect(within(row).getAllByText('No 3D')).toHaveLength(2)
     expect(within(row).queryByText('0.0%')).toBeNull()
     expect(document.body.textContent).not.toMatch(/activation/i)
   })

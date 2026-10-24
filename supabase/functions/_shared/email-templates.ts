@@ -117,6 +117,6 @@ ${button}
 ${c.note ? `<p style="margin:0;font-size:13px;color:#5A5148">${esc(c.note)}</p>` : ''}
 ${data.actionUrl ? `<p style="margin:24px 0 0;font-size:12px;color:#6E6559;word-break:break-all">${esc(data.actionUrl)}</p>` : ''}
 </td></tr></table></td></tr></table></body></html>`
-  const text = [c.heading, '', c.body, ...(c.cta && data.actionUrl ? ['', `${c.cta}: ${data.actionUrl}`] : []), ...(c.note ? ['', c.note] : []), '', '— Sanctus'].join('\n')
+  const text = [c.heading, '', c.body, ...(c.cta && data.actionUrl ? ['', `${c.cta}: ${data.actionUrl}`] : []), ...(c.note ? ['', c.note] : []), '', 'Sanctus'].join('\n')
   return { subject: c.subject, html, text }
 }
