@@ -1,36 +1,35 @@
 import { KeyRound } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Link, Navigate, useNavigate } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { Button, ButtonLink } from '@/components/ui/Button'
+import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
 import { SiteHeader } from '../marketing/SiteChrome'
 import { MIN_PASSWORD_LENGTH } from './ResetPasswordPage'
-import { authErrorText } from './authErrors'
+import { authErrorText, normalizeCode } from './authErrors'
 
 /**
- * Landing page of an owner invitation (ADR-0024). Supabase Auth signs the visitor in from the link
- * (the invite/magic-link tokens arrive in the URL fragment and are consumed by supabase-js, never stored by us);
- * the owner then sets a password and the acceptance is recorded by complete_owner_onboarding().
+ * Landing page of an owner invitation (ADR-0024, ADR-0027). The owner signs in with the email address and the
+ * one-time code from the invitation email (verified by Supabase Auth, never stored by us), then sets a password;
+ * the acceptance is recorded by complete_owner_onboarding().
  */
 export default function AcceptInvitePage() {
   const { t } = useI18n()
   useDocumentTitle(t('invite.title'))
   const { user, business, accountError, retry } = useAccount()
-  // Supabase reports expired or used links in the fragment (#error=access_denied&error_code=otp_expired).
+  // Links from invitations sent before ADR-0027 still land here; Supabase reports expired or used ones in the fragment.
   const [linkError] = useState(() => new URLSearchParams(window.location.hash.replace(/^#/, '')).get('error_code'))
 
   let body
   if (!auth) body = <InlineNotice tone="neutral">{t('invite.demo')}</InlineNotice>
-  else if (linkError) body = <Invalid expired={linkError === 'otp_expired'} />
   else if (user === undefined && accountError) body = <ErrorState message={t('invite.loadFailed')} onRetry={retry} retryLabel={t('common.retry')} />
   else if (user === undefined) return <FullPageSpinner label={t('invite.checking')} />
-  else if (!user) body = <Invalid expired />
+  else if (!user) body = <EnterCode linkError={linkError} />
   else if (user.role === 'super_admin') return <Navigate to="/admin" replace />
   else body = <SetPassword userId={user.id} businessName={business?.name ?? ''} />
 
@@ -45,15 +44,58 @@ export default function AcceptInvitePage() {
   )
 }
 
-function Invalid({ expired }: { expired: boolean }) {
+/** Email and invitation code. On success the auth listener reloads the account and the password form replaces this. */
+function EnterCode({ linkError }: { linkError: string | null }) {
   const { t } = useI18n()
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!auth) return
+    if (!EMAIL.test(email.trim())) return setError(t('auth.error.emailInvalid'))
+    const token = normalizeCode(code)
+    if (!token) return setError(t('auth.error.codeFormat'))
+    setPending(true)
+    const res = await auth.verifyEmailCode(email.trim().toLowerCase(), token, 'invite')
+    if (!res.ok) {
+      setPending(false)
+      return setError(authErrorText(t, res.error))
+    }
+    // Stays pending: the account reload swaps this form for the password step.
+  }
+
   return (
-    <>
-      <InlineNotice tone="warning">{expired ? t('invite.expired') : t('invite.invalid')}</InlineNotice>
-      <ButtonLink to="/login">{t('invite.signIn')}</ButtonLink>
-    </>
+    <form onSubmit={submit} className="space-y-4" noValidate>
+      {linkError && <InlineNotice tone="warning">{linkError === 'otp_expired' ? t('invite.expired') : t('invite.invalid')}</InlineNotice>}
+      <p className="text-sm text-ink-muted">{t('invite.codeIntro')}</p>
+      {error && (
+        <InlineNotice tone="warning">
+          <span role="alert">{error}</span>
+        </InlineNotice>
+      )}
+      <FormField label={t('invite.email')} required>
+        <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </FormField>
+      <FormField label={t('invite.code')} hint={t('invite.codeHelp')} required>
+        <Input inputMode="numeric" autoComplete="one-time-code" maxLength={14} value={code} onChange={(e) => setCode(e.target.value)} />
+      </FormField>
+      <Button type="submit" variant="primary" className="w-full" loading={pending} disabled={!email.trim() || !code.trim()}>
+        {t('invite.verify')}
+      </Button>
+      <p className="text-center text-sm">
+        {t('invite.haveAccount')}{' '}
+        <Link to="/login" className="text-accent-ink hover:underline">
+          {t('invite.signIn')}
+        </Link>
+      </p>
+    </form>
   )
 }
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Remembers (per tab, per user) that the password is set, so a retry after a failed onboarding step does not ask for it again. */
 export const PASSWORD_SAVED_KEY = 'arfurn:invitePasswordSaved'

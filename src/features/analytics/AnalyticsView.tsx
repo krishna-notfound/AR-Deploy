@@ -151,7 +151,7 @@ export function AnalyticsView({
           </Card>
         )}
         <Card>
-          <CardHeader title="Top-performing products" description="By product page views" />
+          <CardHeader title="Most viewed products" description="Product page views" />
           <CardBody>
             {loading || productsLoading ? (
               <Skeleton className="h-40 w-full" />
@@ -187,7 +187,7 @@ export function AnalyticsView({
       </div>
 
       <Card>
-        <CardHeader title="Product performance" description="Sort by any column" />
+        <CardHeader title="Product performance" description="Select a column header to sort" />
         <DataTable
           rows={rows}
           columns={columns}

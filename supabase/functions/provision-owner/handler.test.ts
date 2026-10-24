@@ -13,13 +13,13 @@ const CONFIG: EmailConfig = {
   testRecipients: ['owner@shop.test'],
   adminNotificationEmail: 'team@account.test',
 }
-const LINK = 'https://project.supabase.co/auth/v1/verify?token=secret-token&type=invite'
+const CODE = '48213907'
 
 function deps(over: Partial<ProvisionDeps> = {}) {
   let owner: { userId: string; email: string; acceptedAt: string | null } | null = null
   const logs: (LogEntry & { createdAt: string })[] = []
   const audits: { eventType: string; metadata?: Record<string, unknown> }[] = []
-  const links: { type: string; email: string; redirectTo: string }[] = []
+  const links: { type: string; email: string }[] = []
   const bodies: string[] = []
   const fetchFn = vi.fn(async (_u: string, init?: RequestInit) => {
     bodies.push(String(init?.body))
@@ -34,7 +34,7 @@ function deps(over: Partial<ProvisionDeps> = {}) {
     getBusiness: async (id) => (id === BIZ ? { id, name: 'Casa Lisboa' } : null),
     getOwner: async () => owner,
     accountByEmail: async (e) => (e === 'admin@platform.test' ? { id: 'admin-id', invited: false, ownsBusiness: false } : null),
-    generateLink: async (type, email, redirectTo) => (links.push({ type, email, redirectTo }), { ok: true, url: LINK, userId: 'new-user' }),
+    generateCode: async (type, email) => (links.push({ type, email }), { ok: true, code: CODE, userId: 'new-user' }),
     linkOwner: async (_b, userId) => {
       if (owner && owner.userId !== userId) return 'business_has_owner'
       if (owner) return 'already_linked'
@@ -65,16 +65,19 @@ describe('provision-owner', () => {
     expect((await handleProvisionOwner(post(provision(), 'owner-token'), d)).status).toBe(403)
   })
 
-  it('links the owner, emails the invitation and never returns or logs the link', async () => {
+  it('links the owner, emails the invitation code and never returns or logs it', async () => {
     const { d, logs, audits, links, bodies } = deps()
     const res = await handleProvisionOwner(post(provision()), d)
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toEqual({ owner: 'linked', email: { status: 'accepted', attempt: 1 } })
-    expect(JSON.stringify(json)).not.toContain('secret-token')
-    expect(links[0]).toEqual({ type: 'invite', email: 'owner@shop.test', redirectTo: 'https://preview.example.app/accept-invite?lang=pt' })
-    expect(bodies[0]).toContain('secret-token') // the link goes into the email only
-    expect(JSON.stringify(logs)).not.toContain('secret-token')
+    expect(JSON.stringify(json)).not.toContain(CODE)
+    expect(links[0]).toEqual({ type: 'invite', email: 'owner@shop.test' })
+    expect(bodies[0]).toContain(CODE) // the code goes into the email only
+    expect(bodies[0]).toContain('https://preview.example.app/accept-invite?lang=pt') // a plain page link, no token
+    expect(bodies[0]).not.toContain('/auth/v1/verify')
+    expect(JSON.stringify(logs)).not.toContain(CODE)
+    expect(JSON.stringify(audits)).not.toContain(CODE)
     expect(logs[0]).toMatchObject({ kind: 'owner_invitation', status: 'accepted', workflow: `invite:${BIZ}`, attempt: 1, applicationId: APP, businessId: BIZ, triggeredBy: 'admin-id' })
     expect(audits).toEqual([{ eventType: 'invitation_requested', actorId: 'admin-id', businessId: BIZ, applicationId: APP, metadata: { attempt: 1, email_status: 'accepted' } }])
   })
@@ -112,12 +115,12 @@ describe('provision-owner', () => {
     expect(links).toHaveLength(0)
   })
 
-  it('falls back to a sign-in link when the invited account is already confirmed', async () => {
+  it('falls back to a sign-in code when the invited account is already confirmed', async () => {
     const { d, links } = deps({
       accountByEmail: async () => ({ id: 'existing', invited: true, ownsBusiness: false }),
-      generateLink: async (type, email, redirectTo) => {
-        links.push({ type, email, redirectTo })
-        return type === 'invite' ? { ok: false, error: 'already registered' } : { ok: true, url: LINK, userId: 'existing' }
+      generateCode: async (type, email) => {
+        links.push({ type, email })
+        return type === 'invite' ? { ok: false, error: 'already registered' } : { ok: true, code: CODE, userId: 'existing' }
       },
     })
     const res = await handleProvisionOwner(post(provision()), d)
@@ -125,8 +128,8 @@ describe('provision-owner', () => {
     expect(links.map((l) => l.type)).toEqual(['invite', 'magiclink'])
   })
 
-  it('audits and reports a failed link without linking anyone', async () => {
-    const { d, audits, logs } = deps({ generateLink: async () => ({ ok: false, error: 'redirect not allowed' }) })
+  it('audits and reports a failed code without linking anyone', async () => {
+    const { d, audits, logs } = deps({ generateCode: async () => ({ ok: false, error: 'rate limited' }) })
     const res = await handleProvisionOwner(post(provision()), d)
     expect(res.status).toBe(502)
     expect(await res.json()).toEqual({ error: 'invite_link_failed' })
@@ -142,9 +145,9 @@ describe('provision-owner', () => {
   })
 
   it('uses the admin origin for the landing page only when APP_BASE_URL is unset and the origin is https', async () => {
-    const a = deps({ config: { ok: false, missing: ['APP_BASE_URL'] } })
+    const a = deps({ config: { ok: true, config: { ...CONFIG, appBaseUrl: '' } } })
     await handleProvisionOwner(post(provision(), 'admin-token', 'https://sanctus-preview.vercel.app'), a.d)
-    expect(a.links[0]!.redirectTo).toBe('https://sanctus-preview.vercel.app/accept-invite?lang=pt')
+    expect(a.bodies[0]).toContain('https://sanctus-preview.vercel.app/accept-invite?lang=pt')
     const b = deps({ config: { ok: false, missing: ['APP_BASE_URL'] } })
     expect((await handleProvisionOwner(post(provision(), 'admin-token', 'http://evil.test'), b.d)).status).toBe(503)
   })
@@ -175,12 +178,13 @@ describe('provision-owner', () => {
     expect(await (await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), d)).json()).toEqual({ error: 'already_accepted' })
   })
 
-  it('resends in the requested language (link and template)', async () => {
-    const { d, setOwner, links, logs } = deps()
+  it('resends in the requested language (page link and template)', async () => {
+    const { d, setOwner, bodies, logs } = deps()
     setOwner({ userId: 'u1', email: 'owner@shop.test', acceptedAt: null })
     await handleProvisionOwner(post({ action: 'resend', businessId: BIZ, language: 'pt' }), d)
-    expect(links[0]!.redirectTo).toBe('https://preview.example.app/accept-invite?lang=pt')
-    expect(logs[0]!.subject).toMatch(/^Novo link de convite/)
+    expect(bodies[0]).toContain('https://preview.example.app/accept-invite?lang=pt')
+    expect(bodies[0]).toContain(CODE)
+    expect(logs[0]!.subject).toMatch(/^Novo código de convite/)
   })
 
   it('treats provisioning the same owner again as a resend', async () => {

@@ -161,14 +161,14 @@ function SidebarContent({ nav, variant, collapsed, onNavigate }: { nav: NavItem[
             <button
               type="button"
               onClick={() => void leave({ signOut: true })}
-              title={collapsed ? 'Logout' : undefined}
+              title={collapsed ? 'Log out' : undefined}
               className={cn(
                 'flex h-9 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-ink-muted hover:bg-subtle hover:text-ink',
                 collapsed && 'justify-center px-0',
               )}
             >
               <LogOut className="size-[18px] shrink-0" aria-hidden />
-              <span className={cn(collapsed && 'sr-only')}>Logout</span>
+              <span className={cn(collapsed && 'sr-only')}>Log out</span>
             </button>
           </li>
         </ul>
@@ -195,7 +195,7 @@ function MobileDrawer({ nav, variant, onClose }: { nav: NavItem[]; variant: 'adm
 
 function Topbar({ onMenu, variant }: { onMenu: () => void; variant: 'admin' | 'business' }) {
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line bg-canvas/90 px-4 backdrop-blur-sm sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line bg-canvas px-4 sm:px-6 lg:px-8">
       <IconButton aria-label="Open navigation" onClick={onMenu} className="-ml-2 lg:hidden">
         <Menu className="size-5" />
       </IconButton>
@@ -305,7 +305,7 @@ function ProfileMenu() {
             }}
             className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm hover:bg-subtle"
           >
-            <LogOut className="size-4 text-ink-muted" aria-hidden /> Logout
+            <LogOut className="size-4 text-ink-muted" aria-hidden /> Log out
           </button>
         </div>
       )}

@@ -123,8 +123,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
         <div className="flex items-start gap-5">
           {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
           <div className="min-w-0">
-            <p className="text-eyebrow text-ink-muted">{t('catalog.eyebrow')}</p>
-            <h1 className="mt-4 text-headline">{b.name}</h1>
+            <h1 className="text-headline">{b.name}</h1>
             {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
             {products.status === 'success' && (
               <p className="mt-3 text-label text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
@@ -181,7 +180,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   <div className="relative overflow-hidden bg-subtle">
                     <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
                     {hasAny3d(p) && (
-                      <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 bg-canvas/90 px-2.5 py-1.5 text-[10px] font-medium tracking-[0.16em] text-ink uppercase">
+                      <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 bg-canvas px-2 py-1 text-[13px] text-ink">
                         <Box className="size-3" strokeWidth={1.5} aria-hidden />
                         {t('catalog.has3d')}
                       </span>

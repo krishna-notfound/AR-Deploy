@@ -528,7 +528,7 @@ export function ProductEditorForm({
       </div>
 
       {/* Sticky publishing bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur-sm lg:left-[var(--sidebar-w,0)]">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w,0)]">
         <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <div className="mr-auto hidden items-center gap-2 text-[13px] text-ink-muted sm:flex">
             <ProductStatusBadge status={isNew ? 'draft' : currentStatus} />

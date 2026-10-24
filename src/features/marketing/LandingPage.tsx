@@ -172,7 +172,7 @@ function Collections({ links }: { links: ReturnType<typeof useLandingLinks> }) {
                 <h3 className="mt-5 text-eyebrow text-ink">{t(`landing.col.${c.key}` as TranslationKey)}</h3>
                 <p className="mt-2 text-[13px] leading-5 text-ink-muted">{t(`landing.col.${c.key}Body` as TranslationKey)}</p>
                 {href && (
-                  <ArrowLink to={href} className="mt-6 self-start border-transparent text-[10px] text-ink-muted hover:border-current">
+                  <ArrowLink to={href} className="mt-6 self-start border-transparent text-ink-muted hover:border-current">
                     <span className="sr-only">{t(`landing.col.${c.key}` as TranslationKey)}: </span>
                     {t('landing.col.view')}
                   </ArrowLink>

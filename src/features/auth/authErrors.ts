@@ -11,6 +11,13 @@ const KEYS: Record<string, TranslationKey> = {
   session_not_found: 'auth.error.sessionExpired',
   refresh_token_not_found: 'auth.error.sessionExpired',
   network: 'auth.error.network',
+  otp_expired: 'auth.error.codeInvalid',
+}
+
+/** A code as typed or pasted from the email: spaces and dashes dropped. Valid when 6 to 10 digits remain. */
+export function normalizeCode(raw: string): string | null {
+  const code = raw.replace(/[\s-]/g, '')
+  return /^\d{6,10}$/.test(code) ? code : null
 }
 
 /** Auth errors on the public (EN/PT) auth pages, in the visitor's language. Unknown codes get a generic message. */

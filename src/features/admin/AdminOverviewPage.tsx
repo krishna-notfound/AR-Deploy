@@ -1,4 +1,4 @@
-import { Building2, Inbox, PackagePlus, Plus, QrCode } from 'lucide-react'
+import { Building2, PackagePlus, Plus, QrCode } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -33,7 +33,6 @@ export default function AdminOverviewPage() {
     <>
       <PageHeader
         title="Overview"
-        description="Every business catalog on the platform at a glance."
         actions={
           <>
             <ButtonLink to="/admin/catalogs" icon={<QrCode className="size-4" aria-hidden />}>
@@ -83,7 +82,7 @@ export default function AdminOverviewPage() {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
-              <CardHeader title="Top-performing products" description="By views, last 30 days" />
+              <CardHeader title="Most viewed products" description="Last 30 days" />
               <CardBody>
                 {products.status === 'error' && !products.data ? (
                   <ErrorState message={products.error.message} onRetry={products.refetch} />
@@ -213,9 +212,6 @@ function PendingApplications() {
         <ErrorState message={`Could not load applications. ${q.error.message}`} onRetry={q.refetch} className="py-6" />
       ) : (
         <div className="flex flex-wrap items-center gap-3 p-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-subtle text-ink-muted">
-            <Inbox className="size-5" aria-hidden />
-          </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-[15px] font-semibold text-ink">
               {total === 0 ? 'No applications awaiting review' : `${formatNumber(total)} application${total === 1 ? '' : 's'} awaiting review`}

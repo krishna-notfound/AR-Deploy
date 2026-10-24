@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type LogoutResult, AccountProvider, SupabaseAccountProvider, useAccount } from '@/auth/AccountProvider'
+import { ToastProvider } from '@/components/ui/ToastProvider'
 import AcceptInvitePage from '@/features/auth/AcceptInvitePage'
+import ResetPasswordPage from '@/features/auth/ResetPasswordPage'
 import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
 import { type AuthService, type SignedInAccount, service } from '@/services'
 import { fail, ok } from '@/services/catalogService'
@@ -28,6 +30,7 @@ function fakeAuth(overrides: Partial<AuthService> = {}) {
     signInWithPassword: vi.fn(async () => ok(undefined)),
     signOut: vi.fn(async () => ok(undefined)),
     requestPasswordReset: vi.fn(async () => ok(undefined)),
+    verifyEmailCode: vi.fn(async () => ok(undefined)),
     updatePassword: vi.fn(async () => ok(undefined)),
     updateDisplayName: vi.fn(async () => ok(undefined)),
     completeOwnerOnboarding: vi.fn(async () => ok({ businessId: 'biz_casa' })),
@@ -186,5 +189,87 @@ describe('AcceptInvitePage (COR-15)', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar e continuar' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Escolha uma palavra-passe mais forte')
     expect(auth.completeOwnerOnboarding).not.toHaveBeenCalled()
+  })
+})
+
+describe('AcceptInvitePage: invitation code (ADR-0027)', () => {
+  function renderPage() {
+    return render(
+      <MemoryRouter initialEntries={['/accept-invite']}>
+        <LanguageProvider>
+          <AccountProvider>
+            <Routes>
+              <Route path="/accept-invite" element={<AcceptInvitePage />} />
+            </Routes>
+          </AccountProvider>
+        </LanguageProvider>
+      </MemoryRouter>,
+    )
+  }
+
+  it('signs a signed-out visitor in with email and code, then asks for the password', async () => {
+    const getCurrentUser = vi.fn<AuthService['getCurrentUser']>().mockResolvedValue(ok(null))
+    const { auth, emit } = fakeAuth({ getCurrentUser })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await screen.findByLabelText(/^Email/), 'Rui@Test.pt')
+    await user.type(screen.getByLabelText(/^Code from the email/), '4821 3907')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(auth.verifyEmailCode).toHaveBeenCalledWith('rui@test.pt', '48213907', 'invite')
+    getCurrentUser.mockResolvedValue(ok(owner))
+    await emit()
+    expect(await screen.findByLabelText(/^Password/)).toBeInTheDocument()
+  })
+
+  it('explains a wrong or expired code', async () => {
+    const { auth } = fakeAuth({
+      verifyEmailCode: vi.fn(async () => ({ ok: false as const, error: { code: 'PERMISSION' as const, message: 'Token has expired or is invalid', reason: 'otp_expired' } })),
+    })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await screen.findByLabelText(/^Email/), 'rui@test.pt')
+    await user.type(screen.getByLabelText(/^Code from the email/), '12345678')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('That code is wrong or has expired')
+  })
+
+  it('refuses a code that is not made of digits without calling the server', async () => {
+    const { auth } = fakeAuth()
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await screen.findByLabelText(/^Email/), 'rui@test.pt')
+    await user.type(screen.getByLabelText(/^Code from the email/), 'abc123')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('It is made of digits only')
+    expect(auth.verifyEmailCode).not.toHaveBeenCalled()
+  })
+})
+
+describe('ResetPasswordPage: reset code (ADR-0027)', () => {
+  it('requests a code, verifies it and shows the new-password form', async () => {
+    const { auth } = fakeAuth()
+    fake.auth = auth
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/reset-password']}>
+        <LanguageProvider>
+          <ToastProvider>
+            <Routes>
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+            </Routes>
+          </ToastProvider>
+        </LanguageProvider>
+      </MemoryRouter>,
+    )
+    await user.type(await screen.findByLabelText(/^Email/), 'rui@test.pt')
+    await user.click(screen.getByRole('button', { name: 'Send code' }))
+    expect(auth.requestPasswordReset).toHaveBeenCalledWith('rui@test.pt', expect.stringMatching(/\/reset-password$/))
+    await user.type(await screen.findByLabelText(/^Code from the email/), '48213907')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(auth.verifyEmailCode).toHaveBeenCalledWith('rui@test.pt', '48213907', 'recovery')
+    expect(await screen.findByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
   })
 })

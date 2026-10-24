@@ -36,7 +36,6 @@ export default function BusinessOverviewPage() {
     <>
       <PageHeader
         title="Overview"
-        description={`How ${business.name}’s catalog is doing.`}
         meta={<BusinessStatusBadge status={business.status} />}
         actions={
           <>
@@ -164,7 +163,7 @@ function NextSteps({ business, products, failed }: { business: Business; product
       { label: 'Add a 3D model (GLB) and an iPhone AR file (USDZ) so customers can see it in their room' },
       { label: 'Publish it, then print your catalog QR code', to: '/dashboard/catalog' },
     ]
-    return <StepsCard title="Get started" description="Three steps to a catalog customers can open in AR." steps={steps} ordered />
+    return <StepsCard title="Get started" steps={steps} ordered />
   }
   const drafts = products.filter((p) => p.status === 'draft').length
   const readiness = products.map(productArReadiness)
@@ -180,21 +179,21 @@ function NextSteps({ business, products, failed }: { business: Business; product
   if (blocked) rows.push({ label: `${count(blocked, 'model needs', 'models need')} re-exporting for Android AR`, to: myProductsPath({ ar: 'android-blocked' }) })
   if (noUsdz) rows.push({ label: `${count(noUsdz, 'product has', 'products have')} no iPhone AR file (USDZ)`, to: myProductsPath({ ar: 'android-only' }) })
   if (rows.length === 0) return <StepsCard title="Next steps" steps={[{ done: true, label: 'Every product is published with a 3D model and an iPhone AR file.' }]} />
-  return <StepsCard title="Next steps" description="What needs your attention." steps={rows} />
+  return <StepsCard title="Next steps" steps={rows} />
 }
 
-function StepsCard({ title, description, steps, ordered }: { title: string; description?: string; steps: Step[]; ordered?: boolean }) {
+function StepsCard({ title, steps, ordered }: { title: string; steps: Step[]; ordered?: boolean }) {
   const List = ordered ? 'ol' : 'ul'
   return (
     <Card>
-      <CardHeader title={title} description={description} />
+      <CardHeader title={title} />
       <List className="divide-y divide-line border-t border-line">
         {steps.map((step, i) => {
           const marker = step.done ? (
             <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />
           ) : ordered ? (
-            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-subtle text-[11px] font-medium text-ink-muted tabular-nums" aria-hidden>
-              {i + 1}
+            <span className="w-4 shrink-0 text-ink-muted tabular-nums" aria-hidden>
+              {i + 1}.
             </span>
           ) : (
             <Circle className="size-2 shrink-0 fill-warning text-warning" aria-hidden />

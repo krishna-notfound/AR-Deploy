@@ -60,7 +60,7 @@ function PublishedProductQr({ product: p, business: b }: { product: Product; bus
         </InlineNotice>
       )}
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-        <div className="w-full max-w-[200px] shrink-0 rounded-xl bg-white p-3 shadow-[var(--shadow-card)]">
+        <div className="w-full max-w-[200px] shrink-0 rounded-lg border border-line bg-white p-3">
           {qr.url ? (
             <img src={qr.url} alt={`QR code linking to ${target}`} className="aspect-square w-full" />
           ) : qr.error ? (

@@ -18,11 +18,7 @@ export function EmptyState({
 }) {
   return (
     <div className={cn('flex flex-col items-center px-6 py-12 text-center', className)}>
-      {Icon && (
-        <span className="mb-4 grid size-11 place-items-center rounded-full bg-subtle text-ink-muted">
-          <Icon className="size-5" aria-hidden />
-        </span>
-      )}
+      {Icon && <Icon className="mb-3 size-5 text-ink-faint" aria-hidden />}
       <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
       {body && <p className="mt-1 max-w-sm text-sm text-ink-muted">{body}</p>}
       {action && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
@@ -33,9 +29,7 @@ export function EmptyState({
 export function ErrorState({ message, onRetry, retryLabel = 'Try again', className }: { message: string; onRetry?: () => void; retryLabel?: string; className?: string }) {
   return (
     <div role="alert" className={cn('flex flex-col items-center px-6 py-10 text-center', className)}>
-      <span className="mb-3 grid size-10 place-items-center rounded-full bg-danger-soft text-danger">
-        <AlertTriangle className="size-5" aria-hidden />
-      </span>
+      <AlertTriangle className="mb-3 size-5 text-danger" aria-hidden />
       <p className="max-w-sm text-sm text-ink">{message}</p>
       {onRetry && (
         <Button className="mt-4" size="sm" onClick={onRetry}>

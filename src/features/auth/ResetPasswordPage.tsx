@@ -9,14 +9,14 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
 import { SiteHeader } from '../marketing/SiteChrome'
-import { authErrorText } from './authErrors'
+import { authErrorText, normalizeCode } from './authErrors'
 
 export const MIN_PASSWORD_LENGTH = 12
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /**
- * Password recovery (Supabase mode). Without a session it asks for an email and sends a reset link;
- * opened from that link (recovery session) or while signed in, it sets a new password.
+ * Password recovery (Supabase mode, ADR-0027). Without a session it asks for an email, emails a one-time code and
+ * signs in with that code (recovery session); with a session it sets a new password.
  */
 export default function ResetPasswordPage() {
   const { t } = useI18n()
@@ -25,11 +25,13 @@ export default function ResetPasswordPage() {
   const toast = useToast()
   const [hasSession, setHasSession] = useState<boolean | null>(null)
   const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
   const [pending, setPending] = useState(false)
+  const [resending, setResending] = useState(false)
 
   useEffect(() => {
     if (!auth) return
@@ -52,6 +54,28 @@ export default function ResetPasswordPage() {
     if (!res.ok) return setError(authErrorText(t, res.error))
     setError(null)
     setSent(true)
+  }
+
+  const verifyCode = async (e: FormEvent) => {
+    e.preventDefault()
+    const token = normalizeCode(code)
+    if (!token) return setError(t('auth.error.codeFormat'))
+    setPending(true)
+    const res = await authService.verifyEmailCode(email.trim(), token, 'recovery')
+    setPending(false)
+    if (!res.ok) return setError(authErrorText(t, res.error))
+    setError(null)
+    setHasSession(true)
+  }
+
+  const resendCode = async () => {
+    setResending(true)
+    const res = await authService.requestPasswordReset(email.trim(), `${window.location.origin}/reset-password`)
+    setResending(false)
+    if (!res.ok) return setError(authErrorText(t, res.error))
+    setError(null)
+    setCode('')
+    toast.success(t('reset.resent'))
   }
 
   const setNewPassword = async (e: FormEvent) => {
@@ -102,9 +126,31 @@ export default function ResetPasswordPage() {
             <MailCheck className="size-6 text-accent" aria-hidden />
             <h1 className="mt-4 text-title font-normal">{t('reset.sentTitle')}</h1>
             <p className="mt-2 text-sm leading-6 text-ink-muted">{t('reset.sentBody', { email: email.trim() })}</p>
-            <Link to="/login" className="mt-6 inline-block text-sm text-accent-ink hover:underline">
-              {t('reset.back')}
-            </Link>
+            <form onSubmit={verifyCode} className="mt-8 space-y-4" noValidate>
+              {errorNotice}
+              <FormField label={t('reset.code')}>
+                <Input inputMode="numeric" autoComplete="one-time-code" maxLength={14} value={code} onChange={(e) => setCode(e.target.value)} />
+              </FormField>
+              <Button type="submit" variant="primary" className="w-full" loading={pending} disabled={!code.trim()}>
+                {t('reset.verify')}
+              </Button>
+              <div className="flex flex-wrap justify-between gap-x-4 gap-y-2 text-sm">
+                <Button type="button" variant="ghost" size="sm" loading={resending} onClick={() => void resendCode()}>
+                  {t('reset.resend')}
+                </Button>
+                <button
+                  type="button"
+                  className="text-accent-ink hover:underline"
+                  onClick={() => {
+                    setSent(false)
+                    setCode('')
+                    setError(null)
+                  }}
+                >
+                  {t('reset.otherEmail')}
+                </button>
+              </div>
+            </form>
           </>
         ) : (
           <>

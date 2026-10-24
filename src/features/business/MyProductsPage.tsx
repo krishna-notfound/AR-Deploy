@@ -25,7 +25,6 @@ export default function MyProductsPage() {
     <>
       <PageHeader
         title="My products"
-        description={`Products in ${business.name}’s catalog.`}
         actions={
           <ButtonLink to="/dashboard/products/new" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
             Add product

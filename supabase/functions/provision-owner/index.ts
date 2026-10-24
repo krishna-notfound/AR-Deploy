@@ -45,10 +45,11 @@ Deno.serve((req) =>
       if (m.error) throw new Error(`membership lookup failed: ${m.error.message}`)
       return { id, invited: !!u.data.user.invited_at, ownsBusiness: (m.count ?? 0) > 0 }
     },
-    async generateLink(type, email, redirectTo) {
-      const { data, error } = await admin.auth.admin.generateLink({ type, email, options: { redirectTo } })
-      if (error || !data.properties?.action_link || !data.user) return { ok: false, error: error?.message ?? 'no_link' }
-      return { ok: true, url: data.properties.action_link, userId: data.user.id }
+    async generateCode(type, email) {
+      // Only the one-time code is used (ADR-0027); the action link Supabase also returns is discarded.
+      const { data, error } = await admin.auth.admin.generateLink({ type, email })
+      if (error || !data.properties?.email_otp || !data.user) return { ok: false, error: error?.message ?? 'no_code' }
+      return { ok: true, code: data.properties.email_otp, userId: data.user.id }
     },
     async linkOwner(businessId, userId, actorId, applicationId) {
       const { data, error } = await admin.rpc('service_link_owner', { p_business_id: businessId, p_user_id: userId, p_actor: actorId, p_application_id: applicationId })

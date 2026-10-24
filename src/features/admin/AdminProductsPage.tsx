@@ -35,7 +35,6 @@ export default function AdminProductsPage() {
     <>
       <PageHeader
         title="All products"
-        description="Products across every business catalog."
         actions={
           <Button variant="primary" icon={<PackagePlus className="size-4" aria-hidden />} onClick={addProduct}>
             Add product

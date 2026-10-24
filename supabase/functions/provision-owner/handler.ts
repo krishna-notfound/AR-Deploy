@@ -1,8 +1,9 @@
 // Request handling for the provision-owner Edge Function (ADR-0024). Platform admins only.
 //   POST { action: "provision", businessId, email, language, applicationId? }  → links the single owner, emails an invitation
-//   POST { action: "resend", businessId, language? }                           → new invitation link for the invited owner
-// The link comes from Supabase Auth (auth.admin.generateLink), goes only into the email and is never returned,
-// stored or logged. An email failure keeps the owner linked; the admin can resend once the cause is fixed.
+//   POST { action: "resend", businessId, language? }                           → new invitation code for the invited owner
+// The one-time code comes from Supabase Auth (auth.admin.generateLink's email_otp, ADR-0027), goes only into the email
+// and is never returned, stored or logged. The email links to the plain /accept-invite page, where the owner types it.
+// An email failure keeps the owner linked; the admin can resend once the cause is fixed.
 import { type ConfigResult, type EmailStatus, type LogEntry, isValidEmail, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
@@ -10,7 +11,7 @@ import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
 export const RESEND_COOLDOWN_SECONDS = 60
 export const MAX_INVITATION_ATTEMPTS = 10
 
-export type LinkResult = { ok: true; url: string; userId: string } | { ok: false; error: string }
+export type CodeResult = { ok: true; code: string; userId: string } | { ok: false; error: string }
 
 export interface ProvisionDeps {
   config: ConfigResult
@@ -25,8 +26,8 @@ export interface ProvisionDeps {
    * invitation (auth.users.invited_at); `ownsBusiness` when it is already a member of a business.
    */
   accountByEmail(email: string): Promise<{ id: string; invited: boolean; ownsBusiness: boolean } | null>
-  /** auth.admin.generateLink; 'invite' creates the account, 'magiclink' signs an existing one in. */
-  generateLink(type: 'invite' | 'magiclink', email: string, redirectTo: string): Promise<LinkResult>
+  /** The one-time code of auth.admin.generateLink; 'invite' creates the account, 'magiclink' signs an existing one in. */
+  generateCode(type: 'invite' | 'magiclink', email: string): Promise<CodeResult>
   linkOwner(businessId: string, userId: string, actorId: string, applicationId: string | null): Promise<'linked' | 'already_linked' | 'business_has_owner'>
   /** Invitation emails already logged for this business (any outcome), newest first. */
   invitationAttempts(businessId: string): Promise<{ count: number; lastAt: string | null }>
@@ -76,17 +77,17 @@ export async function handleProvisionOwner(req: Request, deps: ProvisionDeps): P
     // An account this platform did not invite was registered by someone else (or before sign-ups were closed). Linking
     // it would hand the business to whoever set its password, so it is refused rather than reused (SEC-20).
     if (existing && !existing.invited) return reply(409, { error: 'account_not_invited' })
-    const redirect = landingUrl(deps, req, lang)
-    if (!redirect) return reply(503, { error: 'not_configured' })
-    const link = await createLink(deps, email, redirect)
-    if (!link.ok) {
-      await deps.audit({ eventType: 'invitation_failed', actorId, businessId, applicationId, metadata: { reason: link.error.slice(0, 200) } })
+    const page = landingUrl(deps, req, lang)
+    if (!page) return reply(503, { error: 'not_configured' })
+    const issued = await createCode(deps, email)
+    if (!issued.ok) {
+      await deps.audit({ eventType: 'invitation_failed', actorId, businessId, applicationId, metadata: { reason: issued.error.slice(0, 200) } })
       return reply(502, { error: 'invite_link_failed' })
     }
-    const linked = await deps.linkOwner(businessId, link.userId, actorId, applicationId)
+    const linked = await deps.linkOwner(businessId, issued.userId, actorId, applicationId)
     if (linked === 'business_has_owner') return reply(409, { error: 'business_has_owner' })
     const attempts = await deps.invitationAttempts(businessId)
-    const sent = await sendInvitation(deps, { kind: 'owner_invitation', to: email, lang, business, url: link.url, attempt: attempts.count + 1, actorId, applicationId })
+    const sent = await sendInvitation(deps, { kind: 'owner_invitation', to: email, lang, business, page, code: issued.code, attempt: attempts.count + 1, actorId, applicationId })
     await deps.audit({ eventType: 'invitation_requested', actorId, businessId, applicationId, metadata: { attempt: sent.attempt, email_status: sent.status } })
     return reply(200, { owner: linked, email: sent } satisfies Outcome)
   }
@@ -110,29 +111,29 @@ async function resend(
   if (attempts.count >= MAX_INVITATION_ATTEMPTS) return reply(429, { error: 'too_many_attempts' })
   const now = (deps.now ?? (() => new Date()))().getTime()
   if (attempts.lastAt && now - Date.parse(attempts.lastAt) < RESEND_COOLDOWN_SECONDS * 1000) return reply(429, { error: 'cooldown' })
-  const redirect = landingUrl(deps, req, lang)
-  if (!redirect) return reply(503, { error: 'not_configured' })
-  const link = await createLink(deps, owner.email, redirect)
-  if (!link.ok) {
-    await deps.audit({ eventType: 'invitation_failed', actorId, businessId: business.id, applicationId, metadata: { reason: link.error.slice(0, 200), resend: true } })
+  const page = landingUrl(deps, req, lang)
+  if (!page) return reply(503, { error: 'not_configured' })
+  const issued = await createCode(deps, owner.email)
+  if (!issued.ok) {
+    await deps.audit({ eventType: 'invitation_failed', actorId, businessId: business.id, applicationId, metadata: { reason: issued.error.slice(0, 200), resend: true } })
     return reply(502, { error: 'invite_link_failed' })
   }
-  const sent = await sendInvitation(deps, { kind: 'invitation_resend', to: owner.email, lang, business, url: link.url, attempt: attempts.count + 1, actorId, applicationId })
+  const sent = await sendInvitation(deps, { kind: 'invitation_resend', to: owner.email, lang, business, page, code: issued.code, attempt: attempts.count + 1, actorId, applicationId })
   await deps.audit({ eventType: 'invitation_resent', actorId, businessId: business.id, applicationId, metadata: { attempt: sent.attempt, email_status: sent.status } })
   return reply(200, { owner: 'already_linked', email: sent } satisfies Outcome)
 }
 
-/** An invite link for a new or never-confirmed account; a sign-in link once the account is confirmed. */
-async function createLink(deps: ProvisionDeps, email: string, redirectTo: string): Promise<LinkResult> {
-  const invite = await deps.generateLink('invite', email, redirectTo)
+/** An invite code for a new or never-confirmed account; a sign-in code once the account is confirmed. Each replaces the last. */
+async function createCode(deps: ProvisionDeps, email: string): Promise<CodeResult> {
+  const invite = await deps.generateCode('invite', email)
   if (invite.ok) return invite
-  const magic = await deps.generateLink('magiclink', email, redirectTo)
+  const magic = await deps.generateCode('magiclink', email)
   return magic.ok ? magic : { ok: false, error: `${invite.error} / ${magic.error}` }
 }
 
 async function sendInvitation(
   deps: ProvisionDeps,
-  a: { kind: 'owner_invitation' | 'invitation_resend'; to: string; lang: 'en' | 'pt'; business: { id: string; name: string }; url: string; attempt: number; actorId: string; applicationId: string | null },
+  a: { kind: 'owner_invitation' | 'invitation_resend'; to: string; lang: 'en' | 'pt'; business: { id: string; name: string }; page: string; code: string; attempt: number; actorId: string; applicationId: string | null },
 ): Promise<Outcome['email']> {
   const workflow = `invite:${a.business.id}`
   const base = { kind: a.kind, businessId: a.business.id, applicationId: a.applicationId ?? undefined, workflow, attempt: a.attempt, triggeredBy: a.actorId }
@@ -141,8 +142,8 @@ async function sendInvitation(
     await deps.log({ ...base, recipient: a.to, subject, status: 'blocked', error: 'email_not_configured' })
     return { status: 'blocked', error: 'email_not_configured', attempt: a.attempt }
   }
-  // Supabase verify links are https:// on hosted projects; anything else is refused by the template.
-  const email = renderEmail(a.kind, a.lang, { businessName: a.business.name, actionUrl: a.url })
+  // The landing page must be https:// (the template refuses anything else); the code only ever goes into this email.
+  const email = renderEmail(a.kind, a.lang, { businessName: a.business.name, actionUrl: a.page, code: a.code })
   const r = await sendAndLog({ config: deps.config.config, fetch: deps.fetch, log: deps.log }, { ...email, ...base, to: a.to, idempotencyKey: `${workflow}:${a.attempt}` })
   return { status: r.status, error: r.error, attempt: a.attempt }
 }

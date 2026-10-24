@@ -23,7 +23,7 @@ test('every Super Admin sidebar item opens its page', async ({ page }) => {
 
 test('logout returns to the demo entry and guards admin routes', async ({ page }) => {
   await signInAsSuperAdmin(page)
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Logout' }).click()
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Log out' }).click()
   await expect(page.getByRole('heading', { name: 'Choose how to explore the platform.' })).toBeVisible()
   await page.goto('/admin/products')
   await expect(page).toHaveURL(/\/demo\?next=%2Fadmin%2Fproducts/)

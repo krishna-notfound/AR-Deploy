@@ -281,7 +281,7 @@ export function ModelPreview({
 
   return (
     <div>
-      <div className="relative aspect-[16/10] overflow-hidden rounded-[var(--radius-card)] bg-[radial-gradient(ellipse_at_center,#ffffff_0%,#efede8_100%)]">
+      <div className="relative aspect-[16/10] overflow-hidden rounded-[var(--radius-card)] bg-subtle">
         <ModelViewer
           key={`${glb.url}-${attempt}`}
           src={glb.url}

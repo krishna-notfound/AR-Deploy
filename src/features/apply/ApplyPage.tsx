@@ -202,8 +202,7 @@ export default function ApplyPage() {
         ) : (
           <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-16">
             <aside>
-              <p className="text-eyebrow text-ink-muted">{t('apply.eyebrow')}</p>
-              <h1 className="mt-4 text-headline">{t('apply.title')}</h1>
+              <h1 className="text-headline">{t('apply.title')}</h1>
               <p className="mt-4 text-[15px] leading-7 text-ink-muted">{t('apply.intro')}</p>
               <Progress current={idx} onGo={(i) => i < idx && go(STEPS[i]!)} />
             </aside>

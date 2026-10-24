@@ -45,8 +45,13 @@ export interface AuthService {
   signInWithPassword(email: string, password: string): Promise<AuthResult<void>>
   /** 'global' (default) ends every session of the user; 'local' only this browser's. */
   signOut(scope?: 'global' | 'local'): Promise<Result<void>>
-  /** Sends a reset link. Succeeds whether or not the email has an account (no account enumeration). */
+  /** Emails a one-time reset code (ADR-0027). Succeeds whether or not the email has an account (no account enumeration). */
   requestPasswordReset(email: string, redirectTo: string): Promise<AuthResult<void>>
+  /**
+   * Signs in with a one-time code from an email (ADR-0027): 'recovery' for a password reset, 'invite' for an owner
+   * invitation (an invite code, or a sign-in code once the account is confirmed). Wrong and expired codes both fail.
+   */
+  verifyEmailCode(email: string, code: string, purpose: 'recovery' | 'invite'): Promise<AuthResult<void>>
   /**
    * Sets a new password for the current (e.g. recovery or invitation) session, then signs out the user's other sessions.
    * Re-entering the current password counts as success.
@@ -99,6 +104,12 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo })
       // Rate limits and delivery problems are reported; "unknown email" is not distinguishable by design.
       return error ? authFail('UNKNOWN', error) : ok(undefined)
+    },
+
+    async verifyEmailCode(email, code, purpose) {
+      // 'email' accepts both kinds of code provision-owner sends: an invitation (confirmation token) and a sign-in code.
+      const { error } = await sb.auth.verifyOtp({ email, token: code, type: purpose === 'recovery' ? 'recovery' : 'email' })
+      return error ? authFail('PERMISSION', error) : ok(undefined)
     },
 
     async updatePassword(password) {

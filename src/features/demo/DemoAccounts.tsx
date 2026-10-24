@@ -56,7 +56,7 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
             <p className="mt-1.5 flex-1 text-sm leading-6 text-ink-muted">
               For the platform team. Manage every business, product, catalog and QR code, and see platform-wide analytics.
             </p>
-            <Button variant="primary" className="mt-6 self-start rounded-full px-5" onClick={enterAdmin}>
+            <Button variant="primary" className="mt-6 self-start" onClick={enterAdmin}>
               Continue as Super Admin
             </Button>
           </section>
@@ -84,7 +84,7 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
                   </Select>
                 )}
               </FormField>
-              <Button variant="primary" className="rounded-full px-5" onClick={enterBusiness} disabled={!businessId}>
+              <Button variant="primary" onClick={enterBusiness} disabled={!businessId}>
                 Continue
               </Button>
             </div>
@@ -98,7 +98,7 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
             This build uses a real Supabase backend, so the demo account picker is turned off. Sign in with an account that a platform admin has
             linked to the platform team or to a business.
           </p>
-          <ButtonLink to={next ? `/login?next=${encodeURIComponent(next)}` : '/login'} variant="primary" className="mt-6 rounded-full px-5">
+          <ButtonLink to={next ? `/login?next=${encodeURIComponent(next)}` : '/login'} variant="primary" className="mt-6">
             Sign in
           </ButtonLink>
         </div>
