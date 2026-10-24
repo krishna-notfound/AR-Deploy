@@ -32,6 +32,11 @@ export default defineConfig(({ mode, command }) => {
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts', 'supabase/tests/**/*.test.ts'],
       css: false,
+      // Component tests drive whole pages with simulated input; 5 s is too tight once the suite runs in parallel.
+      testTimeout: 20_000,
+      // One jsdom worker per core starves the lazy-loaded pages (cold imports took over 20 s); half the cores is
+      // faster overall and keeps timing-sensitive UI tests stable.
+      maxWorkers: '50%',
       // Tests always run in demo mode, whatever a developer's .env.local says.
       env: { VITE_DATA_MODE: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_ROOT_DOMAIN: '' },
     },
