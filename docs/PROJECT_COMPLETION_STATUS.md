@@ -1,7 +1,7 @@
 # Sanctus: project completion status
 
 **Last updated:** 2026-10-24
-**Branch:** `feature/sanctus-brand-design-system`, pushed. Tested code commit: `a350156`. Later commits change only docs and config.
+**Branch:** `feature/sanctus-brand-design-system`, pushed. Tested code commit: `26c03a5`. Later commits change only docs and config.
 **Data:** the client dev project `zggylkbgajamhriebdrg`, used by the Preview. The live project `pmnjchhrgvajtjpadpqo` and `main` are untouched.
 
 This is the single place for **what is done, what is blocked and what decides the release**. Detailed evidence is linked, not repeated.
@@ -24,6 +24,8 @@ This is the single place for **what is done, what is blocked and what decides th
 | Auth settings (zggyl) | Site URL = Preview; exact redirects for `/login`, `/reset-password` and `/accept-invite` (plus localhost for dev); public sign-up refused (`signup_disabled` verified); minimum password length 12 | n/a | Verified by sign-in (200) and a sign-up probe (422) |
 | Email functions redeployed | `submit-application`, `provision-owner`, `send-test-email` | n/a | Preflight 204 |
 | Email delivery (Resend) | All secrets set: a new sending-only key "Sanctus server 2026-10-24" (temporary, the owner will replace it), the test sender `onboarding@resend.dev`, the Preview as `APP_BASE_URL`, a test admin inbox, and the signed webhook | n/a | 2026-10-24 on the Preview: applicant confirmation, admin notification and owner invitation all reached **delivered** through the signed webhook (`email_log`, application `ABE43EC0` and business "QA Preview Atelier 10201001") |
+| Password reset | `/reset-password` crashed on the Preview ("Something went wrong": the page uses `t()` but its route sat outside the `LanguageProvider`). Moved under the public layout. Auth emails now go through Resend SMTP. | `26c03a5` | e2e regression test. On the Preview, 2026-10-24: a reset for the QA owner's test inbox was **delivered** by Resend (sender "Sanctus"), and its link opened the Preview's "Choose a new password" form. The password was not changed. |
+| Leaked-password protection | `password_hibp_enabled = true` on zggyl | n/a | Management API read-back |
 | Public Preview | Vercel protection off (owner request, 2026-10-22). `main` and production unchanged. | n/a | https://ar-deploy-git-feature-sanctus-brand-design-system-track0.vercel.app opens with no login |
 
 ## 2. Implemented, but not yet verified externally
@@ -39,8 +41,8 @@ This is the single place for **what is done, what is blocked and what decides th
 | B2 | ~~Leaked-password protection~~ **Done 2026-10-24** (`password_hibp_enabled = true`, set through the Supabase Management API) | n/a | n/a |
 | B3 | ~~Resend key and webhook~~ **Done 2026-10-24** (temporary key; the old exposed "Sanctus server (Edge Functions)" key was revoked 2026-10-24). Still open: the real sender address and admin inbox (client decision). | Owner and client | n/a |
 | B4 | Sending domain | Client (DNS) | Verify a domain in Resend. Until then, mail only reaches the Resend account's own address. |
-| B5 | Webhook **done**. Still open: Supabase Auth SMTP through Resend, so password-reset and Auth emails reach real people. It needs a verified sending domain (B4). | After B4 | Auth → SMTP: `smtp.resend.com:465`, user `resend`, password = an API key, sender on the verified domain |
-| B6 | Application, admin and invitation emails **delivered** (test inboxes). Still open: password-recovery email (Supabase Auth mailer until B5), and delivery to real inboxes (needs B4). | After B4 and B5 | n/a |
+| B5 | Webhook **done**. Auth SMTP through Resend **set 2026-10-24** (`smtp.resend.com:465`, user `resend`, the server key, sender "Sanctus" <onboarding@resend.dev>, Auth email limit 30 per hour). Still open: switch the SMTP sender to the verified domain, so Auth emails reach real inboxes. | After B4 | Auth → SMTP → sender address on the verified domain |
+| B6 | Application, admin, invitation and password-reset emails **delivered** (test inboxes). Still open: delivery to real inboxes (needs B4). | After B4 | n/a |
 | B7 | **Meshy-generated model** for the end-to-end model test | Owner | The actual GLB (and USDZ if available) file. No Meshy model exists in the repo or `AR-attachment/`. |
 | B8 | Real-device AR: Scene Viewer, Quick Look, true scale | A person with an ARCore Android phone and an iPhone | Steps are in `docs/SANCTUS_3D_AR_QA_REPORT.md`, section 7 |
 | B9 | ~~Push and check embedding on the Preview~~ **Done 2026-10-24** | n/a | n/a |
@@ -58,16 +60,16 @@ These are not to be decided silently.
 - **Analytics:** count every page view (today) or unique daily visitors.
 - **Landing quote attribution "— SANCTUS":** this is the client's reference copy, so the dash was kept.
 
-## 5. Test results (current tree, `a350156`, 2026-10-24)
+## 5. Test results (current tree, `26c03a5`, 2026-10-24)
 
 | Command | Result |
 |---|---|
 | `npm run typecheck` | pass |
 | `npm run lint` | pass (0 errors, advisory warnings only) |
-| `npm test` | **311 passed, 15 skipped** (the live integration suite needs credentials). 4 consecutive runs green. |
+| `npm test` | **311 passed, 15 skipped** (the live integration suite needs credentials). 3 consecutive runs green after two load-sensitive tests were made deterministic. |
 | `npx vitest run supabase/tests` | **50 passed** (includes the prepared migration) |
 | `npm run build` | pass |
-| `npm run test:e2e` (demo mode, desktop and mobile) | **31 passed** |
+| `npm run test:e2e` (demo mode, desktop and mobile) | **32 passed** (adds the reset-password regression test) |
 | Preview journeys (on `a1e8392` and `422481b`) | 98 PASS, 0 open FAIL, 5 BLOCKED (devices, other-tenant writes), 1 NOT TESTED (on purpose) |
 
 ## 6. Incident log
@@ -87,10 +89,10 @@ These are not to be decided silently.
 
 ## 8. Next actions, in order
 
-1. Owner: B3 (the new Resend key and webhook secret in `.env.qa`) and the B2 dashboard toggle.
-2. Orchestrator: load the secrets, revoke the old key, then run B6 (real email tests with Resend test inboxes).
-4. B7 (Meshy model) and B8 (device AR) tests.
-5. Client decisions (section 4).
+1. Owner: manual test on the Preview, including B7 (Meshy model).
+2. Client: sending domain, sender address and admin inbox (B3, B4), then switch the Resend and SMTP sender to it.
+3. B7 (Meshy model) and B8 (device AR) tests.
+4. Client decisions (section 4).
 
 ## 9. Production release conditions
 
