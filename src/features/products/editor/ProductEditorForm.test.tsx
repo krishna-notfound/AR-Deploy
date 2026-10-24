@@ -32,7 +32,11 @@ function EditRoute() {
   const { productId } = useParams()
   const q = useServiceQuery(() => service.getProductById(productId!), [productId])
   if (!q.data) return <p>loading</p>
-  return <ProductEditorForm key={q.data.id} scope="business" product={q.data} currentStatus={q.data.status} businesses={[business]} fixedBusiness={business} breadcrumbs={crumbs} />
+  return (
+    <div data-testid="edit-route">
+      <ProductEditorForm key={q.data.id} scope="business" product={q.data} currentStatus={q.data.status} businesses={[business]} fixedBusiness={business} breadcrumbs={crumbs} />
+    </div>
+  )
 }
 
 function renderNew() {
@@ -117,7 +121,8 @@ describe('product editor: publish rules', () => {
     await user.type(screen.getByRole('textbox', { name: /^Product name/ }), 'Test sofa')
     await user.click(screen.getByRole('button', { name: 'Publish' }))
     await waitFor(() => expect(router.state.location.pathname).toMatch(/\/edit$/))
-    await screen.findByText('Fix these 3 issues to continue')
+    // Wait for the remounted edit-page editor, not the new-product one it replaces (the draft loads in between).
+    await within(await screen.findByTestId('edit-route', {}, { timeout: 10_000 })).findByText('Fix these 3 issues to continue')
     expect(within(summary()).getByText('Add at least one product image before publishing.')).toBeInTheDocument()
     expect(within(summary()).getAllByText(DIM_MSG)).toHaveLength(1)
   })

@@ -115,7 +115,6 @@ function pathModeRoutes(): RouteObject[] {
           children: [
             { path: '/demo', element: <DemoEntryPage /> },
             { path: '/login', element: <LoginPage /> },
-            { path: '/reset-password', element: <ResetPasswordPage /> },
           ],
         },
         adminRoutes,
@@ -125,6 +124,8 @@ function pathModeRoutes(): RouteObject[] {
           children: [
             { path: '/', element: <LandingPage /> },
             { path: '/apply', element: <ApplyPage /> },
+            // Both use t(), so they need the LanguageProvider of this layout.
+            { path: '/reset-password', element: <ResetPasswordPage /> },
             { path: '/accept-invite', element: <AcceptInvitePage /> },
             { path: '/catalog/:businessSlug', element: <CatalogPage /> },
             { path: '/products/:businessSlug/:productSlug', element: <ProductPage /> },

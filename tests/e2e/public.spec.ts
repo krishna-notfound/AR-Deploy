@@ -151,3 +151,14 @@ test('in-app browser notice appears for Instagram, on the catalog (QR landing) a
   await expect(page.getByText(/open this page in Safari/)).toBeHidden()
   await ctx.close()
 })
+
+// Regression: /reset-password crashed ("useI18n must be used inside <LanguageProvider>") while it sat outside PublicLayout.
+test('the reset-password page renders without crashing', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('/reset-password?lang=en')
+  // Demo mode has no password reset, so the page sends visitors to /demo.
+  await expect(page).toHaveURL(/\/demo/)
+  await expect(page.getByText('Something went wrong')).toBeHidden()
+  expect(errors).toEqual([])
+})

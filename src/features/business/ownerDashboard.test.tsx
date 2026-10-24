@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
 import type { Product } from '@/domain/types'
@@ -26,6 +26,18 @@ function openApp(url: string, account?: { role: 'business_admin'; businessId: st
   return render(<App />)
 }
 const asOwner = (businessId: string) => ({ role: 'business_admin' as const, businessId })
+
+// Warm the lazy routes once: on a busy full run a cold import (charts included) can outlast the find timeouts.
+beforeAll(async () => {
+  await Promise.all([
+    import('@/features/business/BusinessOverviewPage'),
+    import('@/features/business/MyProductsPage'),
+    import('@/features/business/BusinessAnalyticsPage'),
+    import('@/features/business/MyCatalogPage'),
+    import('@/features/public/CatalogPage'),
+    import('@/features/public/ProductPage'),
+  ])
+}, 60_000)
 
 beforeEach(async () => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
