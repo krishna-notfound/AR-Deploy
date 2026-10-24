@@ -18,6 +18,9 @@ Returns hostname mode when `VITE_ROOT_DOMAIN` is set, the hostname is `{slug}.{r
 | `productLocalPath(b, p, { preview? })` | `/products/{bSlug}/{pSlug}` | "Open preview" |
 | `tenantCatalogPath()` / `tenantProductPath(p)` | `/`, `/products/{pSlug}` on a business subdomain | Public catalogue links |
 | `myProductsPath({ status?, ar? })` | `/dashboard/products?…` | Overview "Next steps" links |
+| `productEmbedUrl(b, p, { lang? })` | `https://{b.slug}.{ROOT}/embed/products/{p.slug}` (path mode: `origin/embed/products/{bSlug}/{pSlug}`), `?lang=` optional | "Embed on your website" snippet (ADR-0026) |
+| `productEmbedLocalPath(b, p)` / `tenantProductEmbedPath(p)` | `/embed/products/{bSlug}/{pSlug}`, `/embed/products/{pSlug}` on a subdomain | Embed routes |
+| `embedProductPageUrl(b, p, { tenant, variantId?, lang? })` | Absolute product page URL on this deployment with `?variant=&lang=` | The embed's AR / details link (new tab) |
 
 `ROOT = import.meta.env.VITE_ROOT_DOMAIN ?? 'example.com'`.
 Share and copy actions on **public** pages use `window.location.href`.

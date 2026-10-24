@@ -6,7 +6,7 @@ Architecture: static Vite SPA on Vercel, with Supabase Postgres, Auth and Storag
 - framework `vite`, build `npm run build`, output `dist`
 - an SPA rewrite to `/index.html` (static files take precedence)
 - immutable caching for `/assets/*`
-- headers: `nosniff`, `strict-origin-when-cross-origin`, `frame-ancestors 'none'`, and `Permissions-Policy` that allows camera and XR for AR
+- headers: `nosniff`, `strict-origin-when-cross-origin`, and `Permissions-Policy` that allows camera and XR for AR on every path; `frame-ancestors 'none'` on every path except `/embed/*`, which gets `frame-ancestors *` so any website can frame a public product (ADR-0026). The two sources do not overlap; `src/features/public/embed.test.tsx` checks the result.
 
 | Setting | Value |
 |---|---|

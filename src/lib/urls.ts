@@ -1,5 +1,5 @@
 // The only place URLs are composed. See System_arch/design/08-tenancy-urls.md.
-import type { Business, Product } from '@/domain/types'
+import type { Business, Lang, Product } from '@/domain/types'
 
 type Sluggable = Pick<Business, 'slug'>
 type ProductSluggable = Pick<Product, 'slug'>
@@ -65,6 +65,34 @@ export function tenantProductPath(p: ProductSluggable, opts?: { preview?: boolea
 
 export function productLocalPath(b: Sluggable, p: ProductSluggable, opts?: { preview?: boolean }): string {
   return `/products/${b.slug}/${p.slug}${opts?.preview ? '?preview=1' : ''}`
+}
+
+/** Embed route (ADR-0026): the chrome-less product view other websites show in an iframe. */
+export function productEmbedLocalPath(b: Sluggable, p: ProductSluggable): string {
+  return `/embed/products/${b.slug}/${p.slug}`
+}
+
+/** Embed route on a business's own subdomain. */
+export function tenantProductEmbedPath(p: ProductSluggable): string {
+  return `/embed/products/${p.slug}`
+}
+
+/** Public embed URL for the owner's iframe snippet. `lang` fixes the language; without it the visitor's browser decides. */
+export function productEmbedUrl(b: Sluggable, p: ProductSluggable, opts?: { lang?: Lang }): string {
+  const base = PUBLIC_URL_MODE === 'path' ? absoluteLocalUrl(productEmbedLocalPath(b, p)) : `${catalogPublicUrl(b)}${tenantProductEmbedPath(p)}`
+  return opts?.lang ? `${base}?lang=${opts.lang}` : base
+}
+
+/**
+ * The full product page an embed hands off to (opened in a new tab, where native AR works), on this deployment,
+ * on the same finish and language as the embed.
+ */
+export function embedProductPageUrl(b: Sluggable, p: ProductSluggable, opts: { tenant: boolean; variantId?: string; lang?: Lang }): string {
+  const q = new URLSearchParams()
+  if (opts.variantId) q.set(VARIANT_PARAM, opts.variantId)
+  if (opts.lang) q.set('lang', opts.lang)
+  const path = opts.tenant ? tenantProductPath(p) : productLocalPath(b, p)
+  return absoluteLocalUrl(`${path}${q.size ? `?${q.toString()}` : ''}`)
 }
 
 export function absoluteLocalUrl(path: string): string {

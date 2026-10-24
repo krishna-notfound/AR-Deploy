@@ -43,6 +43,8 @@ export function ProductMedia({
   onModelState,
   onArStatus,
   onInteract,
+  ar = true,
+  fill = false,
 }: {
   name: string
   gallery: ProductImage[]
@@ -55,6 +57,10 @@ export function ProductMedia({
   onModelState: (url: string, s: ModelState, info?: ModelLoadInfo) => void
   onArStatus: (s: ArStatus) => void
   onInteract?: () => void
+  /** False in the embed: AR never starts inside an iframe, the full product page handles it (ADR-0026). */
+  ar?: boolean
+  /** Stage fills the parent's height instead of a fixed aspect ratio (embed). */
+  fill?: boolean
 }) {
   const { t } = useI18n()
   const { glb, usdz } = models
@@ -101,8 +107,8 @@ export function ProductMedia({
   }
 
   return (
-    <div>
-      <div className="relative aspect-square overflow-hidden bg-subtle sm:aspect-[5/4]">
+    <div className={cn(fill && 'flex h-full flex-col')}>
+      <div className={cn('relative overflow-hidden bg-subtle', fill ? 'min-h-0 flex-1' : 'aspect-square sm:aspect-[5/4]')}>
         {glb && (
           <div className={cn('absolute inset-0', mode !== '3d' && 'invisible')} aria-hidden={mode !== '3d'}>
             <ModelViewer
@@ -113,7 +119,7 @@ export function ProductMedia({
               iosSrc={usdz?.url}
               poster={poster}
               alt={t('product.view3d') + ': ' + name}
-              ar
+              ar={ar}
               className="absolute inset-0"
               onProgress={(p) => setLoad((l) => (l.url === glbUrl ? { ...l, progress: p } : l))}
               onLoad={(info) => update('loaded', info)}

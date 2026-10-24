@@ -67,6 +67,10 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'product.unitToggle': 'Unidades',
   'product.translationFallback': 'Apresentado em inglês',
 
+  'embed.arLink': 'Ver no seu espaço (abre a Sanctus)',
+  'embed.arNote': 'A RA abre na página completa do produto, num novo separador.',
+  'embed.fullPage': 'Ver todos os detalhes (abre a Sanctus)',
+
   'viewer.hint': 'Arraste para girar',
   'viewer.loading': 'A carregar o modelo 3D…',
   'viewer.errorTitle': 'Não foi possível carregar o modelo 3D',

@@ -132,6 +132,14 @@ A tool that shrinks GLB files before upload is built, but it is **switched OFF**
 - **Download QR codes for print only from the live production site.** On a preview or local address the panel shows a warning, because the QR code would point to that temporary address.
 - **Product links:** use **Copy URL** in the product list. On the product page, customers can use **Share** (their phone's share menu, or the link is copied) or **Copy link**.
 
+### Embedding a product on your own website
+
+- **Copy the code:** in the product list, open a product's menu (**⋯**) and choose **Embed on your website**. Pick the language (or leave it on the visitor's browser), then press **Copy code** and paste it into your website where the product should appear (most site builders have an "HTML" or "Embed" block).
+- **Only published products** can be embedded. A draft shows "Not public yet" instead of a code. If your catalog is not active, the frame shows "product not available" until it is.
+- **What visitors see:** a compact card with the main photo, name, price and finishes. They can switch to the 3D model and turn it. It always shows the current product, so changes you make here appear on your site automatically.
+- **AR:** phones only start AR from a full page, not from inside another website. In the frame, **View in your space (opens Sanctus)** opens the product's page in a new tab, where visitors tap AR as usual.
+- **Size:** the code fills the width of the space (up to 960 px) and is 560 px tall. You can change the `height` value in the code if your page needs it.
+
 ---
 
 ## 7. How AR works for customers

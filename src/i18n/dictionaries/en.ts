@@ -65,6 +65,10 @@ export const en = {
   'product.unitToggle': 'Units',
   'product.translationFallback': 'Shown in English',
 
+  'embed.arLink': 'View in your space (opens Sanctus)',
+  'embed.arNote': 'AR opens on the full product page in a new tab.',
+  'embed.fullPage': 'Full details (opens Sanctus)',
+
   'viewer.hint': 'Drag to rotate',
   'viewer.loading': 'Loading 3D model…',
   'viewer.errorTitle': 'The 3D model could not be loaded',

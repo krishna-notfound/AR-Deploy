@@ -1,4 +1,4 @@
-import { Copy, CopyPlus, ExternalLink, Eye, EyeOff, MoreHorizontal, Pencil, QrCode, Trash2 } from 'lucide-react'
+import { CodeXml, Copy, CopyPlus, ExternalLink, Eye, EyeOff, MoreHorizontal, Pencil, QrCode, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Badge, ProductStatusBadge, type Tone } from '@/components/ui/Badge'
@@ -9,6 +9,7 @@ import type { Business, Product, ProductAnalytics } from '@/domain/types'
 import { formatDate, formatMoney, formatNumber } from '@/lib/format'
 import { primaryImage } from '@/lib/product'
 import { AR_READINESS_HINT, AR_READINESS_LABEL, type ProductArReadiness, hasArModel, productArReadiness } from './productReadiness'
+import { EmbedCodeDialog } from './EmbedCodeDialog'
 import { ProductQrDialog } from './ProductQrDialog'
 import { editPath, type EditorScope, useProductActions } from './useProductActions'
 
@@ -55,6 +56,7 @@ export function ProductTable({
 }) {
   const actions = useProductActions(scope)
   const [qrFor, setQrFor] = useState<Product | null>(null)
+  const [embedFor, setEmbedFor] = useState<Product | null>(null)
 
   const menuItems = (p: Product): (MenuItem | 'separator')[] => {
     const b = businesses.get(p.businessId)
@@ -63,6 +65,7 @@ export function ProductTable({
       { label: p.status === 'published' ? 'Open product page' : 'Preview draft', icon: <ExternalLink />, onSelect: () => actions.openPreview(p, b) },
       { label: 'Copy product URL', icon: <Copy />, onSelect: () => void actions.copyUrl(p, b) },
       { label: p.status === 'published' ? 'Product QR code' : 'Product QR code (not public yet)', icon: <QrCode />, onSelect: () => setQrFor(p) },
+      { label: p.status === 'published' ? 'Embed on your website' : 'Embed on your website (not public yet)', icon: <CodeXml />, onSelect: () => setEmbedFor(p) },
       { label: 'Duplicate', icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) },
       p.status === 'published'
         ? { label: 'Unpublish', icon: <EyeOff />, onSelect: () => void actions.unpublish(p) }
@@ -156,6 +159,7 @@ export function ProductTable({
         )}
       />
       <ProductQrDialog product={qrFor} business={qrFor ? businesses.get(qrFor.businessId) : undefined} onClose={() => setQrFor(null)} />
+      <EmbedCodeDialog product={embedFor} business={embedFor ? businesses.get(embedFor.businessId) : undefined} onClose={() => setEmbedFor(null)} />
     </>
   )
 }

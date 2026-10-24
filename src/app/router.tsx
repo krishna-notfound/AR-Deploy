@@ -40,6 +40,7 @@ const BusinessSettingsPage = lazy(() => import('@/features/business/BusinessSett
 
 const CatalogPage = lazy(() => import('@/features/public/CatalogPage'))
 const ProductPage = lazy(() => import('@/features/public/ProductPage'))
+const EmbedProductPage = lazy(() => import('@/features/public/EmbedProductPage'))
 
 function PublicLayout() {
   return (
@@ -127,6 +128,8 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/accept-invite', element: <AcceptInvitePage /> },
             { path: '/catalog/:businessSlug', element: <CatalogPage /> },
             { path: '/products/:businessSlug/:productSlug', element: <ProductPage /> },
+            // Framable by any website (vercel.json, ADR-0026); chrome-less, public data only.
+            { path: '/embed/products/:businessSlug/:productSlug', element: <EmbedProductPage /> },
             { path: '*', element: <PublicNotFoundPage /> },
           ],
         },
@@ -147,6 +150,7 @@ function hostnameModeRoutes(slug: string): RouteObject[] {
           children: [
             { path: '/', element: <CatalogPage tenantSlug={slug} /> },
             { path: '/products/:productSlug', element: <ProductPage tenantSlug={slug} /> },
+            { path: '/embed/products/:productSlug', element: <EmbedProductPage tenantSlug={slug} /> },
             { path: '*', element: <PublicNotFoundPage tenant /> },
           ],
         },

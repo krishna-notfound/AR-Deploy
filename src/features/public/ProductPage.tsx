@@ -30,6 +30,7 @@ import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { ShareButton } from './ShareActions'
 import { TAP_TARGET } from './tapTarget'
+import { VariantPicker } from './VariantPicker'
 
 /** Ignore AR taps this soon after a launch (double taps, impatient re-taps while the native viewer opens). */
 export const AR_RELAUNCH_MS = 2000
@@ -280,35 +281,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
             <LocalizedSpan as="p" text={product.shortDescription} className="mt-4 max-w-md text-[15px] leading-7 text-ink-muted" />
 
-            {product.variants.length > 0 && (
-              <section className="mt-8" aria-labelledby="variants-h">
-                <h2 id="variants-h" className="text-eyebrow text-ink">
-                  {t('product.colors')}
-                </h2>
-                <div role="radiogroup" aria-labelledby="variants-h" className="mt-3 flex flex-wrap gap-3">
-                  {product.variants.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={v.id === variantId}
-                      aria-label={localized(v.name) + (v.priceDelta ? ` +${formatMoney(v.priceDelta, product.currency, lang)}` : '')}
-                      title={localized(v.name)}
-                      onClick={() => selectVariant(v.id)}
-                      className={cn('grid size-10 place-items-center rounded-full border transition-colors', v.id === variantId ? 'border-ink' : 'border-transparent hover:border-line-strong')}
-                    >
-                      <span className="size-8 rounded-full ring-1 ring-black/10" style={{ background: v.colorHex ?? 'var(--color-limestone)' }} aria-hidden />
-                    </button>
-                  ))}
-                </div>
-                {variant && (
-                  <p className="mt-2 text-[13px] text-ink-muted">
-                    <LocalizedSpan text={variant.name} />
-                    {variant.priceDelta ? <span className="ml-2 text-ink-faint tabular-nums">+{formatMoney(variant.priceDelta, product.currency, lang)}</span> : null}
-                  </p>
-                )}
-              </section>
-            )}
+            <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="mt-8" />
 
             <div className="mt-8 flex flex-col gap-5">
               {/* Only for a model that loaded; "AR" only where AR can open (AR-08). */}

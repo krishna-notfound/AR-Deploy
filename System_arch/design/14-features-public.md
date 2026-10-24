@@ -34,6 +34,12 @@ Mobile-first, single column. Switches to two columns at `lg`.
   - the product is unpublished and this isn't a draft preview, or
   - the business is inactive.
 
+## Embed `/embed/products/:businessSlug/:productSlug` (ADR-0026)
+- Chrome-less product card for other websites' iframes (`EmbedProductPage`); `/embed/products/:productSlug` on a business subdomain.
+- Primary photo, name, price, `VariantPicker`, and `ProductMedia` (`fill`, `ar={false}`) with a "View in 3D" / "Photos" toggle on the stage.
+- Published products of active businesses only; never a draft preview, even for a signed-in owner. Loading, "Product not available" and error-with-retry states.
+- "View in your space (opens Sanctus)" opens the full product page in a new tab (same finish and language), where native AR runs. Records `view` and `model_interaction` like the product page, never `ar_activation`.
+
 ## Landing page (`/`, ADR-0016)
 Sections:
 - **Hero:** live model-viewer turntable of the Glam Velvet Sofa, with a caption of its size measured in the browser.
