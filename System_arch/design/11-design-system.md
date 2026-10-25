@@ -101,3 +101,12 @@ Source: the client's brand board (`AR-attachment/`, design/21). Token names are 
 - **Platform chrome:** `Wordmark` and `BrandMark` are the traced SANCTUS wordmark and "S" monogram. `SiteHeader variant="overlay"` sits on the landing hero; `solid` elsewhere. The mobile menu is a native `<dialog>`.
 - **Public pages:** `LanguageSwitcher` is an "EN / PT" radio group. Catalogue cards are 4:5, image-first, with a category caption and a serif name. The product page opens on the photograph; 3D and AR are round actions beside the stage.
 
+## Dashboard type (ADR-0031)
+
+Inside the dashboards (`[data-surface="dashboard"]`, set by `DashboardShell`) the type and density change. Everything outside it (landing, apply, sign-in, join, demo, public pages except D8) keeps the Sanctus values above. Full values: `design/dashboard/BRIEF.md` §1–§2.
+
+- **Fonts:** Inter 400/500/600 for all UI text, tables, forms and numbers. Cormorant Garamond 500 for the page title (h1) only.
+- **Scale:** h1 32/1.15/-0.01em; subline 15; card title 16/600; body and input 14 (16 under 640px); table cell 14/20, secondary line 13/18, header 13/500 sentence case; label 14/500; help 13; KPI value 28/1.1 tabular, KPI label 13; badge 12/20; button 14/500 sentence case; nav item 14.
+- **Spacing:** canvas padding 40/24/16, card gap and padding 24, controls 40 (36 in card headers, 44 touch), sidebar 256 with 40px rows and 18px icons, top bar 56.
+- **Rules:** nothing under 12px; greys are `#5A5148` (`#6E6559` only for placeholders); weights 400/500/600; tabular figures on numbers; no small uppercase letter-spaced text (only the SANCTUS wordmark); no icons on stat cards.
+- **Guard:** `npx playwright test --project=guard` checks that the untouched pages are pixel-identical (`tests/visual/guard.spec.ts`).

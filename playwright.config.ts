@@ -14,8 +14,16 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', testIgnore: /\.mobile\.spec\.ts$/, use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
-    { name: 'mobile', testMatch: /\.mobile\.spec\.ts$/, use: { ...devices['Pixel 7'] } },
+    { name: 'desktop', testIgnore: [/\.mobile\.spec\.ts$/, /tests[\\/]visual[\\/]/], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
+    { name: 'mobile', testMatch: /\.mobile\.spec\.ts$/, testIgnore: /tests[\\/]visual[\\/]/, use: { ...devices['Pixel 7'] } },
+    // Pixel guard for the pages the dashboard redesign must not touch (ADR-0031). Run it with `--project=guard`.
+    {
+      name: 'guard',
+      testDir: './tests/visual',
+      testMatch: /visual[\\/]guard\.spec\.ts$/,
+      use: { ...devices['Desktop Chrome'] },
+      expect: { toHaveScreenshot: { maxDiffPixels: 0, animations: 'disabled' } },
+    },
   ],
   webServer: {
     command: 'npm run dev -- --port 5199 --strictPort',
