@@ -532,6 +532,14 @@ describe('Supabase account service', () => {
     const refused = fake({ rpc: { admin_list_closure_requests: { data: { error: 'forbidden' } } } })
     const lr = await account(refused).listClosureRequests()
     expect(!lr.ok && lr.error).toMatchObject({ code: 'PERMISSION', reason: 'not_allowed' })
+    // A session that does not meet 2FA: list_my_security_events raises aal2_required (42501).
+    const gated = fake({ rpc: { list_my_security_events: { error: { code: '42501', message: 'aal2_required' } } } })
+    const le = await account(gated).listSecurityEvents()
+    expect(!le.ok && le.error).toMatchObject({ reason: 'aal2_required', message: 'This needs 2FA. Sign in with your authenticator code first.' })
+    // Any other 42501 stays not_allowed.
+    const denied = fake({ rpc: { list_my_security_events: { error: { code: '42501', message: 'permission denied for function list_my_security_events' } } } })
+    const ld = await account(denied).listSecurityEvents()
+    expect(!ld.ok && ld.error.reason).toBe('not_allowed')
     // Reasons the database and function can answer are known, never collapsed to 'unknown'.
     for (const reason of ['not_allowed', 'invalid_request']) {
       const g = fake({ invoke: { error: httpError(400, { ok: false, error: reason }) } })

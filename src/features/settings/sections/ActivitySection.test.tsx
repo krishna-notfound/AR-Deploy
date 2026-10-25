@@ -92,4 +92,12 @@ describe('Security activity section', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('Signed in')).toBeInTheDocument()
   })
+
+  it('a refusal for a session without 2FA (aal2_required) is a plain message, not an empty list or a crash', { timeout: 20_000 }, async () => {
+    vi.spyOn(account, 'listSecurityEvents').mockResolvedValue(accountFail('aal2_required'))
+    open()
+    expect(await screen.findByText('Could not load your security activity. This needs 2FA. Sign in with your authenticator code first.')).toBeInTheDocument()
+    expect(screen.queryByText('No security activity yet')).toBeNull()
+    expect(screen.getByRole('heading', { level: 1, name: 'Security activity' })).toBeInTheDocument()
+  })
 })

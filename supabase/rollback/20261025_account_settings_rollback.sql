@@ -92,6 +92,8 @@ drop function if exists public.caller_has_verified_factor();
 
 -- 3. Policies on shared tables, and the storage owner policies as the storage migration created them.
 drop policy if exists "Users read their own account events" on public.audit_events;
+-- Added by 20261025180600_account_settings_optin_2fa; the policy above uses it, so it goes after the policy.
+drop function if exists public.caller_mfa_satisfied();
 drop index if exists public.audit_events_actor_type_created_idx;
 drop index if exists public.audit_events_account_subject_idx;
 drop policy if exists "Logo writers can read" on storage.objects;
@@ -210,7 +212,8 @@ drop function if exists private.closure_follow_status();
 
 -- 5. The avatars bucket, only when empty. Hosted Storage blocks direct deletes from its tables unless
 -- storage.allow_delete_query is on (ignored where the setting does not exist, e.g. PGlite). If the delete is
--- still refused, delete the empty bucket in the dashboard (Storage > avatars > Delete bucket).
+-- still refused, the refusal is only a notice (the rest of this rollback commits): delete the empty bucket in
+-- the dashboard then (Storage > avatars > Delete bucket).
 do $$
 begin
   perform set_config('storage.allow_delete_query', 'true', true);
@@ -218,8 +221,14 @@ exception when others then
   null;
 end;
 $$;
-delete from storage.buckets b
- where b.id = 'avatars'
-   and not exists (select 1 from storage.objects o where o.bucket_id = b.id);
+do $$
+begin
+  delete from storage.buckets b
+   where b.id = 'avatars'
+     and not exists (select 1 from storage.objects o where o.bucket_id = b.id);
+exception when others then
+  raise notice 'avatars bucket not deleted (%): delete it in the dashboard (Storage > avatars > Delete bucket)', sqlerrm;
+end;
+$$;
 
 commit;

@@ -46,6 +46,29 @@ as $$
           or not coalesce((select s.require_2fa_business from public.platform_settings s where s.id), false));
 $$;
 
+-- The own security activity as 20261025163627_account_settings created it (the policy first: it uses
+-- caller_mfa_satisfied).
+drop policy if exists "Users read their own account events" on public.audit_events;
+create policy "Users read their own account events" on public.audit_events
+  for select to authenticated
+  using (event_type like 'account\_%'
+         and (actor_id = (select auth.uid()) or metadata ->> 'subject_id' = (select auth.uid())::text));
+
+create or replace function public.list_my_security_events()
+returns setof public.audit_events
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select e.* from public.audit_events e
+  where (e.actor_id = (select auth.uid()) or e.metadata ->> 'subject_id' = (select auth.uid())::text)
+    and e.event_type like 'account\_%'
+  order by e.created_at desc, e.id
+  limit 50;
+$$;
+
+drop function if exists public.caller_mfa_satisfied();
 drop function if exists public.caller_has_verified_factor();
 
 commit;

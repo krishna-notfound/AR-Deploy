@@ -9,6 +9,8 @@
 -- no verified factor). Users without 2FA are unaffected; an unverified (half-enrolled) factor does not count.
 -- Not gated, as before: the own profile row, platform_settings, my_security_state, record_sign_in and the
 -- Auth MFA APIs, so a user signed in at aal1 can still finish the TOTP challenge or set 2FA up.
+-- Gated by the same rule (final review): the caller's own account events (list_my_security_events and the
+-- own-events read policy on audit_events), which hold sign-in IPs and devices.
 -- =============================================================================
 
 -- True when the caller has a verified MFA factor. Security definer: the API roles cannot read auth.mfa_factors.
@@ -79,3 +81,54 @@ revoke execute on function public.is_platform_admin() from public, anon;
 revoke execute on function public.is_business_member(uuid) from public, anon;
 grant execute on function public.is_platform_admin() to authenticated, service_role;
 grant execute on function public.is_business_member(uuid) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- The caller's own security activity (sign-in IPs and devices) needs the same 2FA rule as their data.
+-- ---------------------------------------------------------------------------
+
+-- True when the caller's session meets 2FA for their own account: aal2, or (the policy of the caller's group is
+-- off and the caller has no verified factor). Security definer: private.requires_2fa and auth.mfa_factors are not
+-- reachable from the API roles. Answers for auth.uid() only.
+create function public.caller_mfa_satisfied()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select auth.jwt()) ->> 'aal', '') = 'aal2'
+      or (not private.requires_2fa((select auth.uid())) and not public.caller_has_verified_factor());
+$$;
+revoke execute on function public.caller_mfa_satisfied() from public, anon;
+grant execute on function public.caller_mfa_satisfied() to authenticated, service_role;
+
+-- The caller's own account_ events, newest first, at most 50. Refused with aal2_required (42501) while the
+-- session does not meet 2FA, so the app shows a plain refusal instead of an empty list.
+create or replace function public.list_my_security_events()
+returns setof public.audit_events
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.caller_mfa_satisfied() then
+    raise exception 'aal2_required' using errcode = '42501';
+  end if;
+  return query
+    select e.* from public.audit_events e
+    where (e.actor_id = (select auth.uid()) or e.metadata ->> 'subject_id' = (select auth.uid())::text)
+      and e.event_type like 'account\_%'
+    order by e.created_at desc, e.id
+    limit 50;
+end;
+$$;
+revoke execute on function public.list_my_security_events() from public, anon;
+grant execute on function public.list_my_security_events() to authenticated;
+
+drop policy if exists "Users read their own account events" on public.audit_events;
+create policy "Users read their own account events" on public.audit_events
+  for select to authenticated
+  using (event_type like 'account\_%'
+         and (actor_id = (select auth.uid()) or metadata ->> 'subject_id' = (select auth.uid())::text)
+         and (select public.caller_mfa_satisfied()));
