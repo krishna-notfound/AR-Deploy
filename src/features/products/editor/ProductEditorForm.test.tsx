@@ -143,6 +143,76 @@ describe('product editor: publish rules', () => {
   })
 })
 
+describe('product editor: section index, language control and publish bar (BRIEF section 6)', () => {
+  const publishBar = (root: HTMLElement = document.body) => within(root).getByRole('region', { name: 'Save and publish' })
+
+  it('the publish bar says "Not saved yet", then "Unsaved changes" after an edit and "All changes saved" after saving', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    expect(within(publishBar()).getByText('Not saved yet')).toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), 'Test sofa')
+    expect(within(publishBar()).getByText('Unsaved changes')).toBeInTheDocument()
+    await user.click(within(publishBar()).getByRole('button', { name: 'Save draft' }))
+    const edit = await screen.findByTestId('edit-route', {}, { timeout: 10_000 })
+    expect(await within(publishBar(edit)).findByText('All changes saved')).toBeInTheDocument()
+    expect(within(publishBar(edit)).getByRole('button', { name: 'Preview' })).toBeInTheDocument()
+    expect(within(publishBar(edit)).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
+  })
+
+  it('announces only the save status, not the status badge', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    const live = publishBar().querySelectorAll('[aria-live]')
+    expect(live).toHaveLength(1)
+    expect(live[0]).toHaveTextContent(/^Not saved yet$/)
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), 'Sofa')
+    expect(publishBar().querySelector('[aria-live]')).toHaveTextContent(/^Unsaved changes$/)
+  })
+
+  it('marks the clicked index item as the current location', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    const index = screen.getByRole('navigation', { name: 'Editor sections' })
+    expect(within(index).getByRole('link', { name: 'Basic information' })).toHaveAttribute('aria-current', 'location')
+    await user.click(within(index).getByRole('link', { name: 'Dimensions & specs' }))
+    expect(within(index).getByRole('link', { name: 'Dimensions & specs' })).toHaveAttribute('aria-current', 'location')
+    expect(within(index).getByRole('link', { name: 'Basic information' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks the index item of a section with errors, and only those', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    const index = screen.getByRole('navigation', { name: 'Editor sections' })
+    expect(within(index).getByRole('link', { name: 'Basic information' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Publish' }))
+    expect(within(index).getByRole('link', { name: 'Basic information (has errors)' })).toBeInTheDocument()
+    expect(within(index).getByRole('link', { name: 'Images (has errors)' })).toBeInTheDocument()
+    expect(within(index).getByRole('link', { name: 'Dimensions & specs (has errors)' })).toBeInTheDocument()
+    expect(within(index).getByRole('link', { name: 'Call to action' })).toBeInTheDocument()
+    expect(within(index).getByRole('link', { name: '3D models' })).toBeInTheDocument()
+    expect(within(index).queryAllByRole('link', { name: /\(has errors\)$/ })).toHaveLength(3)
+    // The COR-12 summary text is unchanged.
+    expect(within(summary()).getByText('Fix these 5 issues to continue')).toBeInTheDocument()
+  })
+
+  it('the EN/PT switch is a group named after its field, with two toggle buttons and a "PT ·" marker', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    const group = screen.getByRole('group', { name: 'Product name language' })
+    const buttons = within(group).getAllByRole('button')
+    expect(buttons).toHaveLength(2)
+    expect(within(group).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'true')
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), 'Sofa')
+    const pt = within(group).getByRole('button', { name: /^PT/ })
+    expect(pt).toHaveTextContent('PT ·')
+    await user.click(pt)
+    expect(pt).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('If left empty, customers see the English text.')).toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), 'Sofá')
+    expect(pt).toHaveTextContent(/^PT$/)
+  })
+})
+
 describe('product editor: uploads and units', () => {
   it('keeps both models when a slow GLB finishes after a fast USDZ (COR-13)', async () => {
     const user = userEvent.setup()

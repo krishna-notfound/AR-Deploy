@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ChevronDown, CircleSlash, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ChevronDown, CircleSlash, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button, IconButton } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Form'
@@ -31,6 +31,7 @@ export function VariantsEditor({
   businessId,
   dimensions,
   poster,
+  error,
 }: {
   variants: ProductVariant[]
   /** Receives an updater, so uploads that finish later never overwrite changes made meanwhile. */
@@ -39,6 +40,8 @@ export function VariantsEditor({
   businessId?: string
   dimensions: Dimensions
   poster?: string
+  /** The variants' save error, shown under the heading. */
+  error?: string
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const set = (id: string, fn: (v: ProductVariant) => ProductVariant) => onChange((list) => list.map((v) => (v.id === id ? fn(v) : v)))
@@ -51,11 +54,29 @@ export function VariantsEditor({
       return next
     })
   const summary = variantMediaSummary(variants)
+  const add = () => onChange((list) => [...list, { id: newId('var'), name: { en: '' }, colorHex: '#c8c2b8' }])
 
   return (
     <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[14px] leading-5 font-semibold text-ink">Colours and variants</h3>
+          <p className="mt-0.5 text-[13px] leading-[1.45] text-ink-muted">
+            {variants.length ? 'The price difference is added to the base price when a customer selects the option.' : 'No colours or options yet.'}
+          </p>
+          {error && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-[1.45] text-danger">
+              <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              {error}
+            </p>
+          )}
+        </div>
+        <Button size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={add}>
+          Add colour or option
+        </Button>
+      </div>
       {variants.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="mt-4 space-y-2">
           {variants.map((v, i) => {
             const label = v.name.en || 'option'
             const photos = v.images?.length ?? 0
@@ -63,14 +84,14 @@ export function VariantsEditor({
             const expanded = open === v.id
             const panelId = `${v.id}-media`
             return (
-              <li key={v.id} className="rounded-lg border border-line">
+              <li key={v.id} className="rounded-[var(--radius-card)] border border-line">
                 <div className="grid grid-cols-[auto_1fr_auto] items-start gap-2 p-2.5 sm:grid-cols-[auto_1fr_1fr_8rem_7rem_auto]">
                   <input
                     type="color"
                     aria-label={`Colour swatch for ${label}`}
                     value={v.colorHex ?? '#cccccc'}
                     onChange={(e) => update(v.id, { colorHex: e.target.value })}
-                    className="size-10 cursor-pointer rounded-md border border-line-strong bg-surface p-1"
+                    className="size-10 cursor-pointer rounded-[var(--radius-control)] border border-line-strong bg-surface p-1"
                   />
                   <Input aria-label="Option name (English)" placeholder="Name (English)" value={v.name.en} onChange={(e) => update(v.id, { name: { ...v.name, en: e.target.value } })} />
                   <Input
@@ -107,7 +128,7 @@ export function VariantsEditor({
                     </IconButton>
                   </div>
                   {Number.isNaN(v.priceDelta) && (
-                    <p id={`${v.id}-delta-error`} className="col-span-full text-xs font-medium text-danger">
+                    <p id={`${v.id}-delta-error`} className="col-span-full text-[13px] text-danger">
                       Enter the price difference as an amount such as 25.00. Negative amounts are not supported.
                     </p>
                   )}
@@ -126,8 +147,8 @@ export function VariantsEditor({
                 {expanded && (
                   <div id={panelId} className="min-w-0 space-y-5 border-t border-line p-3 sm:p-4">
                     <div>
-                      <h4 className="text-sm font-semibold">Photos for {label}</h4>
-                      <p className="mb-3 text-xs text-ink-muted">
+                      <h4 className="text-[14px] font-semibold text-ink">Photos for {label}</h4>
+                      <p className="mt-0.5 mb-3 text-[13px] text-ink-muted">
                         {photos ? 'Shown in the gallery when a customer picks this option.' : 'No photos yet: customers who pick this option see the product’s photos.'}
                       </p>
                       <ImageUpload
@@ -141,7 +162,7 @@ export function VariantsEditor({
                       />
                     </div>
                     <div className="border-t border-line pt-4">
-                      <h4 className="mb-3 text-sm font-semibold">3D models for {label}</h4>
+                      <h4 className="mb-3 text-[14px] font-semibold text-ink">3D models for {label}</h4>
                       <ModelSection
                         context="variant"
                         businessId={businessId}
@@ -159,19 +180,15 @@ export function VariantsEditor({
           })}
         </ul>
       )}
-      <Button size="sm" className="mt-3" icon={<Plus className="size-4" aria-hidden />} onClick={() => onChange((list) => [...list, { id: newId('var'), name: { en: '' }, colorHex: '#c8c2b8' }])}>
-        Add colour or option
-      </Button>
-      <p className="mt-2 text-xs text-ink-muted">The price difference is added to the base price when a customer selects the option.</p>
       {summary.total > 0 && (
         <section aria-label="Options: photos and 3D" className="mt-4 rounded-[var(--radius-card)] border border-line p-4">
-          <h4 className="text-sm font-semibold">
+          <h4 className="text-[14px] font-semibold text-ink">
             {summary.withModel} of {summary.total} option{summary.total === 1 ? '' : 's'} have their own 3D model
           </h4>
-          <p className="mt-0.5 text-xs text-ink-muted">Never required to publish. Options without their own files show the product’s photos and model, with a note on the page.</p>
+          <p className="mt-0.5 text-[13px] text-ink-muted">Never required to publish. Options without their own files show the product’s photos and model, with a note on the page.</p>
           <ul className="mt-3 space-y-2">
             {summary.lines.map((l) => (
-              <li key={l.id} className="flex items-start gap-2.5 text-xs">
+              <li key={l.id} className="flex items-start gap-2.5 text-[13px]">
                 {l.level === 'ready' ? (
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
                 ) : l.level === 'warning' ? (

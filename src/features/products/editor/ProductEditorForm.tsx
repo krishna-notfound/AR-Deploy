@@ -1,5 +1,5 @@
 import { useCan } from '@/auth/usePermission'
-import { AlertCircle, ExternalLink, Eye, EyeOff, Save, Trash2 } from 'lucide-react'
+import { AlertCircle, ExternalLink, EyeOff, Trash2 } from 'lucide-react'
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useBlocker, useLocation, useNavigate } from 'react-router'
 import { type Crumb, PageHeader } from '@/components/layout/PageHeader'
@@ -7,7 +7,7 @@ import { ProductStatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { CopyButton } from '@/components/ui/CopyButton'
-import { FormField, Input, InputAddon, SegmentedControl, Select } from '@/components/ui/Form'
+import { FormField, Input, InputAddon, Select } from '@/components/ui/Form'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -22,6 +22,7 @@ import { type EditorScope, editPath, useProductActions } from '../useProductActi
 import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput } from './formModel'
 import { LocalizedField } from './LocalizedField'
 import { ModelSection } from './ModelSection'
+import { Segmented } from './Segmented'
 import { VariantsEditor } from './VariantsEditor'
 
 const SECTIONS = [
@@ -79,6 +80,61 @@ function checkForm(f: EditorForm) {
 /** Identical messages (the three dimensions) count and show once. */
 const issueCount = (e: Errors) => new Set(Object.values(e)).size
 
+/** Below the sticky top bar (56px) plus a 24px gap: the section-index offset and the sections' scroll margin. */
+const STICKY_TOP = 80
+
+type SectionId = (typeof SECTIONS)[number]['id']
+
+/**
+ * The section being read: the last one whose top has passed the sticky offset, or the last one at the page end.
+ * A section picked in the index stays marked until the user scrolls by hand, so a short last section never
+ * steals the mark from the one that was clicked.
+ */
+function useActiveSection(): [SectionId, (id: SectionId) => void] {
+  const [active, setActive] = useState<SectionId>(SECTIONS[0].id)
+  const picked = useRef<SectionId | null>(null)
+  useEffect(() => {
+    let frame = 0
+    const measure = () => {
+      frame = 0
+      if (picked.current) return setActive(picked.current)
+      let current: SectionId = SECTIONS[0].id
+      for (const s of SECTIONS) {
+        const box = document.getElementById(s.id)?.getBoundingClientRect()
+        if (box && box.height > 0 && box.top <= STICKY_TOP + 40) current = s.id
+      }
+      const doc = document.documentElement
+      if (window.scrollY > 0 && window.innerHeight + window.scrollY >= doc.scrollHeight - 2) current = SECTIONS[SECTIONS.length - 1]!.id
+      setActive(current)
+    }
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure)
+    }
+    const release = () => {
+      picked.current = null
+    }
+    measure()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    window.addEventListener('wheel', release, { passive: true })
+    window.addEventListener('touchmove', release, { passive: true })
+    window.addEventListener('keydown', release)
+    return () => {
+      if (frame) cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      window.removeEventListener('wheel', release)
+      window.removeEventListener('touchmove', release)
+      window.removeEventListener('keydown', release)
+    }
+  }, [])
+  const pick = (id: SectionId) => {
+    picked.current = id
+    setActive(id)
+  }
+  return [active, pick]
+}
+
 export function ProductEditorForm({
   scope,
   product,
@@ -126,6 +182,21 @@ export function ProductEditorForm({
   const summaryRef = useRef<HTMLDivElement>(null)
   const prevForm = useRef(form)
   const dimErrId = useId()
+  const [activeSection, pickSection] = useActiveSection()
+  const chipsRef = useRef<HTMLUListElement>(null)
+
+  // Phones: keep the active chip in view. The row scrolls sideways inside itself; the page never scrolls, because
+  // the chip row is usually off-screen while the user reads further down.
+  useEffect(() => {
+    const row = chipsRef.current
+    if (!row || row.scrollWidth <= row.clientWidth || window.matchMedia?.('(min-width: 1024px)').matches) return
+    const chip = row.querySelector<HTMLElement>('[aria-current="location"]')?.parentElement
+    if (!chip) return
+    const pad = 16
+    const left = chip.offsetLeft - row.offsetLeft
+    if (left - pad < row.scrollLeft) row.scrollTo?.({ left: left - pad, behavior: 'smooth' })
+    else if (left + chip.offsetWidth + pad > row.scrollLeft + row.clientWidth) row.scrollTo?.({ left: left + chip.offsetWidth + pad - row.clientWidth, behavior: 'smooth' })
+  }, [activeSection])
 
   const dirty = JSON.stringify(form) !== snapshot
   const business = businesses.find((b) => b.id === form.input.businessId) ?? fixedBusiness
@@ -301,8 +372,11 @@ export function ProductEditorForm({
   const dimError = DIMS.map((k) => err(`dimensions.${k}`)).find(Boolean)
   const poster = primaryImage({ images: form.input.images } as Product)?.url
 
+  const statusText = dirty ? 'Unsaved changes' : isNew ? 'Not saved yet' : 'All changes saved'
+
   return (
-    <>
+    // The form column stops at 792px (BRIEF section 6: a 200px index, a 32px gap, then the cards).
+    <div className="lg:max-w-[1024px]">
       <PageHeader
         title={isNew ? 'Add product' : form.input.name.en || 'Untitled product'}
         breadcrumbs={breadcrumbs}
@@ -310,28 +384,51 @@ export function ProductEditorForm({
           <>
             <ProductStatusBadge status={isNew ? 'draft' : currentStatus} />
             {business && <span className="text-[13px] text-ink-muted">{business.name}</span>}
-            {dirty && <span className="text-[13px] text-warning">Unsaved changes</span>}
+            {dirty && (
+              <>
+                <span aria-hidden className="text-[13px] text-line-strong">
+                  ·
+                </span>
+                <span className="text-[13px] font-medium text-warning">Unsaved changes</span>
+              </>
+            )}
           </>
         }
         actions={
           !isNew && allowed('products.delete') && (
-            <Button variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={onDelete} loading={busy === 'delete'} disabled={!!busy} className="text-danger hover:bg-danger-soft">
+            <Button variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={onDelete} loading={busy === 'delete'} disabled={!!busy} className="text-danger! hover:bg-danger-soft">
               Delete
             </Button>
           )
         }
       />
 
-      <div className="grid gap-8 lg:grid-cols-[180px_minmax(0,1fr)]">
-        <nav aria-label="Editor sections" className="hidden lg:block">
-          <ul className="sticky top-24 space-y-0.5 text-[13px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
+        {/* Under lg a scrolling row of chips; from lg a 200px sticky list with a 2px ink bar on the active item. */}
+        <nav aria-label="Editor sections" className="-mx-4 min-w-0 sm:-mx-6 lg:mx-0">
+          <ul ref={chipsRef} className="flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 lg:sticky lg:top-20 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0">
             {SECTIONS.map((s) => {
               const hasError = errorList.some(([k]) => FIELD_SECTION[k] === s.id)
+              const active = activeSection === s.id
               return (
-                <li key={s.id}>
-                  <a href={`#${s.id}`} className={cn('flex items-center justify-between rounded-md px-2.5 py-1.5 hover:bg-subtle', hasError ? 'text-danger' : 'text-ink-muted hover:text-ink')}>
+                <li key={s.id} className="shrink-0">
+                  <a
+                    href={`#${s.id}`}
+                    onClick={() => pickSection(s.id)}
+                    aria-current={active ? 'location' : undefined}
+                    aria-label={hasError ? `${s.label} (has errors)` : undefined}
+                    className={cn(
+                      'flex h-10 items-center gap-2 rounded-[var(--radius-control)] border px-4 text-[14px] whitespace-nowrap transition-colors max-lg:pointer-coarse:h-11',
+                      'lg:h-9 lg:justify-between lg:rounded-none lg:border-0 lg:border-l-2 lg:bg-transparent lg:px-3',
+                      hasError
+                        ? cn('border-danger/40 text-danger', active ? 'bg-danger-soft font-medium lg:border-danger' : 'bg-surface lg:border-transparent')
+                        : active
+                          ? 'border-ink bg-ink font-medium text-chalk lg:text-ink'
+                          : 'border-line bg-surface text-ink-muted hover:text-ink lg:border-transparent',
+                    )}
+                  >
                     {s.label}
-                    {hasError && <AlertCircle className="size-3.5" aria-label="Has errors" />}
+                    {hasError && <AlertCircle className="size-4 shrink-0" aria-hidden />}
                   </a>
                 </li>
               )
@@ -339,15 +436,18 @@ export function ProductEditorForm({
           </ul>
         </nav>
 
-        <div className="min-w-0 space-y-6 pb-28">
+        <div className="min-w-0 space-y-6 pb-16">
           {errorList.length > 0 && (
-            <div ref={summaryRef} tabIndex={-1} role="alert" className="rounded-[var(--radius-card)] border border-danger/30 bg-danger-soft px-4 py-3 outline-none">
-              <p className="text-sm font-semibold text-danger">Fix {issues.length === 1 ? 'this issue' : `these ${issues.length} issues`} to continue</p>
-              <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-[13px] text-danger">
-                {issues.map(([msg, k]) => (
-                  <li key={k}>{FIELD_SECTION[k] ? <a href={`#${FIELD_SECTION[k]}`} className="underline">{msg}</a> : msg}</li>
-                ))}
-              </ul>
+            <div ref={summaryRef} tabIndex={-1} role="alert" className="flex gap-3 rounded-[var(--radius-card)] border border-danger/40 bg-danger-soft p-4 outline-none focus-visible:outline-2 focus-visible:outline-danger sm:px-6">
+              <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold text-danger">Fix {issues.length === 1 ? 'this issue' : `these ${issues.length} issues`} to continue</p>
+                <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[13px] leading-[1.45] text-danger">
+                  {issues.map(([msg, k]) => (
+                    <li key={k}>{FIELD_SECTION[k] ? <a href={`#${FIELD_SECTION[k]}`} className="underline underline-offset-2">{msg}</a> : msg}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
 
@@ -404,7 +504,7 @@ export function ProductEditorForm({
             </FormField>
             <LocalizedField label="Short description" value={form.input.shortDescription} onChange={(shortDescription) => setInput({ shortDescription })} maxLength={160} hint="One sentence shown under the price." />
             <LocalizedField label="Full description" multiline rows={5} value={form.input.description} onChange={(description) => setInput({ description })} />
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
               <FormField label="Category">
                 <Select value={form.input.category} onChange={(e) => setInput({ category: e.target.value as Category })}>
                   {CATEGORIES.map((c) => (
@@ -416,7 +516,7 @@ export function ProductEditorForm({
                 </Select>
               </FormField>
               <FormField label="Price" error={err('price')} hint="Required to publish.">
-                <Input inputMode="decimal" placeholder="0.00" value={form.priceText} onChange={(e) => setForm((f) => ({ ...f, priceText: e.target.value }))} />
+                <Input inputMode="decimal" placeholder="0.00" className="tabular-nums" value={form.priceText} onChange={(e) => setForm((f) => ({ ...f, priceText: e.target.value }))} />
               </FormField>
               <FormField label="Currency">
                 <Select value={form.input.currency} onChange={(e) => setInput({ currency: e.target.value as Currency })}>
@@ -432,9 +532,9 @@ export function ProductEditorForm({
 
           <Section id="images" title="Images" description="Product photos for the gallery. At least one is required to publish." error={err('images')}>
             <ImageUpload label="Upload product images" kind="gallery" businessId={form.input.businessId} images={form.input.images} onChange={updateImages} />
-            <div className="border-t border-line pt-5">
-              <h3 className="mb-1 text-sm font-semibold">Additional photos</h3>
-              <p className="mb-3 text-xs text-ink-muted">Room shots, details and close-ups shown lower on the product page.</p>
+            <div className="border-t border-line pt-6">
+              <h3 className="text-[14px] leading-5 font-semibold text-ink">Additional photos</h3>
+              <p className="mt-0.5 mb-3 text-[13px] leading-[1.45] text-ink-muted">Room shots, details and close-ups shown lower on the product page.</p>
               <ImageUpload label="Upload additional photos" kind="additional" businessId={form.input.businessId} allowPrimary={false} images={form.input.images} onChange={updateImages} />
             </div>
           </Section>
@@ -452,8 +552,9 @@ export function ProductEditorForm({
 
           <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale.">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium">Measured in</span>
-              <SegmentedControl
+              <span className="text-[14px] font-medium text-ink">Measured in</span>
+              <Segmented
+                kind="radio"
                 label="Dimension unit"
                 value={unit}
                 onChange={onUnit}
@@ -474,6 +575,7 @@ export function ProductEditorForm({
                       <InputAddon side="right" addon={unit}>
                         <Input
                           inputMode="decimal"
+                          className="tabular-nums"
                           {...(shared ? { 'aria-invalid': true, 'aria-describedby': dimErrId } : {})}
                           value={form.dims[k]}
                           onChange={(ev) => setForm((f) => ({ ...f, dims: { ...f.dims, [k]: ev.target.value } }))}
@@ -484,16 +586,18 @@ export function ProductEditorForm({
                 })}
               </div>
               {dimError && (
-                <p id={dimErrId} className="mt-1.5 text-xs font-medium text-danger">
+                <p id={dimErrId} className="mt-2 flex items-start gap-1.5 text-[13px] leading-[1.45] text-danger">
+                  <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                   {dimError}
                 </p>
               )}
             </div>
-            <div className="grid items-start gap-4 sm:grid-cols-[1fr_14rem] [&>*:last-child]:sm:pt-3">
+            {/* The weight label row has no EN/PT switch, so it drops 4px to line its input up with the material's. */}
+            <div className="grid items-start gap-4 sm:grid-cols-[2fr_1fr] [&>*:last-child]:sm:pt-1">
               <LocalizedField label="Material" value={form.input.material} onChange={(material) => setInput({ material })} placeholder="e.g. Solid oak, linen upholstery" />
               <FormField label="Weight" optional error={err('weight')}>
                 <div className="flex gap-2">
-                  <Input inputMode="decimal" value={form.weightText} onChange={(e) => setForm((f) => ({ ...f, weightText: e.target.value }))} />
+                  <Input inputMode="decimal" className="tabular-nums" value={form.weightText} onChange={(e) => setForm((f) => ({ ...f, weightText: e.target.value }))} />
                   <Select
                     aria-label="Weight unit"
                     className="w-20 shrink-0"
@@ -506,10 +610,9 @@ export function ProductEditorForm({
                 </div>
               </FormField>
             </div>
-            <div>
-              <h3 className="mb-1 text-sm font-semibold">Colours and variants</h3>
-              {err('variants') && <p className="mb-2 text-xs font-medium text-danger">{err('variants')}</p>}
+            <div className="border-t border-line pt-5">
               <VariantsEditor
+                error={err('variants')}
                 variants={form.input.variants}
                 onChange={(update) => setForm((f) => ({ ...f, input: { ...f.input, variants: update(f.input.variants) } }))}
                 currency={form.input.currency}
@@ -521,7 +624,7 @@ export function ProductEditorForm({
           </Section>
 
           <Section id="cta" title="Call to action" description="The main button on the product page, for example a contact form or WhatsApp link.">
-            <div className="grid items-start gap-4 sm:grid-cols-2 [&>*:last-child]:sm:pt-3">
+            <div className="grid items-start gap-x-6 gap-y-5 sm:grid-cols-2 [&>*:last-child]:sm:pt-1">
               <LocalizedField label="Button label" value={form.input.cta.label} onChange={(label) => setInput({ cta: { ...form.input.cta, label } })} maxLength={40} />
               <FormField label="Button link" optional error={err('cta.url')} hint="If empty, the button shows the store’s contact details.">
                 <Input type="url" placeholder="https://" value={form.input.cta.url ?? ''} onChange={(e) => setInput({ cta: { ...form.input.cta, url: e.target.value } })} />
@@ -531,30 +634,35 @@ export function ProductEditorForm({
         </div>
       </div>
 
-      {/* Sticky publishing bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w,0)]">
-        <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="mr-auto hidden items-center gap-2 text-[13px] text-ink-muted sm:flex">
+      {/* Sticky publishing bar (BRIEF section 6): 64px from sm; on phones the status sits above three equal buttons. */}
+      <section aria-label="Save and publish" className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w,0)]">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-2.5 px-4 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-0 lg:px-10">
+          <p className="flex min-w-0 items-center gap-2.5 text-[13px] text-ink-muted">
             <ProductStatusBadge status={isNew ? 'draft' : currentStatus} />
-            {dirty ? 'Unsaved changes' : isNew ? 'Not saved yet' : 'All changes saved'}
+            <span aria-live="polite" className={cn(dirty && 'max-sm:font-medium max-sm:text-warning')}>
+              {statusText}
+            </span>
+          </p>
+          <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:items-center sm:gap-3">
+            <Button onClick={onPreview} loading={busy === 'preview'} disabled={!!busy || !business} className="max-sm:px-2">
+              Preview
+              {busy !== 'preview' && <ExternalLink className="size-4" aria-hidden />}
+            </Button>
+            <Button onClick={onSaveDraft} loading={busy === 'save'} disabled={!!busy || (!dirty && !isNew)} className="max-sm:px-2">
+              {currentStatus === 'published' && !isNew ? 'Save changes' : 'Save draft'}
+            </Button>
+            {!allowed('products.publish') ? null : currentStatus === 'published' && !isNew ? (
+              <Button variant="secondary" onClick={onUnpublish} loading={busy === 'unpublish'} disabled={!!busy} icon={<EyeOff className="size-4" aria-hidden />} className="max-sm:px-2">
+                Unpublish
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={onPublish} loading={busy === 'publish'} disabled={!!busy} className="max-sm:px-2 sm:px-5">
+                Publish
+              </Button>
+            )}
           </div>
-          <Button onClick={onPreview} loading={busy === 'preview'} disabled={!!busy || !business} icon={<ExternalLink className="size-4" aria-hidden />}>
-            Preview
-          </Button>
-          <Button onClick={onSaveDraft} loading={busy === 'save'} disabled={!!busy || (!dirty && !isNew)} icon={<Save className="size-4" aria-hidden />}>
-            {currentStatus === 'published' && !isNew ? 'Save changes' : 'Save draft'}
-          </Button>
-          {!allowed('products.publish') ? null : currentStatus === 'published' && !isNew ? (
-            <Button variant="secondary" onClick={onUnpublish} loading={busy === 'unpublish'} disabled={!!busy} icon={<EyeOff className="size-4" aria-hidden />}>
-              Unpublish
-            </Button>
-          ) : (
-            <Button variant="primary" onClick={onPublish} loading={busy === 'publish'} disabled={!!busy} icon={<Eye className="size-4" aria-hidden />}>
-              Publish
-            </Button>
-          )}
         </div>
-      </div>
+      </section>
 
       <Modal
         open={publishedOpen && !!latest && !!business}
@@ -625,19 +733,27 @@ export function ProductEditorForm({
           </>
         }
       />
-    </>
+    </div>
   )
 }
 
 function Section({ id, title, description, children, error }: { id: string; title: string; description?: string; children: ReactNode; error?: string }) {
+  // A flat card: Inter 16/600 title, one muted line, 24px padding and 20px between fields (BRIEF section 6).
   return (
-    <Card id={id} className="scroll-mt-24">
-      <div className="border-b border-line px-5 py-4">
-        <h2 className="text-[15px] font-semibold">{title}</h2>
-        {description && <p className="mt-0.5 text-[13px] text-ink-muted">{description}</p>}
-        {error && <p className="mt-1 text-xs font-medium text-danger">{error}</p>}
+    <Card id={id} aria-labelledby={`${id}-title`} role="region" className="scroll-mt-20 p-4 sm:p-6">
+      <div className="mb-5">
+        <h2 id={`${id}-title`} className="text-[length:var(--text-ui-card)] leading-[1.4] font-semibold text-ink">
+          {title}
+        </h2>
+        {description && <p className="mt-0.5 text-[13px] leading-[1.45] text-ink-muted">{description}</p>}
+        {error && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-[1.45] text-danger">
+            <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            {error}
+          </p>
+        )}
       </div>
-      <div className="space-y-5 p-5">{children}</div>
+      <div className="space-y-5">{children}</div>
     </Card>
   )
 }
