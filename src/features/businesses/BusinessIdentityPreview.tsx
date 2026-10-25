@@ -14,7 +14,7 @@ export function BusinessIdentityPreview({ business }: { business: Pick<BusinessI
         <div className="flex items-center gap-1.5 border-b border-line bg-canvas px-3 py-2">
           <span className="size-2 rounded-full bg-line-strong" />
           <span className="size-2 rounded-full bg-line-strong" />
-          <span className="ml-2 truncate rounded bg-surface px-2 py-0.5 text-[11px] text-ink-muted">{catalogPublicUrl(business)}</span>
+          <span className="ml-2 truncate rounded bg-surface px-2 py-0.5 text-xs text-ink-muted">{catalogPublicUrl(business)}</span>
         </div>
         <div className="p-5">
           <div className="flex items-center gap-3">

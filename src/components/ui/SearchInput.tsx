@@ -2,11 +2,15 @@ import { Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/cn'
 import { useInDashboard } from '@/components/layout/dashboardContext'
+import { useFieldProps } from './Form'
 
 /** True when the caller already sets a width, so the dashboard default must not fight it. */
 const hasWidth = (c?: string) => !!c && /(^|\s)(\S+:)*(w|max-w|flex)-/.test(c)
 
-/** Debounced search box. Calls onChange 250 ms after typing stops. */
+/**
+ * Debounced search box. Calls onChange 250 ms after typing stops. Inside a FormField it takes the field's id and
+ * description, so the visible label names and focuses it; on its own, `label` is its accessible name.
+ */
 export function SearchInput({
   value,
   onChange,
@@ -23,6 +27,8 @@ export function SearchInput({
   delay?: number
 }) {
   const dash = useInDashboard()
+  const field = useFieldProps()
+  const inField = 'id' in field
   const [draft, setDraft] = useState(value)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -40,7 +46,8 @@ export function SearchInput({
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" aria-hidden />
       <input
         type="search"
-        aria-label={label}
+        {...field}
+        aria-label={inField ? undefined : label}
         value={draft}
         placeholder={placeholder}
         onChange={(e) => setDraft(e.target.value)}
