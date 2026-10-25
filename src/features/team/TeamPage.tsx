@@ -4,7 +4,7 @@ import { History, KeyRound, MailPlus, ShieldCheck, Users, UserCog } from 'lucide
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { ButtonLink } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { SampleDataTag } from '@/components/ui/Badge'
 import { SkeletonRows } from '@/components/ui/Skeleton'
@@ -17,6 +17,7 @@ import { useServiceQuery } from '@/services/hooks'
 import { AccessHistory } from './AccessHistory'
 import { InvitationPanel } from './InvitationPanel'
 import { InvitationsTable } from './InvitationsTable'
+import { InviteMemberDialog } from './InviteMemberDialog'
 import { MembersTable } from './MembersTable'
 
 type Tab = 'members' | 'invitations' | 'history'
@@ -62,6 +63,9 @@ export default function TeamPage() {
             <ButtonLink to="/admin/team/permissions" icon={<KeyRound className="size-4" aria-hidden />}>
               Role permissions
             </ButtonLink>
+            <Button variant="primary" icon={<MailPlus className="size-4" aria-hidden />} onClick={startInvite}>
+              Invite member
+            </Button>
           </>
         }
       />
@@ -106,6 +110,7 @@ export default function TeamPage() {
       </Card>
 
       <InvitationPanel member={inviteFor} onClose={() => setParam('invite', null)} />
+      <InviteMemberDialog open={params.get('new') === '1'} onClose={() => setParam('new', null)} onInvited={() => members.refetch()} />
     </>
   )
 }
