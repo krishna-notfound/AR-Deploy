@@ -15,6 +15,7 @@ import { BrandMark, Wordmark } from '../ui/BrandMark'
 import { InlineNotice } from '../ui/States'
 import { DashboardContext, type DashboardContextValue, useDashboard, usePendingApplications } from './dashboardContext'
 import { FullPageSpinner } from './FullPageSpinner'
+import { BreadcrumbSlotContext, type BreadcrumbSlot } from './PageHeader'
 import type { NavItem } from './nav'
 
 const SIDEBAR_KEY = 'arfurn:sidebar'
@@ -35,6 +36,9 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
   const nav = useMemo(() => allNav.filter((i) => !i.requires || can(i.requires)), [allNav, can])
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
+  // The top bar's breadcrumb slot: a page header portals its path in here and the default trail steps aside.
+  const [crumbSlot, setCrumbSlot] = useState<HTMLElement | null>(null)
+  const [hasCrumbs, setHasCrumbs] = useState(false)
   const location = useLocation()
   const { business } = useAccount()
 
@@ -63,8 +67,11 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
     [variant, business?.name],
   )
 
+  const crumbs = useMemo<BreadcrumbSlot>(() => ({ slot: crumbSlot, setHasCrumbs }), [crumbSlot])
+
   return (
     <DashboardContext.Provider value={ctx}>
+      <BreadcrumbSlotContext.Provider value={crumbs}>
       <div data-surface="dashboard" className="min-h-dvh bg-canvas" style={{ '--sidebar-w': collapsed ? '72px' : '256px' } as React.CSSProperties}>
         <a href="#main" className="sr-only z-50 rounded bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
           Skip to content
@@ -102,7 +109,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
         {mobileOpen && <MobileDrawer nav={nav} variant={variant} onClose={() => setMobileOpen(false)} />}
 
         <div className={cn('transition-[padding] duration-150', collapsed ? 'lg:pl-[72px]' : 'lg:pl-64')}>
-          <Topbar onMenu={() => setMobileOpen(true)} nav={nav} variant={variant} />
+          <Topbar onMenu={() => setMobileOpen(true)} nav={nav} variant={variant} slotRef={setCrumbSlot} hasCrumbs={hasCrumbs} />
           <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1320px] px-4 pt-6 pb-16 outline-none sm:px-6 lg:px-10 lg:pt-10">
             {variant === 'business' && <CatalogStatusNotice />}
             <Suspense fallback={<FullPageSpinner />}>
@@ -111,6 +118,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
           </main>
         </div>
       </div>
+      </BreadcrumbSlotContext.Provider>
     </DashboardContext.Provider>
   )
 }
@@ -157,11 +165,11 @@ function Brand({ collapsed, variant }: { collapsed?: boolean; variant: Variant }
     )
   }
   return (
-    <Link to={to} className="flex min-w-0 flex-col items-start gap-2.5 rounded-[var(--radius-control)] focus-visible:outline-accent-bright">
-      <Wordmark size={15} className="text-chalk" />
-      <span className="max-w-full truncate border border-chalk/25 px-1.5 py-0.5 text-[10px] leading-none font-medium tracking-[0.18em] text-chalk/75 uppercase">
-        {label}
+    <Link to={to} className="flex min-w-0 flex-col items-start gap-1.5 rounded-[var(--radius-control)] focus-visible:outline-accent-bright">
+      <span data-wordmark className="flex">
+        <Wordmark size={15} className="text-chalk" />
       </span>
+      <span className="max-w-full truncate text-[length:var(--text-ui-small)] leading-[1.3] text-chalk/70">{label}</span>
     </Link>
   )
 }
@@ -177,7 +185,7 @@ function NavBadge({ kind, collapsed }: { kind: NonNullable<NavItem['badge']>; co
       <span
         aria-hidden
         className={cn(
-          'grid h-[18px] min-w-[18px] place-items-center rounded-[var(--radius-control)] bg-accent-bright px-1 text-[10.5px] leading-none font-semibold text-obsidian tabular-nums',
+          'grid h-[18px] min-w-[18px] place-items-center rounded-[var(--radius-control)] bg-accent-bright px-1 text-[12px] leading-none font-semibold text-obsidian tabular-nums',
           collapsed ? 'absolute top-0.5 right-1.5' : 'ml-auto',
         )}
       >
@@ -217,7 +225,7 @@ function SidebarContent({
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'relative flex h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-[13.5px] transition-colors focus-visible:outline-accent-bright',
+                    'relative flex h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-[length:var(--text-ui-body)] transition-colors focus-visible:outline-accent-bright',
                     collapsed && 'justify-center px-0',
                     isActive
                       ? 'bg-white/[0.08] font-medium text-chalk before:absolute before:inset-y-2 before:left-0 before:w-[2px] before:bg-accent-bright'
@@ -273,8 +281,8 @@ function UserBlock({ collapsed }: { collapsed?: boolean }) {
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium text-chalk">{user?.name ?? 'Signed in'}</p>
-            <p className="truncate text-[11px] text-chalk/65">
+            <p className="truncate text-[length:var(--text-ui-body)] font-medium text-chalk">{user?.name ?? 'Signed in'}</p>
+            <p className="truncate text-[12px] text-chalk/65">
               {user?.email}
               {isDemoMode && ' · demo'}
             </p>
@@ -315,20 +323,37 @@ function useSection(nav: NavItem[]) {
     .sort((a, b) => b.to.length - a.to.length)[0]
 }
 
-function Topbar({ onMenu, nav, variant }: { onMenu: () => void; nav: NavItem[]; variant: Variant }) {
+function Topbar({
+  onMenu,
+  nav,
+  variant,
+  slotRef,
+  hasCrumbs,
+}: {
+  onMenu: () => void
+  nav: NavItem[]
+  variant: Variant
+  slotRef: (el: HTMLElement | null) => void
+  hasCrumbs: boolean
+}) {
   const section = useSection(nav)
   const { business } = useAccount()
   const { home, homeTo } = useDashboard() ?? { home: 'Sanctus', homeTo: '/' }
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line bg-canvas px-4 sm:px-6 lg:px-10">
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-canvas px-4 sm:px-6 lg:px-10">
       <IconButton aria-label="Open navigation" onClick={onMenu} className="-ml-2 lg:hidden pointer-coarse:size-11">
         <Menu className="size-5" />
       </IconButton>
       <Link to={homeTo} aria-label="Sanctus, dashboard home" className="text-ink lg:hidden">
-        <Wordmark size={12} />
+        <span data-wordmark className="flex">
+          <Wordmark size={12} />
+        </span>
       </Link>
+      {/* A page with its own path (breadcrumbs prop) portals it here; otherwise the default trail below shows. */}
+      <div ref={slotRef} className="contents" />
+      {!hasCrumbs && (
       <nav aria-label="You are here" className="hidden min-w-0 lg:block">
-        <ol className="flex min-w-0 items-center gap-2 text-[13px] text-ink-muted">
+        <ol className="flex min-w-0 items-center gap-1.5 text-[length:var(--text-ui-body)] text-ink-muted">
           <li className="min-w-0 truncate">
             <Link to={homeTo} className="hover:text-ink hover:underline">
               {home}
@@ -336,7 +361,7 @@ function Topbar({ onMenu, nav, variant }: { onMenu: () => void; nav: NavItem[]; 
           </li>
           {section && (
             <>
-              <li aria-hidden className="text-line-strong">
+              <li aria-hidden className="text-ink-muted">
                 /
               </li>
               <li aria-current="page" className="truncate font-medium text-ink">
@@ -346,17 +371,18 @@ function Topbar({ onMenu, nav, variant }: { onMenu: () => void; nav: NavItem[]; 
           )}
         </ol>
       </nav>
+      )}
       <div className="ml-auto flex items-center gap-2">
         {/* Honest labelling in the demo; a production owner has no use for the data source's name (DUX-08). */}
         {isDemoMode && (
-          <span className="hidden border border-line-strong px-2 py-1 text-[10.5px] font-medium tracking-[0.14em] text-ink-muted uppercase sm:inline">Demo mode</span>
+          <span className="hidden border border-line-strong px-2.5 py-0.5 text-[12px] leading-tight text-ink-muted sm:inline">Demo mode</span>
         )}
         {variant === 'business' && business && (
           <a
             href={catalogLocalPath(business, { preview: business.status !== 'active' })}
             target="_blank"
             rel="noopener"
-            className="inline-flex min-h-10 items-center gap-1.5 px-2 text-[13px] font-medium text-ink hover:underline pointer-coarse:min-h-11"
+            className="inline-flex min-h-10 items-center gap-1.5 px-2 text-[length:var(--text-ui-body)] font-medium text-ink hover:underline pointer-coarse:min-h-11"
           >
             <span className="hidden sm:inline">{business.status === 'active' ? 'View catalog' : 'Preview catalog'}</span>
             <span className="sm:hidden">Catalog</span>
