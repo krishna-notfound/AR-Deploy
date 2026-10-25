@@ -16,6 +16,7 @@ import { myProductsPath } from '@/lib/urls'
 import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useCancelClosure } from '../settings/useCancelClosure'
+import { SetupProgressCard } from '../settings/OnboardingChecklist'
 import { ActivityList } from '../shared/ActivityList'
 import { MostViewedList } from '../analytics/MostViewedList'
 import { hasArModel, productArReadiness } from '../products/productReadiness'
@@ -47,6 +48,7 @@ export default function BusinessOverviewPage() {
         }
       />
       <ClosureBanner />
+      <SetupProgressCard scope="business" className="mb-6 block" />
       {summary.status === 'error' && !s ? (
         <Card>
           <ErrorState message={summary.error.message} onRetry={summary.refetch} />

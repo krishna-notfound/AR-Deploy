@@ -1,16 +1,17 @@
 // After-sign-in checks that stand between a signed-in user and the dashboards (spec §8, Sign-in). UX only, NOT a
 // security boundary: with the 2FA policy on, RLS refuses an aal1 session's data requests; this gate explains why and
-// offers the way through instead of empty tables. Task 12 adds the onboarding checklist as a later check.
+// offers the way through instead of empty tables. After the 2FA checks: the "Complete your setup" checklist.
 import { ShieldCheck } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { DashboardContext, type DashboardContextValue } from '@/components/layout/dashboardContext'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { User } from '@/domain/types'
+import type { Business, User } from '@/domain/types'
 import { RECOVERED_NOTICE, TwoFactorStep } from '@/features/auth/TwoFactorStep'
+import { ONBOARDING_CHECK, onboardingVisitsVersion, subscribeOnboardingVisits } from '@/features/settings/OnboardingChecklist'
 import { TotpSetup } from '@/features/settings/TotpSetup'
 import { InlineNotice } from '@/components/ui/States'
 import { settingsPath } from '@/lib/urls'
@@ -35,6 +36,10 @@ export interface GateContext {
   security: SecurityInfo
   user: User
   scope: 'admin' | 'business'
+  /** The business owner's business, once loaded (null for staff, or while hidden or loading). */
+  business: Business | null
+  /** The route being entered (pathname). */
+  path: string
   refresh: () => Promise<void>
   patch: (p: SecurityPatch) => void
 }
@@ -145,6 +150,7 @@ function CheckFailedNotice({ onRetry }: { onRetry: () => void }) {
 export const GATE_CHECKS: readonly GateCheck[] = [
   { id: '2fa-code', applies: ({ security }) => needsCodeStep(security), Screen: CodeGate },
   { id: '2fa-setup', applies: ({ security }) => needsTwoFactorSetup(security), Screen: SetupGate },
+  ONBOARDING_CHECK,
 ]
 
 function GateFrame({ scope, children }: { scope: 'admin' | 'business'; children: ReactNode }) {
@@ -173,6 +179,9 @@ export function SecurityGate({ children, checks = GATE_CHECKS }: { children: Rea
   const { user, business, holdGate } = useAccount()
   const { refresh, patch, ...security } = useSecurityState()
   const leave = useLeaveAccount()
+  const { pathname } = useLocation()
+  // The setup checklist can let the user through for this visit: show the app then.
+  useSyncExternalStore(subscribeOnboardingVisits, onboardingVisitsVersion, onboardingVisitsVersion)
   const [held, setHeld] = useState<string | null>(null)
   // A screen that holds also keeps the account mounted (AccountProvider); let go when this gate goes away.
   useEffect(() => () => holdGate(false), [holdGate])
@@ -182,7 +191,7 @@ export function SecurityGate({ children, checks = GATE_CHECKS }: { children: Rea
   // A failed check never blocks: the checks decide from what is known, and the loader retries in the background.
   if (!security.loaded) return <FullPageSpinner />
   const scope = user.role === 'super_admin' ? 'admin' : 'business'
-  const ctx: GateContext = { security, user, scope, refresh, patch }
+  const ctx: GateContext = { security, user, scope, business, path: pathname, refresh, patch }
   const active = (held ? checks.find((c) => c.id === held) : undefined) ?? checks.find((c) => c.applies(ctx))
   const retry = () => void refresh()
   if (!active) {

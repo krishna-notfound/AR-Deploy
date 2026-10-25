@@ -30,7 +30,10 @@ interface State {
   closureRequests: ClosureRequest[]
 }
 
-function initial(): State {
+/** When the demo accounts finished "Complete your setup": they start completed, so the dashboards open directly. */
+const DEMO_SETUP_COMPLETED_AT = '2026-01-01T00:00:00.000Z'
+
+function initial(onboarding: 'completed' | 'new' = 'completed'): State {
   return {
     profile: {
       userId: 'demo-user',
@@ -40,7 +43,7 @@ function initial(): State {
       dateFormat: 'd MMM yyyy',
       clock: '24h',
       notifyNewApplications: true,
-      onboardingCompletedAt: null,
+      onboardingCompletedAt: onboarding === 'completed' ? DEMO_SETUP_COMPLETED_AT : null,
       onboardingDismissedAt: null,
     },
     email: DEMO_EMAIL,
@@ -59,9 +62,12 @@ function initial(): State {
 
 let state = initial()
 
-/** Back to the starting state (tests, demo reset). */
-export function resetMockAccount(): void {
-  state = initial()
+/**
+ * Back to the starting state (tests, demo reset). `onboarding: 'new'` starts like a new account, with the setup
+ * neither completed nor dismissed (tests of the setup checklist).
+ */
+export function resetMockAccount(opts: { onboarding?: 'completed' | 'new' } = {}): void {
+  state = initial(opts.onboarding)
 }
 
 const nowIso = () => new Date().toISOString()

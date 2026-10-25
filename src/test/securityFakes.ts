@@ -58,6 +58,8 @@ export interface FakeSecurity {
    * stale value, or 'fail'. Undefined: derived from factor and aal. A verified code makes the local value current.
    */
   local?: AssuranceLevels | 'fail'
+  /** "Complete your setup": completed by default, so the gate tests reach the dashboard (Task 12). */
+  onboarding: SecurityState['onboarding']
 }
 
 /**
@@ -65,7 +67,7 @@ export interface FakeSecurity {
  * real supabase-js raises: MFA_CHALLENGE_VERIFIED after a verified code, TOKEN_REFRESHED after a recovery code.
  */
 export function fakeAccount(start: Partial<FakeSecurity> = {}, fire: () => void = () => {}) {
-  const s: FakeSecurity = { factor: false, aal: 'aal1', requires2fa: false, recovery: [RECOVERY], ...start }
+  const s: FakeSecurity = { factor: false, aal: 'aal1', requires2fa: false, recovery: [RECOVERY], onboarding: { completedAt: '2026-01-01T00:00:00.000Z', dismissedAt: null }, ...start }
   const normalise = (c: string) => c.toUpperCase().replace(/[\s-]/g, '')
   const state = (): SecurityState => ({
     requires2fa: s.requires2fa,
@@ -74,7 +76,7 @@ export function fakeAccount(start: Partial<FakeSecurity> = {}, fire: () => void 
     recoveryCodesLeft: s.factor ? s.recovery.length : null,
     pendingEmail: null,
     closure: null,
-    onboarding: { completedAt: null, dismissedAt: null },
+    onboarding: s.onboarding,
   })
   let pendingFactor: string | null = null
   const impl: Partial<AccountService> = {

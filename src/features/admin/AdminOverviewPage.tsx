@@ -18,6 +18,7 @@ import { applicationsAdminPath } from '@/lib/urls'
 import { MostViewedList } from '../analytics/MostViewedList'
 import { hasArModel } from '../products/productReadiness'
 import { useBusinesses } from '../products/useCatalogData'
+import { SetupProgressCard } from '../settings/OnboardingChecklist'
 
 export default function AdminOverviewPage() {
   const can = useCan()
@@ -64,6 +65,7 @@ export default function AdminOverviewPage() {
       />
 
       <PendingApplications />
+      <SetupProgressCard scope="admin" className="mb-6 block" />
 
       {summary.status === 'error' && !s ? (
         <Card>
