@@ -23,7 +23,43 @@ describe('Supabase team service', () => {
   it('maps the member list rows', async () => {
     const row = { id: 'm1', userId: null, email: 'ana@studio.test', fullName: null, role: 'team', status: 'invited', invitedBy: 'owner@x.test', createdAt: '2026-10-25T00:00:00Z', activatedAt: null, deactivatedAt: null, lastSignInAt: null, invite: { status: 'sent', expiresAt: '2026-11-01T00:00:00Z' } }
     const { sb } = stub({ admin_list_members: { members: [row] } })
-    expect(await createSupabaseTeam(sb).listMembers()).toEqual({ ok: true, data: [row] })
+    expect(await createSupabaseTeam(sb).listMembers()).toEqual({ ok: true, data: [{ ...row, avatarUrl: null }] })
+  })
+
+  it('adds photos and profile names from profiles, with one query for the listed users', async () => {
+    const member = (id: string, userId: string | null, fullName: string | null) => ({ id, userId, email: `${id}@x.test`, fullName, role: 'team', status: userId ? 'active' : 'invited', invitedBy: null, createdAt: 'a', activatedAt: null, deactivatedAt: null, lastSignInAt: null, invite: null })
+    const rows = [member('owner', 'u1', null), member('ana', 'u2', 'Ana Ribeiro'), member('marta', null, null)]
+    const inFn = vi.fn(async () => ({ data: [{ user_id: 'u1', avatar_path: 'u1/p.webp', display_name: 'Owner Name' }, { user_id: 'u2', avatar_path: null, display_name: null }], error: null }))
+    const select = vi.fn(() => ({ in: inFn }))
+    const from = vi.fn(() => ({ select }))
+    const getPublicUrl = vi.fn((path: string) => ({ data: { publicUrl: `https://cdn.test/avatars/${path}` } }))
+    const sb = {
+      rpc: vi.fn(async (fn: string) => ({ data: fn === 'admin_list_members' ? { members: rows } : { member: rows[0] }, error: null })),
+      from,
+      storage: { from: vi.fn(() => ({ getPublicUrl })) },
+    } as unknown as SupabaseClient
+    const r = await createSupabaseTeam(sb).listMembers()
+    expect(from).toHaveBeenCalledWith('profiles')
+    expect(select).toHaveBeenCalledWith('user_id, avatar_path, display_name')
+    expect(inFn).toHaveBeenCalledWith('user_id', ['u1', 'u2'])
+    expect(r.ok && r.data.map((m) => [m.id, m.fullName, m.avatarUrl])).toEqual([
+      ['owner', 'Owner Name', 'https://cdn.test/avatars/u1/p.webp'],
+      ['ana', 'Ana Ribeiro', null],
+      ['marta', null, null],
+    ])
+    const one = await createSupabaseTeam(sb).getMember('owner')
+    expect(one.ok && one.data.avatarUrl).toBe('https://cdn.test/avatars/u1/p.webp')
+    expect(inFn).toHaveBeenLastCalledWith('user_id', ['u1'])
+  })
+
+  it('still lists the members, with initials, when the photo lookup fails', async () => {
+    const row = { id: 'm1', userId: 'u1', email: 'ana@studio.test', fullName: 'Ana', role: 'team', status: 'active', invitedBy: null, createdAt: 'a', activatedAt: null, deactivatedAt: null, lastSignInAt: null, invite: null }
+    const sb = {
+      rpc: vi.fn(async () => ({ data: { members: [row] }, error: null })),
+      from: () => ({ select: () => ({ in: async () => ({ data: null, error: { code: '42501', message: 'denied' } }) }) }),
+      storage: { from: () => ({ getPublicUrl: () => ({ data: { publicUrl: 'x' } }) }) },
+    } as unknown as SupabaseClient
+    expect(await createSupabaseTeam(sb).listMembers()).toEqual({ ok: true, data: [{ ...row, avatarUrl: null }] })
   })
 
   it('turns {error} answers from the database into reasons', async () => {

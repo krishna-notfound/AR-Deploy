@@ -36,13 +36,27 @@ describe('Member detail (ADR-0029)', () => {
     expect(await screen.findByText('Invited as Team')).toBeInTheDocument() // this member's access events
   })
 
-  it('shows the header avatar as a 48px Inter square (overriding the serif default)', { timeout: 20_000 }, async () => {
+  it('shows the header avatar as a 48px Inter square with the initials when there is no photo', { timeout: 20_000 }, async () => {
     open('/admin/team/mem_ana')
     await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
     const avatar = screen.getByText('AR')
-    expect(avatar.className).toContain('size-12!')
-    expect(avatar.className).toContain('font-ui!')
-    expect(avatar.className).toContain('bg-canvas!') // the shared Monogram still carries font-display; font-ui! (important) overrides it
+    expect(avatar).toHaveAttribute('data-avatar')
+    expect(avatar.className).toContain('size-12')
+    expect(avatar.className).toContain('font-[family-name:var(--font-ui)]')
+    expect(avatar.className).not.toContain('font-display')
+    expect(avatar.querySelector('img')).toBeNull()
+  })
+
+  it("shows the member's photo in the header when they have one", { timeout: 20_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' })) // the demo team is staff-only
+    const real = await service.listMembers()
+    if (!real.ok) throw new Error('demo team did not load')
+    // The page reads the member from the team list.
+    vi.spyOn(service, 'listMembers').mockResolvedValue({ ok: true, data: real.data.map((m) => (m.id === 'mem_ana' ? { ...m, avatarUrl: 'https://cdn.test/avatars/ana.webp' } : m)) })
+    open('/admin/team/mem_ana')
+    await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
+    const img = document.querySelector('main [data-avatar] img')
+    expect(img?.getAttribute('src')).toBe('https://cdn.test/avatars/ana.webp')
   })
 
   it('lists the invitation history', { timeout: 20_000 }, async () => {

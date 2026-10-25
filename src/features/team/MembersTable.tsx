@@ -3,6 +3,7 @@
 import { MoreHorizontal, Users } from 'lucide-react'
 import { useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
+import { Avatar } from '@/components/ui/Avatar'
 import { type Column, DataTable } from '@/components/ui/DataTable'
 import { FormField, Select } from '@/components/ui/Form'
 import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
@@ -10,7 +11,6 @@ import { SearchInput } from '@/components/ui/SearchInput'
 import { EmptyState } from '@/components/ui/States'
 import type { MemberStatus, PlatformMember, PlatformRole } from '@/domain/types'
 import { formatDate, formatRelative } from '@/lib/format'
-import { Monogram } from '../applications/Monogram'
 import { InviteStatusBadge, MemberStatusBadge, RoleBadge } from './teamLabels'
 import { useMemberActions } from './useMemberActions'
 
@@ -60,7 +60,7 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
 
   const name = (m: PlatformMember) => (
     <div className="flex min-w-0 items-center gap-3">
-      <Monogram name={m.fullName ?? m.email} className="size-8! bg-subtle! font-ui! text-[12px]! font-medium" />
+      <Avatar name={m.fullName ?? m.email} src={m.avatarUrl} size={32} className="bg-subtle!" />
       <div className="min-w-0">
         <p className={m.fullName ? 'truncate text-ui-body leading-5 font-medium text-ink' : 'truncate text-ui-body leading-5 text-ink-muted'}>{m.fullName ?? 'Name not set yet'}</p>
         <p className="truncate text-ui-small text-ink-muted leading-[18px]" title={m.email}>

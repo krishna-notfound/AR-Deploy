@@ -74,6 +74,13 @@ function details(action: AccessAction, m: Record<string, unknown>, to?: string |
   }
 }
 
+const AVATARS = 'avatars'
+interface ProfileBits {
+  user_id: string
+  avatar_path: string | null
+  display_name: string | null
+}
+
 /** `notify` tells open queries to refetch after a successful change (the service's subscribe listeners). */
 export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () => {}): TeamMethods {
   /** Calls a database function that answers { ok: true, ... } or { error }. */
@@ -98,6 +105,31 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
     }
   }
 
+  /**
+   * Adds each member's photo, and the name they chose in Profile settings, from public.profiles (one query; RLS lets
+   * platform members read profiles). The photo is decorative: if the lookup fails the list still loads, with initials.
+   */
+  async function withProfiles(members: PlatformMember[]): Promise<PlatformMember[]> {
+    const ids = [...new Set(members.map((m) => m.userId).filter((id): id is string => !!id))]
+    let byUser = new Map<string, ProfileBits>()
+    if (ids.length) {
+      try {
+        const { data, error } = await sb.from('profiles').select('user_id, avatar_path, display_name').in('user_id', ids)
+        if (!error && data) byUser = new Map((data as ProfileBits[]).map((p) => [p.user_id, p]))
+      } catch {
+        // Unreachable or not migrated yet: initials.
+      }
+    }
+    return members.map((m) => {
+      const p = m.userId ? byUser.get(m.userId) : undefined
+      return {
+        ...m,
+        fullName: p?.display_name?.trim() || m.fullName,
+        avatarUrl: p?.avatar_path ? sb.storage.from(AVATARS).getPublicUrl(p.avatar_path).data.publicUrl : null,
+      }
+    })
+  }
+
   const done = (r: Result<unknown>): Result<void> => {
     if (!r.ok) return r
     notify()
@@ -120,11 +152,13 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
 
     listMembers: async () => {
       const r = await call('admin_list_members')
-      return r.ok ? ok((r.data.members ?? []) as PlatformMember[]) : r
+      return r.ok ? ok(await withProfiles((r.data.members ?? []) as PlatformMember[])) : r
     },
     getMember: async (id) => {
       const r = await call('admin_get_member', { p_member: id })
-      return r.ok ? ok(r.data.member as PlatformMember) : r
+      if (!r.ok) return r
+      const member = r.data.member as PlatformMember | undefined
+      return ok(member ? (await withProfiles([member]))[0]! : (member as unknown as PlatformMember))
     },
     listMemberInvites: async (id) => {
       const r = await call('admin_list_member_invites', { p_member: id })
