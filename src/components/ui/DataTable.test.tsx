@@ -149,6 +149,8 @@ describe('Pagination, SearchInput and Menu inside the shell', () => {
   })
 })
 
+// The expected strings are copied byte for byte from commit 70ac7ba (before Task 5): the Pagination and SearchInput literals,
+// and for the page-number button its base literal joined with the unselected-state classes by cn().
 describe('outside the shell the controls keep their original class lists', () => {
   it('Pagination', () => {
     render(<Pagination page={2} pageSize={10} total={45} onPage={() => {}} />)
