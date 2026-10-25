@@ -1,7 +1,8 @@
 // Request handling for the public submit-application Edge Function (design/24-applications.md, ADR-0024).
 //   POST <wizard answers + submissionKey>  →  200 { id, reference }
 // Validates with the same rules as the wizard, rate-limits per salted IP hash, stores the application with the
-// service role, records the audit event and sends the confirmation and admin notification. Email problems never
+// service role, records the audit event and sends the confirmation and the admin notification (to the admin inbox and
+// to opted-in staff who can view applications). Email problems never
 // undo the stored application: every attempt is logged with what actually happened.
 import { type NormalizedApplication, validateApplication } from '../_shared/application.ts'
 import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
@@ -30,6 +31,8 @@ export interface SubmitDeps {
   insert(app: NormalizedApplication, submitterHash: string): Promise<StoredApplication | 'duplicate_key'>
   audit(event: { eventType: string; applicationId: string; toStatus?: string; metadata?: Record<string, unknown> }): Promise<void>
   log(entry: LogEntry): Promise<string>
+  /** Staff who can see applications (applications.view) and keep new-application alerts on (profiles). */
+  staffAlertRecipients(): Promise<string[]>
 }
 
 export async function submitterHash(ip: string, salt: string): Promise<string> {
@@ -74,12 +77,21 @@ export async function handleSubmitApplication(req: Request, deps: SubmitDeps): P
 
 /** Confirmation to the applicant and notification to the platform team. Logs each outcome; never throws. */
 async function sendApplicationEmails(deps: SubmitDeps, app: NormalizedApplication, stored: StoredApplication) {
-  const jobs: { kind: 'application_confirmation' | 'admin_notification'; to: string; lang: 'en' | 'pt' }[] = [
-    { kind: 'application_confirmation', to: app.applicantEmail, lang: app.language },
-    { kind: 'admin_notification', to: deps.config.ok ? deps.config.config.adminNotificationEmail : '', lang: 'en' },
+  const inbox = deps.config.ok ? deps.config.config.adminNotificationEmail : ''
+  const jobs: { kind: 'application_confirmation' | 'admin_notification'; to: string; lang: 'en' | 'pt'; workflow: string }[] = [
+    { kind: 'application_confirmation', to: app.applicantEmail, lang: app.language, workflow: `application:${stored.id}:application_confirmation` },
+    { kind: 'admin_notification', to: inbox, lang: 'en', workflow: `application:${stored.id}:admin_notification` },
   ]
+  // Opted-in staff get the same alert, once each and never twice for the admin inbox (S1, spec §3).
+  const seen = new Set([inbox.trim().toLowerCase()].filter(Boolean))
+  for (const email of await staffRecipients(deps)) {
+    const key = email.trim().toLowerCase()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    jobs.push({ kind: 'admin_notification', to: email.trim(), lang: 'en', workflow: `application:${stored.id}:staff_alert:${(await sha256Hex(key)).slice(0, 16)}` })
+  }
   for (const job of jobs) {
-    const workflow = `application:${stored.id}:${job.kind}`
+    const workflow = job.workflow
     try {
       if (!deps.config.ok || !job.to) {
         const rendered = renderEmail(job.kind, job.lang, { businessName: app.businessName })
@@ -105,5 +117,14 @@ async function sendApplicationEmails(deps: SubmitDeps, app: NormalizedApplicatio
       // The application is stored; a logging failure must not turn the response into an error.
       console.error(`application email ${job.kind} failed: ${String(e).slice(0, 200)}`)
     }
+  }
+}
+
+async function staffRecipients(deps: SubmitDeps): Promise<string[]> {
+  try {
+    return await deps.staffAlertRecipients()
+  } catch (e) {
+    console.error(`staff alert lookup failed: ${String(e).slice(0, 200)}`)
+    return []
   }
 }

@@ -447,6 +447,11 @@ verify_jwt = true
 [functions.accept-member-invite]
 verify_jwt = false
 
+# Account security (S1): action codes, recovery codes, 2FA off, closure and the Owner's reset tools. Signed-in
+# callers only; the handler takes the caller from getUser() and reads aal only after that.
+[functions.account-security]
+verify_jwt = true
+
 # Resend delivery events: authenticated by the svix signature (RESEND_WEBHOOK_SECRET), not a Supabase JWT.
 [functions.resend-webhook]
 verify_jwt = false

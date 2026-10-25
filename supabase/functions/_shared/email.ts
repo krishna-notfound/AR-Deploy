@@ -1,7 +1,17 @@
 // Server-side email through Resend (design/23-email.md). Web-standard APIs only (fetch, no SDK, no Deno globals),
 // so it runs in Edge Functions and under Vitest. The API key is an Edge Function secret and never reaches a browser.
 
-export type EmailKind = 'owner_invitation' | 'invitation_resend' | 'application_confirmation' | 'admin_notification' | 'team_invitation' | 'test'
+export type EmailKind =
+  | 'owner_invitation'
+  | 'invitation_resend'
+  | 'application_confirmation'
+  | 'admin_notification'
+  | 'team_invitation'
+  | 'test'
+  // Account security (S1, spec §7): action codes, security notices and closure alerts for the admin inbox.
+  | 'security_code'
+  | 'security_notice'
+  | 'closure_request'
 
 /** Same values as the email_log.status check constraint. */
 export type EmailStatus = 'blocked' | 'failed' | 'accepted' | 'sent' | 'delivered' | 'delayed' | 'bounced' | 'complained'

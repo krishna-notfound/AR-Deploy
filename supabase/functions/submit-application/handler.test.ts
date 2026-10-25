@@ -56,6 +56,7 @@ function deps(over: Partial<SubmitDeps> = {}) {
     },
     audit: async (e) => void audits.push(e),
     log: async (e) => (logs.push(e), `log-${logs.length}`),
+    staffAlertRecipients: async () => [],
     ...over,
   }
   return { d, rows, logs, audits, sends, fetchFn }
@@ -172,6 +173,27 @@ describe('submit-application', () => {
     await handleSubmitApplication(post(VALID), d)
     expect(logs[0]).toMatchObject({ kind: 'application_confirmation', status: 'blocked', error: 'test_sender_recipient_not_allowed' })
     expect(sends.map((s) => s.to)).toEqual(['team@account.test'])
+  })
+
+  it('emails opted-in staff with applications.view once each, without duplicating the admin inbox', async () => {
+    const recipients = vi.fn(async () => ['Team@Account.test', 'ana.staff@account.test', 'ana.staff@account.test', 'bo@account.test'])
+    const { d, logs, sends } = deps({
+      staffAlertRecipients: recipients,
+      config: { ok: true, config: { ...CONFIG, testRecipients: [...CONFIG.testRecipients, 'ana.staff@account.test', 'bo@account.test'] } },
+    })
+    expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
+    expect(recipients).toHaveBeenCalledTimes(1)
+    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test', 'ana.staff@account.test', 'bo@account.test'])
+    expect(logs.filter((l) => l.kind === 'admin_notification').map((l) => l.status)).toEqual(['accepted', 'accepted', 'accepted'])
+    expect(new Set(logs.map((l) => l.workflow)).size).toBe(4)
+  })
+
+  it('keeps the application when the staff lookup fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { d, sends } = deps({ staffAlertRecipients: async () => Promise.reject(new Error('db down')) })
+    expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
+    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test'])
+    spy.mockRestore()
   })
 
   it('fails closed without a salt', async () => {
