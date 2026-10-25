@@ -1,7 +1,8 @@
-import { type ReactNode, useEffect } from 'react'
+import { createContext, type ReactNode, useContext, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { cn } from '@/lib/cn'
-import { useDashboard } from './dashboardContext'
+import { useDashboard, useInDashboard } from './dashboardContext'
 
 export interface Crumb {
   label: string
@@ -9,8 +10,62 @@ export interface Crumb {
 }
 
 /**
- * Dashboard page header: a small uppercase eyebrow (the breadcrumb path when given, otherwise the dashboard's name),
- * a large serif title, one optional line of description and right-aligned actions.
+ * Where the dashboard top bar shows a page's breadcrumbs. The shell provides the slot element (once it has mounted)
+ * and learns through `setHasCrumbs` when a page fills it, so it can hide its default trail instead of doubling it.
+ */
+export interface BreadcrumbSlot {
+  slot: HTMLElement | null
+  setHasCrumbs: (has: boolean) => void
+}
+export const BreadcrumbSlotContext = createContext<BreadcrumbSlot | null>(null)
+
+/** Breadcrumbs for the top bar: the dashboard's name, then the page's own path (14px, current page in ink). */
+function TopBarCrumbs({ crumbs }: { crumbs: Crumb[] }) {
+  const dashboard = useDashboard()
+  const trail: Crumb[] = [{ label: dashboard?.home ?? 'Sanctus', to: dashboard?.homeTo ?? '/' }, ...crumbs]
+  return (
+    <nav aria-label="Breadcrumb" className="hidden min-w-0 lg:block">
+      <ol className="flex min-w-0 items-center gap-x-1.5 text-[length:var(--text-ui-body)] text-ink-muted">
+        {trail.map((c, i) => {
+          const last = i === trail.length - 1
+          return (
+            <li key={`${c.label}-${i}`} className={cn('flex items-center gap-x-1.5', last ? 'min-w-0' : 'shrink-0')}>
+              {i > 0 && (
+                <span aria-hidden className="text-ink-muted">
+                  /
+                </span>
+              )}
+              {c.to && !last ? (
+                <Link to={c.to} className="hover:text-ink hover:underline">
+                  {c.label}
+                </Link>
+              ) : (
+                <span aria-current={last ? 'page' : undefined} className={cn('truncate', last && 'font-medium text-ink')}>
+                  {c.label}
+                </span>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
+
+/** Tells the shell this page owns the top bar's breadcrumb while it is mounted. */
+function useClaimBreadcrumbSlot(active: boolean) {
+  const setHasCrumbs = useContext(BreadcrumbSlotContext)?.setHasCrumbs
+  useEffect(() => {
+    if (!active || !setHasCrumbs) return
+    setHasCrumbs(true)
+    return () => setHasCrumbs(false)
+  }, [active, setHasCrumbs])
+}
+
+/**
+ * Dashboard page header. Inside the dashboard shell: a Cormorant title, one optional line (status `meta` first, then
+ * the description) and right-aligned actions; the breadcrumb path moves to the top bar and there is no eyebrow.
+ * Elsewhere it keeps its earlier look: a small uppercase eyebrow or breadcrumb above a larger serif title.
  */
 export function PageHeader({
   title,
@@ -28,14 +83,37 @@ export function PageHeader({
   eyebrow?: ReactNode
 }) {
   useDocumentTitle(typeof title === 'string' ? title : undefined)
-  const dashboard = useDashboard()
-  const fallbackEyebrow = eyebrow ?? dashboard?.eyebrow
+  const inDashboard = useInDashboard()
+  const slot = useContext(BreadcrumbSlotContext)
+  const crumbs = breadcrumbs && breadcrumbs.length > 0 ? breadcrumbs : null
+  useClaimBreadcrumbSlot(inDashboard && !!crumbs && !!slot?.slot)
+
+  if (inDashboard) {
+    return (
+      <div className="mb-8">
+        {crumbs && slot?.slot && createPortal(<TopBarCrumbs crumbs={crumbs} />, slot.slot)}
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+          <div className="min-w-0">
+            <h1 className="font-display text-[length:var(--text-ui-h1)] leading-[1.15] font-medium tracking-[-0.01em] text-ink">{title}</h1>
+            {(meta || description) && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                {meta}
+                {description && <p className="max-w-2xl text-[length:var(--text-ui-sub)] leading-[1.5] text-ink-muted">{description}</p>}
+              </div>
+            )}
+          </div>
+          {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="mb-8 border-b border-line pb-6">
-      {breadcrumbs && breadcrumbs.length > 0 ? (
+      {crumbs ? (
         <nav aria-label="Breadcrumb" className="mb-3">
           <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 font-medium tracking-[0.18em] text-ink-muted uppercase">
-            {breadcrumbs.map((c, i) => (
+            {crumbs.map((c, i) => (
               <li key={`${c.label}-${i}`} className="flex min-w-0 items-center gap-2">
                 {i > 0 && (
                   <span aria-hidden className="text-line-strong">
@@ -56,10 +134,10 @@ export function PageHeader({
           </ol>
         </nav>
       ) : (
-        fallbackEyebrow && (
+        eyebrow && (
           <p className="mb-3 flex items-center gap-2 text-[11px] leading-4 font-medium tracking-[0.18em] text-accent-ink uppercase">
             <span className="size-1 shrink-0 bg-accent" aria-hidden />
-            {fallbackEyebrow}
+            {eyebrow}
           </p>
         )
       )}
@@ -75,7 +153,7 @@ export function PageHeader({
   )
 }
 
-/** A serif section heading for dashboard panels (cards), with an optional line of description and actions. */
+/** A section heading for dashboard panels (cards): serif outside the shell, Inter 16/600 inside it. */
 export function PanelHeader({
   title,
   description,
@@ -89,11 +167,18 @@ export function PanelHeader({
   className?: string
   as?: 'h2' | 'h3'
 }) {
+  const inDashboard = useInDashboard()
   return (
     <div className={cn('flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-5 pt-5 pb-4 sm:px-6', className)}>
       <div className="min-w-0">
-        <H className="font-display text-[1.5rem] leading-tight font-normal text-ink">{title}</H>
-        {description && <p className="mt-1 text-[13px] text-ink-muted">{description}</p>}
+        {inDashboard ? (
+          <H className="font-[family-name:var(--font-ui)] text-[length:var(--text-ui-card)] leading-[1.4] font-semibold text-ink">{title}</H>
+        ) : (
+          <H className="font-display text-[1.5rem] leading-tight font-normal text-ink">{title}</H>
+        )}
+        {description && (
+          <p className={cn('mt-1 text-ink-muted', inDashboard ? 'text-[length:var(--text-ui-small)] leading-[1.45]' : 'text-[13px]')}>{description}</p>
+        )}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
