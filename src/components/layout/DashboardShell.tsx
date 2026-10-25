@@ -39,6 +39,14 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
   const { business } = useAccount()
 
   useEffect(() => setMobileOpen(false), [location.pathname])
+  // Dialogs, menus and toasts render in portals under <body>, outside the shell root: mark the body too so the
+  // dashboard type (Inter) reaches them. Removed on leaving the dashboard so public pages never carry it.
+  useEffect(() => {
+    document.body.dataset.surface = 'dashboard'
+    return () => {
+      delete document.body.dataset.surface
+    }
+  }, [])
   useEffect(() => {
     try {
       localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0')
@@ -57,7 +65,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
 
   return (
     <DashboardContext.Provider value={ctx}>
-      <div className="min-h-dvh bg-canvas" style={{ '--sidebar-w': collapsed ? '72px' : '256px' } as React.CSSProperties}>
+      <div data-surface="dashboard" className="min-h-dvh bg-canvas" style={{ '--sidebar-w': collapsed ? '72px' : '256px' } as React.CSSProperties}>
         <a href="#main" className="sr-only z-50 rounded bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
           Skip to content
         </a>

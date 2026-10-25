@@ -15,6 +15,9 @@ export const DashboardContext = createContext<DashboardContextValue | null>(null
 
 export const useDashboard = () => useContext(DashboardContext)
 
+/** True under the dashboard shell (React context passes through portals, so dialogs and menus count too). */
+export const useInDashboard = () => useContext(DashboardContext) !== null
+
 /**
  * Applications waiting for a decision (submitted or under review), counted by the service. Platform admins only:
  * pass `enabled: false` elsewhere so an owner's session never asks for applications.
