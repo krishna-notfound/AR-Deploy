@@ -19,6 +19,7 @@ const SUPABASE_STUBS = `
     raw_user_meta_data jsonb default '{}');
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('test.jwt', true), ''), '{}')::jsonb $$;
+  create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, status text, factor_type text);
   grant usage on schema auth to anon, authenticated, service_role;
   create schema storage;
   create table storage.buckets (id text primary key, name text not null, public boolean default false,

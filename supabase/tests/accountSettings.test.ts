@@ -18,6 +18,7 @@ const SUPABASE_STUBS = `
     raw_user_meta_data jsonb default '{}');
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('test.jwt', true), ''), '{}')::jsonb $$;
+  create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, status text, factor_type text);
   grant usage on schema auth to anon, authenticated, service_role;
   create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid);
   create schema storage;
@@ -127,7 +128,7 @@ describe('account settings: profiles and policy (Task 1)', () => {
     const fresh = await PGlite.create()
     try {
       await fresh.exec(SUPABASE_STUBS)
-      await applyAll(fresh, (n) => n !== ACCOUNT_MIGRATION)
+      await applyAll(fresh, (n) => n < ACCOUNT_MIGRATION)
       await fresh.exec(`
         insert into auth.users (id, email, raw_user_meta_data) values
           ('${OWNER_U}', 'o@test', '{"display_name":"Meta Name"}'), ('${TEAM_U}', 't@test', '{}'), ('${STRANGER_U}', 's@test', null),
@@ -789,6 +790,121 @@ describe('account settings: review fixes (round 1)', () => {
     } finally {
       await base.close()
       await rolled.close()
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Opt-in 2FA: a user who turned 2FA on needs aal2 even with the policy off
+// ---------------------------------------------------------------------------
+
+const OPTIN_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_account_settings_optin_2fa.sql'))!
+
+describe('opt-in 2FA (follow-up)', () => {
+  const F_TEAM_U = '00000000-0000-0000-0000-0000000000e1'
+  const F_BIZ_U = '00000000-0000-0000-0000-0000000000e2'
+  const UNVERIFIED_U = '00000000-0000-0000-0000-0000000000e3'
+  const F_BIZ = '10000000-0000-0000-0000-0000000000e2'
+  const U_BIZ = '10000000-0000-0000-0000-0000000000e3'
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email) values ('${F_TEAM_U}', 'f-team@test'), ('${F_BIZ_U}', 'f-biz@test'), ('${UNVERIFIED_U}', 'unver@test');
+      insert into public.platform_members (user_id, email, role, status) values ('${F_TEAM_U}', 'f-team@test', 'team', 'active');
+      insert into public.businesses (id, name, slug, status) values ('${F_BIZ}', 'Factor Co', 'factor-co', 'active'), ('${U_BIZ}', 'Unverified Co', 'unverified-co', 'active');
+      insert into public.business_members (business_id, user_id) values ('${F_BIZ}', '${F_BIZ_U}'), ('${U_BIZ}', '${UNVERIFIED_U}');
+      insert into auth.mfa_factors (user_id, status, factor_type) values
+        ('${F_TEAM_U}', 'verified', 'totp'), ('${F_BIZ_U}', 'verified', 'totp'), ('${UNVERIFIED_U}', 'unverified', 'totp');
+      update public.platform_settings set require_2fa_staff = false, require_2fa_business = false;
+    `)
+  })
+
+  it('policy off, a user with a verified factor at aal1: platform_can and is_business_member are false and storage writes are refused', async () => {
+    expect(await flag(F_TEAM_U, `public.platform_can('products.view')`, 'aal1')).toBe(false)
+    expect(await flag(F_TEAM_U, 'public.is_platform_member()', 'aal1')).toBe(false)
+    expect(await count(F_TEAM_U, 'select count(*)::int as n from public.business_applications', [], 'aal1')).toBe(0)
+    expect(await flag(F_BIZ_U, `public.is_business_member('${F_BIZ}')`, 'aal1')).toBe(false)
+    await expect(probe(F_BIZ_U, `insert into storage.objects (bucket_id, name) values ('business-logos', '${F_BIZ}/a.png')`, [], 'aal1')).rejects.toThrow(/row-level security/)
+    expect(await affected(F_BIZ_U, `update public.businesses set name = 'Factor Co 2' where id = '${F_BIZ}'`, [], 'aal1')).toBe(0)
+    // The Owner too.
+    await db.query(`insert into auth.mfa_factors (user_id, status, factor_type) values ($1, 'verified', 'totp')`, [OWNER_U])
+    try {
+      expect(await flag(OWNER_U, 'public.is_platform_admin()', 'aal1')).toBe(false)
+      expect(await flag(OWNER_U, 'public.is_platform_admin()', 'aal2')).toBe(true)
+    } finally {
+      await db.query(`delete from auth.mfa_factors where user_id = $1`, [OWNER_U])
+    }
+  })
+
+  it('the same users at aal2 are allowed', async () => {
+    expect(await flag(F_TEAM_U, `public.platform_can('products.view')`, 'aal2')).toBe(true)
+    expect(await flag(F_TEAM_U, 'public.is_platform_member()', 'aal2')).toBe(true)
+    expect(await count(F_TEAM_U, 'select count(*)::int as n from public.business_applications', [], 'aal2')).toBe(1)
+    expect(await flag(F_BIZ_U, `public.is_business_member('${F_BIZ}')`, 'aal2')).toBe(true)
+    expect((await probe(F_BIZ_U, `insert into storage.objects (bucket_id, name) values ('business-logos', '${F_BIZ}/a.png')`, [], 'aal2')).affectedRows).toBe(1)
+    expect(await affected(F_BIZ_U, `update public.businesses set name = 'Factor Co 2' where id = '${F_BIZ}'`, [], 'aal2')).toBe(1)
+  })
+
+  it('a user without factors at aal1, policy off, is allowed as before', async () => {
+    expect(await flag(TEAM_U, `public.platform_can('products.view')`, 'aal1')).toBe(true)
+    expect(await flag(OWNER_U, 'public.is_platform_admin()', 'aal1')).toBe(true)
+    expect(await flag(BIZ_OWNER_U, `public.is_business_member('${BIZ}')`, 'aal1')).toBe(true)
+    expect((await probe(BIZ_OWNER_U, `insert into storage.objects (bucket_id, name) values ('business-logos', '${BIZ}/b.png')`, [], 'aal1')).affectedRows).toBe(1)
+  })
+
+  it('a user with only an unverified factor at aal1 is allowed', async () => {
+    expect(await flag(UNVERIFIED_U, `public.is_business_member('${U_BIZ}')`, 'aal1')).toBe(true)
+    expect((await probe(UNVERIFIED_U, `insert into storage.objects (bucket_id, name) values ('product-media', '${U_BIZ}/m.glb')`, [], 'aal1')).affectedRows).toBe(1)
+  })
+
+  it('my_security_state and the own profile still work at aal1 with a factor', async () => {
+    expect(await call(F_TEAM_U, 'select public.my_security_state() as r', [], 'aal1')).toMatchObject({ requires_2fa: false, aal: 'aal1' })
+    expect(await count(F_TEAM_U, 'select count(*)::int as n from public.profiles where user_id = $1', [F_TEAM_U], 'aal1')).toBe(1)
+    expect(await affected(F_TEAM_U, `update public.profiles set clock = '12h' where user_id = $1`, [F_TEAM_U], 'aal1')).toBe(1)
+    expect(await count(F_TEAM_U, 'select count(*)::int as n from public.platform_settings', [], 'aal1')).toBe(1)
+    expect(await call(F_BIZ_U, `select to_jsonb(public.record_sign_in('Safari')) as r`, [], 'aal1')).toBe('recorded')
+    // Staff profile reads are gated like the rest of the staff data.
+    expect(await count(F_TEAM_U, 'select count(*)::int as n from public.profiles', [], 'aal1')).toBe(1)
+  })
+
+  it('caller_has_verified_factor answers for the caller only and is not callable by anon', async () => {
+    expect(await flag(F_TEAM_U, 'public.caller_has_verified_factor()', 'aal1')).toBe(true)
+    expect(await flag(UNVERIFIED_U, 'public.caller_has_verified_factor()', 'aal1')).toBe(false)
+    expect(await flag(STRANGER_U, 'public.caller_has_verified_factor()', 'aal1')).toBe(false)
+    await expect(probe('', 'select public.caller_has_verified_factor()', [], null, 'anon')).rejects.toThrow(/permission denied/)
+    await expect(probe(F_TEAM_U, 'select * from auth.mfa_factors', [], 'aal2')).rejects.toThrow(/permission denied/)
+  })
+
+  it('the opt-in rollback restores the policy-only rule, and the main rollback still applies after it', async () => {
+    const fresh = await PGlite.create()
+    try {
+      await fresh.exec(SUPABASE_STUBS)
+      await applyAll(fresh, (n) => n <= OPTIN_MIGRATION)
+      await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_account_settings_optin_2fa_rollback.sql'), 'utf8'))
+      const defs = await fresh.query<{ proname: string; d: string }>(
+        `select p.proname, pg_get_functiondef(p.oid) as d from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where (n.nspname, p.proname) in (('private', 'mfa_satisfied'), ('public', 'is_platform_admin'), ('public', 'is_business_member'))`)
+      expect(defs.rows).toHaveLength(3)
+      for (const r of defs.rows) {
+        expect(r.d).not.toContain('caller_has_verified_factor')
+        expect(r.d).toContain('platform_settings')
+      }
+      expect((await fresh.query(`select 1 from pg_proc where proname = 'caller_has_verified_factor'`)).rows).toEqual([])
+      await fresh.exec(`
+        insert into auth.users (id, email) values ('${F_BIZ_U}', 'f@test');
+        insert into public.businesses (id, name, slug, status) values ('${F_BIZ}', 'Factor Co', 'factor-co', 'active');
+        insert into public.business_members (business_id, user_id) values ('${F_BIZ}', '${F_BIZ_U}');
+        insert into auth.mfa_factors (user_id, status, factor_type) values ('${F_BIZ_U}', 'verified', 'totp');`)
+      const member = await fresh.transaction(async (tx) => {
+        await tx.exec('set local role authenticated')
+        await tx.query(`select set_config('test.uid', $1, true)`, [F_BIZ_U])
+        return (await tx.query<{ m: boolean }>(`select public.is_business_member('${F_BIZ}') as m`)).rows[0]!.m
+      })
+      expect(member).toBe(true)
+      await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_account_settings_rollback.sql'), 'utf8'))
+      expect((await fresh.query(`select to_regclass('public.profiles') as t`)).rows[0]).toEqual({ t: null })
+    } finally {
+      await fresh.close()
     }
   })
 })
