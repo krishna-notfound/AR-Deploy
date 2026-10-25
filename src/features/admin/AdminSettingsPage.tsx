@@ -51,19 +51,17 @@ export default function AdminSettingsPage() {
         <Card>
           <PanelHeader title="Profile" description={isDemoMode ? 'Demo account. Real sign-in needs Supabase mode.' : 'Signed in with Supabase Auth.'} />
           <CardBody className="sm:px-6">
-            <dl className="grid gap-4 text-sm sm:grid-cols-3">
-              <div>
-                <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Name</dt>
-                <dd className="mt-1.5 font-medium">{user?.name}</dd>
-              </div>
-              <div>
-                <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Email</dt>
-                <dd className="mt-1.5 font-medium">{user?.email}</dd>
-              </div>
-              <div>
-                <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Role</dt>
-                <dd className="mt-1.5 font-medium">Super Admin</dd>
-              </div>
+            <dl className="divide-y divide-subtle border-t border-subtle text-[length:var(--text-ui-body)] leading-5">
+              {[
+                ['Name', user?.name],
+                ['Email', user?.email],
+                ['Role', 'Super Admin'],
+              ].map(([label, value]) => (
+                <div key={label} className="grid gap-1 py-3 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-4">
+                  <dt className="text-[length:var(--text-ui-small)] leading-5 text-ink-muted">{label}</dt>
+                  <dd className="min-w-0 break-words text-ink">{value}</dd>
+                </div>
+              ))}
             </dl>
           </CardBody>
         </Card>
@@ -72,12 +70,12 @@ export default function AdminSettingsPage() {
           <PanelHeader title="Data backend" />
           <CardBody className="sm:px-6">
             {isDemoMode ? (
-              <p className="text-sm text-ink-muted">
-                <strong className="font-medium text-ink">Demo mode.</strong> Sample data stored in this browser. To use Supabase, set VITE_DATA_MODE=supabase with the
+              <p className="text-[length:var(--text-ui-body)] leading-5 text-ink-muted">
+                <strong className="font-medium text-ink">Demo mode.</strong> Sample data stored in this browser. To use Supabase, set <code className="rounded-[2px] bg-subtle px-1.5 py-0.5 font-mono text-[length:var(--text-ui-small)] text-ink">VITE_DATA_MODE=supabase</code> with the
                 project URL and publishable key (design/19-supabase.md).
               </p>
             ) : (
-              <p className="text-sm text-ink-muted">
+              <p className="text-[length:var(--text-ui-body)] leading-5 text-ink-muted">
                 <strong className="font-medium text-ink">Supabase mode.</strong> Data, files and sign-in come from {backend.mode === 'supabase' ? new URL(backend.url).host : 'Supabase'}.
                 Access is enforced by the database policies, not by this screen.
               </p>
@@ -90,7 +88,7 @@ export default function AdminSettingsPage() {
           <PanelHeader title="Demo data" description="Changes are saved in this browser only." />
           <CardBody className="space-y-5 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="max-w-md text-sm text-ink-muted">Restore the original sample businesses, products and analytics.</p>
+              <p className="max-w-md text-[length:var(--text-ui-body)] leading-5 text-ink-muted">Restore the original sample businesses, products and analytics.</p>
               <Button onClick={reset} loading={resetting} icon={<RotateCcw className="size-4" aria-hidden />}>
                 Reset demo data
               </Button>
@@ -116,28 +114,28 @@ export default function AdminSettingsPage() {
         <Card>
           <PanelHeader title="What this demo does and does not do" description="Frontend behaviour versus functionality that needs the backend phase." />
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[length:var(--text-ui-body)] leading-5">
               <thead>
-                <tr className="border-y border-line text-left text-ink-muted">
-                  <th scope="col" className="px-5 py-2 font-medium">
+                <tr className="border-y border-line text-left text-[length:var(--text-ui-small)] text-ink-muted">
+                  <th scope="col" className="px-5 py-2 font-medium sm:px-6">
                     Capability
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
                     In this demo
                   </th>
-                  <th scope="col" className="px-5 py-2 font-medium">
+                  <th scope="col" className="px-5 py-2 font-medium sm:px-6">
                     Needs backend
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody className="divide-y divide-subtle">
                 {CAPABILITIES.map(([a, b, c]) => (
                   <tr key={a}>
-                    <th scope="row" className="px-5 py-2.5 text-left font-medium">
+                    <th scope="row" className="px-5 py-3 text-left align-top font-medium sm:px-6">
                       {a}
                     </th>
-                    <td className="px-3 py-2.5 text-ink-muted">{b}</td>
-                    <td className="px-5 py-2.5 text-ink-muted">{c}</td>
+                    <td className="px-3 py-3 align-top text-ink-muted">{b}</td>
+                    <td className="px-5 py-3 align-top text-ink-muted sm:px-6">{c}</td>
                   </tr>
                 ))}
               </tbody>
@@ -149,7 +147,7 @@ export default function AdminSettingsPage() {
         <Card>
           <PanelHeader title="Sample asset credits" />
           <CardBody className="sm:px-6">
-            <ul className="space-y-1.5 text-[13px] text-ink-muted">
+            <ul className="space-y-1.5 text-[length:var(--text-ui-small)] leading-[1.45] text-ink-muted">
               {MODEL_CREDITS.map((m) => (
                 <li key={m.name}>
                   3D model “{m.name}”, {m.source},{' '}
@@ -158,7 +156,7 @@ export default function AdminSettingsPage() {
                   </a>
                 </li>
               ))}
-              <li>
+              <li className="border-t border-subtle pt-2">
                 Photos from {PHOTO_CREDIT.source},{' '}
                 <a href={PHOTO_CREDIT.url} target="_blank" rel="noreferrer" className="text-accent-ink underline">
                   {PHOTO_CREDIT.license}

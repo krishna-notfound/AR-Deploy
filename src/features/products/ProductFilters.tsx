@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { Select } from '@/components/ui/Form'
+import { cn } from '@/lib/cn'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { type Business, CATEGORIES, type Category, type Product, type ProductStatus } from '@/domain/types'
 import { type ProductArReadiness, productArReadiness } from './productReadiness'
@@ -75,6 +76,16 @@ export function applyProductFilters(products: Product[], f: ProductFilterState):
   )
 }
 
+/** A filter control with its name visible above it (BRIEF: label 14/500, 8px gap). */
+function FilterField({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={cn('flex min-w-0 flex-col gap-2', className)}>
+      <span className="text-[length:var(--text-ui-body)] leading-5 font-medium text-ink">{label}</span>
+      {children}
+    </label>
+  )
+}
+
 export function ProductFilterBar({
   state,
   update,
@@ -85,41 +96,51 @@ export function ProductFilterBar({
   businesses?: Business[]
 }) {
   return (
-    <div className="flex flex-col gap-2 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-6">
-      <SearchInput value={state.q} onChange={(q) => update({ q })} label="Search products by name" placeholder="Search by product name" className="sm:w-72" />
+    <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-6">
+      <FilterField label="Search" className="sm:w-[260px]">
+        <SearchInput value={state.q} onChange={(q) => update({ q })} label="Search products by name" placeholder="Search by product name" className="w-full" />
+      </FilterField>
       {businesses && (
-        <Select aria-label="Filter by business" value={state.business} onChange={(e) => update({ business: e.target.value })} className="sm:w-52">
-          <option value="">All businesses</option>
-          {businesses.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
+        <FilterField label="Business" className="sm:w-[190px]">
+          <Select aria-label="Filter by business" value={state.business} onChange={(e) => update({ business: e.target.value })}>
+            <option value="">All businesses</option>
+            {businesses.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+      )}
+      <FilterField label="Status" className="sm:w-[150px]">
+        <Select aria-label="Filter by status" value={state.status} onChange={(e) => update({ status: e.target.value as ProductFilterState['status'] })}>
+          <option value="">All statuses</option>
+          <option value="published">Published</option>
+          <option value="draft">Draft</option>
+        </Select>
+      </FilterField>
+      <FilterField label="Category" className="sm:w-[170px]">
+        <Select aria-label="Filter by category" value={state.category} onChange={(e) => update({ category: e.target.value as ProductFilterState['category'] })}>
+          <option value="">All categories</option>
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c} className="capitalize">
+              {c[0]?.toUpperCase()}
+              {c.slice(1)}
             </option>
           ))}
         </Select>
-      )}
-      <Select aria-label="Filter by status" value={state.status} onChange={(e) => update({ status: e.target.value as ProductFilterState['status'] })} className="sm:w-40">
-        <option value="">All statuses</option>
-        <option value="published">Published</option>
-        <option value="draft">Draft</option>
-      </Select>
-      <Select aria-label="Filter by category" value={state.category} onChange={(e) => update({ category: e.target.value as ProductFilterState['category'] })} className="sm:w-40">
-        <option value="">All categories</option>
-        {CATEGORIES.map((c) => (
-          <option key={c} value={c} className="capitalize">
-            {c[0]?.toUpperCase()}
-            {c.slice(1)}
-          </option>
-        ))}
-      </Select>
-      <Select aria-label="Filter by 3D and AR" value={state.ar} onChange={(e) => update({ ar: e.target.value as ProductFilterState['ar'] })} className="sm:w-48">
-        <option value="">All 3D / AR</option>
-        <option value="ready">AR ready</option>
-        <option value="android-only">Needs iPhone file (USDZ)</option>
-        <option value="android-blocked">Android AR blocked</option>
-        <option value="photos-only">No 3D model</option>
-      </Select>
+      </FilterField>
+      <FilterField label="3D / AR" className="sm:w-[180px]">
+        <Select aria-label="Filter by 3D and AR" value={state.ar} onChange={(e) => update({ ar: e.target.value as ProductFilterState['ar'] })}>
+          <option value="">All 3D / AR</option>
+          <option value="ready">AR ready</option>
+          <option value="android-only">Needs iPhone file (USDZ)</option>
+          <option value="android-blocked">Android AR blocked</option>
+          <option value="photos-only">No 3D model</option>
+        </Select>
+      </FilterField>
       {hasProductFilters(state) && (
-        <button type="button" onClick={() => update(CLEARED_PRODUCT_FILTERS)} className="min-h-10 text-[13px] font-medium text-accent-ink hover:underline sm:ml-1">
+        <button type="button" onClick={() => update(CLEARED_PRODUCT_FILTERS)} className="min-h-10 text-[length:var(--text-ui-small)] font-medium text-accent-ink hover:underline sm:ml-1">
           Clear filters
         </button>
       )}

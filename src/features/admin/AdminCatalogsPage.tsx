@@ -31,8 +31,8 @@ export default function AdminCatalogsPage() {
           <EmptyState icon={Building2} title="No catalogs yet" body="Create a business to get its catalog URL and QR code." action={<ButtonLink to="/admin/businesses/new" variant="primary">Create business</ButtonLink>} />
         </Card>
       ) : (
-        <div className="space-y-5">
-          <FormField label="Business" className="max-w-sm">
+        <div className="space-y-6">
+          <FormField label="Business" className="max-w-xs">
             <Select value={selected?.business.id} onChange={(e) => setParams({ business: e.target.value }, { replace: true })}>
               {list.map((c) => (
                 <option key={c.business.id} value={c.business.id}>
