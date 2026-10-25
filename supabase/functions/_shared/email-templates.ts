@@ -20,7 +20,22 @@ export interface TemplateData {
   note?: string
   expiresAt?: string
   inviterName?: string
+  /** Account security notice (S1): which change the email reports. */
+  notice?: SecurityNotice
+  /** Closure alert for the admin inbox: the account that asked to close. */
+  accountEmail?: string
 }
+
+/** The account changes a security notice can report (spec §7). */
+export type SecurityNotice =
+  | '2fa_enabled'
+  | '2fa_disabled'
+  | 'recovery_used'
+  | 'recovery_regenerated'
+  | '2fa_reset_by_owner'
+  | 'closure_requested'
+  | 'closure_completed'
+  | 'closure_restored'
 
 export interface RenderedEmail {
   subject: string
@@ -53,8 +68,78 @@ The Sanctus team has invited you to join the platform as ${role}. As ${role} you
   }
 }
 
+// Account security emails (S1). The account pages are English only, so each has one wording for both languages.
+// The code email carries no link at all: a security code next to a button is what phishing looks like.
+const securityCode = (): Copy => ({
+  subject: 'Your Sanctus security code',
+  heading: 'Your security code',
+  body: 'Use this code to confirm the change you started in Sanctus. It expires in 10 minutes and works once. If you did not ask for it, you can ignore this email: nothing changes without the code.',
+})
+
+const NOT_YOU = 'If this was not you, sign in and change your password, then contact the Sanctus team.'
+const NOTICE: Record<SecurityNotice, Omit<Copy, 'cta'>> = {
+  '2fa_enabled': {
+    subject: 'Two-step verification is on',
+    heading: 'Two-step verification is on',
+    body: 'Your Sanctus account now asks for a code from your authenticator app when you sign in. Keep your recovery codes somewhere safe.',
+    note: NOT_YOU,
+  },
+  '2fa_disabled': {
+    subject: 'Two-step verification was turned off',
+    heading: 'Two-step verification was turned off',
+    body: 'Your Sanctus account no longer asks for an authenticator code when you sign in. Your recovery codes no longer work.',
+    note: NOT_YOU,
+  },
+  recovery_used: {
+    subject: 'A recovery code was used on your account',
+    heading: 'A recovery code was used',
+    body: 'Someone signed in to your Sanctus account with a recovery code. Two-step verification is now off and your other recovery codes no longer work. Set up two-step verification again from your security settings.',
+    note: NOT_YOU,
+  },
+  recovery_regenerated: {
+    subject: 'New recovery codes were created',
+    heading: 'New recovery codes were created',
+    body: 'A new set of recovery codes was created for your Sanctus account. The previous codes no longer work.',
+    note: NOT_YOU,
+  },
+  '2fa_reset_by_owner': {
+    subject: 'Your two-step verification was reset',
+    heading: 'Your two-step verification was reset',
+    body: 'The platform owner reset two-step verification on your Sanctus account. Your authenticator app and recovery codes no longer work. Sign in and set up two-step verification again.',
+    note: 'If you did not ask for this, contact the Sanctus team.',
+  },
+  closure_requested: {
+    subject: 'We received your request to close your account',
+    heading: 'Your closure request is with us',
+    body: 'Your catalogue is now offline and the Sanctus team will close your account. Until then you can cancel the request from your account settings, and your catalogue goes back to how it was.',
+    note: 'If you did not ask for this, sign in, cancel the request and change your password.',
+  },
+  closure_completed: {
+    subject: 'Your Sanctus account was closed',
+    heading: 'Your account was closed',
+    body: 'Your Sanctus account, your business and its catalogue have been deleted, as you asked. This cannot be undone.',
+  },
+  closure_restored: {
+    subject: 'Your Sanctus account stays open',
+    heading: 'Your account stays open',
+    body: 'The Sanctus team cancelled the closure of your account. Your catalogue is back to how it was before you asked to close it.',
+    note: 'If you still want to close your account, you can ask again from your account settings.',
+  },
+}
+const securityNotice = (d: TemplateData): Copy => ({ ...NOTICE[d.notice ?? '2fa_disabled'], cta: 'Open Sanctus' })
+
+const closureRequest = (d: TemplateData): Copy => ({
+  subject: 'An account asked to be closed',
+  heading: 'An account asked to be closed',
+  body: `${d.accountEmail ?? 'A business owner'} asked to close their Sanctus account. Their catalogue is now offline. Review the request in the platform console: complete the closure, or restore the account.`,
+  cta: 'Open Sanctus',
+})
+
 const COPY: Record<EmailKind, Record<EmailLang, (d: TemplateData) => Copy>> = {
   team_invitation: { en: teamInvitation, pt: teamInvitation },
+  security_code: { en: securityCode, pt: securityCode },
+  security_notice: { en: securityNotice, pt: securityNotice },
+  closure_request: { en: closureRequest, pt: closureRequest },
   owner_invitation: {
     en: (d) => ({
       subject: `You're invited to manage ${d.businessName ?? 'your catalogue'} on Sanctus`,
@@ -161,3 +246,20 @@ ${data.actionUrl ? `<p style="margin:24px 0 0;font-size:12px;color:#6E6559;word-
   const text = [c.heading, '', c.body, ...(c.list ? c.list.map((li) => `- ${li}`) : []), ...(c.quote ? ['', c.quote] : []), ...(data.code ? ['', `${CODE_LABEL[lang]}: ${data.code}`] : []), ...(c.cta && data.actionUrl ? ['', `${c.cta}: ${data.actionUrl}`] : []), ...(c.note ? ['', c.note] : []), '', 'Sanctus'].join('\n')
   return { subject: c.subject, html, text }
 }
+
+/** The only link an account-security email may carry: the app's own https base URL. */
+const appLink = (appBaseUrl: string | undefined) => (appBaseUrl && /^https:\/\/[^\s/]+$/.test(appBaseUrl) ? appBaseUrl : undefined)
+
+/** "Your Sanctus security code: 123456 (expires in 10 minutes)". No link. */
+export function securityCodeEmail(code: string): RenderedEmail {
+  if (!/^\d{6}$/.test(code)) throw new Error('a security code is 6 digits')
+  return renderEmail('security_code', 'en', { code })
+}
+
+/** A plain notice about a change to the account, with at most a link to the app. */
+export const securityNoticeEmail = (notice: SecurityNotice, appBaseUrl?: string): RenderedEmail =>
+  renderEmail('security_notice', 'en', { notice, actionUrl: appLink(appBaseUrl) })
+
+/** The admin inbox alert for a business owner's closure request. */
+export const closureRequestEmail = (accountEmail: string, appBaseUrl?: string): RenderedEmail =>
+  renderEmail('closure_request', 'en', { accountEmail, actionUrl: appLink(appBaseUrl) })

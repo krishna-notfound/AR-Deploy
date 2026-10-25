@@ -79,6 +79,30 @@ Deno.serve((req) =>
       if (error) throw new Error(`email_log insert failed: ${error.message}`)
       return data.id as string
     },
+    // Active members whose role has applications.view, plus the Owner, minus anyone who turned the alert off in
+    // their profile (the column defaults to on, so a missing profile row counts as on).
+    async staffAlertRecipients() {
+      const perms = await admin.from('platform_role_permissions').select('role').eq('permission', 'applications.view')
+      if (perms.error) throw new Error(`permission lookup failed: ${perms.error.message}`)
+      const roles = (perms.data ?? []).map((r) => r.role as string)
+      const members = roles.length
+        ? await admin.from('platform_members').select('user_id, email').eq('status', 'active').in('role', roles).not('user_id', 'is', null)
+        : { data: [] as { user_id: string; email: string }[], error: null }
+      if (members.error) throw new Error(`member lookup failed: ${members.error.message}`)
+      const owners = await admin.from('platform_admins').select('user_id')
+      if (owners.error) throw new Error(`owner lookup failed: ${owners.error.message}`)
+      const byUser = new Map<string, string>((members.data ?? []).map((m) => [m.user_id as string, m.email as string]))
+      for (const o of owners.data ?? []) {
+        if (byUser.has(o.user_id)) continue
+        const { data } = await admin.auth.admin.getUserById(o.user_id)
+        if (data.user?.email) byUser.set(o.user_id, data.user.email)
+      }
+      if (!byUser.size) return []
+      const off = await admin.from('profiles').select('user_id').in('user_id', [...byUser.keys()]).eq('notify_new_applications', false)
+      if (off.error) throw new Error(`profile lookup failed: ${off.error.message}`)
+      for (const p of off.data ?? []) byUser.delete(p.user_id as string)
+      return [...byUser.values()]
+    },
   }).catch((e) => {
     console.error(`submit-application: ${String(e).slice(0, 300)}`)
     return new Response(JSON.stringify({ error: 'unknown' }), { status: 500, headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' } })
