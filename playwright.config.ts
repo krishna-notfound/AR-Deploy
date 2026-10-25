@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// Each git worktree can run its own server: set E2E_PORT to a free port so parallel runs never share one.
+const PORT = Number(process.env.E2E_PORT) || 5199
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -10,7 +13,7 @@ export default defineConfig({
   timeout: 90_000,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:5199',
+    baseURL: `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
   },
   projects: [
@@ -26,8 +29,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --port 5199 --strictPort',
-    url: 'http://localhost:5199',
+    command: `npm run dev -- --port ${PORT} --strictPort`,
+    url: `http://localhost:${PORT}`,
     reuseExistingServer: true,
     timeout: 60_000,
     // E2E covers demo mode; process env beats .env.local, so a developer's Supabase setup is not used here.
