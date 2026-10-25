@@ -1,5 +1,5 @@
 import { Table2 } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { DailyPoint } from '@/domain/types'
 import { formatNumber } from '@/lib/format'
 import { Button } from '../ui/Button'
@@ -14,6 +14,7 @@ const KEYS = Object.keys(SERIES) as SeriesKey[]
 export function ActivityTrend({ data, compact }: { data: DailyPoint[]; compact?: boolean }) {
   const [showTable, setShowTable] = useState(false)
   const [show, setShow] = useState<Record<SeriesKey, boolean>>({ views: true, ar: true })
+  const lockedHint = useId()
   const views = data.reduce((s, d) => s + d.views, 0)
   const ar = data.reduce((s, d) => s + d.arActivations, 0)
   const tableToggle = (
@@ -29,24 +30,33 @@ export function ActivityTrend({ data, compact }: { data: DailyPoint[]; compact?:
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           {!showTable && (
             <div role="group" aria-label="Series shown in the chart" className="-ml-2 flex flex-wrap items-center gap-x-1 gap-y-1">
-              {KEYS.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  aria-pressed={show[k]}
-                  // The chart is never empty: the last visible series stays on.
-                  disabled={show[k] && visible === 1}
-                  onClick={() => setShow((s) => ({ ...s, [k]: !s[k] }))}
-                  className="inline-flex h-8 items-center gap-2 rounded-[var(--radius-control)] px-2 text-[length:var(--text-ui-small)] text-ink-muted transition-colors hover:bg-subtle hover:text-ink disabled:cursor-default disabled:hover:bg-transparent aria-[pressed=false]:text-ink-faint"
-                >
-                  <span
-                    className="size-2 shrink-0 rounded-full border-[1.5px]"
-                    style={{ borderColor: SERIES[k].color, background: show[k] ? SERIES[k].color : 'transparent' }}
-                    aria-hidden
-                  />
-                  {SERIES[k].label}
-                </button>
-              ))}
+              {KEYS.map((k) => {
+                // The chart is never empty: the last visible series stays on. It stays focusable and says why.
+                const locked = show[k] && visible === 1
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={show[k]}
+                    aria-disabled={locked || undefined}
+                    aria-describedby={locked ? lockedHint : undefined}
+                    onClick={() => {
+                      if (!locked) setShow((s) => ({ ...s, [k]: !s[k] }))
+                    }}
+                    className="inline-flex h-8 items-center gap-2 rounded-[var(--radius-control)] px-2 text-[length:var(--text-ui-small)] text-ink-muted transition-colors hover:bg-subtle hover:text-ink aria-disabled:cursor-default aria-disabled:hover:bg-transparent aria-[pressed=false]:text-ink-faint max-sm:h-11"
+                  >
+                    <span
+                      className="size-2 shrink-0 rounded-full border-[1.5px]"
+                      style={{ borderColor: SERIES[k].color, background: show[k] ? SERIES[k].color : 'transparent' }}
+                      aria-hidden
+                    />
+                    {SERIES[k].label}
+                  </button>
+                )
+              })}
+              <span id={lockedHint} className="sr-only">
+                At least one series stays visible
+              </span>
             </div>
           )}
           <div className="ml-auto">{tableToggle}</div>

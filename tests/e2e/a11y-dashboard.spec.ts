@@ -1,4 +1,4 @@
-import { type Page, expect, test } from '@playwright/test'
+import { type Locator, type Page, expect, test } from '@playwright/test'
 import { signInAsBusiness, signInAsSuperAdmin } from './helpers'
 
 // Dashboard type and layout checks (A1 dashboard clarity pass, ADR-0031, demo mode). On every in-scope dashboard
@@ -7,11 +7,30 @@ import { signInAsBusiness, signInAsSuperAdmin } from './helpers'
 // describe block below with a 390px viewport.
 // Task 13b: product editor routes
 
-type Route = { name: string; path: string; ready: (page: Page) => Promise<void>; act?: (page: Page) => Promise<void> }
+type Route = {
+  name: string
+  path: string
+  ready: (page: Page) => Promise<void>
+  /** Data routes: an element that only exists once the (delayed) mock data has rendered. */
+  loaded?: (page: Page) => Locator
+  act?: (page: Page) => Promise<void>
+  /** Fewest text elements the audit must measure inside <main>, so an empty or half-rendered page cannot pass. */
+  min?: number
+}
 
 const h1 = (name: string | RegExp) => async (page: Page) => {
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
 }
+
+/** First visible match in <main>: the desktop table and the phone list render the same text, one of them hidden. */
+const inMain = (text: string | RegExp) => (page: Page) => page.locator('main').getByText(text).locator('visible=true').first()
+const chart = (page: Page) => page.locator('main').getByRole('img', { name: /last 30 days/ }).first()
+// Dashboard labels append " Required", so match the start of the label.
+const field = (label: string) => (page: Page) => page.locator('main').getByLabel(new RegExp(`^${label}`)).first()
+/** A data row: a table body row on desktop, a list item in the phone list. */
+const row = (listName: string) => (page: Page) =>
+  page.locator('main').locator('tbody tr').or(page.locator('main').getByRole('list', { name: listName }).getByRole('listitem')).locator('visible=true').first()
+const qr = (page: Page) => page.locator('main').getByRole('img', { name: /^QR code linking to/ }).first()
 
 const showTable = async (page: Page) => {
   await page.getByRole('button', { name: 'Show as table' }).first().click()
@@ -19,33 +38,40 @@ const showTable = async (page: Page) => {
 }
 
 const ADMIN_ROUTES: Route[] = [
-  { name: 'admin overview', path: '/admin', ready: h1('Overview') },
-  { name: 'admin overview: chart as a table', path: '/admin', ready: h1('Overview'), act: showTable },
-  { name: 'applications list', path: '/admin/applications', ready: h1('Applications') },
-  { name: 'businesses list', path: '/admin/businesses', ready: h1('Businesses') },
-  { name: 'new business', path: '/admin/businesses/new', ready: h1(/./) },
-  { name: 'business detail: details', path: '/admin/businesses/biz_casa', ready: h1('Casa Lisboa Interiors') },
-  { name: 'business detail: products', path: '/admin/businesses/biz_casa?tab=products', ready: h1('Casa Lisboa Interiors') },
-  { name: 'business detail: owners', path: '/admin/businesses/biz_casa?tab=owners', ready: h1('Casa Lisboa Interiors') },
-  { name: 'business detail: QR', path: '/admin/businesses/biz_casa?tab=qr', ready: h1('Casa Lisboa Interiors') },
-  { name: 'catalogs', path: '/admin/catalogs', ready: h1(/catalog/i) },
-  { name: 'products list', path: '/admin/products', ready: h1('All products') },
-  { name: 'analytics', path: '/admin/analytics', ready: h1('Analytics') },
-  { name: 'audit log', path: '/admin/activity', ready: h1(/./) },
-  { name: 'settings', path: '/admin/settings', ready: h1('Settings') },
-  { name: 'team list', path: '/admin/team', ready: h1('Team & Access') },
-  { name: 'member detail', path: '/admin/team/mem_joao', ready: h1('João Costa') },
-  { name: 'role permissions', path: '/admin/team/permissions', ready: h1(/./) },
-  { name: 'page not found in the shell', path: '/admin/no-such-page', ready: h1('Page not found') },
+  { name: 'admin overview', path: '/admin', ready: h1('Overview'), loaded: chart },
+  { name: 'admin overview: chart as a table', path: '/admin', ready: h1('Overview'), loaded: chart, act: showTable },
+  { name: 'applications list', path: '/admin/applications', ready: h1('Applications'), loaded: inMain(/No applications yet|Atelier Claro/) },
+  { name: 'businesses list', path: '/admin/businesses', ready: h1('Businesses'), loaded: inMain('Nordhaus Living') },
+  { name: 'new business', path: '/admin/businesses/new', ready: h1(/./), loaded: field('Business name') },
+  { name: 'business detail: details', path: '/admin/businesses/biz_casa', ready: h1('Casa Lisboa Interiors'), loaded: field('Business name') },
+  { name: 'business detail: products', path: '/admin/businesses/biz_casa?tab=products', ready: h1('Casa Lisboa Interiors'), loaded: inMain('Glam Velvet Sofa') },
+  {
+    name: 'business detail: owners',
+    path: '/admin/businesses/biz_casa?tab=owners',
+    ready: h1('Casa Lisboa Interiors'),
+    // biz_casa has no owner in demo: the invite form replaces the owner row once the members query has answered.
+    loaded: (page) => page.locator('main').getByRole('textbox', { name: /^Owner email/ }).or(page.locator('main').getByText(/@/)).first(),
+  },
+  { name: 'business detail: QR', path: '/admin/businesses/biz_casa?tab=qr', ready: h1('Casa Lisboa Interiors'), loaded: qr },
+  { name: 'catalogs', path: '/admin/catalogs', ready: h1(/catalog/i), loaded: qr },
+  { name: 'products list', path: '/admin/products', ready: h1('All products'), loaded: row('Products') },
+  { name: 'analytics', path: '/admin/analytics', ready: h1('Analytics'), loaded: chart },
+  // Demo mode has no audit events (the server writes them), so this page is short: heading, search and empty state.
+  { name: 'audit log', path: '/admin/activity', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('heading', { name: 'No events yet' }).or(row('Events')(page)).first(), min: 5 },
+  { name: 'settings', path: '/admin/settings', ready: h1('Settings'), loaded: inMain('admin@platform.example') },
+  { name: 'team list', path: '/admin/team', ready: h1('Team & Access'), loaded: inMain('ana.ribeiro@sanctus.example') },
+  { name: 'member detail', path: '/admin/team/mem_joao', ready: h1('João Costa'), loaded: inMain('joao.costa@sanctus.example') },
+  { name: 'role permissions', path: '/admin/team/permissions', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('checkbox').first() },
+  { name: 'page not found in the shell', path: '/admin/no-such-page', ready: h1('Page not found'), min: 3 },
 ]
 
 const BUSINESS_ROUTES: Route[] = [
-  { name: 'business overview', path: '/dashboard', ready: h1('Overview') },
-  { name: 'business overview: chart as a table', path: '/dashboard', ready: h1('Overview'), act: showTable },
-  { name: 'business catalog', path: '/dashboard/catalog', ready: h1(/./) },
-  { name: 'business products', path: '/dashboard/products', ready: h1(/./) },
-  { name: 'business analytics', path: '/dashboard/analytics', ready: h1('Analytics') },
-  { name: 'business settings', path: '/dashboard/settings', ready: h1(/./) },
+  { name: 'business overview', path: '/dashboard', ready: h1('Overview'), loaded: chart },
+  { name: 'business overview: chart as a table', path: '/dashboard', ready: h1('Overview'), loaded: chart, act: showTable },
+  { name: 'business catalog', path: '/dashboard/catalog', ready: h1(/./), loaded: qr },
+  { name: 'business products', path: '/dashboard/products', ready: h1(/./), loaded: inMain('Glam Velvet Sofa') },
+  { name: 'business analytics', path: '/dashboard/analytics', ready: h1('Analytics'), loaded: chart },
+  { name: 'business settings', path: '/dashboard/settings', ready: h1(/./), loaded: field('Business name') },
 ]
 
 /** Demo has no seeded applications: send one through the public form so the detail page has a record. */
@@ -74,6 +100,22 @@ async function submitApplication(page: Page) {
 
 type Offender = { tag: string; cls: string; text: string; value: string }
 
+/** Anything in <main> that means data is still on its way: busy controls, skeleton bars, loading statuses, spinners. */
+const LOADING = ['[aria-busy="true"]', '[role="status"][aria-label="Loading"]', 'span.block.bg-subtle[aria-hidden="true"]', '.animate-spin']
+  .map((s) => `main ${s}`)
+  .join(', ')
+
+/** Waits until the route has rendered its data: its own `loaded` element, then no loading indicator left in <main>. */
+async function waitForLoaded(page: Page, route: Route, afterAction = false) {
+  await expect(page.locator('main'), 'the dashboard renders a <main> landmark').toHaveCount(1)
+  if (route.loaded && !afterAction) await expect(route.loaded(page), `${route.path} shows its data`).toBeVisible()
+  await expect(page.locator(LOADING), `${route.path} has no loading indicator left`).toHaveCount(0)
+  // Charts size themselves after the first paint: measure once their axis text is drawn.
+  if (await page.locator('main .recharts-responsive-container').count()) {
+    await expect(page.locator('main .recharts-cartesian-axis-tick-value').first()).toBeVisible()
+  }
+}
+
 /** Runs the three checks in the page and returns the offending elements, so a failure says what to fix. */
 async function audit(page: Page, checkOverflow: boolean) {
   // Let fonts, lazy chunks and charts settle before measuring.
@@ -92,30 +134,42 @@ async function audit(page: Page, checkOverflow: boolean) {
       text: (ownText(el) || (el as HTMLInputElement).placeholder || '').slice(0, 60),
       value,
     })
+    // Visibility rule (both checks and the overflow list): an element counts only when a sighted person can see it.
+    // Skipped: anything inside .sr-only or [aria-hidden="true"]; anything checkVisibility() rejects (display:none or a
+    // collapsed tree, content-visibility, visibility:hidden, opacity 0); and boxes of 1px or less in either direction,
+    // which is how clipped screen-reader-only text renders.
     const visible = (el: Element) => {
+      if (el.closest('.sr-only, [aria-hidden="true"]')) return false
+      if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false
       const r = el.getBoundingClientRect()
-      if (r.width === 0 || r.height === 0) return false
-      const s = getComputedStyle(el)
-      return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0
+      return r.width > 1 && r.height > 1
     }
     const isField = (el: Element) => el.matches('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), textarea, select')
 
     const small: Offender[] = []
     const main = document.querySelector('main')
+    let measuredMain = 0
     for (const el of Array.from(main?.querySelectorAll('*') ?? [])) {
       // Chart text (SVG ticks and labels) counts too.
       if (el.closest('[data-wordmark]')) continue
       if (!ownText(el) && !isField(el)) continue
       if (!visible(el)) continue
+      measuredMain++
       const size = parseFloat(getComputedStyle(el).fontSize)
       if (size < 12) small.push(describe(el, `${size}px`))
     }
 
     const upper: Offender[] = []
-    for (const scope of Array.from(document.querySelectorAll('[data-surface="dashboard"]'))) {
+    // <body> and the shell root both carry the marker: walk only the outermost scopes so nothing is counted twice.
+    const scopes = Array.from(document.querySelectorAll('[data-surface="dashboard"]'))
+    const outer = scopes.filter((s) => !scopes.some((o) => o !== s && o.contains(s)))
+    let measuredScope = 0
+    for (const scope of outer) {
       for (const el of [scope, ...Array.from(scope.querySelectorAll('*'))]) {
         if (el.closest('[data-wordmark]') || el.closest('svg')) continue
         if (!ownText(el) && !isField(el)) continue
+        if (!visible(el)) continue
+        measuredScope++
         if (getComputedStyle(el).textTransform === 'uppercase') upper.push(describe(el, 'uppercase'))
       }
     }
@@ -128,7 +182,16 @@ async function audit(page: Page, checkOverflow: boolean) {
         if (r.right > window.innerWidth + 1 && r.width > 0 && visible(el)) wide.push(describe(el, `right ${Math.round(r.right)}px`))
       }
     }
-    return { small, upper: Array.from(new Map(upper.map((o) => [JSON.stringify(o), o])).values()), scroll, wide: wide.slice(0, 15) }
+    return {
+      hasMain: !!main,
+      scopes: scopes.length,
+      measuredMain,
+      measuredScope,
+      small,
+      upper: Array.from(new Map(upper.map((o) => [JSON.stringify(o), o])).values()),
+      scroll,
+      wide: wide.slice(0, 15),
+    }
   }, checkOverflow)
 }
 
@@ -137,12 +200,19 @@ const list = (items: Offender[]) => items.map((o) => `  <${o.tag} class="${o.cls
 async function checkRoute(page: Page, route: Route, mobile: boolean) {
   await page.goto(route.path)
   await route.ready(page)
-  if (route.act) await route.act(page)
-  // Charts size themselves after the first paint: measure once their axis text is drawn.
-  if (await page.locator('main .recharts-responsive-container').count()) {
-    await expect(page.locator('main .recharts-cartesian-axis-tick-value').first()).toBeVisible()
+  await waitForLoaded(page, route)
+  if (route.act) {
+    await route.act(page)
+    await waitForLoaded(page, route, true)
   }
   const r = await audit(page, mobile)
+  // Guard against a false green: the audit must have found the page and measured a real amount of text.
+  const counts = `${r.measuredMain} text elements in <main>, ${r.measuredScope} in the dashboard scope`
+  test.info().annotations.push({ type: 'audited', description: `${route.path}: ${counts}` })
+  console.log(`[a11y] ${mobile ? '390' : 'desktop'} ${route.path}${route.act ? ' (after action)' : ''}: ${counts}`)
+  expect(r.hasMain, `${route.path} has a <main> element`).toBe(true)
+  expect(r.scopes, `${route.path} is inside [data-surface="dashboard"]`).toBeGreaterThan(0)
+  expect(r.measuredMain, `Too little text measured in <main> on ${route.path} (${counts})`).toBeGreaterThanOrEqual(route.min ?? 15)
   expect(r.small, `Text under 12px inside <main> on ${route.path}:\n${list(r.small)}`).toEqual([])
   expect(r.upper, `Uppercase text in the dashboard scope on ${route.path}:\n${list(r.upper)}`).toEqual([])
   if (r.scroll) {
@@ -166,7 +236,12 @@ function suite(mobile: boolean) {
     await signInAsSuperAdmin(page)
     await page.goto('/admin/applications')
     await page.getByRole('link', { name: /Atelier Claro/ }).or(page.getByRole('button', { name: /Atelier Claro|Review/ })).first().click()
-    const route: Route = { name: 'application detail', path: page.url().replace(/^https?:\/\/[^/]+/, ''), ready: h1(/Atelier Claro/) }
+    const route: Route = {
+      name: 'application detail',
+      path: page.url().replace(/^https?:\/\/[^/]+/, ''),
+      ready: h1(/Atelier Claro/),
+      loaded: inMain('rita@atelier-claro.test'),
+    }
     await checkRoute(page, route, mobile)
   })
 
