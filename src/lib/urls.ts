@@ -1,5 +1,5 @@
 // The only place URLs are composed. See System_arch/design/08-tenancy-urls.md.
-import type { Business, Lang, Product } from '@/domain/types'
+import type { Business, Lang, Product, SettingsSection } from '@/domain/types'
 
 type Sluggable = Pick<Business, 'slug'>
 type ProductSluggable = Pick<Product, 'slug'>
@@ -123,4 +123,9 @@ export function shareableCurrentUrl(): string {
   const u = new URL(window.location.href)
   u.searchParams.delete('preview')
   return u.toString()
+}
+
+/** The settings hub (S1): /dashboard/settings/<section> for business owners, /admin/settings/<section> for staff. */
+export function settingsPath(scope: 'admin' | 'business', section: SettingsSection = 'account'): string {
+  return `${scope === 'admin' ? '/admin' : '/dashboard'}/settings/${section}`
 }
