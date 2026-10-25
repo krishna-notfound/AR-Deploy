@@ -7,7 +7,7 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
 - Spec (approved 2026-10-25): `docs/superpowers/specs/2026-10-25-platform-team-rbac-design.md`
 - Plan (18 tasks): `docs/superpowers/plans/2026-10-25-platform-team-rbac.md`
 - Decisions: ADR-0029 and ADR-0030 (written in Task 1 of the plan)
-- Status (2026-10-25): **Tasks 1–17 done on the branch** (native execution). All tests pass: 439 unit, 38 browser. Task 18 done 2026-10-25 with the owner's go-ahead: applied to `zggylkbgajamhriebdrg` and checked live (invite, join, Team limits, deactivation, history, link reuse refused). **Next: add-on A1 (UI pass), as the owner asked.**
+- Status (2026-10-25): **Tasks 1–17 done on the branch** (native execution). All tests pass: 439 unit, 38 browser. Task 18 done 2026-10-25 with the owner's go-ahead: applied to `zggylkbgajamhriebdrg` and checked live (invite, join, Team limits, deactivation, history, link reuse refused). A1 (UI pass) followed; see below.
 
 ## Add-ons (agreed 2026-10-25, after P12.0)
 
@@ -55,8 +55,19 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
   - whether the type scale may change globally (`src/index.css` tokens), which needs an ADR;
   - whether fonts stay Cormorant Garamond + Jost or the dashboards get a more readable UI face (a new font needs an ADR).
 
+- **Status (2026-10-25): built on the branch, ahead of A3 and A2 at the owner's request.**
+  - **Designs:** Stitch variant A (Inter for the dashboards), approved by the owner.
+  - **Spec and plan:** `docs/superpowers/specs/2026-10-25-dashboard-clarity-design.md` and `docs/superpowers/plans/2026-10-25-dashboard-clarity.md`.
+  - **Decision:** ADR-0031, which scopes the dashboard type with `data-surface="dashboard"` and `useInDashboard()`.
+  - **Public pages:** they keep their look (pixel guard, 14 pages) apart from the label type in the shell and embed.
+  - **Testing:**
+    - every page was checked on real client data, read-only, against its Stitch screen;
+    - `tests/e2e/a11y-dashboard.spec.ts` enforces no text under 12px, no uppercase and no horizontal scroll at 390.
+  - **Not done (deferred):** an Uploaded/Remote URL switch on the 3D model slots, and folding the editor's segmented control into the shared one.
+
 ## Log
 
 | Date | Note |
 |---|---|
 | 2026-10-25 | P12.0 spec approved and plan written. Add-ons A1–A3 recorded from the owner's request, to run after P12.0. |
+| 2026-10-25 | P12.0 live. A1 dashboard clarity pass built and reviewed (14 tasks plus a visual review against Stitch); next is the owner's business-logic pass, then A3 and A2. |

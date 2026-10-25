@@ -8,7 +8,16 @@
 - **Applied to `zggylkbgajamhriebdrg` on 2026-10-25 and checked live.** The deploy steps are in `docs/OPERATIONS_RUNBOOK.md` ("Platform team roles"), and the rollback is `supabase/rollback/20261025_platform_team_roles_rollback.sql`.
 - **Before the migration:** sign-in falls back to `platform_admins`, and Team & Access says it isn't switched on.
 - **Demo mode:** `/demo` has "Continue as Admin (sample)" and "Continue as Team (sample)"; the sample invitation link is `/join#t=demo-invite-token`.
-- **Next:** add-ons A3, A2 and A1 (`System_arch/tasks/P12-team-roles-and-addons.md`).
+- **Next:** A1 is built (see below). Then the owner's business-logic pass, then add-ons A3 and A2 (`System_arch/tasks/P12-team-roles-and-addons.md`).
+
+## Dashboard type (ADR-0031, 2026-10-25, same branch)
+- **Where the dashboard look applies:** inside `DashboardShell`, and only there. The shell root and `<body>` (for portals) carry `data-surface="dashboard"`, which sets Inter (`--font-ui`) and the `--text-ui-*` sizes.
+- **Shared components:** they branch on `useInDashboard()`. Outside the shell they render exactly the classes they used to.
+- **Guards:**
+  - `tests/visual/guard.spec.ts` (Playwright project `guard`) compares 7 owner-designed pages at 1440 and 390 with `maxDiffPixels: 0`;
+  - `tests/e2e/a11y-dashboard.spec.ts` checks that dashboard pages have no text under 12px, no uppercase and no horizontal scroll at 390.
+- **Design review:** `node scripts/design-review.mjs --port <dev port>` screenshots every dashboard page on the configured backend, read-only. `python scripts/design-sheet.py` pairs each screenshot with its Stitch screen in `design/review/pairs/` (git-ignored).
+- **Gotcha:** `cn()` has no tailwind-merge. To override a component class from a caller, use the Tailwind 4 important suffix (`size-8!`).
 
 ## Next session: start here (2026-10-20)
 1. **The client now has Supabase Pro.** Next job: set up their **staging** and **production** projects. Follow `docs/OPERATIONS_RUNBOOK.md` ("Separate staging project", then "Deploying"). First ask the owner for the project refs and to be invited. Never reuse `pmnjchhrgvajtjpadpqo` (previous demo) or `bothonopxtznzviieoic` (Shringaar) for this.

@@ -63,6 +63,13 @@ These are not to be decided silently.
 
 ## 5. Test results
 
+Dashboard clarity pass A1, on the branch at tree `32ae117` (2026-10-25):
+- `npm test`: **564 passed, 15 skipped**. One run had an auth timing flake; that file passed 3 of 3 on its own and the next full run passed.
+- Playwright desktop + mobile: **98 passed**. This includes `a11y-dashboard.spec.ts` (no text under 12px, no uppercase, no horizontal scroll at 390).
+- Pixel guard: **14/14**, run with `--workers=1`. Under parallel load it can fail on glyph edges.
+- Typecheck, lint (0 errors) and build pass.
+- Every dashboard page was also checked against its Stitch screen on real client data, read-only.
+
 Team roles, on the branch (2026-10-25): `npm test` **439 passed, 15 skipped** (database rules on PGlite included), `npm run test:e2e` **38 passed** (6 new team journeys), typecheck, lint and build pass.
 
 Earlier run (tree `26c03a5`, 2026-10-24):
