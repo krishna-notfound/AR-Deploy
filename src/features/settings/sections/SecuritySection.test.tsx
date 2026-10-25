@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AccountProvider, ACCOUNT_KEY } from '@/auth/AccountProvider'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import type { SecurityState } from '@/domain/types'
@@ -40,6 +41,9 @@ const state = (patch: Partial<SecurityState>): SecurityState => ({
 })
 
 const twoFactorCard = () => screen.getByRole('region', { name: 'Two-step verification (2FA)' })
+const cardHeading = () => screen.getByRole('heading', { level: 2, name: 'Two-step verification (2FA)' })
+/** Lets pending promises and the renders they cause settle. */
+const settle = () => new Promise((r) => setTimeout(r, 0))
 
 /** Types a code into the action-code dialog and confirms it (the dialog's contract: a code field and the confirm label). */
 async function confirmWithCode(user: ReturnType<typeof userEvent.setup>, dialogName: string, confirmLabel: string) {
@@ -81,9 +85,10 @@ describe('Security & 2FA section', () => {
     // 2FA is on from the accepted code, while the first recovery codes are still on screen.
     expect(within(twoFactorCard()).getByText('On')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Done' }))
-    expect(await screen.findByText('2FA is on')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Turn off 2FA' })).toBeInTheDocument()
+    expect(screen.getByText('2FA is on')).toBeInTheDocument()
     expect(within(twoFactorCard()).getByText('On')).toBeInTheDocument()
+    expect(cardHeading()).toHaveFocus()
     expect(screen.getByText('8 of 8 recovery codes left')).toBeInTheDocument()
   })
 
@@ -117,6 +122,7 @@ describe('Security & 2FA section', () => {
     await user.click(screen.getByRole('checkbox', { name: 'I saved these codes' }))
     await user.click(done)
     expect(screen.queryByRole('list', { name: 'Recovery codes' })).not.toBeInTheDocument()
+    expect(cardHeading()).toHaveFocus()
 
     await user.click(screen.getByRole('button', { name: 'Turn off 2FA' }))
     await confirmWithCode(user, 'Turn off 2FA?', 'Turn off 2FA')
@@ -124,6 +130,111 @@ describe('Security & 2FA section', () => {
     expect(await screen.findByText('2FA is off')).toBeInTheDocument()
     expect(await within(twoFactorCard()).findByText('Off')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Turn on 2FA' })).toBeInTheDocument()
+    await waitFor(() => expect(cardHeading()).toHaveFocus())
+  })
+
+  it('finishing setup keeps the card on while the state refreshes: Turn on never flashes back', async () => {
+    const user = userEvent.setup()
+    const real = account.getSecurityState
+    renderSection()
+    await user.click(await screen.findByRole('button', { name: 'Turn on 2FA' }))
+    await user.type(await screen.findByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
+    await user.click(await screen.findByRole('checkbox', { name: 'I saved these codes' }))
+
+    let release: () => void = () => {}
+    vi.spyOn(account, 'getSecurityState').mockImplementationOnce(
+      () => new Promise((resolve) => {
+        release = () => void real().then(resolve)
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await settle()
+    expect(screen.queryByRole('button', { name: 'Turn on 2FA' })).not.toBeInTheDocument()
+    expect(within(twoFactorCard()).getByText('On')).toBeInTheDocument()
+    release()
+    expect(await screen.findByRole('button', { name: 'Turn off 2FA' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Turn on 2FA' })).not.toBeInTheDocument()
+  })
+
+  it('regenerated codes stay on screen until Done; a failed refresh afterwards keeps the card and toasts', async () => {
+    const user = userEvent.setup()
+    await enable2fa()
+    renderSection()
+    await screen.findByRole('region', { name: 'Two-step verification (2FA)' })
+    const get = vi.spyOn(account, 'getSecurityState').mockResolvedValue(accountFail('unknown'))
+
+    await user.click(screen.getByRole('button', { name: 'Regenerate recovery codes' }))
+    await confirmWithCode(user, 'Regenerate recovery codes', 'Regenerate codes')
+    expect(await screen.findByRole('list', { name: 'Recovery codes' })).toBeInTheDocument()
+    await settle()
+    expect(get).not.toHaveBeenCalled()
+    expect(screen.getByRole('list', { name: 'Recovery codes' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: 'I saved these codes' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(await screen.findByText("Couldn't refresh your security settings")).toBeInTheDocument()
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(within(twoFactorCard()).getByText('On')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Turn off 2FA' })).toBeInTheDocument()
+    expect(cardHeading()).toHaveFocus()
+  })
+
+  it('Turn off with a wrong code: the dialog stays open, no toast, still On', async () => {
+    const user = userEvent.setup()
+    await enable2fa()
+    const disable = vi.spyOn(account, 'disable2fa').mockResolvedValue(accountFail('invalid_code'))
+    renderSection()
+    await user.click(await screen.findByRole('button', { name: 'Turn off 2FA' }))
+    await confirmWithCode(user, 'Turn off 2FA?', 'Turn off 2FA')
+    await waitFor(() => expect(disable).toHaveBeenCalledTimes(1))
+    await settle()
+    expect(screen.getByRole('dialog', { name: 'Turn off 2FA?' })).toBeInTheDocument()
+    expect(screen.queryByText('2FA is off')).not.toBeInTheDocument()
+    expect(within(twoFactorCard()).getByText('On')).toBeInTheDocument()
+  })
+
+  it('Regenerate with a refused code: the dialog stays open and no codes are shown', async () => {
+    const user = userEvent.setup()
+    await enable2fa()
+    const generate = vi.spyOn(account, 'generateRecoveryCodes').mockResolvedValue(accountFail('code_expired'))
+    renderSection()
+    await user.click(await screen.findByRole('button', { name: 'Regenerate recovery codes' }))
+    await confirmWithCode(user, 'Regenerate recovery codes', 'Regenerate codes')
+    await waitFor(() => expect(generate).toHaveBeenCalledWith(DEMO_CODE))
+    await settle()
+    expect(screen.getByRole('dialog', { name: 'Regenerate recovery codes' })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Recovery codes' })).not.toBeInTheDocument()
+  })
+
+  it("the downloaded codes name the signed-in account", async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'business_admin', businessId: 'biz_casa' }))
+    await enable2fa()
+    render(
+      <AccountProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <SecuritySection />
+          </ConfirmProvider>
+        </ToastProvider>
+      </AccountProvider>,
+    )
+    await user.click(await screen.findByRole('button', { name: 'Regenerate recovery codes' }))
+    await confirmWithCode(user, 'Regenerate recovery codes', 'Regenerate codes')
+    await screen.findByRole('list', { name: 'Recovery codes' })
+    const createObjectURL = vi.fn((_b: Blob) => 'blob:codes')
+    const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL }
+    URL.createObjectURL = createObjectURL
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    try {
+      await user.click(screen.getByRole('button', { name: 'Download .txt' }))
+      expect(await createObjectURL.mock.calls[0]![0].text()).toMatch(/Account: \S+@\S+/)
+    } finally {
+      URL.createObjectURL = original.create
+      URL.revokeObjectURL = original.revoke
+    }
   })
 
   it("Turn off when the policy requires 2FA shows 'Your organisation requires 2FA' and no button", async () => {

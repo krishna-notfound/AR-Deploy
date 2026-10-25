@@ -44,7 +44,7 @@ describe('TotpSetup', () => {
 
     await user.type(field, '000000')
     await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
-    expect(await screen.findByText(/That code didn't match/)).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/That code didn't match/)
     expect(screen.queryByRole('list', { name: 'Recovery codes' })).not.toBeInTheDocument()
   })
 
@@ -54,7 +54,7 @@ describe('TotpSetup', () => {
     renderSetup()
     await user.type(await screen.findByLabelText('6-digit code'), '12a')
     await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
-    expect(await screen.findByText('Enter the 6-digit code from your authenticator app.')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter the 6-digit code from your authenticator app.')
     expect(confirm).not.toHaveBeenCalled()
   })
 
@@ -93,12 +93,47 @@ describe('TotpSetup', () => {
     expect(done).toBeEnabled()
     await user.click(done)
     expect(onDone).toHaveBeenCalledTimes(1)
+    // A done stage replaces the codes, which are shown only once.
+    expect(screen.queryByRole('list', { name: 'Recovery codes' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '2FA is on' })).toHaveFocus()
+  })
+
+  it('focuses the code field when it appears, and again after a wrong code, which is announced', async () => {
+    const user = userEvent.setup()
+    renderSetup()
+    const field = await screen.findByLabelText('6-digit code')
+    expect(field).toHaveFocus()
+    await user.type(field, '000000')
+    await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/That code didn't match/)
+    expect(field).toHaveFocus()
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('moves focus to the heading of each new stage', async () => {
+    const user = userEvent.setup()
+    renderSetup()
+    await user.type(await screen.findByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
+    expect(await screen.findByRole('heading', { name: 'Save your recovery codes' })).toHaveFocus()
+  })
+
+  it('accepts a pasted code with spaces and a dash', async () => {
+    const user = userEvent.setup()
+    const confirm = vi.spyOn(account, 'confirmTotpEnrollment')
+    renderSetup()
+    await user.click(await screen.findByLabelText('6-digit code'))
+    await user.paste(' 123-456 ')
+    await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
+    expect(await screen.findByRole('list', { name: 'Recovery codes' })).toBeInTheDocument()
+    expect(confirm).toHaveBeenCalledWith(expect.any(String), DEMO_CODE)
   })
 
   it("MFA disabled in Supabase (enroll error mfa_not_enabled) shows '2FA is not available yet: an administrator must enable it'", async () => {
     vi.spyOn(account, 'startTotpEnrollment').mockResolvedValue(accountFail('mfa_not_enabled'))
     renderSetup()
     expect(await screen.findByText('2FA is not available yet: an administrator must enable it.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: "2FA isn't available yet" })).toHaveFocus()
     expect(screen.queryByLabelText('6-digit code')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
   })

@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type FormEvent, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { CopyButton } from '@/components/ui/CopyButton'
 import { FormField, Input } from '@/components/ui/Form'
@@ -32,20 +32,36 @@ export function qrImageSrc(qr: string): string {
 /** The setup key in groups of four, easier to type into an authenticator app. */
 const groupKey = (secret: string) => secret.replace(/\s/g, '').replace(/(.{4})(?=.)/g, '$1 ')
 
+/** A pasted or typed code without spaces or dashes ("123 456", "123-456"). */
+const cleanCode = (code: string) => code.replace(/[\s-]/g, '')
+
 type Stage =
   | { kind: 'loading' }
   | { kind: 'failed'; message: string; unavailable: boolean }
   | { kind: 'scan'; enrollment: TotpEnrollment }
   | { kind: 'codes'; codes: string[] }
   | { kind: 'codesFailed'; message: string }
+  | { kind: 'done' }
+
+/** A stage's heading: a programmatic focus target (tabIndex -1), so focus never falls back to the page. */
+function StageHeading({ headingRef, children }: { headingRef: RefObject<HTMLHeadingElement | null>; children: ReactNode }) {
+  return (
+    <h3 ref={headingRef} tabIndex={-1} className="text-ui-body font-semibold text-ink outline-none">
+      {children}
+    </h3>
+  )
+}
 
 /**
  * Authenticator (TOTP) setup, self-contained: enrol, scan the QR code or type the setup key, confirm a 6-digit code,
- * then save the first set of recovery codes. `onDone` runs once 2FA is on (Security settings, the sign-in policy gate
- * and onboarding reuse it). `onCancel`, when given, adds a Cancel button while the code is not yet confirmed;
- * `onEnabled`, when given, runs as soon as the code is accepted (2FA is on from then, before the codes are saved).
+ * then save the first set of recovery codes. `onDone` runs once 2FA is on and the codes are saved (Security settings,
+ * the sign-in policy gate and onboarding reuse it). Optional: `onCancel` adds a Cancel button until the code is
+ * confirmed; `onEnabled` runs as soon as the code is accepted; `email` is written into the saved recovery codes.
+ *
+ * Focus: the code field when it appears and after a refused code; otherwise each new stage's heading (the recovery
+ * codes focus their own heading).
  */
-export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void; onCancel?: () => void; onEnabled?: () => void }) {
+export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () => void; onCancel?: () => void; onEnabled?: () => void; email?: string | null }) {
   const [stage, setStage] = useState<Stage>({ kind: 'loading' })
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState<string | null>(null)
@@ -53,6 +69,9 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
   const [generating, setGenerating] = useState(false)
   const mounted = useRef(false)
   const started = useRef(false)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const codeField = useRef<HTMLDivElement>(null)
+  const focusCode = () => codeField.current?.querySelector('input')?.focus()
 
   const start = useCallback(async () => {
     setStage({ kind: 'loading' })
@@ -77,6 +96,11 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
     }
   }, [start])
 
+  useEffect(() => {
+    if (stage.kind === 'scan') focusCode()
+    else if (stage.kind !== 'codes') heading.current?.focus()
+  }, [stage.kind])
+
   const generate = async () => {
     setGenerating(true)
     // The first set straight after enrolment needs no emailed code.
@@ -86,11 +110,16 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
     setStage(r.ok ? { kind: 'codes', codes: r.data } : { kind: 'codesFailed', message: r.error.message })
   }
 
+  const refuse = (message: string) => {
+    setCodeError(message)
+    focusCode()
+  }
+
   const verify = async (e: FormEvent, enrollment: TotpEnrollment) => {
     e.preventDefault()
-    const clean = code.replace(/\s/g, '')
+    const clean = cleanCode(code)
     if (!/^\d{6}$/.test(clean)) {
-      setCodeError(NOT_SIX_DIGITS)
+      refuse(NOT_SIX_DIGITS)
       return
     }
     setCodeError(null)
@@ -99,7 +128,7 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
     if (!mounted.current) return
     if (!r.ok) {
       setVerifying(false)
-      setCodeError(r.error.reason === 'invalid_code' ? WRONG_CODE : r.error.reason === 'mfa_not_enabled' ? NOT_AVAILABLE : r.error.message)
+      refuse(r.error.reason === 'invalid_code' ? WRONG_CODE : r.error.reason === 'mfa_not_enabled' ? NOT_AVAILABLE : r.error.message)
       return
     }
     onEnabled?.()
@@ -108,14 +137,23 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
     setVerifying(false)
   }
 
+  const finish = () => {
+    // The codes are shown once: a done stage replaces them before the caller moves on.
+    setStage({ kind: 'done' })
+    onDone()
+  }
+
   if (stage.kind === 'loading') {
     return (
-      <div role="status" aria-label="Preparing 2FA setup" className="flex flex-col gap-4 sm:flex-row">
-        <Skeleton className="size-44 shrink-0" />
-        <div className="flex-1 space-y-2">
-          <Skeleton className="h-3.5 w-2/3" />
-          <Skeleton className="h-3.5 w-1/2" />
-          <Skeleton className="mt-4 h-9 w-40" />
+      <div role="status" aria-label="Preparing 2FA setup" className="space-y-4">
+        <StageHeading headingRef={heading}>Preparing your 2FA setup</StageHeading>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <Skeleton className="size-44 shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-3.5 w-1/2" />
+            <Skeleton className="mt-4 h-9 w-40" />
+          </div>
         </div>
       </div>
     )
@@ -124,6 +162,7 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
   if (stage.kind === 'failed') {
     return (
       <div className="space-y-3">
+        <StageHeading headingRef={heading}>{stage.unavailable ? "2FA isn't available yet" : "2FA setup couldn't start"}</StageHeading>
         {stage.unavailable ? (
           <InlineNotice tone="warning">{stage.message}</InlineNotice>
         ) : (
@@ -138,17 +177,27 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
     )
   }
 
-  if (stage.kind === 'codes') return <RecoveryCodes codes={stage.codes} onDone={onDone} />
+  if (stage.kind === 'codes') return <RecoveryCodes codes={stage.codes} account={email} onDone={finish} />
+
+  if (stage.kind === 'done') {
+    return (
+      <div className="space-y-1">
+        <StageHeading headingRef={heading}>2FA is on</StageHeading>
+        <p className="text-ui-small text-ink-muted">You will be asked for a code from your authenticator app when you sign in.</p>
+      </div>
+    )
+  }
 
   if (stage.kind === 'codesFailed') {
     return (
       <div className="space-y-3">
+        <StageHeading headingRef={heading}>Recovery codes not created</StageHeading>
         <div role="alert" className="space-y-1">
           <p className="text-ui-body text-ink">2FA is on, but we couldn't create your recovery codes.</p>
           <p className="text-ui-small text-ink-muted">{stage.message} You can also create them later in Security settings.</p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          <Button onClick={onDone}>Finish without codes</Button>
+          <Button onClick={finish}>Finish without codes</Button>
           <Button variant="primary" loading={generating} onClick={() => void generate()}>
             Try again
           </Button>
@@ -160,6 +209,7 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
   const { enrollment } = stage
   return (
     <form noValidate onSubmit={(e) => void verify(e, enrollment)} className="space-y-5">
+      <StageHeading headingRef={heading}>Connect your authenticator app</StageHeading>
       {isDemoMode && (
         <InlineNotice tone="neutral">
           <strong className="font-medium text-ink">Demo.</strong> The QR code is a placeholder and no authenticator app is checked: use the code it shows.
@@ -188,12 +238,12 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
           </div>
         </div>
       </div>
+      <div ref={codeField}>
       <FormField label="6-digit code" error={codeError ?? undefined} className="max-w-60">
         <Input
           inputMode="numeric"
           autoComplete="one-time-code"
-          pattern="[0-9]*"
-          maxLength={7}
+          maxLength={16}
           value={code}
           onChange={(e) => {
             setCode(e.target.value)
@@ -201,6 +251,13 @@ export function TotpSetup({ onDone, onCancel, onEnabled }: { onDone: () => void;
           }}
         />
       </FormField>
+      </div>
+      {/* The field shows the error and is marked invalid; this live region announces it, also when focus was already there. */}
+      {codeError && (
+        <p role="alert" className="sr-only">
+          {codeError}
+        </p>
+      )}
       <div className="flex flex-wrap justify-end gap-2">
         {onCancel && <Button onClick={onCancel}>Cancel</Button>}
         <Button type="submit" variant="primary" loading={verifying}>

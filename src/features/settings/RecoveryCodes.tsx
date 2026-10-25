@@ -1,16 +1,24 @@
 import { Download } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { CopyButton } from '@/components/ui/CopyButton'
 import { Checkbox } from '@/components/ui/Form'
 
 /** The plain-text form of a set of recovery codes, for Copy and the downloaded .txt file. */
-export function recoveryCodesText(codes: string[]): string {
-  return ['Sanctus recovery codes', 'Each code works once. Keep them somewhere safe.', '', ...codes, ''].join('\n')
+export function recoveryCodesText(codes: string[], account?: string | null, created: Date = new Date()): string {
+  return [
+    'Sanctus recovery codes',
+    ...(account ? [`Account: ${account}`] : []),
+    `Created: ${created.toISOString().slice(0, 10)}`,
+    'Each code works once. Keep them somewhere safe.',
+    '',
+    ...codes,
+    '',
+  ].join('\n')
 }
 
-function download(codes: string[]) {
-  const url = URL.createObjectURL(new Blob([recoveryCodesText(codes)], { type: 'text/plain;charset=utf-8' }))
+function download(text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
   const a = document.createElement('a')
   a.href = url
   a.download = 'sanctus-recovery-codes.txt'
@@ -23,14 +31,24 @@ function download(codes: string[]) {
 
 /**
  * A freshly made set of recovery codes, shown once: the list, Copy, Download (.txt) and an "I saved these codes" tick
- * that unlocks Done. Self-contained (Task 8 setup, regenerate, and the sign-in gate and onboarding through TotpSetup).
+ * that unlocks Done. Its heading takes focus when it appears. `account` (the email) is written into the copied text and
+ * the file, so a saved file says which account it belongs to. Self-contained: TotpSetup and Security settings use it.
  */
-export function RecoveryCodes({ codes, onDone, doneLabel = 'Done' }: { codes: string[]; onDone: () => void; doneLabel?: string }) {
+export function RecoveryCodes({ codes, onDone, doneLabel = 'Done', account }: { codes: string[]; onDone: () => void; doneLabel?: string; account?: string | null }) {
   const [saved, setSaved] = useState(false)
+  // One timestamp per set, so Copy and Download carry the same date.
+  const [created] = useState(() => new Date())
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    heading.current?.focus()
+  }, [])
+  const text = recoveryCodesText(codes, account, created)
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-ui-body font-semibold text-ink">Save your recovery codes</h3>
+        <h3 ref={heading} tabIndex={-1} className="text-ui-body font-semibold text-ink outline-none">
+          Save your recovery codes
+        </h3>
         <p className="mt-1 text-ui-small text-ink-muted">
           If you lose your phone, a recovery code lets you sign in. Each code works once. They are shown only now.
         </p>
@@ -43,8 +61,8 @@ export function RecoveryCodes({ codes, onDone, doneLabel = 'Done' }: { codes: st
         ))}
       </ul>
       <div className="flex flex-wrap gap-2">
-        <CopyButton text={recoveryCodesText(codes)} label="Copy codes" toastTitle="Recovery codes copied" />
-        <Button size="sm" icon={<Download className="size-4" aria-hidden />} onClick={() => download(codes)}>
+        <CopyButton text={text} label="Copy codes" toastTitle="Recovery codes copied" />
+        <Button size="sm" icon={<Download className="size-4" aria-hidden />} onClick={() => download(text)}>
           Download .txt
         </Button>
       </div>
