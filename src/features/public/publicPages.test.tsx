@@ -110,3 +110,41 @@ describe('public 404 (UX-03)', () => {
     expect(await screen.findByRole('heading', { name: 'Page not found', level: 1 })).toBeInTheDocument()
   })
 })
+
+/** Class tokens that render small, widely spaced uppercase text (D8: at least 12px, tracking 0.08em at most). */
+const SMALL_SPACED = /(^|\s)(text-eyebrow|text-label|text-\[(9|10|11)px\]|tracking-\[0\.(0[9]|[1-9]\d*)em\])(\s|$)/
+
+function smallSpacedClasses(root: HTMLElement) {
+  return Array.from(root.querySelectorAll('[class]'))
+    .map((el) => el.getAttribute('class') ?? '')
+    .filter((c) => SMALL_SPACED.test(c) && !c.includes('font-display')) // the business wordmark is a 17px+ logotype, not a label
+}
+
+describe('public catalogue clarity (D8)', () => {
+  it('catalogue cards have no index numbering', async () => {
+    openApp('/catalog/nordhaus')
+    await screen.findByText(/^\d+ products$/)
+    const chips = Array.from(document.body.querySelectorAll('span')).map((s) => s.textContent ?? '')
+    expect(chips.filter((t) => /^\d{2} \/\//.test(t.trim()))).toEqual([])
+    expect(document.body.textContent).not.toMatch(/\d{2} \/\//)
+  })
+
+  it('"View piece" is sentence case, not uppercase', async () => {
+    openApp('/catalog/nordhaus')
+    await screen.findByText(/^\d+ products$/)
+    const label: HTMLElement | null = screen.getAllByText('View piece')[0] ?? null
+    for (let el = label; el && el.tagName !== 'A'; el = el.parentElement) {
+      expect(el.className).not.toMatch(/uppercase|text-label/)
+    }
+  })
+
+  it('has no small widely spaced uppercase labels on the cards or the product page', async () => {
+    const { unmount } = openApp('/catalog/nordhaus')
+    await screen.findByText(/^\d+ products$/)
+    expect(smallSpacedClasses(document.body)).toEqual([])
+    unmount()
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    await screen.findByRole('heading', { level: 1 })
+    expect(smallSpacedClasses(document.body)).toEqual([])
+  })
+})

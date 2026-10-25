@@ -211,10 +211,10 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
   const { width: dw, height: dh, depth: dd } = product.dimensions
   const dimsLine = dw > 0 && dh > 0 && dd > 0 ? t('product.dimsLine', { w: fmtLen(dw), d: fmtLen(dd), h: fmtLen(dh), unit }) : ''
-  const stageChip = 'border border-line px-2 py-0.5 text-[10px] leading-4 font-medium tracking-[0.18em] text-ink'
+  const stageChip = 'border border-line px-2 py-0.5 text-xs leading-4 font-medium tracking-[0.08em] text-ink'
 
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
-  const textAction = cn(TAP_TARGET, 'inline-flex items-center border-b border-current pb-1 text-label text-ink transition-colors hover:text-accent-ink')
+  const textAction = cn(TAP_TARGET, 'inline-flex items-center border-b border-current pb-1 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink transition-colors hover:text-accent-ink')
 
   return (
     <PublicShell business={business} catalogHref={catalogHref}>
@@ -228,7 +228,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
       )}
 
       <div className="mx-auto max-w-[1320px] px-5 pt-6 pb-20 sm:px-10 sm:pt-8">
-        <Link to={catalogHref} className={cn(TAP_TARGET, 'inline-flex items-center gap-2 py-1 text-label text-ink-muted hover:text-ink')}>
+        <Link to={catalogHref} className={cn(TAP_TARGET, 'inline-flex items-center gap-2 py-1 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted hover:text-ink')}>
           <ArrowLeft className="size-3.5" strokeWidth={1.5} aria-hidden />
           {t('nav.backToCatalog', { name: business.name })}
         </Link>
@@ -240,7 +240,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
               {/* Framed viewer card, as the landing's 3D section: a slim top bar of chips, the stage, a dimensions line. */}
               <figure className="min-w-0 flex-1 border border-line bg-surface">
                 <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line px-3 py-2 sm:px-4">
-                  <p className="flex min-w-0 items-center gap-2.5 text-[10px] leading-4 font-medium tracking-[0.18em] uppercase">
+                  <p className="flex min-w-0 items-center gap-2.5 text-xs leading-4 font-medium tracking-[0.08em] uppercase">
                     <span className={cn('size-1.5 shrink-0 rounded-full', mode === '3d' && modelState === 'loaded' ? 'bg-success' : 'bg-accent')} aria-hidden />
                     <span className="shrink-0 text-ink">{mode === '3d' ? t('product.stage3d') : t('product.stagePhotos')}</span>
                     <span className="hidden h-3 w-px shrink-0 bg-line sm:block" aria-hidden />
@@ -276,7 +276,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                 </div>
                 {dimsLine && (
                   <figcaption className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line px-3 py-3 sm:px-4">
-                    <span className="text-[10px] leading-4 font-medium tracking-[0.18em] text-ink-muted uppercase">{t('product.dimensions')}</span>
+                    <span className="text-xs leading-4 font-medium tracking-[0.08em] text-ink-muted uppercase">{t('product.dimensions')}</span>
                     <span className="text-[13px] text-ink-body tabular-nums">{dimsLine}</span>
                   </figcaption>
                 )}
@@ -304,7 +304,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           </div>
 
           <div className="min-w-0 lg:order-1 lg:pt-2">
-            <p className="text-eyebrow text-accent-ink">{t(`category.${product.category}`)}</p>
+            <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t(`category.${product.category}`)}</p>
             <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
             <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
             <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
@@ -314,7 +314,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             <div className="mt-8 flex flex-col gap-5">
               {/* Only for a model that loaded; "AR" only where AR can open (AR-08). */}
               {modelState === 'loaded' && (
-                <button type="button" onClick={open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch rounded-[2px] bg-obsidian px-8 text-label text-chalk transition-colors hover:bg-umber sm:self-start">
+                <button type="button" onClick={open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch rounded-[2px] bg-obsidian px-8 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-chalk transition-colors hover:bg-umber sm:self-start">
                   {availability === 'available' ? t('product.view3dAr') : t('product.view3d')}
                   <Box className="size-4" strokeWidth={1.4} aria-hidden />
                 </button>
@@ -336,7 +336,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
             <section className="mt-10 border-t border-line pt-6" aria-labelledby="dims-h">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 id="dims-h" className="text-eyebrow text-ink">
+                <h2 id="dims-h" className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">
                   {t('product.dimensions')}
                 </h2>
                 {/* Hit areas grown to 44px tall on the small control; its look is unchanged. */}
@@ -358,7 +358,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                 <dl className="grid grid-cols-3 gap-3 text-sm sm:min-w-44 sm:grid-cols-1 sm:gap-0 sm:divide-y sm:divide-line">
                   {(['width', 'height', 'depth'] as const).map((k) => (
                     <div key={k} className="sm:flex sm:items-baseline sm:justify-between sm:gap-6 sm:py-2.5">
-                      <dt className="text-[10px] leading-4 font-medium tracking-[0.18em] text-ink-muted uppercase">{t(`product.${k}`)}</dt>
+                      <dt className="text-xs leading-4 font-medium tracking-[0.08em] text-ink-muted uppercase">{t(`product.${k}`)}</dt>
                       <dd className="mt-1 text-[14px] text-ink tabular-nums sm:mt-0">
                         {fmtLen(product.dimensions[k])} {unit}
                       </dd>
@@ -373,7 +373,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
               <dl className="mt-8 divide-y divide-line border-y border-line">
                 {localized(product.material) && (
                   <div className="flex items-baseline justify-between gap-6 py-4">
-                    <dt className="shrink-0 text-eyebrow text-ink">{t('product.material')}</dt>
+                    <dt className="shrink-0 text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">{t('product.material')}</dt>
                     <dd className="min-w-0 text-right text-[14px] text-ink-muted">
                       <LocalizedSpan text={product.material} />
                     </dd>
@@ -381,7 +381,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                 )}
                 {product.weight && (
                   <div className="flex items-baseline justify-between gap-6 py-4">
-                    <dt className="shrink-0 text-eyebrow text-ink">{t('product.weight')}</dt>
+                    <dt className="shrink-0 text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">{t('product.weight')}</dt>
                     <dd className="text-right text-[14px] text-ink-muted tabular-nums">
                       {product.weight.value} {product.weight.unit}
                     </dd>
@@ -392,7 +392,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
             {localized(product.description) && (
               <section className={cn('pt-6', localized(product.material) || product.weight ? 'mt-0' : 'mt-8 border-t border-line')} aria-labelledby="desc-h">
-                <h2 id="desc-h" className="text-eyebrow text-ink">
+                <h2 id="desc-h" className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">
                   {t('product.description')}
                 </h2>
                 <LocalizedSpan as="p" text={product.description} className="mt-3 max-w-prose text-[15px] leading-7 whitespace-pre-line text-ink-muted" />
@@ -403,7 +403,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
         {additional.length > 0 && (
           <section className="mt-20 border-t border-line pt-8" aria-labelledby="more-h">
-            <h2 id="more-h" className="text-eyebrow text-ink">
+            <h2 id="more-h" className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">
               {t('product.morePhotos')}
             </h2>
             <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
@@ -495,14 +495,14 @@ function RailAction({ mark, label, onClick, pressed }: { mark: ReactNode; label:
     <button type="button" onClick={onClick} className="group flex w-24 flex-col items-center gap-2.5 text-center">
       <span
         className={cn(
-          'grid size-12 place-items-center rounded-[2px] border text-[11px] font-medium tracking-[0.12em] transition-colors',
+          'grid size-12 place-items-center rounded-[2px] border text-xs font-medium tracking-[0.08em] transition-colors',
           pressed ? 'border-obsidian bg-obsidian text-chalk' : 'border-line-strong bg-surface text-ink group-hover:border-obsidian group-hover:bg-obsidian group-hover:text-chalk',
         )}
         aria-hidden
       >
         {mark}
       </span>
-      <span className="text-[10px] leading-4 font-medium tracking-[0.16em] text-ink-body uppercase">{label}</span>
+      <span className="text-xs leading-4 font-medium tracking-[0.08em] text-ink-body uppercase">{label}</span>
     </button>
   )
 }

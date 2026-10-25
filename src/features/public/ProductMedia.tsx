@@ -129,7 +129,7 @@ export function ProductMedia({
             />
             {state === 'loading' && (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 pb-6" role="status">
-                <span className="text-label text-ink-muted">{t('viewer.loading')}</span>
+                <span className="text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted">{t('viewer.loading')}</span>
                 <div className="h-px w-40 overflow-hidden bg-line">
                   <div className="h-full bg-ink transition-[width]" style={{ width: `${Math.max(6, Math.round(progress * 100))}%` }} />
                 </div>
@@ -138,14 +138,14 @@ export function ProductMedia({
             {state === 'loaded' && (
               <>
                 {/* Chips on the stage, as the landing's viewer card. */}
-                <p className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-2 border border-line bg-surface px-2.5 py-1.5 text-[10px] leading-4 font-medium tracking-[0.18em] text-ink uppercase sm:bottom-4 sm:left-4">
+                <p className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-2 border border-line bg-surface px-2.5 py-1.5 text-xs leading-4 font-medium tracking-[0.08em] text-ink uppercase sm:bottom-4 sm:left-4">
                   <Rotate3d className="size-3.5" strokeWidth={1.4} aria-hidden />
                   {t('viewer.hint')}
                 </p>
                 <button
                   type="button"
                   onClick={() => innerRef.current?.resetCamera()}
-                  className="absolute top-3 right-3 inline-flex items-center gap-1.5 border border-line bg-surface px-2.5 py-1.5 text-[10px] leading-4 font-medium tracking-[0.18em] text-ink uppercase transition-colors before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] hover:border-line-strong sm:top-4 sm:right-4"
+                  className="absolute top-3 right-3 inline-flex items-center gap-1.5 border border-line bg-surface px-2.5 py-1.5 text-xs leading-4 font-medium tracking-[0.08em] text-ink uppercase transition-colors before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] hover:border-line-strong sm:top-4 sm:right-4"
                 >
                   <Maximize className="size-3.5" strokeWidth={1.4} aria-hidden />
                   {t('viewer.reset')}

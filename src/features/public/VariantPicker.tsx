@@ -15,7 +15,7 @@ export function VariantPicker({ product, selectedId, onSelect, className }: { pr
   if (!product.variants.length) return null
   return (
     <section className={className} aria-labelledby={headingId}>
-      <h2 id={headingId} className="text-eyebrow text-ink-muted">
+      <h2 id={headingId} className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink-muted">
         {t('product.colors')}
       </h2>
       {variant && (
