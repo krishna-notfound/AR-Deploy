@@ -65,7 +65,7 @@ $$;
 -- 2. Functions.
 drop function if exists public.service_create_action_code(uuid, text, text, text);
 drop function if exists public.service_check_action_code(uuid, text, text);
-drop function if exists public.service_discard_action_code(uuid, uuid);
+drop function if exists public.service_void_action_codes(uuid, text);
 drop function if exists public.service_set_recovery_codes(uuid, text[], text);
 drop function if exists public.service_use_recovery_code(uuid, text);
 drop function if exists public.service_clear_recovery_codes(uuid);

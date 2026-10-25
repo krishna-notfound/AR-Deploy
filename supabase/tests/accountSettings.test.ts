@@ -368,7 +368,7 @@ const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex')
 
 const SERVICE_FUNCTIONS = [
   'service_create_action_code(uuid, text, text, text)', 'service_check_action_code(uuid, text, text)',
-  'service_discard_action_code(uuid, uuid)', 'service_set_recovery_codes(uuid, text[], text)',
+  'service_void_action_codes(uuid, text)', 'service_set_recovery_codes(uuid, text[], text)',
   'service_use_recovery_code(uuid, text)', 'service_clear_recovery_codes(uuid)', 'service_has_recovery_codes(uuid)',
   'service_log_account_event(uuid, text, jsonb, text)', 'service_requires_2fa(uuid)', 'service_request_closure(uuid)',
   'service_restore_closure(uuid, uuid)', 'service_closure_target(uuid)', 'service_classify_user(uuid)',
@@ -426,12 +426,15 @@ describe('account settings: codes and closure (Task 2)', () => {
     const stored = await db.query<{ code_hash: string }>('select code_hash from private.action_codes where user_id = $1', [CODES_U])
     expect(stored.rows.every((r) => /^[0-9a-f]{64}$/.test(r.code_hash))).toBe(true)
 
-    // A discarded code (the email failed) is unusable but still counts towards the hourly limit.
+    // Voided codes (the email failed) are unusable but still count towards the hourly limit; voiding is not limited.
     await db.query(`update private.action_codes set created_at = now() - interval '2 hours' where user_id = $1`, [CODES_U])
-    const unsent = await create('complete_closure', '777777')
-    expect(await svc('select public.service_discard_action_code($1, $2) as r', [CODES_U, unsent.id])).toEqual({ ok: true })
+    await create('complete_closure', '777777')
+    await create('owner_reset_2fa', '888888')
+    expect(await svc('select public.service_void_action_codes($1, $2) as r', [CODES_U, 'complete_closure'])).toEqual({ ok: true })
     expect(await check('complete_closure', '777777')).toEqual({ error: 'invalid_code' })
-    expect((await db.query(`select 1 from private.action_codes where id = $1`, [unsent.id])).rows).toHaveLength(1)
+    expect(await check('owner_reset_2fa', '888888')).toEqual({ ok: true })
+    expect((await db.query(`select 1 from private.action_codes where user_id = $1 and created_at > now() - interval '1 hour'`, [CODES_U])).rows).toHaveLength(2)
+    for (let i = 0; i < 7; i++) expect(await svc('select public.service_void_action_codes($1, $2) as r', [CODES_U, 'complete_closure'])).toEqual({ ok: true })
   })
 
   it('recovery codes: a set replaces the previous set; each code works once (case-insensitive, dash ignored); service_has_recovery_codes and my_recovery_codes_left count unused codes (own only)', async () => {
@@ -560,6 +563,22 @@ describe('account settings: codes and closure (Task 2)', () => {
     const gone = '00000000-0000-0000-0000-0000000000ff'
     expect(await svc('select public.service_log_account_event($1, $2, $3, $4) as r', [gone, 'account_deleted', { email_hash: sha('x') }, null])).toEqual({ ok: true })
     expect((await db.query(`select actor_id from public.audit_events where event_type = 'account_deleted'`)).rows).toEqual([{ actor_id: null }])
+  })
+
+  it('a request outlives its deleted business (business_id null) until the user is deleted', async () => {
+    const u = '00000000-0000-0000-0000-0000000000c5'
+    const b = '10000000-0000-0000-0000-0000000000c5'
+    await db.exec(`
+      insert into auth.users (id, email) values ('${u}', 'retry@shop.test');
+      insert into public.businesses (id, name, slug, status) values ('${b}', 'Retry Co', 'retry-co', 'active');
+      insert into public.business_members (business_id, user_id) values ('${b}', '${u}');
+    `)
+    expect(await svc('select public.service_request_closure($1) as r', [u])).toEqual({ ok: true, kind: 'business', business_id: b })
+    await db.query('delete from public.businesses where id = $1', [b])
+    expect((await db.query('select business_id from public.account_closure_requests where user_id = $1', [u])).rows).toEqual([{ business_id: null }])
+    expect(await svc('select public.service_closure_target($1) as r', [u])).toEqual({ ok: true, business_id: null, email: 'retry@shop.test' })
+    await db.query('delete from auth.users where id = $1', [u])
+    expect((await db.query('select 1 from public.account_closure_requests where user_id = $1', [u])).rows).toHaveLength(0)
   })
 
   it('service_restore_closure restores the status and logs account_closure_restored', async () => {

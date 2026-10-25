@@ -448,7 +448,7 @@ create table private.action_codes (
   salt        text not null check (char_length(salt) between 1 and 128),
   expires_at  timestamptz not null default now() + interval '10 minutes',
   attempts    integer not null default 0 check (attempts between 0 and 5),
-  -- Set when the code is used, replaced by a newer code, or discarded (its email failed). Never usable again.
+  -- Set when the code is used, replaced by a newer code, or voided (its email failed). Never usable again.
   consumed_at timestamptz,
   created_at  timestamptz not null default now()
 );
@@ -469,7 +469,7 @@ alter table private.recovery_codes enable row level security;
 revoke all on private.recovery_codes from public, anon, authenticated, service_role;
 
 -- A new code for the same user and purpose replaces the older ones. At most 5 codes per user per hour (all
--- purposes; replaced and discarded codes still count, so a failing email cannot be used to send more).
+-- purposes; replaced and voided codes still count, so a failing email cannot be used to send more).
 create function public.service_create_action_code(p_user uuid, p_purpose text, p_code_hash text, p_salt text)
 returns jsonb
 language plpgsql
@@ -534,14 +534,16 @@ begin
 end;
 $$;
 
--- Makes a code unusable (its email could not be sent). The row stays, so it still counts towards the limit.
-create function public.service_discard_action_code(p_user uuid, p_id uuid)
+-- Makes every live code for the user and purpose unusable (called after the email failed to send). Not rate
+-- limited. The rows stay, so they still count towards the hourly limit.
+create function public.service_void_action_codes(p_user uuid, p_purpose text)
 returns jsonb
 language sql
 security definer
 set search_path = ''
 as $$
-  update private.action_codes set consumed_at = coalesce(consumed_at, now()) where id = p_id and user_id = p_user;
+  update private.action_codes set consumed_at = now()
+   where user_id = p_user and purpose = p_purpose and consumed_at is null;
   select jsonb_build_object('ok', true);
 $$;
 
@@ -689,7 +691,9 @@ $$;
 
 create table public.account_closure_requests (
   user_id                  uuid primary key references auth.users (id) on delete cascade,
-  business_id              uuid references public.businesses (id) on delete cascade,
+  -- set null, not cascade: if complete_closure deletes the business and then fails to delete the user, the request
+  -- stays (business_id null) so a retry finds it. The user_id cascade removes it once the user is gone.
+  business_id              uuid references public.businesses (id) on delete set null,
   requested_at             timestamptz not null default now(),
   previous_business_status text check (previous_business_status in ('active', 'inactive', 'draft'))
 );
@@ -872,7 +876,7 @@ declare
 begin
   foreach f in array array[
     'public.service_create_action_code(uuid, text, text, text)', 'public.service_check_action_code(uuid, text, text)',
-    'public.service_discard_action_code(uuid, uuid)', 'public.service_set_recovery_codes(uuid, text[], text)',
+    'public.service_void_action_codes(uuid, text)', 'public.service_set_recovery_codes(uuid, text[], text)',
     'public.service_use_recovery_code(uuid, text)', 'public.service_clear_recovery_codes(uuid)',
     'public.service_has_recovery_codes(uuid)', 'public.service_log_account_event(uuid, text, jsonb, text)',
     'public.service_requires_2fa(uuid)', 'public.service_classify_user(uuid)', 'public.service_request_closure(uuid)',
