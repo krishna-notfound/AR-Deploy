@@ -1,18 +1,20 @@
 import { ArrowRight, BarChart3, CheckCircle2, ChevronRight, PackagePlus } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { useCurrentBusiness } from '@/auth/AccountProvider'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
 import { PageHeader, PanelHeader, panelLinkClass } from '@/components/layout/PageHeader'
 import { BusinessStatusBadge, SampleDataTag } from '@/components/ui/Badge'
-import { ButtonLink } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { StatGroup } from '@/components/ui/StatGroup'
 import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { Business, Product } from '@/domain/types'
-import { formatNumber, formatPercent } from '@/lib/format'
+import { useToast } from '@/components/ui/ToastProvider'
+import { formatDate, formatNumber, formatPercent } from '@/lib/format'
 import { myProductsPath } from '@/lib/urls'
-import { service } from '@/services'
+import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ActivityList } from '../shared/ActivityList'
 import { MostViewedList } from '../analytics/MostViewedList'
@@ -44,6 +46,7 @@ export default function BusinessOverviewPage() {
           </ButtonLink>
         }
       />
+      <ClosureBanner />
       {summary.status === 'error' && !s ? (
         <Card>
           <ErrorState message={summary.error.message} onRetry={summary.refetch} />
@@ -206,5 +209,39 @@ function StepsCard({ title, steps, ordered, className }: { title: string; steps:
         })}
       </List>
     </Card>
+  )
+}
+
+/**
+ * The owner asked to close the account (spec 8): the catalog is offline until the platform completes the closure,
+ * and the owner can still withdraw the request here or in settings. Nothing shows while loading or on a failed check:
+ * the closure state is not this page's data, and My account shows its own error.
+ */
+function ClosureBanner() {
+  const toast = useToast()
+  const security = useServiceQuery(() => account.getSecurityState(), [])
+  const [cancelling, setCancelling] = useState(false)
+  const closure = security.data?.closure
+  if (!closure) return null
+
+  const cancel = async () => {
+    setCancelling(true)
+    const r = await account.cancelClosure()
+    setCancelling(false)
+    if (!r.ok) {
+      toast.error("Couldn't cancel the closure request", r.error.message)
+      return
+    }
+    toast.success('Closure request cancelled', 'Your catalog is back to its previous status.')
+    security.refetch()
+  }
+
+  return (
+    <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] bg-warning-soft px-4 py-3 text-ui-body text-warning">
+      <p className="min-w-0">Closure requested on {formatDate(closure.requestedAt)} · Your catalog is offline.</p>
+      <Button size="sm" onClick={() => void cancel()} loading={cancelling}>
+        Cancel request
+      </Button>
+    </div>
   )
 }
