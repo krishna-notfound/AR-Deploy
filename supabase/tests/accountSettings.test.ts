@@ -2,6 +2,7 @@
 // Account settings, security and 2FA (S1): applies every migration to a disposable in-process Postgres (PGlite)
 // with the same Supabase stand-ins as platformTeam.test.ts, then checks the rules as the API roles, at aal1 and aal2.
 // Nothing here touches a live project.
+import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { PGlite, type Transaction } from '@electric-sql/pglite'
@@ -335,8 +336,11 @@ describe('account settings: profiles and policy (Task 1)', () => {
       actor_id: OWNER_U,
       metadata: { from: { require_2fa_staff: false, require_2fa_business: false }, to: { require_2fa_staff: false, require_2fa_business: true } },
     })
-    const s = (await db.query<{ updated_by: string }>('select updated_by from public.platform_settings')).rows[0]!
-    expect(s.updated_by).toBe(OWNER_U)
+    // The trigger stamps who and when (the service layer sends neither).
+    const s = (await db.query<{ updated_by: string; fresh: boolean }>(
+      `select updated_by, updated_at > now() - interval '1 minute' as fresh from public.platform_settings`)).rows[0]!
+    expect(s).toEqual({ updated_by: OWNER_U, fresh: true })
+    await expect(probe(OWNER_U, `update public.platform_settings set updated_by = $1`, [ADMIN_U], 'aal2')).rejects.toThrow(/permission denied/)
     // A no-op update writes nothing.
     await as(OWNER_U, (tx) => tx.query('update public.platform_settings set require_2fa_business = true'), 'authenticated', 'aal2')
     expect((await db.query<{ n: number }>(`select count(*)::int as n from public.audit_events where event_type = 'platform_security_policy_changed'`)).rows[0]!.n).toBe(before + 1)
@@ -347,5 +351,266 @@ describe('account settings: profiles and policy (Task 1)', () => {
     for (const kind of ['security_code', 'security_notice', 'closure_request'])
       await svc(`with x as (insert into public.email_log (kind, recipient, subject, status) values ($1, 'a@studio.test', 'Code', 'accepted') returning id) select to_jsonb(id) as r from x`, [kind])
     await expect(db.query(`insert into public.email_log (kind, recipient, subject, status) values ('nope', 'a@studio.test', 'x', 'accepted')`)).rejects.toThrow(/check/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 2: action codes, recovery codes and account closure
+// ---------------------------------------------------------------------------
+
+const CLOSE_BIZ_U = '00000000-0000-0000-0000-0000000000c1'
+const DRAFT_OWNER_U = '00000000-0000-0000-0000-0000000000c2'
+const CLOSE_STAFF_U = '00000000-0000-0000-0000-0000000000c3'
+const CODES_U = '00000000-0000-0000-0000-0000000000c4'
+const BIZ_C = '10000000-0000-0000-0000-0000000000c1'
+const BIZ_D = '10000000-0000-0000-0000-0000000000c2'
+const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex')
+
+const SERVICE_FUNCTIONS = [
+  'service_create_action_code(uuid, text, text, text)', 'service_check_action_code(uuid, text, text)',
+  'service_discard_action_code(uuid, uuid)', 'service_set_recovery_codes(uuid, text[], text)',
+  'service_use_recovery_code(uuid, text)', 'service_clear_recovery_codes(uuid)', 'service_has_recovery_codes(uuid)',
+  'service_log_account_event(uuid, text, jsonb, text)', 'service_requires_2fa(uuid)', 'service_request_closure(uuid)',
+  'service_restore_closure(uuid, uuid)', 'service_closure_target(uuid)', 'service_classify_user(uuid)',
+]
+
+const NEW_FUNCTIONS = [
+  'mfa_satisfied', 'my_security_state', 'record_sign_in', 'log_account_event', 'list_my_security_events', 'cancel_account_closure',
+  'my_recovery_codes_left', 'admin_list_closure_requests', 'account_group', 'requires_2fa', 'undo_closure', 'create_profile_for_new_user',
+  'profiles_valid_timezone', 'platform_settings_stamp', 'platform_settings_audit',
+  ...SERVICE_FUNCTIONS.map((f) => f.slice(0, f.indexOf('('))),
+]
+
+describe('account settings: codes and closure (Task 2)', () => {
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email) values ('${CLOSE_BIZ_U}', 'close@shop.test'), ('${DRAFT_OWNER_U}', 'draft@shop.test'),
+        ('${CLOSE_STAFF_U}', 'leaver@studio.test'), ('${CODES_U}', 'codes@test');
+      insert into public.businesses (id, name, slug, status) values ('${BIZ_C}', 'Closing Co', 'closing-co', 'active'),
+        ('${BIZ_D}', 'Draft Co', 'draft-co', 'draft');
+      insert into public.business_members (business_id, user_id) values ('${BIZ_C}', '${CLOSE_BIZ_U}'), ('${BIZ_D}', '${DRAFT_OWNER_U}');
+      insert into public.platform_members (user_id, email, role, status) values ('${CLOSE_STAFF_U}', 'leaver@studio.test', 'team', 'active');
+      insert into auth.sessions (user_id) values ('${CLOSE_STAFF_U}'), ('${CLOSE_STAFF_U}'), ('${TEAM_U}');
+    `)
+  })
+
+  it('action code: correct code passes once, then invalid_code; expired code gives code_expired; the 6th wrong attempt gives too_many_attempts; a newer code invalidates an older one; the 6th code within an hour gives rate_limited', async () => {
+    const create = (purpose: string, code: string, salt = 'salt-' + code) =>
+      svc('select public.service_create_action_code($1, $2, $3, $4) as r', [CODES_U, purpose, sha(salt + code), salt])
+    const check = (purpose: string, code: string) => svc('select public.service_check_action_code($1, $2, $3) as r', [CODES_U, purpose, code])
+
+    expect(await svc('select public.service_create_action_code($1, $2, $3, $4) as r', [CODES_U, 'make_coffee', sha('x'), 'x'])).toEqual({ error: 'invalid_request' })
+    expect(await svc('select public.service_create_action_code($1, $2, $3, $4) as r', [CODES_U, 'disable_2fa', 'not-a-hash', 'x'])).toEqual({ error: 'invalid_request' })
+
+    const first = await create('disable_2fa', '123456')
+    expect(first).toMatchObject({ ok: true })
+    expect(typeof first.id).toBe('string')
+    expect(await check('request_closure', '123456')).toEqual({ error: 'invalid_code' })
+    expect(await check('disable_2fa', ' 123 456 ')).toEqual({ ok: true })
+    expect(await check('disable_2fa', '123456')).toEqual({ error: 'invalid_code' })
+
+    const late = await create('disable_2fa', '222222')
+    await db.query(`update private.action_codes set expires_at = now() - interval '1 second' where id = $1`, [late.id])
+    expect(await check('disable_2fa', '222222')).toEqual({ error: 'code_expired' })
+
+    await create('disable_2fa', '333333')
+    for (let i = 0; i < 5; i++) expect(await check('disable_2fa', '000000')).toEqual({ error: 'invalid_code' })
+    expect(await check('disable_2fa', '333333')).toEqual({ error: 'too_many_attempts' })
+
+    await create('regenerate_recovery', '444444')
+    await create('regenerate_recovery', '555555')
+    expect(await check('regenerate_recovery', '444444')).toEqual({ error: 'invalid_code' })
+    expect(await check('regenerate_recovery', '555555')).toEqual({ ok: true })
+
+    expect(await create('owner_reset_2fa', '666666')).toEqual({ error: 'rate_limited' })
+    const stored = await db.query<{ code_hash: string }>('select code_hash from private.action_codes where user_id = $1', [CODES_U])
+    expect(stored.rows.every((r) => /^[0-9a-f]{64}$/.test(r.code_hash))).toBe(true)
+
+    // A discarded code (the email failed) is unusable but still counts towards the hourly limit.
+    await db.query(`update private.action_codes set created_at = now() - interval '2 hours' where user_id = $1`, [CODES_U])
+    const unsent = await create('complete_closure', '777777')
+    expect(await svc('select public.service_discard_action_code($1, $2) as r', [CODES_U, unsent.id])).toEqual({ ok: true })
+    expect(await check('complete_closure', '777777')).toEqual({ error: 'invalid_code' })
+    expect((await db.query(`select 1 from private.action_codes where id = $1`, [unsent.id])).rows).toHaveLength(1)
+  })
+
+  it('recovery codes: a set replaces the previous set; each code works once (case-insensitive, dash ignored); service_has_recovery_codes and my_recovery_codes_left count unused codes (own only)', async () => {
+    const codes = (prefix: string) => Array.from({ length: 8 }, (_, i) => `${prefix}${'23456789'[i]}`)
+    const setOf = (list: string[], salt: string) => svc('select public.service_set_recovery_codes($1, $2, $3) as r', [CODES_U, list.map((c) => sha(salt + c)), salt])
+    const use = (code: string) => svc('select public.service_use_recovery_code($1, $2) as r', [CODES_U, code])
+
+    expect(await setOf(codes('ABCDEFGHJ'), 'salt-one')).toEqual({ ok: true })
+    expect(await svc('select public.service_has_recovery_codes($1) as r', [CODES_U])).toEqual({ ok: true, count: 8 })
+    expect(await setOf(codes('KMNPQRSTU'), 'salt-two')).toEqual({ ok: true })
+    expect(await use('ABCDEFGHJ2')).toEqual({ error: 'invalid_code' })
+    expect(await use('kmnpq-rstu2 ')).toEqual({ ok: true, remaining: 7 })
+    expect(await use('KMNPQRSTU2')).toEqual({ error: 'invalid_code' })
+    expect(await use(' KMNPQ RSTU3')).toEqual({ ok: true, remaining: 6 })
+    expect(await use('')).toEqual({ error: 'invalid_code' })
+    expect(await use('KMNPQ-RSTU1')).toEqual({ error: 'invalid_code' })
+    expect(await svc('select public.service_has_recovery_codes($1) as r', [CODES_U])).toEqual({ ok: true, count: 6 })
+    expect(await call(CODES_U, 'select to_jsonb(public.my_recovery_codes_left()) as r')).toBe(6)
+    expect(await call(STRANGER_U, 'select to_jsonb(public.my_recovery_codes_left()) as r')).toBe(0)
+    expect(await svc('select public.service_set_recovery_codes($1, $2, $3) as r', [CODES_U, [sha('a')], 'salt'])).toEqual({ error: 'invalid_request' })
+    expect(await svc('select public.service_has_recovery_codes($1) as r', [CODES_U])).toEqual({ ok: true, count: 6 })
+    expect(await svc('select public.service_clear_recovery_codes($1) as r', [CODES_U])).toEqual({ ok: true })
+    expect(await svc('select public.service_has_recovery_codes($1) as r', [CODES_U])).toEqual({ ok: true, count: 0 })
+    await expect(probe('', 'select public.my_recovery_codes_left()', [], null, 'anon')).rejects.toThrow(/permission denied/)
+  })
+
+  it('private tables and service_* functions are not reachable from anon or authenticated', async () => {
+    for (const fn of SERVICE_FUNCTIONS) {
+      const r = (await db.query<J>(
+        `select has_function_privilege('anon', $1, 'execute') as anon, has_function_privilege('authenticated', $1, 'execute') as auth,
+                has_function_privilege('service_role', $1, 'execute') as svc`, [`public.${fn}`])).rows[0]
+      expect({ fn, ...r }).toEqual({ fn, anon: false, auth: false, svc: true })
+    }
+    for (const role of ['authenticated', 'anon'] as const) {
+      await expect(probe(OWNER_U, 'select * from private.action_codes', [], 'aal2', role)).rejects.toThrow(/permission denied/)
+      await expect(probe(OWNER_U, 'select * from private.recovery_codes', [], 'aal2', role)).rejects.toThrow(/permission denied/)
+      await expect(probe(OWNER_U, `select public.service_check_action_code($1, 'disable_2fa', '123456')`, [OWNER_U], 'aal2', role)).rejects.toThrow(/permission denied/)
+    }
+  })
+
+  it("service_request_closure: a business owner's business goes inactive and a request row exists; staff are deactivated; the Owner gets owner_cannot_close; a second request gets already_requested", async () => {
+    const req = (u: string) => svc('select public.service_request_closure($1) as r', [u])
+    expect(await req(CLOSE_BIZ_U)).toEqual({ ok: true, kind: 'business', business_id: BIZ_C })
+    expect((await db.query('select status from public.businesses where id = $1', [BIZ_C])).rows[0]).toEqual({ status: 'inactive' })
+    expect((await db.query('select business_id, previous_business_status from public.account_closure_requests where user_id = $1', [CLOSE_BIZ_U])).rows[0])
+      .toEqual({ business_id: BIZ_C, previous_business_status: 'active' })
+    expect(await req(CLOSE_BIZ_U)).toEqual({ error: 'already_requested' })
+
+    expect(await req(CLOSE_STAFF_U)).toEqual({ ok: true, kind: 'staff' })
+    expect((await db.query('select status from public.platform_members where user_id = $1', [CLOSE_STAFF_U])).rows[0]).toEqual({ status: 'deactivated' })
+    expect((await db.query<{ user_id: string }>('select user_id from auth.sessions')).rows.map((r) => r.user_id)).toEqual([TEAM_U])
+
+    expect(await req(OWNER_U)).toEqual({ error: 'owner_cannot_close' })
+    expect(await req(STRANGER_U)).toEqual({ error: 'not_allowed' })
+    // The Edge Function logs account_closure_requested (controller ruling): the SQL side writes no row of its own.
+    expect((await db.query(`select 1 from public.audit_events where event_type = 'account_closure_requested'`)).rows).toHaveLength(0)
+    const state = await call(CLOSE_BIZ_U, 'select public.my_security_state() as r')
+    expect(state.closure).toEqual({ business_id: BIZ_C, requested_at: expect.any(String) })
+  })
+
+  it('cancel restores the previous business status', async () => {
+    expect(await svc('select public.service_request_closure($1) as r', [DRAFT_OWNER_U])).toEqual({ ok: true, kind: 'business', business_id: BIZ_D })
+    expect((await db.query('select status from public.businesses where id = $1', [BIZ_D])).rows[0]).toEqual({ status: 'inactive' })
+    expect(await call(DRAFT_OWNER_U, 'select public.cancel_account_closure() as r')).toEqual({ ok: true })
+    expect((await db.query('select status from public.businesses where id = $1', [BIZ_D])).rows[0]).toEqual({ status: 'draft' })
+    expect((await db.query('select 1 from public.account_closure_requests where user_id = $1', [DRAFT_OWNER_U])).rows).toHaveLength(0)
+    expect(await call(DRAFT_OWNER_U, 'select public.my_security_state() as r')).toMatchObject({ closure: null })
+    expect(await call(DRAFT_OWNER_U, 'select public.cancel_account_closure() as r')).toEqual({ error: 'not_found' })
+    const ev = await db.query<J>(`select actor_id, business_id, to_status, metadata from public.audit_events where event_type = 'account_closure_cancelled'`)
+    expect(ev.rows).toEqual([{ actor_id: DRAFT_OWNER_U, business_id: BIZ_D, to_status: 'draft', metadata: { subject_id: DRAFT_OWNER_U } }])
+    await expect(probe('', 'select public.cancel_account_closure()', [], null, 'anon')).rejects.toThrow(/permission denied/)
+  })
+
+  it('account_closure_requests: readable by the requester and staff with businesses.view only', async () => {
+    const n = (u: string, aal: Aal = 'aal1') => count(u, 'select count(*)::int as n from public.account_closure_requests', [], aal)
+    expect(await n(CLOSE_BIZ_U)).toBe(1)
+    expect(await n(TEAM_U)).toBe(1)
+    expect(await n(OWNER_U)).toBe(1)
+    expect(await n(BIZ_OWNER_U)).toBe(0)
+    expect(await n(STRANGER_U)).toBe(0)
+    await db.exec(`delete from public.platform_role_permissions where role = 'team' and permission = 'businesses.view'`)
+    try {
+      expect(await n(TEAM_U)).toBe(0)
+    } finally {
+      await db.exec(`insert into public.platform_role_permissions values ('team', 'businesses.view')`)
+    }
+    await withPolicy(true, false, async () => {
+      expect(await n(TEAM_U, 'aal1')).toBe(0)
+      expect(await n(TEAM_U, 'aal2')).toBe(1)
+    })
+    await expect(probe(CLOSE_BIZ_U, 'delete from public.account_closure_requests')).rejects.toThrow(/permission denied/)
+    await expect(probe(CLOSE_BIZ_U, `update public.account_closure_requests set previous_business_status = 'active'`)).rejects.toThrow(/permission denied/)
+    await expect(probe(STRANGER_U, `insert into public.account_closure_requests (user_id) values ($1)`, [STRANGER_U])).rejects.toThrow(/permission denied/)
+  })
+
+  it('admin_list_closure_requests requires businesses.view', async () => {
+    const list = (u: string, aal: Aal = 'aal1') => call(u, 'select public.admin_list_closure_requests() as r', [], aal)
+    const rows = (await list(TEAM_U)) as unknown as J[]
+    expect(rows).toEqual([{ user_id: CLOSE_BIZ_U, email: 'close@shop.test', business_id: BIZ_C, business_name: 'Closing Co', requested_at: expect.any(String) }])
+    expect(await list(OWNER_U)).toHaveLength(1)
+    expect(await list(STRANGER_U)).toEqual({ error: 'forbidden' })
+    expect(await list(CLOSE_BIZ_U)).toEqual({ error: 'forbidden' })
+    await withPolicy(true, false, async () => {
+      expect(await list(TEAM_U, 'aal1')).toEqual({ error: 'forbidden' })
+    })
+    await expect(probe('', 'select public.admin_list_closure_requests()', [], null, 'anon')).rejects.toThrow(/permission denied/)
+  })
+
+  it('service_requires_2fa, service_classify_user, service_closure_target and service_log_account_event', async () => {
+    const kind = async (u: string) => (await svc('select public.service_classify_user($1) as r', [u])).kind
+    expect([await kind(OWNER_U), await kind(TEAM_U), await kind(CLOSE_STAFF_U), await kind(BIZ_OWNER_U), await kind(STRANGER_U)])
+      .toEqual(['owner', 'staff', 'staff', 'business', 'none'])
+    await withPolicy(true, false, async () => {
+      expect(await svc('select public.service_requires_2fa($1) as r', [TEAM_U])).toEqual({ ok: true, requires: true, group: 'staff' })
+      expect(await svc('select public.service_requires_2fa($1) as r', [BIZ_OWNER_U])).toEqual({ ok: true, requires: false, group: 'business' })
+      expect(await svc('select public.service_requires_2fa($1) as r', [STRANGER_U])).toEqual({ ok: true, requires: false, group: 'none' })
+    })
+    expect(await svc('select public.service_closure_target($1) as r', [CLOSE_BIZ_U])).toEqual({ ok: true, business_id: BIZ_C, email: 'close@shop.test' })
+    expect(await svc('select public.service_closure_target($1) as r', [STRANGER_U])).toEqual({ error: 'not_found' })
+
+    expect(await svc('select public.service_log_account_event($1, $2, $3, $4) as r', [STRANGER_U, 'account_2fa_enabled', { factor: 'totp' }, '203.0.113.9'])).toEqual({ ok: true })
+    const ev = await db.query<J>(`select actor_id, metadata from public.audit_events where event_type = 'account_2fa_enabled'`)
+    expect(ev.rows).toEqual([{ actor_id: STRANGER_U, metadata: { factor: 'totp', ip: '203.0.113.9' } }])
+    expect(await svc('select public.service_log_account_event($1, $2, $3, $4) as r', [STRANGER_U, 'access_denied', {}, null])).toEqual({ error: 'invalid_request' })
+    // The subject may already be deleted (account_deleted): logged without an actor.
+    const gone = '00000000-0000-0000-0000-0000000000ff'
+    expect(await svc('select public.service_log_account_event($1, $2, $3, $4) as r', [gone, 'account_deleted', { email_hash: sha('x') }, null])).toEqual({ ok: true })
+    expect((await db.query(`select actor_id from public.audit_events where event_type = 'account_deleted'`)).rows).toEqual([{ actor_id: null }])
+  })
+
+  it('service_restore_closure restores the status and logs account_closure_restored', async () => {
+    expect(await svc('select public.service_restore_closure($1, $2) as r', [CLOSE_BIZ_U, OWNER_U])).toEqual({ ok: true })
+    expect((await db.query('select status from public.businesses where id = $1', [BIZ_C])).rows[0]).toEqual({ status: 'active' })
+    expect((await db.query('select 1 from public.account_closure_requests where user_id = $1', [CLOSE_BIZ_U])).rows).toHaveLength(0)
+    const ev = await db.query<J>(`select actor_id, business_id, metadata from public.audit_events where event_type = 'account_closure_restored'`)
+    expect(ev.rows).toEqual([{ actor_id: OWNER_U, business_id: BIZ_C, metadata: { subject_id: CLOSE_BIZ_U } }])
+    expect(await svc('select public.service_restore_closure($1, $2) as r', [CLOSE_BIZ_U, OWNER_U])).toEqual({ error: 'not_found' })
+    // The subject sees the Owner's restore in their own activity.
+    const mine = (await as(CLOSE_BIZ_U, (tx) => tx.query<{ event_type: string }>('select event_type from public.list_my_security_events()'))).rows.map((r) => r.event_type)
+    expect(mine).toEqual(['account_closure_restored'])
+  })
+
+  it('rollback script restores the four helpers without the 2FA clause and drops the new objects', async () => {
+    const fresh = await PGlite.create()
+    try {
+      await fresh.exec(SUPABASE_STUBS)
+      await applyAll(fresh, (n) => n <= ACCOUNT_MIGRATION)
+      await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_account_settings_rollback.sql'), 'utf8'))
+      const gone = await fresh.query<J>(
+        `select to_regclass('public.profiles') as a, to_regclass('public.platform_settings') as b, to_regclass('public.account_closure_requests') as c,
+                to_regclass('private.action_codes') as d, to_regclass('private.recovery_codes') as e`)
+      expect(gone.rows[0]).toEqual({ a: null, b: null, c: null, d: null, e: null })
+      const left = await fresh.query<{ proname: string }>(
+        `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname in ('public', 'private') and p.proname = any($1)`, [NEW_FUNCTIONS])
+      expect(left.rows).toEqual([])
+      const defs = await fresh.query<{ d: string }>(
+        `select pg_get_functiondef(p.oid) as d from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.proname in ('is_platform_admin', 'is_business_member', 'platform_can', 'is_platform_member')`)
+      expect(defs.rows).toHaveLength(4)
+      for (const r of defs.rows) {
+        expect(r.d).not.toContain('mfa_satisfied')
+        expect(r.d).not.toContain('platform_settings')
+      }
+      const policies = await fresh.query(`select policyname from pg_policies where policyname in ('Users read their own account events',
+        'Users upload their own avatar', 'Users replace their own avatar', 'Users delete their own avatar', 'Users read their own avatar files')`)
+      expect(policies.rows).toEqual([])
+      expect((await fresh.query(`select 1 from storage.buckets where id = 'avatars'`)).rows).toEqual([])
+      await fresh.exec(`insert into auth.users (id, email) values ('${OWNER_U}', 'o@test'); insert into public.platform_admins (user_id) values ('${OWNER_U}')`)
+      const ok = await fresh.transaction(async (tx) => {
+        await tx.exec('set local role authenticated')
+        await tx.query(`select set_config('test.uid', $1, true)`, [OWNER_U])
+        return (await tx.query<{ a: boolean; c: boolean }>(`select public.is_platform_admin() as a, public.platform_can('products.view') as c`)).rows[0]
+      })
+      expect(ok).toEqual({ a: true, c: true })
+      // The earlier migration's rollback still applies on top.
+      await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_platform_team_roles_rollback.sql'), 'utf8'))
+    } finally {
+      await fresh.close()
+    }
   })
 })
