@@ -57,7 +57,7 @@ const ADMIN_ROUTES: Route[] = [
   { name: 'analytics', path: '/admin/analytics', ready: h1('Analytics'), loaded: chart },
   // Demo mode has no audit events (the server writes them), so this page is short: heading, search and empty state.
   { name: 'audit log', path: '/admin/activity', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('heading', { name: 'No events yet' }).or(row('Events')(page)).first(), min: 5 },
-  { name: 'settings', path: '/admin/settings', ready: h1('Settings'), loaded: inMain('admin@platform.example') },
+  { name: 'settings: platform general', path: '/admin/settings/platform', ready: h1('General'), loaded: inMain('Sample asset credits') },
   { name: 'team list', path: '/admin/team', ready: h1('Team & Access'), loaded: inMain('ana.ribeiro@sanctus.example') },
   { name: 'member detail', path: '/admin/team/mem_joao', ready: h1('João Costa'), loaded: inMain('joao.costa@sanctus.example') },
   { name: 'role permissions', path: '/admin/team/permissions', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('checkbox').first() },
@@ -73,7 +73,7 @@ const BUSINESS_ROUTES: Route[] = [
   { name: 'business products', path: '/dashboard/products', ready: h1(/./), loaded: inMain('Glam Velvet Sofa') },
   { name: 'business analytics', path: '/dashboard/analytics', ready: h1('Analytics'), loaded: chart },
   { name: 'business product editor', path: '/dashboard/products/prd_glam_sofa/edit', ready: h1('Glam Velvet Sofa'), loaded: field('Product name') },
-  { name: 'business settings', path: '/dashboard/settings', ready: h1(/./), loaded: field('Business name') },
+  { name: 'settings: business profile', path: '/dashboard/settings/business', ready: h1('Business profile'), loaded: field('Business name') },
 ]
 
 /** Demo has no seeded applications: send one through the public form so the detail page has a record. */

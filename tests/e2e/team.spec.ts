@@ -20,17 +20,20 @@ test('the Owner invites a Team member and sees the invitation', async ({ page })
   await expect(page.getByRole('table').getByText('new@studio.test')).toBeVisible()
 })
 
-test('an Admin does not see Team & Access or Settings, and a direct link is refused', async ({ page }) => {
+test('an Admin does not see Team & Access or the platform settings, and a direct link is refused', async ({ page }) => {
   await signInAsPlatform(page, 'admin')
   const nav = page.getByRole('navigation', { name: 'Main' })
   await expect(nav.getByRole('link', { name: /Applications/ })).toBeVisible()
   await expect(nav.getByRole('link', { name: /Team & Access/ })).toHaveCount(0)
-  await expect(nav.getByRole('link', { name: /Settings/ })).toHaveCount(0)
+  // Settings opens the Admin's own account sections; the Owner's Platform group is not there.
+  await nav.getByRole('link', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'My account' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('heading', { name: 'Platform' })).toHaveCount(0)
   await page.goto('/admin/team')
   await expect(page.getByText("You don't have access to this page")).toBeVisible()
 })
 
-test('a Team member cannot publish or delete, and Settings is refused', async ({ page }) => {
+test('a Team member cannot publish or delete, and the platform settings are out of reach', async ({ page }) => {
   await signInAsPlatform(page, 'team')
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: /All Products/ }).click()
   await page.getByRole('button', { name: /^Actions for / }).first().click()
@@ -38,8 +41,10 @@ test('a Team member cannot publish or delete, and Settings is refused', async ({
   await expect(menu.getByRole('menuitem', { name: 'Edit' })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: /^(Publish|Unpublish|Delete)$/ })).toHaveCount(0)
   await page.keyboard.press('Escape')
-  await page.goto('/admin/settings')
-  await expect(page.getByText("You don't have access to this page")).toBeVisible()
+  // A direct link to an Owner-only section lands on the member's own account settings.
+  await page.goto('/admin/settings/platform')
+  await expect(page.getByRole('heading', { level: 1, name: 'My account' })).toBeVisible()
+  await expect(page).toHaveURL(/\/admin\/settings\/account$/)
 })
 
 test('the Owner deactivates and reactivates a member', async ({ page }) => {

@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import type { Need } from '@/auth/usePermission'
+import { settingsPath } from '@/lib/urls'
 
 export interface NavItem {
   to: string
@@ -23,6 +24,8 @@ export interface NavItem {
   badge?: 'pendingApplications'
   /** Platform permission(s) needed to see this place; any one is enough (ADR-0029). Omitted: everyone. */
   requires?: Need | Need[]
+  /** Opens a full-screen view (the settings hub) whose close button returns to the page it was opened from. */
+  returnsHere?: boolean
 }
 
 export const adminNav: NavItem[] = [
@@ -34,7 +37,8 @@ export const adminNav: NavItem[] = [
   { to: '/admin/catalogs', label: 'Catalogs & QR Codes', icon: QrCode, requires: 'products.view' },
   { to: '/admin/team', label: 'Team & Access', icon: Users, requires: 'owner' },
   { to: '/admin/activity', label: 'Audit log', icon: History, requires: ['records.view', 'access.view'] },
-  { to: '/admin/settings', label: 'Settings', icon: Settings, requires: 'owner' },
+  // Every platform role has account settings; the Owner-only sections are hidden inside the hub.
+  { to: settingsPath('admin'), label: 'Settings', icon: Settings, returnsHere: true },
 ]
 
 export const businessNav: NavItem[] = [
@@ -44,5 +48,5 @@ export const businessNav: NavItem[] = [
   { to: '/dashboard/products', label: 'My Products', icon: Package },
   { to: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/dashboard/catalog', label: 'My Catalog & QR', icon: Store },
-  { to: '/dashboard/settings', label: 'Business Settings', icon: Settings },
+  { to: settingsPath('business'), label: 'Settings', icon: Settings, returnsHere: true },
 ]

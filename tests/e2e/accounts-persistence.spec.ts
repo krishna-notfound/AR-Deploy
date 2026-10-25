@@ -25,7 +25,7 @@ test('business admin sees only their own business and cannot open admin pages', 
 
 test('business settings: slug read-only, edits persist after reload', async ({ page }) => {
   await signInAsBusiness(page, 'Nordhaus Living')
-  await page.goto('/dashboard/settings')
+  await page.goto('/dashboard/settings/business')
   await expect(page.getByText('Changing your catalog address requires platform support.')).toBeVisible()
   await expect(page.getByLabel('Catalog address (subdomain)')).toHaveCount(0)
   await page.getByLabel('Business name').fill('Nordhaus Living Studio')
@@ -52,7 +52,7 @@ test('corrupt stored data is reset safely', async ({ page: first, context }) => 
 
 test('reset demo data from settings', async ({ page }) => {
   await signInAsSuperAdmin(page)
-  await page.goto('/admin/settings')
+  await page.goto('/admin/settings/platform')
   await page.getByRole('button', { name: 'Reset demo data' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Reset demo data' }).click()
   await expectToast(page, 'Demo data reset')
