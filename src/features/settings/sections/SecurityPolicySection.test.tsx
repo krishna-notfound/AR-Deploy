@@ -5,6 +5,7 @@ import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
 import { account, service } from '@/services'
 import { accountFail } from '@/services/accountService'
+import { CODE_PROMPT } from '@/features/auth/TwoFactorStep'
 import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
 
 type As = { role: 'super_admin'; platformRole?: 'owner' | 'admin' | 'team' }
@@ -95,7 +96,9 @@ describe('Security policy section', () => {
     expect(p2.ok && p2.data).toMatchObject({ require2faStaff: true, require2faBusiness: true })
   })
 
-  it('with 2FA set up but signed in at aal1, both switches are disabled with "Sign in with your 2FA code to change these."', { timeout: 20_000 }, async () => {
+  it('with 2FA set up but signed in at aal1, the Owner is asked for the code before Security policy (no switch to misuse)', { timeout: 20_000 }, async () => {
+    // Since the sign-in gate (Task 9), a session at aal1 with a verified factor never reaches the section: the gate
+    // asks for the authenticator code first. The section's own "Sign in with your 2FA code" reason stays as a fallback.
     const original = account.getSecurityState.bind(account)
     vi.spyOn(account, 'getSecurityState').mockImplementation(async () => {
       const r = await original()
@@ -103,12 +106,8 @@ describe('Security policy section', () => {
     })
     const save = vi.spyOn(account, 'updatePlatformSettings')
     open({ role: 'super_admin' })
-    const staff = await screen.findByRole('switch', { name: 'Require 2FA for staff' })
-    expect(staff).toBeDisabled()
-    expect(screen.getByRole('switch', { name: 'Require 2FA for business owners' })).toBeDisabled()
-    expect(screen.getAllByText(/Sign in with your 2FA code to change these\./).length).toBeGreaterThan(0)
-    expect(screen.queryByText(/Turn on your own 2FA first/)).toBeNull()
-    await userEvent.click(staff)
+    expect(await screen.findByText(new RegExp(CODE_PROMPT))).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Require 2FA for staff' })).toBeNull()
     expect(save).not.toHaveBeenCalled()
   })
 
