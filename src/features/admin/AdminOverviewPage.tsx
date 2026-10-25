@@ -1,5 +1,5 @@
 import { useCan } from '@/auth/usePermission'
-import { ArrowRight, Box, Building2, ClipboardList, Eye, Globe, Package, PackagePlus, PencilLine, Plus, QrCode } from 'lucide-react'
+import { ArrowRight, Building2, ClipboardList, PackagePlus, Plus, QrCode } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
 import { usePendingApplications } from '@/components/layout/dashboardContext'
@@ -73,14 +73,13 @@ export default function AdminOverviewPage() {
           <StatGroup
             loading={!s}
             stats={[
-              { label: 'Businesses', icon: Building2, value: formatNumber(s?.totals.businesses ?? 0), hint: bizQuery.data ? `${formatNumber(activeBusinesses)} active` : undefined },
-              { label: 'Products', icon: Package, value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
-              { label: 'Published', icon: Globe, value: formatNumber(s?.totals.published ?? 0), hint: s ? `of ${formatNumber(s.totals.products)} products` : undefined },
-              { label: 'Drafts', icon: PencilLine, value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
-              { label: 'Product page views', icon: Eye, value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+              { label: 'Businesses', value: formatNumber(s?.totals.businesses ?? 0), hint: bizQuery.data ? `${formatNumber(activeBusinesses)} active` : undefined },
+              { label: 'Products', value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
+              { label: 'Published', value: formatNumber(s?.totals.published ?? 0), hint: s ? `of ${formatNumber(s.totals.products)} products` : undefined },
+              { label: 'Drafts', value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
+              { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
               {
                 label: 'AR launch attempts',
-                icon: Box,
                 value: formatNumber(s?.totals.arActivations ?? 0),
                 hint: s && s.totals.views ? `Last 30 days · ${formatPercent(s.totals.arActivations / s.totals.views)} of views` : 'Last 30 days',
               },

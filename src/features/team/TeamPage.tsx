@@ -1,6 +1,6 @@
 // Team & Access (ADR-0029): who can use the platform console, their invitations and the access history.
 // Owner only (route guard). Every change is enforced and recorded by the database.
-import { History, KeyRound, MailPlus, ShieldCheck, Users, UserCog } from 'lucide-react'
+import { History, KeyRound, MailPlus } from 'lucide-react'
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -74,10 +74,10 @@ export default function TeamPage() {
         className="mb-6"
         loading={members.status === 'loading' && !members.data}
         stats={[
-          { label: 'Active members', value: counts.active, icon: ShieldCheck, hint: 'Owner included' },
-          { label: 'Pending invitations', value: counts.pending, icon: MailPlus },
-          { label: 'Admins', value: counts.admins, icon: UserCog },
-          { label: 'Team', value: counts.team, icon: Users },
+          { label: 'Active members', value: counts.active, hint: 'Owner included' },
+          { label: 'Pending invitations', value: counts.pending },
+          { label: 'Admins', value: counts.admins },
+          { label: 'Team', value: counts.team },
         ]}
         footer={isDemoMode ? <SampleDataTag /> : undefined}
       />

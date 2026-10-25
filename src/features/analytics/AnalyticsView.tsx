@@ -1,4 +1,4 @@
-import { BarChart3, Box, Eye, Globe, Percent, Rotate3d } from 'lucide-react'
+import { BarChart3 } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
@@ -110,14 +110,14 @@ export function AnalyticsView({
       <StatGroup
         loading={loading}
         stats={[
-          { label: 'Product page views', icon: Eye, value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
-          { label: 'AR launch attempts', icon: Box, value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
+          { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+          { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
           // The seeded sample data has no 3D interactions: "0" next to thousands of views would read as broken tracking.
           s?.isSample && !s.totals.modelInteractions
-            ? { label: '3D interactions', icon: Rotate3d, value: 'Not recorded', hint: 'Not in the sample data' }
-            : { label: '3D interactions', icon: Rotate3d, value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Times a visitor turned or zoomed a 3D model' },
-          { label: 'AR launch rate', icon: Percent, value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : 'No views yet', hint: 'AR launch attempts per product page view' },
-          { label: 'Published products', icon: Globe, value: formatNumber(s?.totals.published ?? 0), hint: 'Current' },
+            ? { label: '3D interactions', value: 'Not recorded', hint: 'Not in the sample data' }
+            : { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Times a visitor turned or zoomed a 3D model' },
+          { label: 'AR launch rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : 'No views yet', hint: 'AR launch attempts per product page view' },
+          { label: 'Published products', value: formatNumber(s?.totals.published ?? 0), hint: 'Current' },
         ]}
         footer={
           s?.isSample && !onBusinessChange ? (

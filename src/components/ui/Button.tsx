@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from 'react'
 import { Link } from 'react-router'
+import { useInDashboard } from '@/components/layout/dashboardContext'
 import { cn } from '@/lib/cn'
 
 export type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'brand'
@@ -28,8 +29,16 @@ const sizes: Record<ButtonSize, string> = {
   lg: 'h-12 px-6 text-label uppercase',
 }
 
-export function buttonClasses(variant: ButtonVariant = 'secondary', size: ButtonSize = 'md', className?: string) {
-  return cn(base, variants[variant], sizes[size], className)
+// Dashboard buttons (BRIEF section 1): 14px / 500, sentence case, no tracking. Heights 40 (md), 36 (sm), 44 on touch screens.
+// The editorial lg size is public/auth only; inside the dashboard it falls back to md.
+const dashboardSizes: Record<ButtonSize, string> = {
+  sm: 'h-9 px-3 text-[14px] normal-case tracking-normal max-sm:h-11 pointer-coarse:h-11',
+  md: 'h-10 px-4 text-[14px] normal-case tracking-normal max-sm:h-11 pointer-coarse:h-11',
+  lg: 'h-10 px-4 text-[14px] normal-case tracking-normal max-sm:h-11 pointer-coarse:h-11',
+}
+
+export function buttonClasses(variant: ButtonVariant = 'secondary', size: ButtonSize = 'md', className?: string, inDashboard = false) {
+  return cn(base, variants[variant], inDashboard ? dashboardSizes[size] : sizes[size], className)
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -40,8 +49,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ variant = 'secondary', size = 'md', loading, icon, className, children, disabled, type = 'button', ...rest }: ButtonProps) {
+  const inDashboard = useInDashboard()
   return (
-    <button type={type} className={buttonClasses(variant, size, className)} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
+    <button type={type} className={buttonClasses(variant, size, className, inDashboard)} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
       {loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : icon}
       {children}
     </button>
@@ -55,8 +65,9 @@ interface ButtonLinkProps extends ComponentProps<typeof Link> {
 }
 
 export function ButtonLink({ variant = 'secondary', size = 'md', icon, className, children, ...rest }: ButtonLinkProps) {
+  const inDashboard = useInDashboard()
   return (
-    <Link className={buttonClasses(variant, size, className)} {...rest}>
+    <Link className={buttonClasses(variant, size, className, inDashboard)} {...rest}>
       {icon}
       {children}
     </Link>

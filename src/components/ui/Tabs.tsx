@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useRef } from 'react'
+import { useInDashboard } from '@/components/layout/dashboardContext'
 import { cn } from '@/lib/cn'
 
 export interface TabDef<T extends string> {
@@ -27,6 +28,7 @@ export function Tabs<T extends string>({
   variant?: 'underline' | 'pill'
 }) {
   const id = useId()
+  const inDashboard = useInDashboard()
   const listRef = useRef<HTMLDivElement>(null)
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
@@ -52,14 +54,15 @@ export function Tabs<T extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(t.value)}
             className={cn(
-              'inline-flex shrink-0 items-center gap-2 text-[12px] font-medium tracking-[0.12em] whitespace-nowrap uppercase transition-colors',
+              'inline-flex shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors',
+              inDashboard ? 'text-[14px] tracking-normal normal-case tabular-nums' : 'text-[12px] tracking-[0.12em] uppercase',
               variant === 'underline'
                 ? cn('-mb-px min-h-11 border-b-2 px-3', selected ? 'border-ink text-ink' : 'border-transparent text-ink-muted hover:text-ink')
                 : cn('min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11', selected ? 'bg-obsidian text-chalk' : 'text-ink-muted hover:bg-subtle hover:text-ink'),
             )}
           >
             {t.label}
-            {t.badge}
+            {inDashboard && t.badge !== undefined ? <span className="tabular-nums opacity-80">{t.badge}</span> : t.badge}
           </button>
         )
       })}
