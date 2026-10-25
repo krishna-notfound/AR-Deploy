@@ -87,6 +87,15 @@ describe('Badge override', () => {
     expect(cls).toContain('bg-obsidian')
     expect(cls).not.toContain('bg-subtle')
   })
+
+  it('a hover:bg class does not replace the tone', () => {
+    render(
+      <InShell>
+        <Badge className="hover:bg-obsidian">Hover</Badge>
+      </InShell>,
+    )
+    expect(screen.getByText('Hover').className).toContain('bg-subtle')
+  })
 })
 
 describe('Button', () => {
@@ -104,6 +113,26 @@ describe('Button', () => {
       expect(cls).not.toMatch(/tracking-(?!normal)/)
       expect(cls).toContain('font-medium')
     }
+  })
+
+  it('sizes md 40, sm 36 and 44 under sm; lg falls back to md inside the dashboard', () => {
+    render(
+      <InShell>
+        <Button>Md</Button>
+        <Button size="sm">Sm</Button>
+        <Button size="lg">Lg</Button>
+      </InShell>,
+    )
+    const md = screen.getByText('Md').className
+    expect(md).toContain('h-10')
+    expect(md).toContain('max-sm:h-11')
+    const sm = screen.getByText('Sm').className
+    expect(sm).toContain('h-9')
+    expect(sm).toContain('max-sm:h-11')
+    const lg = screen.getByText('Lg').className
+    expect(lg).toContain('h-10')
+    expect(lg).not.toContain('h-12')
+    expect(lg).not.toContain('text-label')
   })
 
   it('keeps the editorial lg size outside the dashboard', () => {

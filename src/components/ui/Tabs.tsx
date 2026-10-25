@@ -62,7 +62,7 @@ export function Tabs<T extends string>({
             )}
           >
             {t.label}
-            {inDashboard && t.badge !== undefined ? <span className="tabular-nums opacity-80">{t.badge}</span> : t.badge}
+            {inDashboard && t.badge != null && t.badge !== false ? <span className="tabular-nums">{t.badge}</span> : t.badge}
           </button>
         )
       })}

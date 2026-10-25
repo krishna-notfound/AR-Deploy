@@ -25,8 +25,8 @@ export function Badge({ tone = 'neutral', children, className, dot }: { tone?: T
         inDashboard
           ? 'inline-flex h-5 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-[12px] leading-5 font-medium tracking-normal whitespace-nowrap normal-case tabular-nums'
           : 'inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-2 py-[3px] text-[11px] leading-4 font-medium tracking-[0.06em] whitespace-nowrap uppercase',
-        // A caller that passes its own background (the Owner role pill) replaces the tone; same-property utilities otherwise resolve by stylesheet order.
-        inDashboard ? (className?.includes('bg-') ? undefined : dashboardTones[tone]) : tones[tone],
+        // A caller that passes its own background (the Owner role pill) replaces the tone, so it must also supply the text colour; same-property utilities otherwise resolve by stylesheet order.
+        inDashboard ? (className && /(^|\s)bg-/.test(className) ? undefined : dashboardTones[tone]) : tones[tone],
         className,
       )}
     >
