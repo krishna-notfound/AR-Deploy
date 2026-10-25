@@ -182,10 +182,10 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
               inputMode="numeric"
               autoComplete="one-time-code"
               pattern="[0-9]*"
-              maxLength={CODE_LENGTH}
               value={code}
               disabled={!sent || pending}
               onChange={(e) => {
+                // No maxLength: it would cut a pasted '123 456' before the space is stripped.
                 setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))
                 if (error) setError(null)
               }}

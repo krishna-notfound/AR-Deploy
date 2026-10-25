@@ -136,6 +136,21 @@ describe('ActionCodeDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
+  it("a pasted code with a space or dash ('123 456', '123-456') keeps all six digits", async () => {
+    const user = userEvent.setup()
+    const { onConfirm } = renderDialog()
+    await screen.findByText(/We emailed a 6-digit code to/)
+    expect(codeInput()).not.toHaveAttribute('maxlength')
+    await user.click(codeInput())
+    await user.paste('123 456')
+    expect(codeInput()).toHaveValue('123456')
+    await user.clear(codeInput())
+    await user.paste(' 123-4567')
+    expect(codeInput()).toHaveValue('123456')
+    await user.click(confirmButton())
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith('123456'))
+  })
+
   it('focuses the code field once the code is sent', async () => {
     renderDialog()
     await screen.findByText(/We emailed a 6-digit code to/)

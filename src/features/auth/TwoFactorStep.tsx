@@ -114,11 +114,11 @@ export function TwoFactorStep({
               <Input
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
                 value={code}
                 readOnly={busy}
                 onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, '')
+                  // No maxLength: it would cut a pasted '123 456' before the space is stripped.
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 6)
                   setCode(digits)
                   if (error) setError(null)
                   if (digits.length === 6) void verify(digits)
