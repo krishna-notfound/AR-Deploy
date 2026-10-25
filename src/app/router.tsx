@@ -28,7 +28,6 @@ const BusinessDetailPage = lazy(() => import('@/features/admin/BusinessDetailPag
 const AdminProductsPage = lazy(() => import('@/features/admin/AdminProductsPage'))
 const AdminAnalyticsPage = lazy(() => import('@/features/admin/AdminAnalyticsPage'))
 const AdminCatalogsPage = lazy(() => import('@/features/admin/AdminCatalogsPage'))
-const AdminSettingsPage = lazy(() => import('@/features/admin/AdminSettingsPage'))
 const ApplicationsPage = lazy(() => import('@/features/admin/ApplicationsPage'))
 const ApplicationDetailPage = lazy(() => import('@/features/admin/ApplicationDetailPage'))
 const AuditLogPage = lazy(() => import('@/features/admin/AuditLogPage'))
@@ -37,12 +36,12 @@ const RolePermissionsPage = lazy(() => import('@/features/team/RolePermissionsPa
 const MemberDetailPage = lazy(() => import('@/features/team/MemberDetailPage'))
 const JoinPage = lazy(() => import('@/features/join/JoinPage'))
 const ProductEditorPage = lazy(() => import('@/features/products/ProductEditorPage'))
+const SettingsLayout = lazy(() => import('@/features/settings/SettingsLayout'))
 
 const BusinessOverviewPage = lazy(() => import('@/features/business/BusinessOverviewPage'))
 const MyProductsPage = lazy(() => import('@/features/business/MyProductsPage'))
 const BusinessAnalyticsPage = lazy(() => import('@/features/business/BusinessAnalyticsPage'))
 const MyCatalogPage = lazy(() => import('@/features/business/MyCatalogPage'))
-const BusinessSettingsPage = lazy(() => import('@/features/business/BusinessSettingsPage'))
 
 const CatalogPage = lazy(() => import('@/features/public/CatalogPage'))
 const ProductPage = lazy(() => import('@/features/public/ProductPage'))
@@ -90,7 +89,6 @@ const adminRoutes: RouteObject = {
     { path: 'team/permissions', element: <RequirePermission need="owner"><RolePermissionsPage /></RequirePermission> },
     { path: 'team/:memberId', element: <RequirePermission need="owner"><MemberDetailPage /></RequirePermission> },
     { path: 'activity', element: <RequirePermission need={['records.view', 'access.view']}><AuditLogPage /></RequirePermission> },
-    { path: 'settings', element: <RequirePermission need="owner"><AdminSettingsPage /></RequirePermission> },
     { path: '*', element: <NotFoundPage inShell /> },
   ],
 }
@@ -109,10 +107,30 @@ const businessRoutes: RouteObject = {
     { path: 'products/:productId/edit', element: <ProductEditorPage scope="business" /> },
     { path: 'analytics', element: <BusinessAnalyticsPage /> },
     { path: 'catalog', element: <MyCatalogPage /> },
-    { path: 'settings', element: <BusinessSettingsPage /> },
     { path: '*', element: <NotFoundPage inShell /> },
   ],
 }
+
+// The settings hub is full-screen, outside DashboardShell but behind the same role guard. Every platform role
+// reaches its account sections; the Owner-only sections are hidden by the section registry, not by the route.
+const settingsRoutes: RouteObject[] = [
+  {
+    path: '/admin/settings/:section?',
+    element: (
+      <RequireRole allow="super_admin">
+        <SettingsLayout scope="admin" />
+      </RequireRole>
+    ),
+  },
+  {
+    path: '/dashboard/settings/:section?',
+    element: (
+      <RequireRole allow="business_admin">
+        <SettingsLayout scope="business" />
+      </RequireRole>
+    ),
+  },
+]
 
 function pathModeRoutes(): RouteObject[] {
   return [
@@ -126,6 +144,7 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/demo', element: <DemoEntryPage /> },
             { path: '/login', element: <LoginPage /> },
             { path: JOIN_PATH, element: <JoinPage /> },
+            ...settingsRoutes,
           ],
         },
         adminRoutes,

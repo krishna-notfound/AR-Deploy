@@ -1,12 +1,12 @@
 import { RotateCcw } from 'lucide-react'
 import { useState } from 'react'
-import { PageHeader, PanelHeader } from '@/components/layout/PageHeader'
-import { useAccount } from '@/auth/AccountProvider'
+import { PanelHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Switch } from '@/components/ui/Form'
 import { useToast } from '@/components/ui/ToastProvider'
+import { SectionHeader } from '../SettingsUi'
 import { FAIL_RATE_KEY, MODEL_CREDITS, PHOTO_CREDIT, backend, isDemoMode, service } from '@/services'
 
 const CAPABILITIES: [string, string, string][] = [
@@ -22,8 +22,7 @@ const CAPABILITIES: [string, string, string][] = [
   ['AR', 'Real model-viewer AR on supported phones', 'Hosted model files with correct CORS headers'],
 ]
 
-export default function AdminSettingsPage() {
-  const { user } = useAccount()
+export default function PlatformSection() {
   const confirm = useConfirm()
   const toast = useToast()
   const [failOn, setFailOn] = useState(() => parseFloat(localStorage.getItem(FAIL_RATE_KEY) ?? '0') > 0)
@@ -46,26 +45,8 @@ export default function AdminSettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" />
-      <div className="max-w-3xl space-y-6">
-        <Card>
-          <PanelHeader title="Profile" description={isDemoMode ? 'Demo account. Real sign-in needs Supabase mode.' : 'Signed in with Supabase Auth.'} />
-          <CardBody className="sm:px-6">
-            <dl className="divide-y divide-subtle border-t border-subtle text-[length:var(--text-ui-body)] leading-5">
-              {[
-                ['Name', user?.name],
-                ['Email', user?.email],
-                ['Role', 'Super Admin'],
-              ].map(([label, value]) => (
-                <div key={label} className="grid gap-1 py-3 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-4">
-                  <dt className="text-[length:var(--text-ui-small)] leading-5 text-ink-muted">{label}</dt>
-                  <dd className="min-w-0 break-words text-ink">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </CardBody>
-        </Card>
-
+      <SectionHeader title="General" description={isDemoMode ? 'Where this platform keeps its data, the demo tools and the sample asset credits.' : 'Where this platform keeps its data, and the sample asset credits.'} />
+      <div className="space-y-6">
         <Card>
           <PanelHeader title="Data backend" />
           <CardBody className="sm:px-6">

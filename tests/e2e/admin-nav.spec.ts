@@ -10,13 +10,17 @@ test('every Super Admin sidebar item opens its page', async ({ page }) => {
     ['All Products', 'All products'],
     ['Analytics', 'Analytics'],
     ['Catalogs & QR Codes', 'Catalogs & QR codes'],
-    ['Settings', 'Settings'],
     ['Overview', 'Overview'],
   ]
   for (const [link, heading] of pages) {
     await nav.getByRole('link', { name: link }).click()
     await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
   }
+  // Settings is full-screen, outside the shell: it opens on My account and closes back to where it was opened.
+  await nav.getByRole('link', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'My account' })).toBeVisible()
+  await page.getByRole('button', { name: 'Close settings' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
   // Sample data is labelled on overview
   await expect(page.getByText('Sample data').first()).toBeVisible()
 })

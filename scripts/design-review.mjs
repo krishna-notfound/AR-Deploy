@@ -116,7 +116,7 @@ const ADMIN = [
   { key: 'admin-product-new', url: '/admin/products/new', stitch: S.editor },
   { key: 'admin-analytics', url: '/admin/analytics', stitch: S.adminAnalytics },
   { key: 'admin-audit', url: '/admin/activity', stitch: S.audit },
-  { key: 'admin-settings', url: '/admin/settings', stitch: S.adminSettings },
+  { key: 'admin-settings', url: '/admin/settings/platform', stitch: S.adminSettings },
   { key: 'admin-team', url: '/admin/team', stitch: S.team },
   { key: 'admin-member', from: { list: '/admin/team', pick: /^\/admin\/team\/(?!permissions$)[^/?#]+$/, viaMenu: 'View' }, stitch: S.member },
   { key: 'admin-roles', url: '/admin/team/permissions', stitch: S.roles },
@@ -127,7 +127,7 @@ const BUSINESS = [
   { key: 'biz-products', url: '/dashboard/products', stitch: null },
   { key: 'biz-product-edit', from: { list: '/dashboard/products', pick: /^\/dashboard\/products\/(?!new$)[^/?#]+\/edit$/ }, stitch: S.editor },
   { key: 'biz-analytics', url: '/dashboard/analytics', stitch: null },
-  { key: 'biz-settings', url: '/dashboard/settings', stitch: S.bizSettings },
+  { key: 'biz-settings', url: '/dashboard/settings/business', stitch: S.bizSettings },
 ]
 
 // ---- browser helpers -------------------------------------------------------

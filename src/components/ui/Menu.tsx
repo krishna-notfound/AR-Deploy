@@ -147,6 +147,8 @@ export function Popover({
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // Handled here: an outer Esc handler (the settings hub's close) must not act on it too.
+        e.preventDefault()
         setOpen(false)
         btnRef.current?.focus()
       }

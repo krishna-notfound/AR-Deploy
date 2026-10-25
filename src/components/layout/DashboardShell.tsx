@@ -1,15 +1,17 @@
 import { useCan } from '@/auth/usePermission'
-import { ArrowUpRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Repeat, X } from 'lucide-react'
+import { ArrowUpRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Repeat, ShieldCheck, UserRound, X } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
-import { initials } from '@/auth/accounts'
 import { cn } from '@/lib/cn'
 import { formatNumber } from '@/lib/format'
-import { catalogLocalPath } from '@/lib/urls'
+import { catalogLocalPath, settingsPath } from '@/lib/urls'
+import { settingsReturnState } from '@/lib/settingsReturn'
 import { isDemoMode } from '@/services'
+import { Avatar } from '../ui/Avatar'
 import { IconButton } from '../ui/Button'
+import { DropdownMenu } from '../ui/Menu'
 import { useFocusTrap } from '../ui/Modal'
 import { BrandMark, Wordmark } from '../ui/BrandMark'
 import { InlineNotice } from '../ui/States'
@@ -208,6 +210,7 @@ function SidebarContent({
   onNavigate?: () => void
   footer?: React.ReactNode
 }) {
+  const { pathname, search } = useLocation()
   return (
     <>
       <div className={cn('flex min-h-[84px] items-center border-b border-white/10', collapsed ? 'justify-center px-2' : 'px-5')}>
@@ -221,6 +224,7 @@ function SidebarContent({
               <NavLink
                 to={item.to}
                 end={item.end}
+                state={item.returnsHere ? settingsReturnState(pathname + search) : undefined}
                 onClick={onNavigate}
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
@@ -241,17 +245,55 @@ function SidebarContent({
           ))}
         </ul>
         {footer && <div className="px-3 pb-2">{footer}</div>}
-        <UserBlock collapsed={collapsed} />
+        <UserBlock collapsed={collapsed} variant={variant} />
       </nav>
     </>
   )
 }
 
-function UserBlock({ collapsed }: { collapsed?: boolean }) {
+function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Variant }) {
   const { user } = useAccount()
   const leave = useLeaveAccount()
+  const navigate = useNavigate()
+  const { pathname, search } = useLocation()
   const iconBtn =
     'grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-chalk/70 hover:bg-white/[0.06] hover:text-chalk focus-visible:outline-accent-bright pointer-coarse:size-11'
+  const name = user?.name ?? 'Signed in'
+  // Settings is full-screen; its close button comes back to this page.
+  const openSettings = (section: 'account' | 'security') => navigate(settingsPath(variant, section), { state: settingsReturnState(pathname + search) })
+  const menu = (
+    // The menu sits at the foot of the sidebar, so it opens upwards (the descendant classes place it above the trigger).
+    <div className={cn('[&_[role=menu]]:bottom-full [&_[role=menu]]:mb-1', !collapsed && 'flex min-w-0 flex-1 [&>div]:min-w-0 [&>div]:flex-1')}>
+      <DropdownMenu
+        label={`Account menu, ${name}`}
+        align="start"
+        items={[
+          { label: 'Account settings', icon: <UserRound />, onSelect: () => openSettings('account') },
+          { label: 'Security & 2FA', icon: <ShieldCheck />, onSelect: () => openSettings('security') },
+          'separator',
+          { label: 'Sign out', icon: <LogOut />, onSelect: () => void leave({ signOut: true }) },
+        ]}
+        triggerClassName={cn(
+          'h-auto! w-full! justify-start! gap-2.5 p-1! text-left text-chalk! hover:bg-white/[0.06]! hover:text-chalk! focus-visible:outline-accent-bright',
+          collapsed && 'w-auto! justify-center!',
+        )}
+        trigger={
+          <>
+            {user ? <Avatar name={user.name} size={32} tone="dark" /> : <UserRound className="size-4" aria-hidden />}
+            {!collapsed && (
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[length:var(--text-ui-body)] font-medium text-chalk">{name}</span>
+                <span className="block truncate text-[12px] text-chalk/65">
+                  {user?.email}
+                  {isDemoMode && ' · demo'}
+                </span>
+              </span>
+            )}
+          </>
+        }
+      />
+    </div>
+  )
   const actions = (
     <>
       <button
@@ -270,26 +312,9 @@ function UserBlock({ collapsed }: { collapsed?: boolean }) {
     </>
   )
   return (
-    <div className={cn('border-t border-white/10 p-3', collapsed && 'flex flex-col items-center gap-1')}>
-      {collapsed ? (
-        actions
-      ) : (
-        <div className="flex items-center gap-2.5">
-          {user && (
-            <span className="grid size-9 shrink-0 place-items-center border border-chalk/25 font-display text-[15px] text-chalk" aria-hidden>
-              {initials(user.name)}
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[length:var(--text-ui-body)] font-medium text-chalk">{user?.name ?? 'Signed in'}</p>
-            <p className="truncate text-[12px] text-chalk/65">
-              {user?.email}
-              {isDemoMode && ' · demo'}
-            </p>
-          </div>
-          {actions}
-        </div>
-      )}
+    <div className={cn('border-t border-white/10 p-3', collapsed ? 'flex flex-col items-center gap-1' : 'flex items-center gap-1')}>
+      {menu}
+      {actions}
     </div>
   )
 }

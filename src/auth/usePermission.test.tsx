@@ -16,7 +16,7 @@ const mainNav = () => screen.getByRole('navigation', { name: 'Main' })
 beforeAll(async () => {
   await Promise.all([
     import('@/features/admin/AdminOverviewPage'),
-    import('@/features/admin/AdminSettingsPage'),
+    import('@/features/team/TeamPage'),
     import('@/features/admin/AdminProductsPage'),
     import('@/features/admin/ApplicationsPage'),
   ])
@@ -41,12 +41,13 @@ describe('permission-aware dashboard (ADR-0029)', () => {
     expect(within(nav).getByRole('link', { name: /Analytics/ })).toBeInTheDocument()
     expect(within(nav).getByRole('link', { name: /All Products/ })).toBeInTheDocument()
     expect(within(nav).queryByRole('link', { name: /Team & Access/ })).toBeNull()
-    expect(within(nav).queryByRole('link', { name: /Settings/ })).toBeNull()
     expect(within(nav).queryByRole('link', { name: /Audit log/ })).toBeNull()
+    // Every platform role has its own account settings; the hub hides the Owner's sections.
+    expect(within(nav).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/admin/settings/account')
   })
 
   it('a blocked page says so instead of showing data', { timeout: 20_000 }, async () => {
-    openAs('team', '/admin/settings')
+    openAs('team', '/admin/team')
     expect(await screen.findByText("You don't have access to this page")).toBeInTheDocument()
     expect(screen.getByText('Ask the platform owner if you need it.')).toBeInTheDocument()
   })
