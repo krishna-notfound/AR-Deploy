@@ -46,11 +46,11 @@ describe('Team & Access page (ADR-0029)', () => {
     open('/admin/team')
     await within(await screen.findByRole('table')).findByText('ana.ribeiro@sanctus.example')
     await user.type(screen.getByRole('searchbox', { name: 'Search members' }), 'marta')
-    await waitFor(() => expect(within(table()).queryByText('ana.ribeiro@sanctus.example')).toBeNull())
+    await waitFor(() => expect(within(table()).queryByText('ana.ribeiro@sanctus.example')).toBeNull(), { timeout: 5_000 })
     expect(within(table()).getByText('marta.lopes@sanctus.example')).toBeInTheDocument()
     await user.clear(screen.getByRole('searchbox', { name: 'Search members' }))
     await user.selectOptions(screen.getByLabelText('Role'), 'team')
-    await waitFor(() => expect(within(table()).getAllByRole('row')).toHaveLength(3)) // header + 2
+    await waitFor(() => expect(within(table()).getAllByRole('row')).toHaveLength(3), { timeout: 5_000 }) // header + 2 (after the search debounce)
   })
 
   it('offers only the actions that make sense for each person', { timeout: 20_000 }, async () => {
