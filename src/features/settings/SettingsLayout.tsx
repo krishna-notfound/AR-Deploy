@@ -17,6 +17,7 @@ import { settingsPath } from '@/lib/urls'
 import { isDemoMode } from '@/services'
 import { SettingsSectionPage } from './SettingsSectionPage'
 import { TitleFocusContext } from './SettingsUi'
+import { useMyProfile } from './useMyProfile'
 import {
   SETTINGS_GROUPS,
   type SettingsScope,
@@ -208,6 +209,8 @@ function SectionList({
   // Below 640px the list is a screen of its own, so it carries the page title; on wide screens the section's title is it.
   useDocumentTitle(wide ? undefined : 'Settings')
   const titleId = useId()
+  // The name and photo set in Profile settings (shared with the sidebar); the account's own name until they load.
+  const { profile } = useMyProfile()
   // Below 640px the list is the whole screen, so it is the page's main landmark; beside a section it is not.
   const Root = wide ? 'div' : 'main'
   const groups = SETTINGS_GROUPS.map((g) => ({ group: g, items: sections.filter((s) => s.group === g) })).filter((g) => g.items.length > 0)
@@ -229,10 +232,10 @@ function SectionList({
           </div>
         )}
         {user && (
-          <div className="mb-5 flex min-w-0 items-center gap-3 px-3">
-            <Avatar name={user.name} size={40} />
+          <div data-settings-identity className="mb-5 flex min-w-0 items-center gap-3 px-3">
+            <Avatar name={profile?.displayName || user.name} src={profile?.avatarUrl} size={40} />
             <div className="min-w-0">
-              <p className="truncate text-ui-body font-medium text-ink">{user.name}</p>
+              <p className="truncate text-ui-body font-medium text-ink">{profile?.displayName || user.name}</p>
               <p className="truncate text-ui-small text-ink-muted">
                 {user.email}
                 {isDemoMode && ' · demo'}

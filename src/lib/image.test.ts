@@ -36,7 +36,25 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const photo = () => new File([new Uint8Array(10)], 'me.jpg', { type: 'image/jpeg' })
+/** A minimal JPEG header: SOI, an APP0 segment, then a baseline SOF0 frame of the given size. */
+function jpeg(w: number, h: number): File {
+  const app0 = [0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00]
+  const sof0 = [0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]
+  return new File([new Uint8Array([0xff, 0xd8, ...app0, ...sof0, 0xff, 0xd9])], 'me.jpg', { type: 'image/jpeg' })
+}
+const be32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]
+const le24 = (n: number) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255]
+function png(w: number, h: number): File {
+  const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+  const ihdr = [...be32(13), 0x49, 0x48, 0x44, 0x52, ...be32(w), ...be32(h), 8, 6, 0, 0, 0, 0, 0, 0, 0]
+  return new File([new Uint8Array([...sig, ...ihdr])], 'me.png', { type: 'image/png' })
+}
+function webpVp8x(w: number, h: number): File {
+  const ascii = (t: string) => [...t].map((c) => c.charCodeAt(0))
+  const chunk = [...ascii('VP8X'), 10, 0, 0, 0, 0, 0, 0, 0, ...le24(w - 1), ...le24(h - 1)]
+  return new File([new Uint8Array([...ascii('RIFF'), 22, 0, 0, 0, ...ascii('WEBP'), ...chunk])], 'me.webp', { type: 'image/webp' })
+}
+const photo = () => jpeg(800, 600)
 
 describe('squareResize', () => {
   it('squareResize crops to a square of the requested size', async () => {
@@ -65,8 +83,49 @@ describe('squareResize', () => {
     expect(encodes[1]!.quality).toBe(0.9)
   })
 
-  it('rejects a file that is not a readable image', async () => {
-    vi.stubGlobal('createImageBitmap', vi.fn(async () => Promise.reject(new Error('decode'))))
-    await expect(squareResize(photo())).rejects.toThrow()
+  it('rejects a file that is not a readable image (both createImageBitmap forms and <img> fail)', async () => {
+    const decode = vi.fn(async () => Promise.reject(new Error('decode')))
+    vi.stubGlobal('createImageBitmap', decode)
+    // jsdom never loads or fails an <img>; a browser fires error for a broken file.
+    class BrokenImage {
+      onerror: (() => void) | null = null
+      onload: (() => void) | null = null
+      set src(_v: string) {
+        queueMicrotask(() => this.onerror?.())
+      }
+    }
+    vi.stubGlobal('Image', BrokenImage)
+    await expect(squareResize(photo())).rejects.toThrow(/couldn't be read/)
+    expect(decode).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuses an image over 40 megapixels from its header, before decoding it', async () => {
+    const decode = vi.fn(async () => ({ width: 10, height: 10, close: vi.fn() }))
+    vi.stubGlobal('createImageBitmap', decode)
+    for (const bomb of [jpeg(8000, 6000), png(20_000, 20_000), webpVp8x(16_383, 16_383)]) {
+      await expect(squareResize(bomb)).rejects.toThrow(/couldn't be read/)
+    }
+    expect(decode).not.toHaveBeenCalled()
+    // 40 MP exactly is still fine.
+    await expect(squareResize(png(8000, 5000))).resolves.toBeInstanceOf(Blob)
+  })
+
+  it('refuses a file whose header has no image size', async () => {
+    const decode = vi.fn(async () => ({ width: 10, height: 10, close: vi.fn() }))
+    vi.stubGlobal('createImageBitmap', decode)
+    await expect(squareResize(new File([new Uint8Array(64)], 'x.jpg', { type: 'image/jpeg' }))).rejects.toThrow(/couldn't be read/)
+    expect(decode).not.toHaveBeenCalled()
+  })
+
+  it('tries createImageBitmap with options, then without, when the options form is not supported', async () => {
+    const decode = vi.fn(async (_f: Blob, opts?: unknown) => {
+      if (opts) throw new TypeError('options not supported')
+      return { width: 400, height: 400, close: vi.fn() }
+    })
+    vi.stubGlobal('createImageBitmap', decode)
+    await expect(squareResize(webpVp8x(400, 400))).resolves.toBeInstanceOf(Blob)
+    expect(decode).toHaveBeenCalledTimes(2)
+    expect(decode.mock.calls[0]![1]).toEqual({ imageOrientation: 'from-image' })
+    expect(decode.mock.calls[1]).toHaveLength(1)
   })
 })

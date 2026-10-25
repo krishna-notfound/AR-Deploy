@@ -3,8 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
-import { account, service } from '@/services'
+import { ACCOUNT_ERRORS, account, service } from '@/services'
 import { resetMockAccount } from '@/services/mock/mockAccount'
+import { resetMyProfileStore } from '../useMyProfile'
 
 const resized = new Blob([new Uint8Array(2048)], { type: 'image/webp' })
 vi.mock('@/lib/image', () => ({ squareResize: vi.fn(async () => resized) }))
@@ -24,6 +25,7 @@ beforeEach(async () => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   localStorage.clear()
   resetMockAccount()
+  resetMyProfileStore()
   await service.resetDemoData()
 })
 
@@ -34,6 +36,9 @@ afterEach(() => {
 
 const photoCard = () => screen.getByRole('region', { name: 'Photo' })
 const preview = () => photoCard().querySelector('[data-avatar]')!
+const hubIdentity = () => document.querySelector('[data-settings-identity]') as HTMLElement
+const fail = (reason: string, message: string) => ({ ok: false as const, error: { code: 'VALIDATION' as const, reason, message } })
+const goodPhoto = () => new File([new Uint8Array(900 * 1024)], 'me.png', { type: 'image/png' })
 
 describe('ProfileSection', () => {
   it('name: empty and 81-character names are refused; save updates the sidebar name', async () => {
@@ -105,6 +110,60 @@ describe('ProfileSection', () => {
     await waitFor(() => expect(preview().querySelector('img')).toBeNull())
     expect(preview().textContent).toMatch(/^[A-Z]{1,2}$/)
     expect(screen.queryByRole('button', { name: 'Remove photo' })).toBeNull()
+  })
+
+  it('prefills the name with the account name when the profile has none', async () => {
+    open()
+    expect(await screen.findByRole('textbox', { name: 'Name' })).toHaveValue('Casa Lisboa Interiors owner')
+  })
+
+  it('the settings hub header shows the new name and photo after a save', async () => {
+    const user = userEvent.setup()
+    open()
+    const field = await screen.findByRole('textbox', { name: 'Name' })
+    expect(hubIdentity().querySelector('[data-avatar] img')).toBeNull()
+    await user.clear(field)
+    await user.type(field, 'Marta Silva')
+    await user.click(screen.getByRole('button', { name: 'Save name' }))
+    await screen.findByText('Name saved')
+    await user.upload(screen.getByLabelText('Upload photo'), goodPhoto())
+    await screen.findByText('Photo updated')
+    await waitFor(() => expect(within(hubIdentity()).getByText('Marta Silva')).toBeInTheDocument())
+    expect(hubIdentity().querySelector('[data-avatar] img')).not.toBeNull()
+  })
+
+  it('photo: says so when the image cannot be decoded, and uploads nothing', async () => {
+    const user = userEvent.setup()
+    open()
+    const upload = vi.spyOn(account, 'uploadAvatar')
+    vi.mocked(squareResize).mockRejectedValueOnce(new Error('decode'))
+    await user.upload(await screen.findByLabelText('Upload photo'), goodPhoto())
+    expect(await screen.findByText("That image couldn't be read. Try another file.")).toBeInTheDocument()
+    expect(upload).not.toHaveBeenCalled()
+    expect(preview().querySelector('img')).toBeNull()
+  })
+
+  it('photo: shows the service message when the upload is refused', async () => {
+    const user = userEvent.setup()
+    open()
+    const message = ACCOUNT_ERRORS.invalid_avatar!.message
+    vi.spyOn(account, 'uploadAvatar').mockResolvedValue(fail('invalid_avatar', message))
+    await user.upload(await screen.findByLabelText('Upload photo'), goodPhoto())
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    expect(screen.queryByText('Photo updated')).toBeNull()
+    expect(preview().querySelector('img')).toBeNull()
+  })
+
+  it('photo: keeps the photo and says why when Remove fails', async () => {
+    const user = userEvent.setup()
+    open()
+    await user.upload(await screen.findByLabelText('Upload photo'), goodPhoto())
+    await screen.findByText('Photo updated')
+    vi.spyOn(account, 'removeAvatar').mockResolvedValue(fail('unknown', 'Could not remove the photo. Try again.'))
+    await user.click(screen.getByRole('button', { name: 'Remove photo' }))
+    expect(await screen.findByText('Could not remove the photo. Try again.')).toBeInTheDocument()
+    expect(preview().querySelector('img')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument()
   })
 
   it('shows an error with a retry when the profile cannot be loaded', async () => {

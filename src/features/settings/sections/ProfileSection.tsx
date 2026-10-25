@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { FormField, Input } from '@/components/ui/Form'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { ErrorState } from '@/components/ui/States'
+import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { MB } from '@/lib/files'
 import { squareResize } from '@/lib/image'
@@ -28,6 +28,14 @@ export default function ProfileSection() {
       <SectionHeader title="Profile" description="Your name and photo, as your team sees them." />
       {profile ? (
         <div className="space-y-6">
+          {error && (
+            <InlineNotice tone="warning">
+              Couldn't refresh your profile: {error}{' '}
+              <button type="button" className="font-medium underline underline-offset-2" onClick={reload}>
+                Try again
+              </button>
+            </InlineNotice>
+          )}
           <NameCard profile={profile} setProfile={setProfile} />
           <PhotoCard profile={profile} setProfile={setProfile} />
         </div>
@@ -52,8 +60,10 @@ export default function ProfileSection() {
 type CardProps = { profile: Profile; setProfile: (p: Profile) => void }
 
 function NameCard({ profile, setProfile }: CardProps) {
+  const { user } = useAccount()
   const toast = useToast()
-  const [draft, setDraft] = useState(() => profile.displayName ?? '')
+  // Supabase falls back to the email for an account with no name: never prefill that as a name.
+  const [draft, setDraft] = useState(() => profile.displayName ?? (user && user.name !== user.email ? user.name : ''))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
