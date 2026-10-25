@@ -44,12 +44,13 @@ export function ModelSection({
   return (
     <div className="space-y-5">
       {context === 'product' && (
-        <InlineNotice icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
+        <InlineNotice tone="neutral" className="border border-line text-ink-body" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
           Upload the files your 3D artist delivered. <strong className="font-medium">GLB</strong> powers the 3D viewer and Android AR.{' '}
           <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are optimized for size before upload; USDZ files are stored as uploaded. Nothing is converted.' : 'Files are stored as uploaded: they are not converted or compressed.'}
         </InlineNotice>
       )}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* GLB and USDZ side by side, stacked on phones (BRIEF section 6). */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {(['glb', 'usdz'] as const).map((f) => (
           <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange(f, a)} allowLink={context === 'product'} />
         ))}
@@ -129,46 +130,46 @@ function ModelSlot({
   const unsupported = format === 'glb' ? sceneViewerUnsupported(asset?.requiredExtensions) : []
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-line p-4">
+    <div className="min-w-0 rounded-[var(--radius-card)] border border-line bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h4 className="text-sm font-semibold">{info.title}</h4>
-          <p className="mt-0.5 text-xs leading-5 text-ink-muted">{info.use}</p>
+        <div className="min-w-0">
+          <h4 className="text-[14px] leading-5 font-semibold text-ink">{info.title}</h4>
+          <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">{info.use}</p>
         </div>
         <Badge tone="neutral">.{format}</Badge>
       </div>
 
       {asset ? (
-        <div className="mt-3 flex items-center gap-3 rounded-lg bg-canvas px-3 py-2.5">
-          <FileBox className="size-5 shrink-0 text-ink-muted" aria-hidden />
+        <div className="mt-3 flex items-center gap-3 rounded-[var(--radius-control)] border border-line bg-subtle/60 px-3 py-2.5">
+          <FileBox className="size-4 shrink-0 text-ink-muted" aria-hidden />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium" title={asset.fileName}>
+            <p className="truncate text-[14px] font-medium text-ink" title={asset.fileName}>
               {asset.fileName}
             </p>
-            <p className="flex flex-wrap items-center gap-x-2 text-xs text-ink-muted">
+            <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-ink-muted tabular-nums">
               {asset.sizeBytes ? formatFileSize(asset.sizeBytes) : asset.url.startsWith('blob:') ? 'Uploaded file' : 'Remote URL'}
               <AssetStatusBadge status={stale ? 'missing' : asset.status} />
             </p>
           </div>
-          <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} disabled={!!checking} onClick={() => onChange(undefined)} aria-label={`Remove ${format.toUpperCase()} file`}>
+          <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} disabled={!!checking} onClick={() => onChange(undefined)} aria-label={`Remove ${format.toUpperCase()} file`} className="shrink-0 text-danger! hover:bg-danger-soft">
             Remove
           </Button>
         </div>
       ) : (
-        <div className="mt-3 rounded-lg border border-dashed border-line-strong px-3 py-4 text-center text-xs text-ink-muted">
+        <div className="mt-3 rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-5 text-center text-[13px] text-ink-muted">
           No {format.toUpperCase()} file yet.
         </div>
       )}
       {asset?.status === 'session-only' && !stale && (
-        <p className="mt-2 text-xs text-info">Stored in this browser session only. Real hosting needs backend storage.</p>
+        <p className="mt-2 text-[13px] text-info">Stored in this browser session only. Real hosting needs backend storage.</p>
       )}
-      {stale && <p className="mt-2 text-xs text-warning">This uploaded file is no longer available after reloading. Upload it again (backend storage needed).</p>}
+      {stale && <p className="mt-2 text-[13px] text-warning">This uploaded file is no longer available after reloading. Upload it again (backend storage needed).</p>}
 
       <div className="mt-3 flex flex-col gap-2">
         <label
           htmlFor={id}
           className={cn(
-            'inline-flex h-8 w-fit items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[13px] font-medium focus-within:outline-2 focus-within:outline-accent',
+            'inline-flex h-9 w-fit items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px] font-medium text-ink focus-within:outline-2 focus-within:outline-ink max-sm:h-11 pointer-coarse:h-11',
             checking ? 'cursor-wait opacity-60' : 'cursor-pointer hover:bg-subtle',
           )}
         >
@@ -201,17 +202,17 @@ function ModelSlot({
                 void onUrl()
               }
             }}
-            className="h-8 text-[13px]"
+            className="h-9 max-sm:h-11"
           />
           <Button size="sm" onClick={() => void onUrl()} disabled={!!checking || !urlDraft.trim()} icon={<Link2 className="size-4" aria-hidden />}>
             Link
           </Button>
         </div>
         )}
-        <p className="text-[11px] text-ink-faint">Max {formatFileSize(MODEL_RULES[format].maxBytes)}. The file structure is checked to confirm the format.</p>
+        <p className="text-[13px] text-ink-muted">Max {formatFileSize(MODEL_RULES[format].maxBytes)}. The file structure is checked to confirm the format.</p>
       </div>
       {optimizeNote && asset && (
-        <p className="mt-2 text-xs text-ink-muted">
+        <p className="mt-2 text-[13px] text-ink-muted">
           {optimizeNote.text}{' '}
           {optimizeNote.original && (
             <button type="button" disabled={!!checking} className="font-medium text-ink underline underline-offset-2" onClick={() => void onFile(optimizeNote.original!, { keepOriginal: true })}>
@@ -220,9 +221,9 @@ function ModelSlot({
           )}
         </p>
       )}
-      {unsupported.length > 0 && asset && <p className="mt-2 text-xs text-warning">{sceneViewerWarning(unsupported)}</p>}
+      {unsupported.length > 0 && asset && <p className="mt-2 text-[13px] text-warning">{sceneViewerWarning(unsupported)}</p>}
       {error && (
-        <p role="alert" className="mt-2 text-xs font-medium text-danger">
+        <p role="alert" className="mt-2 text-[13px] text-danger">
           {error}
         </p>
       )}
@@ -266,10 +267,10 @@ export function ModelPreview({
 
   if (!glb || stale) {
     return (
-      <div className="flex flex-col items-center rounded-[var(--radius-card)] bg-canvas px-6 py-10 text-center">
-        <Box className="size-6 text-ink-faint" aria-hidden />
-        <p className="mt-3 text-sm font-medium">{context === 'variant' ? 'No 3D model for this option' : 'No 3D preview yet'}</p>
-        <p className="mt-1 max-w-sm text-xs text-ink-muted">
+      <div className="flex flex-col items-center rounded-[var(--radius-card)] border border-line bg-subtle/50 px-4 py-10 text-center sm:px-6">
+        <Box className="size-6 text-ink-muted" aria-hidden />
+        <p className="mt-3 text-[14px] font-medium text-ink">{context === 'variant' ? 'No 3D model for this option' : 'No 3D preview yet'}</p>
+        <p className="mt-1 max-w-md text-[13px] leading-[1.45] text-ink-muted">
           {context === 'variant'
             ? 'Customers who pick this option see the product’s main 3D model, with a note that this finish may look different. Upload a GLB (and a USDZ for iPhone) made for this option to show it in 3D and AR.'
             : 'Add a GLB model to show the 3D viewer and the “View in AR” button. Without one, customers see the photo gallery only.'}
@@ -281,7 +282,7 @@ export function ModelPreview({
 
   return (
     <div>
-      <div className="relative aspect-[16/10] overflow-hidden rounded-[var(--radius-card)] bg-subtle">
+      <div className="relative aspect-[16/10] overflow-hidden rounded-[var(--radius-card)] border border-line bg-subtle">
         <ModelViewer
           key={`${glb.url}-${attempt}`}
           src={glb.url}
@@ -306,8 +307,8 @@ export function ModelPreview({
           <div className="absolute inset-0 grid place-items-center bg-canvas/90 p-6 text-center" role="alert">
             <div>
               <AlertTriangle className="mx-auto size-6 text-danger" aria-hidden />
-              <p className="mt-2 text-sm font-medium">The model could not be loaded</p>
-              <p className="mt-1 text-xs text-ink-muted">Check that the URL is reachable and allows cross-origin requests (CORS), or upload the file again.</p>
+              <p className="mt-2 text-[14px] font-medium text-ink">The model could not be loaded</p>
+              <p className="mt-1 text-[13px] text-ink-muted">Check that the URL is reachable and allows cross-origin requests (CORS), or upload the file again.</p>
               <Button
                 size="sm"
                 className="mt-3"
@@ -335,23 +336,24 @@ const LEVEL_ICON = {
   missing: <CircleSlash className="mt-0.5 size-4 shrink-0 text-ink-faint" aria-hidden />,
 }
 const LEVEL_TEXT = { ready: 'Ready', warning: 'Needs attention', missing: 'Not available' }
+const LEVEL_TONE = { ready: 'success', warning: 'warning', missing: 'neutral' } as const
 
 /** What customers get on each platform, so the admin knows before publishing (ADR-0018). */
 function ArReadiness({ items }: { items: ReadinessItem[] }) {
   return (
-    <section aria-label="AR readiness" className="mt-4 w-full rounded-[var(--radius-card)] border border-line p-4 text-left">
-      <h4 className="text-sm font-semibold">AR readiness</h4>
-      <ul className="mt-3 space-y-2.5">
+    <section aria-label="AR readiness" className="mt-4 w-full rounded-[var(--radius-card)] border border-line bg-surface p-4 text-left">
+      <h4 className="text-[14px] font-semibold text-ink">AR readiness</h4>
+      <ul className="mt-3 space-y-3">
         {items.map((i) => (
-          <li key={i.key} className="flex items-start gap-2.5 text-xs">
+          <li key={i.key} className="flex items-start gap-2.5 text-[13px] leading-[1.45]">
             {LEVEL_ICON[i.level]}
-            <div>
-              <p className="font-medium text-ink">
-                {i.label}
-                <span className="sr-only"> ({LEVEL_TEXT[i.level]})</span>
-              </p>
+            <div className="min-w-0 flex-1">
+              <p className="text-ink">{i.label}</p>
               <p className="mt-0.5 text-ink-muted">{i.detail}</p>
             </div>
+            <Badge tone={LEVEL_TONE[i.level]} className="shrink-0">
+              {LEVEL_TEXT[i.level]}
+            </Badge>
           </li>
         ))}
       </ul>
@@ -369,10 +371,10 @@ const MISMATCH_HINT: Record<ScaleMismatchReason, (k?: number) => string> = {
 function ScaleReport({ scale }: { scale: ScaleCheck }) {
   const m = (v: number) => `${Math.round(v * 100)} cm`
   if (scale.status === 'unknown')
-    return <p className="mt-2 text-xs text-ink-muted">Enter width, height and depth to compare them with the model’s real size.</p>
+    return <p className="mt-3 text-[13px] text-ink-muted">Enter width, height and depth to compare them with the model’s real size.</p>
   const sizes = (s: { x: number; y: number; z: number }) => `${m(s.x)} × ${m(s.y)} × ${m(s.z)}`
   return (
-    <div className="mt-3 flex items-start gap-2.5 text-xs">
+    <div className="mt-3 flex items-start gap-2.5 text-[13px] leading-[1.45]">
       {scale.status === 'verified' ? (
         <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
       ) : (
