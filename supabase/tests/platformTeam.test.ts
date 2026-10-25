@@ -304,3 +304,158 @@ describe('permission matrix (Task 2)', () => {
     await expect(db.query(`insert into public.platform_members (user_id, email, role) values ($1, 'bizowner@test', 'team')`, [BIZ_OWNER_U])).rejects.toThrow(/business_owner/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Task 3: member management and invitation functions
+// ---------------------------------------------------------------------------
+
+type J = Record<string, unknown>
+const call = async (uid: string, sql: string, params: unknown[] = [], role: 'authenticated' | 'service_role' = 'authenticated') =>
+  (await as(uid, (tx) => tx.query<{ r: J }>(sql, params), role)).rows[0]!.r
+const svc = (sql: string, params: unknown[] = []) => call('', sql, params, 'service_role')
+const hash = (n: number) => n.toString(16).padStart(64, '0')
+const auditCount = async (type: string, actor?: string) =>
+  (await db.query<{ n: number }>(`select count(*)::int as n from public.audit_events where event_type = $1 ${actor ? 'and actor_id = $2' : ''}`, actor ? [type, actor] : [type])).rows[0]!.n
+
+describe('member management (Task 3)', () => {
+  it('only the owner can invite, and a refused call is audited', async () => {
+    const before = await auditCount('access_denied', ADMIN_U)
+    expect(await call(ADMIN_U, `select public.admin_invite_member('x@studio.test', 'team') as r`)).toEqual({ error: 'forbidden' })
+    expect(await auditCount('access_denied', ADMIN_U)).toBe(before + 1)
+  })
+
+  it('invite is case and space insensitive', async () => {
+    const first = await call(OWNER_U, `select public.admin_invite_member('  Ana@Studio.test ', 'admin') as r`)
+    expect(first.ok).toBe(true)
+    expect(await call(OWNER_U, `select public.admin_invite_member('ana@studio.test', 'team') as r`)).toEqual({ error: 'already_member' })
+    expect((await db.query(`select 1 from public.platform_members where email = 'ana@studio.test' and status = 'invited'`)).rows).toHaveLength(1)
+    expect(await auditCount('access_invite_created', OWNER_U)).toBeGreaterThan(0)
+  })
+
+  it('rejects invalid emails, business owners and owners', async () => {
+    expect(await call(OWNER_U, `select public.admin_invite_member('not-an-email', 'team') as r`)).toEqual({ error: 'invalid_email' })
+    await db.exec(`update auth.users set email = 'bizowner@shop.test' where id = '${BIZ_OWNER_U}'; update auth.users set email = 'owner@sanctus.test' where id = '${OWNER_U}'`)
+    try {
+      expect(await call(OWNER_U, `select public.admin_invite_member('BizOwner@Shop.test', 'team') as r`)).toEqual({ error: 'business_owner' })
+      expect(await call(OWNER_U, `select public.admin_invite_member('owner@sanctus.test', 'team') as r`)).toEqual({ error: 'owner_protected' })
+    } finally {
+      await db.exec(`update auth.users set email = 'bizowner@test' where id = '${BIZ_OWNER_U}'; update auth.users set email = 'owner@test' where id = '${OWNER_U}'`)
+    }
+  })
+
+  it('changes roles, never the owner, and audits the change', async () => {
+    const team = (await db.query<{ id: string }>(`select id from public.platform_members where user_id = '${TEAM_U}'`)).rows[0]!.id
+    expect(await call(ADMIN_U, `select public.admin_set_member_role($1, 'admin') as r`, [team])).toEqual({ error: 'forbidden' })
+    expect(await call(OWNER_U, `select public.admin_set_member_role($1, 'admin') as r`, [team])).toEqual({ ok: true })
+    const ev = await db.query<{ from_status: string; to_status: string }>(`select from_status, to_status from public.audit_events where event_type = 'access_role_changed' order by created_at desc limit 1`)
+    expect(ev.rows[0]).toEqual({ from_status: 'team', to_status: 'admin' })
+    expect(await call(OWNER_U, `select public.admin_set_member_role($1, 'team') as r`, [team])).toEqual({ ok: true })
+    expect(await call(OWNER_U, `select public.admin_set_member_role($1, 'team') as r`, [OWNER_U])).toEqual({ error: 'not_found' })
+  })
+
+  it('deactivates and reactivates', async () => {
+    const team = (await db.query<{ id: string }>(`select id from public.platform_members where user_id = '${TEAM_U}'`)).rows[0]!.id
+    expect(await call(OWNER_U, `select public.admin_deactivate_member($1) as r`, [team])).toEqual({ ok: true, userId: TEAM_U })
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.business_applications')).toBe(0)
+    expect(await call(OWNER_U, `select public.admin_reactivate_member($1) as r`, [team])).toEqual({ ok: true })
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.business_applications')).toBeGreaterThan(0)
+  })
+
+  it('rejects unknown permissions and audits permission changes', async () => {
+    expect(await call(OWNER_U, `select public.admin_set_role_permissions('team', array['products.view', 'x']) as r`)).toEqual({ error: 'unknown_permission' })
+    expect(await call(ADMIN_U, `select public.admin_set_role_permissions('team', array['products.view']) as r`)).toEqual({ error: 'forbidden' })
+    const r = await call(OWNER_U, `select public.admin_set_role_permissions('team', array['businesses.view', 'applications.view', 'products.view', 'analytics.view', 'products.publish']) as r`)
+    expect(r).toEqual({ ok: true })
+    const ev = await db.query<{ metadata: J }>(`select metadata from public.audit_events where event_type = 'access_permissions_changed' order by created_at desc limit 1`)
+    expect(ev.rows[0]!.metadata).toEqual({ role: 'team', added: ['products.publish'], removed: ['products.edit'] })
+    await call(OWNER_U, `select public.admin_set_role_permissions('team', array['businesses.view', 'applications.view', 'products.view', 'analytics.view', 'products.edit']) as r`)
+  })
+
+  it('lists members (owner included) and refuses non-owners', async () => {
+    const list = await call(OWNER_U, `select public.admin_list_members() as r`)
+    const members = list.members as J[]
+    expect(members.find((m) => m.role === 'owner')?.email).toBe('owner@test')
+    expect(members.find((m) => m.userId === TEAM_U)).toMatchObject({ role: 'team', status: 'active', email: 'team@test' })
+    expect(await call(TEAM_U, `select public.admin_list_members() as r`)).toEqual({ error: 'forbidden' })
+  })
+})
+
+describe('invitations (Task 3)', () => {
+  let member = ''
+  beforeAll(async () => {
+    member = (await call(OWNER_U, `select public.admin_invite_member('invitee@studio.test', 'team') as r`)).memberId as string
+    await db.exec(`insert into auth.users (id, email, email_confirmed_at) values ('00000000-0000-0000-0000-0000000000c1', 'invitee@studio.test', now())`)
+  })
+
+  it('rate limits invitations and keeps only the newest live', async () => {
+    const m = (await call(OWNER_U, `select public.admin_invite_member('limit@studio.test', 'team') as r`)).memberId as string
+    for (let i = 1; i <= 5; i++) {
+      const r = await svc(`select public.service_create_member_invite($1, $2, now() + interval '7 days', $3) as r`, [m, hash(1000 + i), OWNER_U])
+      expect(r.ok).toBe(true)
+    }
+    expect(await svc(`select public.service_create_member_invite($1, $2, now() + interval '7 days', $3) as r`, [m, hash(1006), OWNER_U])).toEqual({ error: 'rate_limited' })
+    const live = await db.query(`select 1 from private.platform_invites where member_id = $1 and status in ('pending', 'sent', 'email_failed')`, [m])
+    expect(live.rows).toHaveLength(1)
+  })
+
+  it('records the email result', async () => {
+    const r = await svc(`select public.service_create_member_invite($1, $2, now() + interval '7 days', $3) as r`, [member, hash(2001), OWNER_U])
+    await svc(`select public.service_record_invite_email($1, false, 'provider down') as r`, [r.inviteId])
+    const row = await db.query<{ status: string; last_email_result: string }>('select status, last_email_result from private.platform_invites where id = $1', [r.inviteId])
+    expect(row.rows[0]).toEqual({ status: 'email_failed', last_email_result: 'failed: provider down' })
+    expect(await auditCount('access_invite_email_failed')).toBeGreaterThan(0)
+  })
+
+  it('accepts once, with the right email only', async () => {
+    const r = await svc(`select public.service_create_member_invite($1, $2, now() + interval '7 days', $3) as r`, [member, hash(3001), OWNER_U])
+    expect(r.ok).toBe(true)
+    const seen = await svc(`select public.service_inspect_invite($1) as r`, [hash(3001)])
+    expect(seen).toMatchObject({ state: 'valid', email: 'invitee@studio.test', role: 'team', invitedBy: 'owner@test', userExists: true })
+    expect(await svc(`select to_jsonb(public.service_accept_invite($1, $2)) as r`, [hash(3001), STRANGER_U])).toBe('email_mismatch')
+    expect(await svc(`select to_jsonb(public.service_accept_invite($1, $2, 'Ina Vitee')) as r`, [hash(3001), '00000000-0000-0000-0000-0000000000c1'])).toBe('ok')
+    const m = await db.query<{ status: string; user_id: string; full_name: string }>('select status, user_id, full_name from public.platform_members where id = $1', [member])
+    expect(m.rows[0]).toEqual({ status: 'active', user_id: '00000000-0000-0000-0000-0000000000c1', full_name: 'Ina Vitee' })
+    expect(await svc(`select to_jsonb(public.service_accept_invite($1, $2)) as r`, [hash(3001), '00000000-0000-0000-0000-0000000000c1'])).toBe('invite_used')
+    expect((await svc(`select public.service_inspect_invite($1) as r`, [hash(3001)])).state).toBe('used')
+    expect((await svc(`select public.service_inspect_invite($1) as r`, [hash(9999)])).state).toBe('invalid')
+  })
+
+  it('refuses expired and revoked invitations', async () => {
+    const m = (await call(OWNER_U, `select public.admin_invite_member('late@studio.test', 'team') as r`)).memberId as string
+    await svc(`select public.service_create_member_invite($1, $2, now() - interval '1 minute', $3) as r`, [m, hash(4001), OWNER_U])
+    expect((await svc(`select public.service_inspect_invite($1) as r`, [hash(4001)])).state).toBe('expired')
+    expect(await svc(`select to_jsonb(public.service_accept_invite($1, $2)) as r`, [hash(4001), STRANGER_U])).toBe('invite_expired')
+    await svc(`select public.service_create_member_invite($1, $2, now() + interval '7 days', $3) as r`, [m, hash(4002), OWNER_U])
+    expect(await call(OWNER_U, `select public.admin_revoke_member_invite($1) as r`, [m])).toEqual({ ok: true })
+    expect((await svc(`select public.service_inspect_invite($1) as r`, [hash(4002)])).state).toBe('revoked')
+    expect(await svc(`select to_jsonb(public.service_accept_invite($1, $2)) as r`, [hash(4002), STRANGER_U])).toBe('invite_revoked')
+  })
+
+  it('service functions are not callable by signed-in users', async () => {
+    await expect(as(OWNER_U, (tx) => tx.query(`select public.service_inspect_invite($1)`, [hash(3001)]))).rejects.toThrow(/permission denied/)
+    await expect(as(OWNER_U, (tx) => tx.query(`select * from private.platform_invites`))).rejects.toThrow(/permission denied/)
+  })
+
+  it('never stores the secret hash in audit metadata', async () => {
+    const leaked = await db.query(`select 1 from public.audit_events where metadata::text ~ '[0-9a-f]{64}'`)
+    expect(leaked.rows).toHaveLength(0)
+  })
+})
+
+describe('rollback script for 20261025070915_platform_team_roles', () => {
+  it('removes everything and restores the admin-only checks', async () => {
+    const fresh = await PGlite.create()
+    await fresh.exec(SUPABASE_STUBS)
+    for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()) await fresh.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
+    await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_platform_team_roles_rollback.sql'), 'utf8'))
+    expect((await fresh.query(`select to_regclass('public.platform_members') as t`)).rows[0]).toEqual({ t: null })
+    expect((await fresh.query(`select count(*)::int as n from pg_policies where policyname like 'Platform members%'`)).rows[0]).toEqual({ n: 0 })
+    const defs = await fresh.query<{ d: string }>(
+      `select pg_get_functiondef(p.oid) as d from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname in ('guard_business_admin_fields', 'admin_review_application', 'admin_list_business_members', 'admin_user_emails')`,
+    )
+    expect(defs.rows).toHaveLength(4)
+    for (const r of defs.rows) expect(r.d).not.toContain('platform_can')
+    await fresh.close()
+  })
+})
