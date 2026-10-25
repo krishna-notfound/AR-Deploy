@@ -34,19 +34,19 @@ export function MostViewedList({
         const attempts = arAttempts(p, r)
         const sub = [businesses?.get(p.businessId)?.name, formatMoney(p.price, p.currency)].filter(Boolean).join(' · ')
         return (
-          <li key={r.productId} className="grid grid-cols-[1.75rem_auto_minmax(0,1fr)_auto] items-center gap-3 py-3">
-            <span className="text-xs text-ink-faint tabular-nums" aria-hidden>
-              {String(i + 1).padStart(2, '0')}
+          <li key={r.productId} className="grid grid-cols-[1.25rem_auto_minmax(0,1fr)_auto] items-center gap-3 py-3">
+            <span className="text-ui-body text-ink-muted tabular-nums" aria-hidden>
+              {i + 1}
             </span>
             <SmartImage src={primaryImage(p)?.url} alt="" className="size-11 shrink-0 border border-line" />
             <div className="min-w-0">
-              <Link to={`${editBase}/${p.id}/edit`} className="block truncate text-sm font-medium text-ink hover:underline">
+              <Link to={`${editBase}/${p.id}/edit`} className="block truncate text-ui-body font-medium text-ink hover:underline max-sm:whitespace-normal max-sm:[overflow-wrap:anywhere]">
                 {p.name.en}
               </Link>
-              <p className="truncate text-xs text-ink-muted">{sub}</p>
+              <p className="truncate text-ui-small text-ink-muted">{sub}</p>
             </div>
-            <p className="text-right text-xs leading-5 text-ink-muted tabular-nums">
-              <span className="block text-sm font-medium text-ink">{formatNumber(r.views)} views</span>
+            <p className="text-right text-ui-small text-ink-muted tabular-nums">
+              <span className="block text-ui-body font-medium text-ink">{formatNumber(r.views)} views</span>
               {attempts === null ? 'No 3D model' : `${formatNumber(attempts)} AR attempts`}
             </p>
           </li>

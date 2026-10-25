@@ -61,7 +61,9 @@ describe('catalogue status notice (DUX-01)', () => {
     expect(screen.getByRole('link', { name: 'Preview your catalog' })).toHaveAttribute('href', '/catalog/oak-ember?preview=1')
     // The page itself is lazy-loaded after the shell: wait for it before looking for its header button.
     await screen.findByRole('heading', { name: 'Overview', level: 1 }, { timeout: 15_000 })
-    expect(screen.getByRole('button', { name: 'Preview catalog (not public yet)' })).toBeInTheDocument()
+    // The only catalog link in the page chrome is the top bar's (D5); the header no longer repeats it.
+    expect(screen.getByRole('link', { name: /^Preview catalog/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Preview catalog/ })).toBeNull()
   })
 
   it('keeps the "not public yet" copy for a draft business', async () => {
@@ -74,9 +76,25 @@ describe('catalogue status notice (DUX-01)', () => {
   it('shows no notice for an active business', async () => {
     openApp('/dashboard', asOwner('biz_casa'))
     await screen.findByRole('heading', { name: 'Overview', level: 1 })
-    await screen.findByRole('button', { name: 'View my catalog' })
+    await screen.findByRole('link', { name: /^View catalog/ })
     expect(screen.queryByText('Your catalog is paused.')).toBeNull()
     expect(screen.queryByText(/is not public yet/)).toBeNull()
+  })
+})
+
+describe('business Overview layout (dashboard clarity, D4 and D5)', () => {
+  it('business Overview has no recent lists and links the catalog only from the top bar', async () => {
+    openApp('/dashboard', asOwner('biz_casa'))
+    await screen.findByRole('heading', { name: 'Overview', level: 1 })
+    await screen.findByRole('heading', { name: 'Most viewed products' }, { timeout: 15_000 })
+    expect(screen.queryByRole('heading', { name: /Recently added products|Recent products/ })).toBeNull()
+    // Exactly one catalog link (the shell's "View catalog", or "Preview catalog" when not public) and it sits in the top bar.
+    const links = screen.getAllByRole('link', { name: /^(View my catalog|View catalog|Preview catalog)/ })
+    expect(links).toHaveLength(1)
+    expect(links[0]?.closest('header')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: /View my catalog|Preview catalog/ })).toBeNull()
+    // The title carries the business name next to the status, not as an eyebrow above it.
+    expect(within(screen.getByRole('main')).getByText('Casa Lisboa Interiors')).toBeInTheDocument()
   })
 })
 
@@ -140,6 +158,21 @@ describe('analytics labels (DUX-07)', () => {
     expect(within(row).getAllByText('No 3D')).toHaveLength(2)
     expect(within(row).queryByText('0.0%')).toBeNull()
     expect(document.body.textContent).not.toMatch(/activation/i)
+  })
+})
+
+describe('shared analytics view (platform scope)', () => {
+  it('labels the business filter, keeps the sample tag and lists views by business as plain truncated rows', { timeout: 20_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
+    window.history.replaceState(null, '', '/admin/analytics')
+    render(<App />)
+    expect(await screen.findByLabelText('Business', undefined, { timeout: 15_000 })).toBeInTheDocument()
+    expect(await screen.findByText('Sample data')).toBeInTheDocument()
+    const list = await screen.findByRole('list', { name: 'Views by business' })
+    const first = within(list).getAllByRole('listitem')[0]
+    expect(first?.querySelector('p')?.getAttribute('title')).toBeTruthy()
+    const ranks = within(screen.getByRole('heading', { name: 'Most viewed products' }).closest('div[class*="rounded"]') as HTMLElement)
+    expect(ranks.queryByText('01')).toBeNull()
   })
 })
 
