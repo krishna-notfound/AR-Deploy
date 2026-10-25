@@ -9,6 +9,7 @@ import { formatNumber } from '@/lib/format'
 import { catalogLocalPath, settingsPath } from '@/lib/urls'
 import { settingsReturnState } from '@/lib/settingsReturn'
 import { isDemoMode } from '@/services'
+import { useMyProfile } from '@/features/settings/useMyProfile'
 import { Avatar } from '../ui/Avatar'
 import { IconButton } from '../ui/Button'
 import { DropdownMenu } from '../ui/Menu'
@@ -253,12 +254,14 @@ function SidebarContent({
 
 function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Variant }) {
   const { user } = useAccount()
+  const { profile } = useMyProfile()
   const leave = useLeaveAccount()
   const navigate = useNavigate()
   const { pathname, search } = useLocation()
   const iconBtn =
     'grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-chalk/70 hover:bg-white/[0.06] hover:text-chalk focus-visible:outline-accent-bright pointer-coarse:size-11'
-  const name = user?.name ?? 'Signed in'
+  // The name and photo set in Profile settings win; until they load (or if they can't), the account's own name.
+  const name = profile?.displayName || user?.name || 'Signed in'
   // Settings is full-screen; its close button comes back to this page.
   const openSettings = (section: 'account' | 'security') => navigate(settingsPath(variant, section), { state: settingsReturnState(pathname + search) })
   const menu = (
@@ -279,7 +282,7 @@ function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Varia
         )}
         trigger={
           <>
-            {user ? <Avatar name={user.name} size={32} tone="dark" /> : <UserRound className="size-4" aria-hidden />}
+            {user ? <Avatar name={name} src={profile?.avatarUrl} size={32} tone="dark" /> : <UserRound className="size-4" aria-hidden />}
             {!collapsed && (
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[length:var(--text-ui-body)] font-medium text-chalk">{name}</span>

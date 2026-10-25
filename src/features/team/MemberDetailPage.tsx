@@ -3,6 +3,7 @@
 import { Check, ChevronDown, UserX } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { Avatar } from '@/components/ui/Avatar'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { DropdownMenu } from '@/components/ui/Menu'
@@ -13,7 +14,6 @@ import { formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { Monogram } from '../applications/Monogram'
 import { AccessHistory } from './AccessHistory'
 import { PERMISSION_GROUPS, ROLE_LABEL } from './permissions'
 import { InviteStatusBadge, MemberStatusBadge, RoleBadge } from './teamLabels'
@@ -122,7 +122,7 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Card className="p-6">
           <div className="flex items-center gap-3">
-            <Monogram name={m.fullName ?? m.email} className="size-12! bg-canvas! font-ui! text-[15px]! font-medium" />
+            <Avatar name={m.fullName ?? m.email} src={m.avatarUrl} size={48} className="bg-canvas!" />
             <div className="min-w-0">
               <p className="truncate text-[length:var(--text-ui-card)] font-medium text-ink">{m.fullName ?? 'Name not set yet'}</p>
               <p className="truncate text-ui-body text-ink-muted">{m.email}</p>

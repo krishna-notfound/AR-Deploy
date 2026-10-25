@@ -7,6 +7,8 @@ import { newId } from '@/lib/id'
 import { type CatalogService, type Result, ok, teamFail } from '../catalogService'
 import type { Db } from './db'
 import { type DemoTeam, DEMO_OWNER_EMAIL, createDemoTeam } from './teamSeed'
+// Circular with mockAccount (it reads demoPlatformRole): both use the other only inside functions, never at load.
+import { mockAccountService } from './mockAccount'
 import { store } from './store'
 
 const ACCOUNT_KEY = 'arfurn:account'
@@ -58,6 +60,27 @@ function withInvite(t: DemoTeam, m: PlatformMember): PlatformMember {
   return { ...m, invite: latest ? { status: effective(latest), expiresAt: latest.expiresAt } : null }
 }
 
+/** The demo person signed in for each platform role (the same people as the sample team, auth/accounts.ts). */
+const DEMO_VIEWER: Record<PlatformRole, string> = { owner: 'usr_platform', admin: 'usr_mem_ana', team: 'usr_mem_joao' }
+
+/**
+ * The profiles join, demo style: the sample team has no photos, but the signed-in demo person's row shows the name and
+ * photo they set in Profile settings (kept in memory by the demo account service, so gone on reload).
+ */
+async function withDemoProfile(r: Result<PlatformMember[]>): Promise<Result<PlatformMember[]>> {
+  if (!r.ok) return r
+  const role = demoPlatformRole()
+  const me = role ? DEMO_VIEWER[role] : null
+  const profile = me && r.data.some((m) => m.userId === me) ? await mockAccountService.getProfile() : null
+  return ok(
+    r.data.map((m) =>
+      m.userId === me && profile?.ok
+        ? { ...m, fullName: profile.data.displayName || m.fullName, avatarUrl: profile.data.avatarUrl }
+        : { ...m, avatarUrl: m.avatarUrl ?? null },
+    ),
+  )
+}
+
 function issueInvite(t: DemoTeam, m: PlatformMember): InviteOutcome {
   for (const i of t.invites[m.id] ?? []) if (LIVE.has(i.status)) Object.assign(i, { status: 'revoked', revokedAt: nowIso() })
   const sentAt = nowIso()
@@ -80,20 +103,26 @@ export function createMockTeam(run: Run): TeamMethods {
         return ok<PlatformAccess | null>({ role, permissions: role === 'owner' ? [...ALL_PERMISSIONS] : [...t.rolePermissions[role]] })
       }),
 
-    listMembers: () =>
-      run(() => {
-        if (denied('open Team & Access')) return teamFail('forbidden')
-        const t = team(store.get())
-        return ok(t.members.map((m) => withInvite(t, m)))
-      }),
+    listMembers: async () =>
+      withDemoProfile(
+        await run(() => {
+          if (denied('open Team & Access')) return teamFail('forbidden')
+          const t = team(store.get())
+          return ok(t.members.map((m) => withInvite(t, m)))
+        }),
+      ),
 
-    getMember: (id) =>
-      run(() => {
+    getMember: async (id) => {
+      const r = await run(() => {
         if (denied('open a team member')) return teamFail('forbidden')
         const t = team(store.get())
         const m = t.members.find((x) => x.id === id)
         return m ? ok(withInvite(t, m)) : teamFail('not_found')
-      }),
+      })
+      if (!r.ok) return r
+      const joined = await withDemoProfile(ok([r.data]))
+      return joined.ok ? ok(joined.data[0]!) : joined
+    },
 
     listMemberInvites: (id) =>
       run(() => {

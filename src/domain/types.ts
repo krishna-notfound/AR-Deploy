@@ -314,6 +314,8 @@ export interface PlatformMember {
   deactivatedAt: ISODate | null
   lastSignInAt: ISODate | null
   invite: { status: InviteStatus; expiresAt: ISODate } | null
+  /** Their profile photo (public URL), or null for initials. Absent when the source does not know it. */
+  avatarUrl?: string | null
 }
 export interface MemberInvite {
   id: ID
