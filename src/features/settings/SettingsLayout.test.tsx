@@ -231,7 +231,8 @@ describe('Settings hub', () => {
   it('removes data-surface from body when settings closes', { timeout: 20_000 }, async () => {
     const r = open(BUSINESS, '/dashboard/settings/account')
     await screen.findByRole('heading', { level: 1, name: 'My account' })
-    expect(document.body.dataset.surface).toBe('dashboard')
+    // The body mark is set in an effect; under a loaded parallel run it can land after the heading.
+    await waitFor(() => expect(document.body.dataset.surface).toBe('dashboard'))
     r.unmount()
     expect(document.body.dataset.surface).toBeUndefined()
   })
