@@ -197,7 +197,7 @@ The Owner can require 2FA, and that requirement is enforced by the database, not
 - Insert, update and delete only under `avatars/<auth.uid()>/…`.
 
 **Enforcing "require 2FA"**
-- A helper, `private.mfa_satisfied(scope text)`. It returns true when the policy for that scope (`staff` or `business`) is off, or when `auth.jwt()->>'aal' = 'aal2'`.
+- A helper, `private.mfa_satisfied(scope text)`. The rule is `aal2 OR (policy off AND no verified factor)`: it returns true when `auth.jwt()->>'aal' = 'aal2'`, or when the policy for that scope (`staff` or `business`) is off and the caller has no verified factor in `auth.mfa_factors` (checked through `public.caller_has_verified_factor()`, security definer). So a user who turned on 2FA themselves needs aal2 even with the policy off (Supabase's opt-in pattern, migration `20261025180600_account_settings_optin_2fa`). An unverified factor does not count.
 - `is_platform_admin()`, `is_platform_member()` and `platform_can()` add `and private.mfa_satisfied('staff')`. `is_business_member()` adds `and private.mfa_satisfied('business')`.
 - Public catalog reads do not use these helpers, so they are unaffected.
 - `service_*` functions (service role) are unaffected.
