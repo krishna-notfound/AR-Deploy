@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronLeft, ChevronRight, Hand, Maximize } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Maximize, Rotate3d } from 'lucide-react'
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { SmartImage } from '@/components/ui/SmartImage'
@@ -128,8 +128,8 @@ export function ProductMedia({
               onInteract={onInteract}
             />
             {state === 'loading' && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 pb-6" role="status">
-                <span className="text-xs text-ink-muted">{t('viewer.loading')}</span>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 pb-6" role="status">
+                <span className="text-label text-ink-muted">{t('viewer.loading')}</span>
                 <div className="h-px w-40 overflow-hidden bg-line">
                   <div className="h-full bg-ink transition-[width]" style={{ width: `${Math.max(6, Math.round(progress * 100))}%` }} />
                 </div>
@@ -137,25 +137,26 @@ export function ProductMedia({
             )}
             {state === 'loaded' && (
               <>
-                <p className="pointer-events-none absolute inset-x-0 bottom-5 flex items-center justify-center gap-2 text-xs text-ink-muted">
-                  <Hand className="size-4" strokeWidth={1.4} aria-hidden />
+                {/* Chips on the stage, as the landing's viewer card. */}
+                <p className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-2 border border-line bg-surface px-2.5 py-1.5 text-[10px] leading-4 font-medium tracking-[0.18em] text-ink uppercase sm:bottom-4 sm:left-4">
+                  <Rotate3d className="size-3.5" strokeWidth={1.4} aria-hidden />
                   {t('viewer.hint')}
                 </p>
                 <button
                   type="button"
                   onClick={() => innerRef.current?.resetCamera()}
-                  className="absolute top-4 right-4 inline-flex items-center gap-1.5 border border-line-strong/40 bg-surface/90 px-3 py-1.5 text-xs text-ink hover:bg-surface"
+                  className="absolute top-3 right-3 inline-flex items-center gap-1.5 border border-line bg-surface px-2.5 py-1.5 text-[10px] leading-4 font-medium tracking-[0.18em] text-ink uppercase transition-colors before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] hover:border-line-strong sm:top-4 sm:right-4"
                 >
-                  <Maximize className="size-3.5" aria-hidden />
+                  <Maximize className="size-3.5" strokeWidth={1.4} aria-hidden />
                   {t('viewer.reset')}
                 </button>
               </>
             )}
             {state === 'error' && (
-              <div className="absolute inset-0 grid place-items-center bg-canvas/90 p-6 text-center" role="alert">
+              <div className="absolute inset-0 grid place-items-center bg-canvas p-6 text-center" role="alert">
                 <div className="max-w-xs">
-                  <AlertTriangle className="mx-auto size-6 text-warning" aria-hidden />
-                  <p className="mt-2 text-sm font-medium">{t('viewer.errorTitle')}</p>
+                  <AlertTriangle className="mx-auto size-5 text-warning" strokeWidth={1.5} aria-hidden />
+                  <p className="mt-3 font-display text-[1.35rem] leading-snug">{t('viewer.errorTitle')}</p>
                   <p className="mt-1 text-[13px] text-ink-muted">{timedOut ? t('viewer.timeout') : t('viewer.errorBody')}</p>
                   <div className="mt-4 flex justify-center gap-2">
                     <Button size="sm" onClick={retry}>
@@ -176,7 +177,7 @@ export function ProductMedia({
       </div>
 
       {gallery.length > 1 && (
-        <ul className="mt-3 flex gap-2 overflow-x-auto" aria-label={t('product.mediaLabel')}>
+        <ul className="mt-3 flex gap-2 overflow-x-auto pb-0.5" aria-label={t('product.mediaLabel')}>
           {gallery.map((img, i) => (
             <li key={img.id} className="shrink-0">
               <button
@@ -184,7 +185,7 @@ export function ProductMedia({
                 aria-label={t('product.photo', { n: i + 1, total: gallery.length })}
                 aria-current={mode === 'photos' && i === photoIdx}
                 onClick={() => showPhoto(i)}
-                className={cn('block size-16 overflow-hidden border transition-colors sm:size-20', mode === 'photos' && i === photoIdx ? 'border-ink' : 'border-transparent opacity-80 hover:opacity-100')}
+                className={cn('block size-16 overflow-hidden border bg-subtle p-0.5 transition-colors sm:size-20', mode === 'photos' && i === photoIdx ? 'border-ink' : 'border-line opacity-80 hover:border-line-strong hover:opacity-100')}
               >
                 <SmartImage src={img.url} alt="" className="size-full object-cover" />
               </button>
@@ -192,7 +193,7 @@ export function ProductMedia({
           ))}
         </ul>
       )}
-      {!glb && <p className="mt-3 text-center text-xs text-ink-muted">{t('viewer.unavailable')}</p>}
+      {!glb && <p className="mt-3 text-center text-[12px] text-ink-muted">{t('viewer.unavailable')}</p>}
       {/* A failed model is reported here too while the photos are shown: the 3D call to action is gone (AR-08). */}
       {glb && state === 'error' && mode !== '3d' && (
         <p className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs text-ink-muted" role="status">
@@ -226,10 +227,10 @@ function Gallery({ images, name, idx, onIdx }: { images: ProductImage[]; name: s
       <SmartImage src={current?.url} alt={`${name}. ${t('product.photo', { n: idx + 1, total: images.length })}`} className="size-full object-contain" />
       {images.length > 1 && (
         <>
-          <button type="button" aria-label={t('product.prevPhoto')} onClick={() => go(-1)} className="absolute top-1/2 left-3 grid size-9 -translate-y-1/2 place-items-center bg-surface/85 hover:bg-surface">
+          <button type="button" aria-label={t('product.prevPhoto')} onClick={() => go(-1)} className="absolute top-1/2 left-3 grid size-10 -translate-y-1/2 place-items-center border border-line bg-surface transition-colors hover:border-line-strong">
             <ChevronLeft className="size-4" strokeWidth={1.5} aria-hidden />
           </button>
-          <button type="button" aria-label={t('product.nextPhoto')} onClick={() => go(1)} className="absolute top-1/2 right-3 grid size-9 -translate-y-1/2 place-items-center bg-surface/85 hover:bg-surface">
+          <button type="button" aria-label={t('product.nextPhoto')} onClick={() => go(1)} className="absolute top-1/2 right-3 grid size-10 -translate-y-1/2 place-items-center border border-line bg-surface transition-colors hover:border-line-strong">
             <ChevronRight className="size-4" strokeWidth={1.5} aria-hidden />
           </button>
         </>

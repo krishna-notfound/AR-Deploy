@@ -1,5 +1,6 @@
 import { History } from 'lucide-react'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { PanelHeader } from '@/components/layout/PageHeader'
+import { Card, CardBody } from '@/components/ui/Card'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { ID } from '@/domain/types'
@@ -17,7 +18,7 @@ export function AuditTimeline({ applicationId, businessId, title = 'History' }: 
   const items = [...(q.data?.items ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   return (
     <Card>
-      <CardHeader title={title} />
+      <PanelHeader title={title} />
       <CardBody>
         {q.status === 'loading' && !q.data ? (
           <SkeletonRows rows={3} />

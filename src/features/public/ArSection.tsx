@@ -48,19 +48,21 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
 
   if (availability === 'available')
     return (
-      <button type="button" onClick={onShowTips} className={cn(TAP_TARGET, 'text-[13px] text-ink-muted underline-offset-2 hover:text-ink hover:underline')}>
+      <button type="button" onClick={onShowTips} className={cn(TAP_TARGET, 'self-start text-label text-ink-muted underline-offset-4 transition-colors hover:text-ink hover:underline')}>
         {t('ar.tipsLink')}
       </button>
     )
 
   return (
-    <div className="border border-line bg-surface p-4">
-      <div className="flex gap-3">
-        <Smartphone className="mt-0.5 size-5 shrink-0 text-accent" strokeWidth={1.5} aria-hidden />
+    <div className="border border-line bg-surface p-4 sm:p-5">
+      <div className="flex gap-3.5">
+        <span className="grid size-9 shrink-0 place-items-center rounded-[2px] border border-line">
+          <Smartphone className="size-4 text-accent-ink" strokeWidth={1.4} aria-hidden />
+        </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold">{t('ar.unsupportedTitle')}</p>
-          <p className="mt-0.5 text-[13px] leading-5 text-ink-muted">{t('ar.unsupportedBody')}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <p className="text-eyebrow text-ink">{t('ar.unsupportedTitle')}</p>
+          <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t('ar.unsupportedBody')}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
             <CopyLink size="sm" />
             <Button size="sm" variant="ghost" icon={<QrCode className="size-4" aria-hidden />} onClick={() => setShowQr((v) => !v)} aria-expanded={showQr}>
               {showQr ? t('ar.hideQr') : t('ar.showQr')}
@@ -80,7 +82,7 @@ function PageQr() {
   const qr = useQrCode(url, 360)
   return (
     <div className="mt-4 flex items-center gap-4 border-t border-line pt-4">
-      {qr.url ? <img src={qr.url} alt={t('ar.qrHint')} className="size-28" /> : <div className="size-28 animate-shimmer bg-subtle" />}
+      {qr.url ? <img src={qr.url} alt={t('ar.qrHint')} className="size-28 shrink-0 border border-line bg-white p-1" /> : <div className="size-28 shrink-0 animate-shimmer bg-subtle" />}
       <p className="flex items-start gap-1.5 text-xs leading-5 text-ink-muted">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         {t('ar.qrHint')}

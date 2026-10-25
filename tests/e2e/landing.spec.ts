@@ -26,7 +26,7 @@ test('landing page shows the client copy in Portuguese and links to real catalog
   // The illustrative piece (no product record, no 3D model) never links to another product's 3D/AR page.
   await page.goto('/')
   await expect(page.getByText('Peça ilustrativa: imagem e preço das referências da marca.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Ver em 3D / AR' })).toHaveCount(0)
+  await expect(page.locator('#experiencia figure').getByRole('link')).toHaveCount(0)
 })
 
 test('old "/?next=" links still reach the account picker', async ({ page }) => {

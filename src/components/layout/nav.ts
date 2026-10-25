@@ -17,11 +17,13 @@ export interface NavItem {
   icon: LucideIcon
   /** Match only the exact path (for index routes). */
   end?: boolean
+  /** A live count shown next to the label (real data only). */
+  badge?: 'pendingApplications'
 }
 
 export const adminNav: NavItem[] = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/admin/applications', label: 'Applications', icon: ClipboardList },
+  { to: '/admin/applications', label: 'Applications', icon: ClipboardList, badge: 'pendingApplications' },
   { to: '/admin/businesses', label: 'Businesses', icon: Building2 },
   { to: '/admin/products', label: 'All Products', icon: Package },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },

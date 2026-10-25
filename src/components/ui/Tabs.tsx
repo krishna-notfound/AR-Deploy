@@ -7,19 +7,24 @@ export interface TabDef<T extends string> {
   badge?: ReactNode
 }
 
-/** WAI-ARIA tabs (manual activation via arrow keys + Enter/Space or click). */
+/**
+ * WAI-ARIA tabs (manual activation via arrow keys + Enter/Space or click). `underline` for page sections,
+ * `pill` for filter tabs above a table (the selected one is filled).
+ */
 export function Tabs<T extends string>({
   tabs,
   value,
   onChange,
   label,
   className,
+  variant = 'underline',
 }: {
   tabs: TabDef<T>[]
   value: T
   onChange: (v: T) => void
   label: string
   className?: string
+  variant?: 'underline' | 'pill'
 }) {
   const id = useId()
   const listRef = useRef<HTMLDivElement>(null)
@@ -33,7 +38,7 @@ export function Tabs<T extends string>({
     }
   }
   return (
-    <div ref={listRef} role="tablist" aria-label={label} onKeyDown={onKey} className={cn('flex gap-1 border-b border-line', className)}>
+    <div ref={listRef} role="tablist" aria-label={label} onKeyDown={onKey} className={cn('flex gap-1 overflow-x-auto', variant === 'underline' && 'border-b border-line', className)}>
       {tabs.map((t) => {
         const selected = t.value === value
         return (
@@ -47,8 +52,10 @@ export function Tabs<T extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(t.value)}
             className={cn(
-              '-mb-px inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
-              selected ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:text-ink',
+              'inline-flex shrink-0 items-center gap-2 text-[12px] font-medium tracking-[0.12em] whitespace-nowrap uppercase transition-colors',
+              variant === 'underline'
+                ? cn('-mb-px min-h-11 border-b-2 px-3', selected ? 'border-ink text-ink' : 'border-transparent text-ink-muted hover:text-ink')
+                : cn('min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11', selected ? 'bg-obsidian text-chalk' : 'text-ink-muted hover:bg-subtle hover:text-ink'),
             )}
           >
             {t.label}

@@ -17,6 +17,15 @@ import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
 import { isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useBusinessActions } from '../businesses/useBusinessActions'
+import { Monogram } from '../applications/Monogram'
+
+function BusinessMark({ b, className }: { b: Business; className?: string }) {
+  return b.logoUrl ? (
+    <SmartImage src={b.logoUrl} alt="" className={`size-10 shrink-0 border border-line bg-surface object-contain p-0.5 ${className ?? ''}`} />
+  ) : (
+    <Monogram name={b.name} className={className} />
+  )
+}
 
 interface Row {
   catalog: BusinessCatalog
@@ -70,7 +79,7 @@ export default function BusinessesListPage() {
       sortValue: (r) => r.catalog.business.name.toLowerCase(),
       cell: (r) => (
         <div className="flex items-center gap-3">
-          <SmartImage src={r.catalog.business.logoUrl} alt="" className="size-10 shrink-0 rounded-lg object-contain" />
+          <BusinessMark b={r.catalog.business} />
           <div className="min-w-0">
             <Link to={businessAdminPath(r.catalog.business.id)} className="block truncate font-medium hover:underline">
               {r.catalog.business.name}
@@ -109,7 +118,7 @@ export default function BusinessesListPage() {
         }
       />
       <Card>
-        <div className="flex flex-col gap-2 border-b border-line p-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 border-b border-line p-4 sm:flex-row sm:items-center sm:px-6">
           <SearchInput value={q} onChange={(v) => setParam('q', v)} label="Search businesses" placeholder="Search by name or address" className="sm:w-72" />
           <Select aria-label="Filter by status" value={status} onChange={(e) => setParam('status', e.target.value)} className="sm:w-44">
             <option value="">All statuses</option>
@@ -149,7 +158,7 @@ export default function BusinessesListPage() {
             }
             mobileRow={(r) => (
               <div className="flex items-center gap-3">
-                <SmartImage src={r.catalog.business.logoUrl} alt="" className="size-11 shrink-0 rounded-lg object-contain" />
+                <BusinessMark b={r.catalog.business} className="size-11" />
                 <div className="min-w-0 flex-1">
                   <Link to={businessAdminPath(r.catalog.business.id)} className="block truncate text-sm font-medium">
                     {r.catalog.business.name}

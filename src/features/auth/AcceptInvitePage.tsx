@@ -1,4 +1,4 @@
-import { KeyRound } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
@@ -9,7 +9,8 @@ import { FormField, Input } from '@/components/ui/Form'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
-import { SiteHeader } from '../marketing/SiteChrome'
+import { cn } from '@/lib/cn'
+import { AuthHeading, AuthLayout, StepIndicator, authFieldsClass } from './AuthLayout'
 import { MIN_PASSWORD_LENGTH } from './ResetPasswordPage'
 import { authErrorText, normalizeCode } from './authErrors'
 
@@ -26,21 +27,27 @@ export default function AcceptInvitePage() {
   const [linkError] = useState(() => new URLSearchParams(window.location.hash.replace(/^#/, '')).get('error_code'))
 
   let body
+  // Step of the code flow (ADR-0027): 0 = verify the code, 1 = set the password. Null when no step applies.
+  let step: number | null = null
   if (!auth) body = <InlineNotice tone="neutral">{t('invite.demo')}</InlineNotice>
   else if (user === undefined && accountError) body = <ErrorState message={t('invite.loadFailed')} onRetry={retry} retryLabel={t('common.retry')} />
   else if (user === undefined) return <FullPageSpinner label={t('invite.checking')} />
-  else if (!user) body = <EnterCode linkError={linkError} />
+  else if (!user) {
+    step = 0
+    body = <EnterCode linkError={linkError} />
+  }
   else if (user.role === 'super_admin') return <Navigate to="/admin" replace />
-  else body = <SetPassword userId={user.id} businessName={business?.name ?? ''} />
+  else {
+    step = 1
+    body = <SetPassword userId={user.id} businessName={business?.name ?? ''} />
+  }
 
   return (
-    <div className="min-h-dvh bg-canvas">
-      <SiteHeader cta={false} />
-      <main className="mx-auto max-w-md px-5 py-16 sm:py-24">
-        <h1 className="text-title font-normal">{t('invite.title')}</h1>
-        <div className="mt-8 space-y-6">{body}</div>
-      </main>
-    </div>
+    <AuthLayout>
+      {step !== null && <StepIndicator label={t('invite.steps')} current={step} steps={[t('invite.step.code'), t('invite.step.password')]} className="mb-10" />}
+      <AuthHeading eyebrow={t('invite.eyebrow')} title={t('invite.title')} />
+      <div className="mt-6 space-y-6">{body}</div>
+    </AuthLayout>
   )
 }
 
@@ -68,9 +75,9 @@ function EnterCode({ linkError }: { linkError: string | null }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4" noValidate>
+    <form onSubmit={submit} className={cn('space-y-5', authFieldsClass)} noValidate>
       {linkError && <InlineNotice tone="warning">{linkError === 'otp_expired' ? t('invite.expired') : t('invite.invalid')}</InlineNotice>}
-      <p className="text-sm text-ink-muted">{t('invite.codeIntro')}</p>
+      <p className="text-[15px] leading-7 text-ink-muted">{t('invite.codeIntro')}</p>
       {error && (
         <InlineNotice tone="warning">
           <span role="alert">{error}</span>
@@ -80,17 +87,18 @@ function EnterCode({ linkError }: { linkError: string | null }) {
         <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       </FormField>
       <FormField label={t('invite.code')} hint={t('invite.codeHelp')} required>
-        <Input inputMode="numeric" autoComplete="one-time-code" maxLength={14} value={code} onChange={(e) => setCode(e.target.value)} />
+        <Input inputMode="numeric" autoComplete="one-time-code" maxLength={14} value={code} onChange={(e) => setCode(e.target.value)} className="tracking-[0.2em]" />
       </FormField>
-      <Button type="submit" variant="primary" className="w-full" loading={pending} disabled={!email.trim() || !code.trim()}>
+      <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending} disabled={!email.trim() || !code.trim()}>
         {t('invite.verify')}
+        {!pending && <ArrowRight className="size-4" aria-hidden />}
       </Button>
-      <p className="text-center text-sm">
-        {t('invite.haveAccount')}{' '}
-        <Link to="/login" className="text-accent-ink hover:underline">
-          {t('invite.signIn')}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-canvas px-5 py-3 text-sm">
+        <span className="text-ink-muted">{t('invite.haveAccount')}</span>
+        <Link to="/login" className="inline-flex min-h-11 items-center gap-2 text-label text-ink hover:text-accent-ink">
+          {t('invite.signIn')} <ArrowRight className="size-3.5" aria-hidden />
         </Link>
-      </p>
+      </div>
     </form>
   )
 }
@@ -153,8 +161,8 @@ function SetPassword({ userId, businessName }: { userId: string; businessName: s
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4" noValidate>
-      <p className="text-sm text-ink-muted">{t('invite.intro', { business: businessName })}</p>
+    <form onSubmit={submit} className={cn('space-y-5', authFieldsClass)} noValidate>
+      <p className="text-[15px] leading-7 text-ink-muted">{t('invite.intro', { business: businessName })}</p>
       {error && (
         <InlineNotice tone="warning">
           <span role="alert">{error}</span>
@@ -177,12 +185,13 @@ function SetPassword({ userId, businessName }: { userId: string; businessName: s
       <Button
         type="submit"
         variant="primary"
+        size="lg"
         className="w-full"
         loading={pending}
-        icon={<KeyRound className="size-4" aria-hidden />}
         disabled={!passwordSaved && (!password || !confirm)}
       >
         {passwordSaved ? t('invite.continue') : t('invite.submit')}
+        {!pending && <ArrowRight className="size-4" aria-hidden />}
       </Button>
     </form>
   )

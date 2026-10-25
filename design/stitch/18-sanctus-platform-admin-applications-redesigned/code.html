@@ -1,0 +1,686 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&amp;family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "background": "#fcf9f2",
+          "primary": "#010101",
+          "surface-dim": "#dcdad3",
+          "on-tertiary-fixed": "#1d1c16",
+          "outline": "#7a776f",
+          "on-surface-variant": "#494740",
+          "inverse-on-surface": "#f3f0e9",
+          "surface-container-low": "#f6f3ec",
+          "on-tertiary-container": "#87847c",
+          "on-primary": "#ffffff",
+          "on-tertiary": "#ffffff",
+          "error-container": "#ffdad6",
+          "surface-tint": "#605e5b",
+          "tertiary-container": "#1e1c16",
+          "on-primary-container": "#878481",
+          "primary-container": "#1d1c1a",
+          "on-background": "#1c1c18",
+          "surface-variant": "#e5e2db",
+          "outline-variant": "#cbc6bd",
+          "on-secondary-fixed-variant": "#55442d",
+          "surface-container-lowest": "#ffffff",
+          "inverse-primary": "#cac6c2",
+          "secondary-container": "#f5dcbd",
+          "surface-bright": "#fcf9f2",
+          "on-secondary-container": "#726047",
+          "error": "#ba1a1a",
+          "on-primary-fixed-variant": "#484644",
+          "on-surface": "#1c1c18",
+          "secondary-fixed-dim": "#dbc3a5",
+          "on-error-container": "#93000a",
+          "tertiary-fixed-dim": "#cac6bd",
+          "on-secondary-fixed": "#261906",
+          "primary-fixed": "#e6e2de",
+          "inverse-surface": "#31312c",
+          "surface-container": "#f1eee7",
+          "on-primary-fixed": "#1c1b19",
+          "tertiary-fixed": "#e7e2d8",
+          "tertiary": "#010100",
+          "primary-fixed-dim": "#cac6c2",
+          "surface-container-high": "#ebe8e1",
+          "secondary-fixed": "#f8dfc0",
+          "surface": "#fcf9f2",
+          "secondary": "#6e5b43",
+          "on-tertiary-fixed-variant": "#49473f",
+          "on-secondary": "#ffffff",
+          "on-error": "#ffffff",
+          "surface-container-highest": "#e5e2db"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "gutter-desktop": "2.5rem",
+          "space-lg": "1.5rem",
+          "space-xs": "0.25rem",
+          "margin-tablet": "2.5rem",
+          "space-sm": "0.5rem",
+          "gutter": "1.5rem",
+          "space-2xl": "4rem",
+          "margin": "1.25rem",
+          "space-md": "1rem",
+          "margin-desktop": "4rem",
+          "space-xl": "2.5rem"
+        },
+        "fontFamily": {
+          "body-sm": ["Manrope"],
+          "headline-md": ["EB Garamond"],
+          "headline-lg": ["EB Garamond"],
+          "label-sm": ["Manrope"],
+          "headline-sm": ["EB Garamond"],
+          "display-hero-mobile": ["EB Garamond"],
+          "display-hero": ["EB Garamond"],
+          "body-lg": ["Manrope"],
+          "label-md": ["Manrope"],
+          "headline-lg-mobile": ["EB Garamond"],
+          "eyebrow": ["Manrope"],
+          "body-md": ["Manrope"]
+        },
+        "fontSize": {
+          "body-sm": ["12px", {"lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "400"}],
+          "headline-md": ["28px", {"lineHeight": "36px", "letterSpacing": "0.01em", "fontWeight": "400"}],
+          "headline-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "0", "fontWeight": "400"}],
+          "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "500"}],
+          "headline-sm": ["22px", {"lineHeight": "30px", "letterSpacing": "0.01em", "fontWeight": "400"}],
+          "display-hero-mobile": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.01em", "fontWeight": "400"}],
+          "display-hero": ["56px", {"lineHeight": "64px", "letterSpacing": "-0.01em", "fontWeight": "400"}],
+          "body-lg": ["16px", {"lineHeight": "26px", "letterSpacing": "0.01em", "fontWeight": "400"}],
+          "label-md": ["13px", {"lineHeight": "18px", "letterSpacing": "0.06em", "fontWeight": "500"}],
+          "headline-lg-mobile": ["28px", {"lineHeight": "36px", "letterSpacing": "0", "fontWeight": "400"}],
+          "eyebrow": ["11px", {"lineHeight": "16px", "letterSpacing": "0.18em", "fontWeight": "500"}],
+          "body-md": ["14px", {"lineHeight": "22px", "letterSpacing": "0.01em", "fontWeight": "400"}]
+        }
+      }
+    }
+  }</script></head><body class="bg-inverse-on-surface font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-72 bg-primary-container text-inverse-on-surface z-50 flex flex-col justify-between select-none"><div class="flex flex-col flex-1 overflow-y-auto"><div class="px-space-lg pt-space-lg pb-space-md border-b border-surface-tint/20"><div class="flex items-center justify-between"><span class="font-headline-sm text-headline-sm tracking-wider uppercase text-inverse-on-surface">Sanctus Platform</span></div><div class="mt-space-xs flex items-center justify-between"><span class="font-eyebrow text-eyebrow uppercase px-space-xs py-0.5 rounded-DEFAULT bg-surface-container-highest/20 text-inverse-primary border border-surface-tint/30">Admin Console</span><span class="font-label-sm text-label-sm text-on-primary-container tracking-wider">v3.4</span></div></div><nav class="flex-1 px-space-sm py-space-md space-y-space-md" data-active-classes="bg-inverse-surface text-inverse-on-surface border-l-2 border-secondary font-medium"><div class="space-y-1"><a class="flex items-center justify-between px-space-sm py-space-xs rounded-DEFAULT text-inverse-primary hover:bg-inverse-surface hover:text-inverse-on-surface transition-colors" data-path="overview" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">grid_view</span><span class="font-body-sm text-body-sm">Overview</span></span></a></div><div class="space-y-1"><a aria-current="page" class="flex items-center justify-between px-space-sm py-space-xs rounded-DEFAULT transition-colors bg-inverse-surface text-inverse-on-surface border-l-2 border-secondary font-medium" data-path="applications" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">assignment_turned_in</span><span class="font-body-sm text-body-sm">Applications</span></span><span class="px-space-xs py-0.5 rounded-DEFAULT bg-secondary text-inverse-on-surface font-label-sm text-label-sm font-semibold">12</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-DEFAULT text-inverse-primary hover:bg-inverse-surface hover:text-inverse-on-surface transition-colors" data-path="businesses-ateliers" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">storefront</span><span class="font-body-sm text-body-sm">Businesses / Ateliers</span></span></a></div><div class="space-y-1"><a class="flex items-center justify-between px-space-sm py-space-xs rounded-DEFAULT text-inverse-primary hover:bg-inverse-surface hover:text-inverse-on-surface transition-colors" data-path="all-products" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">chair</span><span class="font-body-sm text-body-sm">All Products</span></span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-DEFAULT text-inverse-primary hover:bg-inverse-surface hover:text-inverse-on-surface transition-colors" data-path="catalogs-qr-codes" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">qr_code_2</span><span class="font-body-sm text-body-sm">Catalogs &amp; QR Codes</span></span></a></div><div class="space-y-1"><a class="flex items-center justify-between px-space-sm py-space-xs rounded-DEFAULT text-inverse-primary hover:bg-inverse-surface hover:text-inverse-on-surface transition-colors" data-path="analytics-telemetry" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">insights</span><span class="font-body-sm text-body-sm">Analytics &amp; Telemetry</span></span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-DEFAULT text-inverse-primary hover:bg-inverse-surface hover:text-inverse-on-surface transition-colors" data-path="audit-log" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">history_edu</span><span class="font-body-sm text-body-sm">Audit Log</span></span></a></div><div class="space-y-1"><a class="flex items-center justify-between px-space-sm py-space-xs rounded-DEFAULT text-inverse-primary hover:bg-inverse-surface hover:text-inverse-on-surface transition-colors" data-path="settings" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">tune</span><span class="font-body-sm text-body-sm">Settings</span></span></a></div></nav></div><div class="p-space-md border-t border-surface-tint/20 space-y-space-sm bg-tertiary-container"><div class="flex items-center justify-between px-space-sm py-1"><div class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-secondary animate-pulse"></span><span class="font-label-sm text-label-sm text-inverse-primary uppercase tracking-wider">Spatial Engine 3.4 ACTIVE</span></div><button class="text-on-primary-container hover:text-inverse-on-surface transition-colors"><span class="material-symbols-outlined text-[18px]">chevron_left</span></button></div><div class="flex items-center justify-between px-space-sm pt-space-xs"><div class="flex items-center gap-space-sm"><div class="w-8 h-8 rounded-DEFAULT bg-surface-container-highest/20 flex items-center justify-center border border-surface-tint/40"><span class="material-symbols-outlined text-inverse-on-surface text-[18px]">shield_person</span></div><div class="flex flex-col"><span class="font-label-md text-label-md text-inverse-on-surface leading-tight">Super Admin</span><span class="font-label-sm text-label-sm text-on-primary-container">core@sanctus.luxury</span></div></div><button class="text-on-primary-container hover:text-inverse-on-surface transition-colors"><span class="material-symbols-outlined text-[18px]">logout</span></button></div></div></aside><div class="pl-72 flex flex-col min-h-screen bg-inverse-on-surface"><header class="fixed top-0 left-72 right-0 h-16 bg-surface-container-low/95 backdrop-blur-md border-b border-outline-variant z-40 flex items-center justify-between px-space-lg"><div class="flex items-center gap-space-sm text-on-surface-variant font-label-md text-label-md"><span class="hover:text-on-surface cursor-pointer transition-colors">Sanctus Admin</span><span class="text-outline-variant">/</span><span class="text-on-surface font-medium capitalize">Workspace</span></div><div class="flex items-center gap-space-md"><div class="relative flex items-center"><div class="flex items-center gap-2 bg-surface border border-outline-variant rounded-DEFAULT px-3 py-1.5 w-64 md:w-80 text-on-surface-variant focus-within:border-primary-container"><span class="material-symbols-outlined text-[18px] text-outline">search</span><input class="w-full bg-transparent border-none outline-none font-body-sm text-body-sm text-on-surface placeholder:text-outline" placeholder="Search catalog, artisans, telemetry..." type="text"><kbd class="font-label-sm text-label-sm px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface-variant border border-outline-variant">⌘K</kbd></div></div><button class="relative p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface rounded-DEFAULT transition-colors"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary"></span></button><div class="h-5 w-px bg-outline-variant"></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-16 flex-1 w-full bg-inverse-on-surface"><div class="flex flex-col w-full">
+<div class="px-space-lg lg:px-gutter-desktop py-space-xl max-w-[1560px] mx-auto w-full space-y-space-xl">
+<!-- Top Editorial Header & Global Batch Action Bar -->
+<header class="flex flex-col md:flex-row md:items-end justify-between gap-space-lg border-b border-outline-variant pb-space-lg">
+<div class="space-y-space-xs max-w-3xl">
+<div class="flex items-center gap-2">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="font-eyebrow text-eyebrow uppercase tracking-[0.2em] text-secondary font-medium">Curatorial Onboarding Division</span>
+<span class="text-outline-variant font-body-sm text-body-sm">/</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Registry Protocol v3.4</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-primary-container tracking-tight leading-none">
+          Applications
+        </h1>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed pt-1">
+          Ateliers &amp; Design Houses requesting platform onboarding. Curate admissions, verify spatial 3D fidelity, and issue cryptographic salon invitation tokens.
+        </p>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<button class="px-space-md py-2.5 rounded-DEFAULT bg-surface-container-lowest border border-outline-variant hover:border-secondary hover:text-secondary text-primary-container font-label-md text-label-md transition-colors flex items-center gap-2" type="button">
+<span class="material-symbols-outlined text-[17px] text-on-surface-variant">download</span>
+<span class="">Export Audit CSV</span>
+</button>
+<button class="px-space-md py-2.5 rounded-DEFAULT bg-primary-container hover:bg-on-surface-variant text-inverse-on-surface font-label-md text-label-md transition-colors flex items-center gap-2 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[17px]">send</span>
+<span class="">Invite Atelier Directly →</span>
+</button>
+</div>
+</header>
+<!-- Row of 4 Compact Operational Metric Cards -->
+<section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-space-md rounded-DEFAULT flex flex-col justify-between hover:border-outline transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-eyebrow text-eyebrow uppercase text-on-surface-variant tracking-widest">Pending Review</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded-DEFAULT bg-secondary-container text-on-secondary-container font-medium">+4 this week</span>
+</div>
+<div class="my-space-sm flex items-baseline gap-2">
+<span class="font-headline-lg text-headline-lg font-normal text-primary-container leading-none">14</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">dossiers queued</span>
+</div>
+<div class="pt-space-xs border-t border-surface-container flex items-center gap-1.5 text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="font-label-sm text-label-sm">Requires curatorial signature</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-space-md rounded-DEFAULT flex flex-col justify-between hover:border-outline transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-eyebrow text-eyebrow uppercase text-on-surface-variant tracking-widest">Approved Ateliers</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface-variant font-medium">ACTIVE</span>
+</div>
+<div class="my-space-sm flex items-baseline gap-2">
+<span class="font-headline-lg text-headline-lg font-normal text-primary-container leading-none">142</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">houses in registry</span>
+</div>
+<div class="pt-space-xs border-t border-surface-container flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm">98.2% catalogue active in AR</span>
+<span class="material-symbols-outlined text-[15px] text-outline">view_in_ar</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-space-md rounded-DEFAULT flex flex-col justify-between hover:border-outline transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-eyebrow text-eyebrow uppercase text-on-surface-variant tracking-widest">Spatial Engine QA</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded-DEFAULT bg-surface-container-high text-primary-container font-medium">3D INSPECT</span>
+</div>
+<div class="my-space-sm flex items-baseline gap-2">
+<span class="font-headline-lg text-headline-lg font-normal text-primary-container leading-none">6</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">assets benchmarking</span>
+</div>
+<div class="pt-space-xs border-t border-surface-container flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm">USDZ / glTF telemetry</span>
+<span class="font-label-sm text-label-sm text-outline">87% mean</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-space-md rounded-DEFAULT flex flex-col justify-between hover:border-outline transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-eyebrow text-eyebrow uppercase text-on-surface-variant tracking-widest">Rejection Rate</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded-DEFAULT bg-surface-container-low text-outline font-medium">Selective 1:32</span>
+</div>
+<div class="my-space-sm flex items-baseline gap-2">
+<span class="font-headline-lg text-headline-lg font-normal text-primary-container leading-none">3.1%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">refusal index</span>
+</div>
+<div class="pt-space-xs border-t border-surface-container flex items-center gap-1.5 text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span class="font-label-sm text-label-sm">Strict galleried protocol</span>
+</div>
+</div>
+</section>
+<!-- Filter & Curatorial Control Deck -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-DEFAULT divide-y divide-outline-variant">
+<!-- Primary Search and Multi-Select Filters -->
+<div class="p-space-md flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+<!-- Search Field -->
+<div class="flex-1 relative max-w-xl">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[19px]">search</span>
+<input class="w-full bg-surface-container-low border border-outline-variant focus:border-primary-container pl-10 pr-4 py-2 font-body-sm text-body-sm text-primary-container placeholder:text-outline outline-none rounded-DEFAULT transition-colors" placeholder="Search by atelier name, designer, dossier ref (#ABE43EC0)..." type="text">
+</div>
+<!-- Filter Dropdowns -->
+<div class="flex flex-wrap items-center gap-space-sm">
+<div class="relative">
+<button class="px-3 py-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant rounded-DEFAULT font-label-md text-label-md text-primary-container flex items-center gap-2" type="button">
+<span class="material-symbols-outlined text-[16px] text-outline">tune</span>
+<span class="">All Disciplines: Furniture, Lighting, Travertine</span>
+<span class="material-symbols-outlined text-[16px] text-outline">expand_more</span>
+</button>
+</div>
+<div class="relative">
+<button class="px-3 py-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant rounded-DEFAULT font-label-md text-label-md text-primary-container flex items-center gap-2" type="button">
+<span class="material-symbols-outlined text-[16px] text-outline">public</span>
+<span class="">Origin: Global Salon</span>
+<span class="material-symbols-outlined text-[16px] text-outline">expand_more</span>
+</button>
+</div>
+<div class="relative">
+<button class="px-3 py-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant rounded-DEFAULT font-label-md text-label-md text-primary-container flex items-center gap-2" type="button">
+<span class="material-symbols-outlined text-[16px] text-outline">calendar_today</span>
+<span class="">Window: Oct 1 — Present</span>
+<span class="material-symbols-outlined text-[16px] text-outline">expand_more</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Status Quick-Filter Tabs & Contextual Action Bar -->
+<div class="px-space-md py-2.5 bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-1 overflow-x-auto">
+<button class="px-3 py-1 rounded-DEFAULT font-label-sm text-label-sm uppercase tracking-wider bg-primary-container text-inverse-on-surface font-medium" type="button">
+            All (162)
+          </button>
+<button class="px-3 py-1 rounded-DEFAULT font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant hover:text-primary-container hover:bg-surface-container transition-colors" type="button">
+            Pending (14)
+          </button>
+<button class="px-3 py-1 rounded-DEFAULT font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant hover:text-primary-container hover:bg-surface-container transition-colors" type="button">
+            Approved (142)
+          </button>
+<button class="px-3 py-1 rounded-DEFAULT font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant hover:text-primary-container hover:bg-surface-container transition-colors" type="button">
+            In QA (6)
+          </button>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="font-eyebrow text-eyebrow uppercase tracking-widest text-on-surface-variant">
+            Showing 6 of 162 Dossiers
+          </span>
+<div class="h-3 w-px bg-outline-variant"></div>
+<button class="px-3 py-1 rounded-DEFAULT border border-outline-variant bg-surface-container-lowest text-outline font-label-sm text-label-sm uppercase tracking-wider cursor-not-allowed" disabled="" type="button">
+            Batch Sign (0)
+          </button>
+</div>
+</div>
+<!-- Curatorial Data Grid Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-container font-eyebrow text-eyebrow uppercase tracking-widest text-on-surface-variant">
+<th class="py-3 px-space-md w-10 text-center" scope="col">
+<input aria-label="Select all dossiers" class="rounded-DEFAULT border-outline-variant text-primary-container focus:ring-0 cursor-pointer" type="checkbox">
+</th>
+<th class="py-3 px-space-md" scope="col">Atelier &amp; Spatial Dossier</th>
+<th class="py-3 px-space-md" scope="col">Principal &amp; Curatorial Channel</th>
+<th class="py-3 px-space-md" scope="col">Curatorial Status</th>
+<th class="py-3 px-space-md" scope="col">Ingestion Date</th>
+<th class="py-3 px-space-md text-right" scope="col">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant font-body-sm text-body-sm">
+<!-- Row 1: Pending Review (QA Email Test Atelier) -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-md text-center align-top pt-5">
+<input aria-label="Select QA Email Test Atelier" class="rounded-DEFAULT border-outline-variant text-primary-container focus:ring-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-high border border-outline-variant flex items-center justify-center shrink-0">
+<span class="font-headline-sm text-headline-sm text-secondary">QA</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary-container font-semibold group-hover:text-secondary transition-colors cursor-pointer">
+                        QA Email Test Atelier
+                      </span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.2 rounded-DEFAULT bg-secondary-container text-on-secondary-container">NEW</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
+<code class="font-label-sm text-label-sm text-outline tracking-wider">#ABE43EC0</code>
+<span class="">•</span>
+<span class="">Furniture Craft</span>
+<span class="">•</span>
+<span class="">Porto, Portugal</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-0.5">
+<div class="text-primary-container font-medium">Tiago Menezes</div>
+<div class="text-outline">delivered+qa-email-test@resend.dev</div>
+<div class="pt-0.5">
+<a class="inline-flex items-center gap-1 font-label-sm text-label-sm text-secondary hover:text-on-secondary-container transition-colors" href="#">
+<span class="material-symbols-outlined text-[13px]">description</span>
+<span class="">View Dossier PDF</span>
+</a>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-1">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-DEFAULT bg-secondary-container/60 border border-secondary/30 text-on-secondary-container font-label-sm text-label-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                    PENDING REVIEW
+                  </span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Awaiting chief curator</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top text-on-surface-variant">
+<div class="">Oct 24, 2026</div>
+<div class="font-label-sm text-label-sm text-outline">02:24 PM (2h ago)</div>
+</td>
+<td class="py-space-md px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2 py-1 bg-primary-container text-inverse-on-surface rounded-DEFAULT font-label-sm text-label-sm hover:bg-on-surface-variant transition-colors" title="Curate &amp; Sign" type="button">
+                    Review
+                  </button>
+<button class="p-1 hover:bg-surface-container rounded-DEFAULT text-on-surface-variant hover:text-primary-container transition-colors" title="Approve" type="button">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+</button>
+<button class="p-1 hover:bg-surface-container rounded-DEFAULT text-on-surface-variant hover:text-error transition-colors" title="Decline" type="button">
+<span class="material-symbols-outlined text-[18px]">cancel</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2: Approved (Studio Vértice Arquiteto) -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-md text-center align-top pt-5">
+<input aria-label="Select Studio Vértice Arquiteto" class="rounded-DEFAULT border-outline-variant text-primary-container focus:ring-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-high border border-outline-variant flex items-center justify-center shrink-0">
+<span class="font-headline-sm text-headline-sm text-primary-container">SV</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-primary-container font-semibold group-hover:text-secondary transition-colors cursor-pointer">
+                        Studio Vértice Arquiteto
+                      </span>
+<span class="material-symbols-outlined text-[15px] text-secondary" title="Verified Atelier">verified</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
+<code class="font-label-sm text-label-sm text-outline tracking-wider">#8B21F04A</code>
+<span class="">•</span>
+<span class="">Spatial &amp; Brutalist Wood</span>
+<span class="">•</span>
+<span class="">Lisboa, Portugal</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-0.5">
+<div class="text-primary-container font-medium">Helena Albuquerque</div>
+<div class="text-outline">curadoria@studiovertice.pt</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Archived 8 Spatial Works</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-1">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-DEFAULT bg-surface-container-highest border border-outline-variant text-primary-container font-label-sm text-label-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                    APPROVED
+                  </span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Salon token issued</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top text-on-surface-variant">
+<div class="">Oct 22, 2026</div>
+<div class="font-label-sm text-label-sm text-outline">06:17 PM (2d ago)</div>
+</td>
+<td class="py-space-md px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2 py-1 border border-outline-variant hover:border-secondary hover:text-secondary rounded-DEFAULT font-label-sm text-label-sm text-on-surface-variant transition-colors" type="button">
+                    Manage Atelier
+                  </button>
+<button class="p-1 hover:bg-surface-container rounded-DEFAULT text-outline hover:text-primary-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: In Spatial QA (Atelier Nômade Mobiliário) -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-md text-center align-top pt-5">
+<input aria-label="Select Atelier Nômade Mobiliário" class="rounded-DEFAULT border-outline-variant text-primary-container focus:ring-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-high border border-outline-variant flex items-center justify-center shrink-0">
+<span class="font-headline-sm text-headline-sm text-primary-container">AN</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary-container font-semibold group-hover:text-secondary transition-colors cursor-pointer">
+                        Atelier Nômade Mobiliário
+                      </span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
+<code class="font-label-sm text-label-sm text-outline tracking-wider">#4F92DA11</code>
+<span class="">•</span>
+<span class="">Jacarandá &amp; Straw Joinery</span>
+<span class="">•</span>
+<span class="">São Paulo, Brazil</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-0.5">
+<div class="text-primary-container font-medium">Lucas Vianna Fontes</div>
+<div class="text-outline">diretoria@nomademobiliario.com.br</div>
+<div class="pt-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Portfolio: 14 models in pipeline</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-1">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-DEFAULT bg-surface-container-high border border-outline-variant text-primary-container font-label-sm text-label-sm font-medium">
+<span class="material-symbols-outlined text-[13px] animate-spin">sync</span>
+                    IN SPATIAL QA
+                  </span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Normal maps 87% complete</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top text-on-surface-variant">
+<div class="">Oct 20, 2026</div>
+<div class="font-label-sm text-label-sm text-outline">05:25 PM (4d ago)</div>
+</td>
+<td class="py-space-md px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2 py-1 bg-surface-container hover:bg-surface-container-high text-primary-container border border-outline-variant rounded-DEFAULT font-label-sm text-label-sm transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">view_in_ar</span>
+<span class="">Inspect 3D</span>
+</button>
+<button class="p-1 hover:bg-surface-container rounded-DEFAULT text-outline hover:text-primary-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: Approved (Linden Spatial Craft) -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-md text-center align-top pt-5">
+<input aria-label="Select Linden Spatial Craft" class="rounded-DEFAULT border-outline-variant text-primary-container focus:ring-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-high border border-outline-variant flex items-center justify-center shrink-0">
+<span class="font-headline-sm text-headline-sm text-primary-container">LC</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-primary-container font-semibold group-hover:text-secondary transition-colors cursor-pointer">
+                        Linden Spatial Craft
+                      </span>
+<span class="material-symbols-outlined text-[15px] text-secondary" title="Verified Atelier">verified</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
+<code class="font-label-sm text-label-sm text-outline tracking-wider">#059B9C06</code>
+<span class="">•</span>
+<span class="">Author Furniture &amp; Castings</span>
+<span class="">•</span>
+<span class="">Milano, Italy</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-0.5">
+<div class="text-primary-container font-medium">Matteo Linden</div>
+<div class="text-outline">studio@lindencraft.it</div>
+<div class="font-label-sm text-label-sm text-secondary">Salone del Mobile '26 Exhibitor</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-1">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-DEFAULT bg-surface-container-highest border border-outline-variant text-primary-container font-label-sm text-label-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                    APPROVED
+                  </span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">1:1 Calibrated to AR</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top text-on-surface-variant">
+<div class="">Oct 18, 2026</div>
+<div class="font-label-sm text-label-sm text-outline">08:46 PM (6d ago)</div>
+</td>
+<td class="py-space-md px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2 py-1 border border-outline-variant hover:border-secondary hover:text-secondary rounded-DEFAULT font-label-sm text-label-sm text-on-surface-variant transition-colors" type="button">
+                    Manage Atelier
+                  </button>
+<button class="p-1 hover:bg-surface-container rounded-DEFAULT text-outline hover:text-primary-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5: Pending Review (Muse Atelier & Gallery) -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-md text-center align-top pt-5">
+<input aria-label="Select Muse Atelier &amp; Gallery" class="rounded-DEFAULT border-outline-variant text-primary-container focus:ring-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-high border border-outline-variant flex items-center justify-center shrink-0">
+<span class="font-headline-sm text-headline-sm text-secondary">MA</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary-container font-semibold group-hover:text-secondary transition-colors cursor-pointer">
+                        Muse Atelier &amp; Gallery
+                      </span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
+<code class="font-label-sm text-label-sm text-outline tracking-wider">#208FD760</code>
+<span class="">•</span>
+<span class="">Washi &amp; Bronze Sculptural Lighting</span>
+<span class="">•</span>
+<span class="">Kyoto, Japan</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-0.5">
+<div class="text-primary-container font-medium">Kenzo Takahashi</div>
+<div class="text-outline">curate@museatelier-kyoto.jp</div>
+<div class="pt-0.5">
+<a class="inline-flex items-center gap-1 font-label-sm text-label-sm text-secondary hover:text-on-secondary-container transition-colors" href="#">
+<span class="material-symbols-outlined text-[13px]">menu_book</span>
+<span class="">Exhibition Catalogue</span>
+</a>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-1">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-DEFAULT bg-secondary-container/60 border border-secondary/30 text-on-secondary-container font-label-sm text-label-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                    PENDING REVIEW
+                  </span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Translucency shader review</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top text-on-surface-variant">
+<div class="">Oct 15, 2026</div>
+<div class="font-label-sm text-label-sm text-outline">03:53 PM (9d ago)</div>
+</td>
+<td class="py-space-md px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2 py-1 bg-primary-container text-inverse-on-surface rounded-DEFAULT font-label-sm text-label-sm hover:bg-on-surface-variant transition-colors" type="button">
+                    Review
+                  </button>
+<button class="p-1 hover:bg-surface-container rounded-DEFAULT text-on-surface-variant hover:text-primary-container transition-colors" title="Approve" type="button">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+</button>
+<button class="p-1 hover:bg-surface-container rounded-DEFAULT text-on-surface-variant hover:text-error transition-colors" title="Decline" type="button">
+<span class="material-symbols-outlined text-[18px]">cancel</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 6: Approved (Atelier Bioma Travertino) -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-space-md px-space-md text-center align-top pt-5">
+<input aria-label="Select Atelier Bioma Travertino" class="rounded-DEFAULT border-outline-variant text-primary-container focus:ring-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-high border border-outline-variant flex items-center justify-center shrink-0">
+<span class="font-headline-sm text-headline-sm text-primary-container">BT</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-primary-container font-semibold group-hover:text-secondary transition-colors cursor-pointer">
+                        Atelier Bioma Travertino
+                      </span>
+<span class="material-symbols-outlined text-[15px] text-secondary" title="Verified Atelier">verified</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
+<code class="font-label-sm text-label-sm text-outline tracking-wider">#7A2A6DAB</code>
+<span class="">•</span>
+<span class="">Roman Stone &amp; Monolithic Slabs</span>
+<span class="">•</span>
+<span class="">Verona, Italy</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-0.5">
+<div class="text-primary-container font-medium">Chiara Moretti</div>
+<div class="text-outline">c.moretti@biomastone.eu</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Stone Quarry Specs: Tivoli Grade A</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="space-y-1">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-DEFAULT bg-surface-container-highest border border-outline-variant text-primary-container font-label-sm text-label-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                    APPROVED
+                  </span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Spatial QR Stand Generated</div>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top text-on-surface-variant">
+<div class="">Oct 12, 2026</div>
+<div class="font-label-sm text-label-sm text-outline">03:31 PM (12d ago)</div>
+</td>
+<td class="py-space-md px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2 py-1 border border-outline-variant hover:border-secondary hover:text-secondary rounded-DEFAULT font-label-sm text-label-sm text-on-surface-variant transition-colors" type="button">
+                    Manage Atelier
+                  </button>
+<button class="p-1 hover:bg-surface-container rounded-DEFAULT text-outline hover:text-primary-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer: Pagination & Curation State -->
+<div class="px-space-md py-3.5 bg-surface-container-lowest flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm text-on-surface-variant">
+<div class="font-body-sm text-body-sm">
+          Displaying <span class="font-medium text-primary-container">1 — 6</span> of <span class="font-medium text-primary-container">162</span> atelier credentials submitted
+        </div>
+<!-- Strict Architectural Pagination Controls -->
+<nav aria-label="Pagination" class="flex items-center gap-1">
+<button class="px-2.5 py-1 rounded-DEFAULT border border-outline-variant text-outline bg-surface-container cursor-not-allowed font-label-sm text-label-sm flex items-center gap-1" disabled="" type="button">
+<span class="material-symbols-outlined text-[14px]">chevron_left</span>
+<span class="">Prev</span>
+</button>
+<button class="w-7 h-7 rounded-DEFAULT bg-primary-container text-inverse-on-surface font-label-sm text-label-sm font-medium flex items-center justify-center" type="button">
+            1
+          </button>
+<button class="w-7 h-7 rounded-DEFAULT border border-outline-variant hover:border-outline text-on-surface-variant font-label-sm text-label-sm flex items-center justify-center transition-colors" type="button">
+            2
+          </button>
+<button class="w-7 h-7 rounded-DEFAULT border border-outline-variant hover:border-outline text-on-surface-variant font-label-sm text-label-sm flex items-center justify-center transition-colors" type="button">
+            3
+          </button>
+<span class="px-1 text-outline font-label-sm text-label-sm">…</span>
+<button class="w-7 h-7 rounded-DEFAULT border border-outline-variant hover:border-outline text-on-surface-variant font-label-sm text-label-sm flex items-center justify-center transition-colors" type="button">
+            27
+          </button>
+<button class="px-2.5 py-1 rounded-DEFAULT border border-outline-variant hover:border-outline text-primary-container hover:bg-surface-container font-label-sm text-label-sm flex items-center gap-1 transition-colors" type="button">
+<span class="">Next</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</button>
+</nav>
+</div>
+</div>
+<!-- Architectural Footnote & Security Envelope -->
+<footer class="pt-space-xs flex flex-col sm:flex-row sm:items-center justify-between text-outline font-label-sm text-label-sm gap-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px] text-secondary">encrypted</span>
+<span class="">Sample demonstration data • Curatorial cryptokey verification active</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="">Sanctus Spatial Asset Protocol (WebXR / USDZ RFC-8820)</span>
+<span class="h-3 w-px bg-outline-variant"></span>
+<span class="">Cluster: eu-central-lisboa</span>
+</div>
+</footer>
+</div>
+</div></main></div>
+
+</body></html>

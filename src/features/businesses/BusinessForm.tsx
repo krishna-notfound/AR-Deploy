@@ -130,7 +130,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
       <div className="min-w-0 space-y-6">
         <Card>
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-[15px] font-semibold">Business profile</h2>
+            <h2 className="font-display text-[1.5rem] leading-tight font-normal">Business profile</h2>
           </div>
           <div className="space-y-5 p-5">
             <FormField label="Business name" required error={errors.name}>
@@ -155,7 +155,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
 
         <Card>
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-[15px] font-semibold">Contact</h2>
+            <h2 className="font-display text-[1.5rem] leading-tight font-normal">Contact</h2>
             <p className="mt-0.5 text-[13px] text-ink-muted">Shown to customers when a product has no call-to-action link.</p>
           </div>
           <div className="grid gap-5 p-5 sm:grid-cols-2">
@@ -176,7 +176,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
 
         <Card>
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-[15px] font-semibold">Catalog</h2>
+            <h2 className="font-display text-[1.5rem] leading-tight font-normal">Catalog</h2>
           </div>
           <div className="space-y-5 p-5">
             {isOwner ? (

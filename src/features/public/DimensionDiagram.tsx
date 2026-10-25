@@ -80,18 +80,24 @@ export function DimensionDiagram({ dims, unit }: { dims: Dimensions; unit: Lengt
         </defs>
         <g className="text-ink-faint">
           {faces.map((f, i) => (
-            <polygon key={i} points={f.map(pt).join(' ')} fill={i === 1 ? '#f2f0eb' : i === 2 ? '#ebe8e2' : '#f7f6f3'} stroke="#9a958c" strokeWidth="1" strokeLinejoin="round" />
+            <polygon
+              key={i}
+              points={f.map(pt).join(' ')}
+              style={{ fill: i === 1 ? 'var(--color-canvas)' : i === 2 ? 'var(--color-subtle)' : 'var(--color-surface)', stroke: 'var(--color-line-strong)' }}
+              strokeWidth="0.9"
+              strokeLinejoin="round"
+            />
           ))}
           {/* hidden edges */}
-          <polyline points={[E, Hh].map(pt).join(' ')} fill="none" stroke="#cfccc5" strokeDasharray="3 3" />
-          <polyline points={[A, E, F].map(pt).join(' ')} fill="none" stroke="#cfccc5" strokeDasharray="3 3" />
+          <polyline points={[E, Hh].map(pt).join(' ')} fill="none" style={{ stroke: 'var(--color-line)' }} strokeDasharray="3 3" />
+          <polyline points={[A, E, F].map(pt).join(' ')} fill="none" style={{ stroke: 'var(--color-line)' }} strokeDasharray="3 3" />
         </g>
         <g className="text-[var(--brand-accent)]" stroke="currentColor" strokeWidth="1.2">
           {[wLine, dLine, hLine].map((l, i) => (
             <line key={i} {...l} markerStart="url(#dim-tick)" markerEnd="url(#dim-tick)" />
           ))}
         </g>
-        <g fontSize="11.5" fontWeight="600" fill="#23221f" fontFamily="inherit">
+        <g fontSize="11" fontWeight="500" letterSpacing="0.04em" style={{ fill: 'var(--color-ink)' }} fontFamily="inherit">
           <text x={mid(wLine)[0] - 4} y={mid(wLine)[1] + 16} textAnchor="middle">
             {label(w)}
           </text>

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SANCTUS | Mobiliário de Autor &amp; Experiência Imersiva</title>
+<!-- Fonts: Cormorant Garamond & Jost -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&amp;family=Jost:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#F3F0E9',
+            surface: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            primaryInk: '#1D1C1A',
+            bodyText: '#3A352F',
+            mutedText: '#5A5148',
+            faintText: '#6E6559',
+            bronze: '#8A765C',
+            bronzeHover: '#76644D',
+            bronzeSoft: '#EAE3D6',
+          },
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['"Jost"', 'sans-serif'],
+          },
+          letterSpacing: {
+            widestLuxury: '0.22em',
+            meta: '0.18em',
+          },
+          borderRadius: {
+            'exact2': '2px',
+          }
+        }
+      }
+    }
+  </script>
+<!-- Typography and Base Styles -->
+<style data-purpose="typography">
+    body {
+      background-color: #F3F0E9;
+      color: #3A352F;
+      font-family: 'Jost', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, h4, .font-editorial {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 400;
+    }
+    .eyebrow {
+      font-family: 'Jost', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+  </style>
+<!-- Component Layout Styling -->
+<style data-purpose="layout-utilities">
+    .hairline-border {
+      border: 1px solid #D9D3C7;
+    }
+    .hairline-b {
+      border-bottom: 1px solid #D9D3C7;
+    }
+    .hairline-t {
+      border-top: 1px solid #D9D3C7;
+    }
+    .hairline-r {
+      border-right: 1px solid #D9D3C7;
+    }
+    .hairline-l {
+      border-left: 1px solid #D9D3C7;
+    }
+    .btn-primary {
+      background-color: #1D1C1A;
+      color: #FAF8F3;
+      border-radius: 2px;
+      transition: background-color 0.2s ease;
+    }
+    .btn-primary:hover {
+      background-color: #3A352F;
+    }
+    .btn-secondary {
+      border: 1px solid #1D1C1A;
+      color: #1D1C1A;
+      border-radius: 2px;
+      transition: all 0.2s ease;
+    }
+    .btn-secondary:hover {
+      background-color: #1D1C1A;
+      color: #FAF8F3;
+    }
+  </style>
+</head>
+<body class="bg-canvas text-bodyText selection:bg-bronzeSoft selection:text-primaryInk antialiased min-h-screen">
+<!-- BEGIN: MainHeader -->
+<header class="sticky top-0 z-50 bg-surface hairline-b" data-purpose="site-navigation-header">
+<div class="max-w-[1440px] mx-auto px-8 lg:px-12 h-20 flex items-center justify-between">
+<!-- Brand Logo / Wordmark -->
+<a class="group flex items-center gap-3" href="#">
+<span class="font-serif text-2xl tracking-[0.35em] text-primaryInk uppercase transition-opacity hover:opacity-80">S A N C T U S</span>
+</a>
+<!-- Main Navigation Links -->
+<nav class="hidden md:flex items-center gap-9" data-purpose="primary-nav-menu">
+<a class="eyebrow text-primaryInk border-b border-primaryInk pb-0.5 tracking-meta" href="#hero">Home</a>
+<a class="eyebrow text-mutedText hover:text-primaryInk transition-colors tracking-meta" href="#colecoes">Coleções</a>
+<a class="eyebrow text-mutedText hover:text-primaryInk transition-colors tracking-meta" href="#projetos">Projetos</a>
+<a class="eyebrow text-mutedText hover:text-primaryInk transition-colors tracking-meta flex items-center gap-1.5" href="#experiencia-3d">
+<span>Experiência 3D / AR</span>
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-bronze"></span>
+</a>
+<a class="eyebrow text-mutedText hover:text-primaryInk transition-colors tracking-meta" href="#sobre">Sobre</a>
+<a class="eyebrow text-mutedText hover:text-primaryInk transition-colors tracking-meta" href="#parceiros">Parcerias</a>
+<a class="eyebrow text-mutedText hover:text-primaryInk transition-colors tracking-meta" href="#contato">Contato</a>
+</nav>
+<!-- Right Utility Controls -->
+<div class="flex items-center gap-6" data-purpose="header-utilities">
+<!-- Search Trigger -->
+<button aria-label="Pesquisa" class="p-1.5 text-primaryInk hover:text-bronze transition-colors">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Account Profile -->
+<button aria-label="Perfil da Conta" class="p-1.5 text-primaryInk hover:text-bronze transition-colors">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Subtle Region & Language Divider -->
+<div class="hairline-l pl-5 flex items-center gap-1.5 text-xs text-mutedText uppercase tracking-wider font-sans font-medium">
+<span class="text-primaryInk">BR</span>
+<span class="text-hairline">/</span>
+<span class="text-faintText hover:text-primaryInk cursor-pointer">EN</span>
+</div>
+</div>
+</div>
+</header>
+<!-- END: MainHeader -->
+<!-- BEGIN: HeroSection -->
+<section class="relative max-w-[1440px] mx-auto px-8 lg:px-12 pt-10 pb-16" data-purpose="hero-presentation" id="hero">
+<div class="relative bg-surface hairline-border rounded-exact2 overflow-hidden">
+<!-- Split Editorial View -->
+<div class="grid grid-cols-1 lg:grid-cols-12 min-h-[640px] items-stretch">
+<!-- Left Editorial Text Content -->
+<div class="lg:col-span-5 p-10 lg:p-14 flex flex-col justify-between z-10 bg-surface">
+<div>
+<span class="eyebrow text-bronze mb-4 block">Mobiliário de Autor &amp; Experiência Imersiva</span>
+<h1 class="text-5xl lg:text-6xl text-primaryInk leading-[1.08] tracking-tight mb-6">
+              Beyond<br/><span class="italic font-light">What Is</span> Seen.
+            </h1>
+<p class="text-base text-mutedText leading-relaxed mb-8 max-w-md font-sans font-light">
+              Design atemporal que transcende o visível e transforma espaços em experiências sensoriais através de tecnologia 3D e Realidade Aumentada nativa.
+            </p>
+<!-- Hero CTAs -->
+<div class="flex flex-wrap items-center gap-4">
+<a class="btn-primary px-7 py-3.5 text-xs eyebrow tracking-widest uppercase inline-flex items-center gap-3" href="#colecoes">
+<span>Explorar Coleções</span>
+<span class="text-sm">→</span>
+</a>
+<a class="btn-secondary px-6 py-3.5 text-xs eyebrow tracking-widest uppercase inline-flex items-center gap-2" href="#experiencia-3d">
+<span>Ver em 3D / AR</span>
+<span class="w-1.5 h-1.5 rounded-full bg-bronze"></span>
+</a>
+</div>
+</div>
+<!-- Micro Pagination & Indicator -->
+<div class="pt-10 flex items-center justify-between hairline-t text-xs text-faintText uppercase tracking-widest font-sans">
+<div class="flex items-center gap-3">
+<span class="text-primaryInk font-medium">01</span>
+<span class="w-8 h-[1px] bg-strongline"></span>
+<span>02</span>
+<span>03</span>
+</div>
+<div class="flex items-center gap-2 tracking-widest text-mutedText hover:text-primaryInk transition-colors cursor-pointer">
+<span>Scroll</span>
+<span>↓</span>
+</div>
+</div>
+</div>
+<!-- Right Architectural Hero Visual -->
+<div class="lg:col-span-7 relative bg-subtle overflow-hidden min-h-[420px] lg:min-h-auto hairline-l"><img alt="Ambiente contemporâneo de alto padrão com sofá curvo bouclé e vista panorâmica para montanhas" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKinemLxrpS9SGrcjnGYRBUbKjAaubMHc1qODfX2GUB1cA85ch6cjcxO55D7aCEfyZ16MoDjdx-SYX1C4Mj9JnhxKOwpCSa1oTAT7EUZryxKjCsHxzZvo53_raD41jaMxwlabAR1BlQNWa11tNPNjFiUpt0E4o4TuLckw-ArckaCGGnaJuDhi7xgX3_R4iXVdTdw4jwPxJ0u0GaZfecUbRDwdxJdl2Tssu1VP920ekq37lEtzdMQc40g"/>
+<div class="absolute bottom-4 right-4 bg-surface/95 hairline-border px-3.5 py-1.5 rounded-exact2">
+<span class="text-[10px] uppercase font-sans tracking-widest text-primaryInk font-medium">AMBIENTE 01 — SALETA TRAVERTINO &amp; VISTA LAGO</span>
+</div></div>
+</div>
+</div>
+</section>
+<!-- END: HeroSection -->
+<!-- BEGIN: CuratedCollections -->
+<section class="max-w-[1440px] mx-auto px-8 lg:px-12 py-16" data-purpose="product-categories-showcase" id="colecoes">
+<!-- Section Header Editorial -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end pb-12 hairline-b">
+<div class="lg:col-span-4">
+<span class="eyebrow text-bronze block mb-2">Coleções</span>
+<h2 class="text-4xl text-primaryInk leading-tight">
+          Formas que conectam.
+        </h2>
+</div>
+<div class="lg:col-span-6">
+<p class="text-mutedText leading-relaxed font-light text-base">
+          Cada peça da Sanctus é um convite à contemplação, unindo materiais nobres, formas orgânicas e um design que se mantém atual por gerações.
+        </p>
+</div>
+<div class="lg:col-span-2 text-left lg:text-right">
+<a class="eyebrow text-primaryInk hover:text-bronze transition-colors inline-flex items-center gap-1.5 tracking-widest" href="#todas-colecoes">
+<span>Ver todas</span>
+<span>→</span>
+</a>
+</div>
+</div>
+<!-- 4 Architectural Category Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-10">
+<!-- Category 1: Sofás -->
+<article class="group bg-surface hairline-border rounded-exact2 flex flex-col p-4 transition-all duration-300 hover:border-strongline" data-purpose="collection-item">
+<div class="aspect-[4/5] overflow-hidden bg-subtle mb-4 rounded-exact2 relative"><img alt="Sofá contemporâneo curvo em tecido bouclé orgânico" class="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5ri8MttrHEeCZSoMlRT4CaFhJlGt9L8vUdi4n7BDkciF5O6gm2GsG9fbxZZEYR2XmikNnAIBoljVJTqwUgKqY7JnvUF0StWmpM83ITWUoR7LW9iQ8MSgw28ElmGBktOiMGefJoQcsppn3z4h0Ls_QwCFJUiavHiATKLIPGIVu2JW4NJxF08s4fJ9HSmzm9uJP04IbUkf0_g8PsNsfWDz3DI4MHllXM0SnV4e4FD0yeoqESiEq68cFjA"/>
+<span class="absolute top-3 left-3 bg-surface/95 px-2 py-1 text-[10px] tracking-widest uppercase text-mutedText hairline-border">01 // Coleção</span></div>
+<div class="flex-grow flex flex-col justify-between pt-2">
+<div>
+<h3 class="text-2xl text-primaryInk mb-1 font-serif">Sofás</h3>
+<p class="text-xs text-mutedText font-light leading-relaxed mb-4">Conforto em forma de arte escultural e proporções generosas.</p>
+</div>
+<a class="eyebrow text-xs text-primaryInk group-hover:text-bronze inline-flex items-center gap-1 tracking-meta" href="#sofas">
+<span>Ver Coleção</span>
+<span>→</span>
+</a>
+</div>
+</article>
+<!-- Category 2: Mesas -->
+<article class="group bg-surface hairline-border rounded-exact2 flex flex-col p-4 transition-all duration-300 hover:border-strongline" data-purpose="collection-item">
+<div class="aspect-[4/5] overflow-hidden bg-subtle mb-4 rounded-exact2 relative"><img alt="Mesa de centro monolítica em travertino bruto com tigela em latão" class="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6ADT-sXbN1rlOiq5TrLQ3tnkx5siUGJlcZPsHS8U54b8TMKZ-b2SpbL007503rxU30oIbR4upuF8yPQllbdIMSdehws0g2pKHrUsbI6O8H6TpGXk3bdhUjEHFBCGrOqRwt0-RCXsjoK8fVZ571V7VqWkqum4__xTLyJVHhoH4tSg0QuFUDHZpq9XajBQeOxCNEmLhS5SFEEE6-akZDFdzz9nDGnNEADFAKES4QYX2EU0G13N9-bNaqw"/>
+<span class="absolute top-3 left-3 bg-surface/95 px-2 py-1 text-[10px] tracking-widest uppercase text-mutedText hairline-border">02 // Coleção</span></div>
+<div class="flex-grow flex flex-col justify-between pt-2">
+<div>
+<h3 class="text-2xl text-primaryInk mb-1 font-serif">Mesas</h3>
+<p class="text-xs text-mutedText font-light leading-relaxed mb-4">O encontro rigoroso entre forma monólita e função diária.</p>
+</div>
+<a class="eyebrow text-xs text-primaryInk group-hover:text-bronze inline-flex items-center gap-1 tracking-meta" href="#mesas">
+<span>Ver Coleção</span>
+<span>→</span>
+</a>
+</div>
+</article>
+<!-- Category 3: Poltronas -->
+<article class="group bg-surface hairline-border rounded-exact2 flex flex-col p-4 transition-all duration-300 hover:border-strongline" data-purpose="collection-item">
+<div class="aspect-[4/5] overflow-hidden bg-subtle mb-4 rounded-exact2 relative"><img alt="Poltrona Linden em madeira maciça de nogueira e estofamento em bouclé linho" class="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyVK6BlpHMXJFqTD_9jkRF-7VAVbd5q3U84CSbj8rHjrz_hycLSpqDBHna4eQjZDJatDjsZKNlAhBIkNywVLEnd8b9ecHeXBazdXmFbN830iT8f-rVyTv8tuxGpL3vYOx0z1v6Xxfxe7uVwFYcyxegdD-VV8PycGWKGIJDHgdBTIlkJKz_PiorwDHHLDEyR2MpGBbUqK3T_NL3SmfDNMVM0tGA2-zaEXWHrLB8v0j94HLztos9hKvC-A"/>
+<span class="absolute top-3 left-3 bg-surface/95 px-2 py-1 text-[10px] tracking-widest uppercase text-mutedText hairline-border">03 // Coleção</span></div>
+<div class="flex-grow flex flex-col justify-between pt-2">
+<div>
+<h3 class="text-2xl text-primaryInk mb-1 font-serif">Poltronas</h3>
+<p class="text-xs text-mutedText font-light leading-relaxed mb-4">Ergonomia e elegância concebidas para momentos de pausa.</p>
+</div>
+<a class="eyebrow text-xs text-primaryInk group-hover:text-bronze inline-flex items-center gap-1 tracking-meta" href="#poltronas">
+<span>Ver Coleção</span>
+<span>→</span>
+</a>
+</div>
+</article>
+<!-- Category 4: Iluminação & Objetos -->
+<article class="group bg-surface hairline-border rounded-exact2 flex flex-col p-4 transition-all duration-300 hover:border-strongline" data-purpose="collection-item">
+<div class="aspect-[4/5] overflow-hidden bg-subtle mb-4 rounded-exact2 relative"><img alt="Pendente escultural em bronze artesanal e vaso cerâmico sobre pedra natural" class="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6ixbJcXMB4Rijn4mGzNGov1xNXZkjmUPEpgfb9dwDqXUEyhVWuDEjFSYLJobq8AbF-846AKgMO4aLJpvw9ufbi0kshnL_gHQgdBALR94p6EG02WC23KhAV51ca9n9q_HOX2oC8hQxFRh5OIsHnWRMWCmGivps6Edylad9yZeUsfeNlpOuuasQJA6hY1PHuuJjY9JouL7attiwjOVlqJ7VOoQyNVCxkUV7swAPBwpzRmdDA7fmqWyzxA"/>
+<span class="absolute top-3 left-3 bg-surface/95 px-2 py-1 text-[10px] tracking-widest uppercase text-mutedText hairline-border">04 // Coleção</span></div>
+<div class="flex-grow flex flex-col justify-between pt-2">
+<div>
+<h3 class="text-2xl text-primaryInk mb-1 font-serif">Iluminação &amp; Objetos</h3>
+<p class="text-xs text-mutedText font-light leading-relaxed mb-4">Luz difusa e cerâmicas minerais como matéria-prima.</p>
+</div>
+<a class="eyebrow text-xs text-primaryInk group-hover:text-bronze inline-flex items-center gap-1 tracking-meta" href="#iluminacao">
+<span>Ver Coleção</span>
+<span>→</span>
+</a>
+</div>
+</article>
+</div>
+</section>
+<!-- END: CuratedCollections -->
+<!-- BEGIN: Immersive3DTeaser -->
+<section class="bg-[#1D1C1A] text-[#FAF8F3] py-20 my-10" data-purpose="interactive-3d-experience" id="experiencia-3d">
+<div class="max-w-[1440px] mx-auto px-8 lg:px-12">
+<!-- Grid layout: Text Overview and 3D Canvas Preview -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+<!-- Text & Narrative -->
+<div class="lg:col-span-5 space-y-6">
+<div class="inline-flex items-center gap-2 px-3 py-1 border border-strongline/40 text-[10px] tracking-widest uppercase text-bronzeSoft">
+<span class="w-1.5 h-1.5 rounded-full bg-bronze"></span>
+            Tecnologia WebGL &amp; WebXR Nativa
+          </div>
+<h2 class="text-4xl lg:text-5xl font-serif text-[#FAF8F3] leading-[1.15]">
+            Explore nossos ambientes e veja em seu próprio espaço.
+          </h2>
+<p class="text-sm text-[#D9D3C7] leading-relaxed font-light">
+            Navegue por ambientes completos em 360°, alterne acabamentos em tempo real e projete o mobiliário em escala real diretamente em sua casa via AR nativo, sem necessidade de baixar qualquer aplicativo.
+          </p>
+<!-- Feature Matrix -->
+<div class="space-y-4 pt-4 hairline-t border-strongline/30">
+<div class="flex items-start gap-3">
+<span class="text-bronze font-serif text-lg">01</span>
+<div>
+<h4 class="text-sm font-medium tracking-wide uppercase font-sans text-[#FAF8F3]">Visualização em 360° em Alta Definição</h4>
+<p class="text-xs text-[#8A8073]">Rotação livre orbital com shaders de luz natural fotorrealista.</p>
+</div>
+</div>
+<div class="flex items-start gap-3">
+<span class="text-bronze font-serif text-lg">02</span>
+<div>
+<h4 class="text-sm font-medium tracking-wide uppercase font-sans text-[#FAF8F3]">Realidade Aumentada Instantânea</h4>
+<p class="text-xs text-[#8A8073]">Aponte a câmera no iOS (QuickLook) ou Android (SceneViewer) com escala 1:1 exata.</p>
+</div>
+</div>
+<div class="flex items-start gap-3">
+<span class="text-bronze font-serif text-lg">03</span>
+<div>
+<h4 class="text-sm font-medium tracking-wide uppercase font-sans text-[#FAF8F3]">Simulação de Texturas Minerais e Tecidos</h4>
+<p class="text-xs text-[#8A8073]">Troca instantânea entre Mármore Calacatta, Travertino Romano e Linho Cru.</p>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="pt-6 flex flex-wrap items-center gap-4">
+<a class="bg-[#FAF8F3] text-primaryInk px-7 py-3.5 rounded-exact2 text-xs eyebrow tracking-widest hover:bg-bronzeSoft transition-colors" href="#iniciar-3d">
+              Iniciar Experiência 3D →
+            </a>
+<button class="px-5 py-3.5 border border-strongline text-[#FAF8F3] rounded-exact2 text-xs eyebrow tracking-widest hover:border-bronzeSoft transition-colors flex items-center gap-2">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM14.625 3.75c-.621 0-1.125.504-1.125 1.125v4.5c0 .621.504 1.125 1.125 1.125h4.5c.621 0 1.125-.504 1.125-1.125v-4.5c0-.621-.504-1.125-1.125-1.125h-4.5ZM14.625 14.625c-.621 0-1.125.504-1.125 1.125v4.5c0 .621.504 1.125 1.125 1.125h4.5c.621 0 1.125-.504 1.125-1.125v-4.5c0-.621-.504-1.125-1.125-1.125h-4.5Z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Abrir QR Code para Celular</span>
+</button>
+</div>
+</div>
+<!-- 3D Interactive Mockup Preview Window -->
+<div class="lg:col-span-7">
+<div class="bg-[#121110] border border-strongline/40 rounded-exact2 p-6 relative">
+<!-- Viewer Top Bar Controls -->
+<div class="flex items-center justify-between pb-4 border-b border-strongline/30 mb-4 text-xs font-sans">
+<div class="flex items-center gap-3">
+<span class="inline-flex items-center gap-1.5 text-bronzeSoft tracking-wider uppercase text-[11px]">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Visualizador Interativo
+                </span>
+<span class="text-hairline/40">|</span>
+<span class="text-faintText text-[11px] uppercase tracking-wider">Poltrona Linden (Madeira Nogueira)</span>
+</div>
+<div class="flex items-center gap-2 text-bronzeSoft text-[11px] uppercase tracking-wider">
+<span class="border border-strongline/50 px-2 py-0.5 rounded-exact2">360° Orbit</span>
+<span class="border border-strongline/50 px-2 py-0.5 rounded-exact2">AR QuickLook</span>
+</div>
+</div>
+<!-- Visual Preview Area -->
+<div class="relative aspect-[16/10] bg-[#181716] overflow-hidden flex items-center justify-center border border-strongline/20 rounded-exact2"><img alt="Visualização interativa 3D de alta definição da Poltrona Linden" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyVK6BlpHMXJFqTD_9jkRF-7VAVbd5q3U84CSbj8rHjrz_hycLSpqDBHna4eQjZDJatDjsZKNlAhBIkNywVLEnd8b9ecHeXBazdXmFbN830iT8f-rVyTv8tuxGpL3vYOx0z1v6Xxfxe7uVwFYcyxegdD-VV8PycGWKGIJDHgdBTIlkJKz_PiorwDHHLDEyR2MpGBbUqK3T_NL3SmfDNMVM0tGA2-zaEXWHrLB8v0j94HLztos9hKvC-A"/>
+<div class="absolute bottom-6 left-6 bg-primaryInk/85 border border-strongline/40 px-3 py-1.5 rounded-exact2 flex items-center gap-2">
+<svg class="w-3.5 h-3.5 text-bronze" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="text-[10px] uppercase font-sans tracking-widest text-[#FAF8F3]">Arraste para rotacionar 360°</span>
+</div>
+<div class="absolute bottom-6 right-6 bg-primaryInk/85 border border-strongline/40 p-2 rounded-exact2 flex items-center gap-2">
+<span class="text-[9px] uppercase tracking-widest text-[#D9D3C7] mr-1">Materiais:</span>
+<button class="w-5 h-5 rounded-full bg-[#EAE3D6] border-2 border-white ring-1 ring-black/50 cursor-pointer" title="Linho Cru"></button>
+<button class="w-5 h-5 rounded-full bg-[#C8BBA8] border border-strongline/50 cursor-pointer hover:border-white transition-colors" title="Travertino Romano"></button>
+<button class="w-5 h-5 rounded-full bg-[#4A3B32] border border-strongline/50 cursor-pointer hover:border-white transition-colors" title="Nogueira Maciça"></button>
+</div></div>
+<!-- Viewer Bottom Micro Stats -->
+<div class="pt-4 flex items-center justify-between text-[11px] text-[#8A8073] font-sans">
+<span>Dimensões: A: 76 cm × L: 85 cm × P: 76 cm</span>
+<span class="hover:text-[#FAF8F3] transition-colors cursor-pointer">Ver especificações técnicas completas →</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Immersive3DTeaser -->
+<!-- BEGIN: EditorialAndNarrative -->
+<section class="max-w-[1440px] mx-auto px-8 lg:px-12 py-20" data-purpose="editorial-philosophy" id="sobre">
+<!-- Quotation Highlight -->
+<div class="py-14 text-center border-y hairline-border mb-16 bg-surface">
+<blockquote class="font-serif text-2xl lg:text-3xl text-primaryInk italic max-w-3xl mx-auto px-4">
+        “O design é a ponte silenciosa entre o visível e o intangível.”
+      </blockquote>
+<p class="eyebrow text-bronze mt-4 tracking-widest">— SANCTUS MANIFESTO</p>
+</div>
+<!-- Two-Column Editorial Spread -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+<!-- Left Narrative Text Column -->
+<div class="lg:col-span-5 space-y-6">
+<span class="eyebrow text-bronze block">Sobre a Sanctus</span>
+<h2 class="text-4xl lg:text-5xl font-serif text-primaryInk leading-[1.15]">
+          Mais do que móveis, criamos atmosferas que acolhem o tempo.
+        </h2>
+<div class="space-y-4 text-mutedText font-light text-base leading-relaxed">
+<p>
+            A SANCTUS nasceu da crença de que o verdadeiro luxo reside nos detalhes imperfeitos da matéria natural. Nossas curadorias unem a tradição do trabalho artesanal e a pureza do design contemporâneo brasileiro e internacional.
+          </p>
+<p>
+            Cada tora de madeira maciça de manejo sustentável, cada bloco de pedra travertino esculpido e cada trama de linho bruto carregam uma história geológica e humana inimitável.
+          </p>
+</div>
+<!-- Metric Numbers -->
+<div class="grid grid-cols-3 gap-6 pt-6 hairline-t">
+<div>
+<span class="block font-serif text-3xl text-primaryInk">+20</span>
+<span class="text-[11px] uppercase tracking-wider text-faintText font-sans">Anos de Ofício</span>
+</div>
+<div>
+<span class="block font-serif text-3xl text-primaryInk">+500</span>
+<span class="text-[11px] uppercase tracking-wider text-faintText font-sans">Projetos no Mundo</span>
+</div>
+<div>
+<span class="block font-serif text-3xl text-primaryInk">15</span>
+<span class="text-[11px] uppercase tracking-wider text-faintText font-sans">Países Atendidos</span>
+</div>
+</div>
+<div class="pt-4">
+<a class="eyebrow text-primaryInk hover:text-bronze transition-colors inline-flex items-center gap-2" href="#historia">
+<span>Conheça Nossa História &amp; Processo</span>
+<span>→</span>
+</a>
+</div>
+</div>
+<!-- Right Visual Column -->
+<div class="lg:col-span-7 grid grid-cols-12 gap-6"><div class="col-span-8 bg-surface hairline-border rounded-exact2 overflow-hidden aspect-[4/5]">
+<img alt="Mesa de centro orgânica em pedra travertino esculpida à mão" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6ADT-sXbN1rlOiq5TrLQ3tnkx5siUGJlcZPsHS8U54b8TMKZ-b2SpbL007503rxU30oIbR4upuF8yPQllbdIMSdehws0g2pKHrUsbI6O8H6TpGXk3bdhUjEHFBCGrOqRwt0-RCXsjoK8fVZ571V7VqWkqum4__xTLyJVHhoH4tSg0QuFUDHZpq9XajBQeOxCNEmLhS5SFEEE6-akZDFdzz9nDGnNEADFAKES4QYX2EU0G13N9-bNaqw"/>
+</div>
+<div class="col-span-4 flex flex-col justify-between gap-6">
+<div class="bg-surface hairline-border rounded-exact2 overflow-hidden aspect-square">
+<img alt="Pendente em bronze fundido e vaso artesanal mineral" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6ixbJcXMB4Rijn4mGzNGov1xNXZkjmUPEpgfb9dwDqXUEyhVWuDEjFSYLJobq8AbF-846AKgMO4aLJpvw9ufbi0kshnL_gHQgdBALR94p6EG02WC23KhAV51ca9n9q_HOX2oC8hQxFRh5OIsHnWRMWCmGivps6Edylad9yZeUsfeNlpOuuasQJA6hY1PHuuJjY9JouL7attiwjOVlqJ7VOoQyNVCxkUV7swAPBwpzRmdDA7fmqWyzxA"/>
+</div>
+<div class="p-6 bg-subtle hairline-border rounded-exact2">
+<span class="eyebrow text-bronze block mb-2">Curadoria</span>
+<p class="text-xs text-mutedText leading-relaxed">
+Materiais autênticos certificados, garantindo durabilidade que atravessa gerações.
+</p>
+</div>
+</div></div>
+</div>
+</section>
+<!-- END: EditorialAndNarrative -->
+<!-- BEGIN: PartnerCTASection -->
+<section class="max-w-[1440px] mx-auto px-8 lg:px-12 py-16" data-purpose="b2b-partnership-cta" id="parceiros">
+<div class="bg-surface hairline-border rounded-exact2 p-10 lg:p-14">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+<div class="lg:col-span-8">
+<span class="eyebrow text-bronze block mb-2">Para Marcas &amp; Designers Independentes</span>
+<h2 class="text-3xl lg:text-4xl font-serif text-primaryInk mb-4">
+            Faça parte da curadoria imersiva Sanctus.
+          </h2>
+<p class="text-mutedText font-light max-w-2xl text-base leading-relaxed">
+            Conecte seu catálogo autoral à nossa plataforma 3D e Realidade Aumentada. Disponibilize suas criações diretamente para os principais escritórios de arquitetura e clientes finais com experiência sensorial sem atrito.
+          </p>
+</div>
+<div class="lg:col-span-4 lg:text-right">
+<a class="btn-primary inline-flex items-center gap-3 px-8 py-4 text-xs eyebrow tracking-widest uppercase" href="#cadastrar">
+<span>Solicitar Acesso / Cadastrar Marca</span>
+<span>→</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<!-- END: PartnerCTASection -->
+<!-- BEGIN: MainFooter -->
+<footer class="bg-surface hairline-t mt-16" data-purpose="site-footer" id="contato">
+<div class="max-w-[1440px] mx-auto px-8 lg:px-12 pt-16 pb-12">
+<!-- Footer Columns -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-16 hairline-b">
+<!-- Brand Summary Column -->
+<div class="lg:col-span-2 space-y-4">
+<span class="font-serif text-2xl tracking-[0.35em] text-primaryInk uppercase block">S A N C T U S</span>
+<p class="text-xs text-mutedText leading-relaxed max-w-sm font-light">
+            Mobiliário de autor e plataforma de experiências espaciais fotorrealistas. Unindo a essência da matéria natural à vanguarda da visualização 3D e Realidade Aumentada.
+          </p>
+<div class="pt-2 text-xs text-faintText">
+<p>Atendimento São Paulo — Lisboa — Milão</p>
+<p class="text-primaryInk mt-1">contato@sanctusdesign.com</p>
+</div>
+</div>
+<!-- Col 1: Coleções -->
+<div>
+<span class="eyebrow text-primaryInk block mb-4">Coleções</span>
+<ul class="space-y-2.5 text-xs text-mutedText font-sans">
+<li><a class="hover:text-primaryInk transition-colors" href="#sofas">Sofás &amp; Chaises</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#poltronas">Poltronas &amp; Cadeiras</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#mesas">Mesas de Centro &amp; Jantar</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#aparadores">Aparadores &amp; Consoles</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#objetos">Iluminação &amp; Objetos</a></li>
+</ul>
+</div>
+<!-- Col 2: Tecnologia & AR -->
+<div>
+<span class="eyebrow text-primaryInk block mb-4">Plataforma</span>
+<ul class="space-y-2.5 text-xs text-mutedText font-sans">
+<li><a class="hover:text-primaryInk transition-colors" href="#3d-webgl">Visualizador 3D WebGL</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#ar-nativo">Realidade Aumentada (AR)</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#configurador">Configurador de Materiais</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#para-arquitetos">Área para Arquitetos</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#modelos-bim">Download 3D / BIM / CAD</a></li>
+</ul>
+</div>
+<!-- Col 3: Institucional -->
+<div>
+<span class="eyebrow text-primaryInk block mb-4">Institucional</span>
+<ul class="space-y-2.5 text-xs text-mutedText font-sans">
+<li><a class="hover:text-primaryInk transition-colors" href="#sobre">O Manifesto Sanctus</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#sustentabilidade">Manejo Sustentável</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#imprensa">Imprensa &amp; Notícias</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#termos">Políticas de Privacidade</a></li>
+<li><a class="hover:text-primaryInk transition-colors" href="#carreiras">Carreiras</a></li>
+</ul>
+</div>
+</div>
+<!-- Bottom Bar: Copyright & Socials -->
+<div class="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-faintText gap-4 font-sans">
+<div>
+<span>© 2026 SANCTUS. TODOS OS DIREITOS RESERVADOS.</span>
+</div>
+<!-- Social Channels -->
+<div class="flex items-center gap-6 text-mutedText">
+<a class="hover:text-primaryInk transition-colors" href="#">Instagram</a>
+<a class="hover:text-primaryInk transition-colors" href="#">Pinterest</a>
+<a class="hover:text-primaryInk transition-colors" href="#">LinkedIn</a>
+<a class="hover:text-primaryInk transition-colors" href="#">ArchDaily</a>
+</div>
+</div>
+</div>
+</footer>
+<!-- END: MainFooter -->
+</body></html>

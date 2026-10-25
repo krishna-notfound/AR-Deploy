@@ -1,38 +1,44 @@
-import { Building2, PackagePlus, Plus, QrCode } from 'lucide-react'
+import { ArrowRight, Box, Building2, ClipboardList, Eye, Globe, Package, PackagePlus, PencilLine, Plus, QrCode } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { usePendingApplications } from '@/components/layout/dashboardContext'
+import { PageHeader, PanelHeader, panelLinkClass } from '@/components/layout/PageHeader'
 import { BusinessStatusBadge, ProductStatusBadge, SampleDataTag } from '@/components/ui/Badge'
 import { ButtonLink } from '@/components/ui/Button'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
-import { SmartImage, Thumb } from '@/components/ui/SmartImage'
+import { Card, CardBody } from '@/components/ui/Card'
+import { SmartImage } from '@/components/ui/SmartImage'
 import { StatGroup } from '@/components/ui/StatGroup'
 import { SkeletonRows, Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
-import { formatNumber, formatRelative } from '@/lib/format'
+import { formatNumber, formatPercent, formatRelative } from '@/lib/format'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ActivityList } from '../shared/ActivityList'
 import { applicationsAdminPath, businessAdminPath } from '@/lib/urls'
 import { primaryImage } from '@/lib/product'
+import { MostViewedList } from '../analytics/MostViewedList'
+import { hasArModel } from '../products/productReadiness'
 import { useBusinesses } from '../products/useCatalogData'
 
 export default function AdminOverviewPage() {
   const summary = useServiceQuery(() => service.getAnalytics(), [])
   const products = useServiceQuery(() => service.getProducts(), [])
   const { list: businesses, map: bizMap, query: bizQuery } = useBusinesses()
-  const activity = useServiceQuery(() => service.getRecentActivity({ limit: 8 }), [])
+  const activity = useServiceQuery(() => service.getRecentActivity({ limit: 6 }), [])
   const s = summary.data
 
   const recentProducts = [...(products.data ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
-  const recentBusinesses = [...businesses].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4)
+  const recentBusinesses = [...businesses].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
   const productMap = new Map((products.data ?? []).map((p) => [p.id, p]))
   const top = (s?.byProduct ?? []).filter((r) => productMap.has(r.productId)).slice(0, 5)
+  const activeBusinesses = businesses.filter((b) => b.status === 'active').length
+  const withModel = products.data?.filter(hasArModel).length
 
   return (
     <>
       <PageHeader
         title="Overview"
+        description="Applications, businesses, products and catalog activity across Sanctus."
         actions={
           <>
             <ButtonLink to="/admin/catalogs" icon={<QrCode className="size-4" aria-hidden />}>
@@ -55,20 +61,25 @@ export default function AdminOverviewPage() {
           <ErrorState message={summary.error.message} onRetry={summary.refetch} />
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           <StatGroup
             loading={!s}
             stats={[
-              { label: 'Businesses', value: formatNumber(s?.totals.businesses ?? 0) },
-              { label: 'Products', value: formatNumber(s?.totals.products ?? 0) },
-              { label: 'Published', value: formatNumber(s?.totals.published ?? 0) },
-              { label: 'Drafts', value: formatNumber(s?.totals.drafts ?? 0) },
-              { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
-              { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
+              { label: 'Businesses', icon: Building2, value: formatNumber(s?.totals.businesses ?? 0), hint: bizQuery.data ? `${formatNumber(activeBusinesses)} active` : undefined },
+              { label: 'Products', icon: Package, value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
+              { label: 'Published', icon: Globe, value: formatNumber(s?.totals.published ?? 0), hint: s ? `of ${formatNumber(s.totals.products)} products` : undefined },
+              { label: 'Drafts', icon: PencilLine, value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
+              { label: 'Product page views', icon: Eye, value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+              {
+                label: 'AR launch attempts',
+                icon: Box,
+                value: formatNumber(s?.totals.arActivations ?? 0),
+                hint: s && s.totals.views ? `Last 30 days · ${formatPercent(s.totals.arActivations / s.totals.views)} of views` : 'Last 30 days',
+              },
             ]}
             footer={
               s?.isSample ? (
-                <span className="flex items-center gap-2">
+                <span className="flex flex-wrap items-center gap-2">
                   <SampleDataTag /> Views and AR figures are seeded sample data plus visits made in this demo, not live production analytics.
                 </span>
               ) : undefined
@@ -76,14 +87,31 @@ export default function AdminOverviewPage() {
           />
 
           <Card>
-            <CardHeader title="Product views and AR launch attempts" description="All businesses, last 30 days" actions={<Link to="/admin/analytics" className="text-[13px] font-medium text-accent-ink hover:underline">Open analytics</Link>} />
-            <CardBody>{s ? <ActivityTrend data={s.series} compact /> : <Skeleton className="h-32 w-full" />}</CardBody>
+            <PanelHeader
+              title="Product views and AR launch attempts"
+              description="All businesses, last 30 days"
+              actions={
+                <Link to="/admin/analytics" className={panelLinkClass}>
+                  Open analytics <ArrowRight className="size-3.5" aria-hidden />
+                </Link>
+              }
+            />
+            <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact /> : <Skeleton className="h-32 w-full" />}</CardBody>
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader title="Most viewed products" description="Last 30 days" />
-              <CardBody>
+          {/* Grid items default to min-width: auto, so a long product name would widen the card past a phone screen. */}
+          <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+            <Card className="lg:col-span-7">
+              <PanelHeader
+                title="Most viewed products"
+                description="Product page views, last 30 days"
+                actions={
+                  <Link to="/admin/analytics" className={panelLinkClass}>
+                    Full ranking <ArrowRight className="size-3.5" aria-hidden />
+                  </Link>
+                }
+              />
+              <CardBody className="sm:px-6">
                 {products.status === 'error' && !products.data ? (
                   <ErrorState message={products.error.message} onRetry={products.refetch} />
                 ) : !s || products.status === 'loading' ? (
@@ -91,40 +119,28 @@ export default function AdminOverviewPage() {
                 ) : top.length === 0 ? (
                   <EmptyState title="No product activity yet" />
                 ) : (
-                  <ul className="divide-y divide-line">
-                    {top.map((r) => {
-                      const p = productMap.get(r.productId)!
-                      return (
-                        <li key={r.productId} className="flex items-center gap-3 py-2.5">
-                          <Thumb src={primaryImage(p)?.url} alt="" />
-                          <div className="min-w-0 flex-1">
-                            <Link to={`/admin/products/${p.id}/edit`} className="block truncate text-sm font-medium hover:underline">
-                              {p.name.en}
-                            </Link>
-                            <p className="truncate text-xs text-ink-muted">{bizMap.get(p.businessId)?.name}</p>
-                          </div>
-                          <span className="text-right text-xs text-ink-muted tabular-nums">
-                            <span className="block font-medium text-ink">{formatNumber(r.views)} views</span>
-                            {formatNumber(r.arActivations)} AR
-                          </span>
-                        </li>
-                      )
-                    })}
-                  </ul>
+                  <MostViewedList rows={top} products={productMap} businesses={bizMap} editBase="/admin/products" />
                 )}
               </CardBody>
             </Card>
 
-            <Card>
-              <CardHeader title="Recent activity" />
-              <CardBody>
+            <Card className="lg:col-span-5">
+              <PanelHeader title="Recent activity" description="Businesses and products" />
+              <CardBody className="sm:px-6">
                 <ActivityList query={activity} />
               </CardBody>
             </Card>
 
-            <Card>
-              <CardHeader title="Recently added products" actions={<Link to="/admin/products" className="text-[13px] font-medium text-accent-ink hover:underline">All products</Link>} />
-              <CardBody>
+            <Card className="lg:col-span-6">
+              <PanelHeader
+                title="Recently added products"
+                actions={
+                  <Link to="/admin/products" className={panelLinkClass}>
+                    All products <ArrowRight className="size-3.5" aria-hidden />
+                  </Link>
+                }
+              />
+              <CardBody className="sm:px-6">
                 {products.status === 'loading' && !products.data ? (
                   <SkeletonRows rows={4} />
                 ) : products.status === 'error' && !products.data ? (
@@ -141,8 +157,8 @@ export default function AdminOverviewPage() {
                 ) : (
                   <ul className="divide-y divide-line">
                     {recentProducts.map((p) => (
-                      <li key={p.id} className="flex items-center gap-3 py-2.5">
-                        <Thumb src={primaryImage(p)?.url} alt="" />
+                      <li key={p.id} className="flex items-center gap-3 py-3">
+                        <SmartImage src={primaryImage(p)?.url} alt="" className="size-11 shrink-0 border border-line" />
                         <div className="min-w-0 flex-1">
                           <Link to={`/admin/products/${p.id}/edit`} className="block truncate text-sm font-medium hover:underline">
                             {p.name.en}
@@ -159,9 +175,16 @@ export default function AdminOverviewPage() {
               </CardBody>
             </Card>
 
-            <Card>
-              <CardHeader title="Recently created businesses" actions={<Link to="/admin/businesses" className="text-[13px] font-medium text-accent-ink hover:underline">All businesses</Link>} />
-              <CardBody>
+            <Card className="lg:col-span-6">
+              <PanelHeader
+                title="Recently created businesses"
+                actions={
+                  <Link to="/admin/businesses" className={panelLinkClass}>
+                    All businesses <ArrowRight className="size-3.5" aria-hidden />
+                  </Link>
+                }
+              />
+              <CardBody className="sm:px-6">
                 {bizQuery.status === 'loading' && !bizQuery.data ? (
                   <SkeletonRows rows={3} />
                 ) : bizQuery.status === 'error' && !bizQuery.data ? (
@@ -171,8 +194,8 @@ export default function AdminOverviewPage() {
                 ) : (
                   <ul className="divide-y divide-line">
                     {recentBusinesses.map((b) => (
-                      <li key={b.id} className="flex items-center gap-3 py-2.5">
-                        <SmartImage src={b.logoUrl} alt="" className="size-10 rounded-lg object-contain" />
+                      <li key={b.id} className="flex items-center gap-3 py-3">
+                        <SmartImage src={b.logoUrl} alt="" className="size-11 shrink-0 border border-line bg-surface object-contain p-1" />
                         <div className="min-w-0 flex-1">
                           <Link to={businessAdminPath(b.id)} className="block truncate text-sm font-medium hover:underline">
                             {b.name}
@@ -195,38 +218,50 @@ export default function AdminOverviewPage() {
 
 /** Applications waiting for a decision (submitted or under review), so new submissions are seen without opening Applications. */
 function PendingApplications() {
-  const q = useServiceQuery(async () => {
-    const [submitted, reviewing] = await Promise.all([service.getApplications({ status: 'submitted', pageSize: 1 }), service.getApplications({ status: 'under_review', pageSize: 1 })])
-    if (!submitted.ok) return submitted
-    if (!reviewing.ok) return reviewing
-    return { ok: true as const, data: { submitted: submitted.data.total, underReview: reviewing.data.total } }
-  }, [])
-  const total = q.data ? q.data.submitted + q.data.underReview : 0
-  return (
-    <Card className="mb-6">
-      {q.status === 'loading' && !q.data ? (
-        <div className="p-4">
-          <SkeletonRows rows={1} />
-        </div>
-      ) : q.status === 'error' && !q.data ? (
+  const q = usePendingApplications()
+  const d = q.data
+  const total = d?.total ?? 0
+  if (q.status === 'loading' && !d)
+    return (
+      <div className="mb-8 border border-line p-4" role="status" aria-label="Loading applications">
+        <Skeleton className="h-4 w-1/3" />
+      </div>
+    )
+  if (q.status === 'error' && !d)
+    return (
+      <Card className="mb-8">
         <ErrorState message={`Could not load applications. ${q.error.message}`} onRetry={q.refetch} className="py-6" />
-      ) : (
-        <div className="flex flex-wrap items-center gap-3 p-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-semibold text-ink">
-              {total === 0 ? 'No applications awaiting review' : `${formatNumber(total)} application${total === 1 ? '' : 's'} awaiting review`}
-            </h2>
-            {total > 0 && q.data && (
-              <p className="text-xs text-ink-muted">
-                {formatNumber(q.data.submitted)} new · {formatNumber(q.data.underReview)} under review
-              </p>
-            )}
-          </div>
-          <ButtonLink to={applicationsAdminPath(q.data && q.data.submitted > 0 ? 'submitted' : q.data && q.data.underReview > 0 ? 'under_review' : undefined)} size="sm" variant={total > 0 ? 'primary' : 'secondary'}>
-            {total > 0 ? 'Review applications' : 'View applications'}
-          </ButtonLink>
-        </div>
-      )}
-    </Card>
+      </Card>
+    )
+  if (!d || total === 0)
+    return (
+      <div className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 border border-line px-4 py-3 sm:px-5">
+        <ClipboardList className="size-4 shrink-0 text-ink-faint" strokeWidth={1.5} aria-hidden />
+        <h2 className="min-w-0 flex-1 text-sm text-ink-muted">No applications awaiting review</h2>
+        <Link to={applicationsAdminPath()} className={panelLinkClass}>
+          View applications <ArrowRight className="size-3.5" aria-hidden />
+        </Link>
+      </div>
+    )
+  return (
+    <section className="mb-8 flex flex-wrap items-center gap-x-5 gap-y-3 border border-accent/35 bg-accent-soft px-4 py-4 sm:px-5" aria-labelledby="pending-apps">
+      <span className="grid size-10 shrink-0 place-items-center border border-accent/40 text-accent-ink" aria-hidden>
+        <ClipboardList className="size-[18px]" strokeWidth={1.5} />
+      </span>
+      <div className="min-w-[10rem] flex-1">
+        <h2 id="pending-apps" className="text-[15px] font-medium text-ink">
+          {`${formatNumber(total)} application${total === 1 ? '' : 's'} awaiting review`}
+        </h2>
+        <p className="mt-0.5 text-[13px] text-ink-body">
+          {formatNumber(d.submitted)} new · {formatNumber(d.underReview)} under review
+        </p>
+      </div>
+      <Link
+        to={applicationsAdminPath(d.submitted > 0 ? 'submitted' : 'under_review')}
+        className="inline-flex min-h-11 w-full items-center gap-1.5 text-sm font-medium text-accent-ink hover:underline sm:w-auto"
+      >
+        Review applications <ArrowRight className="size-4" aria-hidden />
+      </Link>
+    </section>
   )
 }

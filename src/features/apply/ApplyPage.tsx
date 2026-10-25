@@ -11,7 +11,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { isDemoMode, service } from '@/services'
 import { APPLICATION_STEPS, MODEL_READINESS, PHOTO_READINESS, PRODUCT_COUNT_RANGES, validateApplication } from '../../../supabase/functions/_shared/application.ts'
-import { SiteFooter, SiteHeader } from '../marketing/SiteChrome'
+import { AuthHeading, AuthLayout, StepIndicator, authFieldsClass } from '../auth/AuthLayout'
 
 type Step = keyof typeof APPLICATION_STEPS
 const STEPS = Object.keys(APPLICATION_STEPS) as Step[]
@@ -186,214 +186,180 @@ export default function ApplyPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-canvas">
-      <SiteHeader />
-      <main className="mx-auto max-w-[1100px] px-5 py-12 sm:px-10 sm:py-16">
-        {done ? (
-          <Success
-            done={done}
-            onRestart={() => {
-              setParams({}, { replace: true, state: null })
-              setDraft(empty(lang))
-              setErrors({})
-              setDone(null)
-            }}
+    <AuthLayout photo="sofa" wide>
+      {done ? (
+        <Success
+          done={done}
+          onRestart={() => {
+            setParams({}, { replace: true, state: null })
+            setDraft(empty(lang))
+            setErrors({})
+            setDone(null)
+          }}
+        />
+      ) : (
+        <div>
+          <AuthHeading eyebrow={t('apply.eyebrow')} title={t('apply.title')}>
+            <p>{t('apply.intro')}</p>
+          </AuthHeading>
+          <StepIndicator
+            className="mt-10"
+            label={t('apply.progress')}
+            current={idx}
+            steps={STEPS.map((s) => t(`apply.step.${s}` as TranslationKey))}
+            onGo={(i) => i < idx && go(STEPS[i]!)}
+            compactLabels
           />
-        ) : (
-          <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-16">
-            <aside>
-              <h1 className="text-headline">{t('apply.title')}</h1>
-              <p className="mt-4 text-[15px] leading-7 text-ink-muted">{t('apply.intro')}</p>
-              <Progress current={idx} onGo={(i) => i < idx && go(STEPS[i]!)} />
-            </aside>
 
-            <form onSubmit={step === 'review' ? submit : next} noValidate className="min-w-0 border border-line bg-surface p-6 sm:p-10">
-              <p className="text-label text-ink-muted lg:hidden">{t('apply.stepOf', { n: idx + 1, total: STEPS.length })}</p>
-              <h2 ref={headingRef} tabIndex={-1} className="mt-2 font-display text-[1.9rem] leading-tight font-normal outline-none lg:mt-0">
-                {t(`apply.step.${step}` as TranslationKey)}
-              </h2>
-              <p className="mt-2 text-sm text-ink-muted">{t(`apply.step.${step}.hint` as TranslationKey)}</p>
+          <form onSubmit={step === 'review' ? submit : next} noValidate className={cn('mt-10 min-w-0', authFieldsClass)}>
+            <p className="text-label text-ink-muted">{t('apply.stepOf', { n: idx + 1, total: STEPS.length })}</p>
+            <h2 ref={headingRef} tabIndex={-1} className="mt-3 font-display text-[1.9rem] leading-tight font-normal outline-none">
+              {t(`apply.step.${step}` as TranslationKey)}
+            </h2>
+            <p className="mt-2 text-sm text-ink-muted">{t(`apply.step.${step}.hint` as TranslationKey)}</p>
 
-              {/* Honeypot: invisible to people, tempting to bots. */}
-              <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
-                <label>
-                  Company fax
-                  <input tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
-                </label>
-              </div>
+            {/* Honeypot: invisible to people, tempting to bots. */}
+            <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+              <label>
+                Company fax
+                <input tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
+              </label>
+            </div>
 
-              <div className="mt-8 space-y-5">
-                {step === 'business' && (
-                  <>
-                    <FormField label={t('apply.f.businessName')} required error={errors.businessName}>
-                      <Input value={draft.businessName} maxLength={80} autoComplete="organization" onChange={(e) => set('businessName', e.target.value)} />
+            <div className="mt-8 space-y-5">
+              {step === 'business' && (
+                <>
+                  <FormField label={t('apply.f.businessName')} required error={errors.businessName}>
+                    <Input value={draft.businessName} maxLength={80} autoComplete="organization" onChange={(e) => set('businessName', e.target.value)} />
+                  </FormField>
+                  <FormField label={t('apply.f.website')} optional={t('apply.optional')} hint={t('apply.f.website.hint')} error={errors.website}>
+                    <Input value={draft.website} inputMode="url" autoComplete="url" placeholder="www.example.com" onChange={(e) => set('website', e.target.value)} />
+                  </FormField>
+                  <FormField label={t('apply.f.category')} required error={errors.category && draft.categoryKey !== 'other' ? errors.category : undefined}>
+                    <Select value={draft.categoryKey} onChange={(e) => set('categoryKey', e.target.value)}>
+                      <option value="">{t('apply.choose')}</option>
+                      {CATEGORY_KEYS.map((c) => (
+                        <option key={c} value={c}>
+                          {t(`apply.cat.${c}` as TranslationKey)}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                  {draft.categoryKey === 'other' && (
+                    <FormField label={t('apply.f.categoryOther')} required error={errors.category}>
+                      <Input value={draft.categoryOther} maxLength={80} onChange={(e) => set('categoryOther', e.target.value)} />
                     </FormField>
-                    <FormField label={t('apply.f.website')} optional={t('apply.optional')} hint={t('apply.f.website.hint')} error={errors.website}>
-                      <Input value={draft.website} inputMode="url" autoComplete="url" placeholder="www.example.com" onChange={(e) => set('website', e.target.value)} />
-                    </FormField>
-                    <FormField label={t('apply.f.category')} required error={errors.category && draft.categoryKey !== 'other' ? errors.category : undefined}>
-                      <Select value={draft.categoryKey} onChange={(e) => set('categoryKey', e.target.value)}>
-                        <option value="">{t('apply.choose')}</option>
-                        {CATEGORY_KEYS.map((c) => (
-                          <option key={c} value={c}>
-                            {t(`apply.cat.${c}` as TranslationKey)}
-                          </option>
-                        ))}
-                      </Select>
-                    </FormField>
-                    {draft.categoryKey === 'other' && (
-                      <FormField label={t('apply.f.categoryOther')} required error={errors.category}>
-                        <Input value={draft.categoryOther} maxLength={80} onChange={(e) => set('categoryOther', e.target.value)} />
-                      </FormField>
-                    )}
-                    <FormField label={t('apply.f.description')} required hint={t('apply.f.description.hint', { n: draft.description.trim().length })} error={errors.description}>
-                      <Textarea rows={5} maxLength={1000} value={draft.description} onChange={(e) => set('description', e.target.value)} />
-                    </FormField>
-                  </>
-                )}
+                  )}
+                  <FormField label={t('apply.f.description')} required hint={t('apply.f.description.hint', { n: draft.description.trim().length })} error={errors.description}>
+                    <Textarea rows={5} maxLength={1000} value={draft.description} onChange={(e) => set('description', e.target.value)} />
+                  </FormField>
+                </>
+              )}
 
-                {step === 'location' && (
+              {step === 'location' && (
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FormField label={t('apply.f.country')} required error={errors.country}>
+                    <Input value={draft.country} maxLength={80} autoComplete="country-name" onChange={(e) => set('country', e.target.value)} />
+                  </FormField>
+                  <FormField label={t('apply.f.city')} required error={errors.city}>
+                    <Input value={draft.city} maxLength={80} autoComplete="address-level2" onChange={(e) => set('city', e.target.value)} />
+                  </FormField>
+                </div>
+              )}
+
+              {step === 'contact' && (
+                <>
                   <div className="grid gap-5 sm:grid-cols-2">
-                    <FormField label={t('apply.f.country')} required error={errors.country}>
-                      <Input value={draft.country} maxLength={80} autoComplete="country-name" onChange={(e) => set('country', e.target.value)} />
+                    <FormField label={t('apply.f.applicantName')} required error={errors.applicantName}>
+                      <Input value={draft.applicantName} maxLength={120} autoComplete="name" onChange={(e) => set('applicantName', e.target.value)} />
                     </FormField>
-                    <FormField label={t('apply.f.city')} required error={errors.city}>
-                      <Input value={draft.city} maxLength={80} autoComplete="address-level2" onChange={(e) => set('city', e.target.value)} />
+                    <FormField label={t('apply.f.applicantRole')} optional={t('apply.optional')} error={errors.applicantRole}>
+                      <Input value={draft.applicantRole} maxLength={80} autoComplete="organization-title" onChange={(e) => set('applicantRole', e.target.value)} />
                     </FormField>
                   </div>
-                )}
-
-                {step === 'contact' && (
-                  <>
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <FormField label={t('apply.f.applicantName')} required error={errors.applicantName}>
-                        <Input value={draft.applicantName} maxLength={120} autoComplete="name" onChange={(e) => set('applicantName', e.target.value)} />
-                      </FormField>
-                      <FormField label={t('apply.f.applicantRole')} optional={t('apply.optional')} error={errors.applicantRole}>
-                        <Input value={draft.applicantRole} maxLength={80} autoComplete="organization-title" onChange={(e) => set('applicantRole', e.target.value)} />
-                      </FormField>
-                    </div>
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <FormField label={t('apply.f.applicantEmail')} required hint={t('apply.f.applicantEmail.hint')} error={errors.applicantEmail}>
-                        <Input type="email" value={draft.applicantEmail} maxLength={320} autoComplete="email" onChange={(e) => set('applicantEmail', e.target.value)} />
-                      </FormField>
-                      <FormField label={t('apply.f.applicantPhone')} optional={t('apply.optional')} error={errors.applicantPhone}>
-                        <Input type="tel" value={draft.applicantPhone} maxLength={50} autoComplete="tel" onChange={(e) => set('applicantPhone', e.target.value)} />
-                      </FormField>
-                    </div>
-                    <Choice
-                      legend={t('apply.f.language')}
-                      name="language"
-                      value={draft.language}
-                      options={[
-                        ['en', 'English'],
-                        ['pt', 'Português'],
-                      ]}
-                      onChange={(v) => set('language', v as Lang)}
-                      error={errors.language}
-                    />
-                  </>
-                )}
-
-                {step === 'catalogue' && (
-                  <>
-                    <Choice legend={t('apply.f.productCount')} name="productCount" value={draft.productCount} options={PRODUCT_COUNT_RANGES.map((v) => [v, t(`apply.count.${v}` as TranslationKey)])} onChange={(v) => set('productCount', v)} error={errors.productCount} />
-                    <Choice legend={t('apply.f.photoReadiness')} name="photoReadiness" value={draft.photoReadiness} options={PHOTO_READINESS.map((v) => [v, t(`apply.photos.${v}` as TranslationKey)])} onChange={(v) => set('photoReadiness', v)} error={errors.photoReadiness} />
-                    <Choice
-                      legend={t('apply.f.modelReadiness')}
-                      hint={t('apply.f.modelReadiness.hint')}
-                      name="modelReadiness"
-                      value={draft.modelReadiness}
-                      options={MODEL_READINESS.map((v) => [v, t(`apply.models.${v}` as TranslationKey)])}
-                      onChange={(v) => set('modelReadiness', v)}
-                      error={errors.modelReadiness}
-                    />
-                    <FormField label={t('apply.f.notes')} optional={t('apply.optional')} error={errors.notes}>
-                      <Textarea rows={3} maxLength={1000} value={draft.notes} onChange={(e) => set('notes', e.target.value)} />
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <FormField label={t('apply.f.applicantEmail')} required hint={t('apply.f.applicantEmail.hint')} error={errors.applicantEmail}>
+                      <Input type="email" value={draft.applicantEmail} maxLength={320} autoComplete="email" onChange={(e) => set('applicantEmail', e.target.value)} />
                     </FormField>
-                  </>
-                )}
-
-                {step === 'review' && (
-                  <>
-                    <Review draft={draft} onEdit={go} />
-                    <Checkbox label={t('apply.f.consent')} checked={draft.consent} onChange={(e) => set('consent', e.target.checked)} aria-invalid={!!errors.consent} />
-                    {errors.consent && <p className="text-[13px] text-danger">{errors.consent}</p>}
-                    {submitError && (
-                      <InlineNotice tone="warning">
-                        <span role="alert">{submitError}</span>
-                      </InlineNotice>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {step !== 'review' && (APPLICATION_STEPS[step] as readonly string[]).some((f) => errors[f]) && (
-                <p role="alert" className="mt-6 text-[13px] text-danger">
-                  {t('apply.fixFields')}
-                </p>
+                    <FormField label={t('apply.f.applicantPhone')} optional={t('apply.optional')} error={errors.applicantPhone}>
+                      <Input type="tel" value={draft.applicantPhone} maxLength={50} autoComplete="tel" onChange={(e) => set('applicantPhone', e.target.value)} />
+                    </FormField>
+                  </div>
+                  <Choice
+                    legend={t('apply.f.language')}
+                    name="language"
+                    value={draft.language}
+                    options={[
+                      ['en', 'English'],
+                      ['pt', 'Português'],
+                    ]}
+                    onChange={(v) => set('language', v as Lang)}
+                    error={errors.language}
+                  />
+                </>
               )}
 
-              <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
-                {idx > 0 ? (
-                  <Button onClick={() => go(STEPS[idx - 1]!)} icon={<ArrowLeft className="size-4" aria-hidden />}>
-                    {t('apply.back')}
-                  </Button>
-                ) : (
-                  <span />
-                )}
-                {step === 'review' ? (
-                  <Button type="submit" variant="primary" size="lg" loading={submitting} icon={submitError ? <RotateCw className="size-4" aria-hidden /> : <Send className="size-4" aria-hidden />}>
-                    {submitError ? t('apply.retry') : t('apply.submit')}
-                  </Button>
-                ) : (
-                  <Button type="submit" variant="primary" size="lg">
-                    {t('apply.next')} <ArrowRight className="size-4" aria-hidden />
-                  </Button>
-                )}
-              </div>
-            </form>
-          </div>
-        )}
-      </main>
-      <SiteFooter />
-    </div>
-  )
-}
-
-function Progress({ current, onGo }: { current: number; onGo: (i: number) => void }) {
-  const { t } = useI18n()
-  return (
-    <ol className="mt-10 hidden space-y-1 lg:block" aria-label={t('apply.progress')}>
-      {STEPS.map((s, i) => {
-        const state = i < current ? 'done' : i === current ? 'current' : 'todo'
-        const content = (
-          <>
-            <span
-              className={cn(
-                'grid size-7 shrink-0 place-items-center rounded-full border text-xs',
-                state === 'done' ? 'border-ink bg-ink text-chalk' : state === 'current' ? 'border-ink text-ink' : 'border-line-strong text-ink-faint',
+              {step === 'catalogue' && (
+                <>
+                  <Choice legend={t('apply.f.productCount')} name="productCount" value={draft.productCount} options={PRODUCT_COUNT_RANGES.map((v) => [v, t(`apply.count.${v}` as TranslationKey)])} onChange={(v) => set('productCount', v)} error={errors.productCount} />
+                  <Choice legend={t('apply.f.photoReadiness')} name="photoReadiness" value={draft.photoReadiness} options={PHOTO_READINESS.map((v) => [v, t(`apply.photos.${v}` as TranslationKey)])} onChange={(v) => set('photoReadiness', v)} error={errors.photoReadiness} />
+                  <Choice
+                    legend={t('apply.f.modelReadiness')}
+                    hint={t('apply.f.modelReadiness.hint')}
+                    name="modelReadiness"
+                    value={draft.modelReadiness}
+                    options={MODEL_READINESS.map((v) => [v, t(`apply.models.${v}` as TranslationKey)])}
+                    onChange={(v) => set('modelReadiness', v)}
+                    error={errors.modelReadiness}
+                  />
+                  <FormField label={t('apply.f.notes')} optional={t('apply.optional')} error={errors.notes}>
+                    <Textarea rows={3} maxLength={1000} value={draft.notes} onChange={(e) => set('notes', e.target.value)} />
+                  </FormField>
+                </>
               )}
-              aria-hidden
-            >
-              {state === 'done' ? <Check className="size-3.5" /> : i + 1}
-            </span>
-            <span className={cn('text-sm', state === 'todo' ? 'text-ink-faint' : 'text-ink')}>{t(`apply.step.${s}` as TranslationKey)}</span>
-          </>
-        )
-        return (
-          <li key={s} aria-current={state === 'current' ? 'step' : undefined}>
-            {state === 'done' ? (
-              <button type="button" onClick={() => onGo(i)} className="flex w-full items-center gap-3 py-2 text-left hover:underline">
-                {content}
-              </button>
-            ) : (
-              <span className="flex items-center gap-3 py-2">{content}</span>
+
+              {step === 'review' && (
+                <>
+                  <Review draft={draft} onEdit={go} />
+                  <Checkbox label={t('apply.f.consent')} checked={draft.consent} onChange={(e) => set('consent', e.target.checked)} aria-invalid={!!errors.consent} />
+                  {errors.consent && <p className="text-[13px] text-danger">{errors.consent}</p>}
+                  {submitError && (
+                    <InlineNotice tone="warning">
+                      <span role="alert">{submitError}</span>
+                    </InlineNotice>
+                  )}
+                </>
+              )}
+            </div>
+
+            {step !== 'review' && (APPLICATION_STEPS[step] as readonly string[]).some((f) => errors[f]) && (
+              <p role="alert" className="mt-6 text-[13px] text-danger">
+                {t('apply.fixFields')}
+              </p>
             )}
-          </li>
-        )
-      })}
-    </ol>
+
+            <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
+              {idx > 0 ? (
+                <Button size="lg" onClick={() => go(STEPS[idx - 1]!)} icon={<ArrowLeft className="size-4" aria-hidden />}>
+                  {t('apply.back')}
+                </Button>
+              ) : (
+                <span />
+              )}
+              {step === 'review' ? (
+                <Button type="submit" variant="primary" size="lg" loading={submitting} icon={submitError ? <RotateCw className="size-4" aria-hidden /> : <Send className="size-4" aria-hidden />}>
+                  {submitError ? t('apply.retry') : t('apply.submit')}
+                </Button>
+              ) : (
+                <Button type="submit" variant="primary" size="lg">
+                  {t('apply.next')} <ArrowRight className="size-4" aria-hidden />
+                </Button>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
+    </AuthLayout>
   )
 }
 

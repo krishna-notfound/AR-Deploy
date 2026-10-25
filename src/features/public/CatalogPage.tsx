@@ -1,4 +1,4 @@
-import { Box, Eye, PauseCircle, SearchX, Store } from 'lucide-react'
+import { ArrowRight, Box, Eye, PauseCircle, SearchX, Store } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
@@ -6,7 +6,7 @@ import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
-import { SkeletonGrid } from '@/components/ui/Skeleton'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
 import { CATEGORIES, type Category, type Product } from '@/domain/types'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
@@ -24,7 +24,7 @@ import { TAP_TARGET } from './tapTarget'
 export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const params = useParams()
   const slug = tenantSlug ?? params.businessSlug ?? ''
-  const { t, lang, localized } = useI18n()
+  const { t, localized } = useI18n()
   const [search, setSearch] = useSearchParams()
   const q = search.get('q') ?? ''
   const cat = (CATEGORIES as readonly string[]).includes(search.get('category') ?? '') ? (search.get('category') as Category) : ''
@@ -119,24 +119,29 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
           </p>
         </div>
       )}
-      <section className="mx-auto grid max-w-[1320px] gap-8 px-5 pt-14 pb-10 sm:px-10 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-end lg:gap-16">
-        <div className="flex items-start gap-5">
-          {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
-          <div className="min-w-0">
-            <h1 className="text-headline">{b.name}</h1>
-            {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
-            {products.status === 'success' && (
-              <p className="mt-3 text-label text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
-            )}
+      {/* Title block as the landing's section headers: eyebrow, serif name and count left, description right, hairline. */}
+      <section className="mx-auto max-w-[1320px] px-5 pt-12 pb-10 sm:px-10 sm:pt-20 sm:pb-12">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-end lg:gap-16">
+          <div className="flex min-w-0 items-start gap-5">
+            {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
+            <div className="min-w-0">
+              <p className="text-eyebrow text-accent-ink">{t('catalog.eyebrow')}</p>
+              <h1 className="mt-3 text-headline break-words">{b.name}</h1>
+              {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
+              {products.status === 'success' && (
+                <p className="mt-4 text-label text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
+              )}
+            </div>
           </div>
+          {b.description && <p className="max-w-xl text-[15px] leading-7 text-ink-muted lg:justify-self-end">{b.description}</p>}
         </div>
-        {b.description && <p className="max-w-xl text-[15px] leading-7 text-ink-muted">{b.description}</p>}
       </section>
 
-      <div className="sticky top-16 z-20 border-y border-line bg-canvas/95 backdrop-blur-sm sm:top-20">
+      {/* Solid filter bar (no blur), hairline top and bottom. */}
+      <div className="sticky top-16 z-20 border-y border-line bg-canvas sm:top-20">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-8 sm:px-10">
           {categories.length > 1 && (
-            <div role="group" aria-label={t('catalog.categories')} className="-mx-5 -my-2 flex gap-7 overflow-x-auto px-5 py-2 sm:mx-0 sm:px-0">
+            <div role="group" aria-label={t('catalog.categories')} className="-mx-5 -my-1 flex min-w-0 gap-2 overflow-x-auto px-5 py-1 sm:mx-0 sm:px-0">
               {(['', ...categories] as const).map((c) => (
                 <button
                   key={c || 'all'}
@@ -145,8 +150,8 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   onClick={() => setParam('category', c)}
                   className={cn(
                     TAP_TARGET,
-                    'shrink-0 border-b py-2 text-label transition-colors',
-                    cat === c ? 'border-ink text-ink' : 'border-transparent text-ink-muted hover:text-ink',
+                    'h-9 shrink-0 rounded-[2px] border px-4 text-label transition-colors',
+                    cat === c ? 'border-obsidian bg-obsidian text-chalk' : 'border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink',
                   )}
                 >
                   {c ? t(`category.${c}`) : t('catalog.allCategories')}
@@ -154,15 +159,15 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
               ))}
             </div>
           )}
-          <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('catalog.searchLabel')} placeholder={t('catalog.searchPlaceholder')} className="sm:ml-auto sm:w-72" />
+          <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('catalog.searchLabel')} placeholder={t('catalog.searchPlaceholder')} className="sm:ml-auto sm:w-72 sm:shrink-0" />
         </div>
       </div>
 
-      <section className="mx-auto max-w-[1320px] px-5 py-12 sm:px-10 sm:py-16" aria-live="polite">
+      <section className="mx-auto max-w-[1320px] px-5 py-10 sm:px-10 sm:py-16" aria-live="polite">
         {products.status === 'loading' && !products.data ? (
-          <SkeletonGrid />
+          <CardSkeletons label={t('common.loading')} />
         ) : products.status === 'error' && !products.data ? (
-          <ErrorState message={t('common.errorTitle')} onRetry={products.refetch} retryLabel={t('common.retry')} />
+          <ErrorState message={t('common.errorTitle')} onRetry={products.refetch} retryLabel={t('common.retry')} className="py-24" />
         ) : all.length === 0 ? (
           <PublicMessage icon={Box} title={t('catalog.emptyTitle')} body={t('catalog.emptyBody')} />
         ) : visible.length === 0 ? (
@@ -173,31 +178,62 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
             action={<Button onClick={clearFilters}>{t('catalog.clearFilters')}</Button>}
           />
         ) : (
-          <ul className="grid grid-cols-1 gap-x-6 gap-y-14 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {visible.map((p) => (
-              <li key={p.id}>
-                <Link to={productHref(p)} className="group block focus-visible:outline-offset-4">
-                  <div className="relative overflow-hidden bg-subtle">
-                    <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
-                    {hasAny3d(p) && (
-                      <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 bg-canvas px-2 py-1 text-[13px] text-ink">
-                        <Box className="size-3" strokeWidth={1.5} aria-hidden />
-                        {t('catalog.has3d')}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-4 text-eyebrow text-ink-muted">{t(`category.${p.category}`)}</p>
-                  <div className="mt-1.5 flex items-baseline justify-between gap-3">
-                    <LocalizedSpan as="h2" text={p.name} className="font-display text-[1.4rem] leading-snug font-normal text-ink" />
-                    <span className="shrink-0 text-[14px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(initialPrice(p), p.currency, lang)}</span>
-                  </div>
-                  <LocalizedSpan as="p" text={p.shortDescription} className="mt-1 line-clamp-2 text-[13px] leading-5 text-ink-muted" />
-                </Link>
+          <ul className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+            {visible.map((p, i) => (
+              <li key={p.id} className="min-w-0">
+                <ProductCard product={p} index={i + 1} href={productHref(p)} />
               </li>
             ))}
           </ul>
         )}
       </section>
     </PublicShell>
+  )
+}
+
+/** A catalogue card in the landing's collection-card style: hairline frame, photo with an index chip, serif name. */
+function ProductCard({ product: p, index, href }: { product: Product; index: number; href: string }) {
+  const { t, lang, localized } = useI18n()
+  return (
+    <Link to={href} className="group flex h-full flex-col border border-line bg-surface p-3 transition-colors hover:border-line-strong focus-visible:outline-offset-4 sm:p-4">
+      <div className="relative overflow-hidden bg-subtle">
+        <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
+        <span className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate bg-surface px-2 py-1 text-[10px] leading-4 font-medium tracking-[0.18em] text-ink uppercase">
+          <span aria-hidden>{String(index).padStart(2, '0')} // </span>
+          {t(`category.${p.category}`)}
+        </span>
+        {hasAny3d(p) && (
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 bg-surface px-2 py-1 text-[10px] leading-4 font-medium tracking-[0.18em] text-accent-ink uppercase">
+            <Box className="size-3" strokeWidth={1.5} aria-hidden />
+            {t('catalog.has3d')}
+          </span>
+        )}
+      </div>
+      <LocalizedSpan as="h2" text={p.name} className="mt-5 font-display text-[1.45rem] leading-snug font-normal text-ink" />
+      <LocalizedSpan as="p" text={p.shortDescription} className="mt-1.5 mb-5 line-clamp-2 text-[13px] leading-5 text-ink-muted" />
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-4">
+        <span className="text-[14px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(initialPrice(p), p.currency, lang)}</span>
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-label text-ink transition-colors group-hover:text-accent-ink">
+          {t('catalog.viewPiece')}
+          <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden />
+        </span>
+      </div>
+    </Link>
+  )
+}
+
+/** Loading placeholders shaped like the cards. */
+function CardSkeletons({ label }: { label: string }) {
+  return (
+    <div className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4" role="status" aria-label={label}>
+      {Array.from({ length: 8 }, (_, i) => (
+        <div key={i} className="border border-line bg-surface p-3 sm:p-4">
+          <Skeleton className="aspect-[4/5] w-full" />
+          <Skeleton className="mt-5 h-5 w-2/3" />
+          <Skeleton className="mt-2 h-3.5 w-1/2" />
+          <Skeleton className="mt-6 h-3.5 w-1/4" />
+        </div>
+      ))}
+    </div>
   )
 }

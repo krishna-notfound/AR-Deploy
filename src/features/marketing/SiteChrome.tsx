@@ -1,6 +1,6 @@
 import { reducedMotion } from '@/lib/motion'
 import { Menu, UserRound, X } from 'lucide-react'
-import { type ComponentProps, useEffect, useRef } from 'react'
+import { type ComponentProps, type ReactNode, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigationType } from 'react-router'
 import { Wordmark } from '@/components/ui/BrandMark'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
@@ -12,21 +12,35 @@ import { isDemoMode } from '@/services'
 import { LanguageSwitcher } from '../public/PublicShell'
 import { TAP_TARGET } from '../public/tapTarget'
 
-// The reference navigation: every item is a section of the landing page (ids set in LandingPage).
-const NAV: { key: TranslationKey; href: string }[] = [
-  { key: 'site.nav.home', href: '/' },
+type NavItem = { key: TranslationKey; href: string }
+
+// Every item is a section of the landing page (ids set in LandingPage); "Parcerias" is the business band, "Contato" the footer.
+const NAV: NavItem[] = [
   { key: 'site.nav.collections', href: '/#colecoes' },
+  { key: 'site.nav.experience', href: '/#experiencia' },
   { key: 'site.nav.projects', href: '/#projetos' },
   { key: 'site.nav.about', href: '/#sobre' },
+  { key: 'site.nav.partners', href: '/#parcerias' },
   { key: 'site.nav.contact', href: '/#contato' },
+]
+
+const FOOTER_EXPLORE: NavItem[] = [
+  { key: 'site.nav.collections', href: '/#colecoes' },
+  { key: 'site.nav.experience', href: '/#experiencia' },
+  { key: 'site.nav.projects', href: '/#projetos' },
+]
+
+const FOOTER_BRAND: NavItem[] = [
+  { key: 'site.nav.about', href: '/#sobre' },
+  { key: 'site.nav.manifesto', href: '/#manifesto' },
+  { key: 'site.nav.partners', href: '/#parcerias' },
 ]
 
 const YEAR = new Date().getFullYear()
 
-
 /**
  * A link to a landing-page section ("/#sobre"). It goes through the router, whose ScrollRestoration scrolls the
- * section into view (each section has scroll-mt-20 for the header). On the landing page itself that scroll is made
+ * section into view (each section has scroll-mt-24 for the header). On the landing page itself that scroll is made
  * smooth, unless the visitor prefers reduced motion. Arriving from another page, useSectionScroll takes over.
  */
 export function SectionLink({ href, onClick, ...rest }: Omit<ComponentProps<typeof Link>, 'to'> & { href: string }) {
@@ -77,47 +91,59 @@ function useSiteText() {
   return { t: (key: TranslationKey, vars?: Vars) => (i18n ? i18n.t(key, vars) : translate('en', key, vars)), hasLang: !!i18n }
 }
 
+function useAccountLink() {
+  const { t } = useSiteText()
+  return isDemoMode ? { label: t('site.demo'), href: '/demo' } : { label: t('site.account'), href: '/login' }
+}
+
 /**
- * Header for the platform's own pages (landing, demo entry, sign-in). Tenant catalogues use PublicShell.
- * `overlay` sits on the landing hero photograph (chalk text); `solid` is the light bar used everywhere else.
+ * Header for the platform's own pages (landing, apply, demo entry, sign-in). Tenant catalogues use PublicShell.
+ * A solid surface bar with a hairline (no blur). `cta={false}` hides the apply and account links (sign-in pages).
  */
-export function SiteHeader({ variant = 'solid', cta = true }: { variant?: 'overlay' | 'solid'; cta?: boolean }) {
+export function SiteHeader({ cta = true }: { cta?: boolean }) {
   const { t, hasLang } = useSiteText()
+  const account = useAccountLink()
   const menuRef = useRef<HTMLDialogElement>(null)
-  const overlay = variant === 'overlay'
-  const accountLabel = isDemoMode ? t('site.demo') : t('site.account')
-  const accountHref = isDemoMode ? '/demo' : '/login'
 
   return (
-    <header className={cn('z-30', overlay ? 'absolute inset-x-0 top-0 text-chalk' : 'sticky top-0 border-b border-line bg-canvas/95 text-ink backdrop-blur-sm')}>
+    <header className="sticky top-0 z-30 border-b border-line bg-surface text-ink">
       <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-4 px-5 sm:h-20 sm:gap-6 sm:px-10">
         <Link to="/" aria-label={t('site.home')} className="flex min-h-11 shrink-0 items-center">
           <Wordmark size={15} />
         </Link>
-        <nav aria-label={t('site.nav.label')} className="mx-auto hidden lg:block">
-          <ul className="flex gap-10 text-label">
+        <nav aria-label={t('site.nav.label')} className="mx-auto hidden xl:block">
+          <ul className="flex gap-8 text-label">
             {NAV.map((n) => (
               <li key={n.key}>
-                <SectionLink href={n.href} className="py-2 opacity-90 transition-opacity hover:opacity-100">
+                <SectionLink href={n.href} className="py-2 text-ink-muted transition-colors hover:text-ink">
                   {t(n.key)}
                 </SectionLink>
               </li>
             ))}
           </ul>
         </nav>
-        <div className="ml-auto flex items-center gap-3 sm:gap-4 lg:ml-0">
+        <div className="ml-auto flex items-center gap-3 sm:gap-5 xl:ml-0">
           {hasLang && <LanguageSwitcher />}
           {cta && (
-            <Link to={APPLY_PATH} className="hidden border-b border-current pb-0.5 text-label opacity-90 hover:opacity-100 sm:inline">
+            // Below xl the section nav is in the menu, which leaves room for the apply link in the bar.
+            <Link to={APPLY_PATH} className="hidden border-b border-current pb-0.5 text-label sm:inline xl:hidden">
               {t('site.apply')}
             </Link>
           )}
           {cta && (
-            <Link to={accountHref} aria-label={accountLabel} title={accountLabel} className="hidden size-9 place-items-center opacity-90 hover:opacity-100 sm:grid">
-              <UserRound className="size-[18px]" strokeWidth={1.4} aria-hidden />
-            </Link>
+            <>
+              <span className="hidden h-4 w-px bg-line sm:block" aria-hidden />
+              <Link
+                to={account.href}
+                aria-label={account.label}
+                title={account.label}
+                className="hidden size-11 place-items-center text-ink-muted transition-colors hover:text-ink sm:grid"
+              >
+                <UserRound className="size-[18px]" strokeWidth={1.4} aria-hidden />
+              </Link>
+            </>
           )}
-          <button type="button" aria-label={t('site.menuOpen')} className="-mr-2 grid size-11 place-items-center lg:hidden" onClick={() => menuRef.current?.showModal()}>
+          <button type="button" aria-label={t('site.menuOpen')} className="-mr-2 grid size-11 place-items-center xl:hidden" onClick={() => menuRef.current?.showModal()}>
             <Menu className="size-5" strokeWidth={1.4} aria-hidden />
           </button>
         </div>
@@ -129,7 +155,7 @@ export function SiteHeader({ variant = 'solid', cta = true }: { variant?: 'overl
         aria-label={t('site.nav.label')}
         className="m-0 ml-auto h-dvh max-h-none w-full max-w-sm bg-obsidian p-0 text-chalk backdrop:bg-obsidian/60"
       >
-        <div className="flex h-full flex-col px-8 py-6">
+        <div className="flex h-full flex-col overflow-y-auto px-8 py-6">
           <div className="flex items-center justify-between">
             <Wordmark size={15} />
             <button type="button" aria-label={t('site.menuClose')} className="-mr-2 grid size-11 place-items-center" onClick={() => menuRef.current?.close()}>
@@ -152,8 +178,8 @@ export function SiteHeader({ variant = 'solid', cta = true }: { variant?: 'overl
                 <Link to={APPLY_PATH} className="mt-4 block py-1 text-label">
                   {t('site.apply')}
                 </Link>
-                <Link to={accountHref} className="mt-4 block py-1 text-label">
-                  {accountLabel}
+                <Link to={account.href} className="mt-4 block py-1 text-label">
+                  {account.label}
                 </Link>
               </>
             )}
@@ -164,37 +190,67 @@ export function SiteHeader({ variant = 'solid', cta = true }: { variant?: 'overl
   )
 }
 
-/** Reference footer: wordmark · section links · rights line, plus the honest-labelling notes the platform owes its visitors. */
+function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-label text-ink">{title}</h2>
+      <ul className="mt-5 space-y-3 text-[13px] text-ink-muted">{children}</ul>
+    </div>
+  )
+}
+
+const footerLink = cn(TAP_TARGET, 'transition-colors hover:text-ink')
+
+/**
+ * Wordmark and one line, three columns of real links (landing sections, apply, account), rights line and the
+ * honest-labelling notes the platform owes its visitors. No social links or contact details until the client
+ * supplies real ones (no placeholder addresses in production).
+ */
 export function SiteFooter() {
   const { t } = useSiteText()
+  const account = useAccountLink()
+  const sections = (items: NavItem[]) =>
+    items.map((n) => (
+      <li key={n.key}>
+        <SectionLink href={n.href} className={footerLink}>
+          {t(n.key)}
+        </SectionLink>
+      </li>
+    ))
   return (
-    <footer id="contato" className="scroll-mt-20 bg-canvas text-ink">
-      <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-12 gap-y-6 px-5 py-10 sm:px-10">
-        <Link to="/" aria-label={t('site.home')}>
-          <Wordmark size={14} />
-        </Link>
-        <nav aria-label={t('site.nav.label')}>
-          <ul className="flex flex-wrap gap-x-10 gap-y-7 text-label text-ink-muted">
-            {NAV.map((n) => (
-              <li key={n.key}>
-                <SectionLink href={n.href} className={cn(TAP_TARGET, 'hover:text-ink')}>
-                  {t(n.key)}
-                </SectionLink>
-              </li>
-            ))}
-          </ul>
+    <footer id="contato" className="scroll-mt-24 border-t border-line bg-surface text-ink">
+      <div className="mx-auto grid max-w-[1320px] gap-12 px-5 py-14 sm:px-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] lg:py-16">
+        <div>
+          <Link to="/" aria-label={t('site.home')} className={cn(TAP_TARGET, 'inline-flex')}>
+            <Wordmark size={14} />
+          </Link>
+          <p className="mt-4 max-w-xs text-[13px] leading-6 text-ink-muted">{t('site.footer.about')}</p>
+        </div>
+        <nav aria-label={t('site.footer.nav')} className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3">
+          <FooterColumn title={t('site.footer.explore')}>{sections(FOOTER_EXPLORE)}</FooterColumn>
+          <FooterColumn title={t('site.footer.brand')}>{sections(FOOTER_BRAND)}</FooterColumn>
+          <FooterColumn title={t('site.footer.business')}>
+            <li>
+              <Link to={APPLY_PATH} className={footerLink}>
+                {t('site.apply')}
+              </Link>
+            </li>
+            <li>
+              <Link to={account.href} className={footerLink}>
+                {account.label}
+              </Link>
+            </li>
+          </FooterColumn>
         </nav>
-        <Link to={APPLY_PATH} className="text-label text-ink hover:underline lg:ml-auto">
-          {t('site.apply')}
-        </Link>
-        <p className="text-label text-ink-muted">{t('site.rights', { year: YEAR })}</p>
       </div>
       <div className="border-t border-line">
-        {/* Contact details are shown only once the client supplies real ones (no placeholder addresses in production). */}
-        <p className="mx-auto max-w-[1320px] px-5 py-6 text-xs leading-5 text-ink-muted sm:px-10">
-          {t('site.credits')}
-          {isDemoMode ? ` ${t('site.sampleData')}` : ''}
-        </p>
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-6 sm:px-10 lg:flex-row lg:items-start lg:justify-between lg:gap-12">
+          <p className="shrink-0 text-label text-ink-muted">{t('site.rights', { year: YEAR })}</p>
+          <p className="max-w-2xl text-xs leading-5 text-ink-muted lg:text-right">
+            {t('site.credits')}
+            {isDemoMode ? ` ${t('site.sampleData')}` : ''}
+          </p>
+        </div>
       </div>
     </footer>
   )

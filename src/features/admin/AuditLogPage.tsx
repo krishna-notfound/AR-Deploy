@@ -46,13 +46,13 @@ export default function AuditLogPage() {
   return (
     <>
       <PageHeader title="Audit log" description="Who did what, recorded by the server. Entries cannot be edited or deleted." />
-      <Card className="mb-5 p-4">
-        <SearchInput value={search} onChange={(v) => set('q', v)} label="Search events" placeholder="Event, e.g. status, invitation, owner" className="md:max-w-md" />
-      </Card>
       <Card>
+        <div className="border-b border-line p-4 sm:px-6">
+          <SearchInput value={search} onChange={(v) => set('q', v)} label="Search events" placeholder="Event, e.g. status, invitation, owner" className="md:max-w-md" />
+        </div>
         <h2 className="sr-only">Events</h2>
         {q.status === 'loading' && !q.data ? (
-          <div className="p-5">
+          <div className="p-5 sm:px-6">
             <SkeletonRows rows={6} />
           </div>
         ) : q.status === 'error' && !q.data ? (
@@ -63,8 +63,11 @@ export default function AuditLogPage() {
           <>
             <ul className="divide-y divide-line">
               {q.data.items.map((e) => (
-                <li key={e.id} className="grid gap-1 px-5 py-3 md:grid-cols-[200px_1fr_auto] md:items-center md:gap-4">
-                  <span className="text-xs text-ink-muted">{formatDateTime(e.createdAt)}</span>
+                <li key={e.id} className="grid gap-1 px-5 py-3.5 transition-colors hover:bg-canvas/70 sm:px-6 md:grid-cols-[2rem_200px_1fr_auto] md:items-center md:gap-4">
+                  <span className="hidden size-8 place-items-center border border-line bg-canvas text-ink-muted md:grid" aria-hidden>
+                    <History className="size-3.5" strokeWidth={1.75} />
+                  </span>
+                  <span className="text-xs text-ink-muted tabular-nums">{formatDateTime(e.createdAt)}</span>
                   <span className="text-sm text-ink">
                     <span className="font-medium">{eventLabel(e.eventType)}</span>
                     {e.toStatus && (
@@ -95,9 +98,7 @@ export default function AuditLogPage() {
                 </li>
               ))}
             </ul>
-            <div className="border-t border-line px-5 py-3">
-              <Pagination page={page} pageSize={PAGE_SIZE} total={q.data.total} onPage={(p) => set('page', String(p))} noun="events" />
-            </div>
+            <Pagination page={page} pageSize={PAGE_SIZE} total={q.data.total} onPage={(p) => set('page', String(p))} noun="events" />
           </>
         )}
       </Card>

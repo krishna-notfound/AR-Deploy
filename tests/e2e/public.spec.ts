@@ -22,7 +22,7 @@ test('product without a model shows photos and no AR button', async ({ page }) =
   await page.goto('/products/nordhaus/fjord-shell-chair')
   await expect(page.getByText('3D view is not available for this product yet.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'View in AR' })).toHaveCount(0)
-  await expect(page.getByText('W 48', { exact: false }).or(page.getByText('48 cm').first())).toBeVisible()
+  await expect(page.getByText('W 48', { exact: false }).or(page.getByText('48 cm')).first()).toBeVisible()
 })
 
 test('broken model shows a recoverable error', async ({ page }) => {
@@ -144,11 +144,11 @@ test('in-app browser notice appears for Instagram, on the catalog (QR landing) a
   })
   const page = await ctx.newPage()
   await page.goto('/catalog/nordhaus')
-  await expect(page.getByText(/open this page in Safari/)).toBeVisible()
+  await expect(page.getByText(/AR works best in Safari/)).toBeVisible()
   await page.goto('/products/nordhaus/fjord-shell-chair')
-  await expect(page.getByText(/open this page in Safari/)).toBeVisible()
+  await expect(page.getByText(/AR works best in Safari/)).toBeVisible()
   await page.getByRole('button', { name: 'Dismiss' }).click()
-  await expect(page.getByText(/open this page in Safari/)).toBeHidden()
+  await expect(page.getByText(/AR works best in Safari/)).toBeHidden()
   await ctx.close()
 })
 

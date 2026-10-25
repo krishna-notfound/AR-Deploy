@@ -1,76 +1,105 @@
-import { Bell, ChevronsLeft, ChevronsRight, LogOut, Menu, Repeat, X } from 'lucide-react'
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { ArrowUpRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Repeat, X } from 'lucide-react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
 import { initials } from '@/auth/accounts'
 import { cn } from '@/lib/cn'
+import { formatNumber } from '@/lib/format'
 import { catalogLocalPath } from '@/lib/urls'
-import { formatRelative } from '@/lib/format'
-import { isDemoMode, service } from '@/services'
-import { useServiceQuery } from '@/services/hooks'
+import { isDemoMode } from '@/services'
 import { IconButton } from '../ui/Button'
 import { useFocusTrap } from '../ui/Modal'
-import { Popover } from '../ui/Menu'
 import { BrandMark, Wordmark } from '../ui/BrandMark'
-import { SmartImage } from '../ui/SmartImage'
 import { InlineNotice } from '../ui/States'
+import { DashboardContext, type DashboardContextValue, useDashboard, usePendingApplications } from './dashboardContext'
 import { FullPageSpinner } from './FullPageSpinner'
 import type { NavItem } from './nav'
 
 const SIDEBAR_KEY = 'arfurn:sidebar'
-const NOTIF_SEEN_KEY = 'arfurn:notifSeen'
 
-export function DashboardShell({ nav, variant }: { nav: NavItem[]; variant: 'admin' | 'business' }) {
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1')
+type Variant = 'admin' | 'business'
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function DashboardShell({ nav, variant }: { nav: NavItem[]; variant: Variant }) {
+  const [collapsed, setCollapsed] = useState(readCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const { business } = useAccount()
 
   useEffect(() => setMobileOpen(false), [location.pathname])
   useEffect(() => {
-    localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0')
+    try {
+      localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0')
+    } catch {
+      // Storage can be unavailable (private mode); the sidebar just forgets its state.
+    }
   }, [collapsed])
 
+  const ctx = useMemo<DashboardContextValue>(
+    () =>
+      variant === 'admin'
+        ? { variant, home: 'Sanctus Admin', homeTo: '/admin', eyebrow: 'Platform admin' }
+        : { variant, home: business?.name ?? 'My business', homeTo: '/dashboard', eyebrow: 'Business dashboard' },
+    [variant, business?.name],
+  )
+
   return (
-    <div className="min-h-dvh bg-canvas" style={{ '--sidebar-w': collapsed ? '68px' : '240px' } as React.CSSProperties}>
-      <a href="#main" className="sr-only z-50 rounded bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
-        Skip to content
-      </a>
-      {/* Desktop sidebar */}
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line bg-surface transition-[width] duration-150 lg:flex',
-          collapsed ? 'w-[68px]' : 'w-60',
-        )}
-      >
-        <SidebarContent nav={nav} variant={variant} collapsed={collapsed} />
-        <div className="border-t border-line p-2">
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-            className="flex h-9 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-[13px] text-ink-muted hover:bg-subtle hover:text-ink"
-          >
-            {collapsed ? <ChevronsRight className="size-4 shrink-0" aria-hidden /> : <ChevronsLeft className="size-4 shrink-0" aria-hidden />}
-            {!collapsed && 'Collapse'}
-          </button>
+    <DashboardContext.Provider value={ctx}>
+      <div className="min-h-dvh bg-canvas" style={{ '--sidebar-w': collapsed ? '72px' : '256px' } as React.CSSProperties}>
+        <a href="#main" className="sr-only z-50 rounded bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
+          Skip to content
+        </a>
+        {/* Desktop sidebar */}
+        <aside
+          className={cn(
+            'fixed inset-y-0 left-0 z-30 hidden flex-col bg-obsidian text-chalk transition-[width] duration-150 lg:flex',
+            collapsed ? 'w-[72px]' : 'w-64',
+          )}
+        >
+          <SidebarContent
+            nav={nav}
+            variant={variant}
+            collapsed={collapsed}
+            footer={
+              <button
+                type="button"
+                onClick={() => setCollapsed((c) => !c)}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-expanded={!collapsed}
+                className={cn(
+                  'flex h-9 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-[13px] text-chalk/70 hover:bg-white/5 hover:text-chalk focus-visible:outline-accent-bright',
+                  collapsed && 'justify-center px-0',
+                )}
+              >
+                {collapsed ? <ChevronsRight className="size-4 shrink-0" aria-hidden /> : <ChevronsLeft className="size-4 shrink-0" aria-hidden />}
+                {!collapsed && 'Collapse'}
+              </button>
+            }
+          />
+        </aside>
+
+        {/* Mobile drawer */}
+        {mobileOpen && <MobileDrawer nav={nav} variant={variant} onClose={() => setMobileOpen(false)} />}
+
+        <div className={cn('transition-[padding] duration-150', collapsed ? 'lg:pl-[72px]' : 'lg:pl-64')}>
+          <Topbar onMenu={() => setMobileOpen(true)} nav={nav} variant={variant} />
+          <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1320px] px-4 pt-6 pb-16 outline-none sm:px-6 lg:px-10 lg:pt-10">
+            {variant === 'business' && <CatalogStatusNotice />}
+            <Suspense fallback={<FullPageSpinner />}>
+              <Outlet />
+            </Suspense>
+          </main>
         </div>
-      </aside>
-
-      {/* Mobile drawer */}
-      {mobileOpen && <MobileDrawer nav={nav} variant={variant} onClose={() => setMobileOpen(false)} />}
-
-      <div className={cn('transition-[padding] duration-150', collapsed ? 'lg:pl-[68px]' : 'lg:pl-60')}>
-        <Topbar onMenu={() => setMobileOpen(true)} variant={variant} />
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1320px] px-4 pt-5 pb-16 outline-none sm:px-6 lg:px-8">
-          {variant === 'business' && <CatalogStatusNotice />}
-          <Suspense fallback={<FullPageSpinner />}>
-            <Outlet />
-          </Suspense>
-        </main>
       </div>
-    </div>
+    </DashboardContext.Provider>
   )
 }
 
@@ -88,7 +117,7 @@ export function CatalogStatusNotice() {
     </a>
   )
   return (
-    <InlineNotice tone="warning" className="mb-5">
+    <InlineNotice tone="warning" className="mb-6">
       {business.status === 'draft' ? (
         <>
           <strong className="font-medium">{business.name} is not public yet.</strong> You can add products now. Customers will see your
@@ -104,37 +133,69 @@ export function CatalogStatusNotice() {
   )
 }
 
-function Brand({ collapsed, variant }: { collapsed?: boolean; variant: 'admin' | 'business' }) {
+function Brand({ collapsed, variant }: { collapsed?: boolean; variant: Variant }) {
   const { business } = useAccount()
-  if (variant === 'business' && business) {
+  const label = variant === 'business' ? (business?.name ?? 'Business dashboard') : 'Admin console'
+  const to = variant === 'business' ? '/dashboard' : '/admin'
+  if (collapsed) {
     return (
-      <Link to="/dashboard" aria-label={collapsed ? `${business.name}, business dashboard` : undefined} className="flex min-w-0 items-center gap-2.5">
-        <SmartImage src={business.logoUrl} alt="" className="size-8 shrink-0 rounded-lg object-contain" />
-        {!collapsed && (
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-ink">{business.name}</span>
-            <span className="block text-[11px] text-ink-muted">Business dashboard</span>
-          </span>
-        )}
+      <Link to={to} aria-label={variant === 'business' ? `${label}, business dashboard` : 'Sanctus admin console'} className="grid size-10 place-items-center rounded-[var(--radius-control)] focus-visible:outline-accent-bright">
+        <BrandMark className="size-7 text-chalk" />
       </Link>
     )
   }
   return (
-    <Link to="/admin" aria-label={collapsed ? 'Sanctus platform admin' : undefined} className="flex items-center gap-2.5">
-      {collapsed ? <BrandMark className="text-ink" /> : <Wordmark sub="Platform admin" className="text-ink" />}
+    <Link to={to} className="flex min-w-0 flex-col items-start gap-2.5 rounded-[var(--radius-control)] focus-visible:outline-accent-bright">
+      <Wordmark size={15} className="text-chalk" />
+      <span className="max-w-full truncate border border-chalk/25 px-1.5 py-0.5 text-[10px] leading-none font-medium tracking-[0.18em] text-chalk/75 uppercase">
+        {label}
+      </span>
     </Link>
   )
 }
 
-function SidebarContent({ nav, variant, collapsed, onNavigate }: { nav: NavItem[]; variant: 'admin' | 'business'; collapsed?: boolean; onNavigate?: () => void }) {
-  const leave = useLeaveAccount()
+function NavBadge({ kind, collapsed }: { kind: NonNullable<NavItem['badge']>; collapsed?: boolean }) {
+  const q = usePendingApplications(kind === 'pendingApplications')
+  const n = q.data?.total ?? 0
+  if (!n) return null
+  const text = n > 99 ? '99+' : formatNumber(n)
   return (
     <>
-      <div className={cn('flex h-16 items-center border-b border-line', collapsed ? 'justify-center px-2' : 'px-4')}>
+      <span className="sr-only">, {formatNumber(n)} awaiting review</span>
+      <span
+        aria-hidden
+        className={cn(
+          'grid h-[18px] min-w-[18px] place-items-center rounded-[var(--radius-control)] bg-accent-bright px-1 text-[10.5px] leading-none font-semibold text-obsidian tabular-nums',
+          collapsed ? 'absolute top-0.5 right-1.5' : 'ml-auto',
+        )}
+      >
+        {text}
+      </span>
+    </>
+  )
+}
+
+function SidebarContent({
+  nav,
+  variant,
+  collapsed,
+  onNavigate,
+  footer,
+}: {
+  nav: NavItem[]
+  variant: Variant
+  collapsed?: boolean
+  onNavigate?: () => void
+  footer?: React.ReactNode
+}) {
+  return (
+    <>
+      <div className={cn('flex min-h-[84px] items-center border-b border-white/10', collapsed ? 'justify-center px-2' : 'px-5')}>
         <Brand collapsed={collapsed} variant={variant} />
       </div>
-      <nav aria-label="Main" className="flex-1 overflow-y-auto p-2">
-        <ul className="space-y-0.5">
+      {/* The user block sits inside the "Main" navigation so Log out stays with the other places to go. */}
+      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
+        <ul className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
           {nav.map((item) => (
             <li key={item.to}>
               <NavLink
@@ -144,171 +205,154 @@ function SidebarContent({ nav, variant, collapsed, onNavigate }: { nav: NavItem[
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'relative flex h-9 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors',
+                    'relative flex h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-[13.5px] transition-colors focus-visible:outline-accent-bright',
                     collapsed && 'justify-center px-0',
                     isActive
-                      ? 'bg-subtle font-medium text-ink before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-accent'
-                      : 'text-ink-muted hover:bg-subtle hover:text-ink',
+                      ? 'bg-white/[0.08] font-medium text-chalk before:absolute before:inset-y-2 before:left-0 before:w-[2px] before:bg-accent-bright'
+                      : 'text-chalk/70 hover:bg-white/[0.04] hover:text-chalk',
                   )
                 }
               >
-                <item.icon className="size-[18px] shrink-0" aria-hidden />
-                <span className={cn(collapsed && 'sr-only')}>{item.label}</span>
+                <item.icon className="size-[18px] shrink-0" strokeWidth={1.6} aria-hidden />
+                <span className={cn('truncate', collapsed && 'sr-only')}>{item.label}</span>
+                {item.badge && <NavBadge kind={item.badge} collapsed={collapsed} />}
               </NavLink>
             </li>
           ))}
-          <li>
-            <button
-              type="button"
-              onClick={() => void leave({ signOut: true })}
-              title={collapsed ? 'Log out' : undefined}
-              className={cn(
-                'flex h-9 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-ink-muted hover:bg-subtle hover:text-ink',
-                collapsed && 'justify-center px-0',
-              )}
-            >
-              <LogOut className="size-[18px] shrink-0" aria-hidden />
-              <span className={cn(collapsed && 'sr-only')}>Log out</span>
-            </button>
-          </li>
         </ul>
+        {footer && <div className="px-3 pb-2">{footer}</div>}
+        <UserBlock collapsed={collapsed} />
       </nav>
     </>
   )
 }
 
-function MobileDrawer({ nav, variant, onClose }: { nav: NavItem[]; variant: 'admin' | 'business'; onClose: () => void }) {
+function UserBlock({ collapsed }: { collapsed?: boolean }) {
+  const { user } = useAccount()
+  const leave = useLeaveAccount()
+  const iconBtn =
+    'grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-chalk/70 hover:bg-white/[0.06] hover:text-chalk focus-visible:outline-accent-bright pointer-coarse:size-11'
+  const actions = (
+    <>
+      <button
+        type="button"
+        // Supabase mode: the sign-in page sends a signed-in user straight back, so end the session first.
+        onClick={() => void leave({ signOut: !isDemoMode })}
+        aria-label="Switch account"
+        title="Switch account"
+        className={iconBtn}
+      >
+        <Repeat className="size-4" aria-hidden />
+      </button>
+      <button type="button" onClick={() => void leave({ signOut: true })} aria-label="Log out" title="Log out" className={iconBtn}>
+        <LogOut className="size-4" aria-hidden />
+      </button>
+    </>
+  )
+  return (
+    <div className={cn('border-t border-white/10 p-3', collapsed && 'flex flex-col items-center gap-1')}>
+      {collapsed ? (
+        actions
+      ) : (
+        <div className="flex items-center gap-2.5">
+          {user && (
+            <span className="grid size-9 shrink-0 place-items-center border border-chalk/25 font-display text-[15px] text-chalk" aria-hidden>
+              {initials(user.name)}
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium text-chalk">{user?.name ?? 'Signed in'}</p>
+            <p className="truncate text-[11px] text-chalk/65">
+              {user?.email}
+              {isDemoMode && ' · demo'}
+            </p>
+          </div>
+          {actions}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MobileDrawer({ nav, variant, onClose }: { nav: NavItem[]; variant: Variant; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   useFocusTrap(ref, true, onClose)
   return (
     <div className="fixed inset-0 z-40 lg:hidden">
-      <div className="absolute inset-0 animate-fade-in bg-ink/40" onClick={onClose} aria-hidden />
-      <div ref={ref} role="dialog" aria-modal="true" aria-label="Navigation" className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-surface shadow-[var(--shadow-pop)]">
-        <IconButton aria-label="Close navigation" onClick={onClose} className="absolute top-3 right-2">
-          <X className="size-5" />
-        </IconButton>
+      <div className="absolute inset-0 animate-fade-in bg-obsidian/50" onClick={onClose} aria-hidden />
+      <div ref={ref} role="dialog" aria-modal="true" aria-label="Navigation" className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-obsidian text-chalk shadow-[var(--shadow-pop)]">
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={onClose}
+          className="absolute top-5 right-3 grid size-11 place-items-center rounded-[var(--radius-control)] text-chalk/75 hover:bg-white/[0.06] hover:text-chalk focus-visible:outline-accent-bright"
+        >
+          <X className="size-5" aria-hidden />
+        </button>
         <SidebarContent nav={nav} variant={variant} onNavigate={onClose} />
       </div>
     </div>
   )
 }
 
-function Topbar({ onMenu, variant }: { onMenu: () => void; variant: 'admin' | 'business' }) {
+/** The nav item the current path belongs to (longest match), for the top bar's breadcrumb. */
+function useSection(nav: NavItem[]) {
+  const { pathname } = useLocation()
+  return [...nav]
+    .filter((i) => pathname === i.to || (!i.end && pathname.startsWith(`${i.to}/`)))
+    .sort((a, b) => b.to.length - a.to.length)[0]
+}
+
+function Topbar({ onMenu, nav, variant }: { onMenu: () => void; nav: NavItem[]; variant: Variant }) {
+  const section = useSection(nav)
+  const { business } = useAccount()
+  const { home, homeTo } = useDashboard() ?? { home: 'Sanctus', homeTo: '/' }
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line bg-canvas px-4 sm:px-6 lg:px-8">
-      <IconButton aria-label="Open navigation" onClick={onMenu} className="-ml-2 lg:hidden">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line bg-canvas px-4 sm:px-6 lg:px-10">
+      <IconButton aria-label="Open navigation" onClick={onMenu} className="-ml-2 lg:hidden pointer-coarse:size-11">
         <Menu className="size-5" />
       </IconButton>
-      <div className="lg:hidden">
-        <Brand variant={variant} collapsed />
-      </div>
-      <div className="ml-auto flex items-center gap-1.5">
+      <Link to={homeTo} aria-label="Sanctus, dashboard home" className="text-ink lg:hidden">
+        <Wordmark size={12} />
+      </Link>
+      <nav aria-label="You are here" className="hidden min-w-0 lg:block">
+        <ol className="flex min-w-0 items-center gap-2 text-[13px] text-ink-muted">
+          <li className="min-w-0 truncate">
+            <Link to={homeTo} className="hover:text-ink hover:underline">
+              {home}
+            </Link>
+          </li>
+          {section && (
+            <>
+              <li aria-hidden className="text-line-strong">
+                /
+              </li>
+              <li aria-current="page" className="truncate font-medium text-ink">
+                {section.label}
+              </li>
+            </>
+          )}
+        </ol>
+      </nav>
+      <div className="ml-auto flex items-center gap-2">
         {/* Honest labelling in the demo; a production owner has no use for the data source's name (DUX-08). */}
-        {isDemoMode && <span className="hidden rounded-full border border-line-strong px-2.5 py-1 text-[11px] font-medium text-ink-muted sm:inline">Demo mode</span>}
-        <Notifications variant={variant} />
-        <ProfileMenu />
+        {isDemoMode && (
+          <span className="hidden border border-line-strong px-2 py-1 text-[10.5px] font-medium tracking-[0.14em] text-ink-muted uppercase sm:inline">Demo mode</span>
+        )}
+        {variant === 'business' && business && (
+          <a
+            href={catalogLocalPath(business, { preview: business.status !== 'active' })}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex min-h-10 items-center gap-1.5 px-2 text-[13px] font-medium text-ink hover:underline pointer-coarse:min-h-11"
+          >
+            <span className="hidden sm:inline">{business.status === 'active' ? 'View catalog' : 'Preview catalog'}</span>
+            <span className="sm:hidden">Catalog</span>
+            <ArrowUpRight className="size-4" aria-hidden />
+            <span className="sr-only">(opens in a new tab)</span>
+          </a>
+        )}
       </div>
     </header>
-  )
-}
-
-function Notifications({ variant }: { variant: 'admin' | 'business' }) {
-  const { business } = useAccount()
-  const businessId = variant === 'business' ? business?.id : undefined
-  const q = useServiceQuery(() => service.getRecentActivity({ businessId, limit: 8 }), [businessId])
-  const [seen, setSeen] = useState(() => localStorage.getItem(NOTIF_SEEN_KEY) ?? '')
-  const items = q.data ?? []
-  const unread = items.filter((i) => i.at > seen).length
-  const markSeen = () => {
-    const latest = items[0]?.at ?? new Date().toISOString()
-    localStorage.setItem(NOTIF_SEEN_KEY, latest)
-    setSeen(latest)
-  }
-  return (
-    <Popover
-      label={unread ? `Notifications, ${unread} new` : 'Notifications'}
-      triggerClassName="relative grid size-10 place-items-center rounded-[var(--radius-control)] text-ink-muted hover:bg-subtle hover:text-ink"
-      trigger={
-        <>
-          <Bell className="size-[18px]" aria-hidden />
-          {unread > 0 && <span className="absolute top-2 right-2 size-2 rounded-full bg-danger ring-2 ring-canvas" aria-hidden />}
-        </>
-      }
-      panelClassName="w-[min(22rem,calc(100vw-2rem))]"
-    >
-      {() => (
-        <div>
-          <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <p className="text-sm font-semibold">Recent activity</p>
-            {unread > 0 && (
-              <button type="button" onClick={markSeen} className="text-xs font-medium text-accent-ink hover:underline">
-                Mark all as read
-              </button>
-            )}
-          </div>
-          {items.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-ink-muted">No activity yet.</p>
-          ) : (
-            <ul className="max-h-80 divide-y divide-line overflow-y-auto">
-              {items.map((a) => (
-                <li key={a.id} className="flex gap-3 px-4 py-2.5">
-                  <span className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', a.at > seen ? 'bg-accent' : 'bg-transparent')} aria-hidden />
-                  <div className="min-w-0">
-                    <p className="text-[13px] text-ink">{a.message}</p>
-                    <p className="text-xs text-ink-faint">{formatRelative(a.at)}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </Popover>
-  )
-}
-
-function ProfileMenu() {
-  const { user } = useAccount()
-  const leave = useLeaveAccount()
-  if (!user) return null
-  return (
-    <Popover
-      label="Account menu"
-      triggerClassName="grid size-9 place-items-center rounded-full bg-ink text-xs font-semibold text-white hover:opacity-90 pointer-coarse:size-11"
-      trigger={initials(user.name)}
-      panelClassName="w-64"
-    >
-      {(close) => (
-        <div className="py-1.5">
-          <div className="border-b border-line px-4 pt-2 pb-3">
-            <p className="truncate text-sm font-medium">{user.name}</p>
-            <p className="truncate text-xs text-ink-muted">{user.email}</p>
-            <p className="mt-1.5 text-[11px] text-ink-faint">{user.role === 'super_admin' ? 'Super Admin' : 'Business Admin'}
-              {isDemoMode && ' · demo account'}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              close()
-              // Supabase mode: the sign-in page sends a signed-in user straight back, so end the session first.
-              void leave({ signOut: !isDemoMode })
-            }}
-            className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm hover:bg-subtle"
-          >
-            <Repeat className="size-4 text-ink-muted" aria-hidden /> Switch account
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              close()
-              void leave({ signOut: true })
-            }}
-            className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm hover:bg-subtle"
-          >
-            <LogOut className="size-4 text-ink-muted" aria-hidden /> Log out
-          </button>
-        </div>
-      )}
-    </Popover>
   )
 }

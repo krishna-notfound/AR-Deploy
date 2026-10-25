@@ -1,10 +1,11 @@
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, Box, Eye, Globe, Percent, Rotate3d } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
-import { HorizontalBars, SERIES } from '@/components/charts/Charts'
+import { HorizontalBars } from '@/components/charts/Charts'
+import { PanelHeader } from '@/components/layout/PageHeader'
 import { SampleDataTag } from '@/components/ui/Badge'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { Card, CardBody } from '@/components/ui/Card'
 import { type Column, DataTable } from '@/components/ui/DataTable'
 import { Select } from '@/components/ui/Form'
 import { Thumb } from '@/components/ui/SmartImage'
@@ -16,12 +17,7 @@ import { formatNumber, formatPercent } from '@/lib/format'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { primaryImage } from '@/lib/product'
-import { hasArModel } from '../products/productReadiness'
-
-/** Stored AR launch attempts for a product, or null when it has no 3D model and none were recorded (shown as "No 3D"). */
-function arAttempts(p: Product | undefined, r: ProductAnalytics): number | null {
-  return !r.arActivations && p && !hasArModel(p) ? null : r.arActivations
-}
+import { MostViewedList, arAttempts } from './MostViewedList'
 
 /**
  * Shared analytics: product views and AR launch attempts only (design/16).
@@ -114,18 +110,18 @@ export function AnalyticsView({
       <StatGroup
         loading={loading}
         stats={[
-          { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
-          { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
+          { label: 'Product page views', icon: Eye, value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+          { label: 'AR launch attempts', icon: Box, value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
           // The seeded sample data has no 3D interactions: "0" next to thousands of views would read as broken tracking.
           s?.isSample && !s.totals.modelInteractions
-            ? { label: '3D interactions', value: 'Not recorded', hint: 'Not in the sample data' }
-            : { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Times a visitor turned or zoomed a 3D model' },
-          { label: 'AR launch rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : 'No views yet', hint: 'AR launch attempts per product page view' },
-          { label: 'Published products', value: formatNumber(s?.totals.published ?? 0), hint: 'Current' },
+            ? { label: '3D interactions', icon: Rotate3d, value: 'Not recorded', hint: 'Not in the sample data' }
+            : { label: '3D interactions', icon: Rotate3d, value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Times a visitor turned or zoomed a 3D model' },
+          { label: 'AR launch rate', icon: Percent, value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : 'No views yet', hint: 'AR launch attempts per product page view' },
+          { label: 'Published products', icon: Globe, value: formatNumber(s?.totals.published ?? 0), hint: 'Current' },
         ]}
         footer={
           s?.isSample && !onBusinessChange ? (
-            <span className="flex items-center gap-2">
+            <span className="flex flex-wrap items-center gap-2">
               <SampleDataTag /> Includes seeded sample data. Not live production analytics.
             </span>
           ) : undefined
@@ -133,15 +129,15 @@ export function AnalyticsView({
       />
 
       <Card>
-        <CardHeader title="Views and AR launch attempts" description="Daily totals, last 30 days" actions={!onBusinessChange && s?.isSample ? <SampleDataTag /> : undefined} />
-        <CardBody>{loading || !s ? <Skeleton className="h-40 w-full" /> : <ActivityTrend data={s.series} />}</CardBody>
+        <PanelHeader title="Views and AR launch attempts" description="Daily totals, last 30 days" actions={!onBusinessChange && s?.isSample ? <SampleDataTag /> : undefined} />
+        <CardBody className="sm:px-6 sm:pb-6">{loading || !s ? <Skeleton className="h-40 w-full" /> : <ActivityTrend data={s.series} />}</CardBody>
       </Card>
 
-      <div className={showBusinessCol ? 'grid gap-6 lg:grid-cols-2' : ''}>
+      <div className={showBusinessCol ? 'grid gap-6 lg:grid-cols-2 [&>*]:min-w-0' : ''}>
         {showBusinessCol && (
           <Card>
-            <CardHeader title="Views by business" description="Product page views, last 30 days" />
-            <CardBody>
+            <PanelHeader title="Views by business" description="Product page views, last 30 days" />
+            <CardBody className="sm:px-6">
               {loading || !s ? (
                 <Skeleton className="h-40 w-full" />
               ) : (
@@ -151,43 +147,21 @@ export function AnalyticsView({
           </Card>
         )}
         <Card>
-          <CardHeader title="Most viewed products" description="Product page views" />
-          <CardBody>
+          <PanelHeader title="Most viewed products" description="Product page views, last 30 days" />
+          <CardBody className="sm:px-6">
             {loading || productsLoading ? (
               <Skeleton className="h-40 w-full" />
             ) : top.length === 0 ? (
               <EmptyState icon={BarChart3} title="No product activity yet" body="Views and AR launch attempts appear once products are published and visited." />
             ) : (
-              <ol className="space-y-3">
-                {top.map((r, i) => {
-                  const p = productMap.get(r.productId)
-                  const attempts = arAttempts(p, r)
-                  const max = top[0]?.views || 1
-                  return (
-                    <li key={r.productId} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3">
-                      <span className="text-xs text-ink-faint tabular-nums">{i + 1}</span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{p?.name.en}</p>
-                        <div className="mt-1 h-1.5 rounded-full bg-subtle">
-                          <div className="h-full rounded-full" style={{ width: `${(r.views / max) * 100}%`, backgroundColor: SERIES.views.color }} />
-                        </div>
-                      </div>
-                      <span className="text-right text-xs text-ink-muted tabular-nums">
-                        {formatNumber(r.views)} views
-                        <br />
-                        {attempts === null ? 'No 3D model' : `${formatNumber(attempts)} AR attempts`}
-                      </span>
-                    </li>
-                  )
-                })}
-              </ol>
+              <MostViewedList rows={top} products={productMap} businesses={showBusinessCol ? bizMap : undefined} editBase={editBase} />
             )}
           </CardBody>
         </Card>
       </div>
 
       <Card>
-        <CardHeader title="Product performance" description="Select a column header to sort" />
+        <PanelHeader title="Product performance" description="Select a column header to sort" />
         <DataTable
           rows={rows}
           columns={columns}

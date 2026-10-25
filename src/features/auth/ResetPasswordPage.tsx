@@ -1,4 +1,4 @@
-import { KeyRound, MailCheck } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
@@ -8,7 +8,8 @@ import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
-import { SiteHeader } from '../marketing/SiteChrome'
+import { cn } from '@/lib/cn'
+import { AuthHeading, AuthLayout, StepIndicator, authFieldsClass } from './AuthLayout'
 import { authErrorText, normalizeCode } from './authErrors'
 
 export const MIN_PASSWORD_LENGTH = 12
@@ -97,82 +98,100 @@ export default function ResetPasswordPage() {
     </InlineNotice>
   )
 
-  return (
-    <div className="min-h-dvh bg-canvas">
-      <SiteHeader cta={false} />
-      <main className="mx-auto max-w-sm px-5 py-16 sm:py-24">
-        {hasSession === null ? (
-          <p className="text-sm text-ink-muted" role="status">
-            {t('reset.checking')}
-          </p>
-        ) : hasSession ? (
-          <>
-            <h1 className="text-title font-normal">{t('reset.newTitle')}</h1>
-            <form onSubmit={setNewPassword} className="mt-8 space-y-4" noValidate>
-              {errorNotice}
-              <FormField label={t('reset.newPassword')} hint={t('reset.passwordHint', { n: MIN_PASSWORD_LENGTH })}>
-                <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-              </FormField>
-              <FormField label={t('reset.passwordRepeat')}>
-                <Input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-              </FormField>
-              <Button type="submit" variant="primary" className="w-full" loading={pending} icon={<KeyRound className="size-4" aria-hidden />} disabled={!password || !confirm}>
-                {t('reset.save')}
-              </Button>
-            </form>
-          </>
-        ) : sent ? (
-          <>
-            <MailCheck className="size-6 text-accent" aria-hidden />
-            <h1 className="mt-4 text-title font-normal">{t('reset.sentTitle')}</h1>
-            <p className="mt-2 text-sm leading-6 text-ink-muted">{t('reset.sentBody', { email: email.trim() })}</p>
-            <form onSubmit={verifyCode} className="mt-8 space-y-4" noValidate>
-              {errorNotice}
-              <FormField label={t('reset.code')}>
-                <Input inputMode="numeric" autoComplete="one-time-code" maxLength={14} value={code} onChange={(e) => setCode(e.target.value)} />
-              </FormField>
-              <Button type="submit" variant="primary" className="w-full" loading={pending} disabled={!code.trim()}>
-                {t('reset.verify')}
-              </Button>
-              <div className="flex flex-wrap justify-between gap-x-4 gap-y-2 text-sm">
-                <Button type="button" variant="ghost" size="sm" loading={resending} onClick={() => void resendCode()}>
-                  {t('reset.resend')}
-                </Button>
-                <button
-                  type="button"
-                  className="text-accent-ink hover:underline"
-                  onClick={() => {
-                    setSent(false)
-                    setCode('')
-                    setError(null)
-                  }}
-                >
-                  {t('reset.otherEmail')}
-                </button>
-              </div>
-            </form>
-          </>
-        ) : (
-          <>
-            <h1 className="text-title font-normal">{t('reset.requestTitle')}</h1>
-            <p className="mt-2 text-sm text-ink-muted">{t('reset.requestIntro')}</p>
-            <form onSubmit={requestLink} className="mt-8 space-y-4" noValidate>
-              {errorNotice}
-              <FormField label={t('reset.email')}>
-                <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </FormField>
-              <Button type="submit" variant="primary" className="w-full" loading={pending} disabled={!email}>
-                {t('reset.send')}
-              </Button>
-              <p className="text-center text-sm">
-                <Link to="/login" className="text-accent-ink hover:underline">
-                  {t('reset.back')}
-                </Link>
-              </p>
-            </form>
-          </>
-        )}
-      </main>
+  const step = hasSession ? 2 : sent ? 1 : 0
+  const signInRow = (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-canvas px-5 py-3 text-sm">
+      <span className="text-ink-muted">{t('reset.remembered')}</span>
+      <Link to="/login" className="inline-flex min-h-11 items-center gap-2 text-label text-ink hover:text-accent-ink">
+        {t('reset.signIn')} <ArrowRight className="size-3.5" aria-hidden />
+      </Link>
     </div>
+  )
+
+  return (
+    <AuthLayout>
+      {hasSession === null ? (
+        <p className="text-sm text-ink-muted" role="status">
+          {t('reset.checking')}
+        </p>
+      ) : (
+        <>
+          <StepIndicator
+            label={t('reset.steps')}
+            current={step}
+            steps={[t('reset.step.request'), t('reset.step.verify'), t('reset.step.password')]}
+            className="mb-10"
+          />
+          {hasSession ? (
+            <>
+              <AuthHeading eyebrow={t('reset.eyebrow')} title={t('reset.newTitle')} />
+              <form onSubmit={setNewPassword} className={cn('mt-8 space-y-5', authFieldsClass)} noValidate>
+                {errorNotice}
+                <FormField label={t('reset.newPassword')} hint={t('reset.passwordHint', { n: MIN_PASSWORD_LENGTH })}>
+                  <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                </FormField>
+                <FormField label={t('reset.passwordRepeat')}>
+                  <Input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                </FormField>
+                <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending} disabled={!password || !confirm}>
+                  {t('reset.save')}
+                  {!pending && <ArrowRight className="size-4" aria-hidden />}
+                </Button>
+              </form>
+            </>
+          ) : sent ? (
+            <>
+              <AuthHeading eyebrow={t('reset.eyebrow')} title={t('reset.sentTitle')}>
+                <p>{t('reset.sentBody', { email: email.trim() })}</p>
+              </AuthHeading>
+              <form onSubmit={verifyCode} className={cn('mt-8 space-y-5', authFieldsClass)} noValidate>
+                {errorNotice}
+                <FormField label={t('reset.code')}>
+                  <Input inputMode="numeric" autoComplete="one-time-code" maxLength={14} value={code} onChange={(e) => setCode(e.target.value)} className="tracking-[0.2em]" />
+                </FormField>
+                <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending} disabled={!code.trim()}>
+                  {t('reset.verify')}
+                  {!pending && <ArrowRight className="size-4" aria-hidden />}
+                </Button>
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
+                  <Button type="button" variant="ghost" size="sm" className="-ml-3" loading={resending} onClick={() => void resendCode()}>
+                    {t('reset.resend')}
+                  </Button>
+                  <button
+                    type="button"
+                    className="min-h-11 text-accent-ink hover:underline sm:min-h-0"
+                    onClick={() => {
+                      setSent(false)
+                      setCode('')
+                      setError(null)
+                    }}
+                  >
+                    {t('reset.otherEmail')}
+                  </button>
+                </div>
+                {signInRow}
+              </form>
+            </>
+          ) : (
+            <>
+              <AuthHeading eyebrow={t('reset.eyebrow')} title={t('reset.requestTitle')}>
+                <p>{t('reset.requestIntro')}</p>
+              </AuthHeading>
+              <form onSubmit={requestLink} className={cn('mt-8 space-y-5', authFieldsClass)} noValidate>
+                {errorNotice}
+                <FormField label={t('reset.email')}>
+                  <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </FormField>
+                <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending} disabled={!email}>
+                  {t('reset.send')}
+                  {!pending && <ArrowRight className="size-4" aria-hidden />}
+                </Button>
+                <div className="pt-3">{signInRow}</div>
+              </form>
+            </>
+          )}
+        </>
+      )}
+    </AuthLayout>
   )
 }

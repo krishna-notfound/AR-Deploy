@@ -1,4 +1,4 @@
-import { LogIn } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
@@ -9,7 +9,9 @@ import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
 import { auth } from '@/services'
 import { APPLY_PATH } from '@/lib/urls'
-import { SiteHeader } from '../marketing/SiteChrome'
+import { cn } from '@/lib/cn'
+import { TAP_TARGET } from '../public/tapTarget'
+import { AuthHeading, AuthLayout, authFieldsClass } from './AuthLayout'
 
 /** Real sign-in (Supabase mode). In demo mode this route forwards to the demo account picker. */
 export default function LoginPage() {
@@ -40,65 +42,67 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-canvas">
-      <SiteHeader cta={false} />
-      <main className="mx-auto max-w-sm px-5 py-16 sm:py-24">
-        <h1 className="text-title font-normal">Sign in</h1>
-        <p className="mt-2 text-sm text-ink-muted">For platform admins and business owners.</p>
+    <AuthLayout>
+      <AuthHeading eyebrow="Platform access" title="Sign in">
+        <p>For platform admins and business owners.</p>
+      </AuthHeading>
 
-        {signedInEmail ? (
-          <div className="mt-8 space-y-6">
-            <InlineNotice tone="neutral">
-              Signed in as <strong className="font-medium">{signedInEmail}</strong>. This account does not manage a business.
+      {signedInEmail ? (
+        <div className="mt-8 space-y-6">
+          <InlineNotice tone="neutral">
+            Signed in as <strong className="font-medium">{signedInEmail}</strong>. This account does not manage a business.
+          </InlineNotice>
+          <p className="text-sm leading-6 text-ink-muted">
+            Business owners get access by invitation from the Sanctus team after their application is approved. If you applied, we will email you
+            when it has been reviewed.
+          </p>
+          <Button onClick={() => void leave({ signOut: true })}>Sign out</Button>
+        </div>
+      ) : (
+        <form onSubmit={submit} className={cn('mt-8 space-y-5', authFieldsClass)} noValidate>
+          {(error || accountError) && (
+            <InlineNotice tone="warning">
+              <span role="alert">{error ?? accountError}</span>
             </InlineNotice>
-            <p className="text-sm text-ink-muted">
-              Business owners get access by invitation from the Sanctus team after their application is approved. If you applied, we will email you
-              when it has been reviewed.
-            </p>
-            <Button onClick={() => void leave({ signOut: true })}>Sign out</Button>
-          </div>
-        ) : (
-          <form onSubmit={submit} className="mt-8 space-y-4" noValidate>
-            {(error || accountError) && (
-              <InlineNotice tone="warning">
-                <span role="alert">{error ?? accountError}</span>
-              </InlineNotice>
-            )}
-            <FormField label="Email">
-              <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </FormField>
-            <FormField label="Password">
-              <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-            </FormField>
-            <Button type="submit" variant="primary" className="w-full" loading={pending} icon={<LogIn className="size-4" aria-hidden />} disabled={!email || !password}>
-              Sign in
-            </Button>
-            <div className="flex items-center gap-3 text-xs text-ink-muted" aria-hidden>
-              <span className="h-px flex-1 bg-line" />
-              or
-              <span className="h-px flex-1 bg-line" />
-            </div>
-            {/* Placeholder until Google sign-in is configured in Supabase Auth: disabled and labelled, so it is not a dead button. */}
-            <Button type="button" variant="secondary" className="w-full" disabled icon={<GoogleMark />} aria-describedby="google-soon">
-              Continue with Google
-            </Button>
-            <p id="google-soon" className="-mt-2 text-center text-xs text-ink-muted">
-              Coming soon
-            </p>
-            <p className="text-center text-sm">
-              <Link to="/reset-password" className="text-accent-ink hover:underline">
+          )}
+          <FormField label="Email">
+            <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </FormField>
+          <FormField
+            label="Password"
+            aside={
+              <Link to="/reset-password" className={cn(TAP_TARGET, 'text-xs text-accent-ink hover:underline')}>
                 Forgot your password?
               </Link>
-            </p>
-            <p className="text-center text-sm">
-              <Link to={APPLY_PATH} className="text-accent-ink hover:underline">
-                New to Sanctus? Apply as a business
-              </Link>
-            </p>
-          </form>
-        )}
-      </main>
-    </div>
+            }
+          >
+            <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          </FormField>
+          <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending} disabled={!email || !password}>
+            Sign in
+            {!pending && <ArrowRight className="size-4" aria-hidden />}
+          </Button>
+          <div className="flex items-center gap-3 text-xs text-ink-muted" aria-hidden>
+            <span className="h-px flex-1 bg-line" />
+            or
+            <span className="h-px flex-1 bg-line" />
+          </div>
+          {/* Placeholder until Google sign-in is configured in Supabase Auth: disabled and labelled, so it is not a dead button. */}
+          <Button type="button" variant="secondary" className="h-11 w-full" disabled icon={<GoogleMark />} aria-describedby="google-soon">
+            Continue with Google
+          </Button>
+          <p id="google-soon" className="-mt-3 text-center text-xs text-ink-muted">
+            Coming soon
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-canvas px-5 py-4 text-sm">
+            <span className="text-ink-muted">New to Sanctus?</span>
+            <Link to={APPLY_PATH} className="inline-flex min-h-11 items-center gap-2 text-label text-ink hover:text-accent-ink">
+              Apply as a business <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          </div>
+        </form>
+      )}
+    </AuthLayout>
   )
 }
 

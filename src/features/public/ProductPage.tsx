@@ -209,6 +209,10 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     return Number.isInteger(c) ? String(c) : c.toFixed(1)
   }
 
+  const { width: dw, height: dh, depth: dd } = product.dimensions
+  const dimsLine = dw > 0 && dh > 0 && dd > 0 ? t('product.dimsLine', { w: fmtLen(dw), d: fmtLen(dd), h: fmtLen(dh), unit }) : ''
+  const stageChip = 'border border-line px-2 py-0.5 text-[10px] leading-4 font-medium tracking-[0.18em] text-ink'
+
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
   const textAction = cn(TAP_TARGET, 'inline-flex items-center border-b border-current pb-1 text-label text-ink transition-colors hover:text-accent-ink')
 
@@ -232,8 +236,24 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
         <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.7fr)] lg:gap-14">
           {/* Stage + 3D/AR rail (reference: centre stage, round actions on the right). Shown first on phones. */}
           <div ref={stageRef} className="scroll-mt-24 lg:sticky lg:top-28 lg:order-2 lg:self-start">
-            <div className="flex flex-col gap-5 lg:flex-row lg:gap-8">
-              <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-5 lg:flex-row lg:gap-6">
+              {/* Framed viewer card, as the landing's 3D section: a slim top bar of chips, the stage, a dimensions line. */}
+              <figure className="min-w-0 flex-1 border border-line bg-surface">
+                <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line px-3 py-2 sm:px-4">
+                  <p className="flex min-w-0 items-center gap-2.5 text-[10px] leading-4 font-medium tracking-[0.18em] uppercase">
+                    <span className={cn('size-1.5 shrink-0 rounded-full', mode === '3d' && modelState === 'loaded' ? 'bg-success' : 'bg-accent')} aria-hidden />
+                    <span className="shrink-0 text-ink">{mode === '3d' ? t('product.stage3d') : t('product.stagePhotos')}</span>
+                    <span className="hidden h-3 w-px shrink-0 bg-line sm:block" aria-hidden />
+                    <span className="hidden truncate text-ink-muted sm:block">{name}</span>
+                  </p>
+                  {(modelState === 'loaded' || availability === 'available') && (
+                    <p className="flex shrink-0 items-center gap-1.5">
+                      {modelState === 'loaded' && <span className={stageChip}>3D</span>}
+                      {availability === 'available' && <span className={stageChip}>AR</span>}
+                    </p>
+                  )}
+                </div>
+                <div className="p-2.5 sm:p-4">
                 <ProductMedia
                   name={name}
                   gallery={media.gallery}
@@ -253,9 +273,16 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                 {media.fallback && has3d && variant && (
                   <p className="mt-3 text-center text-xs text-ink-muted">{t('ar.variantFallback', { name: localized(variant.name) })}</p>
                 )}
-              </div>
+                </div>
+                {dimsLine && (
+                  <figcaption className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line px-3 py-3 sm:px-4">
+                    <span className="text-[10px] leading-4 font-medium tracking-[0.18em] text-ink-muted uppercase">{t('product.dimensions')}</span>
+                    <span className="text-[13px] text-ink-body tabular-nums">{dimsLine}</span>
+                  </figcaption>
+                )}
+              </figure>
               {(has3d || availability === 'available') && (
-                <ul className="flex justify-center gap-10 lg:flex-col lg:justify-start lg:gap-8 lg:pt-10">
+                <ul className="flex justify-center gap-10 lg:flex-col lg:justify-start lg:gap-7 lg:pt-14">
                   {has3d && (
                     <li>
                       <RailAction
@@ -276,17 +303,18 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             </div>
           </div>
 
-          <div className="min-w-0 lg:order-1">
-            <LocalizedSpan as="h1" text={product.name} className="font-display text-[2.4rem] leading-[1.05] font-normal text-balance text-ink sm:text-[2.9rem]" />
+          <div className="min-w-0 lg:order-1 lg:pt-2">
+            <p className="text-eyebrow text-accent-ink">{t(`category.${product.category}`)}</p>
+            <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
             <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
-            <LocalizedSpan as="p" text={product.shortDescription} className="mt-4 max-w-md text-[15px] leading-7 text-ink-muted" />
+            <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
 
-            <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="mt-8" />
+            <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="mt-8 border-t border-line pt-6" />
 
             <div className="mt-8 flex flex-col gap-5">
               {/* Only for a model that loaded; "AR" only where AR can open (AR-08). */}
               {modelState === 'loaded' && (
-                <button type="button" onClick={open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch bg-ink px-8 text-label text-chalk transition-colors hover:bg-umber sm:self-start">
+                <button type="button" onClick={open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch rounded-[2px] bg-obsidian px-8 text-label text-chalk transition-colors hover:bg-umber sm:self-start">
                   {availability === 'available' ? t('product.view3dAr') : t('product.view3d')}
                   <Box className="size-4" strokeWidth={1.4} aria-hidden />
                 </button>
@@ -327,11 +355,11 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
               </div>
               <div className="mt-4 grid items-center gap-4 sm:grid-cols-[1fr_auto]">
                 <DimensionDiagram dims={product.dimensions} unit={unit} />
-                <dl className="grid grid-cols-3 gap-3 text-sm sm:grid-cols-1 sm:gap-2.5">
+                <dl className="grid grid-cols-3 gap-3 text-sm sm:min-w-44 sm:grid-cols-1 sm:gap-0 sm:divide-y sm:divide-line">
                   {(['width', 'height', 'depth'] as const).map((k) => (
-                    <div key={k} className="sm:flex sm:items-baseline sm:justify-between sm:gap-6">
-                      <dt className="text-xs text-ink-muted">{t(`product.${k}`)}</dt>
-                      <dd className="font-medium tabular-nums">
+                    <div key={k} className="sm:flex sm:items-baseline sm:justify-between sm:gap-6 sm:py-2.5">
+                      <dt className="text-[10px] leading-4 font-medium tracking-[0.18em] text-ink-muted uppercase">{t(`product.${k}`)}</dt>
+                      <dd className="mt-1 text-[14px] text-ink tabular-nums sm:mt-0">
                         {fmtLen(product.dimensions[k])} {unit}
                       </dd>
                     </div>
@@ -342,19 +370,19 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             </section>
 
             {(localized(product.material) || product.weight) && (
-              <dl className="mt-6 space-y-5 border-t border-line pt-6">
+              <dl className="mt-8 divide-y divide-line border-y border-line">
                 {localized(product.material) && (
-                  <div>
-                    <dt className="text-eyebrow text-ink">{t('product.material')}</dt>
-                    <dd className="mt-1.5 text-[14px] text-ink-muted">
+                  <div className="flex items-baseline justify-between gap-6 py-4">
+                    <dt className="shrink-0 text-eyebrow text-ink">{t('product.material')}</dt>
+                    <dd className="min-w-0 text-right text-[14px] text-ink-muted">
                       <LocalizedSpan text={product.material} />
                     </dd>
                   </div>
                 )}
                 {product.weight && (
-                  <div>
-                    <dt className="text-eyebrow text-ink">{t('product.weight')}</dt>
-                    <dd className="mt-1.5 text-[14px] text-ink-muted tabular-nums">
+                  <div className="flex items-baseline justify-between gap-6 py-4">
+                    <dt className="shrink-0 text-eyebrow text-ink">{t('product.weight')}</dt>
+                    <dd className="text-right text-[14px] text-ink-muted tabular-nums">
                       {product.weight.value} {product.weight.unit}
                     </dd>
                   </div>
@@ -363,7 +391,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             )}
 
             {localized(product.description) && (
-              <section className="mt-6 border-t border-line pt-6" aria-labelledby="desc-h">
+              <section className={cn('pt-6', localized(product.material) || product.weight ? 'mt-0' : 'mt-8 border-t border-line')} aria-labelledby="desc-h">
                 <h2 id="desc-h" className="text-eyebrow text-ink">
                   {t('product.description')}
                 </h2>
@@ -374,14 +402,14 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
         </div>
 
         {additional.length > 0 && (
-          <section className="mt-16" aria-labelledby="more-h">
+          <section className="mt-20 border-t border-line pt-8" aria-labelledby="more-h">
             <h2 id="more-h" className="text-eyebrow text-ink">
               {t('product.morePhotos')}
             </h2>
-            <ul className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
               {additional.map((img) => (
-                <li key={img.id}>
-                  <SmartImage src={img.url} alt={img.alt || name} className="aspect-[4/3] w-full" />
+                <li key={img.id} className="border border-line bg-surface p-2.5 sm:p-3">
+                  <SmartImage src={img.url} alt={img.alt || name} className="aspect-[4/3] w-full bg-subtle" />
                 </li>
               ))}
             </ul>
@@ -449,7 +477,7 @@ function ScaleNote({ verified, separateUsdz, measured, unit }: { verified: boole
   }
   const size = `${toUnit(measured.x)} × ${toUnit(measured.y)} × ${toUnit(measured.z)} ${unit}`
   return (
-    <div className={cn('mt-4 flex items-start gap-2.5 px-3 py-2.5 text-[13px]', verified ? 'bg-success-soft text-success' : 'bg-subtle text-ink-muted')}>
+    <div className={cn('mt-5 flex items-start gap-2.5 border px-3.5 py-3 text-[13px]', verified ? 'border-success/20 bg-success-soft text-success' : 'border-line bg-subtle text-ink-muted')}>
       {verified ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden /> : <HelpCircle className="mt-0.5 size-4 shrink-0" aria-hidden />}
       <div>
         <p className="font-medium">{t(keys.title)}</p>
@@ -461,20 +489,20 @@ function ScaleNote({ verified, separateUsdz, measured, unit }: { verified: boole
   )
 }
 
-/** A round action of the reference's right-hand rail ("3D · Visualizar em 3D", "AR · Ver em AR"). */
+/** An action of the stage's rail ("3D · Visualizar em 3D", "AR · Ver em AR"): a hairline square, as the Sanctus chips. */
 function RailAction({ mark, label, onClick, pressed }: { mark: ReactNode; label: string; onClick: () => void; pressed?: boolean }) {
   return (
     <button type="button" onClick={onClick} className="group flex w-24 flex-col items-center gap-2.5 text-center">
       <span
         className={cn(
-          'grid size-12 place-items-center rounded-full border text-[11px] font-medium tracking-[0.08em] transition-colors',
-          pressed ? 'border-ink bg-ink text-chalk' : 'border-ink/70 text-ink group-hover:bg-ink group-hover:text-chalk',
+          'grid size-12 place-items-center rounded-[2px] border text-[11px] font-medium tracking-[0.12em] transition-colors',
+          pressed ? 'border-obsidian bg-obsidian text-chalk' : 'border-line-strong bg-surface text-ink group-hover:border-obsidian group-hover:bg-obsidian group-hover:text-chalk',
         )}
         aria-hidden
       >
         {mark}
       </span>
-      <span className="text-[12px] leading-4 text-ink-body">{label}</span>
+      <span className="text-[10px] leading-4 font-medium tracking-[0.16em] text-ink-body uppercase">{label}</span>
     </button>
   )
 }

@@ -2,7 +2,8 @@ import { MailPlus, RefreshCw, Trash2, UserCheck, UserPlus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button, IconButton } from '@/components/ui/Button'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { PanelHeader } from '@/components/layout/PageHeader'
+import { Card, CardBody } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FormField, Input, Select } from '@/components/ui/Form'
 import { SkeletonRows } from '@/components/ui/Skeleton'
@@ -83,7 +84,7 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
 
   return (
     <Card>
-      <CardHeader title="Owner" description="Each business has exactly one owner, invited by a platform admin." />
+      <PanelHeader title="Owner" description="Each business has exactly one owner, invited by a platform admin." />
       <CardBody className="space-y-5">
         {members.status === 'loading' && !members.data ? (
           <SkeletonRows rows={2} />

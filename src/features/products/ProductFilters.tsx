@@ -85,7 +85,7 @@ export function ProductFilterBar({
   businesses?: Business[]
 }) {
   return (
-    <div className="flex flex-col gap-2 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-center">
+    <div className="flex flex-col gap-2 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-6">
       <SearchInput value={state.q} onChange={(q) => update({ q })} label="Search products by name" placeholder="Search by product name" className="sm:w-72" />
       {businesses && (
         <Select aria-label="Filter by business" value={state.business} onChange={(e) => update({ business: e.target.value })} className="sm:w-52">

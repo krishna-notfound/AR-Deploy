@@ -3,7 +3,7 @@ import { Badge, type Tone } from '@/components/ui/Badge'
 import type { ApplicationStatus, EmailAttemptStatus } from '@/domain/types'
 
 const APP_LABEL: Record<ApplicationStatus, [string, Tone]> = {
-  submitted: ['Submitted', 'info'],
+  submitted: ['Submitted', 'accent'],
   under_review: ['Under review', 'warning'],
   approved: ['Approved', 'success'],
   rejected: ['Rejected', 'danger'],

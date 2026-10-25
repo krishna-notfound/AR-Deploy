@@ -41,13 +41,13 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-5 p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold">{b.name}</h2>
+            <h2 className="font-display text-[1.75rem] leading-tight font-normal">{b.name}</h2>
             <BusinessStatusBadge status={b.status} />
           </div>
 
           <div>
-            <p className="text-[13px] font-medium">Catalog URL</p>
-            <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-line bg-canvas py-1.5 pr-1.5 pl-3">
+            <p className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Catalog URL</p>
+            <div className="mt-2 flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas py-1.5 pr-1.5 pl-3">
               <code className="min-w-0 flex-1 truncate text-sm">{catalog.catalogUrl}</code>
               <CopyButton text={catalog.catalogUrl} label="Copy URL" toastTitle="Catalog URL copied" />
             </div>
@@ -72,12 +72,12 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
 
           <dl className="grid grid-cols-2 gap-4 border-t border-line pt-5 text-sm sm:max-w-sm">
             <div>
-              <dt className="text-[13px] text-ink-muted">Published products</dt>
-              <dd className="mt-0.5 text-xl font-semibold tabular-nums">{catalog.publishedProductCount}</dd>
+              <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Published products</dt>
+              <dd className="mt-2 font-display text-[2rem] leading-none lining-nums tabular-nums">{catalog.publishedProductCount}</dd>
             </div>
             <div>
-              <dt className="text-[13px] text-ink-muted">All products</dt>
-              <dd className="mt-0.5 text-xl font-semibold tabular-nums">{catalog.totalProductCount}</dd>
+              <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">All products</dt>
+              <dd className="mt-2 font-display text-[2rem] leading-none lining-nums tabular-nums">{catalog.totalProductCount}</dd>
             </div>
           </dl>
 
@@ -90,7 +90,7 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
         </div>
 
         <div className="flex min-w-0 flex-col items-center border-t border-line bg-canvas p-6 md:border-t-0 md:border-l">
-          <div className="w-full max-w-[220px] rounded-xl bg-white p-3 shadow-[var(--shadow-card)]">
+          <div className="w-full max-w-[220px] border border-line bg-white p-3">
             {qr.url ? (
               <img src={qr.url} alt={`QR code linking to ${target}`} className="aspect-square w-full" />
             ) : qr.error ? (

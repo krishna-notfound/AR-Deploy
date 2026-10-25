@@ -1,5 +1,6 @@
 import { Mail } from 'lucide-react'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { PanelHeader } from '@/components/layout/PageHeader'
+import { Card, CardBody } from '@/components/ui/Card'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { ID } from '@/domain/types'
@@ -13,7 +14,7 @@ export function EmailActivity({ applicationId, businessId }: { applicationId?: I
   const q = useServiceQuery(() => service.getEmailAttempts({ applicationId, businessId }), [applicationId, businessId])
   return (
     <Card>
-      <CardHeader title="Email activity" description="Each attempt as recorded by the platform. “Accepted” means Resend took the message; only “Delivered” confirms arrival." />
+      <PanelHeader title="Email activity" description="Each attempt as recorded by the platform. “Accepted” means Resend took the message; only “Delivered” confirms arrival." />
       <CardBody>
         {q.status === 'loading' && !q.data ? (
           <SkeletonRows rows={3} />

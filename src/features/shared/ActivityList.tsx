@@ -22,15 +22,15 @@ export function ActivityList({ query }: { query: QueryResult<ActivityItem[]> }) 
   const items = query.data ?? []
   if (items.length === 0) return <EmptyState title="No activity yet" body="Changes to businesses and products will appear here." />
   return (
-    <ol className="space-y-3.5">
+    <ol className="space-y-4">
       {items.map((a) => {
         const Icon = ICON[a.kind]
         return (
           <li key={a.id} className="flex gap-3">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-subtle text-ink-muted">
-              <Icon className="size-3.5" aria-hidden />
+            <span className="grid size-8 shrink-0 place-items-center border border-line bg-canvas text-ink-muted">
+              <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
             </span>
-            <div className="min-w-0 pt-0.5">
+            <div className="min-w-0">
               <p className="text-[13px] leading-5 text-ink">{a.message}</p>
               <p className="text-xs text-ink-faint">
                 <time dateTime={a.at}>{formatRelative(a.at)}</time>

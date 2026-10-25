@@ -29,3 +29,6 @@ test-results
 .env
 .env.*
 !.env.example
+
+# Stitch exports (large screenshots; brief and HTML kept locally)
+design/stitch/**/screenshot.*

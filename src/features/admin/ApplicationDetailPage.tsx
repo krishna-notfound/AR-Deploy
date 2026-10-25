@@ -2,11 +2,11 @@ import { scrollBehavior } from '@/lib/motion'
 import { ArrowDown, Building2, Check, Eye, FileX, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { PageHeader, PanelHeader } from '@/components/layout/PageHeader'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { BusinessStatusBadge } from '@/components/ui/Badge'
 import { Button, ButtonLink } from '@/components/ui/Button'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { Card, CardBody } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FormField, Textarea } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
@@ -162,7 +162,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
             </InlineNotice>
           )}
           <Card>
-            <CardHeader title="Business" />
+            <PanelHeader title="Business" />
             <CardBody>
               <Answers
                 rows={[
@@ -176,7 +176,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title="Applicant" />
+            <PanelHeader title="Applicant" />
             <CardBody>
               <Answers
                 rows={[
@@ -190,7 +190,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title="Catalogue readiness" />
+            <PanelHeader title="Catalogue readiness" />
             <CardBody>
               <Answers
                 rows={[
@@ -204,7 +204,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
           </Card>
           {app.businessId && (
             <Card>
-              <CardHeader
+              <PanelHeader
                 title="Business record"
                 actions={
                   <ButtonLink to={businessAdminPath(app.businessId)} size="sm" icon={<Building2 className="size-4" aria-hidden />}>

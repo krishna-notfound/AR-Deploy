@@ -1,9 +1,9 @@
 import { RotateCcw } from 'lucide-react'
 import { useState } from 'react'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { PageHeader, PanelHeader } from '@/components/layout/PageHeader'
 import { useAccount } from '@/auth/AccountProvider'
 import { Button } from '@/components/ui/Button'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { Card, CardBody } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Switch } from '@/components/ui/Form'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -49,28 +49,28 @@ export default function AdminSettingsPage() {
       <PageHeader title="Settings" />
       <div className="max-w-3xl space-y-6">
         <Card>
-          <CardHeader title="Profile" description={isDemoMode ? 'Demo account. Real sign-in needs Supabase mode.' : 'Signed in with Supabase Auth.'} />
-          <CardBody>
+          <PanelHeader title="Profile" description={isDemoMode ? 'Demo account. Real sign-in needs Supabase mode.' : 'Signed in with Supabase Auth.'} />
+          <CardBody className="sm:px-6">
             <dl className="grid gap-4 text-sm sm:grid-cols-3">
               <div>
-                <dt className="text-[13px] text-ink-muted">Name</dt>
-                <dd className="mt-0.5 font-medium">{user?.name}</dd>
+                <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Name</dt>
+                <dd className="mt-1.5 font-medium">{user?.name}</dd>
               </div>
               <div>
-                <dt className="text-[13px] text-ink-muted">Email</dt>
-                <dd className="mt-0.5 font-medium">{user?.email}</dd>
+                <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Email</dt>
+                <dd className="mt-1.5 font-medium">{user?.email}</dd>
               </div>
               <div>
-                <dt className="text-[13px] text-ink-muted">Role</dt>
-                <dd className="mt-0.5 font-medium">Super Admin</dd>
+                <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Role</dt>
+                <dd className="mt-1.5 font-medium">Super Admin</dd>
               </div>
             </dl>
           </CardBody>
         </Card>
 
         <Card>
-          <CardHeader title="Data backend" />
-          <CardBody>
+          <PanelHeader title="Data backend" />
+          <CardBody className="sm:px-6">
             {isDemoMode ? (
               <p className="text-sm text-ink-muted">
                 <strong className="font-medium text-ink">Demo mode.</strong> Sample data stored in this browser. To use Supabase, set VITE_DATA_MODE=supabase with the
@@ -87,8 +87,8 @@ export default function AdminSettingsPage() {
 
         {isDemoMode && (
         <Card>
-          <CardHeader title="Demo data" description="Changes are saved in this browser only." />
-          <CardBody className="space-y-5">
+          <PanelHeader title="Demo data" description="Changes are saved in this browser only." />
+          <CardBody className="space-y-5 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="max-w-md text-sm text-ink-muted">Restore the original sample businesses, products and analytics.</p>
               <Button onClick={reset} loading={resetting} icon={<RotateCcw className="size-4" aria-hidden />}>
@@ -114,7 +114,7 @@ export default function AdminSettingsPage() {
 
         {isDemoMode && (
         <Card>
-          <CardHeader title="What this demo does and does not do" description="Frontend behaviour versus functionality that needs the backend phase." />
+          <PanelHeader title="What this demo does and does not do" description="Frontend behaviour versus functionality that needs the backend phase." />
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead>
@@ -147,8 +147,8 @@ export default function AdminSettingsPage() {
         )}
 
         <Card>
-          <CardHeader title="Sample asset credits" />
-          <CardBody>
+          <PanelHeader title="Sample asset credits" />
+          <CardBody className="sm:px-6">
             <ul className="space-y-1.5 text-[13px] text-ink-muted">
               {MODEL_CREDITS.map((m) => (
                 <li key={m.name}>

@@ -1,0 +1,747 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-primary-container": "#878481", "tertiary-container": "#1e1c16", "on-tertiary-fixed-variant": "#49473f", "secondary": "#6e5b43", "on-background": "#1c1c18", "secondary-container": "#f5dcbd", "surface-dim": "#dcdad3", "on-secondary-fixed": "#261906", "inverse-on-surface": "#f3f0e9", "on-secondary": "#ffffff", "on-primary-fixed": "#1c1b19", "inverse-surface": "#31312c", "on-secondary-container": "#726047", "tertiary-fixed": "#e7e2d8", "primary-fixed": "#e6e2de", "on-error-container": "#93000a", "surface-tint": "#605e5b", "on-secondary-fixed-variant": "#55442d", "surface-container-low": "#f6f3ec", "surface-container-high": "#ebe8e1", "on-primary": "#ffffff", "primary": "#010101", "outline": "#7a776f", "surface-container": "#f1eee7", "inverse-primary": "#cac6c2", "tertiary-fixed-dim": "#cac6bd", "primary-container": "#1d1c1a", "background": "#fcf9f2", "error-container": "#ffdad6", "on-surface-variant": "#494740", "surface-variant": "#e5e2db", "surface-bright": "#fcf9f2", "on-surface": "#1c1c18", "on-primary-fixed-variant": "#484644", "outline-variant": "#cbc6bd", "on-tertiary-container": "#87847c", "on-error": "#ffffff", "secondary-fixed": "#f8dfc0", "primary-fixed-dim": "#cac6bd", "on-tertiary": "#ffffff", "surface-container-lowest": "#ffffff", "on-tertiary-fixed": "#1d1c16", "secondary-fixed-dim": "#dbc3a5", "tertiary": "#010100", "surface": "#fcf9f2", "error": "#ba1a1a", "surface-container-highest": "#e5e2db" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-md": "1rem", "space-sm": "0.5rem", "margin-desktop": "4rem", "space-xs": "0.25rem", "gutter": "1.5rem", "margin-tablet": "2.5rem", "space-xl": "2.5rem", "margin": "1.25rem", "space-lg": "1.5rem", "gutter-desktop": "2.5rem", "space-2xl": "4rem" }, "fontFamily": { "body-lg": ["Manrope"], "label-md": ["Manrope"], "headline-lg": ["EB Garamond"], "headline-sm": ["EB Garamond"], "eyebrow": ["Manrope"], "label-sm": ["Manrope"], "display-hero-mobile": ["EB Garamond"], "headline-md": ["EB Garamond"], "body-sm": ["Manrope"], "body-md": ["Manrope"], "display-hero": ["EB Garamond"], "headline-lg-mobile": ["EB Garamond"] }, "fontSize": { "body-lg": ["16px", { "lineHeight": "26px", "letterSpacing": "0.01em", "fontWeight": "400" }], "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0.06em", "fontWeight": "500" }], "headline-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "0", "fontWeight": "400" }], "headline-sm": ["22px", { "lineHeight": "30px", "letterSpacing": "0.01em", "fontWeight": "400" }], "eyebrow": ["11px", { "lineHeight": "16px", "letterSpacing": "0.18em", "fontWeight": "500" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "500" }], "display-hero-mobile": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.01em", "fontWeight": "400" }], "headline-md": ["28px", { "lineHeight": "36px", "letterSpacing": "0.01em", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "22px", "letterSpacing": "0.01em", "fontWeight": "400" }], "display-hero": ["56px", { "lineHeight": "64px", "letterSpacing": "-0.01em", "fontWeight": "400" }], "headline-lg-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "0", "fontWeight": "400" }] } } } };</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-72 bg-primary-container text-inverse-on-surface z-50 flex flex-col justify-between select-none transition-all duration-300" id="appSidebar"><div class="flex flex-col flex-1 min-h-0"><div class="h-16 px-space-lg flex items-center justify-between"><div class="flex flex-col"><span class="font-eyebrow text-eyebrow tracking-[0.18em] uppercase text-on-primary-container font-medium">Sanctus Platform</span><span class="font-headline-sm text-headline-sm text-inverse-on-surface tracking-tight font-normal">Console</span></div><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container-high/10 text-on-primary-container border border-outline-variant/20 uppercase tracking-widest">Admin</span></div><div class="px-space-md py-space-sm"><div class="h-px w-full bg-outline-variant/15"></div></div><nav class="flex-1 px-space-sm space-y-1 overflow-y-auto" data-active-classes="bg-surface-container-high/15 text-inverse-on-surface font-medium border-l-2 border-secondary-fixed"><a class="flex items-center gap-3 px-space-md py-2.5 rounded-lg text-on-primary-container hover:bg-surface-container-high/10 hover:text-inverse-on-surface transition-colors" data-path="overview" href="#"><span class="material-symbols-outlined text-[19px]">dashboard</span><span class="font-label-md text-label-md tracking-wider flex-1">Overview</span></a><a aria-current="page" class="flex items-center justify-between px-space-md py-2.5 rounded-lg transition-colors bg-surface-container-high/15 text-inverse-on-surface font-medium border-l-2 border-secondary-fixed" data-path="applications" href="#"><div class="flex items-center gap-3"><span class="material-symbols-outlined text-[19px]">domain_verification</span><span class="font-label-md text-label-md tracking-wider">Applications</span></div><span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-surface-container-high/20 text-inverse-on-surface">12</span></a><a class="flex items-center gap-3 px-space-md py-2.5 rounded-lg text-on-primary-container hover:bg-surface-container-high/10 hover:text-inverse-on-surface transition-colors" data-path="businesses-ateliers" href="#"><span class="material-symbols-outlined text-[19px]">storefront</span><span class="font-label-md text-label-md tracking-wider flex-1">Businesses / Ateliers</span></a><a class="flex items-center gap-3 px-space-md py-2.5 rounded-lg text-on-primary-container hover:bg-surface-container-high/10 hover:text-inverse-on-surface transition-colors" data-path="all-products" href="#"><span class="material-symbols-outlined text-[19px]">view_in_ar</span><span class="font-label-md text-label-md tracking-wider flex-1">All Products</span></a><a class="flex items-center gap-3 px-space-md py-2.5 rounded-lg text-on-primary-container hover:bg-surface-container-high/10 hover:text-inverse-on-surface transition-colors" data-path="analytics-telemetry" href="#"><span class="material-symbols-outlined text-[19px]">query_stats</span><span class="font-label-md text-label-md tracking-wider flex-1">Analytics &amp; Telemetry</span></a><a class="flex items-center gap-3 px-space-md py-2.5 rounded-lg text-on-primary-container hover:bg-surface-container-high/10 hover:text-inverse-on-surface transition-colors" data-path="catalogs-qr-codes" href="#"><span class="material-symbols-outlined text-[19px]">qr_code_2</span><span class="font-label-md text-label-md tracking-wider flex-1">Catalogs &amp; QR Codes</span></a><a class="flex items-center gap-3 px-space-md py-2.5 rounded-lg text-on-primary-container hover:bg-surface-container-high/10 hover:text-inverse-on-surface transition-colors" data-path="audit-log" href="#"><span class="material-symbols-outlined text-[19px]">history</span><span class="font-label-md text-label-md tracking-wider flex-1">Audit Log</span></a><a class="flex items-center gap-3 px-space-md py-2.5 rounded-lg text-on-primary-container hover:bg-surface-container-high/10 hover:text-inverse-on-surface transition-colors" data-path="settings" href="#"><span class="material-symbols-outlined text-[19px]">settings</span><span class="font-label-md text-label-md tracking-wider flex-1">Settings</span></a></nav></div><div class="p-space-md flex flex-col gap-3"><div class="px-space-md py-2.5 rounded-lg bg-surface-container-high/5 flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#34d399]"></span><span class="font-label-sm text-label-sm text-on-primary-container tracking-wider">Spatial Engine 3.4</span></div><span class="font-eyebrow text-[10px] text-inverse-on-surface uppercase tracking-widest opacity-80">Active</span></div><div class="h-px w-full bg-outline-variant/15"></div><div class="flex items-center justify-between px-space-sm pt-1"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-surface-container-high/20 border border-outline-variant/30 flex items-center justify-center text-inverse-on-surface font-label-md text-label-md">SA</div><div class="flex flex-col text-left"><span class="font-label-md text-label-md text-inverse-on-surface font-medium leading-none">Super Admin</span><span class="font-eyebrow text-eyebrow text-on-primary-container tracking-wider mt-0.5">sanctus.internal</span></div></div><div class="flex items-center gap-1"><button class="p-1.5 rounded hover:bg-surface-container-high/10 text-on-primary-container hover:text-inverse-on-surface transition-colors" title="Sign out" type="button"><span class="material-symbols-outlined text-[18px]">logout</span></button><button class="p-1.5 rounded hover:bg-surface-container-high/10 text-on-primary-container hover:text-inverse-on-surface transition-colors" title="Collapse navigation" type="button" id="sidebarToggleBtn" onclick="toggleSidebar()"><span class="material-symbols-outlined text-[18px]">keyboard_double_arrow_left</span></button></div></div></div></aside><div class="pl-72 transition-all duration-300" id="mainContentWrapper"><header class="fixed top-0 left-72 right-0 h-16 bg-surface/90 backdrop-blur-md z-40 px-space-xl flex items-center justify-between transition-all duration-300" id="topNavHeader"><div class="flex items-center gap-3 text-on-surface-variant font-label-md text-label-md"><span class="text-on-surface-variant/70">Sanctus Admin</span><span class="font-eyebrow text-on-surface-variant/40">/</span><span class="text-on-surface font-medium tracking-wide">Applications</span></div><div class="flex items-center gap-space-lg"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[18px]">search</span><input class="w-72 bg-surface-container-low text-on-surface font-body-sm text-body-sm pl-9 pr-12 py-1.5 rounded border border-outline-variant/30 focus:outline-none focus:border-primary transition-colors placeholder:text-on-surface-variant/60" placeholder="Search platform..." type="text"><kbd class="absolute right-2 px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-sm text-[10px] tracking-widest uppercase border border-outline-variant/30 pointer-events-none">⌘K</kbd></div><div class="flex items-center gap-3"><button class="relative p-2 rounded-full hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary"></span></button><div class="relative flex items-center"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#34d399] ring-2 ring-surface"></span></div></div></div></header><main class="relative pt-16 bg-surface w-full min-h-screen px-space-xl py-space-lg"><div class="flex flex-col w-full">
+<!-- Top Curatorial Banner & Metric Dossier Header -->
+<header class="relative mb-space-xl flex flex-col md:flex-row md:items-end justify-between gap-space-lg">
+<div class="max-w-2xl">
+<div class="flex items-center gap-2 mb-2">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="font-eyebrow text-eyebrow tracking-[0.2em] text-secondary uppercase font-medium">Curatorial Onboarding Division</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight font-normal">Applications</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1.5 max-w-xl">
+        Ateliers &amp; Design Houses requesting platform onboarding. Curate admissions, verify spatial 3D fidelity, and issue cryptographic salon invitation tokens.
+      </p>
+</div>
+<!-- Quick Administrative Dispatch -->
+<div class="flex items-center gap-3">
+<button class="group flex items-center gap-2 px-space-md py-2.5 rounded bg-surface-container-low text-on-surface hover:bg-surface-container transition-all" type="button">
+<span class="material-symbols-outlined text-[17px] text-secondary">download</span>
+<span class="font-label-md text-label-md tracking-wider">Export Audit CSV</span>
+</button>
+<button class="flex items-center gap-2.5 px-space-lg py-2.5 rounded bg-primary text-on-primary hover:bg-inverse-surface transition-colors shadow-sm" onclick="document.getElementById('inviteModal').classList.remove('hidden')" type="button">
+<span class="font-label-md text-label-md tracking-wider">Invite Atelier Directly</span>
+<span class="material-symbols-outlined text-[17px] text-secondary-fixed">arrow_forward</span>
+</button>
+</div>
+</header>
+<!-- Metric Architecture (Bento KPI Deck) -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-xl">
+<!-- Card 1: Pending -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between group hover:bg-surface-container-low transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-eyebrow text-eyebrow tracking-[0.16em] uppercase text-on-surface-variant font-medium">Pending Review</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/40 text-on-secondary-container font-label-sm text-[10px] tracking-wide">+4 this week</span>
+</div>
+<div class="mt-4 flex items-baseline gap-3">
+<span class="font-headline-lg text-headline-lg text-primary font-normal leading-none tracking-tight">14</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">dossiers queued</span>
+</div>
+<div class="mt-3 flex items-center gap-1.5 text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-label-sm text-label-sm">Requires curatorial signature</span>
+</div>
+</div>
+<!-- Card 2: Approved Ateliers -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between group hover:bg-surface-container-low transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-eyebrow text-eyebrow tracking-[0.16em] uppercase text-on-surface-variant font-medium">Approved Ateliers</span>
+<span class="flex items-center gap-1 text-[#23543A] font-label-sm text-[10px] uppercase tracking-wider bg-[#E8F2EC] px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[12px]">verified</span> Active
+        </span>
+</div>
+<div class="mt-4 flex items-baseline gap-3">
+<span class="font-headline-lg text-headline-lg text-primary font-normal leading-none tracking-tight">142</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">houses in registry</span>
+</div>
+<div class="mt-3 font-label-sm text-label-sm text-on-surface-variant">
+<span class="text-on-surface font-medium">98.2%</span> catalogue active in AR space
+      </div>
+</div>
+<!-- Card 3: Spatial QA Verification -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between group hover:bg-surface-container-low transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-eyebrow text-eyebrow tracking-[0.16em] uppercase text-on-surface-variant font-medium">Spatial Engine QA</span>
+<span class="font-eyebrow text-[10px] uppercase tracking-widest text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">3D Inspect</span>
+</div>
+<div class="mt-4 flex items-baseline gap-3">
+<span class="font-headline-lg text-headline-lg text-primary font-normal leading-none tracking-tight">6</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">assets benchmarking</span>
+</div>
+<div class="mt-3 flex items-center gap-2">
+<div class="h-1 flex-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 68%;"></div>
+</div>
+<span class="font-label-sm text-[11px] text-on-surface-variant">USDZ/glTF</span>
+</div>
+</div>
+<!-- Card 4: Strict Curatorial Benchmark -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between group hover:bg-surface-container-low transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-eyebrow text-eyebrow tracking-[0.16em] uppercase text-on-surface-variant font-medium">Rejection Rate</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Selective 1:32</span>
+</div>
+<div class="mt-4 flex items-baseline gap-3">
+<span class="font-headline-lg text-headline-lg text-primary font-normal leading-none tracking-tight">3.1%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">refusal index</span>
+</div>
+<div class="mt-3 font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-secondary">workspace_premium</span>
+<span class="">Strict galleried protocol</span>
+</div>
+</div>
+</section>
+<!-- Interactive 3D Spatial Pipeline Preview Strip (Referencing In-Situ AR & Mesh Ingestion) -->
+
+<!-- Filter & Spatial Control Deck -->
+<section class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm mb-space-lg flex flex-col gap-4">
+<!-- Primary Filter Bar -->
+<div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+<!-- Search -->
+<div class="relative flex-1 max-w-lg">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full bg-surface-container-low text-on-surface font-body-sm text-body-sm pl-10 pr-4 py-2.5 rounded focus:outline-none focus:ring-1 focus:ring-primary transition-all placeholder:text-on-surface-variant/60" id="atelierSearch" placeholder="Search by atelier name, designer, dossier ref (#ABE43EC0)..." type="text">
+</div>
+<!-- Segmented Status Badges -->
+<div class="flex items-center gap-1 overflow-x-auto py-1 text-on-surface">
+<button class="px-3 py-1.5 rounded-full bg-primary text-on-primary font-label-sm text-label-sm tracking-wider whitespace-nowrap" type="button">
+          All (162)
+        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm tracking-wider whitespace-nowrap flex items-center gap-1.5" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+          Pending (14)
+        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm tracking-wider whitespace-nowrap flex items-center gap-1.5" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-[#34d399]"></span>
+          Approved (142)
+        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-sm text-label-sm tracking-wider whitespace-nowrap" type="button">
+          In QA (6)
+        </button>
+</div>
+</div>
+<!-- Secondary Refinements & Dropdown Bar -->
+<div class="flex flex-wrap items-center justify-between gap-3 pt-3 bg-surface-container-low/30 -mx-space-md -mb-space-md px-space-md py-3 rounded-b-xl">
+<div class="flex flex-wrap items-center gap-3">
+<!-- Category Dropdown -->
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest text-on-surface font-label-sm text-label-sm pl-3 pr-8 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
+<option>All Disciplines: Furniture, Lighting, Travertine</option>
+<option>Marcenaria &amp; Fine Woodwork</option>
+<option>Architectural &amp; Spatial Lighting</option>
+<option>Cast Bronze &amp; Stone Sculptural</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] text-on-surface-variant">expand_more</span>
+</div>
+<!-- Geography Dropdown -->
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest text-on-surface font-label-sm text-label-sm pl-3 pr-8 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
+<option>Origin: Global Salon</option>
+<option>Portugal (Lisboa, Porto)</option>
+<option>Italy (Milano, Verona)</option>
+<option>Brazil (São Paulo, Rio)</option>
+<option>Japan (Kyoto, Tokyo)</option>
+<option>France &amp; Scandinavia</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] text-on-surface-variant">expand_more</span>
+</div>
+<!-- Date Range Filter -->
+<button class="flex items-center gap-2 bg-surface-container-lowest px-3 py-1.5 rounded text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm" type="button">
+<span class="material-symbols-outlined text-[15px]">calendar_today</span>
+<span class="">Window: Oct 1 — Present</span>
+</button>
+</div>
+<!-- Batch Actions -->
+<div class="flex items-center gap-2">
+<span class="font-eyebrow text-eyebrow text-on-surface-variant uppercase tracking-wider">Showing 6 of 162 Dossiers</span>
+<button class="px-2.5 py-1 rounded bg-surface-container text-on-surface-variant/40 font-label-sm text-[11px] uppercase tracking-wider cursor-not-allowed" disabled="" type="button">
+          Batch Sign (0)
+        </button>
+</div>
+</div>
+</section>
+<!-- Dossier Application Ledger (Bespoke Luxury Table) -->
+<section class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden mb-space-2xl">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-eyebrow text-eyebrow tracking-[0.16em] uppercase">
+<th class="py-3.5 px-space-lg font-medium w-12">
+<input class="rounded text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer" type="checkbox">
+</th>
+<th class="py-3.5 px-4 font-medium">Atelier &amp; Spatial Dossier</th>
+<th class="py-3.5 px-4 font-medium">Principal &amp; Curatorial Channel</th>
+<th class="py-3.5 px-4 font-medium">Curatorial Status</th>
+<th class="py-3.5 px-4 font-medium">Ingestion Date</th>
+<th class="py-3.5 px-space-lg font-medium text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high/40 font-body-sm text-body-sm">
+<!-- ROW 1: QA Email Test Atelier (Pending) -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="py-space-md px-space-lg">
+<input class="rounded text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-4">
+<div class="flex items-center gap-3.5">
+<div class="w-11 h-11 rounded bg-surface-container-high flex items-center justify-center font-headline-sm text-headline-sm text-on-surface font-normal">
+                  QA
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-[18px] text-primary font-normal group-hover:text-secondary transition-colors">QA Email Test Atelier</span>
+<span class="font-eyebrow text-[10px] tracking-wider text-secondary px-1.5 py-0.2 rounded bg-secondary-container/40">New</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="font-mono text-[11px] tracking-wide text-primary">#ABE43EC0</span>
+<span class="">•</span>
+<span class="">Furniture Craft</span>
+<span class="">•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">location_on</span> Porto, Portugal
+                    </span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-4">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-medium">Tiago Menezes</span>
+<a class="text-on-surface-variant hover:text-primary transition-colors text-[13px] flex items-center gap-1" href="mailto:test.atelier@sanctus.design">
+                  qa.atelier@test-sanctus.pt
+                </a>
+<a class="font-label-sm text-[11px] text-secondary hover:text-on-surface tracking-wider uppercase mt-1 flex items-center gap-0.5" href="#">
+                  View Dossier PDF <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+</a>
+</div>
+</td>
+<td class="py-space-md px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FCF3E2] text-[#8C5A14] font-label-sm text-[11px] tracking-wider uppercase font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-[#8C5A14] animate-ping"></span>
+                Pending Review
+              </span>
+<div class="font-label-sm text-[10px] text-on-surface-variant mt-1">Awaiting chief curator</div>
+</td>
+<td class="py-space-md px-4 text-on-surface-variant">
+<div class="">Oct 24, 2026</div>
+<div class="font-label-sm text-[11px] text-secondary">2 hours ago</div>
+</td>
+<td class="py-space-md px-space-lg text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:bg-inverse-surface transition-colors shadow-sm" onclick="openDrawer('QA Email Test Atelier', '#ABE43EC0', 'Furniture Craft', 'Porto, Portugal', 'qa.atelier@test-sanctus.pt')" type="button">
+                  Review Dossier
+                </button>
+<div class="relative inline-block text-left">
+<button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</div>
+</td>
+</tr>
+<!-- ROW 2: Studio Vértice Arquiteto (Approved) -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="py-space-md px-space-lg">
+<input class="rounded text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-4">
+<div class="flex items-center gap-3.5">
+<div class="w-11 h-11 rounded bg-surface-container-high flex items-center justify-center font-headline-sm text-headline-sm text-on-surface font-normal">
+                  SV
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-[18px] text-primary font-normal group-hover:text-secondary transition-colors">Studio Vértice Arquiteto</span>
+<span class="material-symbols-outlined text-[15px] text-[#23543A]">verified</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="font-mono text-[11px] tracking-wide text-primary">#8B21F04A</span>
+<span class="">•</span>
+<span class="">Spatial &amp; Brutalist Wood</span>
+<span class="">•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">location_on</span> Lisboa, Portugal
+                    </span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-4">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-medium">Helena Albuquerque</span>
+<span class="text-on-surface-variant text-[13px]">curadoria@studiovertice.pt</span>
+<a class="font-label-sm text-[11px] text-secondary hover:text-on-surface tracking-wider uppercase mt-1 flex items-center gap-0.5" href="#">
+                  studiovertice.pt <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+</a>
+</div>
+</td>
+<td class="py-space-md px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F2EC] text-[#23543A] font-label-sm text-[11px] tracking-wider uppercase font-medium">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+                Approved
+              </span>
+<div class="font-label-sm text-[10px] text-on-surface-variant mt-1">Salon token issued</div>
+</td>
+<td class="py-space-md px-4 text-on-surface-variant">
+<div class="">Oct 22, 2026</div>
+<div class="font-label-sm text-[11px]">2 days ago</div>
+</td>
+<td class="py-space-md px-space-lg text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 rounded bg-surface-container-low text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" onclick="openDrawer('Studio Vértice Arquiteto', '#8B21F04A', 'Spatial &amp; Brutalist Wood', 'Lisboa, Portugal', 'curadoria@studiovertice.pt')" type="button">
+                  Inspect Spec
+                </button>
+<button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 3: Atelier Nômade Mobiliário (In Spatial QA) -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="py-space-md px-space-lg">
+<input class="rounded text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-4">
+<div class="flex items-center gap-3.5">
+<div class="w-11 h-11 rounded bg-surface-container-high flex items-center justify-center font-headline-sm text-headline-sm text-on-surface font-normal">
+                  NM
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-[18px] text-primary font-normal group-hover:text-secondary transition-colors">Atelier Nômade Mobiliário</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="font-mono text-[11px] tracking-wide text-primary">#4F92DA11</span>
+<span class="">•</span>
+<span class="">Jacarandá &amp; Straw Joinery</span>
+<span class="">•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">location_on</span> São Paulo, Brazil
+                    </span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-4">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-medium">Lucas Vianna Fontes</span>
+<span class="text-on-surface-variant text-[13px]">diretoria@nomademobiliario.com.br</span>
+<a class="font-label-sm text-[11px] text-secondary hover:text-on-surface tracking-wider uppercase mt-1 flex items-center gap-0.5" href="#">
+                  Portfolio (14 models) <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+</a>
+</div>
+</td>
+<td class="py-space-md px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface font-label-sm text-[11px] tracking-wider uppercase font-medium">
+<span class="material-symbols-outlined text-[13px] text-secondary">view_in_ar</span>
+                In Spatial QA
+              </span>
+<div class="font-label-sm text-[10px] text-secondary mt-1">Normal maps 87% complete</div>
+</td>
+<td class="py-space-md px-4 text-on-surface-variant">
+<div class="">Oct 20, 2026</div>
+<div class="font-label-sm text-[11px]">4 days ago</div>
+</td>
+<td class="py-space-md px-space-lg text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:bg-inverse-surface transition-colors shadow-sm" onclick="openDrawer('Atelier Nômade Mobiliário', '#4F92DA11', 'Jacarandá Joinery', 'São Paulo, Brazil', 'diretoria@nomademobiliario.com.br')" type="button">
+                  Review Dossier
+                </button>
+<button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 4: Linden Spatial Craft (Approved) -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="py-space-md px-space-lg">
+<input class="rounded text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-4">
+<div class="flex items-center gap-3.5">
+<div class="w-11 h-11 rounded bg-surface-container-high flex items-center justify-center font-headline-sm text-headline-sm text-on-surface font-normal">
+                  LC
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-[18px] text-primary font-normal group-hover:text-secondary transition-colors">Linden Spatial Craft</span>
+<span class="material-symbols-outlined text-[15px] text-[#23543A]">verified</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="font-mono text-[11px] tracking-wide text-primary">#059B9C06</span>
+<span class="">•</span>
+<span class="">Author Furniture &amp; Castings</span>
+<span class="">•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">location_on</span> Milano, Italy
+                    </span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-4">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-medium">Matteo Linden</span>
+<span class="text-on-surface-variant text-[13px]">studio@lindencraft.it</span>
+<a class="font-label-sm text-[11px] text-secondary hover:text-on-surface tracking-wider uppercase mt-1 flex items-center gap-0.5" href="#">
+                  Salone Del Mobile '26 <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+</a>
+</div>
+</td>
+<td class="py-space-md px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F2EC] text-[#23543A] font-label-sm text-[11px] tracking-wider uppercase font-medium">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+                Approved
+              </span>
+<div class="font-label-sm text-[10px] text-on-surface-variant mt-1">1:1 Calibrated to AR</div>
+</td>
+<td class="py-space-md px-4 text-on-surface-variant">
+<div class="">Oct 18, 2026</div>
+<div class="font-label-sm text-[11px]">6 days ago</div>
+</td>
+<td class="py-space-md px-space-lg text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 rounded bg-surface-container-low text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" onclick="openDrawer('Linden Spatial Craft', '#059B9C06', 'Author Furniture', 'Milano, Italy', 'studio@lindencraft.it')" type="button">
+                  Inspect Spec
+                </button>
+<button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 5: Muse Atelier & Gallery (Pending Review) -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="py-space-md px-space-lg">
+<input class="rounded text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-4">
+<div class="flex items-center gap-3.5">
+<div class="w-11 h-11 rounded bg-surface-container-high flex items-center justify-center font-headline-sm text-headline-sm text-on-surface font-normal">
+                  MA
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-[18px] text-primary font-normal group-hover:text-secondary transition-colors">Muse Atelier &amp; Gallery</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="font-mono text-[11px] tracking-wide text-primary">#208FD760</span>
+<span class="">•</span>
+<span class="">Washi &amp; Bronze Sculptural Lighting</span>
+<span class="">•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">location_on</span> Kyoto, Japan
+                    </span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-4">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-medium">Kenzo Takahashi</span>
+<span class="text-on-surface-variant text-[13px]">curate@museatelier-kyoto.jp</span>
+<a class="font-label-sm text-[11px] text-secondary hover:text-on-surface tracking-wider uppercase mt-1 flex items-center gap-0.5" href="#">
+                  Exhibition Catalogue <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+</a>
+</div>
+</td>
+<td class="py-space-md px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FCF3E2] text-[#8C5A14] font-label-sm text-[11px] tracking-wider uppercase font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-[#8C5A14]"></span>
+                Pending Review
+              </span>
+<div class="font-label-sm text-[10px] text-on-surface-variant mt-1">Translucency shader review</div>
+</td>
+<td class="py-space-md px-4 text-on-surface-variant">
+<div class="">Oct 15, 2026</div>
+<div class="font-label-sm text-[11px]">9 days ago</div>
+</td>
+<td class="py-space-md px-space-lg text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:bg-inverse-surface transition-colors shadow-sm" onclick="openDrawer('Muse Atelier &amp; Gallery', '#208FD760', 'Sculptural Lighting', 'Kyoto, Japan', 'curate@museatelier-kyoto.jp')" type="button">
+                  Review Dossier
+                </button>
+<button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 6: Atelier Bioma Travertino (Approved) -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="py-space-md px-space-lg">
+<input class="rounded text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer" type="checkbox">
+</td>
+<td class="py-space-md px-4">
+<div class="flex items-center gap-3.5">
+<div class="w-11 h-11 rounded bg-surface-container-high flex items-center justify-center font-headline-sm text-headline-sm text-on-surface font-normal">
+                  BT
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-[18px] text-primary font-normal group-hover:text-secondary transition-colors">Atelier Bioma Travertino</span>
+<span class="material-symbols-outlined text-[15px] text-[#23543A]">verified</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="font-mono text-[11px] tracking-wide text-primary">#7A2A6DAB</span>
+<span class="">•</span>
+<span class="">Roman Stone &amp; Monolithic Slabs</span>
+<span class="">•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">location_on</span> Verona, Italy
+                    </span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-4">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-medium">Chiara Moretti</span>
+<span class="text-on-surface-variant text-[13px]">c.moretti@biomastone.eu</span>
+<a class="font-label-sm text-[11px] text-secondary hover:text-on-surface tracking-wider uppercase mt-1 flex items-center gap-0.5" href="#">
+                  Stone Quarry Specs <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+</a>
+</div>
+</td>
+<td class="py-space-md px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F2EC] text-[#23543A] font-label-sm text-[11px] tracking-wider uppercase font-medium">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+                Approved
+              </span>
+<div class="font-label-sm text-[10px] text-on-surface-variant mt-1">Spatial QR Stand Generated</div>
+</td>
+<td class="py-space-md px-4 text-on-surface-variant">
+<div class="">Oct 12, 2026</div>
+<div class="font-label-sm text-[11px]">12 days ago</div>
+</td>
+<td class="py-space-md px-space-lg text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 rounded bg-surface-container-low text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" onclick="openDrawer('Atelier Bioma Travertino', '#7A2A6DAB', 'Roman Stone &amp; Monoliths', 'Verona, Italy', 'c.moretti@biomastone.eu')" type="button">
+                  Inspect Spec
+                </button>
+<button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Architectural Pagination & Status Indicator -->
+<div class="px-space-lg py-4 bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-4 border-t-0">
+<div class="font-body-sm text-body-sm text-on-surface-variant">
+        Displaying <span class="text-on-surface font-medium">1 - 6</span> of <span class="text-on-surface font-medium">162</span> atelier credentials submitted
+      </div>
+<div class="flex items-center gap-2">
+<button class="p-1.5 rounded bg-surface-container-lowest text-on-surface-variant hover:text-on-surface disabled:opacity-30 disabled:pointer-events-none transition-colors" disabled="" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<span class="px-3 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm">1</span>
+<button class="px-3 py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" type="button">2</button>
+<button class="px-3 py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" type="button">3</button>
+<span class="text-on-surface-variant font-body-sm px-1">...</span>
+<button class="px-3 py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" type="button">27</button>
+<button class="p-1.5 rounded bg-surface-container-lowest text-on-surface-variant hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Curatorial Slide-Over Dossier Drawer (Interactive Peek) -->
+<div class="fixed inset-y-0 right-0 w-full max-w-xl bg-surface-container-lowest shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between overflow-y-auto" id="curatorialDrawer">
+<div class="p-space-xl">
+<!-- Drawer Header -->
+<div class="flex items-center justify-between pb-space-md border-b-0">
+<div class="flex items-center gap-2">
+<span class="font-eyebrow text-eyebrow uppercase tracking-[0.2em] text-secondary font-medium">Curatorial Review Dossier</span>
+<span class="font-mono text-eyebrow bg-surface-container px-2 py-0.5 rounded text-primary" id="drawerRef">#ABE43EC0</span>
+</div>
+<button class="p-1.5 rounded-full hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-colors" onclick="closeDrawer()" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Atelier Identity Card -->
+<div class="mt-space-lg flex items-start gap-4">
+<div class="w-16 h-16 rounded bg-surface-container-high flex items-center justify-center font-headline-md text-headline-md text-on-surface font-normal">
+<span id="drawerAvatar" class="">QA</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-primary font-normal leading-tight" id="drawerName">QA Email Test Atelier</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-1" id="drawerMeta">Furniture Craft • Porto, Portugal</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="px-2 py-0.5 rounded-full bg-[#FCF3E2] text-[#8C5A14] font-label-sm text-[10px] uppercase tracking-wider font-medium">Pending Curatorial Seal</span>
+<span class="font-body-sm text-[12px] text-on-surface-variant" id="drawerContact">qa.atelier@test-sanctus.pt</span>
+</div>
+</div>
+</div>
+<!-- In Situ Verification Visual -->
+<div class="mt-space-xl">
+<div class="flex items-center justify-between mb-2">
+<span class="font-eyebrow text-eyebrow uppercase tracking-wider text-on-surface font-medium">Showroom Prototype &amp; Physical Exhibition</span>
+<span class="font-label-sm text-[11px] text-secondary uppercase tracking-widest">Verified In-Situ</span>
+</div>
+<div class="relative w-full h-56 rounded-lg overflow-hidden bg-surface-container-high">
+<img class="w-full h-full object-cover" data-alt="Minimalist luxury design studio interior with travertine stone plinth displaying an organic stoneware vessel and an elegant physical QR code desk sign. Natural architectural lighting, warm beige concrete walls, calm high-end galleried furniture showroom aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoOBARWum7RX4nKzEgH2FpmU8agyU3QBUvSA8WwwNCTAOu88mJx2w5WGag3FPwWBLsswGqg5l26JTxy59kkFtHulbWCMEkl9-L0w20xoaPmcNF__47n9b3H1_zSsL0GCgaPZxDuCTkek_iwRpycj2mOGZIBbaVfhEwLT8nTdKH79XIZFWN1MIDLPcDc2IonyHejmNhZWCC2-QUpzcEkgOneiVLwN1T9FSdaDJAo_rj">
+<div class="absolute bottom-3 left-3 bg-surface/90 backdrop-blur-md px-3 py-1.5 rounded flex items-center gap-2">
+<span class="material-symbols-outlined text-[15px] text-secondary">qr_code_scanner</span>
+<span class="font-label-sm text-[11px] text-on-surface">Physical Salon Token: Sanctus AR-Stand v2</span>
+</div>
+</div>
+</div>
+<!-- Spatial Model Technical Checklist -->
+<div class="mt-space-xl space-y-3">
+<span class="font-eyebrow text-eyebrow uppercase tracking-wider text-on-surface font-medium block">Spatial Compute Asset Compliance</span>
+<div class="p-3 rounded bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[#23543A] text-[18px]">task_alt</span>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Topology &amp; UV Normal Alignment</div>
+<div class="font-body-sm text-[12px] text-on-surface-variant">42,800 polygons, manifold geometry with zero flipped normals</div>
+</div>
+</div>
+<span class="font-mono text-label-sm text-[#23543A]">PASS</span>
+</div>
+<div class="p-3 rounded bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-[#23543A] text-[18px]">task_alt</span>
+<div>
+<div class="font-label-md text-label-md text-on-surface">PBR Texture Channels (Roughness / AO)</div>
+<div class="font-body-sm text-[12px] text-on-surface-variant">Calibrated against walnut wood and brushed champagne brass</div>
+</div>
+</div>
+<span class="font-mono text-label-sm text-[#23543A]">PASS</span>
+</div>
+<div class="p-3 rounded bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-secondary text-[18px]">hourglass_top</span>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Universal Scene Description (USDZ) Compile</div>
+<div class="font-body-sm text-[12px] text-on-surface-variant">Converting for Apple Vision Pro &amp; iOS QuickLook rendering engine</div>
+</div>
+</div>
+<span class="font-mono text-label-sm text-secondary">BUILDING</span>
+</div>
+</div>
+<!-- Chief Curator Notes -->
+<div class="mt-space-xl">
+<label class="font-eyebrow text-eyebrow uppercase tracking-wider text-on-surface font-medium block mb-2">Curatorial Notes &amp; Lineage Assessment</label>
+<textarea class="w-full bg-surface-container-low text-on-surface font-body-sm text-body-sm p-3 rounded focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter private internal feedback regarding craft lineage, physical joinery inspection, or showroom placement..." rows="3"></textarea>
+</div>
+</div>
+<!-- Drawer Footer Actions -->
+<div class="p-space-lg bg-surface-container-low flex items-center justify-between gap-3">
+<button class="px-4 py-2.5 rounded bg-surface-container-lowest text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors" onclick="closeDrawer()" type="button">
+        Defer Review
+      </button>
+<div class="flex items-center gap-2">
+<button class="px-4 py-2.5 rounded bg-error-container text-on-error-container font-label-md text-label-md hover:opacity-90 transition-opacity" type="button">
+          Decline &amp; Provide Reason
+        </button>
+<button class="px-5 py-2.5 rounded bg-primary text-on-primary font-label-md text-label-md hover:bg-inverse-surface transition-colors shadow-sm flex items-center gap-1.5" onclick="triggerApproval()" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span class="">Grant Sanctus Token</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Direct Invitation Modal Dialog (Initially Hidden) -->
+<div class="hidden fixed inset-0 z-50 bg-primary/60 backdrop-blur-sm flex items-center justify-center p-4" id="inviteModal">
+<div class="bg-surface-container-lowest rounded-xl max-w-lg w-full p-space-xl shadow-2xl relative">
+<button class="absolute top-4 right-4 p-1 rounded-full text-on-surface-variant hover:text-on-surface" onclick="document.getElementById('inviteModal').classList.add('hidden')" type="button">
+<span class="material-symbols-outlined">close</span>
+</button>
+<div class="flex items-center gap-2 text-secondary font-eyebrow text-eyebrow uppercase tracking-widest">
+<span class="material-symbols-outlined text-[16px]">mail</span>
+<span class="">Priority Onboarding Dispatch</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-primary mt-1">Issue Atelier Salon Access</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">
+        Generate a secure cryptographic invitation link for a premier atelier. The atelier will bypass standard waitlists and initiate immediate CAD/glTF asset upload.
+      </p>
+<form class="mt-space-lg space-y-4" onsubmit="event.preventDefault(); document.getElementById('inviteModal').classList.add('hidden'); alert('Invitation dispatched to design principal.');">
+<div>
+<label class="font-label-sm text-label-sm text-on-surface block mb-1">Atelier / Maison Name</label>
+<input class="w-full bg-surface-container-low text-on-surface font-body-sm text-body-sm px-3.5 py-2.5 rounded focus:outline-none focus:ring-1 focus:ring-primary" placeholder="e.g. Studio Marcenaria Paulistana" required="" type="text">
+</div>
+<div>
+<label class="font-label-sm text-label-sm text-on-surface block mb-1">Principal Contact Email</label>
+<input class="w-full bg-surface-container-low text-on-surface font-body-sm text-body-sm px-3.5 py-2.5 rounded focus:outline-none focus:ring-1 focus:ring-primary" placeholder="e.g. founder@paulistana.com" required="" type="email">
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="font-label-sm text-label-sm text-on-surface block mb-1">Primary Discipline</label>
+<select class="w-full bg-surface-container-low text-on-surface font-body-sm text-body-sm px-3 py-2.5 rounded focus:outline-none focus:ring-1 focus:ring-primary">
+<option>Bespoke Furniture</option>
+<option>Spatial Lighting</option>
+<option>Stone &amp; Marble</option>
+<option>Textiles &amp; Leather</option>
+</select>
+</div>
+<div>
+<label class="font-label-sm text-label-sm text-on-surface block mb-1">HQ Origin Country</label>
+<select class="w-full bg-surface-container-low text-on-surface font-body-sm text-body-sm px-3 py-2.5 rounded focus:outline-none focus:ring-1 focus:ring-primary">
+<option>Portugal</option>
+<option>Italy</option>
+<option>Brazil</option>
+<option>France</option>
+<option>Japan</option>
+</select>
+</div>
+</div>
+<div class="pt-2 flex items-center justify-end gap-3">
+<button class="px-4 py-2 rounded bg-surface-container-low text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors" onclick="document.getElementById('inviteModal').classList.add('hidden')" type="button">
+            Cancel
+          </button>
+<button class="px-5 py-2 rounded bg-primary text-on-primary font-label-md text-label-md hover:bg-inverse-surface transition-colors shadow-sm flex items-center gap-1.5" type="submit">
+<span class="">Send Direct Token</span>
+<span class="material-symbols-outlined text-[15px]">send</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+<!-- Micro-Interactions Scripting -->
+<script>
+    function openDrawer(name, ref, craft, loc, email) {
+      const drawer = document.getElementById('curatorialDrawer');
+      document.getElementById('drawerName').innerText = name;
+      document.getElementById('drawerRef').innerText = ref;
+      document.getElementById('drawerMeta').innerText = craft + ' • ' + loc;
+      document.getElementById('drawerContact').innerText = email;
+      document.getElementById('drawerAvatar').innerText = name.split(' ').map(w => w[0]).join('').slice(0, 2);
+      
+      drawer.classList.remove('translate-x-full');
+    }
+
+    function closeDrawer() {
+      const drawer = document.getElementById('curatorialDrawer');
+      drawer.classList.add('translate-x-full');
+    }
+
+    function triggerApproval() {
+      alert('Application verified. 1:1 AR spatial credential granted to atelier.');
+      closeDrawer();
+    }
+
+    // Live search filter simulator
+    const searchInput = document.getElementById('atelierSearch');
+    if (searchInput) {
+      searchInput.addEventListener('input', function(e) {
+        const val = e.target.value.toLowerCase();
+        const rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+          const text = row.innerText.toLowerCase();
+          if (text.includes(val)) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    }
+  </script>
+</div></main></div>
+
+<script id="sidebarCollapseScript" class="">function toggleSidebar() { const sidebar = document.getElementById('appSidebar'); const main = document.getElementById('mainContentWrapper'); const header = document.getElementById('topNavHeader'); const btn = document.getElementById('sidebarToggleBtn'); const icon = btn.querySelector('.material-symbols-outlined'); const brandText = sidebar.querySelectorAll('.font-headline-sm, .font-eyebrow, .font-label-md, .font-body-md, .font-label-sm, span:not(.material-symbols-outlined)'); const isCollapsed = sidebar.classList.contains('w-16'); if (!isCollapsed) { sidebar.classList.remove('w-72'); sidebar.classList.add('w-16'); main.classList.remove('pl-72'); main.classList.add('pl-16'); header.classList.remove('left-72'); header.classList.add('left-16'); icon.textContent = 'keyboard_double_arrow_right'; btn.setAttribute('title', 'Expand navigation'); document.querySelectorAll('#appSidebar nav a').forEach(a => { a.classList.add('justify-center', 'px-2'); const label = a.querySelector('.font-label-md'); if (label) label.classList.add('hidden'); const count = a.querySelector('.font-label-sm'); if (count) count.classList.add('hidden'); }); const adminBadge = sidebar.querySelector('header span, aside > div:first-child > div:first-child > span'); if (adminBadge) adminBadge.classList.add('hidden'); const headerLogoText = sidebar.querySelector('aside > div:first-child > div:first-child > div'); if (headerLogoText) headerLogoText.classList.add('hidden'); const spatialPill = sidebar.querySelector('.px-space-md.py-2\.5.rounded-lg.bg-surface-container-high\/5'); if (spatialPill) spatialPill.classList.add('hidden'); const adminInfo = sidebar.querySelector('.flex.items-center.justify-between.px-space-sm.pt-1 > div:first-child > div:last-child'); if (adminInfo) adminInfo.classList.add('hidden'); const signOutBtn = sidebar.querySelector('button[title="Sign out"]'); if (signOutBtn) signOutBtn.classList.add('hidden'); } else { sidebar.classList.remove('w-16'); sidebar.classList.add('w-72'); main.classList.remove('pl-16'); main.classList.add('pl-72'); header.classList.remove('left-16'); header.classList.add('left-72'); icon.textContent = 'keyboard_double_arrow_left'; btn.setAttribute('title', 'Collapse navigation'); document.querySelectorAll('#appSidebar nav a').forEach(a => { a.classList.remove('justify-center', 'px-2'); const label = a.querySelector('.font-label-md'); if (label) label.classList.remove('hidden'); const count = a.querySelector('.font-label-sm'); if (count) count.classList.remove('hidden'); }); const adminBadge = sidebar.querySelector('header span, aside > div:first-child > div:first-child > span'); if (adminBadge) adminBadge.classList.remove('hidden'); const headerLogoText = sidebar.querySelector('aside > div:first-child > div:first-child > div'); if (headerLogoText) headerLogoText.classList.remove('hidden'); const spatialPill = sidebar.querySelector('.px-space-md.py-2\.5.rounded-lg.bg-surface-container-high\/5'); if (spatialPill) spatialPill.classList.remove('hidden'); const adminInfo = sidebar.querySelector('.flex.items-center.justify-between.px-space-sm.pt-1 > div:first-child > div:last-child'); if (adminInfo) adminInfo.classList.remove('hidden'); const signOutBtn = sidebar.querySelector('button[title="Sign out"]'); if (signOutBtn) signOutBtn.classList.remove('hidden'); } }</script></body></html>

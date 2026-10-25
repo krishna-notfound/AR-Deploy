@@ -1,29 +1,41 @@
-import { ArrowRight, Plus } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { type ReactNode, useMemo } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
-import { Wordmark } from '@/components/ui/BrandMark'
 import { arrowLinkClasses } from '@/components/ui/Button'
 import type { Business, Category, Product } from '@/domain/types'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
+import { APPLY_PATH, catalogLocalPath, productLocalPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { TAP_TARGET } from '../public/tapTarget'
 import { SectionLink, SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
 
-// Photography: crops of the client's reference boards (AI-generated, temporary) and licensed Pexels photos; provenance in design/21.
-const IMG = (name: string) => `/images/sanctus/${name}.webp`
+// Photography: the owner's Stitch set (AI-generated, design/stitch/BRIEF.md), 1200×896 unless noted.
+const IMG = (name: string) => `/images/sanctus/v2/${name}.webp`
 
 // The four collection cards of the reference, each tied to a platform category so "Ver coleção" opens real products.
-const COLLECTIONS: { key: 'sofas' | 'tables' | 'armchairs' | 'decor'; category: Category; img: string; w: number; h: number }[] = [
-  { key: 'sofas', category: 'sofa', img: 'col-sofas', w: 298, h: 422 },
-  { key: 'tables', category: 'table', img: 'col-mesas', w: 329, h: 422 },
-  { key: 'armchairs', category: 'chair', img: 'col-poltronas', w: 329, h: 422 },
-  { key: 'decor', category: 'decor', img: 'col-decoracao', w: 333, h: 325 },
+const COLLECTIONS: { key: 'sofas' | 'tables' | 'armchairs' | 'decor'; category: Category; img: string; focus?: string }[] = [
+  { key: 'sofas', category: 'sofa', img: 'sofa-travertine' },
+  { key: 'tables', category: 'table', img: 'dining-table' },
+  { key: 'armchairs', category: 'chair', img: 'lounge-chair', focus: 'object-[62%_80%]' },
+  { key: 'decor', category: 'decor', img: 'lamp-vase' },
 ]
+
+const FEATURES = [
+  ['landing.xp.f1Title', 'landing.xp.f1Body'],
+  ['landing.xp.f2Title', 'landing.xp.f2Body'],
+  ['landing.xp.f3Title', 'landing.xp.f3Body'],
+] as const
+
+const SECTION = 'mx-auto max-w-[1320px] px-5 sm:px-10'
+
+// The references' square call to action (Button lg), composed here because cn() does not merge conflicting colours.
+const CTA = 'inline-flex h-12 items-center justify-center gap-3 whitespace-nowrap rounded-[var(--radius-control)] px-6 text-label uppercase transition-colors select-none'
+const CTA_DARK = cn(CTA, 'bg-ink text-chalk hover:bg-umber')
 
 type Showcase = { product: Product; business: Business }
 
@@ -36,16 +48,16 @@ export default function LandingPage() {
   // Old links sent people to "/?next=…" for the account picker, which now lives at /demo.
   if (params.has('next')) return <Navigate to={`/demo?${params.toString()}`} replace />
   return (
-    <div className="relative min-h-dvh bg-canvas">
-      {/* Outside the hero section so it keeps the page's banner landmark; absolutely placed over the photograph. */}
-      <SiteHeader variant="overlay" />
-      <Hero />
+    <div className="min-h-dvh bg-canvas">
+      <SiteHeader />
       <main>
+        <Hero />
         <Collections links={links} />
-        <AboutAndProjects catalogHref={links.catalog} />
+        <Experience pieceHref={links.piece3d} catalogHref={links.catalog} />
+        <About />
         <Manifesto />
-        <Feature catalogHref={links.catalog} />
-        <Band catalogHref={links.catalog} />
+        <Projects catalogHref={links.catalog} />
+        <Partners />
       </main>
       <SiteFooter />
     </div>
@@ -65,13 +77,16 @@ function useLandingLinks() {
       .filter((p) => active.has(p.businessId) && primaryImage(p))
       .map((p) => ({ product: p, business: active.get(p.businessId)! }))
       .sort((a, b) => a.business.name.localeCompare(b.business.name) || a.product.name.en.localeCompare(b.product.name.en))
-    const catalogOf = (b: Business) => `/catalog/${b.slug}`
     const byCategory = (c: Category) => {
       const hit = items.find((i) => i.product.category === c)
-      return hit ? `${catalogOf(hit.business)}?category=${c}` : undefined
+      return hit ? `${catalogLocalPath(hit.business)}?category=${c}` : undefined
     }
+    // The 3D section opens a real product that has a 3D model, an armchair when there is one.
+    const withModel = items.filter((i) => i.product.models.glb)
+    const piece = withModel.find((i) => i.product.category === 'chair') ?? withModel[0]
     return {
-      catalog: items[0] ? catalogOf(items[0].business) : undefined,
+      catalog: items[0] ? catalogLocalPath(items[0].business) : undefined,
+      piece3d: piece ? productLocalPath(piece.business, piece.product) : undefined,
       category: byCategory,
       settled: products.status !== 'loading' && catalogs.status !== 'loading',
     }
@@ -79,10 +94,10 @@ function useLandingLinks() {
 }
 
 /** A heading set on two lines as in the reference, read as one sentence by screen readers. */
-function TwoLines({ a, b }: { a: string; b: string }) {
+function TwoLines({ a, b, italic }: { a: string; b: string; italic?: boolean }) {
   return (
     <>
-      <span className="block">{a}</span> <span className="block">{b}</span>
+      <span className="block">{a}</span> <span className={cn('block', italic && 'italic')}>{b}</span>
     </>
   )
 }
@@ -110,30 +125,46 @@ function ArrowLink({ to, href, children, className }: { to?: string; href?: stri
   return null
 }
 
+const arrowIcon = <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden />
+
+function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
+  return <p className={cn('text-eyebrow text-accent-ink', className)}>{children}</p>
+}
+
 function Hero() {
   const { t } = useI18n()
   return (
-    <section className="relative isolate flex min-h-[560px] flex-col overflow-hidden bg-obsidian text-chalk sm:min-h-[600px] lg:h-[min(78dvh,700px)]">
-      <img
-        src={IMG('hero')}
-        alt={t('landing.hero.imageAlt')}
-        width={1560}
-        height={712}
-        fetchPriority="high"
-        className="absolute inset-0 -z-10 size-full object-cover object-[40%_center] lg:object-left"
-      />
-      {/* Legibility scrim over the photograph's left wall, where the copy sits in the reference. */}
-      <div className="absolute inset-0 -z-10 bg-linear-to-r from-obsidian/70 via-obsidian/25 to-transparent sm:from-obsidian/55" aria-hidden />
-      <div className="mx-auto flex w-full max-w-[1320px] flex-1 flex-col justify-center px-5 pt-24 pb-16 sm:px-10">
-        <p className="text-eyebrow">{t('landing.hero.eyebrow')}</p>
-        <h1 className="mt-5 text-display text-chalk">
-          <TwoLines a={t('landing.hero.title1')} b={t('landing.hero.title2')} />
-        </h1>
-        <p className="mt-6 max-w-[19rem] text-[15px] leading-7 font-light text-chalk/90">{t('landing.hero.body')}</p>
-        <span className="mt-10 block h-px w-12 bg-chalk/60" aria-hidden />
-        <ArrowLink href="/#colecoes" className="mt-6 self-start border-chalk/70 text-chalk hover:text-limestone">
-          {t('landing.hero.cta')}
-        </ArrowLink>
+    <section className={cn(SECTION, 'pt-5 sm:pt-10')} aria-labelledby="hero-title">
+      <div className="grid border border-line bg-surface lg:min-h-[600px] lg:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="order-2 flex flex-col justify-center px-6 py-10 sm:px-12 sm:py-14 lg:order-1 lg:px-12 lg:py-16 xl:px-14">
+          <Eyebrow>{t('landing.hero.eyebrow')}</Eyebrow>
+          <h1 id="hero-title" className="mt-5 text-display text-ink">
+            <TwoLines a={t('landing.hero.title1')} b={t('landing.hero.title2')} italic />
+          </h1>
+          <p className="mt-6 max-w-sm text-[15px] leading-7 font-light text-ink-body">{t('landing.hero.body')}</p>
+          <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col lg:items-start xl:flex-row">
+            <SectionLink href="/#colecoes" className={CTA_DARK}>
+              {t('landing.hero.cta')}
+              {arrowIcon}
+            </SectionLink>
+            <SectionLink href="/#experiencia" className={cn(CTA, 'border border-ink text-ink hover:bg-subtle')}>
+              {t('landing.hero.cta3d')}
+            </SectionLink>
+          </div>
+        </div>
+        <figure className="relative order-1 lg:order-2">
+          <img
+            src={IMG('hero-living')}
+            alt={t('landing.hero.imageAlt')}
+            width={1376}
+            height={768}
+            fetchPriority="high"
+            className="aspect-[4/3] size-full object-cover sm:aspect-[16/9] lg:absolute lg:inset-0 lg:aspect-auto"
+          />
+          <figcaption className="absolute right-3 bottom-3 bg-surface px-3 py-2 text-[10px] leading-none font-medium tracking-[0.18em] text-ink uppercase sm:right-5 sm:bottom-5">
+            {t('landing.hero.caption')}
+          </figcaption>
+        </figure>
       </div>
     </section>
   )
@@ -142,40 +173,44 @@ function Hero() {
 function Collections({ links }: { links: ReturnType<typeof useLandingLinks> }) {
   const { t } = useI18n()
   return (
-    <section id="colecoes" className="scroll-mt-20" aria-labelledby="col-title">
-      <div className="mx-auto grid max-w-[1320px] gap-x-10 gap-y-12 px-5 py-16 sm:px-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,3fr)] lg:py-20">
-        <div className="lg:pt-2">
-          <p className="text-eyebrow text-ink-muted">{t('landing.col.eyebrow')}</p>
-          <h2 id="col-title" className="mt-5 text-headline">
-            <TwoLines a={t('landing.col.title1')} b={t('landing.col.title2')} />
-          </h2>
-          <p className="mt-6 max-w-sm text-[15px] leading-7 text-ink-muted">{t('landing.col.body')}</p>
+    <section id="colecoes" className="scroll-mt-24" aria-labelledby="col-title">
+      <div className={cn(SECTION, 'py-20 lg:py-28')}>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] lg:items-end lg:gap-14">
+          <div>
+            <Eyebrow>{t('landing.col.eyebrow')}</Eyebrow>
+            <h2 id="col-title" className="mt-4 text-headline">
+              <TwoLines a={t('landing.col.title1')} b={t('landing.col.title2')} />
+            </h2>
+          </div>
+          <p className="max-w-xl text-[15px] leading-7 text-ink-muted">{t('landing.col.body')}</p>
           {links.catalog && (
-            <ArrowLink to={links.catalog} className="mt-10 text-ink">
+            <ArrowLink to={links.catalog} className="justify-self-start text-ink lg:justify-self-end">
               {t('landing.col.all')}
             </ArrowLink>
           )}
         </div>
-        <ul className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4">
-          {COLLECTIONS.map((c) => {
+        <hr className="mt-10 border-line lg:mt-14" />
+        <ul className="mt-10 grid grid-cols-2 gap-3 sm:gap-6 lg:mt-14 lg:grid-cols-4">
+          {COLLECTIONS.map((c, i) => {
             const href = links.category(c.category)
+            const name = t(`landing.col.${c.key}` as TranslationKey)
             return (
-              <li key={c.key} className="flex flex-col">
-                <img
-                  src={IMG(c.img)}
-                  alt=""
-                  width={c.w}
-                  height={c.h}
-                  loading="lazy"
-                  className="aspect-[4/5] w-full bg-subtle object-cover"
-                />
-                <h3 className="mt-5 text-eyebrow text-ink">{t(`landing.col.${c.key}` as TranslationKey)}</h3>
-                <p className="mt-2 text-[13px] leading-5 text-ink-muted">{t(`landing.col.${c.key}Body` as TranslationKey)}</p>
+              <li key={c.key} className="flex flex-col border border-line bg-surface p-2.5 sm:p-4">
+                <div className="relative">
+                  <img src={IMG(c.img)} alt="" width={1200} height={896} loading="lazy" className={cn('aspect-[4/5] w-full bg-subtle object-cover', c.focus)} />
+                  <span className="absolute top-2 left-2 bg-surface px-2 py-1 text-[9px] leading-none tracking-[0.16em] text-ink-muted uppercase sm:top-3 sm:left-3 sm:text-[10px]">
+                    {`${String(i + 1).padStart(2, '0')} // ${t('landing.col.chip')}`}
+                  </span>
+                </div>
+                <h3 className="mt-4 font-display text-[1.375rem] leading-tight font-normal text-ink sm:mt-5 sm:text-[1.625rem]">{name}</h3>
+                <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t(`landing.col.${c.key}Body` as TranslationKey)}</p>
                 {href && (
-                  <ArrowLink to={href} className="mt-6 self-start border-transparent text-ink-muted hover:border-current">
-                    <span className="sr-only">{t(`landing.col.${c.key}` as TranslationKey)}: </span>
-                    {t('landing.col.view')}
-                  </ArrowLink>
+                  <div className="mt-auto pt-5">
+                    <ArrowLink to={href} className="text-ink">
+                      <span className="sr-only">{name}: </span>
+                      {t('landing.col.view')}
+                    </ArrowLink>
+                  </div>
                 )}
               </li>
             )
@@ -186,33 +221,126 @@ function Collections({ links }: { links: ReturnType<typeof useLandingLinks> }) {
   )
 }
 
-function AboutAndProjects({ catalogHref }: { catalogHref?: string }) {
+/**
+ * 3D and AR, explained. The card on the right is the Linden armchair from the brand references: an illustration with
+ * no product record or 3D model, so it is labelled as such and never links anywhere (ADR-0023). The call to action
+ * opens a real published product that has a model.
+ */
+function Experience({ pieceHref, catalogHref }: { pieceHref?: string; catalogHref?: string }) {
+  const { t } = useI18n()
+  const href = pieceHref ?? catalogHref
+  return (
+    <section id="experiencia" className="scroll-mt-24 bg-obsidian text-chalk" aria-labelledby="xp-title">
+      <div className={cn(SECTION, 'grid gap-14 py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-center lg:gap-20 lg:py-28')}>
+        <div>
+          <p className="text-eyebrow text-chalk/70">{t('landing.xp.eyebrow')}</p>
+          <h2 id="xp-title" className="mt-5 text-headline text-chalk">
+            {t('landing.xp.title')}
+          </h2>
+          <p className="mt-6 max-w-md text-[15px] leading-7 font-light text-chalk/80">{t('landing.xp.body')}</p>
+          <ol className="mt-10 divide-y divide-chalk/15 border-y border-chalk/15">
+            {FEATURES.map(([title, body], i) => (
+              <li key={title} className="grid grid-cols-[2.75rem_minmax(0,1fr)] py-5">
+                <span className="font-display text-lg leading-none text-chalk/55 italic" aria-hidden>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <div>
+                  <h3 className="text-label text-chalk">{t(title)}</h3>
+                  <p className="mt-2 text-[13px] leading-5 text-chalk/70">{t(body)}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          {href && (
+            <Link to={href} className={cn(CTA, 'mt-10 bg-chalk text-ink hover:bg-limestone')}>
+              {pieceHref ? t('landing.xp.cta') : t('landing.band.cta')}
+              {arrowIcon}
+            </Link>
+          )}
+        </div>
+
+        <figure className="border border-chalk/15 p-4 sm:p-6">
+          <div className="flex items-start justify-between gap-4 border-b border-chalk/15 pb-4">
+            <div>
+              <p className="text-label text-chalk/60">{t('landing.feature.eyebrow')}</p>
+              <p className="mt-1.5 font-display text-[1.75rem] leading-none">{t('landing.feature.name')}</p>
+            </div>
+            {/* What a product page offers; not controls (this piece is an illustration). */}
+            <div className="flex gap-2 text-[10px] leading-none tracking-[0.2em]" aria-hidden>
+              <span className="border border-chalk/30 px-2.5 py-1.5">3D</span>
+              <span className="border border-chalk/30 px-2.5 py-1.5">AR</span>
+            </div>
+          </div>
+          <div className="relative mt-4 sm:mt-6">
+            <img
+              src={IMG('armchair-walnut')}
+              alt={t('landing.feature.imageAlt')}
+              width={1200}
+              height={896}
+              loading="lazy"
+              className="aspect-[4/3] w-full bg-umber object-cover"
+            />
+            <span className="absolute top-3 left-3 bg-obsidian px-2.5 py-1.5 text-[10px] leading-none tracking-[0.18em] text-chalk uppercase">
+              {t('landing.xp.illustration')}
+            </span>
+          </div>
+          <figcaption className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <dl className="grid gap-4 text-[13px] sm:grid-cols-2">
+              <div>
+                <dt className="text-label text-chalk/60">{t('landing.feature.dimsLabel')}</dt>
+                <dd className="mt-1.5 tracking-[0.04em] text-chalk/85">{t('landing.feature.dims')}</dd>
+              </div>
+              <div>
+                <dt className="text-label text-chalk/60">{t('landing.feature.materialsLabel')}</dt>
+                <dd className="mt-1.5 leading-5 text-chalk/85">{t('landing.feature.materials')}</dd>
+              </div>
+            </dl>
+            <p className="font-display text-xl tracking-[0.04em] sm:text-right">{t('landing.feature.price')}</p>
+            <p className="text-xs leading-5 text-chalk/60 sm:col-span-2">{t('landing.feature.illustrative')}</p>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+  )
+}
+
+function About() {
   const { t } = useI18n()
   return (
-    <section className="grid lg:min-h-[440px] lg:grid-cols-[1.45fr_1.5fr_1.05fr_1fr]">
-      <img src={IMG('about-vase')} alt={t('landing.about.imageAlt')} width={1200} height={1248} loading="lazy" className="aspect-[4/3] size-full object-cover lg:aspect-auto" />
-      <div id="sobre" className="flex scroll-mt-20 flex-col justify-center bg-subtle px-6 py-14 sm:px-10 lg:px-12" aria-labelledby="about-title">
-        <p className="text-eyebrow text-ink-muted">{t('landing.about.eyebrow')}</p>
-        <h2 id="about-title" className="mt-5 font-display text-[clamp(1.75rem,1.3rem+1.4vw,2.4rem)] leading-[1.12] font-normal">
-          <TwoLines a={t('landing.about.title1')} b={t('landing.about.title2')} />
-        </h2>
-        <p className="mt-6 max-w-md text-[14px] leading-7 text-ink-muted">{t('landing.about.body')}</p>
-        <ArrowLink href="/#manifesto" className="mt-8 self-start text-ink">
-          {t('landing.about.cta')}
-        </ArrowLink>
-      </div>
-      <img src={IMG('about-interior')} alt={t('landing.projects.imageAlt')} width={800} height={616} loading="lazy" className="aspect-[4/3] size-full object-cover lg:aspect-auto" />
-      <div id="projetos" className="flex scroll-mt-20 flex-col justify-center bg-obsidian px-6 py-14 text-chalk sm:px-10 lg:px-10" aria-labelledby="projects-title">
-        <p className="text-eyebrow text-chalk/80">{t('landing.projects.eyebrow')}</p>
-        <h2 id="projects-title" className="mt-5 font-display text-[clamp(1.75rem,1.3rem+1.4vw,2.4rem)] leading-[1.12] font-normal text-chalk">
-          <TwoLines a={t('landing.projects.title1')} b={t('landing.projects.title2')} />
-        </h2>
-        <p className="mt-6 max-w-xs text-[14px] leading-7 text-chalk/80">{t('landing.projects.body')}</p>
-        {catalogHref && (
-          <ArrowLink to={catalogHref} className="mt-8 self-start border-chalk/70 text-chalk hover:text-limestone">
-            {t('landing.projects.cta')}
+    <section id="sobre" className="scroll-mt-24" aria-labelledby="about-title">
+      <div className={cn(SECTION, 'grid gap-12 py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16 lg:py-28')}>
+        <div>
+          <Eyebrow>{t('landing.about.eyebrow')}</Eyebrow>
+          <h2 id="about-title" className="mt-5 text-headline">
+            <TwoLines a={t('landing.about.title1')} b={t('landing.about.title2')} />
+          </h2>
+          <p className="mt-6 max-w-md text-[15px] leading-7 text-ink-muted">{t('landing.about.body')}</p>
+          <ArrowLink href="/#manifesto" className="mt-10 text-ink">
+            {t('landing.about.cta')}
           </ArrowLink>
-        )}
+        </div>
+        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-3 sm:gap-6">
+          <img
+            src={IMG('coffee-table')}
+            alt={t('landing.about.imageAlt')}
+            width={1200}
+            height={896}
+            loading="lazy"
+            className="row-span-2 aspect-[4/5] size-full border border-line bg-subtle object-cover"
+          />
+          <img
+            src={IMG('detail-joinery')}
+            alt={t('landing.about.detailAlt')}
+            width={1024}
+            height={1024}
+            loading="lazy"
+            className="aspect-square w-full border border-line bg-subtle object-cover"
+          />
+          <div className="flex flex-col justify-end border border-line bg-subtle p-3 sm:p-5">
+            <span className="block h-px w-8 bg-accent" aria-hidden />
+            <p className="mt-3 font-display text-base leading-snug text-ink-body italic sm:text-xl">{t('landing.feature.textureCaption')}</p>
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -221,106 +349,66 @@ function AboutAndProjects({ catalogHref }: { catalogHref?: string }) {
 function Manifesto() {
   const { t } = useI18n()
   return (
-    <section id="manifesto" className="scroll-mt-20 border-y border-line bg-canvas">
-      <div className="mx-auto flex max-w-[1320px] items-center gap-8 pl-5 sm:pl-10">
-        <figure className="flex-1 py-12 text-center sm:py-14 lg:pl-[12%] lg:text-left">
-          <blockquote className="font-display text-[clamp(1.35rem,1rem+1.2vw,1.9rem)] leading-snug font-normal tracking-[0.03em] text-ink italic">
-            {t('landing.quote')}
-          </blockquote>
-          <figcaption className="mt-4 text-label text-ink-muted lg:pl-[18%]">{t('landing.quoteBy')}</figcaption>
-        </figure>
-        <img src={IMG('quote-stone')} alt="" width={286} height={151} loading="lazy" className="hidden h-40 w-56 self-stretch object-cover md:block" />
-      </div>
+    <section id="manifesto" className={cn(SECTION, 'scroll-mt-24')}>
+      <figure className="border border-line bg-surface px-6 py-14 text-center sm:px-12 lg:py-20">
+        <blockquote className="mx-auto max-w-3xl font-display text-[clamp(1.5rem,1.1rem+1.4vw,2.25rem)] leading-snug font-normal text-ink italic">
+          {t('landing.quote')}
+        </blockquote>
+        <figcaption className="mt-5 text-label text-accent-ink">{t('landing.quoteBy')}</figcaption>
+      </figure>
     </section>
   )
 }
 
-/** Illustrative piece from the brand references. It has no product record or 3D model, so it never links to one (ADR-0023). */
-function Feature({ catalogHref }: { catalogHref?: string }) {
+function Projects({ catalogHref }: { catalogHref?: string }) {
   const { t } = useI18n()
   return (
-    <section className="bg-canvas" aria-labelledby="feature-title">
-      <div className="mx-auto grid max-w-[1320px] gap-x-12 gap-y-10 px-5 py-16 sm:px-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,0.62fr)] lg:py-16">
+    <section id="projetos" className={cn(SECTION, 'scroll-mt-24 pt-20 lg:pt-28')} aria-labelledby="projects-title">
+      <div className="relative isolate flex min-h-[440px] items-end overflow-hidden border border-line bg-obsidian lg:min-h-[540px]">
         <img
-          src={IMG('feature-main')}
-          alt={t('landing.feature.imageAlt')}
-          width={746}
-          height={576}
+          src={IMG('interior-villa')}
+          alt={t('landing.projects.imageAlt')}
+          width={1376}
+          height={768}
           loading="lazy"
-          className="aspect-[4/3] w-full bg-subtle object-cover lg:aspect-auto lg:h-full"
+          className="absolute inset-0 -z-10 size-full object-cover"
         />
-        <div className="flex flex-col justify-center">
-          <p className="text-eyebrow text-ink-muted">{t('landing.feature.eyebrow')}</p>
-          <h2 id="feature-title" className="mt-4 text-title">
-            {t('landing.feature.name')}
+        {/* Plain legibility scrim over the photograph. */}
+        <div className="absolute inset-0 -z-10 bg-obsidian/55 sm:bg-obsidian/45" aria-hidden />
+        <div className="max-w-xl px-6 py-10 text-chalk sm:px-12 sm:py-14">
+          <p className="text-eyebrow text-chalk/85">{t('landing.projects.eyebrow')}</p>
+          <h2 id="projects-title" className="mt-4 text-headline text-chalk">
+            <TwoLines a={t('landing.projects.title1')} b={t('landing.projects.title2')} />
           </h2>
-          <p className="mt-4 text-[15px] tracking-[0.06em] text-ink">{t('landing.feature.price')}</p>
-          <p className="mt-1 text-xs text-ink-faint">{t('landing.feature.illustrative')}</p>
-          <p className="mt-5 max-w-md text-[14px] leading-7 text-ink-muted">{t('landing.feature.body')}</p>
-          <dl className="mt-8 space-y-5">
-            <div>
-              <dt className="text-eyebrow text-ink">{t('landing.feature.dimsLabel')}</dt>
-              <dd className="mt-1.5 text-[13px] tracking-[0.04em] text-ink-muted">{t('landing.feature.dims')}</dd>
-            </div>
-            <div>
-              <dt className="text-eyebrow text-ink">{t('landing.feature.materialsLabel')}</dt>
-              <dd className="mt-1.5 text-[13px] text-ink-muted">{t('landing.feature.materials')}</dd>
-            </div>
-          </dl>
+          <p className="mt-5 max-w-sm text-[15px] leading-7 text-chalk/90">{t('landing.projects.body')}</p>
           {catalogHref && (
-            <Link to={catalogHref} className="mt-9 inline-flex h-12 items-center justify-center self-start bg-ink px-10 text-label text-chalk transition-colors hover:bg-umber">
-              {t('landing.band.cta')}
-            </Link>
+            <ArrowLink to={catalogHref} className="mt-8 border-chalk/70 text-chalk hover:text-limestone">
+              {t('landing.projects.cta')}
+            </ArrowLink>
           )}
         </div>
-        <aside className="lg:border-l lg:border-line lg:pl-10" aria-labelledby="details-title">
-          <h3 id="details-title" className="text-eyebrow text-ink">
-            {t('landing.feature.details')}
-          </h3>
-          <div className="mt-4 divide-y divide-line border-y border-line">
-            {(
-              [
-                ['landing.feature.materialsLabel', 'landing.feature.materials'],
-                ['landing.feature.dimsLabel', 'landing.feature.dims'],
-              ] as const
-            ).map(([label, body]) => (
-              <details key={label} className="group">
-                <summary className="flex cursor-pointer list-none items-center justify-between py-3.5 text-[13px] text-ink [&::-webkit-details-marker]:hidden">
-                  {t(label)}
-                  <Plus className="size-3.5 transition-transform group-open:rotate-45" strokeWidth={1.5} aria-hidden />
-                </summary>
-                <p className="pb-4 text-[13px] leading-6 text-ink-muted">{t(body)}</p>
-              </details>
-            ))}
-          </div>
-          <figure className="mt-6">
-            <img src={IMG('feature-texture')} alt={t('landing.feature.textureAlt')} width={372} height={182} loading="lazy" className="aspect-[2/1] w-full object-cover" />
-            <figcaption className="mt-3 font-display text-[15px] text-ink-muted italic">{t('landing.feature.textureCaption')}</figcaption>
-          </figure>
-        </aside>
       </div>
     </section>
   )
 }
 
-function Band({ catalogHref }: { catalogHref?: string }) {
+function Partners() {
   const { t } = useI18n()
   return (
-    <section className="grid grid-cols-2 gap-1.5 bg-canvas px-1.5 pb-1.5 lg:grid-cols-[1.5fr_1fr_0.95fr_1.1fr]">
-      <div className="relative isolate col-span-2 flex min-h-[260px] flex-col justify-center overflow-hidden px-8 py-12 text-chalk sm:px-12 lg:col-span-1">
-        <img src={IMG('band-lake')} alt="" width={1600} height={840} loading="lazy" className="absolute inset-0 -z-10 size-full object-cover" />
-        <div className="absolute inset-0 -z-10 bg-obsidian/30" aria-hidden />
-        <Wordmark size={14} />
-        <p className="mt-5 text-[17px] font-light">{t('landing.band.title')}</p>
-        {catalogHref && (
-          <ArrowLink to={catalogHref} className="mt-8 self-start border-chalk/70 text-chalk hover:text-limestone">
-            {t('landing.band.cta')}
-          </ArrowLink>
-        )}
+    <section id="parcerias" className={cn(SECTION, 'scroll-mt-24 py-20 lg:py-28')} aria-labelledby="biz-title">
+      <div className="flex flex-col gap-8 border border-line bg-surface px-6 py-10 sm:px-12 sm:py-14 lg:flex-row lg:items-center lg:justify-between lg:gap-16">
+        <div className="max-w-2xl">
+          <Eyebrow>{t('landing.biz.eyebrow')}</Eyebrow>
+          <h2 id="biz-title" className="mt-4 font-display text-[clamp(1.75rem,1.3rem+1.6vw,2.6rem)] leading-[1.12] font-normal text-ink">
+            {t('landing.biz.title')}
+          </h2>
+          <p className="mt-4 text-[15px] leading-7 text-ink-muted">{t('landing.biz.body')}</p>
+        </div>
+        <Link to={APPLY_PATH} className={cn(CTA_DARK, 'shrink-0 self-start lg:self-center')}>
+          {t('site.apply')}
+          {arrowIcon}
+        </Link>
       </div>
-      <img src={IMG('band-fabric')} alt={t('landing.band.fabricAlt')} width={471} height={354} loading="lazy" className="aspect-[4/3] size-full object-cover lg:aspect-auto" />
-      <img src={IMG('band-bench')} alt={t('landing.band.benchAlt')} width={452} height={354} loading="lazy" className="aspect-[4/3] size-full object-cover lg:aspect-auto" />
-      <img src={IMG('band-card')} alt={t('landing.band.cardAlt')} width={530} height={354} loading="lazy" className="col-span-2 aspect-[16/9] size-full object-cover lg:col-span-1 lg:aspect-auto" />
     </section>
   )
 }

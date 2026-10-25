@@ -16,11 +16,11 @@ export function ActivityTrend({ data, compact }: { data: DailyPoint[]; compact?:
       {showTable ? (
         <SeriesTable data={data} />
       ) : (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-8 lg:grid-cols-2">
           {(['views', 'ar'] as const).map((k) => (
             <div key={k}>
-              <div className="mb-2 flex items-baseline gap-2 text-[13px]">
-                <span className="inline-block size-2.5 rounded-sm" style={{ background: SERIES[k].color }} aria-hidden />
+              <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                <span className="inline-block h-0.5 w-4 shrink-0" style={{ background: SERIES[k].color }} aria-hidden />
                 <span className="font-medium text-ink">{SERIES[k].label}</span>
                 <span className="text-ink-muted tabular-nums">{formatNumber(k === 'views' ? views : ar)} in 30 days</span>
               </div>

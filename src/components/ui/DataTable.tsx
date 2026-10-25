@@ -80,7 +80,7 @@ export function DataTable<T>({
       <div className="space-y-4 p-5" role="status" aria-label="Loading">
         {Array.from({ length: 5 }, (_, i) => (
           <div key={i} className="flex items-center gap-4">
-            <Skeleton className="size-10 rounded-lg" />
+            <Skeleton className="size-10 rounded-[var(--radius-control)]" />
             <Skeleton className="h-4 flex-1" />
             <Skeleton className="h-4 w-20" />
             <Skeleton className="hidden h-4 w-24 md:block" />
@@ -107,7 +107,7 @@ export function DataTable<T>({
         <table className="w-full text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-line text-left text-[13px] text-ink-muted">
+            <tr className="border-b border-line bg-canvas/50 text-left text-[10.5px] tracking-[0.16em] text-ink-muted uppercase">
               {columns.map((c) => {
                 const active = sort?.key === c.key
                 const ariaSort = active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : c.sortValue ? 'none' : undefined
@@ -117,7 +117,7 @@ export function DataTable<T>({
                     scope="col"
                     aria-sort={ariaSort}
                     className={cn(
-                      'px-4 py-2.5 font-medium whitespace-nowrap first:pl-5 last:pr-5',
+                      'px-4 py-3 font-medium whitespace-nowrap first:pl-6 last:pr-6',
                       c.align === 'right' && 'text-right',
                       c.priority === 'low' && 'hidden lg:table-cell',
                     )}
@@ -126,7 +126,7 @@ export function DataTable<T>({
                       <button
                         type="button"
                         onClick={() => toggleSort(c.key)}
-                        className={cn('inline-flex items-center gap-1 rounded hover:text-ink', c.align === 'right' && 'flex-row-reverse')}
+                        className={cn('inline-flex items-center gap-1 rounded uppercase hover:text-ink', c.align === 'right' && 'flex-row-reverse')}
                       >
                         {c.header}
                         {active ? (
@@ -145,12 +145,12 @@ export function DataTable<T>({
           </thead>
           <tbody className="divide-y divide-line">
             {visible.map((row) => (
-              <tr key={rowKey(row)} className="hover:bg-canvas/60">
+              <tr key={rowKey(row)} className="transition-colors hover:bg-canvas/70">
                 {columns.map((c) => (
                   <td
                     key={c.key}
                     className={cn(
-                      'px-4 py-3 align-middle first:pl-5 last:pr-5',
+                      'px-4 py-3.5 align-middle first:pl-6 last:pr-6',
                       c.align === 'right' && 'text-right tabular-nums',
                       c.priority === 'low' && 'hidden lg:table-cell',
                       c.className,
