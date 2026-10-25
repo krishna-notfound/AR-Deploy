@@ -112,6 +112,7 @@ export function ProductFilterBar({
           </Select>
         </FilterField>
       )}
+      <div className="grid grid-cols-2 gap-4 sm:contents">
       <FilterField label="Status" className="sm:w-[150px]">
         <Select aria-label="Filter by status" value={state.status} onChange={(e) => update({ status: e.target.value as ProductFilterState['status'] })}>
           <option value="">All statuses</option>
@@ -139,6 +140,7 @@ export function ProductFilterBar({
           <option value="photos-only">No 3D model</option>
         </Select>
       </FilterField>
+      </div>
       {hasProductFilters(state) && (
         <button type="button" onClick={() => update(CLEARED_PRODUCT_FILTERS)} className="min-h-10 text-[length:var(--text-ui-small)] font-medium text-accent-ink hover:underline sm:ml-1">
           Clear filters

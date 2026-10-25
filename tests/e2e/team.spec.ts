@@ -58,10 +58,11 @@ test('the Owner removes a Team permission after confirming', async ({ page }) =>
   await signInAsSuperAdmin(page)
   await page.goto('/admin/team/permissions')
   await page.getByRole('checkbox', { name: 'Team: Create and edit products' }).uncheck()
-  await expect(page.getByText('1 unsaved change')).toBeVisible()
+  await expect(page.locator('[aria-live="polite"]', { hasText: '1 unsaved change' })).toContainText('1 unsaved change')
   await page.getByRole('button', { name: 'Save changes' }).click()
   await confirmDialog(page, 'Save changes')
-  await expect(page.getByText('All changes saved')).toBeVisible()
+  await expect(page.getByText('Permissions saved')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save changes' })).toBeHidden()
   await expect(page.getByRole('checkbox', { name: 'Team: Create and edit products' })).not.toBeChecked()
 })
 

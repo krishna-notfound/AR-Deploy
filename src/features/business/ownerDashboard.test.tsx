@@ -6,6 +6,7 @@ import { ACCOUNT_KEY } from '@/auth/AccountProvider'
 import type { Product } from '@/domain/types'
 import { catalogPublicUrl, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
+import { ok } from '@/services/catalogService'
 import { productArReadiness } from '../products/productReadiness'
 
 // The QR library draws on a canvas jsdom does not have; record what each code would encode instead.
@@ -149,6 +150,25 @@ describe('AR readiness in the product list (DUX-05)', () => {
   })
 })
 
+describe('My products when the business has none', () => {
+  it('hides the filter toolbar and the second Add product, and shows both once there are products', async () => {
+    const real = service.getProductsByBusiness.bind(service)
+    const spy = vi.spyOn(service, 'getProductsByBusiness').mockResolvedValue(ok([]))
+    const first = openApp('/dashboard/products', asOwner('biz_casa'))
+    expect(await screen.findByText('Add your first product')).toBeInTheDocument()
+    expect(screen.queryByRole('searchbox')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Filter by status' })).toBeNull()
+    // Only the header button remains.
+    expect(screen.getAllByRole('link', { name: /Add product/ })).toHaveLength(1)
+    first.unmount()
+
+    spy.mockImplementation(real)
+    openApp('/dashboard/products', asOwner('biz_casa'))
+    await screen.findByRole('table')
+    expect(screen.getByRole('combobox', { name: 'Filter by status' })).toBeInTheDocument()
+  })
+})
+
 describe('analytics labels (DUX-07)', () => {
   it('says "attempts", never "activations", and shows "No 3D" (not a number or a dash) for products without a 3D model', async () => {
     openApp('/dashboard/analytics', asOwner('biz_casa'))
@@ -170,7 +190,7 @@ describe('shared analytics view (platform scope)', () => {
     expect(await screen.findByText('Sample data')).toBeInTheDocument()
     const list = await screen.findByRole('list', { name: 'Views by business' })
     const first = within(list).getAllByRole('listitem')[0]
-    expect(first?.querySelector('p')?.getAttribute('title')).toBeTruthy()
+    expect(first?.querySelector('[title]')?.getAttribute('title')).toBeTruthy()
     const ranks = within(screen.getByRole('heading', { name: 'Most viewed products' }).closest('div[class*="rounded"]') as HTMLElement)
     expect(ranks.queryByText('01')).toBeNull()
   })

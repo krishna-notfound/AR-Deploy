@@ -115,7 +115,7 @@ export default function BusinessDetailPage() {
       {tab === 'products' && (
         <Card>
           <div className="flex items-center justify-between gap-3 border-b border-line p-4">
-            <p className="text-ui-body text-ink-muted">Products in {b.name}’s catalog</p>
+            <p className="text-ui-body text-ink-muted">Products</p>
             <ButtonLink to={`/admin/products/new?business=${b.id}`} size="sm" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
               Add product
             </ButtonLink>
@@ -125,6 +125,7 @@ export default function BusinessDetailPage() {
           ) : (
             <ProductTable
               scope="admin"
+              showBusiness={false}
               products={products.data ?? []}
               businesses={bizMap}
               stats={stats.map}

@@ -34,8 +34,8 @@ export default function TeamPage() {
     () => ({
       active: list.filter((m) => m.status === 'active').length,
       pending: list.filter((m) => m.status === 'invited').length,
-      admins: list.filter((m) => m.role === 'admin').length,
-      team: list.filter((m) => m.role === 'team').length,
+      admins: list.filter((m) => m.role === 'admin' && m.status === 'active').length,
+      team: list.filter((m) => m.role === 'team' && m.status === 'active').length,
     }),
     [list],
   )

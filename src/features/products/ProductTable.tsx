@@ -42,6 +42,7 @@ export function ProductTable({
   businesses,
   stats,
   scope,
+  showBusiness = scope === 'admin',
   loading,
   empty,
   page,
@@ -51,6 +52,8 @@ export function ProductTable({
   businesses: Map<string, Business>
   stats: Map<string, ProductAnalytics>
   scope: EditorScope
+  /** Show the business column and sub-line; off when the table is already limited to one business. */
+  showBusiness?: boolean
   loading?: boolean
   empty: React.ReactNode
   page?: number
@@ -100,7 +103,7 @@ export function ProductTable({
 
   const columns: Column<Product>[] = [
     { key: 'name', header: 'Product', cell: name, sortValue: (p) => p.name.en.toLowerCase(), className: 'max-w-[280px]' },
-    ...(scope === 'admin'
+    ...(showBusiness
       ? [
           {
             key: 'business',
@@ -160,7 +163,7 @@ export function ProductTable({
               <Link to={editPath(scope, p)} className="block truncate text-sm font-medium hover:underline">
                 {p.name.en}
               </Link>
-              {scope === 'admin' && <p className="truncate text-xs text-ink-muted">{businesses.get(p.businessId)?.name}</p>}
+              {showBusiness && <p className="truncate text-xs text-ink-muted">{businesses.get(p.businessId)?.name}</p>}
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
                 <ProductStatusBadge status={p.status} />
                 <span className="font-medium text-ink">{formatMoney(p.price, p.currency)}</span>

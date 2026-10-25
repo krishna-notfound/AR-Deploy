@@ -30,11 +30,12 @@ export function InvitationsTable({ members, onOpen }: { members: PlatformMember[
       key: 'email',
       header: 'Invited email',
       cell: (m) => (
-        <button type="button" className="text-left text-ui-body font-medium text-ink hover:underline" onClick={() => onOpen(m)}>
+        <button type="button" className="block max-w-full truncate text-left text-ui-body font-medium text-ink hover:underline" title={m.email} onClick={() => onOpen(m)}>
           {m.email}
         </button>
       ),
       sortValue: (m) => m.email,
+      className: 'max-w-[280px]',
     },
     { key: 'role', header: 'Role', cell: (m) => <RoleBadge role={m.role} /> },
     { key: 'status', header: 'Invitation', cell: (m) => (m.invite ? <InviteStatusBadge status={m.invite.status} /> : <span className="text-ink-muted">Not sent</span>) },
@@ -54,7 +55,9 @@ export function InvitationsTable({ members, onOpen }: { members: PlatformMember[
       mobileRow={(m) => (
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
-            <p className="text-ui-body font-medium text-ink">{m.email}</p>
+            <p className="truncate text-ui-body font-medium text-ink" title={m.email}>
+              {m.email}
+            </p>
             <div className="flex flex-wrap gap-1.5">
               <RoleBadge role={m.role} />
               {m.invite && <InviteStatusBadge status={m.invite.status} />}

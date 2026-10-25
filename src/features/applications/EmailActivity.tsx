@@ -25,7 +25,7 @@ export function EmailActivity({ applicationId, businessId }: { applicationId?: I
         ) : (
           <ul className="divide-y divide-subtle border-y border-line">
             {q.data.map((e) => (
-              <li key={e.id} className="grid gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-4">
+              <li key={e.id} className="grid justify-items-start gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-start sm:justify-items-stretch sm:gap-4">
                 <div className="min-w-0">
                   <p className="text-ui-body font-medium text-ink">
                     {EMAIL_KIND_LABEL[e.kind] ?? e.kind}
@@ -36,7 +36,9 @@ export function EmailActivity({ applicationId, businessId }: { applicationId?: I
                   </p>
                   {emailReason(e.error) && <p className="mt-1 text-ui-small text-ink-muted">{emailReason(e.error)}</p>}
                 </div>
-                <EmailStatusBadge status={e.status} />
+                <div className="sm:justify-self-end">
+                  <EmailStatusBadge status={e.status} />
+                </div>
               </li>
             ))}
           </ul>

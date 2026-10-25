@@ -125,7 +125,15 @@ function EventRow({ e }: { e: AccessEvent }) {
       <div className="min-w-0">
         <p className="text-ink">
           <span className="font-medium">{ACTION_LABEL[e.action]}</span>
-          {e.member && <span className="text-ink-muted"> · {e.member}</span>}
+          {e.member && (
+            <span className="text-ink-muted">
+              {' '}
+              ·{' '}
+              <span className="inline-block max-w-full truncate align-bottom" title={e.member}>
+                {e.member}
+              </span>
+            </span>
+          )}
           {(e.fromRole || e.toRole) && (
             <span className="text-ink-muted">
               {' '}
@@ -135,7 +143,9 @@ function EventRow({ e }: { e: AccessEvent }) {
           )}
         </p>
         <p className="mt-0.5 text-ui-small text-ink-muted">{e.details}</p>
-        <p className="mt-0.5 text-ui-small text-ink-muted">By {e.actor ?? 'the system'}</p>
+        <p className="mt-0.5 truncate text-ui-small text-ink-muted" title={e.actor ?? undefined}>
+          By {e.actor ?? 'the system'}
+        </p>
       </div>
       <div>{e.outcome === 'denied' ? <Badge tone="danger">Refused</Badge> : <Badge tone="success">Done</Badge>}</div>
     </li>
