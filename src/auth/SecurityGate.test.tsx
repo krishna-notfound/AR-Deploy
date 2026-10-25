@@ -382,6 +382,26 @@ describe('SecurityGate', () => {
     expect(acc.impl.recordSignIn).not.toHaveBeenCalled()
   })
 
+  it('the setup checklist comes after the 2FA gate, and never covers the settings routes', async () => {
+    const onboarding = { completedAt: null, dismissedAt: null }
+    setup({ requires2fa: true, factor: false, aal: 'aal1', onboarding })
+    const first = renderGate()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Set up 2FA to continue' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Complete your setup' })).not.toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.type(await screen.findByLabelText('6-digit code'), TOTP)
+    await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
+    await user.click(await screen.findByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Complete your setup' })).toBeInTheDocument()
+    expect(screen.queryByText('Admin home')).not.toBeInTheDocument()
+    first.unmount()
+
+    setup({ factor: true, aal: 'aal2', onboarding })
+    renderGate('/admin/settings/profile')
+    expect(await screen.findByText('Settings page')).toBeInTheDocument()
+  })
+
   it('demo mode: the gate is a no-op while the demo policy is off', async () => {
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
     renderGate()
