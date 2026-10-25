@@ -101,6 +101,8 @@ export function absoluteLocalUrl(path: string): string {
 
 /** Public "Apply as a business" wizard. */
 export const APPLY_PATH = '/apply'
+/** Where platform team invitation links land (ADR-0030); the secret travels in the URL fragment. */
+export const JOIN_PATH = '/join'
 /** Where owner invitation links land (the provision-owner Edge Function builds the absolute URL from APP_BASE_URL). */
 export const ACCEPT_INVITE_PATH = '/accept-invite'
 

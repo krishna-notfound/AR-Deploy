@@ -1,4 +1,5 @@
 import { RequirePermission } from '@/auth/usePermission'
+import { JOIN_PATH } from '@/lib/urls'
 import { lazy, Suspense } from 'react'
 import { Outlet, type RouteObject, createBrowserRouter } from 'react-router'
 import { RequireRole } from '@/auth/RequireRole'
@@ -34,6 +35,7 @@ const AuditLogPage = lazy(() => import('@/features/admin/AuditLogPage'))
 const TeamPage = lazy(() => import('@/features/team/TeamPage'))
 const RolePermissionsPage = lazy(() => import('@/features/team/RolePermissionsPage'))
 const MemberDetailPage = lazy(() => import('@/features/team/MemberDetailPage'))
+const JoinPage = lazy(() => import('@/features/join/JoinPage'))
 const ProductEditorPage = lazy(() => import('@/features/products/ProductEditorPage'))
 
 const BusinessOverviewPage = lazy(() => import('@/features/business/BusinessOverviewPage'))
@@ -123,6 +125,7 @@ function pathModeRoutes(): RouteObject[] {
           children: [
             { path: '/demo', element: <DemoEntryPage /> },
             { path: '/login', element: <LoginPage /> },
+            { path: JOIN_PATH, element: <JoinPage /> },
           ],
         },
         adminRoutes,
