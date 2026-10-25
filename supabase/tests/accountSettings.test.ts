@@ -18,7 +18,9 @@ const SUPABASE_STUBS = `
     raw_user_meta_data jsonb default '{}');
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('test.jwt', true), ''), '{}')::jsonb $$;
-  create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, status text, factor_type text);
+  create type auth.factor_status as enum ('unverified', 'verified'); create type auth.factor_type as enum ('totp', 'webauthn', 'phone');
+  create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, status auth.factor_status not null,
+    factor_type auth.factor_type not null);
   grant usage on schema auth to anon, authenticated, service_role;
   create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid);
   create schema storage;
@@ -873,6 +875,34 @@ describe('opt-in 2FA (follow-up)', () => {
     expect(await flag(STRANGER_U, 'public.caller_has_verified_factor()', 'aal1')).toBe(false)
     await expect(probe('', 'select public.caller_has_verified_factor()', [], null, 'anon')).rejects.toThrow(/permission denied/)
     await expect(probe(F_TEAM_U, 'select * from auth.mfa_factors', [], 'aal2')).rejects.toThrow(/permission denied/)
+  })
+
+  it('policy on and a verified factor at aal1: false; aal2: true', async () => {
+    await withPolicy(true, true, async () => {
+      expect(await flag(F_TEAM_U, `public.platform_can('products.view')`, 'aal1')).toBe(false)
+      expect(await flag(F_BIZ_U, `public.is_business_member('${F_BIZ}')`, 'aal1')).toBe(false)
+      expect(await flag(F_TEAM_U, `public.platform_can('products.view')`, 'aal2')).toBe(true)
+      expect(await flag(F_BIZ_U, `public.is_business_member('${F_BIZ}')`, 'aal2')).toBe(true)
+    })
+  })
+
+  it('a staff member with only an unverified factor is allowed at aal1 with the policy off', async () => {
+    const u = '00000000-0000-0000-0000-0000000000e4'
+    await db.exec(`
+      insert into auth.users (id, email) values ('${u}', 'unver-staff@test');
+      insert into public.platform_members (user_id, email, role, status) values ('${u}', 'unver-staff@test', 'team', 'active');
+      insert into auth.mfa_factors (user_id, status, factor_type) values ('${u}', 'unverified', 'totp');`)
+    expect(await flag(u, `public.platform_can('products.view')`, 'aal1')).toBe(true)
+    expect(await flag(u, 'public.is_platform_member()', 'aal1')).toBe(true)
+    expect(await flag(u, 'public.caller_has_verified_factor()', 'aal1')).toBe(false)
+  })
+
+  it('cancel_account_closure with a verified factor at aal1 needs aal2', async () => {
+    expect(await svc('select public.service_request_closure($1) as r', [F_BIZ_U])).toMatchObject({ ok: true, kind: 'business' })
+    expect(await call(F_BIZ_U, 'select public.cancel_account_closure() as r', [], 'aal1')).toEqual({ error: 'aal2_required' })
+    expect((await db.query('select 1 from public.account_closure_requests where user_id = $1', [F_BIZ_U])).rows).toHaveLength(1)
+    expect(await call(F_BIZ_U, 'select public.cancel_account_closure() as r', [], 'aal2')).toEqual({ ok: true })
+    expect((await db.query('select status from public.businesses where id = $1', [F_BIZ])).rows[0]).toEqual({ status: 'active' })
   })
 
   it('the opt-in rollback restores the policy-only rule, and the main rollback still applies after it', async () => {

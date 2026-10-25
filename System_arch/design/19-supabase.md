@@ -169,6 +169,9 @@ npm run db:types   # npx supabase gen types typescript --project-id <ref> > src/
 | `uploadAsset` | Storage upload + public URL or signed URL | Bucket policies (above). |
 | sign-in / role | `auth.signInWithPassword`, `auth.getUser`, `platform_admins`, `business_members` | Rows that users cannot write. |
 
+## How the access helpers enforce 2FA (S1, migrations 20261025163627 and 20261025180600)
+`is_platform_admin()`, `is_platform_member()` and `platform_can()` (staff) and `is_business_member()` (business owners) are true only when the 2FA rule holds: **`aal2 OR (policy off AND no verified factor)`**. The policy is `platform_settings.require_2fa_staff` / `require_2fa_business`. The factor check is `public.caller_has_verified_factor()` (security definer: it reads `auth.mfa_factors` for `auth.uid()` only). The definer helpers call `private.mfa_satisfied(scope)`. The two invoker helpers carry the same rule inline, because the API roles have no usage on schema `private`. Every RLS policy and admin function that uses the helpers, including the `business-logos` and `product-media` storage policies, therefore refuses an aal1 session when the policy is on or the user has a verified factor. Not gated: the own `profiles` row, `platform_settings`, `my_security_state()`, `record_sign_in()`, the Auth MFA APIs, public catalog reads and `service_*` functions.
+
 ## Pre-deployment review (2026-10-12)
 Fixed in the migration files (none had been applied anywhere):
 
