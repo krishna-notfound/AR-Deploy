@@ -1,0 +1,85 @@
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { App } from '@/app/App'
+import { ACCOUNT_KEY } from '@/auth/AccountProvider'
+import { service } from '@/services'
+
+function open(url = '/admin/team/permissions') {
+  localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
+  window.history.replaceState(null, '', url)
+  return render(<App />)
+}
+const box = (role: 'Admin' | 'Team', label: string) => screen.getByRole('checkbox', { name: `${role}: ${label}` })
+
+beforeAll(async () => {
+  await import('@/features/team/RolePermissionsPage')
+}, 60_000)
+
+beforeEach(async () => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  localStorage.clear()
+  await service.resetDemoData()
+})
+afterEach(() => {
+  vi.restoreAllMocks()
+  window.history.replaceState(null, '', '/')
+})
+
+describe('Role permissions (ADR-0029)', () => {
+  it('lists the 15 permissions in three groups for Admin and Team; the Owner has everything', { timeout: 20_000 }, async () => {
+    open()
+    await screen.findByRole('heading', { level: 1, name: 'Role permissions' })
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    for (const g of ['Businesses & applications', 'Products & catalogues', 'Insight & records']) expect(screen.getByRole('heading', { name: g })).toBeInTheDocument()
+    expect(box('Team', 'View businesses')).toBeChecked()
+    expect(box('Team', 'Publish and unpublish')).not.toBeChecked()
+    expect(screen.getAllByText("Deletes the product and its media. This can't be undone.").length).toBeGreaterThan(0)
+  })
+
+  it('counts unsaved changes, and Cancel puts them back', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await user.click(box('Team', 'Publish and unpublish'))
+    expect(screen.getByText('1 unsaved change')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(box('Team', 'Publish and unpublish')).not.toBeChecked()
+    expect(screen.queryByText(/unsaved change/)).toBeNull()
+  })
+
+  it('confirms a removal, listing what is taken away, then saves', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    const spy = vi.spyOn(service, 'setRolePermissions')
+    open()
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await user.click(box('Team', 'Create and edit products'))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/Create and edit products/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/1 active Team member/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('team', ['businesses.view', 'applications.view', 'products.view', 'analytics.view']))
+    await waitFor(() => expect(screen.queryByText(/unsaved change/)).toBeNull())
+  })
+
+  it('reset to defaults restores the default sets without saving', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
+    expect((await service.setRolePermissions('team', ['products.view'])).ok).toBe(true)
+    open()
+    await waitFor(() => expect(box('Team', 'View businesses')).not.toBeChecked())
+    await user.click(screen.getByRole('button', { name: 'Reset to defaults' }))
+    expect(box('Team', 'View businesses')).toBeChecked()
+    expect(screen.getByText(/unsaved change/)).toBeInTheDocument()
+  })
+
+  it('asks before leaving with unsaved changes', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await user.click(box('Admin', 'Delete businesses'))
+    await user.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: /Overview/ }))
+    expect(await screen.findByRole('dialog', { name: 'Leave without saving?' })).toBeInTheDocument()
+  })
+})
