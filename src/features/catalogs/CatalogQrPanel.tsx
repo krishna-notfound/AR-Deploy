@@ -38,30 +38,30 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
   return (
     <Card className="overflow-hidden">
       {/* grid-cols-1 + min-w-0: an implicit auto track grew to the URL's width and clipped the column on phones (DUX-03). */}
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="min-w-0 space-y-5 p-5 sm:p-6">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6 p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-display text-[1.75rem] leading-tight font-normal">{b.name}</h2>
+            <h2 className="font-[family-name:var(--font-ui)] text-[20px] leading-[1.4] font-semibold text-ink">{b.name}</h2>
             <BusinessStatusBadge status={b.status} />
           </div>
 
           <div>
-            <p className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Catalog URL</p>
-            <div className="mt-2 flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas py-1.5 pr-1.5 pl-3">
-              <code className="min-w-0 flex-1 truncate text-sm">{catalog.catalogUrl}</code>
+            <p className="text-ui-small font-medium text-ink-muted">Catalog URL</p>
+            <div className="mt-1.5 flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas py-1.5 pr-1.5 pl-3.5">
+              <code className="min-w-0 flex-1 truncate font-[family-name:var(--font-ui)] text-ui-body">{catalog.catalogUrl}</code>
               <CopyButton text={catalog.catalogUrl} label="Copy URL" toastTitle="Catalog URL copied" />
             </div>
             {!PUBLIC_URLS_ARE_LIVE && (
-              <p className="mt-1.5 text-xs text-ink-muted">Example address for this demo. Your real address is set up by the platform team.</p>
+              <p className="mt-2 text-ui-small text-ink-muted">Example address for this demo. Your real address is set up by the platform team.</p>
             )}
             {PUBLIC_URLS_ARE_TEMPORARY && (
-              <p className="mt-1.5 text-xs font-medium text-warning">
+              <p className="mt-2 text-ui-small font-medium text-warning">
                 This is a preview or local address. QR codes and links made here point to it: download QR codes for print from the production site.
               </p>
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b, { preview: !isPublic }), '_blank', 'noopener')}>
               {isPublic ? 'Open catalog' : 'Preview catalog (not public yet)'}
             </Button>
@@ -70,14 +70,14 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
             </ButtonLink>
           </div>
 
-          <dl className="grid grid-cols-2 gap-4 border-t border-line pt-5 text-sm sm:max-w-sm">
+          <dl className="grid grid-cols-2 gap-8 border-t border-line pt-6">
             <div>
-              <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">Published products</dt>
-              <dd className="mt-2 font-display text-[2rem] leading-none lining-nums tabular-nums">{catalog.publishedProductCount}</dd>
+              <dt className="text-ui-small font-medium text-ink-muted">Published products</dt>
+              <dd className="mt-1 text-ui-kpi font-medium text-ink tabular-nums">{catalog.publishedProductCount}</dd>
             </div>
             <div>
-              <dt className="text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase">All products</dt>
-              <dd className="mt-2 font-display text-[2rem] leading-none lining-nums tabular-nums">{catalog.totalProductCount}</dd>
+              <dt className="text-ui-small font-medium text-ink-muted">All products</dt>
+              <dd className="mt-1 text-ui-kpi font-medium text-ink tabular-nums">{catalog.totalProductCount}</dd>
             </div>
           </dl>
 
@@ -89,17 +89,17 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col items-center border-t border-line bg-canvas p-6 md:border-t-0 md:border-l">
-          <div className="w-full max-w-[220px] border border-line bg-white p-3">
+        <div className="flex min-w-0 flex-col items-center border-t border-line bg-canvas p-8 md:border-t-0 md:border-l">
+          <div className="w-full max-w-[240px] border border-line bg-white p-3">
             {qr.url ? (
               <img src={qr.url} alt={`QR code linking to ${target}`} className="aspect-square w-full" />
             ) : qr.error ? (
-              <div className="grid aspect-square place-items-center text-center text-xs text-danger">QR code could not be generated.</div>
+              <div className="grid aspect-square place-items-center text-center text-ui-small text-danger">QR code could not be generated.</div>
             ) : (
               <Skeleton className="aspect-square w-full" />
             )}
           </div>
-          <p className="mt-3 max-w-[240px] text-center text-xs text-ink-muted">
+          <p className="mt-4 max-w-[240px] text-center text-ui-small text-ink-muted">
             <QrCode className="mr-1 inline size-3.5 align-[-2px]" aria-hidden />
             Points to the catalog, so it stays valid when products change.
           </p>

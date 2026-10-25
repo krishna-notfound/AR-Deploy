@@ -1,8 +1,8 @@
 import { BarChart3 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
-import { HorizontalBars } from '@/components/charts/Charts'
+import { SERIES } from '@/components/charts/Charts'
 import { PanelHeader } from '@/components/layout/PageHeader'
 import { SampleDataTag } from '@/components/ui/Badge'
 import { Card, CardBody } from '@/components/ui/Card'
@@ -19,6 +19,9 @@ import { useServiceQuery } from '@/services/hooks'
 import { primaryImage } from '@/lib/product'
 import { MostViewedList, arAttempts } from './MostViewedList'
 
+/** A figure that does not exist (yet): a grey dash at hint size, not a word in the 28px value slot (BRIEF section 4). */
+const MISSING = <span className="text-ui-small font-normal text-ink-muted">—</span>
+
 /**
  * Shared analytics: product views and AR launch attempts only (design/16).
  * With businessId it is scoped to one business; otherwise platform-wide with an optional filter.
@@ -34,6 +37,7 @@ export function AnalyticsView({
   onBusinessChange?: (id: string) => void
   editBase: string
 }) {
+  const selectId = useId()
   const summary = useServiceQuery(() => (businessId ? service.getBusinessAnalytics(businessId) : service.getAnalytics()), [businessId])
   const products = useServiceQuery(() => service.getProducts(businessId ? { businessId } : {}), [businessId])
   const productMap = useMemo(() => new Map<string, Product>((products.data ?? []).map((p) => [p.id, p])), [products.data])
@@ -93,17 +97,24 @@ export function AnalyticsView({
   return (
     <div className="space-y-6">
       {businesses && onBusinessChange && (
-        <div className="flex flex-wrap items-center gap-3">
-          <Select aria-label="Filter analytics by business" value={businessId ?? ''} onChange={(e) => onBusinessChange(e.target.value)} className="w-full sm:w-64">
-            <option value="">All businesses</option>
-            {businesses.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </Select>
-          {s?.isSample && <SampleDataTag />}
-          <span className="text-xs text-ink-muted">Last 30 days.{s?.isSample ? ' Includes visits and AR taps you make in this demo.' : ''}</span>
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+          <div className="w-full sm:w-64">
+            <label htmlFor={selectId} className="mb-1.5 block text-ui-body font-medium text-ink">
+              Business
+            </label>
+            <Select id={selectId} value={businessId ?? ''} onChange={(e) => onBusinessChange(e.target.value)} className="w-full">
+              <option value="">All businesses</option>
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex min-h-10 flex-wrap items-center gap-2">
+            {s?.isSample && <SampleDataTag />}
+            <span className="text-ui-small text-ink-muted">Last 30 days.{s?.isSample ? ' Includes visits and AR taps you make in this demo.' : ''}</span>
+          </div>
         </div>
       )}
 
@@ -114,9 +125,11 @@ export function AnalyticsView({
           { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
           // The seeded sample data has no 3D interactions: "0" next to thousands of views would read as broken tracking.
           s?.isSample && !s.totals.modelInteractions
-            ? { label: '3D interactions', value: 'Not recorded', hint: 'Not in the sample data' }
+            ? { label: '3D interactions', value: MISSING, hint: 'Not recorded in the sample data' }
             : { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Times a visitor turned or zoomed a 3D model' },
-          { label: 'AR launch rate', value: s && s.totals.views ? formatPercent(s.totals.arActivations / s.totals.views) : 'No views yet', hint: 'AR launch attempts per product page view' },
+          s && !s.totals.views
+            ? { label: 'AR launch rate', value: MISSING, hint: 'No views yet' }
+            : { label: 'AR launch rate', value: s ? formatPercent(s.totals.arActivations / s.totals.views) : formatPercent(0), hint: 'AR launch attempts per product page view' },
           { label: 'Published products', value: formatNumber(s?.totals.published ?? 0), hint: 'Current' },
         ]}
         footer={
@@ -141,7 +154,7 @@ export function AnalyticsView({
               {loading || !s ? (
                 <Skeleton className="h-40 w-full" />
               ) : (
-                <HorizontalBars series="views" valueLabel="Views" data={s.byBusiness.map((b) => ({ label: bizMap.get(b.businessId)?.name ?? 'Unknown', value: b.views }))} />
+                <BusinessBars rows={s.byBusiness.map((b) => ({ label: bizMap.get(b.businessId)?.name ?? 'Unknown', value: b.views }))} />
               )}
             </CardBody>
           </Card>
@@ -171,17 +184,50 @@ export function AnalyticsView({
           noun="products"
           initialSort={{ key: 'views', dir: 'desc' }}
           empty={<EmptyState icon={BarChart3} title="No products to report on" body="Add and publish products to start collecting views." />}
-          mobileRow={(r) => (
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate font-medium">{productMap.get(r.productId)?.name.en}</span>
-              <span className="shrink-0 text-xs text-ink-muted tabular-nums">
-                {formatNumber(r.views)} views
-                {arAttempts(productMap.get(r.productId), r) === null ? ' · no 3D model' : ` · ${formatNumber(r.arActivations)} AR attempts`}
-              </span>
-            </div>
-          )}
+          mobileRow={(r) => {
+            const p = productMap.get(r.productId)
+            const attempts = arAttempts(p, r)
+            return (
+              <div className="flex items-center gap-3">
+                <Thumb src={p ? primaryImage(p)?.url : undefined} alt="" size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <Link to={`${editBase}/${r.productId}/edit`} className="min-w-0 text-ui-body font-medium hover:underline">
+                      {p?.name.en}
+                    </Link>
+                    <span className="shrink-0 text-ui-body font-medium tabular-nums">{formatNumber(r.views)} views</span>
+                  </div>
+                  <p className="text-ui-body text-ink-muted tabular-nums">
+                    {attempts === null ? 'No 3D model' : `${formatNumber(attempts)} AR launch attempts · ${r.views ? formatPercent(r.arRate) : 'No views'}`}
+                  </p>
+                </div>
+              </div>
+            )
+          }}
         />
       </Card>
     </div>
+  )
+}
+
+/** Views per business: the name on one truncated line (full name on hover), then a bar and its value. */
+function BusinessBars({ rows }: { rows: { label: string; value: number }[] }) {
+  const max = Math.max(1, ...rows.map((r) => r.value))
+  return (
+    <ul className="space-y-4" aria-label="Views by business">
+      {rows.map((r, i) => (
+        <li key={`${r.label}-${i}`}>
+          <p className="truncate text-ui-body text-ink" title={r.label}>
+            {r.label}
+          </p>
+          <div className="mt-1.5 flex items-center gap-3">
+            <div className="h-2 min-w-0 flex-1">
+              <div className="h-full" style={{ width: `${(r.value / max) * 100}%`, background: SERIES.views.color }} aria-hidden />
+            </div>
+            <span className="w-14 shrink-0 text-right text-ui-small text-ink-muted tabular-nums">{formatNumber(r.value)}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }

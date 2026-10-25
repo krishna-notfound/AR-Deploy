@@ -2,7 +2,7 @@ import { Info, Save } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useBlocker } from 'react-router'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { Card, CardHeader } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FormField, Input, InputAddon, Select, Textarea } from '@/components/ui/Form'
 import { LogoUpload } from '@/components/ui/LogoUpload'
@@ -125,14 +125,12 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
         void submit(business ? 'save' : 'create')
       }}
       noValidate
-      className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"
+      className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"
     >
       <div className="min-w-0 space-y-6">
         <Card>
-          <div className="border-b border-line px-5 py-4">
-            <h2 className="font-display text-[1.5rem] leading-tight font-normal">Business profile</h2>
-          </div>
-          <div className="space-y-5 p-5">
+          <CardHeader title="Business profile" />
+          <div className="space-y-5 px-6 pb-6">
             <FormField label="Business name" required error={errors.name}>
               <Input
                 value={data.name}
@@ -154,11 +152,8 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
         </Card>
 
         <Card>
-          <div className="border-b border-line px-5 py-4">
-            <h2 className="font-display text-[1.5rem] leading-tight font-normal">Contact</h2>
-            <p className="mt-0.5 text-[13px] text-ink-muted">Shown to customers when a product has no call-to-action link.</p>
-          </div>
-          <div className="grid gap-5 p-5 sm:grid-cols-2">
+          <CardHeader title="Contact" description="Shown to customers when a product has no call-to-action link." />
+          <div className="grid gap-5 px-6 pb-6 sm:grid-cols-2">
             <FormField label="Email" optional error={errors['contact.email']}>
               <Input type="email" autoComplete="email" value={data.contact.email ?? ''} onChange={(e) => setContact({ email: e.target.value })} />
             </FormField>
@@ -175,14 +170,12 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
         </Card>
 
         <Card>
-          <div className="border-b border-line px-5 py-4">
-            <h2 className="font-display text-[1.5rem] leading-tight font-normal">Catalog</h2>
-          </div>
-          <div className="space-y-5 p-5">
+          <CardHeader title="Catalog" />
+          <div className="space-y-5 px-6 pb-6">
             {isOwner ? (
               <div>
-                <p className="text-[13px] font-medium">Catalog address</p>
-                <p className="mt-1 rounded-lg border border-line bg-canvas px-3 py-2 text-sm">{catalogPublicUrl(data)}</p>
+                <p className="text-ui-body font-medium">Catalog address</p>
+                <p className="mt-1.5 flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-ui-body break-all">{catalogPublicUrl(data)}</p>
                 <InlineNotice className="mt-3" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
                   Changing your catalog address requires platform support. Editing your profile does not change the address.
                 </InlineNotice>
@@ -230,8 +223,8 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                   </FormField>
                 </div>
                 <fieldset>
-                  <legend className="text-[13px] font-medium">Catalog accent colour</legend>
-                  <p className="mt-0.5 text-xs text-ink-muted">Used for buttons and links on the public catalog.</p>
+                  <legend className="text-ui-body font-medium">Catalog accent colour</legend>
+                  <p className="mt-1 text-ui-small text-ink-muted">Used for buttons and links on the public catalog.</p>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
                     {ACCENTS.map((c) => (
                       <button
@@ -244,12 +237,12 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                         style={{ background: c }}
                       />
                     ))}
-                    <label className="ml-1 inline-flex items-center gap-2 text-xs text-ink-muted">
+                    <label className="ml-1 inline-flex items-center gap-2 text-ui-small text-ink-muted">
                       Custom
                       <input type="color" value={data.branding.accentColor} onChange={(e) => set({ branding: { accentColor: e.target.value.toUpperCase() } })} className="size-8 cursor-pointer rounded border border-line-strong bg-surface p-0.5" />
                     </label>
                   </div>
-                  {errors['branding.accentColor'] && <p className="mt-1 text-xs font-medium text-danger">{errors['branding.accentColor']}</p>}
+                  {errors['branding.accentColor'] && <p className="mt-1 text-ui-small font-medium text-danger">{errors['branding.accentColor']}</p>}
                 </fieldset>
               </>
             )}
@@ -274,7 +267,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
         </div>
       </div>
 
-      <aside className="xl:sticky xl:top-24 xl:self-start">
+      <aside className="min-w-0 xl:sticky xl:top-24 xl:self-start">
         <BusinessIdentityPreview business={previewBusiness} />
       </aside>
 
