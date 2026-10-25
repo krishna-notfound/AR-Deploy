@@ -3,6 +3,7 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
+import { SIGN_IN_PATH } from '@/auth/RequireRole'
 import { useCan } from '@/auth/usePermission'
 import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -15,6 +16,7 @@ import { PASSWORD_MAX, PASSWORD_MIN, type SecurityState, account, auth, isDemoMo
 import { EMAIL_PATTERN } from '@/services/accountService'
 import { type QueryResult, useServiceQuery } from '@/services/hooks'
 import { ActionCodeDialog } from '../ActionCodeDialog'
+import { useCancelClosure } from '../useCancelClosure'
 import { SectionHeader, SettingsCard } from '../SettingsUi'
 
 type Security = QueryResult<SecurityState>
@@ -290,7 +292,7 @@ function BusinessClosure({ security }: { security: Security }) {
   const confirm = useConfirm()
   const toast = useToast()
   const [dialog, setDialog] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
+  const { cancel: cancelRequest, cancelling } = useCancelClosure(security.refetch)
   const closure = security.data?.closure ?? null
 
   const start = async () => {
@@ -307,18 +309,6 @@ function BusinessClosure({ security }: { security: Security }) {
       destructive: true,
     })
     if (go) setDialog(true)
-  }
-
-  const cancelRequest = async () => {
-    setCancelling(true)
-    const r = await account.cancelClosure()
-    setCancelling(false)
-    if (!r.ok) {
-      toast.error("Couldn't cancel the closure request", r.error.message)
-      return
-    }
-    toast.success('Closure request cancelled', 'Your catalog is back to its previous status.')
-    security.refetch()
   }
 
   let body: ReactNode
@@ -410,12 +400,12 @@ function StaffDeletion() {
         onConfirm={async (code) => {
           const r = await account.requestClosure(code)
           if (!r.ok) return r
-          // The server has ended every session: drop this one locally, then leave for the sign-in page.
-          if (auth) await auth.signOut('local')
-          await logout()
-          toast.info('Your account was deleted', 'You have been signed out.')
+          // The server has ended the sessions; logout() ends this one (global, with a local fallback). The account is
+          // gone either way, so the person leaves for the sign-in page even when only this device was signed out.
+          const out = await logout()
+          toast.info('Your account was deleted', out.signedOut && !out.error ? 'You have been signed out.' : 'You were signed out on this device only.')
           // The route guard may get there first (with ?next= back to settings); either way the person lands on sign-in.
-          navigate('/login', { replace: true })
+          navigate(SIGN_IN_PATH, { replace: true })
           return r
         }}
       />

@@ -1,14 +1,16 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { account } from '@/services'
 import { accountFail } from '@/services/accountService'
+import type { Result } from '@/services'
 import { ok } from '@/services/catalogService'
 import { resetMockAccount } from '@/services/mock/mockAccount'
 import { ActionCodeDialog } from './ActionCodeDialog'
 
-function renderDialog(onConfirm = vi.fn(async () => ok(undefined)), onClose = vi.fn()) {
-  render(
+function dialog(onConfirm: (code: string) => Promise<Result<unknown>>, onClose: () => void) {
+  return (
     <ActionCodeDialog
       open
       purpose="request_closure"
@@ -18,9 +20,13 @@ function renderDialog(onConfirm = vi.fn(async () => ok(undefined)), onClose = vi
       destructive
       onClose={onClose}
       onConfirm={onConfirm}
-    />,
+    />
   )
-  return { onConfirm, onClose }
+}
+
+function renderDialog(onConfirm = vi.fn(async (_code: string): Promise<Result<unknown>> => ok(undefined)), onClose = vi.fn()) {
+  const view = render(dialog(onConfirm, onClose))
+  return { onConfirm, onClose, view }
 }
 
 const codeInput = () => screen.getByLabelText('6-digit code')
@@ -101,6 +107,8 @@ describe('ActionCodeDialog', () => {
     const { onConfirm } = renderDialog()
     expect(await screen.findByText("We couldn't send the code. Try again.")).toBeInTheDocument()
     expect(screen.queryByText(/We emailed a 6-digit code to/)).toBeNull()
+    // Announced once: no alert nested inside the live region.
+    expect(document.querySelector('[aria-live] [role="alert"]')).toBeNull()
     // Nothing runs without a sent code.
     expect(confirmButton()).toBeDisabled()
     expect(onConfirm).not.toHaveBeenCalled()
@@ -126,5 +134,44 @@ describe('ActionCodeDialog', () => {
     await user.click(confirmButton())
     await waitFor(() => expect(onConfirm).toHaveBeenCalledWith('123456'))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
+
+  it('focuses the code field once the code is sent', async () => {
+    renderDialog()
+    await screen.findByText(/We emailed a 6-digit code to/)
+    await waitFor(() => expect(codeInput()).toHaveFocus())
+  })
+
+  it('sends a single code under StrictMode', async () => {
+    const send = vi.spyOn(account, 'sendActionCode')
+    render(<StrictMode>{dialog(vi.fn(async () => ok(undefined)), vi.fn())}</StrictMode>)
+    await screen.findByText(/We emailed a 6-digit code to/)
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves no timer running after it unmounts', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { view } = renderDialog()
+    await screen.findByText(/We emailed a 6-digit code to/)
+    await waitFor(() => expect(vi.getTimerCount()).toBeGreaterThan(0))
+    view.unmount()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('runs the action once when the form is submitted twice in a row', async () => {
+    const user = userEvent.setup()
+    let finish: (r: Result<unknown>) => void = () => {}
+    const onConfirm = vi.fn(() => new Promise<Result<unknown>>((r) => (finish = r)))
+    renderDialog(onConfirm)
+    await screen.findByText(/We emailed a 6-digit code to/)
+    await user.type(codeInput(), '123456')
+    const form = codeInput().closest('form') as HTMLFormElement
+    // Both submits land before React re-renders (an Enter key repeat, a double tap).
+    act(() => {
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+    })
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    await act(async () => finish(ok(undefined)))
   })
 })

@@ -1,7 +1,7 @@
 import { ArrowRight, BarChart3, CheckCircle2, ChevronRight, PackagePlus } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback } from 'react'
 import { Link } from 'react-router'
-import { useCurrentBusiness } from '@/auth/AccountProvider'
+import { useAccount, useCurrentBusiness } from '@/auth/AccountProvider'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
 import { PageHeader, PanelHeader, panelLinkClass } from '@/components/layout/PageHeader'
 import { BusinessStatusBadge, SampleDataTag } from '@/components/ui/Badge'
@@ -11,11 +11,11 @@ import { StatGroup } from '@/components/ui/StatGroup'
 import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { Business, Product } from '@/domain/types'
-import { useToast } from '@/components/ui/ToastProvider'
 import { formatDate, formatNumber, formatPercent } from '@/lib/format'
 import { myProductsPath } from '@/lib/urls'
 import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
+import { useCancelClosure } from '../settings/useCancelClosure'
 import { ActivityList } from '../shared/ActivityList'
 import { MostViewedList } from '../analytics/MostViewedList'
 import { hasArModel, productArReadiness } from '../products/productReadiness'
@@ -218,23 +218,18 @@ function StepsCard({ title, steps, ordered, className }: { title: string; steps:
  * the closure state is not this page's data, and My account shows its own error.
  */
 function ClosureBanner() {
-  const toast = useToast()
+  const { retry } = useAccount()
   const security = useServiceQuery(() => account.getSecurityState(), [])
-  const [cancelling, setCancelling] = useState(false)
+  const { refetch } = security
+  // The business status comes back too: load the business again so the status badge follows.
+  const { cancel, cancelling } = useCancelClosure(
+    useCallback(() => {
+      refetch()
+      retry()
+    }, [refetch, retry]),
+  )
   const closure = security.data?.closure
   if (!closure) return null
-
-  const cancel = async () => {
-    setCancelling(true)
-    const r = await account.cancelClosure()
-    setCancelling(false)
-    if (!r.ok) {
-      toast.error("Couldn't cancel the closure request", r.error.message)
-      return
-    }
-    toast.success('Closure request cancelled', 'Your catalog is back to its previous status.')
-    security.refetch()
-  }
 
   return (
     <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] bg-warning-soft px-4 py-3 text-ui-body text-warning">

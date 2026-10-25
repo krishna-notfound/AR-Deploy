@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
+import { SIGN_IN_PATH } from '@/auth/RequireRole'
 import { account, service } from '@/services'
 import { accountFail } from '@/services/accountService'
 import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
@@ -152,8 +153,7 @@ describe('My account section', () => {
 
     expect(await screen.findByText('Your account was deleted')).toBeInTheDocument()
     await waitFor(() => expect(localStorage.getItem(ACCOUNT_KEY)).toBeNull())
-    // Demo mode forwards /login to the demo account picker.
-    await waitFor(() => expect(['/login', '/demo']).toContain(window.location.pathname))
+    await waitFor(() => expect(window.location.pathname).toBe(SIGN_IN_PATH))
     // Signed out: going back to settings asks for an account again.
     expect(screen.queryByRole('heading', { level: 1, name: 'My account' })).toBeNull()
   })
@@ -165,5 +165,88 @@ describe('My account section', () => {
     expect(closing).toHaveTextContent('The platform needs its Owner')
     expect(within(closing).queryByRole('button')).toBeNull()
     expect(screen.queryByRole('button', { name: /Delete account|Request closure/ })).toBeNull()
+  })
+
+  it('staff deletion with a wrong code: the dialog stays open with the error and nobody is signed out', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const request = vi.spyOn(account, 'requestClosure')
+    open({ role: 'super_admin', platformRole: 'admin' }, '/admin/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    await user.click(await within(card('Delete account')).findByRole('button', { name: 'Delete account' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Delete your account?' })).getByRole('button', { name: 'Continue' }))
+    const codeDialog = await screen.findByRole('dialog', { name: 'Confirm account deletion' })
+    await within(codeDialog).findByText(/We emailed a 6-digit code to/)
+    await user.type(within(codeDialog).getByLabelText('6-digit code'), '000000')
+    await user.click(within(codeDialog).getByRole('button', { name: 'Delete account' }))
+
+    expect(await within(codeDialog).findByText("That code isn't right. Check it and try again.")).toBeInTheDocument()
+    expect(request).toHaveBeenCalledWith('000000')
+    expect(screen.getByRole('dialog', { name: 'Confirm account deletion' })).toBeInTheDocument()
+    expect(screen.queryByText('Your account was deleted')).toBeNull()
+    expect(localStorage.getItem(ACCOUNT_KEY)).not.toBeNull()
+    expect(window.location.pathname).toBe('/admin/settings/account')
+  })
+
+  it('change password: current_password_mismatch shows on the current field, same_password on the new field', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    vi.spyOn(account, 'changePassword').mockResolvedValueOnce(accountFail('current_password_mismatch')).mockResolvedValueOnce(accountFail('same_password'))
+    open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    const pw = card('Password')
+    const current = within(pw).getByLabelText('Current password')
+    const next = within(pw).getByLabelText('New password')
+    await user.type(current, 'old-password-123')
+    await user.type(next, 'a-much-longer-password')
+    await user.type(within(pw).getByLabelText('Confirm new password'), 'a-much-longer-password')
+
+    await user.click(within(pw).getByRole('button', { name: 'Change password' }))
+    await waitFor(() => expect(current).toHaveAccessibleDescription('Your current password is incorrect.'))
+    expect(next).not.toHaveAttribute('aria-invalid')
+
+    await user.click(within(pw).getByRole('button', { name: 'Change password' }))
+    await waitFor(() => expect(next).toHaveAccessibleDescription('Choose a password different from your current one.'))
+    expect(current).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('change email: email_taken shows on the email field, rate_limited as a form message', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    vi.spyOn(account, 'requestEmailChange').mockResolvedValueOnce(accountFail('email_taken')).mockResolvedValueOnce(accountFail('rate_limited'))
+    open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    const emailCard = card('Email')
+    const email = await within(emailCard).findByLabelText('New email')
+    await user.type(email, 'taken@studio.example')
+    await user.type(within(emailCard).getByLabelText('Current password'), 'the-right-password')
+
+    await user.click(within(emailCard).getByRole('button', { name: 'Change email' }))
+    await waitFor(() => expect(email).toHaveAccessibleDescription('This email is already used by another account.'))
+
+    await user.click(within(emailCard).getByRole('button', { name: 'Change email' }))
+    expect(await within(emailCard).findByRole('alert')).toHaveTextContent('Too many requests. Wait a while and try again.')
+    expect(email).not.toHaveAttribute('aria-invalid')
+    expect(within(emailCard).queryByRole('status')).toBeNull()
+  })
+
+  it('closure cancel refused (aal2_required): an error toast, and the banner stays in settings and on Overview', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(BUSINESS))
+    expect((await account.requestClosure(DEMO_CODE)).ok).toBe(true)
+    const cancel = vi.spyOn(account, 'cancelClosure').mockResolvedValue(accountFail('aal2_required'))
+
+    const first = open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    const closing = card('Close your account')
+    await user.click(await within(closing).findByRole('button', { name: 'Cancel request' }))
+    expect(await screen.findByText("Couldn't cancel the closure request")).toBeInTheDocument()
+    expect(screen.getByText('This needs 2FA. Sign in with your authenticator code first.')).toBeInTheDocument()
+    expect(within(closing).getByText(/Closure requested on/)).toBeInTheDocument()
+    first.unmount()
+
+    open(BUSINESS, '/dashboard')
+    const banner = (await screen.findByText(/Closure requested on .* · Your catalog is offline\./, {}, { timeout: 10_000 })).closest('[role="status"]') as HTMLElement
+    await user.click(within(banner).getByRole('button', { name: 'Cancel request' }))
+    expect(await screen.findByText("Couldn't cancel the closure request")).toBeInTheDocument()
+    expect(screen.getByText(/Closure requested on .* · Your catalog is offline\./)).toBeInTheDocument()
+    expect(cancel).toHaveBeenCalledTimes(2)
   })
 })

@@ -60,6 +60,10 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
   const live = useRef(true)
   const sendId = useRef(0)
   const sentOnOpen = useRef(false)
+  // Set synchronously, so two submits before a re-render (Enter repeat, double tap) still run the action once.
+  const submitting = useRef(false)
+  // The shared Input takes no ref: reach the field through its wrapper.
+  const codeField = useRef<HTMLDivElement>(null)
   const formId = useId()
 
   const sendCode = useCallback(async () => {
@@ -110,14 +114,16 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault()
-    if (pending || send.status !== 'sent') return
+    if (submitting.current || send.status !== 'sent') return
     if (code.length !== CODE_LENGTH) {
       setError('Enter the 6-digit code.')
       return
     }
+    submitting.current = true
     setPending(true)
     setError(null)
     const r = await onConfirm(code)
+    submitting.current = false
     if (!live.current) return
     setPending(false)
     if (r.ok) {
@@ -129,6 +135,10 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
   }
 
   const sent = send.status === 'sent'
+  // Ready for the code as soon as it is sent, and again after a refused attempt (the field is disabled while it runs).
+  useEffect(() => {
+    if (sent && !pending) codeField.current?.querySelector('input')?.focus()
+  }, [sent, pending])
   const canResend = send.status !== 'sending' && cooldown <= 0 && !pending
 
   return (
@@ -151,6 +161,7 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
       }
     >
       <form id={formId} onSubmit={(e) => void submit(e)} noValidate className="space-y-4">
+        {/* One polite live region announces the sending state, the sent address and a send failure. */}
         <div aria-live="polite">
           {send.status === 'sending' && <p className="text-ui-body text-ink-muted">Sending a code to your email…</p>}
           {send.status === 'sent' && (
@@ -159,29 +170,29 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
             </p>
           )}
           {send.status === 'failed' && (
-            <InlineNotice tone="warning">
-              <span role="alert">{send.message}</span>
-            </InlineNotice>
+            <InlineNotice tone="warning">{send.message}</InlineNotice>
           )}
         </div>
         {isDemoMode && (
           <InlineNotice tone="neutral">Demo: no email is sent. Use the code 123456.</InlineNotice>
         )}
-        <FormField label="6-digit code" error={error ?? undefined}>
-          <Input
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="[0-9]*"
-            maxLength={CODE_LENGTH}
-            value={code}
-            disabled={!sent || pending}
-            onChange={(e) => {
-              setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))
-              if (error) setError(null)
-            }}
-            className="font-mono tracking-[0.3em]"
-          />
-        </FormField>
+        <div ref={codeField}>
+          <FormField label="6-digit code" error={error ?? undefined}>
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={CODE_LENGTH}
+              value={code}
+              disabled={!sent || pending}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))
+                if (error) setError(null)
+              }}
+              className="font-mono tracking-[0.3em]"
+            />
+          </FormField>
+        </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Button size="sm" variant="ghost" onClick={resend} disabled={!canResend} className="-ml-3!">
             {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
