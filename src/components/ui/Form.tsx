@@ -75,13 +75,13 @@ export function FormField({
         </div>
         {children}
         {hint && !error && (
-          <p id={hintId} className={dash ? '-mt-0.5 text-ui-small text-ink-muted' : 'text-xs text-ink-muted'}>
+          <p id={hintId} className={dash ? 'text-ui-small text-ink-muted' : 'text-xs text-ink-muted'}>
             {hint}
           </p>
         )}
         {error &&
           (dash ? (
-            <p id={errId} className="-mt-0.5 flex items-start gap-1.5 text-ui-small text-danger">
+            <p id={errId} className="flex items-start gap-1.5 text-ui-small text-danger">
               <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               {error}
             </p>

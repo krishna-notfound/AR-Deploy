@@ -1,6 +1,6 @@
 import { type ReactNode, createContext, useCallback, useContext, useRef, useState } from 'react'
 import { Button } from './Button'
-import { Modal, useDashboardSurface } from './Modal'
+import { Modal, isDashboardSurface } from './Modal'
 
 export interface ConfirmOptions {
   title: string
@@ -15,10 +15,11 @@ const ConfirmContext = createContext<ConfirmFn | null>(null)
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [opts, setOpts] = useState<ConfirmOptions | null>(null)
-  const dash = useDashboardSurface()
+  const [dash, setDash] = useState(false) // read when the dialog opens, not on every render
   const resolver = useRef<((v: boolean) => void) | null>(null)
 
   const confirm = useCallback<ConfirmFn>((o) => {
+    setDash(isDashboardSurface())
     setOpts(o)
     return new Promise<boolean>((resolve) => {
       resolver.current = resolve

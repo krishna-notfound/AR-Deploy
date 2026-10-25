@@ -49,7 +49,7 @@ export function ErrorState({ message, onRetry, retryLabel = 'Try again', classNa
         <AlertCircle className="mb-2 size-4 text-danger" aria-hidden />
         <p className="max-w-sm text-ui-body text-ink">{message}</p>
         {onRetry && (
-          <Button className="mt-2 text-accent-ink underline underline-offset-2" variant="ghost" size="sm" onClick={onRetry}>
+          <Button className="mt-2 underline underline-offset-2" variant="ghost" size="sm" onClick={onRetry}>
             {retryLabel}
           </Button>
         )}

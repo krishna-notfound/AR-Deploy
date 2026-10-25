@@ -11,9 +11,13 @@ const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), in
  * True under the dashboard shell. ToastProvider and ConfirmProvider sit above the shell, so context alone misses them:
  * the shell also marks <body> (data-surface), which is read here.
  */
+export function isDashboardSurface() {
+  return typeof document !== 'undefined' && document.body.dataset.surface === 'dashboard'
+}
+
 export function useDashboardSurface() {
   const inContext = useInDashboard()
-  return inContext || (typeof document !== 'undefined' && document.body.dataset.surface === 'dashboard')
+  return inContext || isDashboardSurface()
 }
 
 /** Traps focus inside `ref` while active and restores focus on cleanup. */

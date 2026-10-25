@@ -1,7 +1,7 @@
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/cn'
-import { useDashboardSurface } from './Modal'
+import { isDashboardSurface } from './Modal'
 
 export type ToastTone = 'success' | 'error' | 'info'
 interface Toast {
@@ -9,10 +9,12 @@ interface Toast {
   tone: ToastTone
   title: string
   body?: ReactNode
+  /** Whether the dashboard was showing when the toast was raised (a toast can outlive the page that raised it). */
+  dash: boolean
 }
 
 interface ToastApi {
-  show: (t: Omit<Toast, 'id'>, durationMs?: number) => void
+  show: (t: Omit<Toast, 'id' | 'dash'>, durationMs?: number) => void
   success: (title: string, body?: ReactNode) => void
   error: (title: string, body?: ReactNode) => void
   info: (title: string, body?: ReactNode) => void
@@ -26,14 +28,13 @@ const TONES = { success: 'text-success', error: 'text-danger', info: 'text-info'
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(1)
-  const dash = useDashboardSurface()
 
   const dismiss = useCallback((id: number) => setToasts((ts) => ts.filter((t) => t.id !== id)), [])
 
   const show = useCallback<ToastApi['show']>(
     (t, durationMs) => {
       const id = nextId.current++
-      setToasts((ts) => [...ts.slice(-3), { ...t, id }])
+      setToasts((ts) => [...ts.slice(-3), { ...t, id, dash: isDashboardSurface() }])
       setTimeout(() => dismiss(id), durationMs ?? (t.tone === 'error' ? 7000 : 4500))
     },
     [dismiss],
@@ -67,8 +68,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               <Icon className={cn('mt-0.5 size-[18px] shrink-0', TONES[t.tone])} aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className={cn('font-medium text-ink', dash ? 'text-ui-body' : 'text-sm')}>{t.title}</p>
-                {t.body && <div className={cn('mt-0.5 text-ink-muted', dash ? 'text-ui-small' : 'text-[13px]')}>{t.body}</div>}
+                <p className={cn('font-medium text-ink', t.dash ? 'text-ui-body' : 'text-sm')}>{t.title}</p>
+                {t.body && <div className={cn('mt-0.5 text-ink-muted', t.dash ? 'text-ui-small' : 'text-[13px]')}>{t.body}</div>}
               </div>
               <button type="button" aria-label="Dismiss notification" onClick={() => dismiss(t.id)} className="-mr-1 rounded p-0.5 text-ink-faint hover:text-ink">
                 <X className="size-4" aria-hidden />

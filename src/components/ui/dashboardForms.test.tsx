@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Inbox } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from './Card'
 import { EmptyState, ErrorState } from './States'
 import { FormField, Input, Select, Textarea } from './Form'
 import { Modal } from './Modal'
+import { ToastProvider, useToast } from './ToastProvider'
 import { Skeleton, SkeletonRows } from './Skeleton'
 
 function InDashboard({ children }: { children: ReactNode }) {
@@ -32,6 +33,25 @@ describe('FormField in the dashboard', () => {
     expect(err.querySelector('svg')).toBeTruthy()
     expect(screen.queryByText('Shown in the catalog.')).toBeNull()
     expect(screen.getByRole('textbox')).toHaveAttribute('aria-describedby', err.id)
+  })
+
+  it('hint and error sit 8px under the control (no negative margin)', () => {
+    const { rerender } = render(
+      <InDashboard>
+        <FormField label="Name" hint="Help text.">
+          <Input />
+        </FormField>
+      </InDashboard>,
+    )
+    expect(screen.getByText('Help text.').className).not.toMatch(/-mt-/)
+    rerender(
+      <InDashboard>
+        <FormField label="Name" hint="Help text." error="Enter a name.">
+          <Input />
+        </FormField>
+      </InDashboard>,
+    )
+    expect(screen.getByText('Enter a name.').className).not.toMatch(/-mt-/)
   })
 
   it('shows the hint when there is no error', () => {
@@ -119,6 +139,7 @@ describe('states in the dashboard', () => {
     )
     await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }))
     expect(onRetry).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Try again' }).className).not.toMatch(/text-accent-ink/)
     expect(screen.getByRole('alert').querySelector('svg')).toHaveClass('text-danger')
     expect(screen.getByText('Could not load products.')).not.toHaveClass('text-danger')
   })
@@ -203,5 +224,40 @@ describe('Card and dialogs in the dashboard', () => {
   it('Modal keeps its old title class outside the dashboard', () => {
     render(<Modal open onClose={() => {}} title="Hello" />)
     expect(screen.getByRole('heading', { name: 'Hello' })).toHaveClass('text-base')
+  })
+})
+
+describe('toasts remember the surface they were raised on', () => {
+  function Raise() {
+    const toast = useToast()
+    return (
+      <button type="button" onClick={() => toast.success('Saved', 'All good')}>
+        raise
+      </button>
+    )
+  }
+
+  it('a toast raised after the dashboard surface is gone renders public classes; one raised inside keeps dashboard classes', async () => {
+    const user = userEvent.setup()
+    document.body.dataset.surface = 'dashboard'
+    try {
+      render(
+        <ToastProvider>
+          <Raise />
+        </ToastProvider>,
+      )
+      await user.click(screen.getByRole('button', { name: 'raise' }))
+      expect(screen.getByText('Saved')).toHaveClass('text-ui-body')
+      act(() => {
+        delete document.body.dataset.surface
+      })
+      await user.click(screen.getByRole('button', { name: 'raise' }))
+      const toasts = screen.getAllByText('Saved')
+      expect(toasts[0]).toHaveClass('text-ui-body') // still the dashboard one
+      expect(toasts[1]).toHaveClass('text-sm')
+      expect(toasts[1]).not.toHaveClass('text-ui-body')
+    } finally {
+      delete document.body.dataset.surface
+    }
   })
 })
