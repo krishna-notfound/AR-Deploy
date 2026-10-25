@@ -32,6 +32,8 @@ const field = (label: string) => (page: Page) => page.locator('main').getByLabel
 const row = (listName: string) => (page: Page) =>
   page.locator('main').locator('tbody tr').or(page.locator('main').getByRole('list', { name: listName }).getByRole('listitem')).locator('visible=true').first()
 const qr = (page: Page) => page.locator('main').getByRole('img', { name: /^QR code linking to/ }).first()
+/** A settings card title (settings sections render their cards as <h2>), so the audit runs on loaded content. */
+const card = (title: string | RegExp) => (page: Page) => page.locator('main').getByRole('heading', { level: 2, name: title }).first()
 
 const showTable = async (page: Page) => {
   await page.getByRole('button', { name: 'Show as table' }).first().click()
@@ -59,7 +61,15 @@ const ADMIN_ROUTES: Route[] = [
   { name: 'analytics', path: '/admin/analytics', ready: h1('Analytics'), loaded: chart },
   // Demo mode has no audit events (the server writes them), so this page is short: heading, search and empty state.
   { name: 'audit log', path: '/admin/activity', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('heading', { name: 'No events yet' }).or(row('Events')(page)).first(), min: 5 },
+  { name: 'settings: my account', path: '/admin/settings/account', ready: h1('My account'), loaded: card('Password'), min: 10 },
+  { name: 'settings: profile', path: '/admin/settings/profile', ready: h1('Profile'), loaded: field('Name'), min: 8 },
+  { name: 'settings: security and 2FA', path: '/admin/settings/security', ready: h1('Security & 2FA'), loaded: card('Two-step verification (2FA)'), min: 10 },
+  { name: 'settings: notifications', path: '/admin/settings/notifications', ready: h1('Notifications'), loaded: card('Applications'), min: 8 },
+  { name: 'settings: preferences', path: '/admin/settings/preferences', ready: h1('Preferences'), loaded: card('Date and time format'), min: 8 },
+  { name: 'settings: security activity', path: '/admin/settings/activity', ready: h1('Security activity'), loaded: inMain('No security activity yet'), min: 3 },
+  { name: 'settings: security policy', path: '/admin/settings/security-policy', ready: h1('Security policy'), loaded: card('Two-step verification'), min: 8 },
   { name: 'settings: platform general', path: '/admin/settings/platform', ready: h1('General'), loaded: inMain('Sample asset credits') },
+  { name: 'settings: section list', path: '/admin/settings', ready: h1('Settings'), loaded: inMain('Security policy'), min: 10, phoneOnly: true },
   { name: 'team list', path: '/admin/team', ready: h1('Team & Access'), loaded: inMain('ana.ribeiro@sanctus.example') },
   { name: 'member detail', path: '/admin/team/mem_joao', ready: h1('João Costa'), loaded: inMain('joao.costa@sanctus.example') },
   { name: 'role permissions', path: '/admin/team/permissions', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('checkbox').first() },
@@ -75,6 +85,12 @@ const BUSINESS_ROUTES: Route[] = [
   { name: 'business products', path: '/dashboard/products', ready: h1(/./), loaded: inMain('Glam Velvet Sofa') },
   { name: 'business analytics', path: '/dashboard/analytics', ready: h1('Analytics'), loaded: chart },
   { name: 'business product editor', path: '/dashboard/products/prd_glam_sofa/edit', ready: h1('Glam Velvet Sofa'), loaded: field('Product name') },
+  { name: 'settings: my account', path: '/dashboard/settings/account', ready: h1('My account'), loaded: card('Password'), min: 10 },
+  { name: 'settings: profile', path: '/dashboard/settings/profile', ready: h1('Profile'), loaded: field('Name'), min: 8 },
+  { name: 'settings: security and 2FA', path: '/dashboard/settings/security', ready: h1('Security & 2FA'), loaded: card('Two-step verification (2FA)'), min: 10 },
+  { name: 'settings: notifications', path: '/dashboard/settings/notifications', ready: h1('Notifications'), loaded: card('Account security'), min: 6 },
+  { name: 'settings: preferences', path: '/dashboard/settings/preferences', ready: h1('Preferences'), loaded: card('Date and time format'), min: 8 },
+  { name: 'settings: security activity', path: '/dashboard/settings/activity', ready: h1('Security activity'), loaded: inMain('No security activity yet'), min: 3 },
   { name: 'settings: business profile', path: '/dashboard/settings/business', ready: h1('Business profile'), loaded: field('Business name') },
   { name: 'settings: section list', path: '/dashboard/settings', ready: h1('Settings'), loaded: inMain('Business profile'), min: 10, phoneOnly: true },
 ]
@@ -229,7 +245,7 @@ async function checkRoute(page: Page, route: Route, mobile: boolean) {
 }
 
 function suite(mobile: boolean) {
-  for (const route of ADMIN_ROUTES) {
+  for (const route of ADMIN_ROUTES.filter((r) => mobile || !r.phoneOnly)) {
     test(`${route.name} (Owner)`, async ({ page }) => {
       await signInAsSuperAdmin(page)
       await checkRoute(page, route, mobile)
