@@ -366,3 +366,56 @@ export interface InviteInspection {
   expiresAt?: ISODate
   accountExists?: boolean
 }
+
+// Account settings, security and 2FA (S1). The service interface is in services/accountService.ts.
+export type SettingsSection = 'account' | 'profile' | 'security' | 'notifications' | 'preferences' | 'activity' | 'business' | 'platform' | 'security-policy'
+/** What an emailed 6-digit action code unlocks. */
+export type ActionPurpose = 'disable_2fa' | 'regenerate_recovery' | 'request_closure' | 'owner_reset_2fa' | 'complete_closure'
+export type DateFormatPref = 'd MMM yyyy' | 'dd/MM/yyyy' | 'yyyy-MM-dd'
+export interface Profile {
+  userId: ID
+  displayName: string | null
+  avatarUrl: string | null
+  timezone: string
+  dateFormat: DateFormatPref
+  clock: '24h' | '12h'
+  notifyNewApplications: boolean
+  onboardingCompletedAt: string | null
+  onboardingDismissedAt: string | null
+}
+export interface SecurityState {
+  /** The platform policy requires 2FA for the caller's group (staff or business). */
+  requires2fa: boolean
+  aal: 'aal1' | 'aal2'
+  hasVerifiedFactor: boolean
+  /** Unused recovery codes; null while the user has no verified 2FA factor. */
+  recoveryCodesLeft: number | null
+  /** The address an email change is waiting to confirm. */
+  pendingEmail: string | null
+  closure: { requestedAt: string; businessId: ID | null } | null
+  onboarding: { completedAt: string | null; dismissedAt: string | null }
+}
+export interface TotpEnrollment {
+  factorId: string
+  qrSvg: string
+  secret: string
+}
+export interface SecurityEvent {
+  id: ID
+  type: string
+  at: string
+  userAgent: string | null
+  ip: string | null
+}
+export interface PlatformSettings {
+  require2faStaff: boolean
+  require2faBusiness: boolean
+  updatedAt: string | null
+}
+export interface ClosureRequest {
+  userId: ID
+  email: string
+  businessId: ID | null
+  businessName: string | null
+  requestedAt: string
+}

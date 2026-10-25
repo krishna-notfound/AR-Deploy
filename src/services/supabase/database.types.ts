@@ -1,5 +1,7 @@
 // Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-25 after migration 20261025070915
 // (Supabase type generator). Regenerate after any migration: npx supabase gen types typescript --project-id <ref>.
+// S1 (account settings): profiles, platform_settings, account_closure_requests and their functions are hand-added from
+// the spec until the account_settings migration is applied and this file is regenerated (Task 14).
 export type Json =
   | string
   | number
@@ -41,6 +43,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_closure_requests: {
+        Row: {
+          business_id: string | null
+          previous_business_status: string | null
+          requested_at: string
+          user_id: string
+        }
+        Insert: {
+          business_id?: string | null
+          previous_business_status?: string | null
+          requested_at?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string | null
+          previous_business_status?: string | null
+          requested_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_events: {
         Row: {
           actor_id: string | null
@@ -402,6 +425,30 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          id: boolean
+          require_2fa_business: boolean
+          require_2fa_staff: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: boolean
+          require_2fa_business?: boolean
+          require_2fa_staff?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: boolean
+          require_2fa_business?: boolean
+          require_2fa_staff?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       product_analytics: {
         Row: {
           business_id: string
@@ -726,6 +773,45 @@ export type Database = {
         ]
       }
     }
+      profiles: {
+        Row: {
+          avatar_path: string | null
+          clock: string
+          date_format: string
+          display_name: string | null
+          notify_new_applications: boolean
+          onboarding_completed_at: string | null
+          onboarding_dismissed_at: string | null
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_path?: string | null
+          clock?: string
+          date_format?: string
+          display_name?: string | null
+          notify_new_applications?: boolean
+          onboarding_completed_at?: string | null
+          onboarding_dismissed_at?: string | null
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_path?: string | null
+          clock?: string
+          date_format?: string
+          display_name?: string | null
+          notify_new_applications?: boolean
+          onboarding_completed_at?: string | null
+          onboarding_dismissed_at?: string | null
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     Views: {
       product_analytics_daily: {
         Row: {
@@ -768,6 +854,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_list_closure_requests: { Args: never; Returns: Json }
       admin_list_member_invites: { Args: { p_member: string }; Returns: Json }
       admin_list_members: { Args: never; Returns: Json }
       admin_reactivate_member: { Args: { p_member: string }; Returns: Json }
@@ -825,11 +912,35 @@ export type Database = {
           id: string
         }[]
       }
+      cancel_account_closure: { Args: never; Returns: Json }
       complete_owner_onboarding: { Args: never; Returns: string }
       is_business_member: { Args: { bid: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_platform_member: { Args: never; Returns: boolean }
+      list_my_security_events: {
+        Args: never
+        Returns: {
+          actor_id: string | null
+          application_id: string | null
+          business_id: string | null
+          created_at: string
+          event_type: string
+          from_status: string | null
+          id: string
+          metadata: Json
+          to_status: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "audit_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      log_account_event: { Args: { p_event: string }; Returns: undefined }
       my_platform_access: { Args: never; Returns: Json }
+      my_recovery_codes_left: { Args: never; Returns: number }
+      my_security_state: { Args: never; Returns: Json }
       platform_can: { Args: { p_permission: string }; Returns: boolean }
       record_event_limited: {
         Args: {
@@ -840,6 +951,7 @@ export type Database = {
         }
         Returns: string
       }
+      record_sign_in: { Args: { p_user_agent: string }; Returns: string }
       save_product: {
         Args: {
           p_images: Json
@@ -853,6 +965,22 @@ export type Database = {
         Args: { p_full_name?: string; p_token_hash: string; p_user: string }
         Returns: string
       }
+      service_check_action_code: {
+        Args: { p_code: string; p_purpose: string; p_user: string }
+        Returns: Json
+      }
+      service_classify_user: { Args: { p_user: string }; Returns: Json }
+      service_clear_recovery_codes: { Args: { p_user: string }; Returns: Json }
+      service_closure_target: { Args: { p_user: string }; Returns: Json }
+      service_create_action_code: {
+        Args: {
+          p_code_hash: string
+          p_purpose: string
+          p_salt: string
+          p_user: string
+        }
+        Returns: Json
+      }
       service_create_member_invite: {
         Args: {
           p_actor: string
@@ -863,6 +991,7 @@ export type Database = {
         Returns: Json
       }
       service_end_sessions: { Args: { p_user: string }; Returns: undefined }
+      service_has_recovery_codes: { Args: { p_user: string }; Returns: Json }
       service_inspect_invite: { Args: { p_token_hash: string }; Returns: Json }
       service_link_owner: {
         Args: {
@@ -877,6 +1006,15 @@ export type Database = {
         Args: { p_action: string; p_actor: string }
         Returns: undefined
       }
+      service_log_account_event: {
+        Args: {
+          p_event: string
+          p_ip: string
+          p_metadata: Json
+          p_user: string
+        }
+        Returns: Json
+      }
       service_record_email_event: {
         Args: {
           p_event_type: string
@@ -888,6 +1026,20 @@ export type Database = {
       service_record_invite_email: {
         Args: { p_detail: string; p_invite: string; p_ok: boolean }
         Returns: undefined
+      }
+      service_request_closure: { Args: { p_user: string }; Returns: Json }
+      service_requires_2fa: { Args: { p_user: string }; Returns: Json }
+      service_restore_closure: {
+        Args: { p_actor: string; p_user: string }
+        Returns: Json
+      }
+      service_set_recovery_codes: {
+        Args: { p_hashes: string[]; p_salt: string; p_user: string }
+        Returns: Json
+      }
+      service_use_recovery_code: {
+        Args: { p_code: string; p_user: string }
+        Returns: Json
       }
       service_user_can: {
         Args: { p_permission: string; p_user: string }
