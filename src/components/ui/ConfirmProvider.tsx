@@ -1,6 +1,6 @@
 import { type ReactNode, createContext, useCallback, useContext, useRef, useState } from 'react'
 import { Button } from './Button'
-import { Modal } from './Modal'
+import { Modal, useDashboardSurface } from './Modal'
 
 export interface ConfirmOptions {
   title: string
@@ -15,6 +15,7 @@ const ConfirmContext = createContext<ConfirmFn | null>(null)
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [opts, setOpts] = useState<ConfirmOptions | null>(null)
+  const dash = useDashboardSurface()
   const resolver = useRef<((v: boolean) => void) | null>(null)
 
   const confirm = useCallback<ConfirmFn>((o) => {
@@ -49,7 +50,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           </>
         }
       >
-        {opts?.body && <div className="text-sm text-ink-muted">{opts.body}</div>}
+        {opts?.body && <div className={dash ? 'text-ui-body text-ink-muted' : 'text-sm text-ink-muted'}>{opts.body}</div>}
       </Modal>
     </ConfirmContext.Provider>
   )

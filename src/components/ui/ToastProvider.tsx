@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react'
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/cn'
+import { useDashboardSurface } from './Modal'
 
 export type ToastTone = 'success' | 'error' | 'info'
 interface Toast {
@@ -25,6 +26,7 @@ const TONES = { success: 'text-success', error: 'text-danger', info: 'text-info'
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(1)
+  const dash = useDashboardSurface()
 
   const dismiss = useCallback((id: number) => setToasts((ts) => ts.filter((t) => t.id !== id)), [])
 
@@ -65,8 +67,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               <Icon className={cn('mt-0.5 size-[18px] shrink-0', TONES[t.tone])} aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-ink">{t.title}</p>
-                {t.body && <div className="mt-0.5 text-[13px] text-ink-muted">{t.body}</div>}
+                <p className={cn('font-medium text-ink', dash ? 'text-ui-body' : 'text-sm')}>{t.title}</p>
+                {t.body && <div className={cn('mt-0.5 text-ink-muted', dash ? 'text-ui-small' : 'text-[13px]')}>{t.body}</div>}
               </div>
               <button type="button" aria-label="Dismiss notification" onClick={() => dismiss(t.id)} className="-mr-1 rounded p-0.5 text-ink-faint hover:text-ink">
                 <X className="size-4" aria-hidden />

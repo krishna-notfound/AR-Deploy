@@ -1,10 +1,20 @@
 import { X } from 'lucide-react'
 import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useInDashboard } from '@/components/layout/dashboardContext'
 import { cn } from '@/lib/cn'
 import { IconButton } from './Button'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * True under the dashboard shell. ToastProvider and ConfirmProvider sit above the shell, so context alone misses them:
+ * the shell also marks <body> (data-surface), which is read here.
+ */
+export function useDashboardSurface() {
+  const inContext = useInDashboard()
+  return inContext || (typeof document !== 'undefined' && document.body.dataset.surface === 'dashboard')
+}
 
 /** Traps focus inside `ref` while active and restores focus on cleanup. */
 export function useFocusTrap(ref: React.RefObject<HTMLElement | null>, active: boolean, onEscape?: () => void) {
@@ -66,6 +76,7 @@ export function Modal({
   closeLabel?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const dash = useDashboardSurface()
   const titleId = useId()
   const descId = useId()
   useFocusTrap(ref, open, dismissible ? onClose : undefined)
@@ -95,13 +106,13 @@ export function Modal({
           { sm: 'sm:max-w-md', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl' }[size],
         )}
       >
-        <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-2">
+        <div className={cn('flex items-start justify-between gap-4 pb-2', dash ? 'px-6 pt-6' : 'px-5 pt-5')}>
           <div>
-            <h2 id={titleId} className="text-base font-semibold text-ink">
+            <h2 id={titleId} className={cn('font-semibold text-ink', dash ? 'text-ui-card' : 'text-base')}>
               {title}
             </h2>
             {description && (
-              <p id={descId} className="mt-1 text-sm text-ink-muted">
+              <p id={descId} className={cn('mt-1 text-ink-muted', dash ? 'text-ui-body' : 'text-sm')}>
                 {description}
               </p>
             )}
@@ -112,8 +123,8 @@ export function Modal({
             </IconButton>
           )}
         </div>
-        {children && <div className="overflow-y-auto px-5 py-3">{children}</div>}
-        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3.5">{footer}</div>}
+        {children && <div className={cn('overflow-y-auto py-3', dash ? 'px-6 text-ui-body' : 'px-5')}>{children}</div>}
+        {footer && <div className={cn('flex flex-wrap justify-end gap-2 border-t border-line py-3.5', dash ? 'px-6' : 'px-5')}>{footer}</div>}
       </div>
     </div>,
     document.body,

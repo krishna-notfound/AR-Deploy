@@ -1,5 +1,6 @@
-import { AlertTriangle, type LucideIcon } from 'lucide-react'
+import { AlertCircle, AlertTriangle, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useInDashboard } from '@/components/layout/dashboardContext'
 import { cn } from '@/lib/cn'
 import { Button } from './Button'
 
@@ -16,6 +17,16 @@ export function EmptyState({
   action?: ReactNode
   className?: string
 }) {
+  // Dashboard (BRIEF section 7): one ink sentence, one muted sentence, at most one action; no icon tile.
+  if (useInDashboard()) {
+    return (
+      <div className={cn('flex flex-col items-center px-6 py-10 text-center', className)}>
+        <h3 className="text-ui-body font-medium text-ink">{title}</h3>
+        {body && <p className="mt-1 max-w-sm text-ui-body text-ink-muted">{body}</p>}
+        {action && <div className="mt-4 flex flex-wrap justify-center gap-2">{action}</div>}
+      </div>
+    )
+  }
   return (
     <div className={cn('flex flex-col items-center px-6 py-12 text-center', className)}>
       {Icon && (
@@ -31,6 +42,20 @@ export function EmptyState({
 }
 
 export function ErrorState({ message, onRetry, retryLabel = 'Try again', className }: { message: string; onRetry?: () => void; retryLabel?: string; className?: string }) {
+  // Dashboard: the failure stays inside its block; danger colour on the 16px icon only, the retry is a quiet text button.
+  if (useInDashboard()) {
+    return (
+      <div role="alert" className={cn('flex flex-col items-center px-6 py-8 text-center', className)}>
+        <AlertCircle className="mb-2 size-4 text-danger" aria-hidden />
+        <p className="max-w-sm text-ui-body text-ink">{message}</p>
+        {onRetry && (
+          <Button className="mt-2 text-accent-ink underline underline-offset-2" variant="ghost" size="sm" onClick={onRetry}>
+            {retryLabel}
+          </Button>
+        )}
+      </div>
+    )
+  }
   return (
     <div role="alert" className={cn('flex flex-col items-center px-6 py-10 text-center', className)}>
       <AlertTriangle className="mb-3 size-5 text-danger" aria-hidden />
@@ -45,9 +70,10 @@ export function ErrorState({ message, onRetry, retryLabel = 'Try again', classNa
 }
 
 export function InlineNotice({ tone = 'info', children, className, icon }: { tone?: 'info' | 'warning' | 'neutral'; children: ReactNode; className?: string; icon?: ReactNode }) {
+  const dash = useInDashboard()
   const t = { info: 'bg-info-soft text-info', warning: 'bg-warning-soft text-warning', neutral: 'bg-subtle text-ink-muted' }[tone]
   return (
-    <div className={cn('flex gap-2.5 rounded-[var(--radius-control)] px-3.5 py-2.5 text-[13px] leading-5', t, className)}>
+    <div className={cn('flex gap-2.5 rounded-[var(--radius-control)] px-3.5 py-2.5', dash ? 'text-ui-small' : 'text-[13px] leading-5', t, className)}>
       {icon}
       <div className="min-w-0">{children}</div>
     </div>
