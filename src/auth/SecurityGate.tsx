@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import type { User } from '@/domain/types'
 import { RECOVERED_NOTICE, TwoFactorStep } from '@/features/auth/TwoFactorStep'
 import { TotpSetup } from '@/features/settings/TotpSetup'
-import { cn } from '@/lib/cn'
+import { InlineNotice } from '@/components/ui/States'
 import { settingsPath } from '@/lib/urls'
 import {
   ENABLED_PATCH,
@@ -26,6 +26,7 @@ import {
   useSecurityState,
 } from './AccountProvider'
 import { useLeaveAccount } from './RequireRole'
+import { SecurityNoticeContext } from './securityNotice'
 
 export { needsCodeStep, needsTwoFactorSetup }
 
@@ -122,23 +123,20 @@ function SetupGate({ ctx, hold }: GateScreenProps) {
 export const CHECK_FAILED = "We couldn't check your sign-in security. Some data may not load."
 
 /**
- * Both checks failed: a small notice (never blocking; the loader keeps retrying too). `floating`: pinned to the
- * bottom of the window over the app, above the dashboard's fixed sidebar.
+ * Both checks failed: a small notice, never blocking (the loader keeps retrying too). Over the app it is shown inline
+ * at the top of the main column (SecurityNoticeSlot), so it never covers save bars or the sidebar.
  */
-function CheckFailedBanner({ onRetry, floating = false }: { onRetry: () => void; floating?: boolean }) {
+function CheckFailedNotice({ onRetry }: { onRetry: () => void }) {
   return (
-    <div
-      role="status"
-      data-surface="dashboard"
-      className={cn(
-        'flex flex-wrap items-center justify-between gap-x-4 bg-warning-soft px-4 text-ui-small text-ink',
-        floating && 'fixed inset-x-0 bottom-0 z-50 border-t border-line pb-[env(safe-area-inset-bottom)]',
-      )}
-    >
-      <span className="py-2">{CHECK_FAILED}</span>
-      <button type="button" onClick={onRetry} className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-2 hover:no-underline">
-        Retry
-      </button>
+    <div role="status">
+      <InlineNotice tone="warning">
+        <span className="flex flex-wrap items-center justify-between gap-x-4">
+          <span>{CHECK_FAILED}</span>
+          <button type="button" onClick={onRetry} className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-2 hover:no-underline">
+            Retry
+          </button>
+        </span>
+      </InlineNotice>
     </div>
   )
 }
@@ -174,6 +172,7 @@ function GateFrame({ scope, children }: { scope: 'admin' | 'business'; children:
 export function SecurityGate({ children, checks = GATE_CHECKS }: { children: ReactNode; checks?: readonly GateCheck[] }) {
   const { user, business, holdGate } = useAccount()
   const { refresh, patch, ...security } = useSecurityState()
+  const leave = useLeaveAccount()
   const [held, setHeld] = useState<string | null>(null)
   // A screen that holds also keeps the account mounted (AccountProvider); let go when this gate goes away.
   useEffect(() => () => holdGate(false), [holdGate])
@@ -193,19 +192,15 @@ export function SecurityGate({ children, checks = GATE_CHECKS }: { children: Rea
       if (security.state) return <FullPageSpinner />
       return (
         <GateFrame scope={scope}>
-          <CheckFailedBanner onRetry={retry} />
+          <CheckFailedNotice onRetry={retry} />
+          <div className="mt-5 flex justify-end">
+            <Button onClick={() => void leave({ signOut: true })}>Sign out</Button>
+          </div>
         </GateFrame>
       )
     }
     if (!security.state && !security.assurance) {
-      return (
-        <>
-          {children}
-          {/* Room for the pinned notice, so it never covers the end of the page. */}
-          <div aria-hidden className="h-16" />
-          <CheckFailedBanner onRetry={retry} floating />
-        </>
-      )
+      return <SecurityNoticeContext.Provider value={<CheckFailedNotice onRetry={retry} />}>{children}</SecurityNoticeContext.Provider>
     }
     return <>{children}</>
   }

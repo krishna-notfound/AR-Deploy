@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
+import { SecurityNoticeSlot } from '@/auth/securityNotice'
 import { useCan } from '@/auth/usePermission'
 import { DashboardContext, type DashboardContextValue } from '@/components/layout/dashboardContext'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
@@ -150,6 +151,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
                 className={cn('min-w-0 flex-1 outline-none', wide ? 'px-8 py-8 lg:px-10 lg:py-14' : 'px-4 pt-3 pb-12')}
               >
                 <div className="w-full max-w-[720px]">
+                  <SecurityNoticeSlot />
                   {!wide && (
                     <div className="mb-5 flex items-center justify-between gap-3">
                       <Link

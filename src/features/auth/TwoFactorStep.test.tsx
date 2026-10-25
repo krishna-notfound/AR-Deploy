@@ -1,9 +1,11 @@
+import type { ReactNode } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useParams } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/auth/AccountProvider'
 import { RequireRole } from '@/auth/RequireRole'
+import { SecurityNoticeSlot } from '@/auth/securityNotice'
 import { SecurityGate } from '@/auth/SecurityGate'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import type { Business } from '@/domain/types'
@@ -33,6 +35,16 @@ function Settings() {
   return <p>Settings page: {section}</p>
 }
 
+/** A page under the gate: the dashboards render the gate's notice slot at the top of their main column. */
+function Page({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <SecurityNoticeSlot />
+      <div>{children}</div>
+    </>
+  )
+}
+
 function renderLogin(path = '/login') {
   return render(
     <ToastProvider>
@@ -41,9 +53,9 @@ function renderLogin(path = '/login') {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/demo" element={<p>Demo account picker</p>} />
-            <Route path="/admin" element={<RequireRole allow="super_admin"><SecurityGate><p>Admin home</p></SecurityGate></RequireRole>} />
-            <Route path="/admin/settings/:section" element={<RequireRole allow="super_admin"><SecurityGate><Settings /></SecurityGate></RequireRole>} />
-            <Route path="/dashboard" element={<RequireRole allow="business_admin"><SecurityGate><p>Business home</p></SecurityGate></RequireRole>} />
+            <Route path="/admin" element={<RequireRole allow="super_admin"><SecurityGate><Page>Admin home</Page></SecurityGate></RequireRole>} />
+            <Route path="/admin/settings/:section" element={<RequireRole allow="super_admin"><SecurityGate><Page><Settings /></Page></SecurityGate></RequireRole>} />
+            <Route path="/dashboard" element={<RequireRole allow="business_admin"><SecurityGate><Page>Business home</Page></SecurityGate></RequireRole>} />
           </Routes>
         </AccountProvider>
       </MemoryRouter>

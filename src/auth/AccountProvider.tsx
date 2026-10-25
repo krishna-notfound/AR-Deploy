@@ -80,10 +80,13 @@ const NO_SECURITY: SecurityInfo = { loaded: false, failures: 0 }
 /**
  * The sign-in needs the authenticator code: the session's assurance level says aal1 now and aal2 possible, or the
  * server knows a verified factor while the session is at aal1 (a stale local factor list must not skip the step).
+ * Never when the server says there is no factor.
  * The current level comes from the session, or from the server state when the session can't be read.
  */
 export function needsCodeStep(info: Pick<SecurityInfo, 'state' | 'assurance'>): boolean {
   const { assurance: a, state: st } = info
+  // The server knows there is no factor (also a held "no factor" after a recovery code): there is no code to ask for.
+  if (st && !st.hasVerifiedFactor) return false
   if (a && a.currentLevel === 'aal1' && a.nextLevel === 'aal2') return true
   return !!st?.hasVerifiedFactor && (a?.currentLevel ?? st.aal) === 'aal1'
 }

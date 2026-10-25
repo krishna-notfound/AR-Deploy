@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
+import { SecurityNoticeSlot } from '@/auth/securityNotice'
 import { cn } from '@/lib/cn'
 import { formatNumber } from '@/lib/format'
 import { catalogLocalPath, settingsPath } from '@/lib/urls'
@@ -113,6 +114,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
         <div className={cn('transition-[padding] duration-150', collapsed ? 'lg:pl-[72px]' : 'lg:pl-64')}>
           <Topbar onMenu={() => setMobileOpen(true)} nav={nav} variant={variant} slotRef={setCrumbSlot} hasCrumbs={hasCrumbs} />
           <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1320px] px-4 pt-6 pb-16 outline-none sm:px-6 lg:px-10 lg:pt-10">
+            <SecurityNoticeSlot />
             {variant === 'business' && <CatalogStatusNotice />}
             <Suspense fallback={<FullPageSpinner />}>
               <Outlet />

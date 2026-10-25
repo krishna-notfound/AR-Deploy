@@ -1,8 +1,12 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DashboardShell } from '@/components/layout/DashboardShell'
+import { adminNav } from '@/components/layout/nav'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+import SettingsLayout from '@/features/settings/SettingsLayout'
 import type { Business } from '@/domain/types'
 import { type AccountService, type AuthService, service } from '@/services'
 import { accountFail } from '@/services/accountService'
@@ -10,6 +14,7 @@ import { fail, ok } from '@/services/catalogService'
 import { ADMIN, DRAFT_OWNER, TOTP, fakeAccount, fakeAuth } from '@/test/securityFakes'
 import { ACCOUNT_KEY, AccountProvider } from './AccountProvider'
 import { RequireRole } from './RequireRole'
+import { SecurityNoticeSlot } from '@/auth/securityNotice'
 import { SecurityGate } from './SecurityGate'
 
 const fake = vi.hoisted(() => ({ auth: null as AuthService | null, account: null as AccountService | null }))
@@ -26,15 +31,25 @@ vi.mock('@/services', async (importOriginal) => {
   }
 })
 
+/** A page under the gate: the dashboards render the gate's notice slot at the top of their main column. */
+function Page({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <SecurityNoticeSlot />
+      <div>{children}</div>
+    </>
+  )
+}
+
 function renderGate(path = '/admin') {
   return render(
     <ToastProvider>
       <MemoryRouter initialEntries={[path]}>
         <AccountProvider>
           <Routes>
-            <Route path="/admin" element={<RequireRole allow="super_admin"><SecurityGate><p>Admin home</p></SecurityGate></RequireRole>} />
-            <Route path="/admin/settings/:section" element={<RequireRole allow="super_admin"><SecurityGate><p>Settings page</p></SecurityGate></RequireRole>} />
-            <Route path="/dashboard" element={<RequireRole allow="business_admin"><SecurityGate><p>Business home</p></SecurityGate></RequireRole>} />
+            <Route path="/admin" element={<RequireRole allow="super_admin"><SecurityGate><Page>Admin home</Page></SecurityGate></RequireRole>} />
+            <Route path="/admin/settings/:section" element={<RequireRole allow="super_admin"><SecurityGate><Page>Settings page</Page></SecurityGate></RequireRole>} />
+            <Route path="/dashboard" element={<RequireRole allow="business_admin"><SecurityGate><Page>Business home</Page></SecurityGate></RequireRole>} />
             <Route path="/login" element={<p>Sign-in page</p>} />
             <Route path="/demo" element={<p>Demo account picker</p>} />
           </Routes>
@@ -60,6 +75,65 @@ afterEach(() => {
   fake.auth = null
   fake.account = null
   vi.restoreAllMocks()
+})
+
+const CHECK_FAILED = "We couldn't check your sign-in security. Some data may not load."
+
+/** The notice and none of its ancestors are pinned over the page (save bars, sidebar stay uncovered). */
+function expectInline(notice: HTMLElement) {
+  for (let el: HTMLElement | null = notice; el; el = el.parentElement) expect(el.className).not.toMatch(/(^|\s)(fixed|sticky)(\s|$)/)
+}
+
+describe('SecurityGate notice in the dashboards', () => {
+  function failBoth() {
+    const acc = setup({ requires2fa: false })
+    vi.mocked(acc.impl.getSecurityState!).mockResolvedValue(fail('UNKNOWN', 'Database unavailable'))
+    vi.mocked(acc.impl.getAssurance!).mockResolvedValue(accountFail('unknown'))
+    return acc
+  }
+
+  it('sits inline at the top of the dashboard main column, not pinned over the page', { timeout: 20_000 }, async () => {
+    failBoth()
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/admin']}>
+          <AccountProvider>
+            <Routes>
+              <Route path="/admin" element={<RequireRole allow="super_admin"><SecurityGate><DashboardShell nav={adminNav} variant="admin" /></SecurityGate></RequireRole>}>
+                <Route index element={<p>Admin home</p>} />
+              </Route>
+            </Routes>
+          </AccountProvider>
+        </MemoryRouter>
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    const main = document.getElementById('main')!
+    const notice = within(main).getByText(CHECK_FAILED)
+    expectInline(notice)
+    expect(within(main).getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    // Exactly one notice: none outside the main column.
+    expect(screen.getAllByText(CHECK_FAILED)).toHaveLength(1)
+  })
+
+  it('sits inline in the settings main column too', { timeout: 20_000 }, async () => {
+    failBoth()
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/admin/settings/account']}>
+          <AccountProvider>
+            <Routes>
+              <Route path="/admin/settings/:section?" element={<RequireRole allow="super_admin"><SecurityGate><SettingsLayout scope="admin" /></SecurityGate></RequireRole>} />
+            </Routes>
+          </AccountProvider>
+        </MemoryRouter>
+      </ToastProvider>,
+    )
+    const notice = await screen.findByText(CHECK_FAILED)
+    expect(document.getElementById('main')).toContainElement(notice)
+    expectInline(notice)
+    expect(screen.getAllByText(CHECK_FAILED)).toHaveLength(1)
+  })
 })
 
 describe('SecurityGate', () => {
@@ -250,6 +324,25 @@ describe('SecurityGate', () => {
     )
     await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Set up 2FA to continue' })).toBeInTheDocument()
+  })
+
+  it('the notice for a draft owner whose checks fail offers Sign out', async () => {
+    const acc = setup({ requires2fa: true }, DRAFT_OWNER)
+    vi.mocked(acc.impl.getSecurityState!).mockResolvedValue(fail('UNKNOWN', 'Database unavailable'))
+    vi.mocked(acc.impl.getAssurance!).mockResolvedValue(accountFail('unknown'))
+    vi.spyOn(service, 'getBusinessById').mockResolvedValue(fail('NOT_FOUND', 'Business not found'))
+    renderGate('/dashboard')
+    expect(await screen.findByText("We couldn't check your sign-in security. Some data may not load.")).toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByText('Demo account picker')).toBeInTheDocument()
+    expect(acc.auth.signOut).toHaveBeenCalled()
+  })
+
+  it('no code step when the server knows no factor, even if the local level says aal1 -> aal2 (a held "no factor")', async () => {
+    setup({ requires2fa: false, factor: false, aal: 'aal1', local: { currentLevel: 'aal1', nextLevel: 'aal2' } })
+    renderGate()
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    expect(screen.queryByText('Enter the 6-digit code from your authenticator app')).not.toBeInTheDocument()
   })
 
   it('after a recovery code, a stale reload (factor still listed) does not bring the code step back', async () => {
