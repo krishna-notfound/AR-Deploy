@@ -7,14 +7,15 @@ import { IconButton } from './Button'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-/**
- * True under the dashboard shell. ToastProvider and ConfirmProvider sit above the shell, so context alone misses them:
- * the shell also marks <body> (data-surface), which is read here.
- */
+/** Reads the surface the shell marks on <body> (data-surface); call it when an overlay is created, not while rendering. */
 export function isDashboardSurface() {
   return typeof document !== 'undefined' && document.body.dataset.surface === 'dashboard'
 }
 
+/**
+ * True under the dashboard shell. ToastProvider and ConfirmProvider sit above the shell, so context alone misses them:
+ * the <body> mark is read as well.
+ */
 export function useDashboardSurface() {
   const inContext = useInDashboard()
   return inContext || isDashboardSurface()

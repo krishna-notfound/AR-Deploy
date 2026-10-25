@@ -35,7 +35,7 @@ describe('FormField in the dashboard', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('aria-describedby', err.id)
   })
 
-  it('hint and error sit 8px under the control (no negative margin)', () => {
+  it('the field column has the 8px gap and hint and error have no negative margin', () => {
     const { rerender } = render(
       <InDashboard>
         <FormField label="Name" hint="Help text.">
@@ -43,6 +43,7 @@ describe('FormField in the dashboard', () => {
         </FormField>
       </InDashboard>,
     )
+    expect(screen.getByRole('textbox').parentElement).toHaveClass('gap-2')
     expect(screen.getByText('Help text.').className).not.toMatch(/-mt-/)
     rerender(
       <InDashboard>
@@ -236,6 +237,36 @@ describe('toasts remember the surface they were raised on', () => {
       </button>
     )
   }
+
+  it('the surface is read when each toast is raised, even when both are queued in one batch', () => {
+    let api!: ReturnType<typeof useToast>
+    function Grab() {
+      api = useToast()
+      return null
+    }
+    document.body.dataset.surface = 'dashboard'
+    try {
+      render(
+        <ToastProvider>
+          <Grab />
+        </ToastProvider>,
+      )
+      act(() => {
+        api.success('First toast')
+        // React evaluates the first update eagerly and queues the next ones until render, so the second toast
+        // is the one that would read the surface too late.
+        api.success('Queued toast')
+        delete document.body.dataset.surface
+        api.success('Second toast')
+      })
+      expect(screen.getByText('First toast')).toHaveClass('text-ui-body')
+      expect(screen.getByText('Queued toast')).toHaveClass('text-ui-body')
+      expect(screen.getByText('Second toast')).toHaveClass('text-sm')
+      expect(screen.getByText('Second toast')).not.toHaveClass('text-ui-body')
+    } finally {
+      delete document.body.dataset.surface
+    }
+  })
 
   it('a toast raised after the dashboard surface is gone renders public classes; one raised inside keeps dashboard classes', async () => {
     const user = userEvent.setup()

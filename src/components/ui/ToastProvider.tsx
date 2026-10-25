@@ -34,7 +34,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const show = useCallback<ToastApi['show']>(
     (t, durationMs) => {
       const id = nextId.current++
-      setToasts((ts) => [...ts.slice(-3), { ...t, id, dash: isDashboardSurface() }])
+      // Read the surface now: a state updater may run later, after the page has changed.
+      const dash = isDashboardSurface()
+      setToasts((ts) => [...ts.slice(-3), { ...t, id, dash }])
       setTimeout(() => dismiss(id), durationMs ?? (t.tone === 'error' ? 7000 : 4500))
     },
     [dismiss],
