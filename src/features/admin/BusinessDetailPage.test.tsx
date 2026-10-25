@@ -75,3 +75,45 @@ describe('BusinessDetailPage', () => {
     expect(within(await screen.findByRole('dialog')).getByText(new RegExp(`${n} product${n === 1 ? '' : 's'}\\.`))).toBeInTheDocument()
   })
 })
+
+describe('BusinessDetailPage header at narrow widths', () => {
+  const inlineNames = () =>
+    screen
+      .getAllByRole('button')
+      .filter((b) => b.classList.contains('max-sm:hidden'))
+      .map((b) => b.textContent?.trim())
+
+  it('keeps Open catalog as the primary and moves Deactivate and Delete to the More menu below sm', async () => {
+    const user = userEvent.setup()
+    renderPage('details')
+    await screen.findByRole('heading', { level: 1, name: 'Nordhaus Living' })
+    expect(screen.getByRole('button', { name: /Open catalog/ })).not.toHaveClass('max-sm:hidden')
+    expect(inlineNames()).toEqual(['Deactivate', 'Delete'])
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent?.trim())).toEqual(['Deactivate', 'Delete'])
+    // The same confirm dialog as the inline button.
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(await screen.findByRole('dialog', { name: 'Delete Nordhaus Living?' })).toBeInTheDocument()
+  })
+
+  it('offers in the More menu exactly the actions the role may use inline', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    renderPage('details')
+    await screen.findByRole('heading', { level: 1, name: 'Nordhaus Living' })
+    const inline = inlineNames()
+    const trigger = screen.queryByRole('button', { name: 'More actions' })
+    if (inline.length === 0) {
+      expect(trigger).toBeNull()
+      return
+    }
+    await user.click(trigger!)
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent?.trim())).toEqual(inline)
+  })
+
+  it('truncates the catalog path line', async () => {
+    renderPage('details')
+    await screen.findByRole('heading', { level: 1, name: 'Nordhaus Living' })
+    expect(screen.getByText('/catalog/nordhaus')).toHaveClass('truncate')
+  })
+})

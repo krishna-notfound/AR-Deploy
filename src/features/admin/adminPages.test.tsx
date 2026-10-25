@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
@@ -116,5 +117,19 @@ describe('Monogram', () => {
     expect(container.firstElementChild).toHaveClass('size-8', 'text-[12px]', 'font-medium')
     expect(container.firstElementChild).not.toHaveClass('font-display')
     expect(container.firstElementChild).toHaveTextContent('OE')
+  })
+})
+
+describe('AdminOverviewPage header at narrow widths', () => {
+  it('keeps Create business inline and moves View catalogs and Add product to the More menu below sm', async () => {
+    const user = userEvent.setup()
+    renderAt('/admin', <AdminOverviewPage />)
+    const create = await screen.findByRole('link', { name: 'Create business' })
+    expect(create).not.toHaveClass('max-sm:hidden')
+    expect(screen.getByRole('link', { name: 'View catalogs' })).toHaveClass('max-sm:hidden')
+    expect(screen.getByRole('link', { name: 'Add product' })).toHaveClass('max-sm:hidden')
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    const menu = screen.getByRole('menu', { name: 'More actions' })
+    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent?.trim())).toEqual(['View catalogs', 'Add product'])
   })
 })

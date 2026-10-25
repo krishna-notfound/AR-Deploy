@@ -1,6 +1,8 @@
 import { createContext, type ReactNode, useContext, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { MoreHorizontal } from 'lucide-react'
 import { Link } from 'react-router'
+import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { cn } from '@/lib/cn'
 import { useDashboard, useInDashboard } from './dashboardContext'
 
@@ -66,6 +68,10 @@ function useClaimBreadcrumbSlot(active: boolean) {
  * Dashboard page header. Inside the dashboard shell: a Cormorant title, one optional line (status `meta` first, then
  * the description) and right-aligned actions; the breadcrumb path moves to the top bar and there is no eyebrow.
  * Elsewhere it keeps its earlier look: a small uppercase eyebrow or breadcrumb above a larger serif title.
+ *
+ * `more` holds the tertiary actions for phones: below `sm` they sit in a "More actions" menu beside the title and the
+ * actions row is full width (so the one primary is too). The caller still renders those actions inline in `actions`
+ * with `max-sm:hidden`; the menu itself is `sm:hidden`, so only one copy is ever shown, focusable or announced.
  */
 export function PageHeader({
   title,
@@ -74,6 +80,7 @@ export function PageHeader({
   breadcrumbs,
   meta,
   eyebrow,
+  more,
 }: {
   title: ReactNode
   description?: ReactNode
@@ -81,20 +88,37 @@ export function PageHeader({
   breadcrumbs?: Crumb[]
   meta?: ReactNode
   eyebrow?: ReactNode
+  more?: (MenuItem | 'separator')[]
 }) {
   useDocumentTitle(typeof title === 'string' ? title : undefined)
   const inDashboard = useInDashboard()
   const slot = useContext(BreadcrumbSlotContext)
   const crumbs = breadcrumbs && breadcrumbs.length > 0 ? breadcrumbs : null
   useClaimBreadcrumbSlot(inDashboard && !!crumbs && !!slot?.slot)
+  const hasMore = !!more && more.some((m) => m !== 'separator')
+  const moreMenu = hasMore && (
+    <div className="-my-0.5 shrink-0 sm:hidden">
+      <DropdownMenu
+        label="More actions"
+        items={more}
+        trigger={<MoreHorizontal className="size-5" aria-hidden />}
+        triggerClassName="size-11! border border-line-strong bg-surface text-ink!"
+      />
+    </div>
+  )
 
   if (inDashboard) {
     return (
       <div className="mb-8">
         {crumbs && slot?.slot && createPortal(<TopBarCrumbs crumbs={crumbs} />, slot.slot)}
-        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-          <div className="min-w-0">
-            <h1 className="font-display text-[length:var(--text-ui-h1)] leading-[1.15] font-medium tracking-[-0.01em] text-ink">{title}</h1>
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 lg:flex-nowrap">
+          <div data-header-title className={cn('min-w-0 lg:flex-1', hasMore && 'max-sm:w-full')}>
+            <div className="flex items-start gap-3">
+              <h1 className="min-w-0 flex-1 font-display text-[length:var(--text-ui-h1)] leading-[1.15] font-medium tracking-[-0.01em] break-words text-ink lg:line-clamp-2">
+                {title}
+              </h1>
+              {moreMenu}
+            </div>
             {(meta || description) && (
               <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
                 {meta}
@@ -102,7 +126,18 @@ export function PageHeader({
               </div>
             )}
           </div>
-          {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
+          {actions && (
+            <div
+              className={cn(
+                'flex flex-wrap items-center gap-3 lg:shrink-0 lg:self-start',
+                // Below sm only the primary is visible (tertiary actions are in More): the wrapper drops out of the
+                // layout so the primary takes a full-width row, and a header with no primary adds no empty row.
+                hasMore && 'max-sm:contents max-sm:*:w-full',
+              )}
+            >
+              {actions}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -143,7 +178,14 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0">
-          <h1 className="font-display text-[2.125rem] leading-[1.08] font-normal text-ink sm:text-[2.75rem]">{title}</h1>
+          {moreMenu ? (
+            <div className="flex items-start gap-3">
+              <h1 className="font-display text-[2.125rem] leading-[1.08] font-normal text-ink sm:text-[2.75rem]">{title}</h1>
+              {moreMenu}
+            </div>
+          ) : (
+            <h1 className="font-display text-[2.125rem] leading-[1.08] font-normal text-ink sm:text-[2.75rem]">{title}</h1>
+          )}
           {description && <p className="mt-2 max-w-2xl text-[15px] leading-6 text-ink-muted">{description}</p>}
           {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
         </div>

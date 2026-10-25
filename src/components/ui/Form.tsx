@@ -180,7 +180,7 @@ export function Switch({
         onClick={() => onChange(!checked)}
         className={cn(
           'relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors disabled:opacity-50',
-          checked ? 'bg-accent' : 'bg-line-strong',
+          checked ? 'bg-accent' : dash ? 'bg-subtle ring-1 ring-line-strong ring-inset' : 'bg-line-strong',
         )}
       >
         <span className={cn('inline-block size-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-[18px]' : 'translate-x-0.5')} />

@@ -293,3 +293,43 @@ describe('product editor: per-variant photos and 3D', () => {
     expect(await screen.findByText(/stub\.glb does not look like a valid GLB file/)).toBeInTheDocument()
   })
 })
+
+describe('product editor header and price row at narrow widths', () => {
+  async function renderEdit() {
+    const list = await service.getProductsByBusiness('biz_nord')
+    if (!list.ok || !list.data[0]) throw new Error('seed product missing')
+    const p = list.data[0]
+    const router = createMemoryRouter([{ path: '/dashboard/products/:productId/edit', element: <EditRoute /> }], { initialEntries: [`/dashboard/products/${p.id}/edit`] })
+    render(
+      <ToastProvider>
+        <ConfirmProvider>
+          <RouterProvider router={router} />
+        </ConfirmProvider>
+      </ToastProvider>,
+    )
+    await screen.findByTestId('edit-route')
+    return p
+  }
+
+  it('shows Delete inline from sm and in the More menu below sm, with the same confirm', async () => {
+    const user = userEvent.setup()
+    const p = await renderEdit()
+    const inline = screen.getByRole('button', { name: 'Delete' })
+    expect(inline).toHaveClass('max-sm:hidden')
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(await screen.findByRole('dialog')).toHaveAccessibleName(expect.stringContaining(p.name.en))
+  })
+
+  it('has no More menu on a new product (nothing to delete yet)', () => {
+    renderNew()
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull()
+  })
+
+  it('puts Price and Currency side by side below sm', () => {
+    renderNew()
+    const row = screen.getByLabelText('Price').closest('.grid')!
+    expect(row.className).toContain('grid-cols-[1fr_96px]')
+    expect(row.className).toContain('sm:grid-cols-[2fr_1fr_1fr]')
+  })
+})
