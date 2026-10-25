@@ -198,6 +198,9 @@ const ACTIONS: Record<string, Action> = {
     const kind = await classify(ctx, userId)
     if (kind === 'owner') throw new Refusal('owner_cannot_close')
     if (kind !== 'business' && kind !== 'staff') throw new Refusal('not_allowed')
+    // An account protected by 2FA (its own factor, or its group's policy) closes only from a session at aal2: an
+    // emailed code alone (someone with the password and the inbox) is not enough. Refused before the code is checked.
+    await requireAal2For2faUsers(ctx)
     // An open request is refused before the code is checked, so the code stays usable.
     if ((await deps.rpc('service_closure_target', { p_user: userId }))?.ok === true) throw new Refusal('already_requested')
     await checkCode(ctx, 'request_closure', body.code)
@@ -315,6 +318,13 @@ function requireAal2(ctx: Ctx) {
   if (ctx.aal !== 'aal2') throw new Refusal('aal2_required')
 }
 
+/** aal2 when the caller has a verified TOTP factor or their group's policy requires 2FA. */
+async function requireAal2For2faUsers(ctx: Ctx) {
+  if (ctx.aal === 'aal2') return
+  if ((await ctx.deps.listFactors(ctx.userId)).some(isVerifiedTotp)) throw new Refusal('aal2_required')
+  if ((await sql(ctx, 'service_requires_2fa', { p_user: ctx.userId })).requires === true) throw new Refusal('aal2_required')
+}
+
 async function classify(ctx: Ctx, user: string): Promise<string> {
   const kind = (await sql(ctx, 'service_classify_user', { p_user: user })).kind
   return typeof kind === 'string' ? kind : 'none'
@@ -356,8 +366,13 @@ async function wipeSecondFactor(ctx: Ctx, user: string) {
   await sql(ctx, 'service_clear_recovery_codes', { p_user: user })
 }
 
+/**
+ * The request IP is stored only on the caller's own events: an event about someone else (subject_id) shows in that
+ * user's Security activity, which must not reveal where the Owner signed in from.
+ */
 async function logEvent(ctx: Ctx, user: string, event: string, metadata: Record<string, unknown> = {}) {
-  await sql(ctx, 'service_log_account_event', { p_user: user, p_event: event, p_metadata: metadata, p_ip: ctx.ip })
+  const aboutSomeoneElse = typeof metadata.subject_id === 'string' && metadata.subject_id !== user
+  await sql(ctx, 'service_log_account_event', { p_user: user, p_event: event, p_metadata: metadata, p_ip: aboutSomeoneElse ? null : ctx.ip })
 }
 
 /** A security notice to the account holder. The action already happened, so a failed notice only logs. */

@@ -187,6 +187,24 @@ describe('My account section', () => {
     expect(window.location.pathname).toBe('/admin/settings/account')
   })
 
+  it('closure refused with aal2_required (2FA account at aal1): the dialog says so, keeps the code and nothing changes', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const request = vi.spyOn(account, 'requestClosure').mockResolvedValue(accountFail('aal2_required'))
+    open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    await user.click(await within(card('Close your account')).findByRole('button', { name: 'Request closure' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Request closure?' })).getByRole('button', { name: 'Continue' }))
+    const codeDialog = await screen.findByRole('dialog', { name: 'Confirm closure request' })
+    await within(codeDialog).findByText(/We emailed a 6-digit code to/)
+    await user.type(within(codeDialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(within(codeDialog).getByRole('button', { name: 'Request closure' }))
+
+    expect(await within(codeDialog).findByText('This needs 2FA. Sign in with your authenticator code first.')).toBeInTheDocument()
+    expect(request).toHaveBeenCalledWith(DEMO_CODE)
+    expect(within(codeDialog).getByLabelText('6-digit code')).toHaveValue(DEMO_CODE)
+    expect(screen.queryByText('Closure requested')).toBeNull()
+  })
+
   it('change password: current_password_mismatch shows on the current field, same_password on the new field', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     vi.spyOn(account, 'changePassword').mockResolvedValueOnce(accountFail('current_password_mismatch')).mockResolvedValueOnce(accountFail('same_password'))

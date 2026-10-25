@@ -374,6 +374,8 @@ describe('account-security', () => {
 
   it('request_closure: refuses the Owner; a business owner gets kind business and the admin inbox is emailed; staff get kind staff, sessions ended and the user deleted', async () => {
     const { d, s } = deps()
+    // A business owner without 2FA (and no policy) may ask at aal1; one with 2FA needs aal2 (next test).
+    s.factors[BIZ_OWNER] = []
     const ownerCode = await codeFor(d, s, OWNER, 'request_closure')
     const owner = await call(d, tok(OWNER, 'aal2'), { action: 'request_closure', code: ownerCode })
     expect(owner.status).toBe(403)
@@ -405,6 +407,79 @@ describe('account-security', () => {
     expect(deleted.user).toBe(STAFF)
     expect(JSON.stringify(deleted.metadata)).not.toContain('staff@sanctus.test')
     expect(deleted.metadata.email_sha256).toBe(await sha256Hex('staff@sanctus.test'))
+  })
+
+  it('request_closure: a caller with a verified factor needs aal2, refused before the code is checked (the code stays usable)', async () => {
+    const { d, s } = deps()
+    const code = await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1')
+    const refused = await call(d, tok(BIZ_OWNER, 'aal1'), { action: 'request_closure', code })
+    expect(refused.status).toBe(403)
+    expect(await json(refused)).toEqual({ ok: false, error: 'aal2_required' })
+    expect(s.rpcCalls.some((c) => c.fn === 'service_check_action_code')).toBe(false)
+    expect(s.rpcCalls.some((c) => c.fn === 'service_request_closure')).toBe(false)
+    expect(s.codes.find((c) => c.user === BIZ_OWNER && !c.consumed)).toBeDefined()
+    // The same code works once the session is aal2.
+    expect(await json(await call(d, tok(BIZ_OWNER, 'aal2'), { action: 'request_closure', code }))).toEqual({ ok: true, kind: 'business' })
+  })
+
+  it("request_closure: the caller's group policy requires 2FA (no factor yet): aal2 required; no verified factor and no policy: aal1 is enough", async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    s.requires2fa[STAFF] = true
+    const code = await codeFor(d, s, STAFF, 'request_closure', 'aal1')
+    expect(await json(await call(d, tok(STAFF, 'aal1'), { action: 'request_closure', code }))).toEqual({ ok: false, error: 'aal2_required' })
+    expect(s.deletedUsers).toEqual([])
+    expect(s.codes.find((c) => c.user === STAFF && !c.consumed)).toBeDefined()
+
+    s.factors[BIZ_OWNER] = [{ id: 'f-half', type: 'totp', status: 'unverified', updatedAt: NOW.toISOString() }]
+    const bizCode = await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1')
+    expect(await json(await call(d, tok(BIZ_OWNER, 'aal1'), { action: 'request_closure', code: bizCode }))).toEqual({ ok: true, kind: 'business' })
+  })
+
+  it('a regenerate and disable_2fa at aal1 are refused before the code is checked', async () => {
+    const { d, s } = deps()
+    s.recovery[STAFF] = { salt: 'x', rows: [{ hash: 'h', used: false }] }
+    const regen = await codeFor(d, s, STAFF, 'regenerate_recovery', 'aal1')
+    expect(await json(await call(d, tok(STAFF, 'aal1'), { action: 'generate_recovery_codes', code: regen }))).toEqual({ ok: false, error: 'aal2_required' })
+    const off = await codeFor(d, s, STAFF, 'disable_2fa', 'aal1')
+    expect(await json(await call(d, tok(STAFF, 'aal1'), { action: 'disable_2fa', code: off }))).toEqual({ ok: false, error: 'aal2_required' })
+    expect(s.rpcCalls.some((c) => c.fn === 'service_check_action_code')).toBe(false)
+    expect(s.codes.filter((c) => c.user === STAFF && !c.consumed)).toHaveLength(2)
+  })
+
+  it("events about another user never store the actor's IP; the caller's own events do", async () => {
+    const { d, s } = deps()
+    const reset = await codeFor(d, s, OWNER, 'owner_reset_2fa')
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code: reset }))).toEqual({ ok: true })
+
+    s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
+    const close = await codeFor(d, s, OWNER, 'complete_closure')
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: close }))).toEqual({ ok: true })
+
+    // A failed user delete is logged too, also without the IP.
+    s.closures[STAFF_2] = { businessId: null }
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failing = { ...d, deleteUser: async () => Promise.reject(new Error('auth down')) }
+    const retry = await codeFor(d, s, OWNER, 'complete_closure')
+    expect(await json(await call(failing, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: STAFF_2, code: retry }))).toEqual({ ok: false, error: 'unknown' })
+    quiet.mockRestore()
+
+    s.closures[STAFF] = { businessId: null }
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'restore_closure', target_user_id: STAFF }))).toEqual({ ok: true })
+
+    const about = s.rpcCalls.filter((c) => c.fn === 'service_log_account_event' && (c.args.p_metadata as Record<string, unknown>).subject_id !== undefined)
+    expect(about.map((c) => c.args.p_event)).toEqual(['account_2fa_reset_by_owner', 'account_closure_completed', 'account_closure_completed'])
+    for (const c of about) {
+      expect(c.args.p_user).not.toBe((c.args.p_metadata as Record<string, unknown>).subject_id)
+      expect(c.args.p_ip).toBeNull()
+    }
+    // restore_closure logs in SQL (service_restore_closure), which takes no IP.
+    expect(Object.keys(s.rpcCalls.find((c) => c.fn === 'service_restore_closure')!.args).sort()).toEqual(['p_actor', 'p_user'])
+
+    // The caller's own events still carry it.
+    s.factors[STAFF_2] = [{ id: 'f-new', type: 'totp', status: 'verified', updatedAt: NOW.toISOString() }]
+    await call(d, tok(STAFF_2, 'aal2'), { action: 'generate_recovery_codes' })
+    expect(s.events.at(-1)).toMatchObject({ user: STAFF_2, event: 'account_2fa_enabled', ip: '203.0.113.7' })
   })
 
   it('owner_reset_2fa: only the Owner at aal2 with a valid code; never on the Owner; deletes the target\'s factors and codes; emails the target', async () => {
@@ -505,7 +580,7 @@ describe('account-security', () => {
     const { d, s } = deps()
     const base = d.rpc
     d.rpc = async (fn, a) => (fn === 'service_request_closure' ? { ok: true, kind: 'staff' } : base(fn, a))
-    const r = await call(d, tok(BIZ_OWNER), { action: 'request_closure', code: await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1') })
+    const r = await call(d, tok(BIZ_OWNER, 'aal2'), { action: 'request_closure', code: await codeFor(d, s, BIZ_OWNER, 'request_closure') })
     expect(await json(r)).toEqual({ ok: false, error: 'unknown' })
     expect(s.deletedUsers).toEqual([])
   })
