@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 import { adminNav } from '@/components/layout/nav'
@@ -406,5 +406,124 @@ describe('SecurityGate', () => {
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
     renderGate()
     expect(await screen.findByText('Admin home')).toBeInTheDocument()
+  })
+
+  it('Security activity at aal1 with a factor shows the code step first', async () => {
+    setup({ requires2fa: false, factor: true, aal: 'aal1' })
+    renderGate('/admin/settings/activity')
+    expect(await screen.findByText('Enter the 6-digit code from your authenticator app')).toBeInTheDocument()
+    expect(screen.queryByText('Settings page')).not.toBeInTheDocument()
+  })
+})
+
+describe('SecurityGate: a policy turned on mid-session (no auth event)', () => {
+  const GATE = { level: 1, name: 'Set up 2FA to continue' } as const
+  const later = (ms: number) => {
+    const t = Date.now() + ms
+    vi.spyOn(Date, 'now').mockReturnValue(t)
+  }
+
+  it('coming back to the window reloads the state (at most once per 30 s) and shows the gate', async () => {
+    const acc = setup({ requires2fa: false, factor: false, aal: 'aal1' })
+    renderGate()
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    acc.s.requires2fa = true // the Owner turned the staff policy on from another device
+    const loads = vi.mocked(acc.impl.getSecurityState!).mock.calls.length
+    // Within 30 s of the last load: no reload.
+    fireEvent.focus(window)
+    expect(vi.mocked(acc.impl.getSecurityState!).mock.calls.length).toBe(loads)
+    later(31_000)
+    fireEvent.focus(window)
+    expect(await screen.findByRole('heading', GATE)).toBeInTheDocument()
+    expect(screen.queryByText('Admin home')).not.toBeInTheDocument()
+  })
+
+  it('the tab becoming visible again reloads it too', async () => {
+    const acc = setup({ requires2fa: false, factor: false, aal: 'aal1' })
+    renderGate()
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    acc.s.requires2fa = true
+    later(31_000)
+    act(() => void document.dispatchEvent(new Event('visibilitychange')))
+    expect(await screen.findByRole('heading', GATE)).toBeInTheDocument()
+  })
+
+  it('moving to another page reloads it (when 30 s have passed)', async () => {
+    const acc = setup({ requires2fa: false, factor: false, aal: 'aal1' })
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/admin']}>
+          <AccountProvider>
+            <Routes>
+              <Route
+                path="/admin/*"
+                element={
+                  <RequireRole allow="super_admin">
+                    <SecurityGate>
+                      <Link to="/admin/products">Products</Link>
+                      <Routes>
+                        <Route index element={<p>Admin home</p>} />
+                        <Route path="products" element={<p>Products page</p>} />
+                      </Routes>
+                    </SecurityGate>
+                  </RequireRole>
+                }
+              />
+            </Routes>
+          </AccountProvider>
+        </MemoryRouter>
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    acc.s.requires2fa = true
+    later(31_000)
+    await userEvent.setup().click(screen.getByRole('link', { name: 'Products' }))
+    expect(await screen.findByRole('heading', GATE)).toBeInTheDocument()
+    expect(screen.queryByText('Products page')).not.toBeInTheDocument()
+  })
+
+  it('at aal1 the state also reloads every 3 minutes on its own; the timer stops on sign-out and unmount', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const acc = setup({ requires2fa: false, factor: false, aal: 'aal1' })
+      const view = renderGate()
+      expect(await screen.findByText('Admin home')).toBeInTheDocument()
+      acc.s.requires2fa = true
+      await vi.advanceTimersByTimeAsync(180_000)
+      expect(await screen.findByRole('heading', GATE)).toBeInTheDocument()
+
+      // Sign out from the gate: no more reloads.
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(screen.getByRole('button', { name: 'Sign out' }))
+      expect(await screen.findByText('Demo account picker')).toBeInTheDocument()
+      const afterSignOut = vi.mocked(acc.impl.getSecurityState!).mock.calls.length
+      await vi.advanceTimersByTimeAsync(600_000)
+      expect(vi.mocked(acc.impl.getSecurityState!).mock.calls.length).toBe(afterSignOut)
+      view.unmount()
+
+      // Unmounted while signed in: no more reloads either.
+      const again = setup({ requires2fa: false, factor: false, aal: 'aal1' })
+      const second = renderGate()
+      expect(await screen.findByText('Admin home')).toBeInTheDocument()
+      second.unmount()
+      const atUnmount = vi.mocked(again.impl.getSecurityState!).mock.calls.length
+      await vi.advanceTimersByTimeAsync(600_000)
+      expect(vi.mocked(again.impl.getSecurityState!).mock.calls.length).toBe(atUnmount)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('no timer at aal2', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const acc = setup({ requires2fa: true, factor: true, aal: 'aal2' })
+      renderGate()
+      expect(await screen.findByText('Admin home')).toBeInTheDocument()
+      const loads = vi.mocked(acc.impl.getSecurityState!).mock.calls.length
+      await vi.advanceTimersByTimeAsync(600_000)
+      expect(vi.mocked(acc.impl.getSecurityState!).mock.calls.length).toBe(loads)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

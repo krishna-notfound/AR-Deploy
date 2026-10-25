@@ -176,7 +176,7 @@ function GateFrame({ scope, children }: { scope: 'admin' | 'business'; children:
  * applies to the signed-in user instead of the app; with none, the app.
  */
 export function SecurityGate({ children, checks = GATE_CHECKS }: { children: ReactNode; checks?: readonly GateCheck[] }) {
-  const { user, business, holdGate } = useAccount()
+  const { user, business, holdGate, refreshSecurityIfStale } = useAccount()
   const { refresh, patch, ...security } = useSecurityState()
   const leave = useLeaveAccount()
   const { pathname } = useLocation()
@@ -185,6 +185,8 @@ export function SecurityGate({ children, checks = GATE_CHECKS }: { children: Rea
   const [held, setHeld] = useState<string | null>(null)
   // A screen that holds also keeps the account mounted (AccountProvider); let go when this gate goes away.
   useEffect(() => () => holdGate(false), [holdGate])
+  // A new page reloads the security state when it is older than 30 s (a policy turned on mid-session).
+  useEffect(() => refreshSecurityIfStale(), [pathname, refreshSecurityIfStale])
 
   // Signed out or still resolving: RequireRole decides.
   if (!user) return <>{children}</>
