@@ -47,6 +47,9 @@ describe('Security policy section', () => {
     expect(sw).toBeDisabled()
     expect(sw).toHaveAttribute('aria-checked', 'false')
     expect(screen.getAllByText(/Turn on your own 2FA first/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Turning on staff 2FA without it would lock you out of staff data/)).toBeInTheDocument()
+    // RLS refuses every policy update below aal2, so the business-owner switch is off limits too.
+    expect(screen.getByRole('switch', { name: 'Require 2FA for business owners' })).toBeDisabled()
     expect(screen.getByRole('link', { name: 'Go to Security & 2FA' })).toHaveAttribute('href', '/admin/settings/security')
     cleanup()
 
@@ -90,6 +93,37 @@ describe('Security policy section', () => {
     await waitFor(() => expect(biz).toHaveAttribute('aria-checked', 'true'))
     const p2 = await account.getPlatformSettings()
     expect(p2.ok && p2.data).toMatchObject({ require2faStaff: true, require2faBusiness: true })
+  })
+
+  it('with 2FA set up but signed in at aal1, both switches are disabled with "Sign in with your 2FA code to change these."', { timeout: 20_000 }, async () => {
+    const original = account.getSecurityState.bind(account)
+    vi.spyOn(account, 'getSecurityState').mockImplementation(async () => {
+      const r = await original()
+      return r.ok ? { ok: true as const, data: { ...r.data, aal: 'aal1' as const, hasVerifiedFactor: true } } : r
+    })
+    const save = vi.spyOn(account, 'updatePlatformSettings')
+    open({ role: 'super_admin' })
+    const staff = await screen.findByRole('switch', { name: 'Require 2FA for staff' })
+    expect(staff).toBeDisabled()
+    expect(screen.getByRole('switch', { name: 'Require 2FA for business owners' })).toBeDisabled()
+    expect(screen.getAllByText(/Sign in with your 2FA code to change these\./).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Turn on your own 2FA first/)).toBeNull()
+    await userEvent.click(staff)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('turning a policy off at aal2 skips the confirmation and saves', { timeout: 20_000 }, async () => {
+    await ownerAtAal2()
+    await account.updatePlatformSettings({ require2faStaff: true })
+    open({ role: 'super_admin' })
+    const sw = await screen.findByRole('switch', { name: 'Require 2FA for staff' })
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'true'))
+    await waitFor(() => expect(sw).toBeEnabled())
+    await userEvent.click(sw)
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    const p = await account.getPlatformSettings()
+    expect(p.ok && p.data.require2faStaff).toBe(false)
   })
 
   it('cancelling the confirmation saves nothing', { timeout: 20_000 }, async () => {

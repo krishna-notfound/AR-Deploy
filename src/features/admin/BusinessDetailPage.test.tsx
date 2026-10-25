@@ -206,6 +206,56 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
     expect(left.ok && left.data).toEqual([])
   })
 
+  it('a refused Complete closure (aal2_required) keeps the dialog open with the reason and stays on the page', { timeout: 20_000 }, async () => {
+    // Signed in without 2FA: the server refuses at aal1.
+    closureOn('biz_oak')
+    const user = userEvent.setup()
+    renderAt('biz_oak')
+    const banner = await screen.findByRole('region', { name: 'Closure requested' })
+    await user.click(within(banner).getByRole('button', { name: 'Complete closure' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Complete closure of Oak & Ember Studio?' })
+    await within(dialog).findByText(/We emailed a 6-digit code/)
+    await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(within(dialog).getByRole('button', { name: 'Complete closure' }))
+    expect(await within(dialog).findByText(/This needs 2FA/)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Complete closure of Oak & Ember Studio?' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Businesses list' })).toBeNull()
+    expect(screen.queryByText('Closure completed')).toBeNull()
+  })
+
+  it('a Restore that finds the request already handled (not_found) says so and removes the banner', { timeout: 20_000 }, async () => {
+    await ownerAtAal2()
+    closureOn('biz_oak')
+    const user = userEvent.setup()
+    renderAt('biz_oak')
+    const banner = await screen.findByRole('region', { name: 'Closure requested' })
+    // Handled elsewhere (another tab) after this page loaded.
+    expect((await account.restoreClosure('demo-closing-owner')).ok).toBe(true)
+    await user.click(within(banner).getByRole('button', { name: 'Restore' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Restore Oak & Ember Studio?' })).getByRole('button', { name: 'Restore' }))
+    expect(await screen.findByText('This closure was already handled.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Closure requested' })).toBeNull())
+    expect(screen.queryByText('Could not restore the business')).toBeNull()
+  })
+
+  it('a Complete closure that finds the request already handled (not_found) closes the dialog, says so and stays', { timeout: 20_000 }, async () => {
+    await ownerAtAal2()
+    closureOn('biz_oak')
+    const user = userEvent.setup()
+    renderAt('biz_oak')
+    const banner = await screen.findByRole('region', { name: 'Closure requested' })
+    await user.click(within(banner).getByRole('button', { name: 'Complete closure' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Complete closure of Oak & Ember Studio?' })
+    await within(dialog).findByText(/We emailed a 6-digit code/)
+    expect((await account.restoreClosure('demo-closing-owner')).ok).toBe(true)
+    await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(within(dialog).getByRole('button', { name: 'Complete closure' }))
+    expect(await screen.findByText('This closure was already handled.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Closure requested' })).toBeNull())
+    expect(screen.queryByRole('heading', { name: 'Businesses list' })).toBeNull()
+  })
+
   it('shows no banner for a business without a closure request', { timeout: 20_000 }, async () => {
     const list = closureOn('biz_oak')
     renderAt('biz_nord')

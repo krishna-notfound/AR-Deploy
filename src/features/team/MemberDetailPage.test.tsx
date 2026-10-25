@@ -140,6 +140,24 @@ describe('Member detail: Reset 2FA (Owner only)', () => {
     expect(screen.queryByText('Their 2FA was reset. They were emailed.')).toBeNull()
   })
 
+  it('none of these appear for Admin or Team', { timeout: 20_000 }, async () => {
+    for (const platformRole of ['admin', 'team'] as const) {
+      localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole }))
+      window.history.replaceState(null, '', '/admin/team/mem_ana')
+      const { unmount } = render(<App />)
+      expect(await screen.findByText("You don't have access to this page")).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Reset 2FA' })).toBeNull()
+      unmount()
+    }
+  })
+
+  it('keeps the Change role trigger at the control height and its natural width', { timeout: 20_000 }, async () => {
+    open('/admin/team/mem_ana')
+    await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
+    const trigger = screen.getByRole('button', { name: 'Change role' })
+    for (const c of ['h-10!', 'max-sm:h-11!', 'pointer-coarse:h-11!', 'w-auto!']) expect(trigger.className).toContain(c)
+  })
+
   it('is not offered for an invited member with no account yet, nor for the Owner', { timeout: 20_000 }, async () => {
     const { unmount } = open('/admin/team/mem_marta')
     await screen.findByRole('heading', { level: 1, name: 'marta.lopes@sanctus.example' })

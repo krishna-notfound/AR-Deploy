@@ -210,6 +210,8 @@ export default function BusinessDetailPage() {
   )
 }
 
+const ALREADY_HANDLED = 'This closure was already handled.'
+
 /** A business owner asked to close their account (spec 8): the catalog is offline until the Owner completes or restores. */
 function ClosureBanner({ business, request, onRestored }: { business: Business; request: ClosureRequest; onRestored: () => void }) {
   const prefs = usePreferences()
@@ -219,6 +221,12 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
   const titleId = useId()
   const [completing, setCompleting] = useState(false)
   const [restoring, setRestoring] = useState(false)
+
+  // Completed or restored elsewhere (another tab or Owner session) since this page loaded: say so and reload.
+  const alreadyHandled = () => {
+    toast.info(ALREADY_HANDLED)
+    onRestored()
+  }
 
   const restore = async () => {
     if (restoring) return
@@ -234,7 +242,8 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
     if (r.ok) {
       toast.success('Business restored', 'The catalog is back at its previous status and the owner was emailed.')
       onRestored()
-    } else toast.error('Could not restore the business', r.error.message)
+    } else if (r.error.reason === 'not_found') alreadyHandled()
+    else toast.error('Could not restore the business', r.error.message)
   }
 
   return (
@@ -271,6 +280,10 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
           if (r.ok) {
             toast.success('Closure completed', `${business.name} and its owner's account were deleted.`)
             navigate('/admin/businesses')
+          } else if (r.error.reason === 'not_found') {
+            // Nothing left to complete: close the dialog (an ok answer closes it) and show the current state.
+            alreadyHandled()
+            return { ok: true as const, data: undefined }
           }
           return r
         }}

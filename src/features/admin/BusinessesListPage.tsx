@@ -1,6 +1,6 @@
 import { useCan } from '@/auth/usePermission'
 import { Building2, ExternalLink, MoreHorizontal, Package, Pencil, Plus, Power, QrCode, Trash2 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge, BusinessStatusBadge } from '@/components/ui/Badge'
@@ -12,6 +12,7 @@ import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { EmptyState, ErrorState } from '@/components/ui/States'
+import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, BusinessCatalog, BusinessStatus, ClosureRequest } from '@/domain/types'
 import { formatDate, formatNumber } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
@@ -20,6 +21,7 @@ import { account, isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useBusinessActions } from '../businesses/useBusinessActions'
 import { Monogram } from '../applications/Monogram'
+import { ActionCodeDialog } from '../settings/ActionCodeDialog'
 
 function BusinessMark({ b, className }: { b: Business; className?: string }) {
   return b.logoUrl ? (
@@ -67,6 +69,13 @@ export default function BusinessesListPage() {
     const ids = new Set((closures.data ?? []).flatMap((r) => (r.businessId ? [r.businessId] : [])))
     return new Set((catalogs.data ?? []).filter((c) => ids.has(c.business.id)).map((c) => c.business.id))
   }, [closures.data, catalogs.data])
+  // Requests whose business is no longer listed (a closure that stopped part-way): still the Owner's to finish.
+  const orphans = useMemo(() => {
+    if (!catalogs.data) return []
+    const listed = new Set(catalogs.data.map((c) => c.business.id))
+    return (closures.data ?? []).filter((r) => !r.businessId || !listed.has(r.businessId))
+  }, [closures.data, catalogs.data])
+  const closureCount = closing.size + orphans.length
 
   const rows = useMemo<Row[]>(() => {
     const perf = new Map((analytics.data?.byBusiness ?? []).map((b) => [b.businessId, b]))
@@ -156,10 +165,11 @@ export default function BusinessesListPage() {
           {isPlatformOwner && (
             <Button aria-pressed={closureOnly} variant={closureOnly ? 'primary' : 'secondary'} onClick={() => setParam('closure', closureOnly ? '' : '1')}>
               Closure requested{' '}
-              {catalogs.data && closures.data && <Badge tone={closing.size > 0 ? 'warning' : 'neutral'}>{formatNumber(closing.size)}</Badge>}
+              {catalogs.data && closures.data && <Badge tone={closureCount > 0 ? 'warning' : 'neutral'}>{formatNumber(closureCount)}</Badge>}
             </Button>
           )}
         </div>
+        {closureOnly && orphans.length > 0 && <OrphanRequests requests={orphans} onChanged={closures.refetch} />}
         {catalogs.status === 'error' && !catalogs.data ? (
           <ErrorState message={catalogs.error.message} onRetry={catalogs.refetch} />
         ) : closureOnly && closures.status === 'error' && !closures.data ? (
@@ -178,7 +188,11 @@ export default function BusinessesListPage() {
             onPageChange={(p) => setParam('page', p > 1 ? String(p) : '')}
             empty={
               closureOnly && !q && !status ? (
-                <EmptyState title="No closure requests" body="When a business owner asks to close their account, their business shows here." />
+                orphans.length > 0 ? (
+                  <EmptyState title="No listed business has a closure request" body="Only the requests above are open." />
+                ) : (
+                  <EmptyState title="No closure requests" body="When a business owner asks to close their account, their business shows here." />
+                )
               ) : q || status || closureOnly ? (
                 <EmptyState title="No businesses match" body="Try a different search or status." />
               ) : (
@@ -216,5 +230,62 @@ export default function BusinessesListPage() {
         )}
       </Card>
     </>
+  )
+}
+
+const ALREADY_HANDLED = 'This closure was already handled.'
+
+/** Closure requests whose business is gone: the Owner completes them with the same action-code flow as on business detail. */
+function OrphanRequests({ requests, onChanged }: { requests: ClosureRequest[]; onChanged: () => void }) {
+  const prefs = usePreferences()
+  const toast = useToast()
+  const titleId = useId()
+  const [target, setTarget] = useState<ClosureRequest | null>(null)
+
+  return (
+    <section aria-labelledby={titleId} className="border-b border-line bg-warning-soft/40 p-4 sm:px-6">
+      <h2 id={titleId} className="text-ui-body font-semibold text-ink">
+        Requests without a business
+      </h2>
+      <p className="mt-0.5 text-ui-small text-ink-muted">Their business is no longer on the platform. Complete the closure to delete the account and close the request.</p>
+      <ul className="mt-3 divide-y divide-line">
+        {requests.map((r) => (
+          <li key={r.userId} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5">
+            <div className="min-w-0">
+              <p className="text-ui-body break-words text-ink">{r.email}</p>
+              <p className="text-ui-small text-ink-muted">
+                {r.businessName ? `${r.businessName} · ` : ''}Requested {formatDate(r.requestedAt, 'en', prefs)}
+              </p>
+            </div>
+            <Button size="sm" variant="danger" aria-label={`Complete closure for ${r.email}`} onClick={() => setTarget(r)}>
+              Complete closure
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <ActionCodeDialog
+        open={target !== null}
+        purpose="complete_closure"
+        title={`Complete closure for ${target?.email ?? ''}?`}
+        description="This deletes their account and closes the request. It can't be undone. We email them a final notice."
+        confirmLabel="Complete closure"
+        destructive
+        onClose={() => setTarget(null)}
+        onConfirm={async (code) => {
+          if (!target) return { ok: true as const, data: undefined }
+          const r = await account.completeClosure(target.userId, code)
+          if (r.ok) {
+            toast.success('Closure completed', `The account for ${target.email} was deleted.`)
+            onChanged()
+          } else if (r.error.reason === 'not_found') {
+            // Nothing left to complete: close the dialog (an ok answer closes it) and show the current list.
+            toast.info(ALREADY_HANDLED)
+            onChanged()
+            return { ok: true as const, data: undefined }
+          }
+          return r
+        }}
+      />
+    </section>
   )
 }

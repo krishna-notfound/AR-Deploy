@@ -19,8 +19,10 @@ import { SectionHeader, SettingsCard } from '../SettingsUi'
 
 type Key = 'require2faStaff' | 'require2faBusiness'
 
-/** The lockout reason: shown on the disabled switch and after a save refused with aal2_required. */
+/** The lockout reason: shown on the disabled switches and after a save refused with aal2_required. */
 export const OWN_2FA_FIRST = 'Turn on your own 2FA first.'
+/** 2FA is set up but this session never proved it (aal1): RLS refuses every policy update until it does. */
+export const SIGN_IN_WITH_CODE = 'Sign in with your 2FA code to change these.'
 
 const POLICY: Record<Key, { label: string; description: string; who: string; on: string; off: string }> = {
   require2faStaff: {
@@ -65,8 +67,9 @@ function Policy() {
   const failed = (settings.status === 'error' && !settings.data) || (security.status === 'error' && !security.data)
   const policy = saved ?? settings.data
   const own = security.data
-  // The Owner's own 2FA is on and this session proved it: only then can the staff policy be turned on safely.
-  const ownReady = own?.aal === 'aal2' && own.hasVerifiedFactor
+  // Every policy update needs aal2 (RLS), and staff 2FA without the Owner's own 2FA would lock them out: the switches
+  // work only once the Owner's 2FA is on and this session proved it. `reason` says which step is missing.
+  const reason = !own ? null : !own.hasVerifiedFactor ? OWN_2FA_FIRST : own.aal !== 'aal2' ? SIGN_IN_WITH_CODE : null
 
   const change = async (key: Key, value: boolean) => {
     if (pending) return
@@ -116,10 +119,11 @@ function Policy() {
         />
       ) : (
         <div className="space-y-5">
-          {(!ownReady || refused) && (
+          {reason === SIGN_IN_WITH_CODE && !refused && <InlineNotice tone="warning">{SIGN_IN_WITH_CODE}</InlineNotice>}
+          {(reason === OWN_2FA_FIRST || refused) && (
             <InlineNotice tone="warning">
               <span>
-                {OWN_2FA_FIRST} Turning this on without it would lock you out of staff data.{' '}
+                {OWN_2FA_FIRST} Turning on staff 2FA without it would lock you out of staff data.{' '}
                 <Link to={settingsPath('admin', 'security')} className="font-medium underline">
                   Go to Security & 2FA
                 </Link>
@@ -128,16 +132,14 @@ function Policy() {
           )}
           {(['require2faStaff', 'require2faBusiness'] as const).map((key) => {
             const checked = pending?.key === key ? pending.value : policy[key]
-            // The lockout guard: staff 2FA can't be switched on without the Owner's own 2FA at aal2.
-            const locked = key === 'require2faStaff' && !checked && !ownReady
             return (
               <div key={key} className="border-t border-line pt-5 first:border-t-0 first:pt-0">
                 <Switch
                   checked={checked}
-                  disabled={pending !== null || locked}
+                  disabled={pending !== null || reason !== null}
                   onChange={(v) => void change(key, v)}
                   label={POLICY[key].label}
-                  description={locked ? `${POLICY[key].description} ${OWN_2FA_FIRST}` : POLICY[key].description}
+                  description={reason ? `${POLICY[key].description} ${reason}` : POLICY[key].description}
                 />
               </div>
             )

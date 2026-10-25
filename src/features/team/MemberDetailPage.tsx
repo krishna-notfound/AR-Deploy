@@ -102,7 +102,7 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
                 <span id="role">
                   <DropdownMenu
                     label="Change role"
-                    triggerClassName="inline-flex h-10! w-auto! items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-4 text-ui-body font-medium text-ink hover:bg-subtle"
+                    triggerClassName="inline-flex h-10! max-sm:h-11! pointer-coarse:h-11! w-auto! items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-4 text-ui-body font-medium text-ink hover:bg-subtle"
                     trigger={
                       <>
                         Change role <ChevronDown className="size-4" aria-hidden />
