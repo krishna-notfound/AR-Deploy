@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Member Detail</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&amp;family=EB+Garamond:wght@400;500;600&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          canvas: '#FCF9F2',
+          card: '#FFFFFF',
+          subtle: '#F1ECE3',
+          hairline: '#E6E1D6',
+          strongLine: '#C9C3B6',
+          ink: '#1D1C1A',
+          bodyText: '#3A352F',
+          muted: '#6E675F',
+          bronzeText: '#5C4E3A',
+          softBronze: '#EDE7DC',
+          lightBronze: '#DBC3A5',
+          sidebarBg: '#161614',
+          sidebarText: '#F3F0E9'
+        },
+        fontFamily: {
+          serif: ['"Cormorant Garamond"', '"EB Garamond"', 'serif'],
+          sans: ['"Inter"', 'sans-serif']
+        }
+      }
+    }
+  }
+</script>
+<style>
+  body {
+    background-color: #FCF9F2;
+    color: #1D1C1A;
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body class="w-[1440px] min-w-[1440px] mx-auto min-h-screen flex bg-canvas text-ink antialiased">
+<!-- Left Sidebar (256px, solid #161614, full height) -->
+<aside class="w-[256px] min-w-[256px] bg-sidebarBg flex flex-col justify-between select-none text-sidebarText border-r border-[#262624]">
+<div>
+<!-- Brand wordmark header -->
+<div class="px-6 pt-6 pb-5 border-b border-white/10">
+<div class="text-[15px] tracking-[0.25em] font-medium text-sidebarText leading-tight">S A N C T U S</div>
+<div class="text-[13px] text-sidebarText/70 mt-1 font-normal">Admin console</div>
+</div>
+<!-- Navigation items -->
+<nav class="mt-4 px-3 space-y-1">
+<!-- Overview -->
+<a class="flex items-center h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<rect height="7" stroke-width="1.5" width="7" x="3" y="3"></rect>
+<rect height="7" stroke-width="1.5" width="7" x="14" y="3"></rect>
+<rect height="7" stroke-width="1.5" width="7" x="14" y="14"></rect>
+<rect height="7" stroke-width="1.5" width="7" x="3" y="14"></rect>
+</svg>
+          Overview
+        </a>
+<!-- Applications with count badge -->
+<a class="flex items-center justify-between h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<div class="flex items-center">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+            Applications
+          </div>
+<span class="inline-flex items-center justify-center h-[18px] px-1.5 text-[11px] font-medium text-ink bg-lightBronze rounded-[2px] tabular">3</span>
+</a>
+<!-- Businesses -->
+<a class="flex items-center h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+          Businesses
+        </a>
+<!-- All Products -->
+<a class="flex items-center h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+          All Products
+        </a>
+<!-- Analytics -->
+<a class="flex items-center h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+          Analytics
+        </a>
+<!-- Catalogs & QR Codes -->
+<a class="flex items-center h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+          Catalogs &amp; QR Codes
+        </a>
+<!-- Team & Access (Active) -->
+<a class="relative flex items-center h-10 px-3 text-[14px] text-sidebarText font-medium bg-white/[0.08] rounded-[2px]" href="#">
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-lightBronze"></div>
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+          Team &amp; Access
+        </a>
+<!-- Audit log -->
+<a class="flex items-center h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+          Audit log
+        </a>
+<!-- Settings -->
+<a class="flex items-center h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+          Settings
+        </a>
+</nav>
+</div>
+<!-- Bottom user & collapse bar -->
+<div class="px-3 pb-4 pt-2 border-t border-white/10 space-y-1">
+<a class="flex items-center h-10 px-3 text-[14px] text-sidebarText/70 hover:text-sidebarText hover:bg-white/[0.04] rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+        Collapse
+      </a>
+<div class="flex items-center justify-between h-10 px-3 text-[13px] text-sidebarText/80">
+<span class="truncate">admin@platform.example</span>
+<button class="text-sidebarText/70 hover:text-sidebarText p-1 transition-colors" title="Log out" type="button">
+<svg class="w-[16px] h-[16px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- Main Content Wrapper (1184px wide: 1440 - 256) -->
+<div class="w-[1184px] min-w-[1184px] flex flex-col">
+<!-- Top Bar (56px, solid #FCF9F2, 1px bottom hairline) -->
+<header class="h-14 min-h-[56px] border-b border-hairline bg-canvas px-10 flex items-center justify-between">
+<!-- Breadcrumb -->
+<nav class="flex items-center text-[14px] text-muted space-x-2">
+<a class="hover:text-ink transition-colors" href="#">Sanctus Admin</a>
+<span class="text-hairline">/</span>
+<a class="hover:text-ink transition-colors" href="#">Team &amp; Access</a>
+<span class="text-hairline">/</span>
+<span class="text-ink font-medium">Ana Ribeiro</span>
+</nav>
+<!-- Demo mode button -->
+<button class="inline-flex items-center px-3 py-1 text-[12px] font-medium text-ink bg-transparent border border-hairline rounded-[2px] hover:bg-black/[0.03] transition-colors" type="button">
+        Demo mode
+      </button>
+</header>
+<!-- Page Body Area -->
+<main class="flex-1 px-10 py-8 bg-canvas">
+<!-- Full inner width 1104px (1184px - 80px horizontal padding) -->
+<div class="w-full space-y-6">
+<!-- Page Header -->
+<section class="flex items-start justify-between">
+<div>
+<h1 class="font-serif text-[36px] font-medium leading-[1.15] text-ink">Ana Ribeiro</h1>
+<div class="flex items-center gap-2 mt-2">
+<!-- Admin Role Pill: neutral pill -->
+<span class="inline-flex items-center h-5 px-2 text-[12px] font-medium text-bodyText bg-[#EAE6DE] rounded-[2px]">
+                Admin
+              </span>
+<!-- Active Status Pill: #1E653F on #E3F3EA, 20px tall, 2px corner -->
+<span class="inline-flex items-center h-5 px-2 text-[12px] font-medium text-[#1E653F] bg-[#E3F3EA] rounded-[2px]">
+                Active
+              </span>
+</div>
+<!-- Small neutral tag "Sample data" -->
+<div class="mt-2.5">
+<span class="inline-flex items-center h-5 px-2 text-[12px] font-medium text-bodyText bg-[#EAE6DE] rounded-[2px]">
+                Sample data
+              </span>
+</div>
+</div>
+<!-- Header Actions -->
+<div class="flex items-center gap-3">
+<!-- Change role dropdown button -->
+<button class="inline-flex items-center justify-center h-9 px-3.5 text-[14px] font-medium text-ink bg-transparent border border-ink rounded-[2px] hover:bg-black/[0.03] transition-colors" type="button">
+<span>Change role</span>
+<svg class="w-4 h-4 ml-2 text-ink stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+</button>
+<!-- Deactivate outline button: 1px border, #A8362A text -->
+<button class="inline-flex items-center justify-center h-9 px-4 text-[14px] font-medium text-[#A8362A] bg-transparent border border-[#A8362A] rounded-[2px] hover:bg-[#A8362A]/[0.04] transition-colors" type="button">
+              Deactivate
+            </button>
+</div>
+</section>
+<!-- Two columns layout: Left (Member profile) + Right (What Admin can do) -->
+<div class="grid grid-cols-12 gap-6 items-start">
+<!-- Left Card: Member profile (5/12) -->
+<div class="col-span-5 bg-card border border-hairline rounded-[2px] p-6 space-y-6">
+<!-- User summary header -->
+<div class="flex items-center gap-4">
+<!-- 48px square monogram "AR" box -->
+<div class="w-12 h-12 rounded-[2px] bg-canvas border border-hairline flex items-center justify-center text-[15px] font-medium text-ink select-none">
+                AR
+              </div>
+<div>
+<h2 class="text-[16px] font-medium text-ink leading-snug">Ana Ribeiro</h2>
+<div class="text-[13px] text-muted mt-0.5">ana.ribeiro@sanctus.example</div>
+</div>
+</div>
+<!-- Hairline separator -->
+<div class="h-[1px] bg-hairline w-full"></div>
+<!-- Definition list (label 13px muted, value 14px ink tabular, 40px rows) -->
+<div class="divide-y divide-[#F1ECE3]">
+<div class="flex items-center h-10">
+<span class="w-[120px] text-[13px] font-normal text-muted">Joined</span>
+<span class="text-[14px] text-ink tabular">16 Sep 2026</span>
+</div>
+<div class="flex items-center h-10">
+<span class="w-[120px] text-[13px] font-normal text-muted">Last sign-in</span>
+<span class="text-[14px] text-ink">yesterday</span>
+</div>
+<div class="flex items-center h-10">
+<span class="w-[120px] text-[13px] font-normal text-muted">Invited by</span>
+<span class="text-[14px] text-ink truncate">admin@platform.example</span>
+</div>
+</div>
+</div>
+<!-- Right Card: "What Admin can do" (7/12) -->
+<div class="col-span-7 bg-card border border-hairline rounded-[2px] p-6 space-y-6">
+<h2 class="text-[16px] font-semibold text-ink leading-tight">What Admin can do</h2>
+<div class="space-y-5">
+<!-- Group 1: Businesses & applications -->
+<div>
+<h3 class="text-[13px] font-semibold text-ink mb-2.5">Businesses &amp; applications</h3>
+<div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[14px] text-bodyText">
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>View businesses</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Create and edit businesses</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Activate or deactivate businesses</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Delete businesses</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Invite and remove business owners</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>View applications</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Approve applications</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Reject applications</span>
+</div>
+</div>
+</div>
+<!-- Hairline separator -->
+<div class="h-[1px] bg-hairline w-full"></div>
+<!-- Group 2: Products & catalogues -->
+<div>
+<h3 class="text-[13px] font-semibold text-ink mb-2.5">Products &amp; catalogues</h3>
+<div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[14px] text-bodyText">
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>View products and catalogues</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Create and edit products</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Publish and unpublish</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Delete products</span>
+</div>
+</div>
+</div>
+<!-- Hairline separator -->
+<div class="h-[1px] bg-hairline w-full"></div>
+<!-- Group 3: Insight & records -->
+<div>
+<h3 class="text-[13px] font-semibold text-ink mb-2.5">Insight &amp; records</h3>
+<div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[14px] text-bodyText">
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>View analytics</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>View the audit log and email log</span>
+</div>
+<div class="flex items-center gap-2 col-span-2">
+<svg class="w-4 h-4 text-ink flex-shrink-0 stroke-[1.75]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>View access history</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer line -->
+<div class="pt-4 border-t border-hairline text-[13px] text-muted">
+              Permissions belong to the role. Change them on <a class="text-ink underline hover:text-muted transition-colors" href="#">Role permissions</a>.
+            </div>
+</div>
+</div>
+<!-- Card: Invitations -->
+<div class="bg-card border border-hairline rounded-[2px] p-6 space-y-4">
+<h2 class="text-[16px] font-semibold text-ink leading-tight">Invitations</h2>
+<div class="border-t border-hairline pt-4">
+<!-- Row: flex items center between -->
+<div class="flex items-center justify-between">
+<div>
+<div class="text-[14px] text-ink leading-tight tabular">Created 15 Sep 2026, 11:20</div>
+<div class="text-[13px] text-muted mt-1 tabular">Accepted 16 Sep 2026, 09:05 · Email: accepted</div>
+</div>
+<div>
+<!-- Accepted Status Pill: soft green -->
+<span class="inline-flex items-center h-5 px-2 text-[12px] font-medium text-[#1E653F] bg-[#E3F3EA] rounded-[2px]">
+                  Accepted
+                </span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card: Access history -->
+<div class="bg-card border border-hairline rounded-[2px] p-6 space-y-4">
+<h2 class="text-[16px] font-semibold text-ink leading-tight">Access history</h2>
+<div class="border-t border-hairline pt-4">
+<div class="flex items-center justify-between">
+<div class="flex items-start gap-8">
+<!-- Left: Date -->
+<div class="w-[140px] text-[14px] text-ink tabular pt-0.5">
+                  16 Sep 2026, 09:05
+                </div>
+<!-- Middle: event details -->
+<div class="space-y-1">
+<div class="text-[14px] font-semibold text-ink leading-tight">
+                    Invitation accepted · ana.ribeiro@sanctus.example · Admin
+                  </div>
+<div class="text-[13px] text-bodyText leading-tight">
+                    Joined as Admin
+                  </div>
+<div class="text-[13px] text-muted leading-tight">
+                    By ana.ribeiro@sanctus.example
+                  </div>
+</div>
+</div>
+<!-- Right: status pill "Done" -->
+<div>
+<span class="inline-flex items-center h-5 px-2 text-[12px] font-medium text-[#1E653F] bg-[#E3F3EA] rounded-[2px]">
+                  Done
+                </span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

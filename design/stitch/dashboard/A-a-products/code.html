@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – All Products</title>
+<!-- Google Fonts: Cormorant Garamond (500) & Inter (400, 500, 600) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            canvas: '#F3F0E9',
+            card: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            ink: '#1D1C1A',
+            bodytext: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzetext: '#6E5C45',
+            softbronze: '#EAE3D6',
+            lightbronze: '#C9B79B',
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    body {
+      background-color: #F3F0E9;
+      color: #3A352F;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Precise border and styling rules */
+    .hairline-border {
+      border: 1px solid #D9D3C7;
+    }
+    .hairline-b {
+      border-bottom: 1px solid #D9D3C7;
+    }
+    .hairline-t {
+      border-top: 1px solid #D9D3C7;
+    }
+    .subtle-b {
+      border-bottom: 1px solid #ECE7DD;
+    }
+  </style>
+</head>
+<body class="w-[1440px] min-h-screen flex bg-canvas text-bodytext text-[14px] leading-[20px] select-none mx-auto">
+<!-- LEFT SIDEBAR: 256px, solid #1D1C1A, full height -->
+<aside class="w-[256px] min-h-screen bg-ink flex flex-col justify-between shrink-0 select-none">
+<div>
+<!-- Brand & Admin Console Header -->
+<div class="px-6 pt-7 pb-5">
+<div class="text-[15px] font-medium tracking-[0.25em] text-[#F3F0E9] font-sans">
+          S A N C T U S
+        </div>
+<div class="text-[13px] text-[#F3F0E9]/70 mt-1 font-sans">
+          Admin console
+        </div>
+</div>
+<div class="h-[1px] w-full bg-white/10 mb-2"></div>
+<!-- Nav Items -->
+<nav class="space-y-[2px] px-2 py-1">
+<!-- Overview -->
+<a class="h-[40px] px-4 rounded-[2px] flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<rect height="7" rx="1" width="7" x="3" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="14"></rect>
+<rect height="7" rx="1" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- Applications with badge 3 -->
+<a class="h-[40px] px-4 rounded-[2px] flex items-center justify-between text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<div class="flex items-center gap-3">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+<line x1="10" x2="8" y1="9" y2="9"></line>
+</svg>
+<span>Applications</span>
+</div>
+<span class="h-[18px] px-1.5 rounded-[2px] bg-lightbronze text-ink text-[12px] font-medium leading-[18px] flex items-center justify-center">3</span>
+</a>
+<!-- Businesses -->
+<a class="h-[40px] px-4 rounded-[2px] flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<rect height="20" rx="2" width="16" x="4" y="2"></rect>
+<line x1="9" x2="9" y1="22" y2="22.01"></line>
+<line x1="15" x2="15" y1="22" y2="22.01"></line>
+<line x1="9" x2="9" y1="6" y2="6.01"></line>
+<line x1="15" x2="15" y1="6" y2="6.01"></line>
+<line x1="9" x2="9" y1="10" y2="10.01"></line>
+<line x1="15" x2="15" y1="10" y2="10.01"></line>
+<line x1="9" x2="9" y1="14" y2="14.01"></line>
+<line x1="15" x2="15" y1="14" y2="14.01"></line>
+<line x1="9" x2="9" y1="18" y2="18.01"></line>
+<line x1="15" x2="15" y1="18" y2="18.01"></line>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- All Products (Active) -->
+<a class="h-[40px] px-4 rounded-[2px] bg-white/[0.08] relative flex items-center gap-3 text-[14px] font-medium text-[#F3F0E9]" href="#">
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-lightbronze"></div>
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>All Products</span>
+</a>
+<!-- Analytics -->
+<a class="h-[40px] px-4 rounded-[2px] flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- Catalogs & QR Codes -->
+<a class="h-[40px] px-4 rounded-[2px] flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<rect height="3" width="3" x="14" y="14"></rect>
+<rect height="3" width="3" x="18" y="14"></rect>
+<rect height="3" width="3" x="14" y="18"></rect>
+<rect height="3" width="3" x="18" y="18"></rect>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- Team & Access -->
+<a class="h-[40px] px-4 rounded-[2px] flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- Audit log -->
+<a class="h-[40px] px-4 rounded-[2px] flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- Settings -->
+<a class="h-[40px] px-4 rounded-[2px] flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom of Sidebar -->
+<div class="px-2 pb-4">
+<div class="h-[1px] w-full bg-white/10 mb-2"></div>
+<!-- Collapse -->
+<button class="w-full h-[40px] px-4 rounded-[2px] flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</button>
+<!-- User row -->
+<div class="h-[40px] px-4 flex items-center justify-between text-[13px] text-[#F3F0E9]/70">
+<span class="truncate">admin@platform.example</span>
+<button class="text-[#F3F0E9]/70 hover:text-[#F3F0E9] p-1" title="Log out">
+<svg class="w-[16px] h-[16px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- MAIN COLUMN: width 1184px (1440 - 256) -->
+<main class="flex-1 flex flex-col min-w-0 bg-canvas">
+<!-- TOP BAR: 56px, solid #F3F0E9, 1px bottom hairline -->
+<header class="h-[56px] px-10 flex items-center justify-between bg-canvas hairline-b shrink-0">
+<!-- Breadcrumb -->
+<div class="flex items-center gap-1.5 text-[14px]">
+<span class="text-muted">Sanctus Admin</span>
+<span class="text-muted">/</span>
+<span class="text-ink font-medium">All Products</span>
+</div>
+<!-- Demo mode tag -->
+<div class="px-2.5 py-0.5 rounded-[2px] border border-strongline text-[12px] text-muted font-normal">
+        Demo mode
+      </div>
+</header>
+<!-- CONTENT AREA: 40px padding, content width 1104px -->
+<div class="p-10 max-w-[1184px]">
+<div class="w-[1104px] space-y-6">
+<!-- PAGE HEADER: h1 + Single primary action button -->
+<div class="flex items-center justify-between">
+<h1 class="font-serif text-[32px] leading-[1.15] text-ink font-normal">
+            All products
+          </h1>
+<button class="h-[40px] px-4 rounded-[2px] bg-ink text-[#F3F0E9] hover:bg-[#2C2A28] text-[14px] font-medium flex items-center gap-2 transition-colors">
+<svg class="w-[16px] h-[16px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+<span>Add product</span>
+</button>
+</div>
+<!-- MAIN CARD WITH TABLE -->
+<div class="bg-card hairline-border rounded-[2px] overflow-hidden">
+<!-- FILTER ROW INSIDE CARD: 16px 24px, hairline below -->
+<div class="p-6 hairline-b">
+<div class="flex items-end gap-4">
+<!-- Search -->
+<div class="w-[260px]">
+<label class="block text-[13px] font-medium text-bodytext mb-1.5">
+                  Search
+                </label>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted">
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="11" cy="11" r="8"></circle>
+<line x1="21" x2="16.65" y1="21" y2="16.65"></line>
+</svg>
+</span>
+<input class="w-full h-[40px] pl-9 pr-3 rounded-[2px] bg-white hairline-border text-[14px] text-ink placeholder:text-muted focus:outline-none focus:border-ink" placeholder="Search by product name" type="text"/>
+</div>
+</div>
+<!-- Business -->
+<div class="w-[190px]">
+<label class="block text-[13px] font-medium text-bodytext mb-1.5">
+                  Business
+                </label>
+<div class="relative">
+<select class="w-full h-[40px] px-3 pr-8 rounded-[2px] bg-white hairline-border text-[14px] text-ink appearance-none focus:outline-none focus:border-ink cursor-pointer">
+<option>All businesses</option>
+<option>Casa Lisboa Interiors</option>
+<option>Nordhaus Living</option>
+<option>Atelier Verde</option>
+</select>
+<span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted">
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</span>
+</div>
+</div>
+<!-- Status -->
+<div class="w-[150px]">
+<label class="block text-[13px] font-medium text-bodytext mb-1.5">
+                  Status
+                </label>
+<div class="relative">
+<select class="w-full h-[40px] px-3 pr-8 rounded-[2px] bg-white hairline-border text-[14px] text-ink appearance-none focus:outline-none focus:border-ink cursor-pointer">
+<option>All statuses</option>
+<option>Published</option>
+<option>Draft</option>
+</select>
+<span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted">
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</span>
+</div>
+</div>
+<!-- Category -->
+<div class="w-[160px]">
+<label class="block text-[13px] font-medium text-bodytext mb-1.5">
+                  Category
+                </label>
+<div class="relative">
+<select class="w-full h-[40px] px-3 pr-8 rounded-[2px] bg-white hairline-border text-[14px] text-ink appearance-none focus:outline-none focus:border-ink cursor-pointer">
+<option>All categories</option>
+<option>decor</option>
+<option>sofa</option>
+<option>chair</option>
+<option>table</option>
+<option>storage</option>
+</select>
+<span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted">
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</span>
+</div>
+</div>
+<!-- 3D / AR -->
+<div class="w-[170px]">
+<label class="block text-[13px] font-medium text-bodytext mb-1.5">
+                  3D / AR
+                </label>
+<div class="relative">
+<select class="w-full h-[40px] px-3 pr-8 rounded-[2px] bg-white hairline-border text-[14px] text-ink appearance-none focus:outline-none focus:border-ink cursor-pointer">
+<option>All 3D / AR</option>
+<option>Android only</option>
+<option>Android AR blocked</option>
+<option>Photos only</option>
+</select>
+<span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted">
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</span>
+</div>
+</div>
+</div>
+</div>
+<!-- TABLE -->
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="h-[40px] hairline-b text-[13px] font-medium text-muted">
+<th class="w-[32%] px-6 font-medium">Product</th>
+<th class="px-4 font-medium">Business</th>
+<th class="px-4 font-medium text-right">Price</th>
+<th class="px-4 font-medium">Status</th>
+<th class="px-4 font-medium text-right">Views</th>
+<th class="px-4 font-medium text-right">AR attempts</th>
+<th class="px-4 font-medium text-right">
+<div class="inline-flex items-center gap-1">
+<span>Updated</span>
+<svg class="w-3.5 h-3.5 stroke-[1.5] text-muted inline" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</div>
+</th>
+<th class="w-[48px] px-3 font-medium text-center"></th>
+</tr>
+</thead>
+<tbody>
+<!-- ROW 1: Floating Wall Shelves -->
+<tr class="h-[64px] subtle-b hover:bg-[#FAF6EF]/60 transition-colors">
+<td class="px-6 py-2.5">
+<div class="flex items-center gap-3.5">
+<!-- 44px square thumbnail -->
+<img alt="Floating Wall Shelves" class="w-[44px] h-[44px] min-w-[44px] rounded-[2px] hairline-border shrink-0 object-cover block" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAR0szjVXQY_ABc5JuDgcHEzBg2qN-hhAIAYhwlFXrLM1BL9FRkapPeHMOmGoXp5BE_ichcSeq6Uac2Ab1QSXesFIdt1pU5TNhqojrA-9b_BcHUTA9NdHPKt3A--ZAoFan5Rp3AV_IOtd5cCes9a_g2hGYHjnU_DsMgYa5ognEZwxFf5O_Ox8aJSbXLXPvc-cSEH1zXsk19R96K-UDhw2G3nxjvEmHtVNM-EErUhmqD3WMhiozfp6AxNEwyRUBGu2FiDweiVr-UOjG-" style="width: 44px; height: 44px; min-width: 44px; border: 1px solid #D9D3C7; border-radius: 2px; object-fit: cover; display: block;"/>
+<div>
+<div class="text-[14px] font-medium text-ink leading-[18px]">Floating Wall Shelves</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[13px] text-muted">decor</span>
+<span class="h-[20px] px-2 rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium inline-flex items-center">Photos only</span>
+</div>
+</div>
+</div>
+</td>
+<td class="px-4 text-[14px] text-bodytext">Atelier Verde</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">R$790.00</td>
+<td class="px-4">
+<span class="h-[20px] px-2 rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium inline-flex items-center">Draft</span>
+</td>
+<td class="px-4 text-[13px] text-muted text-right tabular-nums">—</td>
+<td class="px-4 text-[13px] text-muted text-right tabular-nums">No 3D</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">24 Oct 2026</td>
+<td class="px-3 text-center">
+<button class="w-[32px] h-[32px] rounded-[2px] hover:bg-subtle text-ink inline-flex items-center justify-center transition-colors">
+<span class="text-[16px] leading-none mb-1">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 2: Linen Two-Seat Sofa -->
+<tr class="h-[64px] subtle-b hover:bg-[#FAF6EF]/60 transition-colors">
+<td class="px-6 py-2.5">
+<div class="flex items-center gap-3.5">
+<img alt="Linen Two-Seat Sofa" class="w-[44px] h-[44px] min-w-[44px] rounded-[2px] hairline-border shrink-0 object-cover block" src="https://lh3.googleusercontent.com/aida/AEtjO1XnjUM4RU4-MWrqkn0GPEJ-SBWb84vK3ubRtKghuDcxY3GHSudeBpdX3L3njV18Cyb9x8-NvLySdu5bI76N7a1tCiLaH-7zUCJ0s2CYLu2FDCyETNFujkCxi2k_2v8AqaPe2h2_w2AJ_Mikh8R8dvwa_u4ARHHvKLyBqSLf9To2mDneT3S42tPdzUH7VqLDxYnNAsBmExrMiEFuZu47j3zkN2UFfq2wJ0741gUBKtsnwJPSMrwcpnkcKe6R" style="width: 44px; height: 44px; min-width: 44px; border: 1px solid #D9D3C7; border-radius: 2px; object-fit: cover; display: block;"/>
+<div>
+<div class="text-[14px] font-medium text-ink leading-[18px]">Linen Two-Seat Sofa</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[13px] text-muted">sofa</span>
+<span class="h-[20px] px-2 rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium inline-flex items-center">Photos only</span>
+</div>
+</div>
+</div>
+</td>
+<td class="px-4 text-[14px] text-bodytext">Nordhaus Living</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">€1,190.00</td>
+<td class="px-4">
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium inline-flex items-center">Published</span>
+</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">296</td>
+<td class="px-4 text-[13px] text-muted text-right tabular-nums">No 3D</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">24 Oct 2026</td>
+<td class="px-3 text-center">
+<button class="w-[32px] h-[32px] rounded-[2px] hover:bg-subtle text-ink inline-flex items-center justify-center transition-colors">
+<span class="text-[16px] leading-none mb-1">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 3: Sheen Lounge Chair -->
+<tr class="h-[64px] subtle-b hover:bg-[#FAF6EF]/60 transition-colors">
+<td class="px-6 py-2.5">
+<div class="flex items-center gap-3.5">
+<img alt="Sheen Lounge Chair" class="w-[44px] h-[44px] min-w-[44px] rounded-[2px] hairline-border shrink-0 object-cover block" src="https://lh3.googleusercontent.com/aida/AEtjO1XBnC2toX4QXPJglZQ0fD_93VQwLmWKbeXGsvPErti6tdl8AsgA4qet5ckuT7ZpOMEe0b_YdM-nBde15ekAAq3dPhWMcXLyy_3VJy04wnP7wpiiX7aViyS3MYog1Zc8M-URzkgbWK0GxWp7EMzF7Hz-0SfzDYT5sVEeoIppheKFWGJuCcmtYFJDe8zoacbhUoJ7fLxfuJTp0Mqadst1a--6hAJk_9Am1OblTF4LL5N6WG8qiaiuX5xZmpR2" style="width: 44px; height: 44px; min-width: 44px; border: 1px solid #D9D3C7; border-radius: 2px; object-fit: cover; display: block;"/>
+<div>
+<div class="text-[14px] font-medium text-ink leading-[18px]">Sheen Lounge Chair</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[13px] text-muted">chair</span>
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5EDF4] text-[#33597A] text-[12px] font-medium inline-flex items-center">Android only</span>
+</div>
+</div>
+</div>
+</td>
+<td class="px-4 text-[14px] text-bodytext">Nordhaus Living</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">€895.00</td>
+<td class="px-4">
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium inline-flex items-center">Published</span>
+</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">498</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">96</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">23 Oct 2026</td>
+<td class="px-3 text-center">
+<button class="w-[32px] h-[32px] rounded-[2px] hover:bg-subtle text-ink inline-flex items-center justify-center transition-colors">
+<span class="text-[16px] leading-none mb-1">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 4: Tejo Side Table -->
+<tr class="h-[64px] subtle-b hover:bg-[#FAF6EF]/60 transition-colors">
+<td class="px-6 py-2.5">
+<div class="flex items-center gap-3.5">
+<img alt="Tejo Side Table" class="w-[44px] h-[44px] min-w-[44px] rounded-[2px] hairline-border shrink-0 object-cover block" src="https://lh3.googleusercontent.com/aida/AEtjO1Vdb2Oick5dVQn_mAvC0Zul3SfPkkW2FND0PNOpCkqX-hocCjnlorokCGLYmbO2zl9bcLNxxCiQ6zSdmx03vA4I-IlwtbQDy5AvTAZv73IkL9khMU8cLQ1qbZweLXb2rVNsgyYEyb8dHH0dfUY6vFNB2ULghuupIsLzDIxA1C6SufJ52kFqg72MWNpVDyRgNkaG0UbNbEH6Zguz6Ri6XVGjWYYsG0Z3O7y6D-etPdFH_EGiul21v1mTRkqC" style="width: 44px; height: 44px; min-width: 44px; border: 1px solid #D9D3C7; border-radius: 2px; object-fit: cover; display: block;"/>
+<div>
+<div class="text-[14px] font-medium text-ink leading-[18px]">Tejo Side Table</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[13px] text-muted">table</span>
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5EDF4] text-[#33597A] text-[12px] font-medium inline-flex items-center">Android only</span>
+</div>
+</div>
+</div>
+</td>
+<td class="px-4 text-[14px] text-bodytext">Casa Lisboa Interiors</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">€189.00</td>
+<td class="px-4">
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium inline-flex items-center">Published</span>
+</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">127</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">63</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">23 Oct 2026</td>
+<td class="px-3 text-center">
+<button class="w-[32px] h-[32px] rounded-[2px] hover:bg-subtle text-ink inline-flex items-center justify-center transition-colors">
+<span class="text-[16px] leading-none mb-1">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 5: Alfama Tall Bookcase -->
+<tr class="h-[64px] subtle-b hover:bg-[#FAF6EF]/60 transition-colors">
+<td class="px-6 py-2.5">
+<div class="flex items-center gap-3.5">
+<img alt="Alfama Tall Bookcase" class="w-[44px] h-[44px] min-w-[44px] rounded-[2px] hairline-border shrink-0 object-cover block" src="https://lh3.googleusercontent.com/aida/AEtjO1XDb0SNvA3mQkRsVmPtrX05oVxmr0sK2yFBbYvXgVjCZ6ocZZi_KZL7XDuLJNBiNmd89q8btuDLcnsIG_kmE98f0vgBnLAUcQCoXsXPn1sJBNj-sAAZRMoElDaRLZmr67NEHkVJAZg-69dqlcBzAUcUEBMDjm9AFgM2ne863l3TKQ5FftlS_NgJb90oZ90IeG9BWtTtoY11JGEB9kDsp8SYybx9AdSPGfppx7zOFV5_9l7OKxXW7ONVttQ" style="width: 44px; height: 44px; min-width: 44px; border: 1px solid #D9D3C7; border-radius: 2px; object-fit: cover; display: block;"/>
+<div>
+<div class="text-[14px] font-medium text-ink leading-[18px]">Alfama Tall Bookcase</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[13px] text-muted">storage</span>
+<span class="h-[20px] px-2 rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium inline-flex items-center">Photos only</span>
+</div>
+</div>
+</div>
+</td>
+<td class="px-4 text-[14px] text-bodytext">Casa Lisboa Interiors</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">€540.00</td>
+<td class="px-4">
+<span class="h-[20px] px-2 rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium inline-flex items-center">Draft</span>
+</td>
+<td class="px-4 text-[13px] text-muted text-right tabular-nums">—</td>
+<td class="px-4 text-[13px] text-muted text-right tabular-nums">No 3D</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">22 Oct 2026</td>
+<td class="px-3 text-center">
+<button class="w-[32px] h-[32px] rounded-[2px] hover:bg-subtle text-ink inline-flex items-center justify-center transition-colors">
+<span class="text-[16px] leading-none mb-1">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 6: Glam Velvet Sofa -->
+<tr class="h-[64px] subtle-b hover:bg-[#FAF6EF]/60 transition-colors">
+<td class="px-6 py-2.5">
+<div class="flex items-center gap-3.5">
+<img alt="Glam Velvet Sofa" class="w-[44px] h-[44px] min-w-[44px] rounded-[2px] hairline-border shrink-0 object-cover block" src="https://lh3.googleusercontent.com/aida/AEtjO1WC3SIGPRYXj8YiKAWCq_v3osyYmldR3WH_V5JzUDChH4ucr60CPtjjk_Y6vCg0YPnfBNI1Y4iGEYRWCoYwzdZn6wRG0zSez0N0BELSlCcKod8xp5xTOPLyjKdI5OuZ7coxqNgad6PU53YpqmWIJFNSWvfAKhI8dOTi1gNyVZR3j0OZ931Xqx_L6ycgPBdFn98UVV8v3-A94Wj8fU1g9dk0QhoalYKuprPeEw1e4VQ2wCJ9erF2r3TDEOgV" style="width: 44px; height: 44px; min-width: 44px; border: 1px solid #D9D3C7; border-radius: 2px; object-fit: cover; display: block;"/>
+<div>
+<div class="text-[14px] font-medium text-ink leading-[18px]">Glam Velvet Sofa</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[13px] text-muted">sofa</span>
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5EDF4] text-[#33597A] text-[12px] font-medium inline-flex items-center">Android only</span>
+</div>
+</div>
+</div>
+</td>
+<td class="px-4 text-[14px] text-bodytext">Casa Lisboa Interiors</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">€1,899.00</td>
+<td class="px-4">
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium inline-flex items-center">Published</span>
+</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">412</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">88</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">21 Oct 2026</td>
+<td class="px-3 text-center">
+<button class="w-[32px] h-[32px] rounded-[2px] hover:bg-subtle text-ink inline-flex items-center justify-center transition-colors">
+<span class="text-[16px] leading-none mb-1">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 7: Alfama Carved Leather Sofa -->
+<tr class="h-[64px] subtle-b hover:bg-[#FAF6EF]/60 transition-colors">
+<td class="px-6 py-2.5">
+<div class="flex items-center gap-3.5">
+<img alt="Alfama Carved Leather Sofa" class="w-[44px] h-[44px] min-w-[44px] rounded-[2px] hairline-border shrink-0 object-cover block" src="https://lh3.googleusercontent.com/aida/AEtjO1VoghBCvIRLWFYopmFBcg3cSPhuKzeZ2OT59PR197ACa2mByJUVN-D5Ed6Ckn5j8O_AG1RaOCXRuPeQf4dIAx-dWeZqaA7hpbxWzkpjK448rTAEOIoFjZ1coPQlUTWlvw2g4xsD53TePK9bgSi3n_iz4CLW-J2iTTyF8Ossq9AO1q-Cq440t0NzNfqUcpmt_lRUqAl52jWKxD6xhRSP6EvVJC7pg_DDk8VuYZg4cnKTYKIcJHcAe2DDNKKT" style="width: 44px; height: 44px; min-width: 44px; border: 1px solid #D9D3C7; border-radius: 2px; object-fit: cover; display: block;"/>
+<div>
+<div class="text-[14px] font-medium text-ink leading-[18px]">Alfama Carved Leather Sofa</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[13px] text-muted">sofa</span>
+<span class="h-[20px] px-2 rounded-[2px] bg-[#F8EEDC] text-[#8F5A0B] text-[12px] font-medium inline-flex items-center">Android AR blocked</span>
+</div>
+</div>
+</div>
+</td>
+<td class="px-4 text-[14px] text-bodytext">Casa Lisboa Interiors</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">€2,490.00</td>
+<td class="px-4">
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium inline-flex items-center">Published</span>
+</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">318</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">61</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">20 Oct 2026</td>
+<td class="px-3 text-center">
+<button class="w-[32px] h-[32px] rounded-[2px] hover:bg-subtle text-ink inline-flex items-center justify-center transition-colors">
+<span class="text-[16px] leading-none mb-1">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 8: Damask Accent Chair -->
+<tr class="h-[64px] hover:bg-[#FAF6EF]/60 transition-colors">
+<td class="px-6 py-2.5">
+<div class="flex items-center gap-3.5">
+<img alt="Damask Accent Chair" class="w-[44px] h-[44px] min-w-[44px] rounded-[2px] hairline-border shrink-0 object-cover block" src="https://lh3.googleusercontent.com/aida/AEtjO1VijpW6wRYT0Pmwia26AlwwG_JAm9u4abtkxFYtY3k75M7eJY1hz9ImPRMekOO77dWpYWvEJoQoYANIhDOuHPMwD1ghO5LwUkXP9aJ80vUTx_v2u7SlqmAOvyQPtMUC9MqpDrs9bIUwWw83rJ7Pcmr9wIN8e8tl3NGt-VvT1wZygBX_s4jcGIVE1aDDuKHMdJG1F2swGnEyt4rxQ6XAeGDYo3utpVL8c1kfYtHHpDHcMndZ_s4cJjq7OFRA" style="width: 44px; height: 44px; min-width: 44px; border: 1px solid #D9D3C7; border-radius: 2px; object-fit: cover; display: block;"/>
+<div>
+<div class="text-[14px] font-medium text-ink leading-[18px]">Damask Accent Chair</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[13px] text-muted">chair</span>
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5EDF4] text-[#33597A] text-[12px] font-medium inline-flex items-center">Android only</span>
+</div>
+</div>
+</div>
+</td>
+<td class="px-4 text-[14px] text-bodytext">Atelier Verde</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">R$2,890.00</td>
+<td class="px-4">
+<span class="h-[20px] px-2 rounded-[2px] bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium inline-flex items-center">Published</span>
+</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">377</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">71</td>
+<td class="px-4 text-[14px] text-bodytext text-right tabular-nums">19 Oct 2026</td>
+<td class="px-3 text-center">
+<button class="w-[32px] h-[32px] rounded-[2px] hover:bg-subtle text-ink inline-flex items-center justify-center transition-colors">
+<span class="text-[16px] leading-none mb-1">⋯</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- FOOTER ROW: hairline above -->
+<div class="px-6 py-4 hairline-t flex items-center justify-between">
+<span class="h-[20px] px-2 rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium inline-flex items-center">
+              Sample data
+            </span>
+<span class="text-[13px] text-muted tabular-nums">
+              Showing 1–20 of 20 products
+            </span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body>
+</html>

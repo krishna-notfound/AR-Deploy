@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dash v2 A – Mobile Team & Access</title>
+  <!-- Google Fonts: Cormorant Garamond 500 & Inter 400, 500, 600 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #F3F0E9;
+      color: #1D1C1A;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-serif {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Exact colors */
+    :root {
+      --canvas: #F3F0E9;
+      --card-surface: #FAF8F3;
+      --subtle: #ECE7DD;
+      --hairline: #D9D3C7;
+      --strong-line: #8A8073;
+      --ink: #1D1C1A;
+      --body-text: #3A352F;
+      --muted: #5A5148;
+      --bronze: #8A765C;
+      --bronze-text: #6E5C45;
+      --soft-bronze: #EAE3D6;
+    }
+    /* Touch target */
+    .touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A5148' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-position: right 12px center;
+      background-repeat: no-repeat;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex justify-center bg-[#F3F0E9]">
+  <!-- 390px Mobile Viewport Container -->
+  <div class="w-[390px] max-w-[390px] min-h-screen bg-[#F3F0E9] flex flex-col antialiased border-x border-[#D9D3C7]">
+
+    <!-- Top Bar (56px, solid #F3F0E9, 1px bottom hairline #D9D3C7) -->
+    <header class="h-[56px] min-h-[56px] bg-[#F3F0E9] border-b border-[#D9D3C7] px-4 flex items-center justify-between sticky top-0 z-30">
+      <div class="flex items-center gap-3">
+        <!-- Hamburger Menu 44px touch target -->
+        <button class="w-[44px] h-[44px] -ml-2 flex items-center justify-center text-[#1D1C1A] hover:bg-[#ECE7DD] rounded-[2px] transition-colors" aria-label="Open navigation menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D1C1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <!-- SANCTUS Wordmark -->
+        <span class="text-[13px] font-medium tracking-[0.22em] text-[#1D1C1A] select-none">S A N C T U S</span>
+      </div>
+
+      <!-- Demo mode tag -->
+      <span class="px-2 py-[2px] border border-[#D9D3C7] text-[#5A5148] text-[12px] font-medium rounded-[2px] leading-tight select-none">
+        Demo mode
+      </span>
+    </header>
+
+    <!-- Main Content (Page padding 16px) -->
+    <main class="p-4 flex flex-col gap-4 flex-1 pb-10">
+
+      <!-- 1. Header Section & Actions -->
+      <section class="flex flex-col gap-2">
+        <h1 class="font-serif text-[28px] leading-[1.15] text-[#1D1C1A] font-normal">Team & Access</h1>
+        <p class="text-[14px] leading-[20px] text-[#5A5148]">Who can use the platform console, and what each role can do.</p>
+
+        <!-- Action Buttons Row (each half width, 44px tall, 2px corners) -->
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <!-- Secondary button "Role permissions" -->
+          <button class="h-[44px] px-3 bg-transparent border border-[#1D1C1A] rounded-[2px] text-[#1D1C1A] text-[14px] font-medium flex items-center justify-center gap-2 hover:bg-[#ECE7DD] transition-colors">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1D1C1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="7.5" cy="15.5" r="5.5"></circle>
+              <path d="m21 2-9.6 9.6"></path>
+              <path d="m15.5 7.5 3 3L22 7l-3-3"></path>
+            </svg>
+            <span>Role permissions</span>
+          </button>
+
+          <!-- Primary button "Invite member" -->
+          <button class="h-[44px] px-3 bg-[#1D1C1A] border border-[#1D1C1A] rounded-[2px] text-[#F3F0E9] text-[14px] font-medium flex items-center justify-center gap-2 hover:bg-[#3A352F] transition-colors">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F3F0E9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="20" height="16" x="2" y="4" rx="0"></rect>
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+              <path d="M19 13v6"></path>
+              <path d="M16 16h6"></path>
+            </svg>
+            <span>Invite member</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Stat card split by 1px dividers into a 2×2 grid -->
+      <section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] overflow-hidden">
+        <div class="grid grid-cols-2 divide-x divide-[#D9D3C7] border-b border-[#D9D3C7]">
+          <!-- Top Left: Active members -->
+          <div class="p-3 flex flex-col gap-1">
+            <span class="text-[13px] font-medium text-[#5A5148]">Active members</span>
+            <span class="text-[24px] font-medium tabular-nums text-[#1D1C1A] leading-tight">3</span>
+            <span class="text-[13px] text-[#5A5148]">Owner included</span>
+          </div>
+          <!-- Top Right: Pending invitations -->
+          <div class="p-3 flex flex-col gap-1">
+            <span class="text-[13px] font-medium text-[#5A5148]">Pending invitations</span>
+            <span class="text-[24px] font-medium tabular-nums text-[#1D1C1A] leading-tight">1</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 divide-x divide-[#D9D3C7] border-b border-[#D9D3C7]">
+          <!-- Bottom Left: Admins -->
+          <div class="p-3 flex flex-col gap-1">
+            <span class="text-[13px] font-medium text-[#5A5148]">Admins</span>
+            <span class="text-[24px] font-medium tabular-nums text-[#1D1C1A] leading-tight">2</span>
+          </div>
+          <!-- Bottom Right: Team -->
+          <div class="p-3 flex flex-col gap-1">
+            <span class="text-[13px] font-medium text-[#5A5148]">Team</span>
+            <span class="text-[24px] font-medium tabular-nums text-[#1D1C1A] leading-tight">2</span>
+          </div>
+        </div>
+        <!-- Card Footer: neutral tag "Sample data" -->
+        <div class="px-3 py-2 bg-[#FAF8F3]">
+          <span class="inline-block px-2 py-[2px] h-[20px] leading-[16px] text-[12px] font-medium text-[#3A352F] bg-[#ECE7DD] rounded-[2px]">
+            Sample data
+          </span>
+        </div>
+      </section>
+
+      <!-- 3. Segmented tabs, full width, 44px tall -->
+      <nav class="h-[44px] min-h-[44px] bg-[#ECE7DD] border border-[#D9D3C7] rounded-[2px] p-[2px] grid grid-cols-3 gap-1 select-none" aria-label="Team sub-sections">
+        <!-- Members 5 (active) -->
+        <button class="h-full bg-[#FAF8F3] border border-[#D9D3C7] text-[#1D1C1A] text-[13px] font-medium rounded-[2px] flex items-center justify-center gap-1.5 transition-colors">
+          <span>Members</span>
+          <span class="tabular-nums">5</span>
+        </button>
+        <!-- Invitations 1 -->
+        <button class="h-full bg-transparent text-[#5A5148] text-[13px] font-medium rounded-[2px] flex items-center justify-center gap-1.5 hover:text-[#1D1C1A] transition-colors">
+          <span>Invitations</span>
+          <span class="tabular-nums">1</span>
+        </button>
+        <!-- Access history -->
+        <button class="h-full bg-transparent text-[#5A5148] text-[13px] font-medium rounded-[2px] flex items-center justify-center hover:text-[#1D1C1A] transition-colors">
+          <span>Access history</span>
+        </button>
+      </nav>
+
+      <!-- 4. Filters Section -->
+      <section class="flex flex-col gap-2.5">
+        <!-- Search field -->
+        <div class="flex flex-col gap-1">
+          <label for="search-members" class="text-[13px] font-medium text-[#5A5148]">Search members</label>
+          <div class="relative flex items-center">
+            <span class="absolute left-3.5 text-[#5A5148] pointer-events-none">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A5148" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <input 
+              id="search-members"
+              type="text" 
+              placeholder="Name or email" 
+              class="w-full h-[44px] pl-9 pr-3 bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] text-[16px] text-[#1D1C1A] placeholder-[#5A5148] focus:outline-none focus:border-[#8A8073] transition-colors"
+            />
+          </div>
+        </div>
+
+        <!-- Role & Status Selects (half-width, 44px) -->
+        <div class="grid grid-cols-2 gap-2">
+          <!-- Role select -->
+          <div class="flex flex-col gap-1">
+            <label for="select-role" class="text-[13px] font-medium text-[#5A5148]">Role</label>
+            <select 
+              id="select-role" 
+              class="w-full h-[44px] px-3 bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] text-[16px] text-[#1D1C1A] focus:outline-none focus:border-[#8A8073] cursor-pointer"
+            >
+              <option>All roles</option>
+              <option>Owner</option>
+              <option>Admin</option>
+              <option>Team</option>
+            </select>
+          </div>
+
+          <!-- Status select -->
+          <div class="flex flex-col gap-1">
+            <label for="select-status" class="text-[13px] font-medium text-[#5A5148]">Status</label>
+            <select 
+              id="select-status" 
+              class="w-full h-[44px] px-3 bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] text-[16px] text-[#1D1C1A] focus:outline-none focus:border-[#8A8073] cursor-pointer"
+            >
+              <option>All statuses</option>
+              <option>Active</option>
+              <option>Invited</option>
+              <option>Deactivated</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Members List inside one bordered card -->
+      <section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] overflow-hidden flex flex-col">
+        
+        <!-- Row 1: Platform Admin (Owner, no ⋯) -->
+        <div class="p-4 flex flex-col gap-2 border-b border-[#D9D3C7]">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <!-- 32px monogram -->
+              <div class="w-[32px] h-[32px] bg-[#ECE7DD] border border-[#D9D3C7] rounded-[2px] flex items-center justify-center text-[12px] font-medium text-[#1D1C1A] select-none">
+                PA
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[15px] font-medium text-[#1D1C1A] leading-tight">Platform Admin</span>
+                <span class="text-[13px] text-[#5A5148] leading-tight">admin@platform.example</span>
+              </div>
+            </div>
+            <!-- No ⋯ button on Owner row as requested -->
+          </div>
+
+          <!-- Pills row: Role + Access -->
+          <div class="flex items-center gap-1.5 pl-[44px]">
+            <!-- Owner pill: #F3F0E9 on #1D1C1A -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#1D1C1A] text-[#F3F0E9] rounded-[2px]">
+              Owner
+            </span>
+            <!-- Active pill: #2F6B4F on #E5F0E9 -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px]">
+              Active
+            </span>
+          </div>
+
+          <!-- Third line: Joined · Last sign-in -->
+          <div class="pl-[44px] text-[13px] text-[#5A5148] tabular-nums leading-tight">
+            Joined 27 Jun 2026 · Last sign-in now
+          </div>
+        </div>
+
+        <!-- Row 2: Ana Ribeiro (Admin, Active) -->
+        <div class="p-4 flex flex-col gap-2 border-b border-[#D9D3C7]">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <!-- 32px monogram -->
+              <div class="w-[32px] h-[32px] bg-[#ECE7DD] border border-[#D9D3C7] rounded-[2px] flex items-center justify-center text-[12px] font-medium text-[#1D1C1A] select-none">
+                AR
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[15px] font-medium text-[#1D1C1A] leading-tight">Ana Ribeiro</span>
+                <span class="text-[13px] text-[#5A5148] leading-tight">ana.ribeiro@sanctus.example</span>
+              </div>
+            </div>
+            <!-- 44px touch target action button -->
+            <button class="w-[44px] h-[44px] -mr-2 -mt-2 flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] hover:bg-[#ECE7DD] rounded-[2px] transition-colors" aria-label="Member options">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Pills row: Role + Access -->
+          <div class="flex items-center gap-1.5 pl-[44px]">
+            <!-- Admin pill: #6E5C45 on #EAE3D6 -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#EAE3D6] text-[#6E5C45] rounded-[2px]">
+              Admin
+            </span>
+            <!-- Active pill: #2F6B4F on #E5F0E9 -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px]">
+              Active
+            </span>
+          </div>
+
+          <!-- Third line: Joined · Last sign-in -->
+          <div class="pl-[44px] text-[13px] text-[#5A5148] tabular-nums leading-tight">
+            Joined 16 Sep 2026 · Last sign-in yesterday
+          </div>
+        </div>
+
+        <!-- Row 3: Pedro Alves (Admin, Deactivated) -->
+        <div class="p-4 flex flex-col gap-2 border-b border-[#D9D3C7]">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <!-- 32px monogram -->
+              <div class="w-[32px] h-[32px] bg-[#ECE7DD] border border-[#D9D3C7] rounded-[2px] flex items-center justify-center text-[12px] font-medium text-[#1D1C1A] select-none">
+                PA
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[15px] font-medium text-[#1D1C1A] leading-tight">Pedro Alves</span>
+                <span class="text-[13px] text-[#5A5148] leading-tight">pedro.alves@sanctus.example</span>
+              </div>
+            </div>
+            <!-- 44px touch target action button -->
+            <button class="w-[44px] h-[44px] -mr-2 -mt-2 flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] hover:bg-[#ECE7DD] rounded-[2px] transition-colors" aria-label="Member options">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Pills row: Role + Access -->
+          <div class="flex items-center gap-1.5 pl-[44px]">
+            <!-- Admin pill: #6E5C45 on #EAE3D6 -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#EAE3D6] text-[#6E5C45] rounded-[2px]">
+              Admin
+            </span>
+            <!-- Deactivated pill: #3A352F on #ECE7DD (neutral/deactivated) -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#ECE7DD] text-[#3A352F] rounded-[2px]">
+              Deactivated
+            </span>
+          </div>
+
+          <!-- Third line: Joined · Last sign-in -->
+          <div class="pl-[44px] text-[13px] text-[#5A5148] tabular-nums leading-tight">
+            Joined 16 Sep 2026 · Last sign-in 9 days ago
+          </div>
+        </div>
+
+        <!-- Row 4: João Costa (Team, Active) -->
+        <div class="p-4 flex flex-col gap-2 border-b border-[#D9D3C7]">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <!-- 32px monogram -->
+              <div class="w-[32px] h-[32px] bg-[#ECE7DD] border border-[#D9D3C7] rounded-[2px] flex items-center justify-center text-[12px] font-medium text-[#1D1C1A] select-none">
+                JC
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[15px] font-medium text-[#1D1C1A] leading-tight">João Costa</span>
+                <span class="text-[13px] text-[#5A5148] leading-tight">joao.costa@sanctus.example</span>
+              </div>
+            </div>
+            <!-- 44px touch target action button -->
+            <button class="w-[44px] h-[44px] -mr-2 -mt-2 flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] hover:bg-[#ECE7DD] rounded-[2px] transition-colors" aria-label="Member options">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Pills row: Role + Access -->
+          <div class="flex items-center gap-1.5 pl-[44px]">
+            <!-- Team pill: #3A352F on #ECE7DD -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#ECE7DD] text-[#3A352F] rounded-[2px]">
+              Team
+            </span>
+            <!-- Active pill: #2F6B4F on #E5F0E9 -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px]">
+              Active
+            </span>
+          </div>
+
+          <!-- Third line: Joined · Last sign-in -->
+          <div class="pl-[44px] text-[13px] text-[#5A5148] tabular-nums leading-tight">
+            Joined 6 Oct 2026 · Last sign-in 3 days ago
+          </div>
+        </div>
+
+        <!-- Row 5: Name not set yet (Team, Invited + Sent) -->
+        <div class="p-4 flex flex-col gap-2">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <!-- 32px monogram -->
+              <div class="w-[32px] h-[32px] bg-[#ECE7DD] border border-[#D9D3C7] rounded-[2px] flex items-center justify-center text-[12px] font-medium text-[#1D1C1A] select-none">
+                ML
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[15px] font-normal text-[#5A5148] italic leading-tight">Name not set yet</span>
+                <span class="text-[13px] text-[#5A5148] leading-tight">marta.lopes@sanctus.example</span>
+              </div>
+            </div>
+            <!-- 44px touch target action button -->
+            <button class="w-[44px] h-[44px] -mr-2 -mt-2 flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] hover:bg-[#ECE7DD] rounded-[2px] transition-colors" aria-label="Member options">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Pills row: Role + Access (Invited + Sent) -->
+          <div class="flex items-center gap-1.5 pl-[44px]">
+            <!-- Team pill: #3A352F on #ECE7DD -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#ECE7DD] text-[#3A352F] rounded-[2px]">
+              Team
+            </span>
+            <!-- Invited pill: info #33597A on #E5EDF4 -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#E5EDF4] text-[#33597A] rounded-[2px]">
+              Invited
+            </span>
+            <!-- Sent pill: info #33597A on #E5EDF4 -->
+            <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-[#E5EDF4] text-[#33597A] rounded-[2px]">
+              Sent
+            </span>
+          </div>
+
+          <!-- Third line: Invited · Last sign-in -->
+          <div class="pl-[44px] text-[13px] text-[#5A5148] tabular-nums leading-tight">
+            Invited 24 Oct 2026 · Last sign-in Never
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 5 members count below list -->
+      <div class="text-[13px] text-[#5A5148] tabular-nums px-1">
+        5 members
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>

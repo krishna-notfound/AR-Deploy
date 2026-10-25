@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 B – Business Overview</title>
+<!-- Google Fonts: Cormorant Garamond (500) and Jost (400, 500) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Jost:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    :root {
+      --canvas: #F3F0E9;
+      --card-surface: #FAF8F3;
+      --subtle: #ECE7DD;
+      --hairline: #D9D3C7;
+      --strong-line: #8A8073;
+      --ink: #1D1C1A;
+      --body-text: #3A352F;
+      --muted: #5A5148;
+      --bronze: #8A765C;
+      --bronze-text: #6E5C45;
+      --soft-bronze: #EAE3D6;
+      --light-bronze: #C9B79B;
+      --sidebar-obsidian: #1D1C1A;
+      --sidebar-chalk: #F3F0E9;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border-radius: 2px !important;
+    }
+
+    body {
+      background-color: var(--canvas);
+      color: var(--body-text);
+      font-family: 'Jost', sans-serif;
+      font-size: 15px;
+      line-height: 22px;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .font-cormorant {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 500;
+    }
+
+    .font-jost {
+      font-family: 'Jost', sans-serif;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Page title */
+    h1.page-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      line-height: 1.15;
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    /* Card and section titles */
+    h2.card-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      line-height: 1.2;
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    /* Standard pill badge */
+    .sanctus-pill {
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 6px;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1;
+      border-radius: 2px;
+    }
+
+    .pill-success {
+      background-color: #E5F0E9;
+      color: #2F6B4F;
+    }
+
+    .pill-warning {
+      background-color: #F8EEDC;
+      color: #8F5A0B;
+    }
+
+    .pill-info {
+      background-color: #E5EDF4;
+      color: #33597A;
+    }
+
+    .pill-danger {
+      background-color: #F8E5E2;
+      color: #A8362A;
+    }
+
+    .pill-neutral {
+      background-color: #ECE7DD;
+      color: #3A352F;
+    }
+
+    /* Custom card definition */
+    .sanctus-card {
+      background-color: var(--card-surface);
+      border: 1px solid var(--hairline);
+      border-radius: 2px;
+      padding: 24px;
+    }
+
+    /* Primary button */
+    .btn-primary {
+      background-color: var(--ink);
+      color: var(--canvas);
+      height: 40px;
+      padding: 0 16px;
+      font-size: 15px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--ink);
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+    .btn-primary:hover {
+      opacity: 0.92;
+    }
+
+    /* Secondary button */
+    .btn-secondary {
+      background-color: transparent;
+      color: var(--ink);
+      height: 40px;
+      padding: 0 16px;
+      font-size: 15px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--ink);
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+    .btn-secondary:hover {
+      background-color: rgba(29, 28, 26, 0.04);
+    }
+  </style>
+</head>
+<body class="flex w-[1440px] min-h-screen mx-auto overflow-x-hidden selection:bg-[#EAE3D6] selection:text-[#1D1C1A]">
+<!-- SHELL: Left sidebar 256px, solid #1D1C1A -->
+<aside class="w-[256px] min-w-[256px] bg-[#1D1C1A] text-[#F3F0E9] flex flex-col justify-between select-none">
+<div>
+<!-- Brand header -->
+<div class="px-6 pt-6 pb-5">
+<div class="text-[15px] font-medium tracking-[0.2em] text-[#F3F0E9]">S A N C T U S</div>
+<div class="text-[14px] text-[#F3F0E9]/70 mt-1">Casa Lisboa Interiors</div>
+</div>
+<!-- Hairline divider: white 10% -->
+<div class="h-[1px] w-full bg-white/10 mb-4"></div>
+<!-- Navigation items -->
+<nav class="flex flex-col gap-1 px-3">
+<!-- Overview (active) -->
+<a class="relative flex items-center h-[40px] px-3 bg-white/[0.08] text-[#F3F0E9] font-medium text-[15px]" href="#overview">
+<!-- Active bar: 2px #C9B79B on left edge -->
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></div>
+<!-- Overview icon (lucide layout-grid, 18px stroke 1.5) -->
+<svg class="w-[18px] h-[18px] mr-3 stroke-[#F3F0E9]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="14" y="14"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- My Products -->
+<a class="flex items-center h-[40px] px-3 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[15px] transition-colors" href="#products">
+<!-- Package / box icon -->
+<svg class="w-[18px] h-[18px] mr-3 stroke-current" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>My Products</span>
+</a>
+<!-- Analytics -->
+<a class="flex items-center h-[40px] px-3 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[15px] transition-colors" href="#analytics">
+<!-- Line chart icon -->
+<svg class="w-[18px] h-[18px] mr-3 stroke-current" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M3 3v18h18"></path>
+<path d="m19 9-5 5-4-4-3 3"></path>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- My Catalog & QR -->
+<a class="flex items-center h-[40px] px-3 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[15px] transition-colors" href="#catalog-qr">
+<!-- QR code / catalog icon -->
+<svg class="w-[18px] h-[18px] mr-3 stroke-current" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="6" width="6" x="3" y="3"></rect>
+<rect height="6" width="6" x="15" y="3"></rect>
+<rect height="6" width="6" x="3" y="15"></rect>
+<path d="M15 15h2v2h-2z"></path>
+<path d="M19 19h2v2h-2z"></path>
+<path d="M19 15h2v2h-2z"></path>
+<path d="M15 19h2v2h-2z"></path>
+</svg>
+<span>My Catalog &amp; QR</span>
+</a>
+<!-- Business Settings -->
+<a class="flex items-center h-[40px] px-3 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[15px] transition-colors" href="#settings">
+<!-- Settings / cog icon -->
+<svg class="w-[18px] h-[18px] mr-3 stroke-current" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Business Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom of sidebar -->
+<div class="px-3 pb-4">
+<!-- Collapse row -->
+<button class="flex items-center w-full h-[40px] px-3 text-[#F3F0E9]/70 hover:text-[#F3F0E9] text-[15px] transition-colors mb-2">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</button>
+<!-- White 10% hairline -->
+<div class="h-[1px] w-full bg-white/10 mb-3"></div>
+<!-- User block with log-out icon button -->
+<div class="flex items-center justify-between px-3 py-1">
+<span class="text-[14px] text-[#F3F0E9]/70 truncate max-w-[170px]" title="owner@casalisboa.example">owner@casalisboa.example</span>
+<button aria-label="Log out" class="text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" title="Log out">
+<!-- Log-out icon -->
+<svg class="w-[18px] h-[18px] stroke-current" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- MAIN COLUMN -->
+<div class="flex-1 flex flex-col min-w-0">
+<!-- Top bar 56px, solid #F3F0E9, 1px bottom hairline #D9D3C7 -->
+<header class="h-[56px] min-h-[56px] bg-[#F3F0E9] border-b border-[#D9D3C7] px-10 flex items-center justify-between">
+<!-- Breadcrumb -->
+<div class="text-[15px]">
+<span class="text-[#5A5148]">Casa Lisboa Interiors</span>
+<span class="text-[#5A5148] mx-2">/</span>
+<span class="text-[#1D1C1A] font-medium">Overview</span>
+</div>
+<!-- Right actions -->
+<div class="flex items-center gap-4">
+<!-- Demo mode outlined tag -->
+<div class="px-2.5 py-0.5 text-[13px] text-[#5A5148] border border-[#8A8073] rounded-[2px] leading-tight">
+          Demo mode
+        </div>
+<!-- View catalog link -->
+<a class="text-[15px] font-medium text-[#1D1C1A] hover:underline flex items-center gap-1" href="#view-catalog">
+<span>View catalog</span>
+<span class="text-[14px]">↗</span>
+</a>
+</div>
+</header>
+<!-- CONTENT AREA: canvas #F3F0E9, 40px padding, content width 1104px -->
+<main class="flex-1 p-10 bg-[#F3F0E9] overflow-y-auto">
+<div class="w-[1104px] mx-auto flex flex-col gap-6">
+<!-- 1. PAGE HEADER -->
+<div class="flex items-end justify-between">
+<div class="flex flex-col gap-1.5">
+<h1 class="page-title">Overview</h1>
+<div class="flex items-center gap-2.5">
+<span class="sanctus-pill pill-success">Active</span>
+<span class="text-[16px] text-[#5A5148]">Casa Lisboa Interiors</span>
+</div>
+</div>
+<!-- Single primary button: Add product -->
+<button class="btn-primary">
+<!-- package-plus icon, 18px stroke 1.5 -->
+<svg class="w-[18px] h-[18px] stroke-current" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M16.5 9.4 7.55 4.24a1.78 1.78 0 0 0-2.5 1.55v8.42a1.78 1.78 0 0 0 .89 1.55l8.95 5.16a1.78 1.78 0 0 0 2.5-1.55V11a1.78 1.78 0 0 0-.89-1.6z"></path>
+<polyline points="3.29 7 12 12 20.71 7"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+<line x1="18" x2="18" y1="3" y2="7"></line>
+<line x1="16" x2="20" y1="5" y2="5"></line>
+</svg>
+<span>Add product</span>
+</button>
+</div>
+<!-- 2. STAT STRIP: ONE card split by 1px vertical dividers into 5 equal columns -->
+<div class="sanctus-card !p-0">
+<div class="grid grid-cols-5 divide-x divide-[#D9D3C7]"><!-- Col 1: Products -->
+<div class="p-6 flex flex-col">
+<div class="text-[14px] font-medium text-[#5A5148]">Products</div>
+<div class="mt-3 mb-2 text-[30px] font-medium text-[#1D1C1A] leading-tight tabular-nums">6</div>
+<div class="text-[14px] text-[#5A5148]">3 with a 3D model</div>
+</div>
+<!-- Col 2: Published -->
+<div class="p-6 flex flex-col">
+<div class="text-[14px] font-medium text-[#5A5148]">Published</div>
+<div class="mt-3 mb-2 text-[30px] font-medium text-[#1D1C1A] leading-tight tabular-nums">5</div>
+<div class="text-[14px] text-[#5A5148]">In your catalog</div>
+</div>
+<!-- Col 3: Drafts -->
+<div class="p-6 flex flex-col">
+<div class="text-[14px] font-medium text-[#5A5148]">Drafts</div>
+<div class="mt-3 mb-2 text-[30px] font-medium text-[#1D1C1A] leading-tight tabular-nums">1</div>
+<div class="text-[14px] text-[#5A5148]">Not published yet</div>
+</div>
+<!-- Col 4: Product page views -->
+<div class="p-6 flex flex-col">
+<div class="text-[14px] font-medium text-[#5A5148]">Product page views</div>
+<div class="mt-3 mb-2 text-[30px] font-medium text-[#1D1C1A] leading-tight tabular-nums">1,284</div>
+<div class="text-[14px] text-[#5A5148]">Last 30 days</div>
+</div>
+<!-- Col 5: AR launch attempts -->
+<div class="p-6 flex flex-col">
+<div class="text-[14px] font-medium text-[#5A5148]">AR launch attempts</div>
+<div class="mt-3 mb-2 text-[30px] font-medium text-[#1D1C1A] leading-tight tabular-nums">212</div>
+<div class="text-[14px] text-[#5A5148]">Last 30 days · 16.5% of views</div>
+</div></div>
+<!-- Footer row inside the same card with a hairline above -->
+<div class="border-t border-[#D9D3C7] px-6 py-3 bg-[#F6F3EC]/50 flex items-center gap-3">
+<span class="sanctus-pill pill-neutral">Sample data</span>
+<span class="text-[14px] text-[#5A5148]">Includes seeded sample data. Not live production analytics.</span>
+</div>
+</div>
+<!-- 3. TWO CARDS SIDE BY SIDE: Left 5/12 "Next steps", Right 7/12 chart -->
+<div class="grid grid-cols-12 gap-6 items-stretch">
+<!-- Left 5/12: Next steps -->
+<div class="col-span-5 sanctus-card flex flex-col justify-between">
+<div>
+<h2 class="card-title mb-4">Next steps</h2>
+<div class="flex flex-col divide-y divide-[#D9D3C7]">
+<!-- Row 1 -->
+<a class="flex items-center justify-between h-[52px] hover:bg-[#F3F0E9]/60 px-1 -mx-1 transition-colors" href="#drafts">
+<div class="flex items-center gap-3">
+<span class="w-[8px] h-[8px] rounded-[2px] bg-[#8F5A0B] flex-shrink-0"></span>
+<span class="text-[15px] text-[#1D1C1A]">1 draft is not published</span>
+</div>
+<!-- chevron-right -->
+<svg class="w-4 h-4 stroke-[#5A5148]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</a>
+<!-- Row 2 -->
+<a class="flex items-center justify-between h-[52px] hover:bg-[#F3F0E9]/60 px-1 -mx-1 transition-colors" href="#missing-3d">
+<div class="flex items-center gap-3">
+<span class="w-[8px] h-[8px] rounded-[2px] bg-[#8F5A0B] flex-shrink-0"></span>
+<span class="text-[15px] text-[#1D1C1A]">3 products have no 3D model (photos only)</span>
+</div>
+<svg class="w-4 h-4 stroke-[#5A5148]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</a>
+<!-- Row 3 -->
+<a class="flex items-center justify-between h-[52px] hover:bg-[#F3F0E9]/60 px-1 -mx-1 transition-colors" href="#android-reexport">
+<div class="flex items-center gap-3">
+<span class="w-[8px] h-[8px] rounded-[2px] bg-[#8F5A0B] flex-shrink-0"></span>
+<span class="text-[15px] text-[#1D1C1A]">1 model needs re-exporting for Android AR</span>
+</div>
+<svg class="w-4 h-4 stroke-[#5A5148]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</a>
+<!-- Row 4 -->
+<a class="flex items-center justify-between h-[52px] hover:bg-[#F3F0E9]/60 px-1 -mx-1 transition-colors" href="#missing-usdz">
+<div class="flex items-center gap-3">
+<span class="w-[8px] h-[8px] rounded-[2px] bg-[#8F5A0B] flex-shrink-0"></span>
+<span class="text-[15px] text-[#1D1C1A]">2 products have no iPhone AR file (USDZ)</span>
+</div>
+<svg class="w-4 h-4 stroke-[#5A5148]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</a>
+</div>
+</div>
+</div>
+<!-- Right 7/12: Views and AR launch attempts chart -->
+<div class="col-span-7 sanctus-card flex flex-col justify-between">
+<div>
+<!-- Header row -->
+<div class="flex items-baseline justify-between mb-2">
+<h2 class="card-title">Views and AR launch attempts</h2>
+<div class="flex items-center gap-3">
+<span class="text-[14px] text-[#5A5148]">Last 30 days</span>
+<a class="text-[15px] font-medium text-[#6E5C45] hover:underline flex items-center gap-1" href="#analytics">
+<span>Open analytics</span>
+<span>→</span>
+</a>
+</div>
+</div>
+<!-- Legend -->
+<div class="flex items-center gap-5 mb-5 text-[14px] text-[#5A5148]">
+<div class="flex items-center gap-2">
+<span class="w-[7px] h-[7px] rounded-[2px] bg-[#1D1C1A]"></span>
+<span>Product page views</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-[7px] h-[7px] rounded-[2px] bg-[#8A765C]"></span>
+<span>AR launch attempts</span>
+</div>
+</div>
+<!-- SVG Line Chart with 30 daily points, no fill, no point markers, 4 gridlines #ECE7DD, Y ticks left -->
+<div class="w-full h-[180px] relative">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 600 180">
+<!-- 4 Horizontal Gridlines #ECE7DD for 60, 40, 20, 0 -->
+<line stroke="#ECE7DD" stroke-width="1" x1="32" x2="600" y1="15" y2="15"></line>
+<line stroke="#ECE7DD" stroke-width="1" x1="32" x2="600" y1="58.33" y2="58.33"></line>
+<line stroke="#ECE7DD" stroke-width="1" x1="32" x2="600" y1="101.66" y2="101.66"></line>
+<line stroke="#ECE7DD" stroke-width="1" x1="32" x2="600" y1="145" y2="145"></line>
+<!-- Y-axis labels left (14px tabular muted) -->
+<text class="tabular-nums" fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="end" x="24" y="19">60</text>
+<text class="tabular-nums" fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="end" x="24" y="62">40</text>
+<text class="tabular-nums" fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="end" x="24" y="105">20</text>
+<text class="tabular-nums" fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="end" x="24" y="148">0</text>
+<!-- Views line #1D1C1A: 2px straight segments, 30 points between 30 and 55 -->
+<polyline fill="none" points="
+                      35,71.3 54.5,67 74,73.5 93.5,69.2 113,64.8 132.5,67 152,62.7 171.5,64.8 
+                      191,60.5 210.5,67 230,58.3 249.5,60.5 269,54 288.5,58.3 308,51.8 327.5,56.2 
+                      347,54 366.5,49.7 386,51.8 405.5,45.3 425,47.5 444.5,43.2 464,45.3 483.5,41 
+                      503,38.8 522.5,41 542,34.5 561.5,36.7 581,30.2 600,28
+                    " stroke="#1D1C1A" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+<!-- AR launch attempts line #8A765C: 2px straight segments, 30 points between 4 and 11 -->
+<polyline fill="none" points="
+                      35,136.3 54.5,134.2 74,136.3 93.5,132 113,134.2 132.5,132 152,129.8 171.5,132 
+                      191,127.7 210.5,129.8 230,127.7 249.5,129.8 269,125.5 288.5,127.7 308,125.5 327.5,123.3 
+                      347,125.5 366.5,121.2 386,123.3 405.5,119 425,121.2 444.5,116.8 464,119 483.5,116.8 
+                      503,114.7 522.5,116.8 542,112.5 561.5,114.7 581,112.5 600,110.3
+                    " stroke="#8A765C" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+<!-- X-axis labels (14px muted): Sep 26, Oct 3, Oct 10, Oct 17, Oct 24 -->
+<text fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="start" x="35" y="172">Sep 26</text>
+<text fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="middle" x="171.5" y="172">Oct 3</text>
+<text fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="middle" x="308" y="172">Oct 10</text>
+<text fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="middle" x="444.5" y="172">Oct 17</text>
+<text fill="#5A5148" font-family="'Jost', sans-serif" font-size="14" text-anchor="end" x="585" y="172">Oct 24</text>
+</svg>
+</div>
+</div>
+</div>
+</div>
+<!-- 4. TWO CARDS SIDE BY SIDE: Left 7/12 "Most viewed products", Right 5/12 "Recent activity" -->
+<div class="grid grid-cols-12 gap-6 items-stretch">
+<!-- Left 7/12: Most viewed products -->
+<div class="col-span-7 sanctus-card flex flex-col justify-between">
+<div>
+<div class="mb-4">
+<h2 class="card-title">Most viewed products</h2>
+<div class="text-[14px] text-[#5A5148] mt-0.5">Product page views, last 30 days</div>
+</div>
+<!-- Ranked list of 5 rows, 64px each, hairline between -->
+<div class="flex flex-col divide-y divide-[#D9D3C7]">
+<!-- Item 1: Glam Velvet Sofa -->
+<div class="flex items-center justify-between h-[64px]">
+<div class="flex items-center gap-4">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-4">1</span>
+<!-- 44px square product photo with 1px border #D9D3C7 -->
+<img alt="Glam Velvet Sofa" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1WC3SIGPRYXj8YiKAWCq_v3osyYmldR3WH_V5JzUDChH4ucr60CPtjjk_Y6vCg0YPnfBNI1Y4iGEYRWCoYwzdZn6wRG0zSez0N0BELSlCcKod8xp5xTOPLyjKdI5OuZ7coxqNgad6PU53YpqmWIJFNSWvfAKhI8dOTi1gNyVZR3j0OZ931Xqx_L6ycgPBdFn98UVV8v3-A94Wj8fU1g9dk0QhoalYKuprPeEw1e4VQ2wCJ9erF2r3TDEOgV"/>
+<div class="flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A]">Glam Velvet Sofa</span>
+<span class="text-[14px] text-[#5A5148]">€1,899</span>
+</div>
+</div>
+<div class="text-right flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A] tabular-nums">412 views</span>
+<span class="text-[14px] text-[#5A5148] tabular-nums">88 AR attempts</span>
+</div>
+</div>
+<!-- Item 2: Wood & Leather Sofa -->
+<div class="flex items-center justify-between h-[64px]">
+<div class="flex items-center gap-4">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-4">2</span>
+<img alt="Wood &amp; Leather Sofa" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VoghBCvIRLWFYopmFBcg3cSPhuKzeZ2OT59PR197ACa2mByJUVN-D5Ed6Ckn5j8O_AG1RaOCXRuPeQf4dIAx-dWeZqaA7hpbxWzkpjK448rTAEOIoFjZ1coPQlUTWlvw2g4xsD53TePK9bgSi3n_iz4CLW-J2iTTyF8Ossq9AO1q-Cq440t0NzNfqUcpmt_lRUqAl52jWKxD6xhRSP6EvVJC7pg_DDk8VuYZg4cnKTYKIcJHcAe2DDNKKT"/>
+<div class="flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A]">Wood &amp; Leather Sofa</span>
+<span class="text-[14px] text-[#5A5148]">€2,490</span>
+</div>
+</div>
+<div class="text-right flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A] tabular-nums">318 views</span>
+<span class="text-[14px] text-[#5A5148] tabular-nums">61 AR attempts</span>
+</div>
+</div>
+<!-- Item 3: Atlantic Round Dining Table -->
+<div class="flex items-center justify-between h-[64px]">
+<div class="flex items-center gap-4">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-4">3</span>
+<img alt="Atlantic Round Dining Table" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VQ15ypp4vqCYV7APHVFoAWrNGv3C_cXvFGntUeU61CHuT2iHJkFTzi8qL_VTVauYBw2SoI_KcsB8zAj0O9RD0x0NMIJn8Ce3EoA8gUsseM16neIetftpbOiNc1bQibUKQ9TX_jF8Zxp8VlSdD_ApMEze0z-1U2JE_OzIpsyjn0mSKw5PA7jOrXeG87lBax9AMtIYjYoEEhA9s0IbKaLYPo6VpN5g3lKPGS1bKyyHGPuIU9FYiUg4JyTkZ-"/>
+<div class="flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A]">Atlantic Round Dining Table</span>
+<span class="text-[14px] text-[#5A5148]">€720</span>
+</div>
+</div>
+<div class="text-right flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A] tabular-nums">241 views</span>
+<span class="text-[14px] text-[#5A5148]">No 3D model</span>
+</div>
+</div>
+<!-- Item 4: Mustard Tufted Armchair -->
+<div class="flex items-center justify-between h-[64px]">
+<div class="flex items-center gap-4">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-4">4</span>
+<img alt="Mustard Tufted Armchair" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VqcIUawrAuSSlybO8F3Qe_ygF9LxXFQSUvvcEhRiID5eZXYRbUBXR0h8azSovsVCtLky-Vw3ggaAoyjWm_e-4vF7HnCbZBbyh_dQDUqMIdTJODaLpdiD_9ndfzWOidSq42e8xITTxvQKwwUw5jVLs8WXYSVj1IzDWTnDSfKcipCVNKFpgzeSheKocwIJtrOiDLhSllaJ3-lV_kc6wI5CsDBB90NqZ7VblHuUv_gr14BADClwX5GRa6whvW"/>
+<div class="flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A]">Mustard Tufted Armchair</span>
+<span class="text-[14px] text-[#5A5148]">€649</span>
+</div>
+</div>
+<div class="text-right flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A] tabular-nums">186 views</span>
+<span class="text-[14px] text-[#5A5148]">No 3D model</span>
+</div>
+</div>
+<!-- Item 5: Tejo Side Table -->
+<div class="flex items-center justify-between h-[64px]">
+<div class="flex items-center gap-4">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-4">5</span>
+<img alt="Tejo Side Table" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1Vdb2Oick5dVQn_mAvC0Zul3SfPkkW2FND0PNOpCkqX-hocCjnlorokCGLYmbO2zl9bcLNxxCiQ6zSdmx03vA4I-IlwtbQDy5AvTAZv73IkL9khMU8cLQ1qbZweLXb2rVNsgyYEyb8dHH0dfUY6vFNB2ULghuupIsLzDIxA1C6SufJ52kFqg72MWNpVDyRgNkaG0UbNbEH6Zguz6Ri6XVGjWYYsG0Z3O7y6D-etPdFH_EGiul21v1mTRkqC"/>
+<div class="flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A]">Tejo Side Table</span>
+<span class="text-[14px] text-[#5A5148]">€189</span>
+</div>
+</div>
+<div class="text-right flex flex-col">
+<span class="text-[15px] font-medium text-[#1D1C1A] tabular-nums">127 views</span>
+<span class="text-[14px] text-[#5A5148] tabular-nums">63 AR attempts</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right 5/12: Recent activity -->
+<div class="col-span-5 sanctus-card flex flex-col justify-between">
+<div>
+<h2 class="card-title mb-4">Recent activity</h2>
+<!-- 5 items, 16px apart, no icons: 15px ink sentence, 14px muted time below -->
+<div class="flex flex-col gap-4">
+<!-- Activity 1 -->
+<div class="flex flex-col">
+<span class="text-[15px] text-[#1D1C1A]">Product “Tejo Side Table” was published</span>
+<span class="text-[14px] text-[#5A5148] mt-0.5">2 days ago</span>
+</div>
+<!-- Activity 2 -->
+<div class="flex flex-col">
+<span class="text-[15px] text-[#1D1C1A]">Product “Alfama Bookcase” was added</span>
+<span class="text-[14px] text-[#5A5148] mt-0.5">3 days ago</span>
+</div>
+<!-- Activity 3 -->
+<div class="flex flex-col">
+<span class="text-[15px] text-[#1D1C1A]">Product “Atlantic Round Dining Table” was published</span>
+<span class="text-[14px] text-[#5A5148] mt-0.5">6 days ago</span>
+</div>
+<!-- Activity 4 -->
+<div class="flex flex-col">
+<span class="text-[15px] text-[#1D1C1A]">Product “Mustard Tufted Armchair” was published</span>
+<span class="text-[14px] text-[#5A5148] mt-0.5">9 days ago</span>
+</div>
+<!-- Activity 5 -->
+<div class="flex flex-col">
+<span class="text-[15px] text-[#1D1C1A]">Product “Wood &amp; Leather Sofa” was published</span>
+<span class="text-[14px] text-[#5A5148] mt-0.5">12 days ago</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body>
+</html>

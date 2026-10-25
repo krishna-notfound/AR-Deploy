@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Public Product Page</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&amp;family=Jost:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    :root {
+      --canvas: #F3F0E9;
+      --surface: #FAF8F3;
+      --subtle: #ECE7DD;
+      --hairline: #D9D3C7;
+      --ink: #1D1C1A;
+      --body: #3A352F;
+      --muted: #5A5148;
+      --bronze: #6E5C45;
+      --success-bg: #E5F0E9;
+      --success-ink: #2F6B4F;
+    }
+
+    body {
+      background-color: var(--canvas);
+      color: var(--body);
+      font-family: 'Jost', sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .font-serif {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 2px radius constraint across all components */
+    .r-2px {
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body class="w-[1440px] min-h-screen mx-auto bg-[#F3F0E9] text-[#3A352F] antialiased">
+<!-- 1. HEADER BAR 80px, solid #F3F0E9, 1px bottom hairline -->
+<header class="w-full h-[80px] bg-[#F3F0E9] border-b border-[#D9D3C7] flex items-center justify-between px-[60px] select-none">
+<div class="flex items-center gap-3">
+<!-- 36px Monogram CL on #7A5C45 -->
+<div class="w-[36px] h-[36px] bg-[#7A5C45] text-[#F3F0E9] r-2px flex items-center justify-center font-serif text-[15px] font-medium tracking-wide">
+        CL
+      </div>
+<span class="font-serif font-medium text-[18px] text-[#1D1C1A] tracking-[0.2em] uppercase">
+        Casa Lisboa Interiors
+      </span>
+</div>
+<!-- Right: EN / PT (PT active) -->
+<div class="text-[13px] tracking-[0.05em] text-[#5A5148] font-normal">
+<span class="hover:text-[#1D1C1A] cursor-pointer">EN</span>
+<span class="mx-1 text-[#D9D3C7]">/</span>
+<span class="font-medium text-[#1D1C1A] underline underline-offset-4 decoration-1">PT</span>
+</div>
+</header>
+<!-- MAIN CONTAINER (1320px content width, 60px side margins) -->
+<main class="w-[1320px] mx-auto px-0 pt-[32px] pb-[72px]">
+<!-- 2. BACK LINK: 32px below header, Jost 14px 500 #5A5148 -->
+<div class="mb-[32px]">
+<a class="inline-flex items-center gap-1.5 text-[14px] font-medium text-[#5A5148] hover:text-[#1D1C1A] transition-colors" href="#catalogo">
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Voltar a Casa Lisboa Interiors</span>
+</a>
+</div>
+<!-- 3. TWO COLUMNS (48px gap: Info ~34% (420px), Stage ~66% (852px)) -->
+<div class="flex items-start gap-[48px]">
+<!-- INFO COLUMN (LEFT ~34% / 420px width) -->
+<section class="w-[420px] flex-shrink-0 flex flex-col">
+<!-- Category Label -->
+<div class="text-[13px] font-medium text-[#6E5C45] tracking-[0.12em] uppercase mb-2">
+          Sofás
+        </div>
+<!-- H1 Product Title: Cormorant Garamond 500, 44px/1.05 -->
+<h1 class="font-serif font-medium text-[44px] leading-[1.05] text-[#1D1C1A] mb-3">
+          Sofá Glam em Veludo
+        </h1>
+<!-- Price: Jost 20px 500 tabular -->
+<div class="text-[20px] font-medium text-[#1D1C1A] tabular-nums mb-3">
+          1899,00 €
+        </div>
+<!-- Short description -->
+<p class="text-[16px] leading-[1.6] text-[#3A352F] mb-6">
+          Sofá curvo em veludo com pés finos de ponta em latão.
+        </p>
+<!-- Finish picker: hairline above, 24px padding -->
+<div class="border-t border-[#D9D3C7] pt-[24px] pb-[24px]">
+<div class="flex items-baseline justify-between mb-3">
+<span class="text-[12px] font-medium text-[#5A5148] tracking-[0.1em] uppercase">
+              Acabamento
+            </span>
+<span class="text-[15px] font-medium text-[#1D1C1A]">
+              Safira
+            </span>
+</div>
+<!-- Swatches (44px square, 2px corners) -->
+<div class="flex items-center gap-3 mb-2.5">
+<!-- Selected Swatch: #1F3F8F with 2px ink ring and 2px gap -->
+<button class="relative w-[44px] h-[44px] r-2px bg-[#1F3F8F] ring-2 ring-[#1D1C1A] ring-offset-2 ring-offset-[#F3F0E9] focus:outline-none" title="Safira (Azul)"></button>
+<!-- Emerald Swatch -->
+<button class="w-[44px] h-[44px] r-2px bg-[#2E5E4E] border border-[#D9D3C7] hover:border-[#1D1C1A] transition-colors focus:outline-none" title="Esmeralda"></button>
+<!-- Dusty Rose Swatch -->
+<button class="w-[44px] h-[44px] r-2px bg-[#C9A0A0] border border-[#D9D3C7] hover:border-[#1D1C1A] transition-colors focus:outline-none" title="Rosa Antigo"></button>
+</div>
+<div class="text-[13px] text-[#5A5148]">
+            Esmeralda e Rosa Antigo: +150,00 €
+          </div>
+</div>
+<!-- Main Button: 52px full width, solid #1D1C1A, text #F3F0E9, Jost 15px 500 -->
+<button class="w-full h-[52px] bg-[#1D1C1A] text-[#F3F0E9] r-2px text-[15px] font-medium flex items-center justify-center gap-2 hover:bg-[#3A352F] transition-colors mb-5">
+<!-- Cube icon thin line -->
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m9-5.25L12 12.75 3 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Visualizar em 3D</span>
+</button>
+<!-- Desktop AR Card (1px border #D9D3C7, bg #FAF8F3, 20px padding) -->
+<div class="border border-[#D9D3C7] bg-[#FAF8F3] r-2px p-[20px] mb-6">
+<div class="text-[15px] font-semibold text-[#1D1C1A] mb-2">
+            Veja no seu espaço com o telemóvel
+          </div>
+<p class="text-[14px] leading-[1.55] text-[#3A352F] mb-4">
+            A RA funciona em iPhones, iPads e telemóveis Android compatíveis. Abra esta página no seu dispositivo móvel.
+          </p>
+<div class="flex items-center gap-2.5">
+<button class="h-[36px] px-3.5 bg-transparent border border-[#D9D3C7] r-2px text-[13px] font-medium text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors flex items-center gap-1.5">
+<svg class="w-3.5 h-3.5 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Copiar link</span>
+</button>
+<button class="h-[36px] px-3.5 bg-transparent border border-[#D9D3C7] r-2px text-[13px] font-medium text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors flex items-center gap-1.5">
+<svg class="w-3.5 h-3.5 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5zM13.5 14.625c0-.621.504-1.125 1.125-1.125h1.5c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5zM18 14.625h1.875c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125H18m0-4.5v4.5m-4.5-1.5h1.5m-1.5 1.5h1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Mostrar código QR</span>
+</button>
+</div>
+</div>
+<!-- Text Actions Row: Jost 14px 500 ink with underline -->
+<div class="flex items-center gap-6 pt-1">
+<a class="text-[14px] font-medium text-[#1D1C1A] underline underline-offset-4 decoration-1 flex items-center gap-1.5 hover:text-[#5A5148]" href="#contacto">
+<span>Contactar vendedor</span>
+<svg class="w-3.5 h-3.5 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<button class="text-[14px] font-medium text-[#1D1C1A] underline underline-offset-4 decoration-1 flex items-center gap-1.5 hover:text-[#5A5148]">
+<span>Partilhar</span>
+<svg class="w-3.5 h-3.5 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</section>
+<!-- STAGE COLUMN (RIGHT ~66% / 852px width) -->
+<section class="flex-1 flex items-start gap-[16px]">
+<div class="flex-1">
+<!-- Framed Stage (1px #D9D3C7 border, #FAF8F3 background) -->
+<div class="border border-[#D9D3C7] bg-[#FAF8F3] r-2px overflow-hidden">
+<!-- Top bar: 44px, hairline below -->
+<div class="h-[44px] px-[16px] border-b border-[#D9D3C7] flex items-center justify-between bg-[#FAF8F3]">
+<div class="flex items-center gap-2.5">
+<span class="w-[6px] h-[6px] rounded-full bg-[#1D1C1A]"></span>
+<span class="text-[12px] font-medium text-[#1D1C1A] tracking-[0.1em] uppercase">
+                  Fotografias
+                </span>
+<span class="w-[1px] h-[14px] bg-[#D9D3C7] mx-1"></span>
+<span class="text-[13px] text-[#5A5148]">
+                  Sofá Glam em Veludo
+                </span>
+</div>
+<!-- Right: small square chip "3D" with 1px border -->
+<div class="w-[26px] h-[26px] border border-[#D9D3C7] r-2px flex items-center justify-center text-[11px] font-medium text-[#1D1C1A] bg-[#F3F0E9]">
+                3D
+              </div>
+</div>
+<!-- Stage area at 5:4 aspect ratio -->
+<div class="relative w-full aspect-[5/4] bg-[#FAF8F3] overflow-hidden flex items-center justify-center">
+<img alt="Sofá Glam em Veludo" class="w-full h-full object-cover select-none" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqX2tGeHvFcknHib8jE3B4UYjJYJ0PE0JfzwwGHqhGZkxi5qO-O9oCW1puJhbhhYQ33iBgI_P6-tMXKpzxjhYJYkSQA1ChqTD8K7pFyW_AQHHsuyKXPiv91VU7dJCqX6sVn5We-UbXBpLiIlWE-cx7Xl7g6ZbgwXkbeBp4jIy3ZBjy2IUew9sCGdvoo7AEs8vCC5pkC428Q8vYeA4NH4_6bRAXR8aU0DoaxWg_5DLKaoCp1-yvwFcc9KAJ7oJddLhclvMrxwpvDDYV"/>
+</div>
+</div>
+<!-- Caption under the stage -->
+<div class="flex items-center justify-between mt-3 px-1 text-[13px]">
+<div class="flex items-center gap-2">
+<span class="text-[12px] font-medium text-[#5A5148] tracking-[0.1em] uppercase">
+                Dimensões
+              </span>
+<span class="text-[14px] text-[#1D1C1A] tabular-nums font-normal">
+                L 219 × P 102 × A 79 cm
+              </span>
+</div>
+</div>
+</div>
+<!-- Narrow vertical rail to the right of stage -->
+<aside class="w-[64px] flex-shrink-0 flex flex-col items-center pt-2">
+<!-- 48px square button with 1px border, cube icon -->
+<button class="w-[48px] h-[48px] border border-[#D9D3C7] bg-[#FAF8F3] r-2px flex items-center justify-center text-[#1D1C1A] hover:bg-[#ECE7DD] hover:border-[#1D1C1A] transition-colors mb-1.5 focus:outline-none" title="Ver em 3D">
+<svg class="w-5 h-5 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m9-5.25L12 12.75 3 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<span class="text-[12px] text-[#5A5148] text-center font-medium leading-tight">
+            Ver em 3D
+          </span>
+</aside>
+</section>
+</div>
+<!-- 4. DETAILS BAND (hairline above, 48px padding) in three columns -->
+<section class="mt-[56px] pt-[48px] border-t border-[#D9D3C7]">
+<div class="grid grid-cols-3 gap-[48px] items-start">
+<!-- Column 1: "Dimensões" Block -->
+<div>
+<!-- Header with label & toggle -->
+<div class="flex items-center justify-between pb-3 border-b border-[#D9D3C7] mb-4">
+<span class="text-[12px] font-medium text-[#5A5148] tracking-[0.1em] uppercase">
+              Dimensões
+            </span>
+<div class="text-[12px] tracking-[0.05em] text-[#5A5148]">
+<span class="font-medium text-[#1D1C1A]">cm</span>
+<span class="mx-1 text-[#D9D3C7]">|</span>
+<span class="hover:text-[#1D1C1A] cursor-pointer">in</span>
+</div>
+</div>
+<!-- Line drawing schematic of a box with dimension arrows -->
+<div class="w-full h-[110px] bg-[#FAF8F3] border border-[#D9D3C7] r-2px p-3 mb-4 flex items-center justify-center">
+<svg class="w-[200px] h-[86px]" fill="none" viewbox="0 0 200 86" xmlns="http://www.w3.org/2000/svg">
+<!-- Isometric/Wireframe furniture block -->
+<rect fill="#ECE7DD" fill-opacity="0.3" height="42" rx="1" stroke="#1D1C1A" stroke-dasharray="0" stroke-width="1.2" width="128" x="36" y="22"></rect>
+<!-- Depth lines -->
+<path d="M36 22 L54 10 L182 10 L164 22" stroke="#5A5148" stroke-dasharray="2 2" stroke-width="1"></path>
+<path d="M182 10 L182 52 L164 64" stroke="#5A5148" stroke-dasharray="2 2" stroke-width="1"></path>
+<!-- Dimension width arrow (bottom) -->
+<line stroke="#6E5C45" stroke-width="1" x1="36" x2="164" y1="74" y2="74"></line>
+<path d="M36 71 L36 77 M164 71 L164 77" stroke="#6E5C45" stroke-width="1"></path>
+<text fill="#6E5C45" font-family="'Jost', sans-serif" font-size="9" font-weight="500" text-anchor="middle" x="100" y="83">219 cm</text>
+<!-- Dimension height arrow (left) -->
+<line stroke="#6E5C45" stroke-width="1" x1="22" x2="22" y1="22" y2="64"></line>
+<path d="M19 22 L25 22 M19 64 L25 64" stroke="#6E5C45" stroke-width="1"></path>
+<text fill="#6E5C45" font-family="'Jost', sans-serif" font-size="9" font-weight="500" text-anchor="end" x="16" y="46">79</text>
+<!-- Dimension depth arrow (top angle) -->
+<line stroke="#6E5C45" stroke-width="1" x1="168" x2="186" y1="20" y2="8"></line>
+<text fill="#6E5C45" font-family="'Jost', sans-serif" font-size="9" font-weight="500" x="184" y="24">102</text>
+</svg>
+</div>
+<!-- Dimension List -->
+<div class="space-y-2 mb-4">
+<div class="flex items-center justify-between text-[14px]">
+<span class="text-[#5A5148]">Largura</span>
+<span class="text-[16px] text-[#1D1C1A] tabular-nums font-normal">219 cm</span>
+</div>
+<div class="flex items-center justify-between text-[14px]">
+<span class="text-[#5A5148]">Altura</span>
+<span class="text-[16px] text-[#1D1C1A] tabular-nums font-normal">79 cm</span>
+</div>
+<div class="flex items-center justify-between text-[14px]">
+<span class="text-[#5A5148]">Profundidade</span>
+<span class="text-[16px] text-[#1D1C1A] tabular-nums font-normal">102 cm</span>
+</div>
+</div>
+<!-- Success Note: #E5F0E9 fill, check icon #2F6B4F -->
+<div class="bg-[#E5F0E9] border border-[#2F6B4F]/20 r-2px p-[14px] flex items-start gap-2.5">
+<div class="w-4 h-4 text-[#2F6B4F] flex-shrink-0 mt-0.5">
+<svg class="w-4 h-4 stroke-[2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4.5 12.75l6 6 9-13.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<div class="text-[14px] font-semibold text-[#2F6B4F] mb-0.5">
+                Modelo à escala real
+              </div>
+<div class="text-[13px] leading-[1.5] text-[#2F6B4F]">
+                O modelo 3D corresponde às dimensões indicadas (margem de 5%, ou 1 cm em peças pequenas), por isso aparece em tamanho real na sua divisão.
+              </div>
+</div>
+</div>
+</div>
+<!-- Column 2: "Material" and "Peso" Rows -->
+<div>
+<div class="space-y-4">
+<div class="py-3 border-b border-[#D9D3C7]">
+<div class="text-[12px] font-medium text-[#5A5148] tracking-[0.1em] uppercase mb-1">
+                Material
+              </div>
+<div class="text-[15px] leading-relaxed text-[#1D1C1A]">
+                Estofo em veludo, estrutura em madeira maciça
+              </div>
+</div>
+<div class="py-3 border-b border-[#D9D3C7]">
+<div class="text-[12px] font-medium text-[#5A5148] tracking-[0.1em] uppercase mb-1">
+                Peso
+              </div>
+<div class="text-[16px] text-[#1D1C1A] tabular-nums">
+                62 kg
+              </div>
+</div>
+</div>
+</div>
+<!-- Column 3: "Sobre esta peça" -->
+<div>
+<div class="pb-3 border-b border-[#D9D3C7] mb-4">
+<span class="text-[12px] font-medium text-[#5A5148] tracking-[0.1em] uppercase">
+              Sobre esta peça
+            </span>
+</div>
+<!-- Paragraph 16px/1.7, max 60 characters per line -->
+<p class="text-[16px] leading-[1.7] text-[#3A352F] max-w-[60ch]">
+            Uma silhueta curva, assento profundo e estofo em veludo macio fazem deste sofá a peça central da sala. Estrutura em madeira maciça seca em estufa e almofadas em espuma de alta resiliência envolta em penas.
+          </p>
+</div>
+</div>
+</section>
+<!-- 5. "MAIS FOTOGRAFIAS" -->
+<section class="mt-[56px] pt-[48px] border-t border-[#D9D3C7]">
+<div class="text-[12px] font-medium text-[#5A5148] tracking-[0.1em] uppercase mb-4">
+        Mais fotografias
+      </div>
+<!-- Two 4:3 photos side by side in 1px frames -->
+<div class="grid grid-cols-2 gap-[24px]">
+<!-- Photo 1: Close-up of velvet cushions -->
+<div class="border border-[#D9D3C7] bg-[#FAF8F3] r-2px overflow-hidden">
+<div class="aspect-[4/3] w-full bg-[#ECE7DD] overflow-hidden">
+<img alt="Pormenor de costura e textura do veludo" class="w-full h-full object-cover select-none" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDU74E-Cuzs9NUHSV8-ZGF8xHfd904VVhU0RUmS9Z50bQtfCSHEsDSjrmfG8Osl8IAtbZnnl05WL55VCRv0jdzrRLoyTFpFv6pDblFPiRzcD1GrkDQoOD-Lomt6cSEquy-ldPjnWDXaHhVBi9aehcT7iQvrW8cksLYRTS_fA2PCTlvDfGP9nrzy5aU9z__Le2NM3GldygmQGATg7ZsfUXbXUUbOTD8uWZ8jw-h237GZmsCO1dc1ffQDB4G-L2irn9aJ0LzX4lnO--Pc"/>
+</div>
+</div>
+<!-- Photo 2: The sofa in a calm grey living room -->
+<div class="border border-[#D9D3C7] bg-[#FAF8F3] r-2px overflow-hidden">
+<div class="aspect-[4/3] w-full bg-[#ECE7DD] overflow-hidden">
+<img alt="O sofá integrado numa sala com luz natural e acabamento mineral" class="w-full h-full object-cover select-none" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7UTw9mrtTEkfp4-xYcRFQtwrwLyTbrPuT0bqSw-BZ4rTIL0lo9TZJMFrwr4B-9NK1uBdk67dVPssGBwGU0MM6ik6mjZdVdM-0cfeIZpqoc2PuhbSEcJgFKkICguo-IpkwuiD4EzKD6edZ38Vs4wOx0UiyxPUnptWHgJHU7lTemAkoZb_SO0wSgDgOZz4Vw44Pqw_mYNqw8CL1yL9EypU50Q7AsAntegD4E-0ztI4plpqlCL7mYx8nNQhEPufuQmFH3iodLztmNa46"/>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- 6. FOOTER: hairline above, 12px muted left, Sanctus tech right -->
+<footer class="w-full border-t border-[#D9D3C7] py-[32px] px-[60px] flex items-center justify-between text-[12px] text-[#5A5148] select-none bg-[#F3F0E9]">
+<div class="tracking-[0.08em] uppercase">
+      © CASA LISBOA INTERIORS
+    </div>
+<div class="flex items-center gap-3">
+<!-- Sanctus wordmark -->
+<span class="font-serif tracking-[0.25em] text-[13px] text-[#1D1C1A] uppercase font-medium">
+        S A N C T U S
+      </span>
+<span class="w-[1px] h-[12px] bg-[#D9D3C7]"></span>
+<span class="text-[13px] text-[#5A5148]">
+        Catálogo com tecnologia Sanctus (demonstração)
+      </span>
+</div>
+</footer>
+</body>
+</html>

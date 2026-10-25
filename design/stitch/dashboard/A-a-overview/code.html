@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<title>Dash v2 A – Admin Overview</title>
+<!-- Google Fonts: Cormorant Garamond (500) and Inter (400, 500, 600) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * {
+    box-sizing: border-box;
+    font-variant-numeric: tabular-nums;
+  }
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #F3F0E9;
+    color: #3A352F;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .font-cormorant {
+    font-family: 'Cormorant Garamond', serif;
+  }
+</style>
+</head>
+<body class="w-[1440px] min-h-screen bg-[#F3F0E9] text-[#3A352F] flex overflow-x-hidden antialiased">
+<!-- ==================== LEFT SIDEBAR (256px, solid #1D1C1A, full height) ==================== -->
+<aside class="w-[256px] min-h-screen bg-[#1D1C1A] text-[#F3F0E9] flex flex-col justify-between shrink-0 select-none">
+<div>
+<!-- Brand & Console Title -->
+<div class="px-6 pt-6 pb-5 border-b border-white/10">
+<div class="text-[15px] font-medium tracking-[0.25em] text-[#F3F0E9]">S A N C T U S</div>
+<div class="text-[13px] text-[#F3F0E9]/70 mt-1">Admin console</div>
+</div>
+<!-- Navigation List -->
+<nav class="mt-3 flex flex-col">
+<!-- 1. Overview (Active) -->
+<a class="relative flex items-center h-[40px] px-6 bg-white/[0.08] text-[#F3F0E9] font-medium text-[14px]" href="#">
+<!-- Active 2px Light Bronze Bar on left edge -->
+<span class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></span>
+<svg class="w-[18px] h-[18px] mr-3 stroke-[#F3F0E9] stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<rect height="7" rx="0.5" width="7" x="3" y="3"></rect>
+<rect height="7" rx="0.5" width="7" x="14" y="3"></rect>
+<rect height="7" rx="0.5" width="7" x="14" y="14"></rect>
+<rect height="7" rx="0.5" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- 2. Applications (with badge count 3) -->
+<a class="flex items-center justify-between h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[14px]" href="#">
+<div class="flex items-center">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+<polyline points="10 9 9 9 8 9"></polyline>
+</svg>
+<span>Applications</span>
+</div>
+<!-- Badge: #1D1C1A text on #C9B79B, 18px tall, 2px corners -->
+<span class="h-[18px] px-1.5 flex items-center justify-center bg-[#C9B79B] text-[#1D1C1A] text-[12px] font-medium rounded-[2px] tabular-nums">3</span>
+</a>
+<!-- 3. Businesses -->
+<a class="flex items-center h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<path d="M3 21h18"></path>
+<path d="M5 21V7l8-4v18"></path>
+<path d="M19 21V11l-6-4"></path>
+<path d="M9 9h1"></path>
+<path d="M9 13h1"></path>
+<path d="M9 17h1"></path>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- 4. All Products -->
+<a class="flex items-center h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>All Products</span>
+</a>
+<!-- 5. Analytics -->
+<a class="flex items-center h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- 6. Catalogs & QR Codes -->
+<a class="flex items-center h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<path d="M14 14h3v3h-3z"></path>
+<path d="M20 14v3"></path>
+<path d="M14 20h6"></path>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- 7. Team & Access -->
+<a class="flex items-center h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- 8. Audit log -->
+<a class="flex items-center h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- 9. Settings -->
+<a class="flex items-center h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom Sidebar Block: Collapse & User info -->
+<div class="pb-5">
+<!-- Collapse row -->
+<a class="flex items-center h-[40px] px-6 text-[#F3F0E9]/70 hover:text-[#F3F0E9] text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</a>
+<!-- User block with log-out button -->
+<div class="px-6 pt-3 mt-1 border-t border-white/10 flex items-center justify-between text-[13px] text-[#F3F0E9]/80">
+<span class="truncate">admin@platform.example</span>
+<button class="text-[#F3F0E9]/70 hover:text-[#F3F0E9] p-1" title="Log out" type="button">
+<svg class="w-4 h-4 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- ==================== MAIN CONTENT WRAPPER ==================== -->
+<div class="flex-1 flex flex-col min-w-0">
+<!-- Top Bar (56px, solid #F3F0E9, 1px bottom hairline) -->
+<header class="h-[56px] bg-[#F3F0E9] border-b border-[#D9D3C7] px-10 flex items-center justify-between shrink-0">
+<div class="text-[14px]">
+<span class="text-[#5A5148]">Sanctus Admin</span>
+<span class="text-[#5A5148] mx-1.5">/</span>
+<span class="text-[#1D1C1A] font-medium">Overview</span>
+</div>
+<div class="px-2.5 py-0.5 text-[12px] text-[#5A5148] border border-[#8A8073] rounded-[2px] leading-tight">
+        Demo mode
+      </div>
+</header>
+<!-- Main Workspace Area: 40px padding, content width 1104px, 24px gap between blocks -->
+<main class="p-10 flex flex-col items-center">
+<div class="w-[1104px] flex flex-col gap-6">
+<!-- 1. PAGE HEADER -->
+<div class="flex items-end justify-between">
+<div>
+<h1 class="font-cormorant text-[32px] font-medium text-[#1D1C1A] leading-[1.15]">Overview</h1>
+<p class="text-[15px] text-[#5A5148] mt-1">Applications, businesses, products and catalog activity across Sanctus.</p>
+</div>
+<!-- Action Buttons: One ghost text, one secondary, ONE primary -->
+<div class="flex items-center gap-3">
+<!-- Ghost text button "View catalogs" (qr-code icon) -->
+<button class="h-[40px] px-3 flex items-center gap-2 text-[14px] font-medium text-[#1D1C1A] hover:bg-[#ECE7DD] rounded-[2px] transition-colors" type="button">
+<svg class="w-4 h-4 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<path d="M14 14h3v3h-3z"></path>
+<path d="M20 14v3"></path>
+<path d="M14 20h6"></path>
+</svg>
+<span>View catalogs</span>
+</button>
+<!-- Secondary button "Add product" -->
+<button class="h-[40px] px-4 flex items-center justify-center text-[14px] font-medium text-[#1D1C1A] border border-[#1D1C1A] rounded-[2px] hover:bg-black/5 transition-colors" type="button">
+              Add product
+            </button>
+<!-- Primary button "Create business" (plus icon) -->
+<button class="h-[40px] px-4 flex items-center justify-center gap-2 text-[14px] font-medium text-[#F3F0E9] bg-[#1D1C1A] rounded-[2px] hover:bg-black transition-colors" type="button">
+<svg class="w-4 h-4 stroke-current stroke-[1.5]" fill="none" viewbox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+<span>Create business</span>
+</button>
+</div>
+</div>
+<!-- 2. APPLICATIONS NOTICE BAND -->
+<div class="w-full bg-[#EAE3D6] border border-[#D9D3C7] rounded-[2px] py-4 px-6 flex items-center justify-between">
+<div>
+<div class="text-[15px] font-medium text-[#1D1C1A] leading-tight">3 applications awaiting review</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight">2 new · 1 under review</div>
+</div>
+<a class="text-[14px] font-medium text-[#6E5C45] hover:text-[#1D1C1A] transition-colors" href="#">
+            Review applications →
+          </a>
+</div>
+<!-- 3. STAT STRIP CARD (6 equal columns separated by 1px vertical dividers, hairline footer inside) -->
+<div class="w-full bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] flex flex-col">
+<div class="grid grid-cols-6 divide-x divide-[#D9D3C7] py-6 px-0">
+<!-- Col 1: Businesses -->
+<div class="px-6 flex flex-col">
+<span class="text-[13px] font-medium text-[#5A5148] leading-tight">Businesses</span>
+<span class="text-[28px] font-medium text-[#1D1C1A] leading-none mt-2.5 mb-1.5 tabular-nums">4</span>
+<span class="text-[13px] text-[#5A5148] leading-tight">3 active</span>
+</div>
+<!-- Col 2: Products -->
+<div class="px-6 flex flex-col">
+<span class="text-[13px] font-medium text-[#5A5148] leading-tight">Products</span>
+<span class="text-[28px] font-medium text-[#1D1C1A] leading-none mt-2.5 mb-1.5 tabular-nums">20</span>
+<span class="text-[13px] text-[#5A5148] leading-tight">8 with a 3D model</span>
+</div>
+<!-- Col 3: Published -->
+<div class="px-6 flex flex-col">
+<span class="text-[13px] font-medium text-[#5A5148] leading-tight">Published</span>
+<span class="text-[28px] font-medium text-[#1D1C1A] leading-none mt-2.5 mb-1.5 tabular-nums">17</span>
+<span class="text-[13px] text-[#5A5148] leading-tight">of 20 products</span>
+</div>
+<!-- Col 4: Drafts -->
+<div class="px-6 flex flex-col">
+<span class="text-[13px] font-medium text-[#5A5148] leading-tight">Drafts</span>
+<span class="text-[28px] font-medium text-[#1D1C1A] leading-none mt-2.5 mb-1.5 tabular-nums">3</span>
+<span class="text-[13px] text-[#5A5148] leading-tight">Not published yet</span>
+</div>
+<!-- Col 5: Product page views -->
+<div class="px-6 flex flex-col">
+<span class="text-[13px] font-medium text-[#5A5148] leading-tight">Product page views</span>
+<span class="text-[28px] font-medium text-[#1D1C1A] leading-none mt-2.5 mb-1.5 tabular-nums">4,862</span>
+<span class="text-[13px] text-[#5A5148] leading-tight">Last 30 days</span>
+</div>
+<!-- Col 6: AR launch attempts -->
+<div class="px-6 flex flex-col">
+<span class="text-[13px] font-medium text-[#5A5148] leading-tight">AR launch attempts</span>
+<span class="text-[28px] font-medium text-[#1D1C1A] leading-none mt-2.5 mb-1.5 tabular-nums">731</span>
+<span class="text-[13px] text-[#5A5148] leading-tight">Last 30 days · 15.0% of views</span>
+</div>
+</div>
+<!-- Stat Card Footer Row -->
+<div class="border-t border-[#D9D3C7] px-6 py-3 bg-[#FAF8F3] flex items-center gap-3">
+<span class="h-[20px] px-2 flex items-center justify-center bg-[#ECE7DD] text-[#3A352F] text-[12px] font-medium rounded-[2px]">
+              Sample data
+            </span>
+<span class="text-[13px] text-[#5A5148]">
+              Views and AR figures are seeded sample data plus visits made in this demo, not live production analytics.
+            </span>
+</div>
+</div>
+<!-- 4. FULL-WIDTH CHART CARD -->
+<div class="w-full bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6 flex flex-col">
+<!-- Card Header -->
+<div class="flex items-start justify-between mb-4">
+<div>
+<h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4]">Product views and AR launch attempts</h2>
+<div class="text-[13px] text-[#5A5148] mt-0.5">All businesses, last 30 days</div>
+</div>
+<a class="text-[14px] font-medium text-[#6E5C45] hover:text-[#1D1C1A] transition-colors" href="#">
+              Open analytics →
+            </a>
+</div>
+<!-- Legend -->
+<div class="flex items-center gap-6 mb-3">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#1D1C1A]"></span>
+<span class="text-[13px] text-[#5A5148]">Product page views</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#8A765C]"></span>
+<span class="text-[13px] text-[#5A5148]">AR launch attempts</span>
+</div>
+</div>
+<!-- SVG Chart Area (220px tall, 30 daily points, two 2px straight lines, 4 gridlines #ECE7DD, y-ticks, x-labels) -->
+<div class="w-full h-[220px] relative">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1056 220">
+<!-- Horizontal Gridlines & Y-labels (ticks at 200, 100, 0)
+                   Plotting area height = 180 (top 15 to 195)
+                   200 => y = 15
+                   100 => y = 105
+                   0   => y = 195
+              -->
+<g stroke="#ECE7DD" stroke-width="1">
+<line x1="36" x2="1056" y1="15" y2="15"></line>
+<line x1="36" x2="1056" y1="75" y2="75"></line>
+<line x1="36" x2="1056" y1="135" y2="135"></line>
+<line x1="36" x2="1056" y1="195" y2="195"></line>
+</g>
+<!-- Y-axis Text labels (tabular numbers) -->
+<text fill="#5A5148" font-family="Inter" font-size="12" text-anchor="start" x="0" y="19">200</text>
+<text fill="#5A5148" font-family="Inter" font-size="12" text-anchor="start" x="0" y="109">100</text>
+<text fill="#5A5148" font-family="Inter" font-size="12" text-anchor="start" x="12" y="198">0</text>
+<!-- Views Line (2px #1D1C1A, between 130 and 190 per day)
+                   Mapping 0-200 -> y = 195 - (val / 200 * 180)
+                   Daily points from i=0 to 29:
+                   x = 36 + i * (1020 / 29)
+              -->
+<polyline fill="none" points="
+                  36,66 71.1,59 106.3,64 141.4,54 176.6,50 211.7,55 246.9,48 282.1,52 317.2,46 352.3,42 
+                  387.5,45 422.6,39 457.8,42 492.9,35 528.1,38 563.2,32 598.4,36 633.6,30 668.7,33 703.9,28 
+                  739,32 774.1,26 809.3,29 844.4,25 879.6,28 914.8,24 949.9,26 985,24 1020.2,25 1056,24
+                " stroke="#1D1C1A" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+<!-- AR Line (2px #8A765C, between 18 and 32 per day)
+                   y = 195 - (val / 200 * 180)
+              -->
+<polyline fill="none" points="
+                  36,177 71.1,175 106.3,176 141.4,173 176.6,171 211.7,172 246.9,170 282.1,169 317.2,168 352.3,167 
+                  387.5,168 422.6,166 457.8,167 492.9,165 528.1,165 563.2,164 598.4,163 633.6,164 668.7,162 703.9,162 
+                  739,163 774.1,161 809.3,161 844.4,160 879.6,160 914.8,159 949.9,158 985,158 1020.2,157 1056,156
+                " stroke="#8A765C" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+</svg>
+<!-- X-axis Labels (Sep 26, Oct 3, Oct 10, Oct 17, Oct 24) placed along bottom -->
+<div class="w-full flex justify-between pl-9 text-[12px] text-[#5A5148] mt-1 select-none">
+<span>Sep 26</span>
+<span>Oct 3</span>
+<span>Oct 10</span>
+<span>Oct 17</span>
+<span>Oct 24</span>
+</div>
+</div>
+</div>
+<!-- 5. TWO CARDS SIDE BY SIDE (7/12 & 5/12, equal height) -->
+<div class="w-full grid grid-cols-12 gap-6 items-stretch">
+<!-- LEFT CARD (7/12): Most viewed products -->
+<div class="col-span-7 bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6 flex flex-col justify-between">
+<div>
+<!-- Header Row -->
+<div class="flex items-start justify-between mb-4">
+<div>
+<h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4]">Most viewed products</h2>
+<div class="text-[13px] text-[#5A5148] mt-0.5">Product page views, last 30 days</div>
+</div>
+<a class="text-[14px] font-medium text-[#6E5C45] hover:text-[#1D1C1A] transition-colors" href="#">
+                  Full ranking →
+                </a>
+</div>
+<!-- Product List (5 rows, 64px, hairline between) -->
+<div class="flex flex-col divide-y divide-[#D9D3C7]">
+<!-- Item 1: Sheen Lounge Chair -->
+<div class="h-[64px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="w-4 text-[13px] text-[#5A5148] tabular-nums text-center">1</span>
+<!-- 44px Square Product Photo -->
+<img alt="Sheen Lounge Chair" class="w-[44px] h-[44px] min-w-[44px] min-h-[44px] object-cover rounded-[2px] border border-[#D9D3C7]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbxB8K8RTSnL_eF5WVTCZpUcMg8Fm1_enhIITgOqu5uPo2maqADWtOinQVuSUisyVED175aGIHws1tFsJyYi5RLWQqxxizfCBfhwcpilwQr0F_RW3jTVR5e_P1fhs2rTDqHVe3947q-YxkYdSoiIMaDiO5_W6iUey0Ph52jpojunhg1G5ewME4xOi48Ia6644eEgo5HhVAamxVGZx6dh_q4ZKmWM_080e4_JyiyHE-KWYKz78_hPcL89wXtcG2SKu1YM7cuxMxCcwq"/>
+<div>
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Sheen Lounge Chair</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight">Nordhaus Living · €895</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight tabular-nums">498 views</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight tabular-nums">96 AR attempts</div>
+</div>
+</div>
+<!-- Item 2: Glam Velvet Sofa -->
+<div class="h-[64px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="w-4 text-[13px] text-[#5A5148] tabular-nums text-center">2</span>
+<!-- 44px Square Product Photo -->
+<img alt="Glam Velvet Sofa" class="w-[44px] h-[44px] min-w-[44px] min-h-[44px] object-cover rounded-[2px] border border-[#D9D3C7]" src="https://lh3.googleusercontent.com/aida/AEtjO1WC3SIGPRYXj8YiKAWCq_v3osyYmldR3WH_V5JzUDChH4ucr60CPtjjk_Y6vCg0YPnfBNI1Y4iGEYRWCoYwzdZn6wRG0zSez0N0BELSlCcKod8xp5xTOPLyjKdI5OuZ7coxqNgad6PU53YpqmWIJFNSWvfAKhI8dOTi1gNyVZR3j0OZ931Xqx_L6ycgPBdFn98UVV8v3-A94Wj8fU1g9dk0QhoalYKuprPeEw1e4VQ2wCJ9erF2r3TDEOgV"/>
+<div>
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Glam Velvet Sofa</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight">Casa Lisboa Interiors · €1,899</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight tabular-nums">412 views</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight tabular-nums">88 AR attempts</div>
+</div>
+</div>
+<!-- Item 3: Damask Accent Chair -->
+<div class="h-[64px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="w-4 text-[13px] text-[#5A5148] tabular-nums text-center">3</span>
+<!-- 44px Square Product Photo -->
+<img alt="Damask Accent Chair" class="w-[44px] h-[44px] min-w-[44px] min-h-[44px] object-cover rounded-[2px] border border-[#D9D3C7]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBesUGJBfT65vdcYabNTqdnKmt9hls3_Y4NlAv7E9EtfIkpXJMRR4Ty-ASY6ta0HvOpwcbYXCJ1cG3NpyRJ57i8jcbg2GiJiMEimN5MIPXoA9NEtbpETCKHFGwSuYcRnsGjXEjV1M-UKlx6bCPekR8rAJfoUjNFWgBPCLffYtU3AqcJwEIm50uCFeDCKaPm0oK96qIuI7LeVp7SdEwvOWnwE2AtXHYghGym894ch6n7MqaYsXNdUo1-Yll7TDxlxypYT3aP8UnUwnep"/>
+<div>
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Damask Accent Chair</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight">Atelier Verde · R$2,890</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight tabular-nums">377 views</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight tabular-nums">71 AR attempts</div>
+</div>
+</div>
+<!-- Item 4: Alfama Carved Leather Sofa -->
+<div class="h-[64px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="w-4 text-[13px] text-[#5A5148] tabular-nums text-center">4</span>
+<!-- 44px Square Product Photo -->
+<img alt="Alfama Carved Leather Sofa" class="w-[44px] h-[44px] min-w-[44px] min-h-[44px] object-cover rounded-[2px] border border-[#D9D3C7]" src="https://lh3.googleusercontent.com/aida/AEtjO1VoghBCvIRLWFYopmFBcg3cSPhuKzeZ2OT59PR197ACa2mByJUVN-D5Ed6Ckn5j8O_AG1RaOCXRuPeQf4dIAx-dWeZqaA7hpbxWzkpjK448rTAEOIoFjZ1coPQlUTWlvw2g4xsD53TePK9bgSi3n_iz4CLW-J2iTTyF8Ossq9AO1q-Cq440t0NzNfqUcpmt_lRUqAl52jWKxD6xhRSP6EvVJC7pg_DDk8VuYZg4cnKTYKIcJHcAe2DDNKKT"/>
+<div>
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Alfama Carved Leather Sofa</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight">Casa Lisboa Interiors · €2,490</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight tabular-nums">318 views</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight tabular-nums">61 AR attempts</div>
+</div>
+</div>
+<!-- Item 5: Linen Two-Seat Sofa -->
+<div class="h-[64px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="w-4 text-[13px] text-[#5A5148] tabular-nums text-center">5</span>
+<!-- 44px Square Product Photo -->
+<img alt="Linen Two-Seat Sofa" class="w-[44px] h-[44px] min-w-[44px] min-h-[44px] object-cover rounded-[2px] border border-[#D9D3C7]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYCrTXCqqaFOyCGQ2orIM7AflltyrLfVuBrDDgCvntoeHFRZDjljcKpjaczkH4axzI0GWY9F3kDuCdGjV5AFJKclz0oFUXGwcSuQqOa5iR7xU_1rtvkEbVA0fRiVD2Nz1nvMjXkzZR-kd7cw6a_ZxWu89vjDwGPVM1nckqxjDpyRmpxfRC7yOTti5bRkiZHzTspgoIqZGQtR54-4FggQXTNxM4WK3ZQqLe7rf0XValB60LosX9ojZx0TQlwrEAQZXbq_UZyCT8trnh"/>
+<div>
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Linen Two-Seat Sofa</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight">Nordhaus Living · €1,190</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight tabular-nums">296 views</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5 leading-tight">No 3D model</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT CARD (5/12): Recent activity -->
+<div class="col-span-5 bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6 flex flex-col justify-between">
+<div>
+<!-- Header Row -->
+<div class="mb-4">
+<h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4]">Recent activity</h2>
+<div class="text-[13px] text-[#5A5148] mt-0.5">Businesses and products</div>
+</div>
+<!-- 5 items, 16px apart, no icons, 14px ink sentence, 13px muted time below -->
+<div class="flex flex-col gap-4">
+<div>
+<div class="text-[14px] text-[#1D1C1A] leading-snug">Product “Floating Wall Shelves” was added</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5">1 day ago</div>
+</div>
+<div>
+<div class="text-[14px] text-[#1D1C1A] leading-snug">Product “Linen Two-Seat Sofa” was published</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5">1 day ago</div>
+</div>
+<div>
+<div class="text-[14px] text-[#1D1C1A] leading-snug">Product “Tejo Side Table” was published</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5">2 days ago</div>
+</div>
+<div>
+<div class="text-[14px] text-[#1D1C1A] leading-snug">Product “Alfama Tall Bookcase” was added</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5">3 days ago</div>
+</div>
+<div>
+<div class="text-[14px] text-[#1D1C1A] leading-snug">Business “Atelier Verde” was created</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5">45 days ago</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

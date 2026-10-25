@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Role permissions</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #F3F0E9;
+      color: #1D1C1A;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-cormorant {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Hairline borders */
+    .border-hairline {
+      border-color: #D9D3C7;
+    }
+    .border-row {
+      border-color: #ECE7DD;
+    }
+  </style>
+</head>
+<body class="w-[1440px] min-h-screen bg-[#F3F0E9] text-[#1D1C1A] flex flex-row selection:bg-[#EAE3D6]">
+<!-- LEFT SIDEBAR: 256px, solid #1D1C1A -->
+<aside class="w-[256px] min-h-screen flex-shrink-0 bg-[#1D1C1A] text-[#F3F0E9] flex flex-col justify-between z-20">
+<div>
+<!-- Brand Header -->
+<div class="px-6 pt-6 pb-5 border-b border-white/10">
+<div class="text-[15px] font-medium tracking-[0.25em] text-[#F3F0E9]">S A N C T U S</div>
+<div class="text-[13px] text-[#F3F0E9]/70 mt-1">Admin console</div>
+</div>
+<!-- Navigation -->
+<nav class="py-4 space-y-0.5">
+<!-- Overview -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<rect height="7" rx="1" width="7" x="3" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="14"></rect>
+<rect height="7" rx="1" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- Applications (with badge 3) -->
+<a class="h-[40px] px-6 flex items-center justify-between text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<div class="flex items-center gap-3">
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+<polyline points="10 9 9 9 8 9"></polyline>
+</svg>
+<span>Applications</span>
+</div>
+<span class="h-[18px] px-1.5 min-w-[18px] flex items-center justify-center text-[12px] font-medium text-[#1D1C1A] bg-[#C9B79B] rounded-[2px] tabular-nums">3</span>
+</a>
+<!-- Businesses -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<rect height="14" rx="2" ry="2" width="20" x="2" y="7"></rect>
+<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- All Products -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>All Products</span>
+</a>
+<!-- Analytics -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- Catalogs & QR Codes -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<line x1="14" x2="14" y1="14" y2="14.01"></line>
+<line x1="17" x2="17" y1="17" y2="17.01"></line>
+<line x1="20" x2="20" y1="20" y2="20.01"></line>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- Team & Access (ACTIVE) -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] font-medium text-[#F3F0E9] bg-white/[0.08] relative" href="#">
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></div>
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- Audit log -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- Settings -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom Sidebar Section -->
+<div class="pb-6 border-t border-white/10">
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[16px] h-[16px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</a>
+<div class="px-6 pt-3 flex items-center justify-between text-[13px] text-[#F3F0E9]/80">
+<span class="truncate">admin@platform.example</span>
+<button class="text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors p-1" title="Log out">
+<svg class="w-[16px] h-[16px] stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- MAIN COLUMN: remaining width (1184px) -->
+<div class="flex-1 flex flex-col min-h-screen relative">
+<!-- TOP BAR: 56px, solid #F3F0E9, 1px bottom hairline -->
+<header class="h-[56px] px-10 bg-[#F3F0E9] border-b border-[#D9D3C7] flex items-center justify-between z-10 flex-shrink-0">
+<!-- Breadcrumb -->
+<nav class="flex items-center space-x-2 text-[14px]">
+<span class="text-[#5A5148]">Sanctus Admin</span>
+<span class="text-[#8A8073]">/</span>
+<a class="text-[#5A5148] hover:text-[#1D1C1A] transition-colors" href="#">Team &amp; Access</a>
+<span class="text-[#8A8073]">/</span>
+<span class="text-[#1D1C1A] font-medium">Role permissions</span>
+</nav>
+<!-- Demo mode tag -->
+<div class="h-[24px] px-2.5 flex items-center text-[12px] text-[#5A5148] border border-[#8A8073] rounded-[2px]">
+        Demo mode
+      </div>
+</header>
+<!-- CONTENT AREA: canvas #F3F0E9, 40px padding, content width 1104px, 24px gaps, extra pb for sticky bar -->
+<main class="p-10 pb-28 max-w-[1184px]">
+<div class="w-[1104px] mx-auto space-y-6">
+<!-- Page Header -->
+<div>
+<h1 class="font-cormorant text-[32px] leading-[1.15] font-medium text-[#1D1C1A]">
+            Role permissions
+          </h1>
+<p class="text-[15px] text-[#5A5148] mt-1">
+            Choose what Admin and Team members can do. The Owner always has every permission.
+          </p>
+</div>
+<!-- CARD 1: Businesses & applications -->
+<section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6 space-y-4">
+<h2 class="text-[16px] font-semibold leading-[1.4] text-[#1D1C1A]">
+            Businesses &amp; applications
+          </h2>
+<div class="w-full">
+<!-- Table Header -->
+<div class="h-[40px] flex items-center border-b border-[#D9D3C7] text-[13px] font-medium text-[#5A5148]">
+<div class="w-[816px] text-left">Permission</div>
+<div class="w-[96px] text-center">Owner</div>
+<div class="w-[96px] text-center">Admin</div>
+<div class="w-[96px] text-center">Team</div>
+</div>
+<!-- Table Rows (each 64px, row rules 1px #ECE7DD) -->
+<div class="divide-y divide-[#ECE7DD]">
+<!-- Row 1: View businesses -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">View businesses</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">See every business, its owner and its catalogue, including drafts.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<!-- Checked Admin -->
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<!-- Checked Team -->
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+</div>
+<!-- Row 2: Create and edit businesses -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Create and edit businesses</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Add businesses and change their details, logo and catalogue address.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<!-- Unchecked Team -->
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+<!-- Row 3: Activate or deactivate businesses -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Activate or deactivate businesses</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Take a catalogue live or offline. Needs “Create and edit businesses”.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+<!-- Row 4: Delete businesses (with warning) -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Delete businesses</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Remove a business for good.</div>
+<div class="mt-1 flex items-center gap-1.5 text-[13px] text-[#8F5A0B] leading-[18px]">
+<svg class="w-3.5 h-3.5 stroke-[1.5] stroke-current fill-none flex-shrink-0" viewbox="0 0 24 24">
+<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+<line x1="12" x2="12" y1="9" y2="13"></line>
+<line x1="12" x2="12.01" y1="17" y2="17"></line>
+</svg>
+<span>Deletes the business, its products and media. This can't be undone.</span>
+</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+<!-- Row 5: Invite and remove business owners -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Invite and remove business owners</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Send owner invitations, resend them and remove an owner.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+<!-- Row 6: View applications -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">View applications</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Read business applications and their email history.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+</div>
+<!-- Row 7: Approve applications -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Approve applications</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Start a review and approve an application, which creates a draft business.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+<!-- Row 8: Reject applications -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Reject applications</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Reject an application with a reason.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- CARD 2: Products & catalogues -->
+<section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6 space-y-4">
+<h2 class="text-[16px] font-semibold leading-[1.4] text-[#1D1C1A]">
+            Products &amp; catalogues
+          </h2>
+<div class="w-full">
+<!-- Table Header -->
+<div class="h-[40px] flex items-center border-b border-[#D9D3C7] text-[13px] font-medium text-[#5A5148]">
+<div class="w-[816px] text-left">Permission</div>
+<div class="w-[96px] text-center">Owner</div>
+<div class="w-[96px] text-center">Admin</div>
+<div class="w-[96px] text-center">Team</div>
+</div>
+<!-- Table Rows -->
+<div class="divide-y divide-[#ECE7DD]">
+<!-- Row 1: View products and catalogues -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">View products and catalogues</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">See every product, including drafts, and the catalogue QR codes.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+</div>
+<!-- Row 2: Create and edit products -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Create and edit products</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Add and change products, photos and 3D models.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+</div>
+<!-- Row 3: Publish and unpublish (CHANGED STATE: Team is checked) -->
+<div class="min-h-[64px] py-2.5 flex items-center bg-[#FAF6EE]/50">
+<div class="w-[816px] pr-6">
+<div class="flex items-center gap-2">
+<span class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Publish and unpublish</span>
+<!-- Subtle unsaved tag indicator -->
+</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Make a product visible in its public catalogue, or hide it.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<!-- Team checkbox is now checked (unsaved change) -->
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center ring-2 ring-[#8F5A0B]/30">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+</div>
+<!-- Row 4: Delete products (with warning) -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">Delete products</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Remove a product for good.</div>
+<div class="mt-1 flex items-center gap-1.5 text-[13px] text-[#8F5A0B] leading-[18px]">
+<svg class="w-3.5 h-3.5 stroke-[1.5] stroke-current fill-none flex-shrink-0" viewbox="0 0 24 24">
+<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+<line x1="12" x2="12" y1="9" y2="13"></line>
+<line x1="12" x2="12.01" y1="17" y2="17"></line>
+</svg>
+<span>Deletes the product and its media. This can't be undone.</span>
+</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- CARD 3: Insight & records -->
+<section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6 space-y-4">
+<h2 class="text-[16px] font-semibold leading-[1.4] text-[#1D1C1A]">
+            Insight &amp; records
+          </h2>
+<div class="w-full">
+<!-- Table Header -->
+<div class="h-[40px] flex items-center border-b border-[#D9D3C7] text-[13px] font-medium text-[#5A5148]">
+<div class="w-[816px] text-left">Permission</div>
+<div class="w-[96px] text-center">Owner</div>
+<div class="w-[96px] text-center">Admin</div>
+<div class="w-[96px] text-center">Team</div>
+</div>
+<!-- Table Rows -->
+<div class="divide-y divide-[#ECE7DD]">
+<!-- Row 1: View analytics -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">View analytics</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Product views and AR launches, across the platform and per business.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+</div>
+<!-- Row 2: View the audit log and email log -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">View the audit log and email log</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Every recorded change and every email the platform sent.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+<!-- Row 3: View access history -->
+<div class="min-h-[64px] py-2.5 flex items-center">
+<div class="w-[816px] pr-6">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-[20px]">View access history</div>
+<div class="text-[13px] text-[#5A5148] leading-[18px]">Invitations, role and permission changes, and refused attempts.</div>
+</div>
+<div class="w-[96px] text-center text-[13px] text-[#5A5148]">All</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] bg-[#1D1C1A] rounded-[2px] flex items-center justify-center">
+<svg class="w-3 h-3 text-white stroke-[2] stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<div class="w-[96px] flex items-center justify-center">
+<div class="w-[18px] h-[18px] border border-[#8A8073] rounded-[2px] bg-transparent"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- STICKY BOTTOM BAR: solid #FAF8F3, 1px top hairline, 64px, across content area (left: 256px to 1440px) -->
+<div class="fixed bottom-0 left-[256px] right-0 h-[64px] bg-[#FAF8F3] border-t border-[#D9D3C7] z-30 flex items-center">
+<div class="w-[1104px] mx-auto flex items-center justify-between">
+<!-- Left status -->
+<div class="flex items-center gap-2 text-[13px] text-[#8F5A0B] font-medium">
+<span class="w-2 h-2 rounded-full bg-[#8F5A0B]"></span>
+<span>1 unsaved change</span>
+</div>
+<!-- Right action buttons -->
+<div class="flex items-center gap-3">
+<!-- Ghost button: Reset to defaults (rotate icon) -->
+<button class="h-[40px] px-3.5 flex items-center gap-2 text-[14px] font-medium text-[#5A5148] hover:text-[#1D1C1A] hover:bg-[#ECE7DD]/50 rounded-[2px] transition-colors">
+<svg class="w-4 h-4 stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+<polyline points="3 3 3 8 8 8"></polyline>
+</svg>
+<span>Reset to defaults</span>
+</button>
+<!-- Secondary button: Cancel -->
+<button class="h-[40px] px-4 flex items-center justify-center text-[14px] font-medium text-[#1D1C1A] bg-transparent border border-[#1D1C1A] rounded-[2px] hover:bg-[#ECE7DD]/40 transition-colors">
+            Cancel
+          </button>
+<!-- Primary button: Save changes (save icon) -->
+<button class="h-[40px] px-5 flex items-center gap-2 text-[14px] font-medium text-[#F3F0E9] bg-[#1D1C1A] rounded-[2px] hover:bg-[#3A352F] transition-colors">
+<svg class="w-4 h-4 stroke-[1.5] stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+<polyline points="17 21 17 13 7 13 7 21"></polyline>
+<polyline points="7 3 7 8 15 8"></polyline>
+</svg>
+<span>Save changes</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

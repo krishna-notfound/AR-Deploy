@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – My Catalog &amp; QR</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            canvas: '#F3F0E9',
+            card: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            'strong-line': '#8A8073',
+            ink: '#1D1C1A',
+            'body-text': '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            'bronze-text': '#6E5C45',
+            'soft-bronze': '#EAE3D6',
+            'light-bronze': '#C9B79B',
+            sidebar: '#1D1C1A',
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F3F0E9;
+      color: #3A352F;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Precise 2px corners constraint */
+    * {
+      border-radius: 0px;
+    }
+    .rounded-2px {
+      border-radius: 2px !important;
+    }
+  </style>
+</head>
+<body class="bg-[#F3F0E9] text-[#3A352F] antialiased min-h-screen">
+<!-- Desktop 1440px container -->
+<div class="w-[1440px] min-h-screen mx-auto flex bg-[#F3F0E9] text-[#3A352F]">
+<!-- LEFT SIDEBAR: 256px, solid #1D1C1A, full height -->
+<aside class="w-[256px] shrink-0 bg-[#1D1C1A] text-[#F3F0E9] flex flex-col justify-between border-r border-[#1D1C1A]">
+<div class="flex flex-col">
+<!-- Brand Header -->
+<div class="px-6 pt-7 pb-6 border-b border-white/10">
+<div class="text-[15px] font-medium tracking-[0.22em] text-[#F3F0E9] uppercase select-none">
+            S A N C T U S
+          </div>
+<div class="text-[13px] text-[#F3F0E9]/70 mt-1.5 font-normal">
+            Casa Lisboa Interiors
+          </div>
+</div>
+<!-- Navigation Menu -->
+<nav class="mt-4 flex flex-col px-0 space-y-0.5">
+<!-- Overview -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="7" rx="0" width="7" x="3" y="3"></rect>
+<rect height="7" rx="0" width="7" x="14" y="3"></rect>
+<rect height="7" rx="0" width="7" x="14" y="14"></rect>
+<rect height="7" rx="0" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- My Products -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>My Products</span>
+</a>
+<!-- Analytics -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- My Catalog & QR (Active) -->
+<a class="h-[40px] px-6 relative flex items-center gap-3 text-[14px] text-[#F3F0E9] font-medium bg-white/[0.08]" href="#">
+<span class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></span>
+<svg class="w-[18px] h-[18px] shrink-0 text-[#C9B79B]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<rect height="3" width="3" x="14" y="14"></rect>
+<line x1="21" x2="21" y1="14" y2="14.01"></line>
+<line x1="21" x2="21" y1="18" y2="21"></line>
+<line x1="18" x2="21" y1="21" y2="21"></line>
+<line x1="17" x2="18" y1="17" y2="17"></line>
+</svg>
+<span>My Catalog &amp; QR</span>
+</a>
+<!-- Business Settings -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors" href="#">
+<svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Business Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom of Sidebar -->
+<div class="flex flex-col border-t border-white/10">
+<!-- Collapse Row -->
+<button class="h-[44px] px-6 flex items-center gap-2.5 text-[13px] text-[#F3F0E9]/60 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</button>
+<!-- User Block -->
+<div class="h-[52px] px-6 flex items-center justify-between border-t border-white/10">
+<span class="text-[13px] text-[#F3F0E9]/70 truncate max-w-[160px]">owner@casalisboa.example</span>
+<button class="text-[#F3F0E9]/60 hover:text-[#F3F0E9] transition-colors p-1" title="Log out">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- RIGHT MAIN WRAPPER: 1184px (1440 - 256) -->
+<main class="flex-1 flex flex-col min-w-0 bg-[#F3F0E9]">
+<!-- TOP BAR: 56px, solid #F3F0E9, 1px bottom hairline -->
+<header class="h-[56px] shrink-0 border-b border-[#D9D3C7] bg-[#F3F0E9] px-10 flex items-center justify-between">
+<!-- Left: Breadcrumb -->
+<nav class="text-[14px] flex items-center gap-1.5">
+<span class="text-[#5A5148]">Casa Lisboa Interiors</span>
+<span class="text-[#8A8073]">/</span>
+<span class="text-[#1D1C1A] font-medium">My Catalog &amp; QR</span>
+</nav>
+<!-- Right: Demo Mode Tag & View Catalog Link -->
+<div class="flex items-center gap-4">
+<span class="inline-flex items-center justify-center h-[24px] px-2.5 text-[12px] text-[#5A5148] border border-[#8A8073] rounded-2px font-medium leading-none">
+            Demo mode
+          </span>
+<a class="text-[14px] font-medium text-[#1D1C1A] hover:text-[#5A5148] flex items-center gap-1 transition-colors" href="#">
+<span>View catalog ↗</span>
+</a>
+</div>
+</header>
+<!-- CONTENT AREA: 40px padding, content width 1104px -->
+<div class="p-10 w-full max-w-[1184px] mx-auto space-y-6">
+<!-- 1. Page Header -->
+<div class="w-full max-w-[1104px]">
+<h1 class="font-serif text-[32px] font-normal leading-[1.15] text-[#1D1C1A]">
+            My catalog &amp; QR code
+          </h1>
+<p class="text-[15px] text-[#5A5148] mt-1.5 leading-normal">
+            Share your catalog link or print the QR code for your showroom, flyers and packaging.
+          </p>
+</div>
+<!-- 2. Split Card: Left flexible (32px padding), Right 320px column on #F3F0E9 with 1px left hairline -->
+<div class="w-full max-w-[1104px] bg-[#FAF8F3] border border-[#D9D3C7] rounded-2px flex items-stretch">
+<!-- LEFT COLUMN: Flexible, 32px padding, compact vertical gap without stretching -->
+<div class="flex-1 p-8 flex flex-col justify-between">
+<div>
+<!-- Section Title with Active Pill -->
+<div class="flex items-center gap-3">
+<h2 class="text-[20px] font-semibold text-[#1D1C1A] leading-[1.4]">
+                  Casa Lisboa Interiors
+                </h2>
+<!-- Pill: 20px tall, 2px corners, #2F6B4F on #E5F0E9 -->
+<span class="inline-flex items-center justify-center h-[20px] px-2 text-[12px] font-medium text-[#2F6B4F] bg-[#E5F0E9] rounded-2px leading-none">
+                  Active
+                </span>
+</div>
+<!-- Catalog URL Section -->
+<div class="mt-6">
+<label class="block text-[13px] font-medium text-[#5A5148] mb-1.5">
+                  Catalog URL
+                </label>
+<!-- URL Box (#F3F0E9, 1px border #D9D3C7, 44px height) -->
+<div class="h-[44px] bg-[#F3F0E9] border border-[#D9D3C7] rounded-2px px-3.5 flex items-center justify-between">
+<span class="text-[14px] text-[#1D1C1A] select-all font-normal truncate mr-2">
+                    https://casa-lisboa.example.com
+                  </span>
+<!-- Copy URL Secondary Button -->
+<button class="h-[30px] px-2.5 flex items-center gap-1.5 text-[13px] font-medium text-[#1D1C1A] border border-[#1D1C1A] rounded-2px hover:bg-[#1D1C1A]/5 transition-colors shrink-0" type="button">
+<svg class="w-3.5 h-3.5 text-[#1D1C1A]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="13" rx="0" width="13" x="9" y="9"></rect>
+<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+</svg>
+<span>Copy URL</span>
+</button>
+</div>
+<!-- 13px muted note -->
+<p class="text-[13px] text-[#5A5148] mt-2 leading-relaxed">
+                  Example address for this demo. Your real address is set up by the platform team.
+                </p>
+</div>
+<!-- Two Secondary Buttons: Open catalog and View products (40px tall) -->
+<div class="mt-6 flex items-center gap-3">
+<button class="h-[40px] px-4 flex items-center gap-2 text-[14px] font-medium text-[#1D1C1A] border border-[#1D1C1A] rounded-2px hover:bg-[#1D1C1A]/5 transition-colors" type="button">
+<svg class="w-4 h-4 text-[#1D1C1A]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+<polyline points="15 3 21 3 21 9"></polyline>
+<line x1="10" x2="21" y1="14" y2="3"></line>
+</svg>
+<span>Open catalog</span>
+</button>
+<button class="h-[40px] px-4 flex items-center gap-2 text-[14px] font-medium text-[#1D1C1A] border border-[#1D1C1A] rounded-2px hover:bg-[#1D1C1A]/5 transition-colors" type="button">
+<svg class="w-4 h-4 text-[#1D1C1A]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>View products</span>
+</button>
+</div>
+</div>
+<!-- Bottom: Hairline rule 24px after action buttons, then two KPI figures -->
+<div class="mt-6 pt-6 border-t border-[#D9D3C7]">
+<div class="grid grid-cols-2 gap-8">
+<!-- Published products -->
+<div>
+<div class="text-[13px] font-medium text-[#5A5148]">
+                    Published products
+                  </div>
+<div class="text-[28px] font-medium text-[#1D1C1A] mt-1 tabular-nums leading-tight">
+                    5
+                  </div>
+</div>
+<!-- All products -->
+<div>
+<div class="text-[13px] font-medium text-[#5A5148]">
+                    All products
+                  </div>
+<div class="text-[28px] font-medium text-[#1D1C1A] mt-1 tabular-nums leading-tight">
+                    6
+                  </div>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: 320px, bg #F3F0E9, 1px left hairline border -->
+<div class="w-[320px] shrink-0 bg-[#F3F0E9] border-l border-[#D9D3C7] p-6 flex flex-col justify-between">
+<div>
+<!-- Real-looking black-and-white QR code, 220px on #FFFFFF square with 1px border #D9D3C7 -->
+<div class="w-[220px] h-[220px] mx-auto bg-white border border-[#D9D3C7] rounded-2px p-3 flex items-center justify-center">
+<!-- High-detail crisp vector QR code pattern representing https://casa-lisboa.example.com -->
+<svg class="w-full h-full text-[#1D1C1A]" fill="currentColor" shape-rendering="crispEdges" viewbox="0 0 148 148">
+<!-- Corner Finder 1: Top-Left -->
+<rect fill="currentColor" height="36" width="36" x="8" y="8"></rect>
+<rect fill="#FFFFFF" height="24" width="24" x="14" y="14"></rect>
+<rect fill="currentColor" height="12" width="12" x="20" y="20"></rect>
+<!-- Corner Finder 2: Top-Right -->
+<rect fill="currentColor" height="36" width="36" x="104" y="8"></rect>
+<rect fill="#FFFFFF" height="24" width="24" x="110" y="14"></rect>
+<rect fill="currentColor" height="12" width="12" x="116" y="20"></rect>
+<!-- Corner Finder 3: Bottom-Left -->
+<rect fill="currentColor" height="36" width="36" x="8" y="104"></rect>
+<rect fill="#FFFFFF" height="24" width="24" x="14" y="110"></rect>
+<rect fill="currentColor" height="12" width="12" x="20" y="116"></rect>
+<!-- Timing Patterns -->
+<rect height="6" width="6" x="48" y="22"></rect>
+<rect height="6" width="6" x="60" y="22"></rect>
+<rect height="6" width="6" x="72" y="22"></rect>
+<rect height="6" width="6" x="84" y="22"></rect>
+<rect height="6" width="6" x="94" y="22"></rect>
+<rect height="6" width="6" x="22" y="48"></rect>
+<rect height="6" width="6" x="22" y="60"></rect>
+<rect height="6" width="6" x="22" y="72"></rect>
+<rect height="6" width="6" x="22" y="84"></rect>
+<rect height="6" width="6" x="22" y="94"></rect>
+<!-- Alignment Pattern in bottom right -->
+<rect height="24" width="24" x="96" y="96"></rect>
+<rect fill="#FFFFFF" height="12" width="12" x="102" y="102"></rect>
+<rect height="4" width="4" x="106" y="106"></rect>
+<!-- Data Modules & Realistic Density -->
+<rect height="8" width="6" x="52" y="10"></rect>
+<rect height="6" width="14" x="64" y="10"></rect>
+<rect height="6" width="10" x="84" y="12"></rect>
+<rect height="12" width="6" x="50" y="32"></rect>
+<rect height="6" width="8" x="62" y="34"></rect>
+<rect height="6" width="12" x="76" y="32"></rect>
+<rect height="12" width="6" x="92" y="34"></rect>
+<rect height="6" width="8" x="10" y="52"></rect>
+<rect height="6" width="10" x="28" y="52"></rect>
+<rect height="14" width="8" x="44" y="50"></rect>
+<rect height="6" width="14" x="56" y="48"></rect>
+<rect height="14" width="6" x="74" y="48"></rect>
+<rect height="6" width="12" x="86" y="54"></rect>
+<rect height="6" width="16" x="104" y="50"></rect>
+<rect height="6" width="12" x="126" y="52"></rect>
+<rect height="12" width="6" x="10" y="64"></rect>
+<rect height="8" width="8" x="28" y="66"></rect>
+<rect height="6" width="14" x="42" y="68"></rect>
+<rect height="14" width="10" x="60" y="60"></rect>
+<rect height="8" width="8" x="78" y="66"></rect>
+<rect height="6" width="14" x="90" y="66"></rect>
+<rect height="12" width="12" x="110" y="62"></rect>
+<rect height="14" width="10" x="128" y="64"></rect>
+<rect height="8" width="10" x="8" y="82"></rect>
+<rect height="6" width="10" x="26" y="80"></rect>
+<rect height="12" width="8" x="40" y="82"></rect>
+<rect height="10" width="12" x="54" y="78"></rect>
+<rect height="12" width="10" x="70" y="80"></rect>
+<rect height="10" width="8" x="86" y="78"></rect>
+<rect height="6" width="14" x="102" y="80"></rect>
+<rect height="6" width="16" x="122" y="82"></rect>
+<rect height="8" width="14" x="48" y="96"></rect>
+<rect height="12" width="8" x="68" y="98"></rect>
+<rect height="14" width="8" x="82" y="96"></rect>
+<rect height="8" width="12" x="126" y="96"></rect>
+<rect height="14" width="8" x="48" y="112"></rect>
+<rect height="8" width="14" x="62" y="116"></rect>
+<rect height="12" width="10" x="80" y="114"></rect>
+<rect height="14" width="14" x="126" y="110"></rect>
+<rect height="8" width="16" x="52" y="130"></rect>
+<rect height="6" width="12" x="74" y="132"></rect>
+<rect height="10" width="14" x="92" y="128"></rect>
+<rect height="8" width="16" x="112" y="130"></rect>
+<rect height="12" width="6" x="134" y="128"></rect>
+</svg>
+</div>
+<!-- Caption 13px muted with a small QR icon -->
+<div class="mt-4 flex items-start gap-2 text-[13px] text-[#5A5148] leading-tight">
+<svg class="w-4 h-4 text-[#8A8073] shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<path d="M14 14h3v3h-3z"></path>
+<path d="M17 17h4v4h-4z"></path>
+</svg>
+<span>Points to the catalog, so it stays valid when products change.</span>
+</div>
+<!-- ONE Primary Button: "Download PNG", full column width (40px tall) -->
+<div class="mt-5">
+<button class="w-full h-[40px] bg-[#1D1C1A] text-[#F3F0E9] rounded-2px text-[14px] font-medium flex items-center justify-center gap-2 hover:bg-[#3A352F] transition-colors" type="button">
+<svg class="w-4 h-4 text-[#F3F0E9]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+<polyline points="7 10 12 15 17 10"></polyline>
+<line x1="12" x2="12" y1="15" y2="3"></line>
+</svg>
+<span>Download PNG</span>
+</button>
+</div>
+</div>
+<!-- Hairline rule, then switch row -->
+<div class="mt-6 pt-5 border-t border-[#D9D3C7]">
+<div class="flex items-start gap-3">
+<!-- 28x16 toggle (off): background #D9D3C7, 2px radius, thumb 12x12 white -->
+<button aria-checked="false" class="w-[28px] h-[16px] bg-[#D9D3C7] rounded-2px shrink-0 mt-0.5 relative p-[2px] transition-colors cursor-pointer" role="switch" type="button">
+<span class="block w-[12px] h-[12px] bg-white rounded-2px shadow-none transition-transform"></span>
+</button>
+<div class="flex-1">
+<span class="block text-[14px] font-medium text-[#1D1C1A] leading-snug">
+                    Encode local preview URL
+                  </span>
+<span class="block text-[13px] text-[#5A5148] mt-1 leading-snug">
+                    For testing on a phone on this network. Leave off for print.
+                  </span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body>
+</html>

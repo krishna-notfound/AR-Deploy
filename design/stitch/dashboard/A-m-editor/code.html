@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Dash v2 A – Mobile Product Editor</title>
+<!-- Google Fonts: Cormorant Garamond (500) and Inter (400, 500, 600) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 CDN with Forms & Container Queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            canvas: '#F3F0E9',
+            card: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            ink: '#1D1C1A',
+            bodytext: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzeText: '#6E5C45',
+            softBronze: '#EAE3D6',
+            warningText: '#8F5A0B',
+            warningBg: '#F8EEDC',
+            dangerText: '#A8362A',
+            dangerBg: '#F8E5E2',
+            successText: '#2F6B4F',
+            successBg: '#E5F0E9',
+          },
+          borderRadius: {
+            'custom': '2px',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="typography">
+    body {
+      font-family: 'Inter', sans-serif;
+      color: #3A352F;
+      background-color: #E5E1D8; /* Background canvas for desktop centering */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .font-cormorant {
+      font-family: 'Cormorant Garamond', serif;
+    }
+    .tnum {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+<style data-purpose="scroll-behavior">
+    /* Utility to hide horizontal scrollbar on section jump row */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="flex justify-center min-h-screen text-[14px] leading-[20px]">
+<!-- Mobile Frame Container (390px fixed width target) -->
+<div class="w-full max-w-[390px] min-h-screen bg-canvas flex flex-col relative overflow-x-hidden border-x border-hairline shadow-none">
+<!-- BEGIN: TopBar -->
+<header class="sticky top-0 z-40 h-[56px] bg-canvas border-b border-hairline px-4 flex items-center justify-between" data-purpose="app-header">
+<!-- Hamburger navigation button (44px touch target) -->
+<button aria-label="Open Navigation" class="w-[44px] h-[44px] -ml-2 flex items-center justify-center text-ink focus:outline-none" type="button">
+<svg fill="none" height="16" stroke="currentColor" stroke-linecap="square" stroke-width="1.5" viewbox="0 0 22 16" width="22">
+<line x1="1" x2="21" y1="1.75" y2="1.75"></line>
+<line x1="1" x2="21" y1="8" y2="8"></line>
+<line x1="1" x2="21" y1="14.25" y2="14.25"></line>
+</svg>
+</button>
+<!-- Sanctuary Brand Wordmark -->
+<div class="font-cormorant text-[13px] tracking-[0.25em] text-ink font-medium select-none">
+        S A N C T U S
+      </div>
+<!-- Catalog External Link -->
+<a class="text-[14px] font-medium text-ink hover:underline flex items-center gap-0.5" href="#catalog">
+        Catalog ↗
+      </a>
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-4 pt-4 pb-36 flex flex-col gap-4" data-purpose="product-editor">
+<!-- BEGIN: TopMetadata -->
+<section class="flex flex-col gap-1" data-purpose="header-metadata">
+<!-- Breadcrumbs -->
+<nav aria-label="Breadcrumb" class="text-[13px] text-muted">
+          My Products <span class="text-muted/60">/</span> Add product
+        </nav>
+<!-- Page Title -->
+<h1 class="font-cormorant text-[28px] leading-[1.15] font-medium text-ink mt-0.5">
+          Add product
+        </h1>
+<!-- Status & Changes indicator -->
+<div class="flex items-center gap-2 mt-1">
+<span class="h-[20px] rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium px-2 inline-flex items-center leading-none">
+            Draft
+          </span>
+<span class="text-[13px] text-warningText font-normal">
+            Unsaved changes
+          </span>
+</div>
+</section>
+<!-- END: TopMetadata -->
+<!-- BEGIN: SectionJumpRow -->
+<nav aria-label="Sections" class="-mx-4 px-4 overflow-x-auto no-scrollbar" data-purpose="section-navigation">
+<div class="flex items-center gap-2 whitespace-nowrap pr-4">
+<!-- Active Chip -->
+<button class="h-[36px] rounded-[2px] px-3 bg-ink text-canvas text-[13px] font-medium flex items-center justify-center" type="button">
+            Basic information
+          </button>
+<!-- Inactive Chips -->
+<button class="h-[36px] rounded-[2px] px-3 bg-card border border-hairline text-ink text-[13px] font-medium flex items-center justify-center" type="button">
+            Images
+          </button>
+<button class="h-[36px] rounded-[2px] px-3 bg-card border border-hairline text-ink text-[13px] font-medium flex items-center justify-center" type="button">
+            3D models
+          </button>
+<button class="h-[36px] rounded-[2px] px-3 bg-card border border-hairline text-ink text-[13px] font-medium flex items-center justify-center" type="button">
+            Dimensions &amp; specs
+          </button>
+<!-- Partially clipped item to indicate scrollability -->
+<button class="h-[36px] rounded-[2px] px-3 bg-card border border-hairline text-ink text-[13px] font-medium flex items-center justify-center" type="button">
+            Call to action
+          </button>
+</div>
+</nav>
+<!-- END: SectionJumpRow -->
+<!-- BEGIN: CardBasicInformation -->
+<section class="bg-card border border-hairline rounded-[2px] p-4 flex flex-col gap-4" data-purpose="basic-information-card">
+<h2 class="text-[16px] leading-[1.4] font-semibold text-ink">
+          Basic information
+        </h2>
+<!-- Field: Product Name -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="text-[14px] font-medium text-ink" for="product-name">
+              Product name <span class="text-[13px] font-normal text-muted ml-1">English · Required</span>
+</label>
+<!-- Language Segmented Control -->
+<div class="flex h-[24px] border border-hairline rounded-[2px] bg-canvas p-[1px] text-[12px] font-medium">
+<span class="px-1.5 bg-card text-ink rounded-[1px] flex items-center">EN</span>
+<span class="px-1.5 text-muted flex items-center">PT</span>
+</div>
+</div>
+<input class="h-[44px] w-full px-3 text-[16px] bg-white border border-hairline rounded-[2px] text-ink focus:outline-none focus:border-ink" id="product-name" type="text" value="Alfama Bookcase"/>
+</div>
+<!-- Field: Product URL -->
+<div class="flex flex-col gap-1.5">
+<label class="text-[14px] font-medium text-ink" for="product-url">
+            Product URL <span class="text-[13px] font-normal text-muted ml-1">Required</span>
+</label>
+<div class="flex h-[44px] rounded-[2px] border border-hairline overflow-hidden focus-within:border-ink">
+<span class="bg-subtle text-muted px-3 text-[14px] flex items-center select-none border-r border-hairline">
+              /products/
+            </span>
+<input class="flex-1 h-full px-3 text-[16px] bg-white border-0 text-ink focus:ring-0 focus:outline-none" id="product-url" type="text" value="alfama-bookcase"/>
+</div>
+<p class="text-[13px] text-muted leading-tight">
+            Demo URL: casa-lisboa.example.com/products/alfama-bookcase
+          </p>
+</div>
+<!-- Field: Short Description -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="text-[14px] font-medium text-ink" for="short-desc">Short description</label>
+<div class="flex h-[24px] border border-hairline rounded-[2px] bg-canvas p-[1px] text-[12px] font-medium"><span class="px-1.5 bg-card text-ink rounded-[1px] flex items-center">EN</span><span class="px-1.5 text-muted flex items-center">PT ·</span></div>
+</div>
+<input class="h-[44px] w-full px-3 text-[16px] bg-white border border-hairline rounded-[2px] text-ink focus:outline-none focus:border-ink" id="short-desc" type="text" value="Open oak bookcase with five shelves."/>
+<p class="text-[13px] text-muted leading-tight">
+            One sentence shown under the price.
+          </p>
+</div>
+<!-- Field: Category -->
+<div class="flex flex-col gap-1.5">
+<label class="text-[14px] font-medium text-ink" for="category-select">
+            Category
+          </label>
+<div class="relative">
+<select class="h-[44px] w-full px-3 text-[16px] bg-white border border-hairline rounded-[2px] text-ink focus:outline-none focus:border-ink appearance-none pr-8" id="category-select">
+<option selected="" value="Storage">Storage</option>
+<option value="Tables">Tables</option>
+<option value="Seating">Seating</option>
+<option value="Lighting">Lighting</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-ink">
+<svg fill="none" height="6" stroke="currentColor" stroke-width="1.5" viewbox="0 0 10 6" width="10">
+<path d="M1 1L5 5L9 1" stroke-linecap="square"></path>
+</svg>
+</div>
+</div>
+</div>
+<!-- Field: Price & Currency -->
+<div class="flex flex-col gap-1.5">
+<div class="grid grid-cols-3 gap-2">
+<div class="col-span-2 flex flex-col gap-1.5">
+<label class="text-[14px] font-medium text-ink" for="price-input">
+                Price
+              </label>
+<input class="tnum h-[44px] w-full px-3 text-[16px] bg-white border border-hairline rounded-[2px] text-ink focus:outline-none focus:border-ink" id="price-input" type="text" value="540.00"/>
+</div>
+<div class="col-span-1 flex flex-col gap-1.5">
+<label class="text-[14px] font-medium text-ink" for="currency-select">
+                Currency
+              </label>
+<div class="relative">
+<select class="h-[44px] w-full px-3 text-[16px] bg-white border border-hairline rounded-[2px] text-ink focus:outline-none focus:border-ink appearance-none" id="currency-select">
+<option selected="" value="EUR">EUR</option>
+<option value="USD">USD</option>
+<option value="GBP">GBP</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-ink">
+<svg fill="none" height="6" stroke="currentColor" stroke-width="1.5" viewbox="0 0 10 6" width="10">
+<path d="M1 1L5 5L9 1" stroke-linecap="square"></path>
+</svg>
+</div>
+</div>
+</div>
+</div>
+<p class="text-[13px] text-muted leading-tight">
+            Required to publish.
+          </p>
+</div>
+</section>
+<!-- END: CardBasicInformation -->
+<!-- BEGIN: CardImages -->
+<section class="bg-card border border-hairline rounded-[2px] p-4 flex flex-col gap-3" data-purpose="product-images-card">
+<div class="flex flex-col gap-0.5">
+<h2 class="text-[16px] leading-[1.4] font-semibold text-ink">
+            Images
+          </h2>
+<p class="text-[13px] text-muted leading-tight">
+            Product photos for the gallery. At least one is required to publish.
+          </p>
+</div>
+<!-- 3-Column Image Grid -->
+<div class="grid grid-cols-3 gap-2 pt-1">
+<!-- Column 1: Primary Image -->
+<div class="relative aspect-square border border-hairline rounded-[2px] overflow-hidden bg-canvas">
+<img alt="Solid natural oak bookcase front view" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1XDb0SNvA3mQkRsVmPtrX05oVxmr0sK2yFBbYvXgVjCZ6ocZZi_KZL7XDuLJNBiNmd89q8btuDLcnsIG_kmE98f0vgBnLAUcQCoXsXPn1sJBNj-sAAZRMoElDaRLZmr67NEHkVJAZg-69dqlcBzAUcUEBMDjm9AFgM2ne863l3TKQ5FftlS_NgJb90oZ90IeG9BWtTtoY11JGEB9kDsp8SYybx9AdSPGfppx7zOFV5_9l7OKxXW7ONVttQ"/>
+<!-- Primary Badge -->
+<span class="absolute bottom-1.5 left-1.5 h-[20px] rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium px-1.5 inline-flex items-center leading-none">
+              Primary
+            </span>
+<!-- Remove Button -->
+<button aria-label="Remove image 1" class="absolute top-1 right-1 w-[32px] h-[32px] flex items-center justify-center bg-card/90 text-ink rounded-[2px] hover:bg-card" type="button">
+<svg height="10" stroke="currentColor" stroke-width="1.5" viewbox="0 0 10 10" width="10">
+<path d="M1 1L9 9M9 1L1 9" stroke-linecap="square"></path>
+</svg>
+</button>
+</div>
+<!-- Column 2: Perspective View -->
+<div class="relative aspect-square border border-hairline rounded-[2px] overflow-hidden bg-canvas">
+<img alt="Solid natural oak bookcase perspective view" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1VMf69iCN23oszlpCVHtYdI3lDvE99Xz450CFNtmYp-ZbUFzcFobmpeazs-YSPjEWtcK86gPWhB6_z7-Q19VJbjU6TWeP1wrXN9-jIOIbHYHzdvW74UqXORYFKR6RTboTJwxp9GG34FNGFziOTodQVvAbF_HZfAhvW6ecv68YHCAhiJCEzNdqoT06mKcJySVyZ6dQwmzYtdSQ1X6rCRdJgG7Nr4-s2gOQfu1ekhJERTybi0iIYplB9DnEiq"/>
+<!-- Remove Button -->
+<button aria-label="Remove image 2" class="absolute top-1 right-1 w-[32px] h-[32px] flex items-center justify-center bg-card/90 text-ink rounded-[2px] hover:bg-card" type="button">
+<svg height="10" stroke="currentColor" stroke-width="1.5" viewbox="0 0 10 10" width="10">
+<path d="M1 1L9 9M9 1L1 9" stroke-linecap="square"></path>
+</svg>
+</button>
+</div>
+<!-- Column 3: Joinery Detail View -->
+<div class="relative aspect-square border border-hairline rounded-[2px] overflow-hidden bg-canvas">
+<img alt="Bookcase corner joinery wood grain close-up" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1VDJhoHKete8QkoeE_6MCjwYoUigj3hed32X3nvmhgnHlovSCFsnJ8y2KT0p3HWLADSlU2z_zw5Xii4HnDSTSxBUGd8ZOHynlW5FKTkVEmhjPXKbgviT6BTt-DDpI8Hh7VrYwgeQ5KkCn80XvjUvFWbHiONuPmdX6oPhtIV_r26N2JmvN5Tdm2Cl6f-ZPqoYti0n4K7SPOyiqCa8O1gdgFLYZSk0uoWyBmo8X64O1-UsVQj7Ik0A_ynCh7G"/>
+<!-- Remove Button -->
+<button aria-label="Remove image 3" class="absolute top-1 right-1 w-[32px] h-[32px] flex items-center justify-center bg-card/90 text-ink rounded-[2px] hover:bg-card" type="button">
+<svg height="10" stroke="currentColor" stroke-width="1.5" viewbox="0 0 10 10" width="10">
+<path d="M1 1L9 9M9 1L1 9" stroke-linecap="square"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Add Images Dashed Upload Target -->
+<button class="w-full h-[64px] border border-dashed border-hairline rounded-[2px] bg-canvas/30 hover:bg-canvas flex items-center justify-center gap-2 text-[14px] font-medium text-ink transition-colors mt-1" type="button"><svg fill="none" height="16" stroke="currentColor" stroke-width="1.5" viewbox="0 0 16 16" width="16"><path d="M8 3V13M3 8H13" stroke-linecap="square"></path></svg> Add images</button>
+</section>
+<!-- END: CardImages -->
+<!-- BEGIN: Card3DModels -->
+<section class="bg-card border border-hairline rounded-[2px] p-4 flex flex-col gap-3" data-purpose="3d-models-card">
+<div class="flex flex-col gap-0.5">
+<h2 class="text-[16px] leading-[1.4] font-semibold text-ink">
+            3D models
+          </h2>
+<p class="text-[13px] text-muted leading-tight">
+            Optional. Products without a model show photos only.
+          </p>
+</div>
+<!-- GLB Model Section -->
+<div class="flex flex-col gap-2 pt-1">
+<div class="flex items-center justify-between">
+<span class="text-[14px] font-medium text-ink">GLB model</span>
+<!-- Segmented Control for Upload / URL -->
+<div class="flex h-[24px] border border-hairline rounded-[2px] bg-canvas p-[1px] text-[12px] font-medium">
+<span class="px-2 bg-card text-ink rounded-[1px] flex items-center">Uploaded file</span>
+<span class="px-2 text-muted flex items-center">Remote URL</span>
+</div>
+</div>
+<!-- File Uploaded Box -->
+<div class="border border-hairline bg-white rounded-[2px] p-3 flex flex-col gap-1.5">
+<!-- Row 1: File icon + Metadata -->
+<div class="flex items-center gap-2 text-ink">
+<svg class="shrink-0 text-muted" fill="none" height="16" stroke="currentColor" stroke-width="1.5" viewbox="0 0 16 16" width="16">
+<path d="M3 2H10L13 5V14H3V2Z" stroke-linecap="square"></path>
+<path d="M10 2V5H13"></path>
+</svg>
+<span class="text-[14px] font-medium truncate text-ink">alfama-bookcase.glb</span>
+<span class="tnum text-[13px] text-muted shrink-0">· 4.2 MB</span>
+</div>
+<!-- Row 2: Plain Text Action Buttons -->
+<div class="flex items-center pl-6">
+<button class="text-[13px] font-medium text-ink underline underline-offset-2 hover:opacity-80" type="button">
+                Replace
+              </button>
+<button class="text-[13px] font-medium text-dangerText ml-4 hover:opacity-80" type="button">
+                Remove
+              </button>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Card3DModels -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: StickyPublishBar -->
+<footer class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-card border-t border-hairline p-3 z-50" data-purpose="sticky-actions-bar">
+<!-- Status Notice Row -->
+<div class="flex items-center gap-2 mb-2">
+<span class="h-[20px] rounded-[2px] bg-subtle text-bodytext text-[12px] font-medium px-2 inline-flex items-center leading-none">
+          Draft
+        </span>
+<span class="text-[13px] text-warningText font-normal">
+          Unsaved changes
+        </span>
+</div>
+<!-- Action Buttons 3-Column Grid -->
+<div class="grid grid-cols-3 gap-2">
+<!-- Secondary Button: Preview -->
+<button class="h-[44px] rounded-[2px] border border-ink bg-transparent text-ink text-[14px] font-medium flex items-center justify-center hover:bg-canvas" type="button">
+          Preview
+        </button>
+<!-- Secondary Button: Save draft -->
+<button class="h-[44px] rounded-[2px] border border-ink bg-transparent text-ink text-[14px] font-medium flex items-center justify-center hover:bg-canvas" type="button">
+          Save draft
+        </button>
+<!-- Primary Button: Publish -->
+<button class="h-[44px] rounded-[2px] bg-ink text-canvas text-[14px] font-medium flex items-center justify-center hover:opacity-95" type="button">
+          Publish
+        </button>
+</div>
+</footer>
+<!-- END: StickyPublishBar -->
+</div>
+</body></html>

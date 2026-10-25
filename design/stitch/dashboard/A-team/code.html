@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Team &amp; Access</title>
+<!-- Google Fonts: Cormorant Garamond 500, Inter 400, 500, 600 -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#F3F0E9',
+            card: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongLine: '#8A8073',
+            ink: '#1D1C1A',
+            body: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzeText: '#6E5C45',
+            softBronze: '#EAE3D6',
+            lightBronze: '#C9B79B',
+            sidebar: '#1D1C1A',
+            chalk: '#F3F0E9',
+            // pill states
+            pillSuccessInk: '#2F6B4F',
+            pillSuccessBg: '#E5F0E9',
+            pillWarningInk: '#8F5A0B',
+            pillWarningBg: '#F8EEDC',
+            pillInfoInk: '#33597A',
+            pillInfoBg: '#E5EDF4',
+            pillDangerInk: '#A8362A',
+            pillDangerBg: '#F8E5E2',
+            pillNeutralInk: '#3A352F',
+            pillNeutralBg: '#ECE7DD',
+          },
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['"Inter"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    * {
+      box-sizing: border-box;
+      border-radius: 2px;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #F3F0E9;
+      color: #3A352F;
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Hairline borders */
+    .border-hairline {
+      border: 1px solid #D9D3C7;
+    }
+    .border-b-hairline {
+      border-bottom: 1px solid #D9D3C7;
+    }
+    .border-t-hairline {
+      border-top: 1px solid #D9D3C7;
+    }
+    .border-r-hairline {
+      border-right: 1px solid #D9D3C7;
+    }
+    .border-subtle-b {
+      border-bottom: 1px solid #ECE7DD;
+    }
+    /* Custom icon style */
+    .icon {
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+    /* Dropdown soft shadow allowed */
+    .dropdown-shadow {
+      box-shadow: 0 4px 12px rgba(29, 28, 26, 0.08);
+    }
+  </style>
+</head>
+<body class="w-[1440px] min-h-screen bg-canvas flex flex-row">
+<!-- ==================== LEFT SIDEBAR (256px, solid #1D1C1A) ==================== -->
+<aside class="w-[256px] min-h-screen bg-sidebar flex flex-col justify-between shrink-0 select-none text-chalk">
+<!-- Top Area -->
+<div>
+<!-- Brand block -->
+<div class="pt-6 pb-5 px-6 border-b border-white/10">
+<div class="text-[15px] font-normal tracking-[0.2em] text-chalk font-serif">S A N C T U S</div>
+<div class="text-[13px] text-chalk/70 mt-1 font-normal font-sans">Admin console</div>
+</div>
+<!-- Navigation items -->
+<nav class="pt-3 flex flex-col font-sans">
+<!-- 1. Overview -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-chalk/70 hover:text-chalk transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="14" y="14"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- 2. Applications (with count 4) -->
+<a class="h-[40px] px-6 flex items-center justify-between text-[14px] text-chalk/70 hover:text-chalk transition-colors" href="#">
+<div class="flex items-center gap-3">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+<polyline points="10 9 9 9 8 9"></polyline>
+</svg>
+<span>Applications</span>
+</div>
+<span class="h-[18px] px-1.5 flex items-center justify-center text-[12px] font-medium text-ink bg-lightBronze rounded-[2px] tabular">4</span>
+</a>
+<!-- 3. Businesses -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-chalk/70 hover:text-chalk transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<rect height="20" rx="1" width="16" x="4" y="2"></rect>
+<line x1="9" x2="15" y1="6" y2="6"></line>
+<line x1="9" x2="15" y1="10" y2="10"></line>
+<line x1="9" x2="15" y1="14" y2="14"></line>
+<line x1="9" x2="15" y1="18" y2="18"></line>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- 4. All Products -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-chalk/70 hover:text-chalk transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>All Products</span>
+</a>
+<!-- 5. Analytics -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-chalk/70 hover:text-chalk transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- 6. Catalogs & QR Codes -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-chalk/70 hover:text-chalk transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<path d="M14 14h3v3h-3z"></path>
+<path d="M20 14v3"></path>
+<path d="M17 20h3"></path>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- 7. Team & Access (ACTIVE) -->
+<a class="h-[40px] px-6 relative flex items-center gap-3 text-[14px] font-medium text-chalk bg-white/8" href="#">
+<!-- 2px left active bar in #C9B79B -->
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-lightBronze"></div>
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- 8. Audit log -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-chalk/70 hover:text-chalk transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- 9. Settings -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-chalk/70 hover:text-chalk transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom Area: Collapse + User Block -->
+<div class="border-t border-white/10 font-sans">
+<button class="w-full h-[40px] px-6 flex items-center gap-3 text-[14px] text-chalk/70 hover:text-chalk transition-colors">
+<svg class="w-[18px] h-[18px] stroke-current icon" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</button>
+<div class="h-[48px] px-6 flex items-center justify-between">
+<span class="text-[13px] text-chalk/70 truncate max-w-[150px]">admin@platform.example</span>
+<button class="w-[28px] h-[28px] flex items-center justify-center text-chalk/70 hover:text-chalk transition-colors" title="Log out">
+<svg class="w-[16px] h-[16px] stroke-current icon" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- ==================== MAIN CONTENT WRAPPER ==================== -->
+<div class="flex-1 min-h-screen flex flex-col bg-canvas">
+<!-- Top Bar (56px, solid #F3F0E9, 1px bottom hairline) -->
+<header class="h-[56px] px-10 flex items-center justify-between border-b-hairline bg-canvas shrink-0">
+<!-- Breadcrumb: Sanctus Admin / Team & Access -->
+<div class="flex items-center gap-2 text-[14px] font-sans">
+<span class="text-muted">Sanctus Admin</span>
+<span class="text-muted">/</span>
+<span class="text-ink font-normal">Team &amp; Access</span>
+</div>
+<!-- Right: Demo mode outlined tag -->
+<div>
+<span class="inline-flex items-center px-2 py-0.5 text-[12px] text-muted border border-strongLine rounded-[2px] leading-tight font-sans">
+          Demo mode
+        </span>
+</div>
+</header>
+<!-- Main Content Canvas (40px padding, content max 1104px, 24px vertical gap) -->
+<main class="p-10 flex flex-col gap-6 max-w-[1184px] pb-[160px]">
+<!-- 1. PAGE HEADER -->
+<section class="flex items-start justify-between">
+<div>
+<h1 class="text-[32px] leading-[1.15] font-serif font-medium text-ink m-0">Team &amp; Access</h1>
+<p class="text-[15px] text-muted mt-1 mb-0 font-sans">Who can use the platform console, and what each role can do.</p>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-3">
+<!-- Secondary: Role permissions (key icon) -->
+<button class="h-[40px] px-4 border border-ink text-ink bg-transparent text-[14px] font-medium font-sans flex items-center gap-2 hover:bg-black/5 transition-colors">
+<svg class="w-[16px] h-[16px] stroke-current icon" viewbox="0 0 24 24">
+<path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5L13 7l-1.5-1.5L10 7M15 4l3 3"></path>
+<circle cx="7.5" cy="15.5" r="5.5"></circle>
+<path d="m11.5 11.5 9-9"></path>
+</svg>
+<span>Role permissions</span>
+</button>
+<!-- Primary: Invite member (mail-plus icon) -->
+<button class="h-[40px] px-4 bg-ink text-chalk text-[14px] font-medium font-sans flex items-center gap-2 hover:bg-black/90 transition-colors">
+<svg class="w-[16px] h-[16px] stroke-current icon" viewbox="0 0 24 24">
+<path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9"></path>
+<polyline points="22,6 12,13 2,6"></polyline>
+<line x1="19" x2="19" y1="16" y2="22"></line>
+<line x1="16" x2="22" y1="19" y2="19"></line>
+</svg>
+<span>Invite member</span>
+</button>
+</div>
+</section>
+<!-- 2. STAT STRIP -->
+<!-- ONE card split by 1px vertical dividers into 4 equal columns, no icons -->
+<section class="bg-card border-hairline">
+<div class="grid grid-cols-4 divide-x divide-hairline">
+<!-- Col 1: Active members -->
+<div class="p-6 flex flex-col justify-start">
+<div class="text-[13px] font-medium text-muted">Active members</div>
+<div class="text-[28px] font-medium text-ink leading-tight mt-1.5 tabular">3</div>
+<div class="text-[13px] text-muted mt-1">Owner included</div>
+</div>
+<!-- Col 2: Pending invitations -->
+<div class="p-6 flex flex-col justify-start">
+<div class="text-[13px] font-medium text-muted">Pending invitations</div>
+<div class="text-[28px] font-medium text-ink leading-tight mt-1.5 tabular">1</div>
+</div>
+<!-- Col 3: Admins -->
+<div class="p-6 flex flex-col justify-start">
+<div class="text-[13px] font-medium text-muted">Admins</div>
+<div class="text-[28px] font-medium text-ink leading-tight mt-1.5 tabular">2</div>
+</div>
+<!-- Col 4: Team -->
+<div class="p-6 flex flex-col justify-start">
+<div class="text-[13px] font-medium text-muted">Team</div>
+<div class="text-[28px] font-medium text-ink leading-tight mt-1.5 tabular">2</div>
+</div>
+</div>
+<!-- Footer row inside card with hairline above: Sample data tag -->
+<div class="px-6 py-2.5 border-t-hairline bg-card flex items-center">
+<span class="inline-flex items-center px-2 py-0.5 text-[12px] font-medium text-pillNeutralInk bg-pillNeutralBg leading-tight">
+            Sample data
+          </span>
+</div>
+</section>
+<!-- 3. TABS AS A SEGMENTED CONTROL -->
+<!-- Track #ECE7DD, 2px corners, 40px tall; active #FAF8F3 with 1px #D9D3C7 border and ink 500 text; inactive muted -->
+<section class="flex items-center">
+<div class="h-[40px] p-1 bg-subtle inline-flex items-center gap-1">
+<!-- Segment 1: Members 5 (ACTIVE) -->
+<button class="h-[32px] px-3.5 bg-card border-hairline flex items-center gap-1.5 text-[14px] font-medium text-ink transition-colors">
+<span>Members</span>
+<span class="text-[14px] font-normal text-muted tabular">5</span>
+</button>
+<!-- Segment 2: Invitations 1 -->
+<button class="h-[32px] px-3.5 bg-transparent flex items-center gap-1.5 text-[14px] font-normal text-muted hover:text-ink transition-colors">
+<span>Invitations</span>
+<span class="text-[14px] font-normal text-muted tabular">1</span>
+</button>
+<!-- Segment 3: Access history -->
+<button class="h-[32px] px-3.5 bg-transparent flex items-center gap-1.5 text-[14px] font-normal text-muted hover:text-ink transition-colors">
+<svg class="w-[14px] h-[14px] stroke-current icon" viewbox="0 0 24 24">
+<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+<path d="M3 3v5h5"></path>
+<polyline points="12 7 12 12 15 15"></polyline>
+</svg>
+<span>Access history</span>
+</button>
+</div>
+</section>
+<!-- 4. MEMBERS TABLE CARD -->
+<section class="bg-card border-hairline flex flex-col relative">
+<!-- Toolbar row inside card (16px 24px padding, hairline below), bottom-aligned -->
+<div class="px-6 py-4 border-b-hairline flex items-end gap-4 font-sans">
+<!-- Search members (320px) -->
+<div class="w-[320px] flex flex-col gap-1.5">
+<label class="text-[13px] font-medium text-muted">Search members</label>
+<div class="relative h-[40px] flex items-center">
+<span class="absolute left-3 text-muted pointer-events-none">
+<svg class="w-[16px] h-[16px] stroke-current icon" viewbox="0 0 24 24">
+<circle cx="11" cy="11" r="8"></circle>
+<line x1="21" x2="16.65" y1="21" y2="16.65"></line>
+</svg>
+</span>
+<input class="w-full h-full pl-9 pr-3 text-[14px] text-ink placeholder:text-muted/60 bg-transparent border-hairline focus:outline-none focus:border-ink transition-colors" placeholder="Name or email" type="text"/>
+</div>
+</div>
+<!-- Role select (160px) -->
+<div class="w-[160px] flex flex-col gap-1.5">
+<label class="text-[13px] font-medium text-muted">Role</label>
+<div class="relative h-[40px]">
+<select class="w-full h-full px-3 pr-8 text-[14px] text-ink bg-transparent border-hairline appearance-none focus:outline-none focus:border-ink cursor-pointer">
+<option>All roles</option>
+<option>Owner</option>
+<option>Admin</option>
+<option>Team</option>
+</select>
+<span class="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+<svg class="w-[14px] h-[14px] stroke-current icon" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</span>
+</div>
+</div>
+<!-- Status select (176px) -->
+<div class="w-[176px] flex flex-col gap-1.5">
+<label class="text-[13px] font-medium text-muted">Status</label>
+<div class="relative h-[40px]">
+<select class="w-full h-full px-3 pr-8 text-[14px] text-ink bg-transparent border-hairline appearance-none focus:outline-none focus:border-ink cursor-pointer">
+<option>All statuses</option>
+<option>Active</option>
+<option>Deactivated</option>
+<option>Invited</option>
+</select>
+<span class="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+<svg class="w-[14px] h-[14px] stroke-current icon" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</span>
+</div>
+</div>
+</div>
+<!-- Table Container -->
+<div class="w-full overflow-visible">
+<table class="w-full text-left border-collapse font-sans">
+<!-- Header row (40px, 13px 500 muted sentence case, no fill, 1px #D9D3C7 rule below) -->
+<thead>
+<tr class="h-[40px] border-b-hairline text-[13px] font-medium text-muted">
+<!-- Member (35%) -->
+<th class="w-[35%] pl-6 font-medium">Member</th>
+<!-- Role -->
+<th class="w-[15%] font-medium">Role</th>
+<!-- Access -->
+<th class="w-[18%] font-medium">Access</th>
+<!-- Joined or invited (right-aligned, small up-arrow sort glyph) -->
+<th class="w-[16%] text-right font-medium">
+<span class="inline-flex items-center gap-1 justify-end">
+<span>Joined or invited</span>
+<svg class="w-[12px] h-[12px] stroke-current icon" viewbox="0 0 24 24">
+<polyline points="18 15 12 9 6 15"></polyline>
+</svg>
+</span>
+</th>
+<!-- Last sign-in (right-aligned) -->
+<th class="w-[11%] text-right font-medium pr-4">Last sign-in</th>
+<!-- Narrow actions column -->
+<th class="w-[5%] pr-6"></th>
+</tr>
+</thead>
+<!-- Rows (60px tall, 1px #ECE7DD row rules) -->
+<tbody class="divide-y divide-subtle">
+<!-- ROW 1: Platform Admin -->
+<tr class="h-[60px] hover:bg-canvas/40 transition-colors">
+<!-- Member -->
+<td class="pl-6 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-[32px] h-[32px] flex items-center justify-center bg-canvas border-hairline text-[12px] font-medium text-ink shrink-0">
+                      PA
+                    </div>
+<div class="flex flex-col">
+<span class="text-[14px] font-medium text-ink leading-tight">Platform Admin</span>
+<span class="text-[13px] text-muted leading-tight mt-0.5">admin@platform.example</span>
+</div>
+</div>
+</td>
+<!-- Role: Owner (#F3F0E9 text on #1D1C1A, 20px tall) -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-chalk bg-ink rounded-[2px] leading-none">
+                    Owner
+                  </span>
+</td>
+<!-- Access: Active (success #2F6B4F on #E5F0E9) -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-pillSuccessInk bg-pillSuccessBg rounded-[2px] leading-none">
+                    Active
+                  </span>
+</td>
+<!-- Joined or invited (right-aligned, tabular) -->
+<td class="text-right text-[14px] text-body tabular">
+                  27 Jun 2026
+                </td>
+<!-- Last sign-in (right-aligned) -->
+<td class="text-right text-[14px] text-body pr-4">
+                  now
+                </td>
+<!-- Actions: NO action button (empty cell) -->
+<td class="pr-6 text-right"></td>
+</tr>
+<!-- ROW 2: Ana Ribeiro -->
+<tr class="h-[60px] hover:bg-canvas/40 transition-colors">
+<!-- Member -->
+<td class="pl-6 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-[32px] h-[32px] flex items-center justify-center bg-canvas border-hairline text-[12px] font-medium text-ink shrink-0">
+                      AR
+                    </div>
+<div class="flex flex-col">
+<span class="text-[14px] font-medium text-ink leading-tight">Ana Ribeiro</span>
+<span class="text-[13px] text-muted leading-tight mt-0.5">ana.ribeiro@sanctus.example</span>
+</div>
+</div>
+</td>
+<!-- Role: Admin (#6E5C45 on #EAE3D6, 20px tall) -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-bronzeText bg-softBronze rounded-[2px] leading-none">
+                    Admin
+                  </span>
+</td>
+<!-- Access: Active (success) -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-pillSuccessInk bg-pillSuccessBg rounded-[2px] leading-none">
+                    Active
+                  </span>
+</td>
+<!-- Joined or invited -->
+<td class="text-right text-[14px] text-body tabular">
+                  16 Sep 2026
+                </td>
+<!-- Last sign-in -->
+<td class="text-right text-[14px] text-body pr-4">
+                  yesterday
+                </td>
+<!-- Action: 32px square ⋯ button -->
+<td class="pr-6 text-right">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-muted hover:text-ink hover:bg-canvas transition-colors" title="More options">
+<svg class="w-[16px] h-[16px] fill-current" viewbox="0 0 24 24">
+<circle cx="5" cy="12" r="1.5"></circle>
+<circle cx="12" cy="12" r="1.5"></circle>
+<circle cx="19" cy="12" r="1.5"></circle>
+</svg>
+</button>
+</td>
+</tr>
+<!-- ROW 3: Pedro Alves -->
+<tr class="h-[60px] hover:bg-canvas/40 transition-colors">
+<!-- Member -->
+<td class="pl-6 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-[32px] h-[32px] flex items-center justify-center bg-canvas border-hairline text-[12px] font-medium text-ink shrink-0">
+                      PA
+                    </div>
+<div class="flex flex-col">
+<span class="text-[14px] font-medium text-ink leading-tight">Pedro Alves</span>
+<span class="text-[13px] text-muted leading-tight mt-0.5">pedro.alves@sanctus.example</span>
+</div>
+</div>
+</td>
+<!-- Role: Admin -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-bronzeText bg-softBronze rounded-[2px] leading-none">
+                    Admin
+                  </span>
+</td>
+<!-- Access: Deactivated (neutral #3A352F on #ECE7DD) -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-pillNeutralInk bg-pillNeutralBg rounded-[2px] leading-none">
+                    Deactivated
+                  </span>
+</td>
+<!-- Joined or invited -->
+<td class="text-right text-[14px] text-body tabular">
+                  16 Sep 2026
+                </td>
+<!-- Last sign-in -->
+<td class="text-right text-[14px] text-body pr-4">
+                  9 days ago
+                </td>
+<!-- Action: 32px square ⋯ button -->
+<td class="pr-6 text-right">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-muted hover:text-ink hover:bg-canvas transition-colors" title="More options">
+<svg class="w-[16px] h-[16px] fill-current" viewbox="0 0 24 24">
+<circle cx="5" cy="12" r="1.5"></circle>
+<circle cx="12" cy="12" r="1.5"></circle>
+<circle cx="19" cy="12" r="1.5"></circle>
+</svg>
+</button>
+</td>
+</tr>
+<!-- ROW 4: João Costa -->
+<tr class="h-[60px] hover:bg-canvas/40 transition-colors">
+<!-- Member -->
+<td class="pl-6 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-[32px] h-[32px] flex items-center justify-center bg-canvas border-hairline text-[12px] font-medium text-ink shrink-0">
+                      JC
+                    </div>
+<div class="flex flex-col">
+<span class="text-[14px] font-medium text-ink leading-tight">João Costa</span>
+<span class="text-[13px] text-muted leading-tight mt-0.5">joao.costa@sanctus.example</span>
+</div>
+</div>
+</td>
+<!-- Role: Team (#3A352F on #ECE7DD, 20px tall) -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-pillNeutralInk bg-pillNeutralBg rounded-[2px] leading-none">
+                    Team
+                  </span>
+</td>
+<!-- Access: Active (success) -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-pillSuccessInk bg-pillSuccessBg rounded-[2px] leading-none">
+                    Active
+                  </span>
+</td>
+<!-- Joined or invited -->
+<td class="text-right text-[14px] text-body tabular">
+                  6 Oct 2026
+                </td>
+<!-- Last sign-in -->
+<td class="text-right text-[14px] text-body pr-4">
+                  3 days ago
+                </td>
+<!-- Action: 32px square ⋯ button -->
+<td class="pr-6 text-right">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-muted hover:text-ink hover:bg-canvas transition-colors" title="More options">
+<svg class="w-[16px] h-[16px] fill-current" viewbox="0 0 24 24">
+<circle cx="5" cy="12" r="1.5"></circle>
+<circle cx="12" cy="12" r="1.5"></circle>
+<circle cx="19" cy="12" r="1.5"></circle>
+</svg>
+</button>
+</td>
+</tr>
+<!-- ROW 5: Marta Lopes (OPEN DROPDOWN MENU) -->
+<tr class="h-[60px] bg-canvas/20">
+<!-- Member -->
+<td class="pl-6 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-[32px] h-[32px] flex items-center justify-center bg-canvas border-hairline text-[12px] font-medium text-ink shrink-0">
+                      ML
+                    </div>
+<div class="flex flex-col">
+<span class="text-[14px] font-normal text-muted leading-tight">Name not set yet</span>
+<span class="text-[13px] text-muted leading-tight mt-0.5">marta.lopes@sanctus.example</span>
+</div>
+</div>
+</td>
+<!-- Role: Team -->
+<td>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-pillNeutralInk bg-pillNeutralBg rounded-[2px] leading-none">
+                    Team
+                  </span>
+</td>
+<!-- Access: Invited (info) and Sent (info) side by side (20px tall, info #33597A on #E5EDF4) -->
+<td>
+<div class="flex items-center gap-1.5">
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-pillInfoInk bg-pillInfoBg rounded-[2px] leading-none">
+                      Invited
+                    </span>
+<span class="inline-flex items-center px-2 h-[20px] text-[12px] font-medium text-pillInfoInk bg-pillInfoBg rounded-[2px] leading-none">
+                      Sent
+                    </span>
+</div>
+</td>
+<!-- Joined or invited -->
+<td class="text-right text-[14px] text-body tabular">
+                  24 Oct 2026
+                </td>
+<!-- Last sign-in (Never in muted) -->
+<td class="text-right text-[14px] text-muted pr-4">
+                  Never
+                </td>
+<!-- Action: ⋯ active with OPEN DROPDOWN -->
+<td class="pr-6 text-right relative">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-ink bg-subtle/80 transition-colors" title="More options">
+<svg class="w-[16px] h-[16px] fill-current" viewbox="0 0 24 24">
+<circle cx="5" cy="12" r="1.5"></circle>
+<circle cx="12" cy="12" r="1.5"></circle>
+<circle cx="19" cy="12" r="1.5"></circle>
+</svg>
+</button>
+<!-- OPEN DROPDOWN MENU (#FAF8F3, 1px border, one soft shadow, 14px items 36px tall) -->
+<!-- Positioned absolute below button, aligned right -->
+<div class="absolute right-6 top-[50px] w-[184px] bg-card border-hairline dropdown-shadow z-30 py-1 text-left font-sans"><a class="h-[36px] px-3.5 flex items-center text-[14px] text-ink hover:bg-canvas transition-colors" href="#">View</a><a class="h-[36px] px-3.5 flex items-center text-[14px] text-ink hover:bg-canvas transition-colors" href="#">Change role</a><a class="h-[36px] px-3.5 flex items-center text-[14px] text-ink hover:bg-canvas transition-colors" href="#">Invitation details</a><a class="h-[36px] px-3.5 flex items-center text-[14px] text-ink hover:bg-canvas transition-colors" href="#">Resend invitation</a><div class="my-1 border-t border-hairline"></div><a class="h-[36px] px-3.5 flex items-center text-[14px] text-pillDangerInk hover:bg-pillDangerBg transition-colors" href="#">Revoke invitation</a></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Under table footer: 13px muted "5 members", 24px padding. No pagination. -->
+<div class="px-6 py-6 border-t border-subtle text-[13px] text-muted font-sans">
+          5 members
+        </div>
+</section>
+</main>
+</div>
+</body>
+</html>

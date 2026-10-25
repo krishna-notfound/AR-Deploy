@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Catalogs &amp; QR Codes</title>
+<!-- Google Fonts: Cormorant Garamond (500) and Inter (400, 500, 600) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#F3F0E9',
+            card: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            ink: '#1D1C1A',
+            body: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzeText: '#6E5C45',
+            softBronze: '#EAE3D6',
+            lightBronze: '#C9B79B',
+            obsidian: '#1D1C1A',
+            chalk: '#F3F0E9',
+          },
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      background-color: #F3F0E9;
+      color: #3A352F;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Exact 2px corners constraint */
+    * {
+      border-radius: 0px;
+    }
+    .rounded-2px {
+      border-radius: 2px !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex bg-canvas text-body w-[1440px]">
+<!-- LEFT SIDEBAR: 256px, solid #1D1C1A, full height -->
+<aside class="w-64 min-w-[256px] max-w-[256px] min-h-screen bg-obsidian text-chalk flex flex-col justify-between select-none shrink-0 border-r border-obsidian z-20">
+<div>
+<!-- Wordmark Logo & Subtitle -->
+<div class="px-6 pt-6 pb-5">
+<div class="text-[15px] font-normal tracking-[0.22em] text-chalk">
+          S A N C T U S
+        </div>
+<div class="text-[13px] text-chalk/70 mt-1">
+          Admin console
+        </div>
+</div>
+<!-- Hairline divider under logo block -->
+<div class="h-px w-full bg-white/10"></div>
+<!-- Navigation items -->
+<nav class="py-3 flex flex-col">
+<!-- 1. Overview -->
+<a class="h-10 px-6 flex items-center text-[14px] text-chalk/70 hover:text-chalk transition-colors group" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk/70 group-hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="7" rx="0.5" width="7" x="3" y="3"></rect>
+<rect height="7" rx="0.5" width="7" x="14" y="3"></rect>
+<rect height="7" rx="0.5" width="7" x="14" y="14"></rect>
+<rect height="7" rx="0.5" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- 2. Applications (with count 3) -->
+<a class="h-10 px-6 flex items-center justify-between text-[14px] text-chalk/70 hover:text-chalk transition-colors group" href="#">
+<div class="flex items-center">
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk/70 group-hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Applications</span>
+</div>
+<!-- small count "3": #1D1C1A text on #C9B79B, 18px tall, 2px corners -->
+<span class="inline-flex items-center justify-center h-[18px] px-1.5 min-w-[18px] bg-lightBronze text-obsidian text-[12px] font-medium rounded-2px tabular-nums leading-none">
+            3
+          </span>
+</a>
+<!-- 3. Businesses -->
+<a class="h-10 px-6 flex items-center text-[14px] text-chalk/70 hover:text-chalk transition-colors group" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk/70 group-hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- 4. All Products -->
+<a class="h-10 px-6 flex items-center text-[14px] text-chalk/70 hover:text-chalk transition-colors group" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk/70 group-hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>All Products</span>
+</a>
+<!-- 5. Analytics -->
+<a class="h-10 px-6 flex items-center text-[14px] text-chalk/70 hover:text-chalk transition-colors group" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk/70 group-hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- 6. Catalogs & QR Codes (ACTIVE ROW) -->
+<a class="relative h-10 px-6 flex items-center text-[14px] text-chalk font-medium bg-white/[0.08]" href="#">
+<!-- Active 2px bar on left edge in #C9B79B -->
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-lightBronze"></div>
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="7" rx="0.5" width="7" x="3" y="3"></rect>
+<rect height="7" rx="0.5" width="7" x="14" y="3"></rect>
+<rect height="7" rx="0.5" width="7" x="3" y="14"></rect>
+<path d="M14 14h3m4 0h-1m-3 3h4m-4 4h1m2 0h1" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- 7. Team & Access -->
+<a class="h-10 px-6 flex items-center text-[14px] text-chalk/70 hover:text-chalk transition-colors group" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk/70 group-hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- 8. Audit log -->
+<a class="h-10 px-6 flex items-center text-[14px] text-chalk/70 hover:text-chalk transition-colors group" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk/70 group-hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- 9. Settings -->
+<a class="h-10 px-6 flex items-center text-[14px] text-chalk/70 hover:text-chalk transition-colors group" href="#">
+<svg class="w-[18px] h-[18px] mr-3 stroke-chalk/70 group-hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom sidebar actions -->
+<div class="border-t border-white/10">
+<!-- Collapse row -->
+<button class="w-full h-10 px-6 flex items-center text-[13px] text-chalk/70 hover:text-chalk transition-colors" type="button">
+<svg class="w-4 h-4 mr-2.5 stroke-chalk/70" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Collapse</span>
+</button>
+<!-- User block with logout button -->
+<div class="h-12 px-6 flex items-center justify-between border-t border-white/5">
+<span class="text-[13px] text-chalk/70 truncate max-w-[170px]" title="admin@platform.example">
+          admin@platform.example
+        </span>
+<button class="text-chalk/70 hover:text-chalk transition-colors p-1" title="Log out" type="button">
+<svg class="w-4 h-4 stroke-chalk/70 hover:stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- MAIN COLUMN -->
+<div class="flex-1 flex flex-col min-w-0">
+<!-- TOP BAR: 56px, solid #F3F0E9, 1px bottom hairline -->
+<header class="h-14 min-h-[56px] max-h-[56px] px-10 bg-canvas border-b border-hairline flex items-center justify-between select-none">
+<!-- Breadcrumb -->
+<div class="flex items-center text-[14px]">
+<span class="text-muted">Sanctus Admin</span>
+<span class="mx-2 text-muted/60">/</span>
+<span class="text-ink font-normal">Catalogs &amp; QR Codes</span>
+</div>
+<!-- Outlined tag "Demo mode" -->
+<div class="h-6 px-2.5 inline-flex items-center text-[12px] text-muted border border-strongline rounded-2px font-normal">
+        Demo mode
+      </div>
+</header>
+<!-- CONTENT AREA: canvas #F3F0E9, 40px padding, content width 1104px -->
+<main class="flex-1 p-10 bg-canvas overflow-y-auto">
+<div class="max-w-[1104px] mx-auto flex flex-col gap-6">
+<!-- 1. PAGE HEADER -->
+<div class="flex flex-col gap-1.5">
+<h1 class="font-serif text-[32px] leading-[1.15] text-ink font-medium">
+            Catalogs &amp; QR codes
+          </h1>
+<p class="text-[15px] text-muted leading-relaxed">
+            Each business has one catalog URL and one QR code for print, packaging and showrooms.
+          </p>
+</div>
+<!-- 2. BUSINESS SELECT (320px wide) -->
+<div class="w-[320px] flex flex-col gap-1.5">
+<label class="text-[13px] font-medium text-muted">
+            Business
+          </label>
+<div class="relative">
+<select class="w-full h-11 px-3.5 pr-9 bg-card border border-hairline rounded-2px text-[14px] text-ink focus:outline-none focus:border-strongline appearance-none cursor-pointer">
+<option selected="">Casa Lisboa Interiors</option>
+<option>Nordhaus Living</option>
+<option>Atelier Verde</option>
+<option>Oak &amp; Ember Studio</option>
+<option>Madeira Viva</option>
+</select>
+<div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-muted">
+<svg class="w-4 h-4 stroke-muted" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+</div>
+<!-- 3. SPLIT CARD: left content (flexible, 32px padding) & right column (320px, #F3F0E9, 1px left hairline) -->
+<div class="bg-card border border-hairline rounded-2px flex flex-row overflow-hidden">
+<!-- LEFT COLUMN: Flexible, 32px padding -->
+<div class="flex-1 p-8 flex flex-col justify-between">
+<div class="flex flex-col gap-6">
+<!-- Business Title & Status Pill -->
+<div class="flex items-center gap-3">
+<h2 class="text-[20px] font-semibold text-ink leading-tight">
+                  Casa Lisboa Interiors
+                </h2>
+<!-- Active pill: #2F6B4F on #E5F0E9, 20px tall, 2px corners -->
+<span class="inline-flex items-center px-2 h-5 bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium rounded-2px">
+                  Active
+                </span>
+</div>
+<!-- Catalog URL Section -->
+<div class="flex flex-col gap-1.5">
+<label class="text-[13px] font-medium text-muted">
+                  Catalog URL
+                </label>
+<!-- URL input box with copy button -->
+<div class="h-11 px-3.5 bg-canvas border border-hairline rounded-2px flex items-center justify-between gap-3">
+<span class="text-[14px] text-ink truncate select-all font-normal">
+                    https://casa-lisboa.example.com
+                  </span>
+<!-- Secondary button "Copy URL" with copy icon -->
+<button class="h-8 px-2.5 inline-flex items-center gap-1.5 text-[13px] font-medium text-ink bg-transparent hover:bg-subtle/60 border border-hairline rounded-2px transition-colors shrink-0" type="button">
+<svg class="w-3.5 h-3.5 stroke-ink" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="13" rx="0.5" width="13" x="9" y="9"></rect>
+<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Copy URL</span>
+</button>
+</div>
+<!-- 13px muted note -->
+<p class="text-[13px] text-muted">
+                  Example address for this demo. Your real address is set up by the platform team.
+                </p>
+</div>
+<!-- Secondary action buttons -->
+<div class="flex items-center gap-3 pt-1">
+<!-- Open catalog button (external-link icon, 40px tall, secondary) -->
+<button class="h-10 px-4 inline-flex items-center gap-2 text-[14px] font-medium text-ink bg-transparent border border-ink rounded-2px hover:bg-subtle/50 transition-colors" type="button">
+<svg class="w-4 h-4 stroke-ink" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Open catalog</span>
+</button>
+<!-- View products button (package icon, 40px tall, secondary) -->
+<button class="h-10 px-4 inline-flex items-center gap-2 text-[14px] font-medium text-ink bg-transparent border border-ink rounded-2px hover:bg-subtle/50 transition-colors" type="button">
+<svg class="w-4 h-4 stroke-ink" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>View products</span>
+</button>
+</div>
+</div>
+<!-- Hairline divider & Stats -->
+<div class="mt-8 pt-6 border-t border-hairline">
+<div class="flex items-center gap-12">
+<!-- Published products -->
+<div class="flex flex-col">
+<span class="text-[13px] font-medium text-muted">
+                    Published products
+                  </span>
+<span class="text-[28px] font-medium text-ink leading-tight tabular-nums mt-1">
+                    5
+                  </span>
+</div>
+<!-- All products -->
+<div class="flex flex-col">
+<span class="text-[13px] font-medium text-muted">
+                    All products
+                  </span>
+<span class="text-[28px] font-medium text-ink leading-tight tabular-nums mt-1">
+                    6
+                  </span>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: 320px, bg #F3F0E9, 1px left hairline -->
+<div class="w-[320px] min-w-[320px] max-w-[320px] bg-canvas border-l border-hairline p-8 flex flex-col items-center">
+<!-- Real-looking QR code: 220px on #FFFFFF square with 1px border -->
+<div class="w-[220px] h-[220px] bg-white border border-hairline rounded-2px p-3.5 flex items-center justify-center shrink-0">
+<svg class="w-full h-full" fill="none" viewbox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+<!-- High-fidelity Vector QR Code Matrix -->
+<!-- Top-Left Position Detection Pattern -->
+<rect fill="#1D1C1A" height="28" width="28" x="5" y="5"></rect>
+<rect fill="#FFFFFF" height="20" width="20" x="9" y="9"></rect>
+<rect fill="#1D1C1A" height="12" width="12" x="13" y="13"></rect>
+<!-- Top-Right Position Detection Pattern -->
+<rect fill="#1D1C1A" height="28" width="28" x="67" y="5"></rect>
+<rect fill="#FFFFFF" height="20" width="20" x="71" y="9"></rect>
+<rect fill="#1D1C1A" height="12" width="12" x="75" y="13"></rect>
+<!-- Bottom-Left Position Detection Pattern -->
+<rect fill="#1D1C1A" height="28" width="28" x="5" y="67"></rect>
+<rect fill="#FFFFFF" height="20" width="20" x="9" y="71"></rect>
+<rect fill="#1D1C1A" height="12" width="12" x="13" y="75"></rect>
+<!-- Timing lines -->
+<rect fill="#1D1C1A" height="4" width="4" x="37" y="17"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="45" y="17"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="53" y="17"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="17" y="37"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="17" y="45"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="17" y="53"></rect>
+<!-- Alignment Pattern (bottom-right area) -->
+<rect fill="#1D1C1A" height="18" width="18" x="69" y="69"></rect>
+<rect fill="#FFFFFF" height="10" width="10" x="73" y="73"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="76" y="76"></rect>
+<!-- Data & Error Correction Matrix Modules -->
+<rect fill="#1D1C1A" height="8" width="4" x="37" y="5"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="45" y="9"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="57" y="5"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="37" y="25"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="49" y="25"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="57" y="25"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="5" y="37"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="9" y="45"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="5" y="57"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="25" y="37"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="25" y="49"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="29" y="57"></rect>
+<rect fill="#1D1C1A" height="8" width="8" x="37" y="37"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="49" y="41"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="57" y="37"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="41" y="49"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="53" y="49"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="37" y="61"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="49" y="61"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="69" y="37"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="77" y="37"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="89" y="37"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="73" y="49"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="85" y="49"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="69" y="57"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="77" y="61"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="85" y="57"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="37" y="73"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="49" y="73"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="57" y="69"></rect>
+<rect fill="#1D1C1A" height="8" width="4" x="41" y="85"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="49" y="89"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="61" y="85"></rect>
+<rect fill="#1D1C1A" height="4" width="4" x="37" y="81"></rect>
+<rect fill="#1D1C1A" height="4" width="12" x="69" y="93"></rect>
+<rect fill="#1D1C1A" height="4" width="8" x="85" y="89"></rect>
+</svg>
+</div>
+<!-- 13px muted caption with a small qr icon -->
+<div class="w-full flex items-start gap-2 mt-4 text-[13px] text-muted leading-snug">
+<svg class="w-4 h-4 stroke-muted shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="6" rx="0.5" width="6" x="3" y="3"></rect>
+<rect height="6" rx="0.5" width="6" x="15" y="3"></rect>
+<rect height="6" rx="0.5" width="6" x="3" y="15"></rect>
+<path d="M14 14h2v2h-2zm3 3h2v2h-2zm-3 3h2v2h-2zm3-3h2v2h-2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Points to the catalog, so it stays valid when products change.</span>
+</div>
+<!-- ONE primary button "Download PNG" (download icon), full column width, solid #1D1C1A, 40px tall -->
+<button class="w-full h-10 mt-5 inline-flex items-center justify-center gap-2 bg-ink text-chalk text-[14px] font-medium rounded-2px hover:bg-black transition-colors" type="button">
+<svg class="w-4 h-4 stroke-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Download PNG</span>
+</button>
+<!-- Hairline divider -->
+<div class="w-full h-px bg-hairline my-6"></div>
+<!-- Switch row: 28x16 toggle (off) with label & description -->
+<div class="w-full flex items-start justify-between gap-3">
+<div class="flex flex-col gap-0.5">
+<label class="text-[14px] font-medium text-ink leading-tight cursor-pointer" for="local-toggle">
+                  Encode local preview URL
+                </label>
+<p class="text-[13px] text-muted leading-snug">
+                  For testing on a phone on this network. Leave off for print.
+                </p>
+</div>
+<!-- 28x16 toggle switch (off) -->
+<div class="relative shrink-0 pt-0.5">
+<input class="sr-only peer" id="local-toggle" type="checkbox"/>
+<div class="w-7 h-4 bg-hairline peer-focus:outline-none rounded-2px peer peer-checked:bg-ink transition-colors cursor-pointer relative">
+<div class="absolute top-[2px] left-[2px] bg-white w-3 h-3 rounded-2px transition-transform peer-checked:translate-x-3"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body>
+</html>

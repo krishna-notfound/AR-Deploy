@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Analytics</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#F3F0E9',
+            card: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            ink: '#1D1C1A',
+            body: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzetext: '#6E5C45',
+            softbronze: '#EAE3D6',
+            lightbronze: '#C9B79B',
+          },
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    * {
+      box-sizing: border-box;
+      border-radius: 0px;
+    }
+    body {
+      background-color: #F3F0E9;
+      color: #3A352F;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      width: 1440px;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    .r-2 {
+      border-radius: 2px;
+    }
+    /* SVG Lucide style icons */
+    .icon {
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+  </style>
+</head>
+<body class="flex min-h-screen bg-canvas text-body">
+<!-- Left Sidebar (256px, solid #1D1C1A, full height) -->
+<aside class="w-[256px] min-w-[256px] bg-ink flex flex-col justify-between select-none text-canvas shrink-0">
+<div>
+<!-- Wordmark Logo & Subtitle -->
+<div class="px-6 pt-6 pb-5">
+<div class="text-[15px] font-medium tracking-[0.25em] text-canvas leading-none">S A N C T U S</div>
+<div class="text-[13px] text-canvas/70 mt-1.5 leading-none">Admin console</div>
+</div>
+<!-- Hairline divider -->
+<div class="h-[1px] bg-white/10 w-full mb-3"></div>
+<!-- Navigation items in order -->
+<nav class="space-y-[2px] px-3">
+<!-- 1. Overview -->
+<a class="flex items-center gap-3 px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas hover:bg-white/[0.04] transition-colors r-2" href="#">
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="14" y="14"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- 2. Applications (with small count "3") -->
+<a class="flex items-center justify-between px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas hover:bg-white/[0.04] transition-colors r-2" href="#">
+<div class="flex items-center gap-3">
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+<polyline points="10 9 9 9 8 9"></polyline>
+</svg>
+<span>Applications</span>
+</div>
+<span class="inline-flex items-center justify-center h-[18px] px-1.5 text-[12px] font-medium bg-lightbronze text-ink r-2 leading-none tabular-nums">3</span>
+</a>
+<!-- 3. Businesses -->
+<a class="flex items-center gap-3 px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas hover:bg-white/[0.04] transition-colors r-2" href="#">
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<rect height="20" rx="0" width="16" x="4" y="2"></rect>
+<line x1="9" x2="9" y1="22" y2="22.01"></line>
+<line x1="15" x2="15" y1="22" y2="22.01"></line>
+<line x1="8" x2="8.01" y1="6" y2="6"></line>
+<line x1="12" x2="12.01" y1="6" y2="6"></line>
+<line x1="16" x2="16.01" y1="6" y2="6"></line>
+<line x1="8" x2="8.01" y1="10" y2="10"></line>
+<line x1="12" x2="12.01" y1="10" y2="10"></line>
+<line x1="16" x2="16.01" y1="10" y2="10"></line>
+<line x1="8" x2="8.01" y1="14" y2="14"></line>
+<line x1="12" x2="12.01" y1="14" y2="14"></line>
+<line x1="16" x2="16.01" y1="14" y2="14"></line>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- 4. All Products -->
+<a class="flex items-center gap-3 px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas hover:bg-white/[0.04] transition-colors r-2" href="#">
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>All Products</span>
+</a>
+<!-- 5. Analytics (ACTIVE) -->
+<a class="relative flex items-center gap-3 px-3 h-10 text-[14px] text-canvas font-medium bg-white/[0.08] r-2" href="#">
+<!-- 2px #C9B79B bar on its left edge -->
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-lightbronze"></div>
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- 6. Catalogs & QR Codes -->
+<a class="flex items-center gap-3 px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas hover:bg-white/[0.04] transition-colors r-2" href="#">
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<path d="M14 14h3v3h-3z"></path>
+<path d="M17 17h3v3h-3z"></path>
+<path d="M14 20h3"></path>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- 7. Team & Access -->
+<a class="flex items-center gap-3 px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas hover:bg-white/[0.04] transition-colors r-2" href="#">
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- 8. Audit log -->
+<a class="flex items-center gap-3 px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas hover:bg-white/[0.04] transition-colors r-2" href="#">
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- 9. Settings -->
+<a class="flex items-center gap-3 px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas hover:bg-white/[0.04] transition-colors r-2" href="#">
+<svg class="w-[18px] h-[18px] icon stroke-current" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom of sidebar: Collapse row + User block -->
+<div class="px-3 pb-4">
+<button class="w-full flex items-center gap-3 px-3 h-10 text-[14px] text-canvas/70 hover:text-canvas transition-colors r-2">
+<svg class="w-4 h-4 icon stroke-current" viewbox="0 0 24 24">
+<polyline points="11 19 4 12 11 5"></polyline>
+<polyline points="18 19 11 12 18 5"></polyline>
+</svg>
+<span>Collapse</span>
+</button>
+<div class="h-[1px] bg-white/10 w-full my-2"></div>
+<div class="flex items-center justify-between px-3 h-10 text-canvas">
+<span class="text-[13px] text-canvas/70 truncate">admin@platform.example</span>
+<button class="text-canvas/70 hover:text-canvas transition-colors p-1" title="Log out">
+<svg class="w-4 h-4 icon stroke-current" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- Main Content Wrapper (1184px remaining width) -->
+<div class="flex-1 flex flex-col min-w-0 bg-canvas">
+<!-- Top Bar (56px, solid #F3F0E9, 1px bottom hairline) -->
+<header class="h-[56px] min-h-[56px] border-b border-hairline px-10 flex items-center justify-between bg-canvas">
+<div class="text-[14px] text-muted flex items-center gap-1.5">
+<span>Sanctus Admin</span>
+<span class="text-muted/60">/</span>
+<span class="text-ink font-medium">Analytics</span>
+</div>
+<div class="border border-strongline text-[12px] text-muted px-2 py-0.5 r-2 leading-tight">
+        Demo mode
+      </div>
+</header>
+<!-- Scrollable Content Area (40px padding, content width 1104px) -->
+<main class="p-10 flex flex-col gap-6 w-full max-w-[1184px]">
+<!-- 1. Page Header -->
+<div>
+<h1 class="font-serif text-[32px] leading-[1.15] text-ink font-medium">Analytics</h1>
+<p class="text-[15px] text-muted mt-1 leading-normal">Product page views and AR launch attempts.</p>
+</div>
+<!-- 2. Filter Row -->
+<div class="flex items-center gap-3">
+<!-- 260px Select with accessible name -->
+<div class="relative w-[260px]">
+<select aria-label="Filter analytics by business" class="w-full h-10 px-3 pr-8 bg-card border border-hairline text-ink text-[14px] r-2 appearance-none focus:outline-none focus:border-strongline">
+<option>All businesses</option>
+<option>Nordhaus Living</option>
+<option>Atelier Verde</option>
+<option>Casa Lisboa Interiors</option>
+<option>Oak &amp; Ember Studio</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted">
+<svg class="w-4 h-4 icon stroke-current" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</div>
+</div>
+<!-- Neutral Tag "Sample data" -->
+<span class="inline-flex items-center h-5 px-2 bg-subtle text-body text-[12px] font-medium r-2 leading-none">
+          Sample data
+        </span>
+<!-- Descriptive muted hint -->
+<span class="text-[13px] text-muted">
+          Last 30 days. Includes visits and AR taps you make in this demo.
+        </span>
+</div>
+<!-- 3. Stat Strip (ONE card split into 5 equal columns by 1px dividers) -->
+<section class="bg-card border border-hairline r-2 grid grid-cols-5 divide-x divide-hairline"><!-- Col 1 -->
+<div class="p-6 flex flex-col">
+<div class="text-[13px] font-medium text-muted">Product page views</div>
+<div class="mt-2 mb-2 flex items-baseline h-7">
+<span class="text-[28px] font-medium text-ink tabular-nums leading-none">4,862</span>
+</div>
+<div class="text-[13px] text-muted">Last 30 days</div>
+</div>
+<!-- Col 2 -->
+<div class="p-6 flex flex-col">
+<div class="text-[13px] font-medium text-muted">AR launch attempts</div>
+<div class="mt-2 mb-2 flex items-baseline h-7">
+<span class="text-[28px] font-medium text-ink tabular-nums leading-none">731</span>
+</div>
+<div class="text-[13px] text-muted">Last 30 days</div>
+</div>
+<!-- Col 3 -->
+<div class="p-6 flex flex-col">
+<div class="text-[13px] font-medium text-muted">3D interactions</div>
+<div class="mt-2 mb-2 flex items-baseline h-7">
+<span class="text-[16px] font-normal text-muted leading-none">Not recorded</span>
+</div>
+<div class="text-[13px] text-muted">Not in the sample data</div>
+</div>
+<!-- Col 4 -->
+<div class="p-6 flex flex-col">
+<div class="text-[13px] font-medium text-muted">AR launch rate</div>
+<div class="mt-2 mb-2 flex items-baseline h-7">
+<span class="text-[28px] font-medium text-ink tabular-nums leading-none">15.0%</span>
+</div>
+<div class="text-[13px] text-muted leading-tight">AR launch attempts per product page view</div>
+</div>
+<!-- Col 5 -->
+<div class="p-6 flex flex-col">
+<div class="text-[13px] font-medium text-muted">Published products</div>
+<div class="mt-2 mb-2 flex items-baseline h-7">
+<span class="text-[28px] font-medium text-ink tabular-nums leading-none">17</span>
+</div>
+<div class="text-[13px] text-muted">Current</div>
+</div></section>
+<!-- 4. Card "Views and AR launch attempts" with two side-by-side 200px charts -->
+<section class="bg-card border border-hairline r-2 p-6 flex flex-col gap-5">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="text-[16px] font-semibold text-ink leading-[1.4]">Views and AR launch attempts</h2>
+<div class="text-[13px] text-muted mt-0.5">Daily totals, last 30 days</div>
+</div>
+<!-- Ghost button "Show as table" -->
+<button class="text-[14px] font-medium text-ink hover:text-muted transition-colors py-1 px-2 r-2">
+            Show as table
+          </button>
+</div>
+<!-- Two charts side by side -->
+<div class="grid grid-cols-2 gap-6">
+<!-- Chart 1: Product views -->
+<div class="flex flex-col">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 bg-ink r-2 inline-block"></span>
+<span class="text-[14px] font-medium text-ink">Product views</span>
+</div>
+<span class="text-[13px] text-muted tabular-nums">4,862 in 30 days</span>
+</div>
+<!-- SVG Line Chart (200px tall) -->
+<div class="w-full h-[200px] bg-card border border-hairline r-2 relative p-2"><svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 480 180">
+<!-- Gridlines at 200 (y=30), 100 (y=85), 0 (y=140) -->
+<line stroke="#ECE7DD" stroke-width="1" x1="45" x2="470" y1="30" y2="30"></line>
+<text class="tabular-nums" fill="#5A5148" font-size="12" text-anchor="end" x="35" y="34">200</text>
+<line stroke="#ECE7DD" stroke-width="1" x1="45" x2="470" y1="85" y2="85"></line>
+<text class="tabular-nums" fill="#5A5148" font-size="12" text-anchor="end" x="35" y="89">100</text>
+<line stroke="#ECE7DD" stroke-width="1" x1="45" x2="470" y1="140" y2="140"></line>
+<text class="tabular-nums" fill="#5A5148" font-size="12" text-anchor="end" x="35" y="144">0</text>
+<!-- Shaded area starting from y=140 (value 0) -->
+<polygon fill="#1D1C1A" fill-opacity="0.10" points="45,140 45,69 60,67 75,64 90,65 105,61 120,62 135,58 150,60 165,57 180,53 195,55 210,51 225,49 240,48 255,46 270,42 285,44 300,40 315,41 330,37 345,38 360,35 375,33 390,31 405,29 420,27 435,26 450,22 465,20 470,18 470,140"></polygon>
+<!-- 2px Polyline -->
+<polyline fill="none" points="45,69 60,67 75,64 90,65 105,61 120,62 135,58 150,60 165,57 180,53 195,55 210,51 225,49 240,48 255,46 270,42 285,44 300,40 315,41 330,37 345,38 360,35 375,33 390,31 405,29 420,27 435,26 450,22 465,20 470,18" stroke="#1D1C1A" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+<!-- X Axis Labels -->
+<text fill="#5A5148" font-size="12" text-anchor="start" x="45" y="168">Sep 26</text>
+<text fill="#5A5148" font-size="12" text-anchor="middle" x="255" y="168">Oct 10</text>
+<text fill="#5A5148" font-size="12" text-anchor="end" x="470" y="168">Oct 24</text>
+</svg></div>
+</div>
+<!-- Chart 2: AR launch attempts -->
+<div class="flex flex-col">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 bg-bronze r-2 inline-block"></span>
+<span class="text-[14px] font-medium text-ink">AR launch attempts</span>
+</div>
+<span class="text-[13px] text-muted tabular-nums">731 in 30 days</span>
+</div>
+<!-- SVG Line Chart (200px tall) -->
+<div class="w-full h-[200px] bg-card border border-hairline r-2 relative p-2"><svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 480 180">
+<!-- Gridlines at 40 (y=30), 20 (y=85), 0 (y=140) -->
+<line stroke="#ECE7DD" stroke-width="1" x1="45" x2="470" y1="30" y2="30"></line>
+<text class="tabular-nums" fill="#5A5148" font-size="12" text-anchor="end" x="35" y="34">40</text>
+<line stroke="#ECE7DD" stroke-width="1" x1="45" x2="470" y1="85" y2="85"></line>
+<text class="tabular-nums" fill="#5A5148" font-size="12" text-anchor="end" x="35" y="89">20</text>
+<line stroke="#ECE7DD" stroke-width="1" x1="45" x2="470" y1="140" y2="140"></line>
+<text class="tabular-nums" fill="#5A5148" font-size="12" text-anchor="end" x="35" y="144">0</text>
+<!-- Shaded area starting from y=140 (value 0) -->
+<polygon fill="#8A765C" fill-opacity="0.10" points="45,140 45,91 60,89 75,88 90,87 105,85 120,86 135,83 150,84 165,81 180,79 195,78 210,75 225,74 240,71 255,69 270,66 285,65 300,62 315,61 330,56 345,54 360,52 375,48 390,45 405,40 420,38 435,34 450,29 465,26 470,22 470,140"></polygon>
+<!-- 2px Polyline -->
+<polyline fill="none" points="45,91 60,89 75,88 90,87 105,85 120,86 135,83 150,84 165,81 180,79 195,78 210,75 225,74 240,71 255,69 270,66 285,65 300,62 315,61 330,56 345,54 360,52 375,48 390,45 405,40 420,38 435,34 450,29 465,26 470,22" stroke="#8A765C" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+<!-- X Axis Labels -->
+<text fill="#5A5148" font-size="12" text-anchor="start" x="45" y="168">Sep 26</text>
+<text fill="#5A5148" font-size="12" text-anchor="middle" x="255" y="168">Oct 10</text>
+<text fill="#5A5148" font-size="12" text-anchor="end" x="470" y="168">Oct 24</text>
+</svg></div>
+</div>
+</div>
+</section>
+<!-- 5. Two Cards Side by Side (Equal height) -->
+<section class="grid grid-cols-12 gap-6 items-stretch">
+<!-- Left 5/12: Views by business -->
+<div class="col-span-5 bg-card border border-hairline r-2 p-6 flex flex-col justify-between">
+<div>
+<h2 class="text-[16px] font-semibold text-ink leading-[1.4]">Views by business</h2>
+<div class="text-[13px] text-muted mt-0.5 mb-6">Product page views, last 30 days</div>
+<!-- Horizontal Bars -->
+<div class="space-y-5">
+<!-- Item 1: Nordhaus Living (1,906) - Max base (approx 100% width) -->
+<div>
+<div class="text-[14px] text-ink mb-1.5 leading-snug">Nordhaus Living</div>
+<div class="flex items-center gap-3">
+<div class="h-[10px] bg-ink w-[240px] r-0"></div>
+<span class="text-[13px] text-muted tabular-nums leading-none">1,906</span>
+</div>
+</div>
+<!-- Item 2: Atelier Verde (1,672) - approx 87% -->
+<div>
+<div class="text-[14px] text-ink mb-1.5 leading-snug">Atelier Verde</div>
+<div class="flex items-center gap-3">
+<div class="h-[10px] bg-ink w-[210px] r-0"></div>
+<span class="text-[13px] text-muted tabular-nums leading-none">1,672</span>
+</div>
+</div>
+<!-- Item 3: Casa Lisboa Interiors (1,284) - approx 67% -->
+<div>
+<div class="text-[14px] text-ink mb-1.5 leading-snug">Casa Lisboa Interiors</div>
+<div class="flex items-center gap-3">
+<div class="h-[10px] bg-ink w-[162px] r-0"></div>
+<span class="text-[13px] text-muted tabular-nums leading-none">1,284</span>
+</div>
+</div>
+<!-- Item 4: Oak & Ember Studio (0) - no bar -->
+<div>
+<div class="text-[14px] text-ink mb-1.5 leading-snug">Oak &amp; Ember Studio</div>
+<div class="flex items-center gap-3">
+<span class="text-[13px] text-muted tabular-nums leading-none">0</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right 7/12: Most viewed products (5 rows, 56px each) -->
+<div class="col-span-7 bg-card border border-hairline r-2 p-6 flex flex-col justify-between">
+<div>
+<h2 class="text-[16px] font-semibold text-ink leading-[1.4]">Most viewed products</h2>
+<div class="text-[13px] text-muted mt-0.5 mb-2">Product page views, last 30 days</div>
+<div class="divide-y divide-subtle">
+<!-- Row 1: Sheen Lounge Chair -->
+<div class="h-[56px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-[14px] text-muted w-4 tabular-nums text-center">1</span>
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Sheen Lounge Chair" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1XKZeTVkimVKBcoMQQKM3PoDstLuleWEYuYM4d1NyzSXzaZW395Muo_DbOvtod1Rbd19aY3Pf2P4XsBANujpOYje-w90Jb83VKBC4mn7K0J5Dn5EKvrfkZ0LkD_FjSUCVisCeaInz4PX2tcrxHSMHelU1G2wvuixiGTbVIDJh-2EICrSrChK--cb28zSv9Y46-Ao7lRn1hTKNQbrFiRG65Q-voe6lDKC8ONNeMXY7mtn4nZ80JhlLD09Ec"/>
+</div>
+<div>
+<div class="text-[14px] font-medium text-ink leading-tight">Sheen Lounge Chair</div>
+<div class="text-[13px] text-muted leading-tight mt-0.5">Nordhaus Living · €895</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-ink tabular-nums leading-tight">498 views</div>
+<div class="text-[13px] text-muted tabular-nums leading-tight mt-0.5">96 AR attempts</div>
+</div>
+</div>
+<!-- Row 2: Glam Velvet Sofa -->
+<div class="h-[56px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-[14px] text-muted w-4 tabular-nums text-center">2</span>
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Glam Velvet Sofa" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1WC3SIGPRYXj8YiKAWCq_v3osyYmldR3WH_V5JzUDChH4ucr60CPtjjk_Y6vCg0YPnfBNI1Y4iGEYRWCoYwzdZn6wRG0zSez0N0BELSlCcKod8xp5xTOPLyjKdI5OuZ7coxqNgad6PU53YpqmWIJFNSWvfAKhI8dOTi1gNyVZR3j0OZ931Xqx_L6ycgPBdFn98UVV8v3-A94Wj8fU1g9dk0QhoalYKuprPeEw1e4VQ2wCJ9erF2r3TDEOgV"/>
+</div>
+<div>
+<div class="text-[14px] font-medium text-ink leading-tight">Glam Velvet Sofa</div>
+<div class="text-[13px] text-muted leading-tight mt-0.5">Casa Lisboa Interiors · €1,899</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-ink tabular-nums leading-tight">412 views</div>
+<div class="text-[13px] text-muted tabular-nums leading-tight mt-0.5">88 AR attempts</div>
+</div>
+</div>
+<!-- Row 3: Damask Accent Chair -->
+<div class="h-[56px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-[14px] text-muted w-4 tabular-nums text-center">3</span>
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Damask Accent Chair" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoke0PcKtl7GB8gCJ6fqf2Bsax4lJllT34Dm4fFJNXm2F-ydWFqcDXiUmuX9YUaNUJA0C4MPjJF5oxX0J0FY3MScgJ6DiIytoYVpYHWAXNmAGfwQPJXyl9CMLu470617DE2ebSRzjRcoYEGAaZAhanJBB9CaF5UM6VzOpDMimkt7vUPHDRTRElg_18xs51XgvcHYZFdiFjuY778r-clh8xEQv5v-5iyiJpj4XitLC4EzWPzTqVh0Nn1THWOhxnrF70oFSZkiYVEDjA"/>
+</div>
+<div>
+<div class="text-[14px] font-medium text-ink leading-tight">Damask Accent Chair</div>
+<div class="text-[13px] text-muted leading-tight mt-0.5">Atelier Verde · R$2,890</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-ink tabular-nums leading-tight">377 views</div>
+<div class="text-[13px] text-muted tabular-nums leading-tight mt-0.5">71 AR attempts</div>
+</div>
+</div>
+<!-- Row 4: Alfama Carved Leather Sofa -->
+<div class="h-[56px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-[14px] text-muted w-4 tabular-nums text-center">4</span>
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Alfama Carved Leather Sofa" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1VoghBCvIRLWFYopmFBcg3cSPhuKzeZ2OT59PR197ACa2mByJUVN-D5Ed6Ckn5j8O_AG1RaOCXRuPeQf4dIAx-dWeZqaA7hpbxWzkpjK448rTAEOIoFjZ1coPQlUTWlvw2g4xsD53TePK9bgSi3n_iz4CLW-J2iTTyF8Ossq9AO1q-Cq440t0NzNfqUcpmt_lRUqAl52jWKxD6xhRSP6EvVJC7pg_DDk8VuYZg4cnKTYKIcJHcAe2DDNKKT"/>
+</div>
+<div>
+<div class="text-[14px] font-medium text-ink leading-tight">Alfama Carved Leather Sofa</div>
+<div class="text-[13px] text-muted leading-tight mt-0.5">Casa Lisboa Interiors · €2,490</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-ink tabular-nums leading-tight">318 views</div>
+<div class="text-[13px] text-muted tabular-nums leading-tight mt-0.5">61 AR attempts</div>
+</div>
+</div>
+<!-- Row 5: Linen Two-Seat Sofa -->
+<div class="h-[56px] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-[14px] text-muted w-4 tabular-nums text-center">5</span>
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0 flex items-center justify-center">
+<img alt="Linen Two-Seat Sofa" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7oEbuILg4x7S4-DI3kjIYh9WoEWz-CXK4ygF7k2mzR182mWYg6cLLEH_bU5KpKuN4pHQJT76lUhrfYqHZESnZbCzph08SSjcs8vzw2Wd5cMSbCZ_N3FAq7_jCPPRXkeS3YETYq69AkBX-2OqBZoV1ubeGb6EZaTgsA_sKFYBdlEWI2UU-oIMm7Zaundq9m2P9cYHNIn2J_f4rU5F6mMN4a9nhx898qjHCWW-b391BZOlEfiAHP5G2H4272EdovSuOqy98tHCK2933"/>
+</div>
+<div>
+<div class="text-[14px] font-medium text-ink leading-tight">Linen Two-Seat Sofa</div>
+<div class="text-[13px] text-muted leading-tight mt-0.5">Nordhaus Living · €1,190</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[14px] font-medium text-ink tabular-nums leading-tight">296 views</div>
+<div class="text-[13px] text-muted tabular-nums leading-tight mt-0.5">No 3D model</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 6. Full-Width Card "Product performance" with data table -->
+<section class="bg-card border border-hairline r-2 p-6 flex flex-col gap-4">
+<div>
+<h2 class="text-[16px] font-semibold text-ink leading-[1.4]">Product performance</h2>
+<div class="text-[13px] text-muted mt-0.5">Select a column header to sort</div>
+</div>
+<!-- Table Container -->
+<div class="w-full">
+<table class="w-full text-left border-collapse">
+<!-- Header Row (40px, 13px weight 500 #5A5148 sentence case, 1px #D9D3C7 rule below) -->
+<thead>
+<tr class="h-10 border-b border-hairline text-[13px] font-medium text-muted">
+<th class="py-0 font-medium">Product</th>
+<th class="py-0 font-medium">Business</th>
+<th class="py-0 font-medium text-right cursor-pointer select-none">
+<span class="inline-flex items-center gap-1 text-ink font-medium">
+                    Views
+                    <svg class="w-3.5 h-3.5 icon stroke-current inline" viewbox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<polyline points="19 12 12 19 5 12"></polyline>
+</svg>
+</span>
+</th>
+<th class="py-0 font-medium text-right">AR launch attempts</th>
+<th class="py-0 font-medium text-right">AR rate</th>
+</tr>
+</thead>
+<!-- Table Body (row rules 1px #ECE7DD, single-line rows 52px) -->
+<tbody class="divide-y divide-subtle text-[14px]">
+<!-- Row 1: Sheen Lounge Chair -->
+<tr class="h-[52px] hover:bg-subtle/30 transition-colors">
+<td class="py-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Sheen Lounge Chair" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1XKZeTVkimVKBcoMQQKM3PoDstLuleWEYuYM4d1NyzSXzaZW395Muo_DbOvtod1Rbd19aY3Pf2P4XsBANujpOYje-w90Jb83VKBC4mn7K0J5Dn5EKvrfkZ0LkD_FjSUCVisCeaInz4PX2tcrxHSMHelU1G2wvuixiGTbVIDJh-2EICrSrChK--cb28zSv9Y46-Ao7lRn1hTKNQbrFiRG65Q-voe6lDKC8ONNeMXY7mtn4nZ80JhlLD09Ec"/>
+</div>
+<span class="font-medium text-ink">Sheen Lounge Chair</span>
+</div>
+</td>
+<td class="py-0 text-muted">Nordhaus Living</td>
+<td class="py-0 text-right tabular-nums text-ink font-medium">498</td>
+<td class="py-0 text-right tabular-nums text-body">96</td>
+<td class="py-0 text-right tabular-nums text-body">19.3%</td>
+</tr>
+<!-- Row 2: Glam Velvet Sofa -->
+<tr class="h-[52px] hover:bg-subtle/30 transition-colors">
+<td class="py-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Glam Velvet Sofa" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1WC3SIGPRYXj8YiKAWCq_v3osyYmldR3WH_V5JzUDChH4ucr60CPtjjk_Y6vCg0YPnfBNI1Y4iGEYRWCoYwzdZn6wRG0zSez0N0BELSlCcKod8xp5xTOPLyjKdI5OuZ7coxqNgad6PU53YpqmWIJFNSWvfAKhI8dOTi1gNyVZR3j0OZ931Xqx_L6ycgPBdFn98UVV8v3-A94Wj8fU1g9dk0QhoalYKuprPeEw1e4VQ2wCJ9erF2r3TDEOgV"/>
+</div>
+<span class="font-medium text-ink">Glam Velvet Sofa</span>
+</div>
+</td>
+<td class="py-0 text-muted">Casa Lisboa Interiors</td>
+<td class="py-0 text-right tabular-nums text-ink font-medium">412</td>
+<td class="py-0 text-right tabular-nums text-body">88</td>
+<td class="py-0 text-right tabular-nums text-body">21.4%</td>
+</tr>
+<!-- Row 3: Damask Accent Chair -->
+<tr class="h-[52px] hover:bg-subtle/30 transition-colors">
+<td class="py-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Damask Accent Chair" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoke0PcKtl7GB8gCJ6fqf2Bsax4lJllT34Dm4fFJNXm2F-ydWFqcDXiUmuX9YUaNUJA0C4MPjJF5oxX0J0FY3MScgJ6DiIytoYVpYHWAXNmAGfwQPJXyl9CMLu470617DE2ebSRzjRcoYEGAaZAhanJBB9CaF5UM6VzOpDMimkt7vUPHDRTRElg_18xs51XgvcHYZFdiFjuY778r-clh8xEQv5v-5iyiJpj4XitLC4EzWPzTqVh0Nn1THWOhxnrF70oFSZkiYVEDjA"/>
+</div>
+<span class="font-medium text-ink">Damask Accent Chair</span>
+</div>
+</td>
+<td class="py-0 text-muted">Atelier Verde</td>
+<td class="py-0 text-right tabular-nums text-ink font-medium">377</td>
+<td class="py-0 text-right tabular-nums text-body">71</td>
+<td class="py-0 text-right tabular-nums text-body">18.8%</td>
+</tr>
+<!-- Row 4: Alfama Carved Leather Sofa -->
+<tr class="h-[52px] hover:bg-subtle/30 transition-colors">
+<td class="py-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Alfama Carved Leather Sofa" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1VoghBCvIRLWFYopmFBcg3cSPhuKzeZ2OT59PR197ACa2mByJUVN-D5Ed6Ckn5j8O_AG1RaOCXRuPeQf4dIAx-dWeZqaA7hpbxWzkpjK448rTAEOIoFjZ1coPQlUTWlvw2g4xsD53TePK9bgSi3n_iz4CLW-J2iTTyF8Ossq9AO1q-Cq440t0NzNfqUcpmt_lRUqAl52jWKxD6xhRSP6EvVJC7pg_DDk8VuYZg4cnKTYKIcJHcAe2DDNKKT"/>
+</div>
+<span class="font-medium text-ink">Alfama Carved Leather Sofa</span>
+</div>
+</td>
+<td class="py-0 text-muted">Casa Lisboa Interiors</td>
+<td class="py-0 text-right tabular-nums text-ink font-medium">318</td>
+<td class="py-0 text-right tabular-nums text-body">61</td>
+<td class="py-0 text-right tabular-nums text-body">19.2%</td>
+</tr>
+<!-- Row 5: Linen Two-Seat Sofa -->
+<tr class="h-[52px] hover:bg-subtle/30 transition-colors">
+<td class="py-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Linen Two-Seat Sofa" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7oEbuILg4x7S4-DI3kjIYh9WoEWz-CXK4ygF7k2mzR182mWYg6cLLEH_bU5KpKuN4pHQJT76lUhrfYqHZESnZbCzph08SSjcs8vzw2Wd5cMSbCZ_N3FAq7_jCPPRXkeS3YETYq69AkBX-2OqBZoV1ubeGb6EZaTgsA_sKFYBdlEWI2UU-oIMm7Zaundq9m2P9cYHNIn2J_f4rU5F6mMN4a9nhx898qjHCWW-b391BZOlEfiAHP5G2H4272EdovSuOqy98tHCK2933"/>
+</div>
+<span class="font-medium text-ink">Linen Two-Seat Sofa</span>
+</div>
+</td>
+<td class="py-0 text-muted">Nordhaus Living</td>
+<td class="py-0 text-right tabular-nums text-ink font-medium">296</td>
+<td class="py-0 text-right text-muted text-[13px]">No 3D</td>
+<td class="py-0 text-right text-muted tabular-nums">—</td>
+</tr>
+<!-- Row 6: Terracotta Sofa -->
+<tr class="h-[52px] hover:bg-subtle/30 transition-colors">
+<td class="py-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 border border-hairline r-2 overflow-hidden bg-subtle shrink-0">
+<img alt="Terracotta Sofa" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuChCVvwNUcxZEP9WaoB--x2-c0BUw1u2jKnKuozJkH6jTK5rxMk8XbC_I9sxWE9ZzzmaIRczAMpAJIMJKZfAECUa6f_I8seNdG7CRksgimsfpOE48RvKUHO7gd6AzmS5KLsWlimSwYphCCFpl4_2Y7HbC7wbRVR3iXzg81P1CHhAkE2KUx5qUixpm8g06in6KH7FLhK9wvubDHL7kxWH9BaNtILECNpc2brzHZFiwq653j_9JcvK_tcNjMbPQNUkqmmLCEG72QFNzu0"/>
+</div>
+<span class="font-medium text-ink">Terracotta Sofa</span>
+</div>
+</td>
+<td class="py-0 text-muted">Atelier Verde</td>
+<td class="py-0 text-right tabular-nums text-ink font-medium">284</td>
+<td class="py-0 text-right text-muted text-[13px]">No 3D</td>
+<td class="py-0 text-right text-muted tabular-nums">—</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer: Pagination & Counts -->
+<div class="flex items-center justify-between pt-3 border-t border-hairline">
+<span class="text-[13px] text-muted tabular-nums">Showing 1–6 of 17 products</span>
+<div class="flex items-center gap-2">
+<!-- Small secondary button "Prev" (disabled, readable) -->
+<button class="h-8 px-3 border border-hairline text-muted/60 text-[13px] font-medium r-2 cursor-not-allowed bg-subtle/30" disabled="">
+              Prev
+            </button>
+<!-- Small secondary button "Next" -->
+<button class="h-8 px-3 border border-ink text-ink hover:bg-ink hover:text-canvas transition-colors text-[13px] font-medium r-2">
+              Next
+            </button>
+</div>
+</div>
+</section>
+</main>
+</div>
+</body>
+</html>

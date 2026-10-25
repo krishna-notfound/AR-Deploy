@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1440, initial-scale=1.0">
+  <title>Dash v2 A – Application Detail (review)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #F3F0E9;
+      color: #1D1C1A;
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-serif-title {
+      font-family: 'Cormorant Garamond', serif;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body class="w-[1440px] min-h-screen bg-[#F3F0E9] text-[#1D1C1A] flex flex-row selection:bg-[#EAE3D6]">
+
+  <!-- LEFT SIDEBAR: 256px, solid #1D1C1A, full height -->
+  <aside class="w-[256px] min-h-screen bg-[#1D1C1A] text-[#F3F0E9] flex flex-col justify-between shrink-0 border-r border-[#1D1C1A]">
+    <!-- Top Section -->
+    <div>
+      <!-- Brand Block -->
+      <div class="px-6 pt-7 pb-6 border-b border-white/10">
+        <div class="text-[15px] font-normal tracking-[0.22em] text-[#F3F0E9] uppercase select-none">
+          S A N C T U S
+        </div>
+        <div class="text-[13px] text-[#F3F0E9]/70 mt-1 select-none font-normal">
+          Admin console
+        </div>
+      </div>
+
+      <!-- Navigation List -->
+      <nav class="pt-4 flex flex-col gap-0.5">
+        <!-- Overview -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+          </svg>
+          <span>Overview</span>
+        </a>
+
+        <!-- Applications (ACTIVE) -->
+        <a href="#" class="h-[40px] pl-[22px] pr-6 flex items-center justify-between text-[14px] font-medium text-[#F3F0E9] bg-white/[0.08] relative border-l-2 border-[#C9B79B]">
+          <div class="flex items-center">
+            <svg class="w-[18px] h-[18px] mr-3 stroke-[#F3F0E9] shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>Applications</span>
+          </div>
+          <!-- Badge: count 3, #1D1C1A on #C9B79B, 18px tall, 2px corners -->
+          <span class="h-[18px] px-1.5 min-w-[18px] rounded-[2px] bg-[#C9B79B] text-[#1D1C1A] text-[12px] font-medium flex items-center justify-center tabular-nums leading-none">
+            3
+          </span>
+        </a>
+
+        <!-- Businesses -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M3 21h18"></path>
+            <path d="M3 7v14"></path>
+            <path d="M21 7v14"></path>
+            <path d="M6 3h12v18H6z"></path>
+          </svg>
+          <span>Businesses</span>
+        </a>
+
+        <!-- All Products -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+          <span>All Products</span>
+        </a>
+
+        <!-- Analytics -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span>Analytics</span>
+        </a>
+
+        <!-- Catalogs & QR Codes -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+            <path d="M14 14h3v3h-3z"></path>
+            <path d="M20 14v6h-3"></path>
+            <path d="M14 20h3"></path>
+          </svg>
+          <span>Catalogs & QR Codes</span>
+        </a>
+
+        <!-- Team & Access -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Team & Access</span>
+        </a>
+
+        <!-- Audit log -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Audit log</span>
+        </a>
+
+        <!-- Settings -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Bottom Section of Sidebar -->
+    <div class="pb-6">
+      <!-- Collapse Row -->
+      <button class="w-full h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+        <svg class="w-[18px] h-[18px] mr-3 stroke-current shrink-0" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+          <polyline points="11 17 6 12 11 7"></polyline>
+          <polyline points="18 17 13 12 18 7"></polyline>
+        </svg>
+        <span>Collapse</span>
+      </button>
+
+      <!-- User Block -->
+      <div class="px-6 pt-3 mt-2 border-t border-white/10 flex items-center justify-between">
+        <span class="text-[13px] text-[#F3F0E9]/70 truncate max-w-[170px] select-none font-normal">
+          admin@platform.example
+        </span>
+        <button title="Log out" class="text-[#F3F0E9]/70 hover:text-[#F3F0E9] p-1 transition-colors">
+          <svg class="w-[18px] h-[18px] stroke-current" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA: 1184px remaining width -->
+  <div class="flex-1 min-h-screen flex flex-col bg-[#F3F0E9]">
+
+    <!-- TOP BAR: 56px, solid #F3F0E9, 1px bottom hairline #D9D3C7 -->
+    <header class="h-[56px] px-10 flex items-center justify-between border-b border-[#D9D3C7] bg-[#F3F0E9] shrink-0">
+      <!-- Breadcrumb: 14px -->
+      <div class="flex items-center text-[14px] leading-none">
+        <span class="text-[#5A5148]">Sanctus Admin</span>
+        <span class="mx-2 text-[#5A5148]">/</span>
+        <a href="#" class="text-[#5A5148] hover:text-[#1D1C1A] transition-colors">Applications</a>
+        <span class="mx-2 text-[#5A5148]">/</span>
+        <span class="text-[#1D1C1A] font-medium">Atelier Norte</span>
+      </div>
+
+      <!-- Right: Demo mode tag -->
+      <div class="h-[24px] px-2 rounded-[2px] border border-[#8A8073] flex items-center justify-center text-[12px] text-[#5A5148] leading-none select-none font-normal">
+        Demo mode
+      </div>
+    </header>
+
+    <!-- CONTENT AREA: 40px padding, content width 1104px (1184 - 80px) -->
+    <main class="p-10 max-w-[1184px]">
+      
+      <!-- 1. PAGE HEADER -->
+      <div class="flex items-start justify-between mb-8 pb-1">
+        <div>
+          <!-- h1: Cormorant Garamond 500, 32px, line-height 1.15 -->
+          <h1 class="font-serif-title font-medium text-[32px] leading-[1.15] text-[#1D1C1A] tracking-normal m-0">
+            Atelier Norte
+          </h1>
+          <!-- Subline: pill "Submitted" and 13px muted -->
+          <div class="flex items-center gap-2.5 mt-2">
+            <!-- Status pill: 20px tall, 2px corners, #6E5C45 on #EAE3D6 -->
+            <span class="h-[20px] px-2 rounded-[2px] bg-[#EAE3D6] text-[#6E5C45] text-[12px] font-medium inline-flex items-center leading-none">
+              Submitted
+            </span>
+            <span class="text-[13px] text-[#5A5148] font-normal tabular-nums">
+              #K7Q2M9XA · submitted 24 Oct 2026, 10:42
+            </span>
+          </div>
+        </div>
+
+        <!-- Action Buttons (Right side, three buttons 40px) -->
+        <div class="flex items-center gap-3 shrink-0">
+          <!-- Secondary: "Start review" (eye icon) transparent with 1px #1D1C1A border -->
+          <button class="h-[40px] px-4 rounded-[2px] border border-[#1D1C1A] bg-transparent text-[#1D1C1A] text-[14px] font-medium inline-flex items-center gap-2 hover:bg-[#ECE7DD]/50 transition-colors">
+            <svg class="w-4 h-4 stroke-current" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span>Start review</span>
+          </button>
+
+          <!-- Danger outline: "Reject" (x icon, 1px #A8362A border, #A8362A text, transparent) -->
+          <button class="h-[40px] px-4 rounded-[2px] border border-[#A8362A] bg-transparent text-[#A8362A] text-[14px] font-medium inline-flex items-center gap-2 hover:bg-[#F8E5E2]/40 transition-colors">
+            <svg class="w-4 h-4 stroke-current" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>Reject</span>
+          </button>
+
+          <!-- Primary: "Approve" (check icon, solid #1D1C1A with #F3F0E9 text) -->
+          <button class="h-[40px] px-5 rounded-[2px] bg-[#1D1C1A] text-[#F3F0E9] text-[14px] font-medium inline-flex items-center gap-2 hover:bg-[#3A352F] transition-colors">
+            <svg class="w-4 h-4 stroke-current" fill="none" stroke-width="1.5" viewBox="0 0 24 24">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Approve</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. TWO COLUMNS LAYOUT: 24px gap, left 7/12 (approx 634px), right 5/12 (approx 446px) -->
+      <div class="grid grid-cols-12 gap-6 items-start">
+        
+        <!-- LEFT COLUMN: 7 / 12 -->
+        <div class="col-span-7 flex flex-col gap-6">
+
+          <!-- Card 1: Business -->
+          <section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6">
+            <h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4] m-0 mb-4">
+              Business
+            </h2>
+
+            <dl class="m-0 p-0 divide-y divide-[#D9D3C7]">
+              <!-- Row: Business name -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Business name
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1">
+                  Atelier Norte
+                </dd>
+              </div>
+
+              <!-- Row: Category -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Category
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1">
+                  Furniture
+                </dd>
+              </div>
+
+              <!-- Row: Website -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Website
+                </dt>
+                <dd class="text-[14px] text-[#6E5C45] m-0 flex-1">
+                  <a href="https://ateliernorte.example" target="_blank" rel="noopener noreferrer" class="hover:underline text-[#6E5C45]">
+                    https://ateliernorte.example
+                  </a>
+                </dd>
+              </div>
+
+              <!-- Row: Location -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Location
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1">
+                  Porto, Portugal
+                </dd>
+              </div>
+
+              <!-- Row: About the business -->
+              <div class="min-h-[40px] py-2.5 flex items-start">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0 pt-0.5">
+                  About the business
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] leading-[20px] m-0 flex-1">
+                  Small workshop making solid oak and linen furniture to order.
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <!-- Card 2: Applicant -->
+          <section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6">
+            <h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4] m-0 mb-4">
+              Applicant
+            </h2>
+
+            <dl class="m-0 p-0 divide-y divide-[#D9D3C7]">
+              <!-- Row: Name -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Name
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1 font-normal">
+                  Rita Sousa
+                </dd>
+              </div>
+
+              <!-- Row: Role -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Role
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1">
+                  Founder
+                </dd>
+              </div>
+
+              <!-- Row: Email -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Email
+                </dt>
+                <dd class="text-[14px] text-[#6E5C45] m-0 flex-1">
+                  <a href="mailto:rita@ateliernorte.example" class="hover:underline text-[#6E5C45]">
+                    rita@ateliernorte.example
+                  </a>
+                </dd>
+              </div>
+
+              <!-- Row: Phone -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Phone
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1 tabular-nums">
+                  +351 22 000 0000
+                </dd>
+              </div>
+
+              <!-- Row: Preferred language -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Preferred language
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1">
+                  Português
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <!-- Card 3: Catalogue readiness -->
+          <section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6">
+            <h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4] m-0 mb-4">
+              Catalogue readiness
+            </h2>
+
+            <dl class="m-0 p-0 divide-y divide-[#D9D3C7]">
+              <!-- Products to show -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Products to show
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1 tabular-nums">
+                  11–50 products
+                </dd>
+              </div>
+
+              <!-- Product photos -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Product photos
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1">
+                  Some ready
+                </dd>
+              </div>
+
+              <!-- 3D models -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  3D models
+                </dt>
+                <dd class="text-[14px] text-[#1D1C1A] m-0 flex-1">
+                  Needs help creating 3D models
+                </dd>
+              </div>
+
+              <!-- Notes -->
+              <div class="min-h-[40px] py-2.5 flex items-center">
+                <dt class="w-[160px] text-[13px] font-medium text-[#5A5148] shrink-0">
+                  Notes
+                </dt>
+                <dd class="text-[14px] text-[#5A5148] m-0 flex-1 italic">
+                  Not given
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+        </div>
+
+        <!-- RIGHT COLUMN: 5 / 12 -->
+        <div class="col-span-5 flex flex-col gap-6">
+
+          <!-- Card 1: History -->
+          <section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4] m-0">
+                History
+              </h2>
+              <!-- Small neutral tag: "Sample data" -->
+              <span class="h-[20px] px-2 rounded-[2px] bg-[#ECE7DD] text-[#3A352F] text-[12px] font-medium inline-flex items-center leading-none">
+                Sample data
+              </span>
+            </div>
+
+            <!-- Vertical timeline: 1px #D9D3C7 line, 8px ink dots -->
+            <div class="relative pl-6 pt-1 pb-1">
+              <!-- Timeline vertical rule -->
+              <div class="absolute left-[3px] top-[10px] bottom-1 w-[1px] bg-[#D9D3C7]"></div>
+
+              <!-- Item 1: Application submitted -->
+              <div class="relative">
+                <!-- Dot: 8px ink #1D1C1A -->
+                <div class="absolute -left-[24px] top-[6px] w-[8px] h-[8px] rounded-full bg-[#1D1C1A]"></div>
+                
+                <div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">
+                  Application submitted
+                </div>
+                <div class="text-[13px] text-[#5A5148] mt-1 tabular-nums">
+                  24 Oct 2026, 10:42 · rita@ateliernorte.example
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Card 2: Email activity -->
+          <section class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6">
+            <h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4] m-0 mb-1.5">
+              Email activity
+            </h2>
+            <p class="text-[13px] text-[#5A5148] leading-[19px] m-0 mb-4">
+              Each attempt as recorded by the platform. “Accepted” means Resend took the message; only “Delivered” confirms arrival.
+            </p>
+
+            <div class="border-t border-[#D9D3C7] divide-y divide-[#D9D3C7]">
+              <!-- Row 1: Application confirmation -->
+              <div class="py-3.5 flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">
+                    Application confirmation
+                  </div>
+                  <div class="text-[13px] text-[#5A5148] mt-1 tabular-nums">
+                    To rita@ateliernorte.example · 24 Oct 2026, 10:42
+                  </div>
+                  <div class="text-[13px] text-[#5A5148] mt-0.5">
+                    Demo mode: no email is sent.
+                  </div>
+                </div>
+                <!-- Status pill: Not sent = #3A352F on #ECE7DD -->
+                <span class="h-[20px] px-2 rounded-[2px] bg-[#ECE7DD] text-[#3A352F] text-[12px] font-medium inline-flex items-center leading-none shrink-0 mt-0.5">
+                  Not sent
+                </span>
+              </div>
+
+              <!-- Row 2: Admin notification -->
+              <div class="py-3.5 flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">
+                    Admin notification
+                  </div>
+                  <div class="text-[13px] text-[#5A5148] mt-1 tabular-nums">
+                    To admin@platform.example · 24 Oct 2026, 10:42
+                  </div>
+                  <div class="text-[13px] text-[#5A5148] mt-0.5">
+                    Demo mode: no email is sent.
+                  </div>
+                </div>
+                <!-- Status pill: Not sent = #3A352F on #ECE7DD -->
+                <span class="h-[20px] px-2 rounded-[2px] bg-[#ECE7DD] text-[#3A352F] text-[12px] font-medium inline-flex items-center leading-none shrink-0 mt-0.5">
+                  Not sent
+                </span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+</body>
+</html>

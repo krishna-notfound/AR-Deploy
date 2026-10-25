@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Product Editor</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#F3F0E9',
+            surface: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            ink: '#1D1C1A',
+            bodytext: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzetext: '#6E5C45',
+            softbronze: '#EAE3D6',
+            lightbronze: '#C9B79B',
+            obsidian: '#1D1C1A',
+            chalk: '#F3F0E9'
+          },
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F3F0E9;
+      color: #3A352F;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Custom inputs */
+    input, select, textarea {
+      font-family: 'Inter', sans-serif;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #1D1C1A !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex bg-canvas text-bodytext text-[14px] leading-[20px]" style="width: 1440px; min-width: 1440px; margin: 0 auto;">
+<!-- Left Sidebar (256px, solid #1D1C1A, full height) -->
+<aside class="w-[256px] min-w-[256px] bg-obsidian text-chalk flex flex-col justify-between self-stretch shrink-0 z-30">
+<div class="flex flex-col">
+<!-- Top Brand Block -->
+<div class="px-6 pt-7 pb-6 border-b border-white/[0.10]">
+<div class="text-[15px] tracking-[0.25em] font-medium text-chalk uppercase font-sans">
+          S A N C T U S
+        </div>
+<div class="text-[13px] text-chalk/70 mt-1.5 font-normal">
+          Casa Lisboa Interiors
+        </div>
+</div>
+<!-- Nav Items -->
+<nav class="mt-4 px-3 space-y-1">
+<!-- Overview -->
+<a class="h-[40px] flex items-center px-3 rounded-[2px] text-chalk/70 hover:text-chalk hover:bg-white/[0.04] transition-colors text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="7" rx="1" width="7" x="3" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="14"></rect>
+<rect height="7" rx="1" width="7" x="3" y="14"></rect>
+</svg>
+          Overview
+        </a>
+<!-- My Products (active) -->
+<a class="h-[40px] flex items-center px-3 rounded-[2px] bg-white/[0.08] text-chalk font-medium text-[14px] relative" href="#">
+<span class="absolute left-0 top-0 bottom-0 w-[2px] bg-lightbronze"></span>
+<svg class="w-[18px] h-[18px] mr-3 shrink-0 text-chalk" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+<path d="m3.3 7 8.7 5 8.7-5"></path>
+<path d="M12 22V12"></path>
+</svg>
+          My Products
+        </a>
+<!-- Analytics -->
+<a class="h-[40px] flex items-center px-3 rounded-[2px] text-chalk/70 hover:text-chalk hover:bg-white/[0.04] transition-colors text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M3 3v18h18"></path>
+<path d="m19 9-5 5-4-4-3 3"></path>
+</svg>
+          Analytics
+        </a>
+<!-- My Catalog & QR -->
+<a class="h-[40px] flex items-center px-3 rounded-[2px] text-chalk/70 hover:text-chalk hover:bg-white/[0.04] transition-colors text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<rect height="3" width="3" x="14" y="14"></rect>
+<rect height="3" width="3" x="18" y="18"></rect>
+</svg>
+          My Catalog &amp; QR
+        </a>
+<!-- Business Settings -->
+<a class="h-[40px] flex items-center px-3 rounded-[2px] text-chalk/70 hover:text-chalk hover:bg-white/[0.04] transition-colors text-[14px]" href="#">
+<svg class="w-[18px] h-[18px] mr-3 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+          Business Settings
+        </a>
+</nav>
+</div>
+<!-- Bottom Sidebar Section -->
+<div class="px-4 pb-6 space-y-2 border-t border-white/[0.08] pt-4">
+<!-- Collapse row -->
+<button class="w-full h-[36px] flex items-center px-2 text-chalk/70 hover:text-chalk transition-colors text-[13px] rounded-[2px]">
+<svg class="w-[16px] h-[16px] mr-2.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="m11 17-5-5 5-5"></path>
+<path d="m18 17-5-5 5-5"></path>
+</svg>
+        Collapse
+      </button>
+<!-- User block -->
+<div class="flex items-center justify-between px-2 pt-2">
+<span class="text-[13px] text-chalk/80 truncate max-w-[170px]" title="owner@casalisboa.example">owner@casalisboa.example</span>
+<button class="text-chalk/60 hover:text-chalk p-1" title="Log out">
+<svg class="w-[16px] h-[16px]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- Main Content Wrap -->
+<div class="flex-1 flex flex-col min-w-0 bg-canvas relative pb-[88px]">
+<!-- Top Bar (56px, solid #F3F0E9, 1px bottom hairline) -->
+<header class="h-[56px] min-h-[56px] bg-canvas border-b border-hairline px-10 flex items-center justify-between shrink-0 sticky top-0 z-20">
+<!-- Left Breadcrumb -->
+<div class="flex items-center space-x-2 text-[14px]">
+<span class="text-muted">Casa Lisboa Interiors</span>
+<span class="text-hairline">/</span>
+<span class="text-muted">My Products</span>
+<span class="text-hairline">/</span>
+<span class="text-ink font-medium">Add product</span>
+</div>
+<!-- Right Actions -->
+<div class="flex items-center space-x-4">
+<span class="h-[24px] px-2.5 inline-flex items-center text-[12px] text-muted border border-strongline rounded-[2px] font-medium leading-none">
+          Demo mode
+        </span>
+<a class="text-[14px] font-medium text-ink hover:underline inline-flex items-center" href="#">
+          View catalog ↗
+        </a>
+</div>
+</header>
+<!-- Page Body: 40px padding, content width 1104px -->
+<main class="p-10 max-w-[1104px] w-full">
+<!-- Page Header -->
+<div class="mb-8">
+<h1 class="font-serif text-[32px] leading-[1.15] font-medium text-ink">
+          Add product
+        </h1>
+<div class="mt-2 flex items-center space-x-3 text-[13px]">
+<span class="h-[20px] px-2 inline-flex items-center text-[12px] font-medium bg-[#ECE7DD] text-[#3A352F] rounded-[2px] leading-none">
+            Draft
+          </span>
+<span class="text-muted">Casa Lisboa Interiors</span>
+<span class="text-hairline">·</span>
+<span class="text-[#8F5A0B] font-medium">Unsaved changes</span>
+</div>
+</div>
+<!-- Two Columns Layout: Left Index 200px Sticky, Right Form 840px (32px gap) -->
+<div class="flex items-start gap-8">
+<!-- Sticky Section Index (200px) -->
+<aside class="w-[200px] min-w-[200px] shrink-0 sticky top-[80px]">
+<ul class="space-y-0 text-[14px]">
+<li>
+<a class="h-[36px] flex items-center px-3 text-ink font-medium relative border-l-2 border-ink" href="#basic-info">
+                Basic information
+              </a>
+</li>
+<li>
+<a class="h-[36px] flex items-center px-3 text-muted hover:text-ink transition-colors border-l-2 border-transparent" href="#images">
+                Images
+              </a>
+</li>
+<li>
+<a class="h-[36px] flex items-center px-3 text-muted hover:text-ink transition-colors border-l-2 border-transparent" href="#3d-models">
+                3D models
+              </a>
+</li>
+<li>
+<a class="h-[36px] flex items-center px-3 text-muted hover:text-ink transition-colors border-l-2 border-transparent" href="#dimensions">
+                Dimensions &amp; specs
+              </a>
+</li>
+<li>
+<a class="h-[36px] flex items-center px-3 text-muted hover:text-ink transition-colors border-l-2 border-transparent" href="#cta">
+                Call to action
+              </a>
+</li>
+</ul>
+</aside>
+<!-- Form Column (840px, cards 24px apart) -->
+<div class="w-[840px] flex-1 space-y-6">
+<!-- Card 1: Basic Information -->
+<section class="bg-surface border border-hairline rounded-[2px] p-6" id="basic-info">
+<div class="mb-5">
+<h2 class="text-[16px] leading-[1.4] font-semibold text-ink">Basic information</h2>
+</div>
+<div class="space-y-5">
+<!-- Product Name -->
+<div>
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center space-x-1.5 text-[14px]">
+<label class="font-medium text-ink" for="product-name">Product name</label>
+<span class="text-[13px] text-muted font-normal">English</span>
+<span class="text-hairline">·</span>
+<span class="text-[13px] text-muted font-normal">Required</span>
+</div>
+<!-- Segmented Control EN | PT -->
+<div class="inline-flex border border-hairline rounded-[2px] overflow-hidden text-[12px] font-medium leading-none">
+<button class="px-2 py-1 bg-subtle text-ink font-medium" type="button">EN</button>
+<button class="px-2 py-1 bg-surface text-muted hover:text-ink border-l border-hairline" type="button">PT</button>
+</div>
+</div>
+<input class="w-full h-[40px] px-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink" id="product-name" type="text" value="Alfama Bookcase"/>
+</div>
+<!-- Product URL -->
+<div>
+<div class="flex items-center space-x-1.5 text-[14px] mb-2">
+<label class="font-medium text-ink" for="product-url">Product URL</label>
+<span class="text-hairline">·</span>
+<span class="text-[13px] text-muted font-normal">Required</span>
+</div>
+<div class="flex rounded-[2px] border border-hairline bg-surface overflow-hidden h-[40px]">
+<span class="h-full px-3.5 bg-subtle flex items-center text-[13px] text-muted border-r border-hairline shrink-0">
+                    /products/
+                  </span>
+<input class="flex-1 px-3 text-[14px] text-ink bg-transparent outline-none" id="product-url" type="text" value="alfama-bookcase"/>
+</div>
+<p class="text-[13px] text-muted mt-2">Demo URL: casa-lisboa.example.com/products/alfama-bookcase</p>
+</div>
+<!-- Short Description -->
+<div>
+<div class="flex items-center justify-between mb-2">
+<label class="text-[14px] font-medium text-ink" for="short-desc">Short description</label>
+<!-- Segmented Control EN | PT (translation missing indicator) -->
+<div class="inline-flex border border-hairline rounded-[2px] overflow-hidden text-[12px] font-medium leading-none">
+<button class="px-2 py-1 bg-subtle text-ink font-medium" type="button">EN</button>
+<button class="px-2 py-1 bg-surface text-muted hover:text-ink border-l border-hairline flex items-center gap-1" type="button">
+<span>PT</span>
+<span class="text-[#8F5A0B]">·</span>
+</button>
+</div>
+</div>
+<input class="w-full h-[40px] px-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink" id="short-desc" type="text" value="Open oak bookcase with five shelves."/>
+<p class="text-[13px] text-muted mt-2">One sentence shown under the price.</p>
+</div>
+<!-- Full Description -->
+<div>
+<div class="flex items-center justify-between mb-2">
+<label class="text-[14px] font-medium text-ink" for="full-desc">Full description</label>
+<!-- Segmented Control EN | PT -->
+<div class="inline-flex border border-hairline rounded-[2px] overflow-hidden text-[12px] font-medium leading-none">
+<button class="px-2 py-1 bg-subtle text-ink font-medium" type="button">EN</button>
+<button class="px-2 py-1 bg-surface text-muted hover:text-ink border-l border-hairline" type="button">PT</button>
+</div>
+</div>
+<textarea class="w-full p-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink leading-[20px]" id="full-desc" rows="4">A tall open bookcase in solid oak. Five fixed shelves hold books and objects; the back is open so it can stand in the middle of a room.</textarea>
+</div>
+<!-- Row of 3: Category, Price, Currency -->
+<div class="grid grid-cols-12 gap-4">
+<div class="col-span-6">
+<label class="block text-[14px] font-medium text-ink mb-2" for="category">Category</label>
+<select class="w-full h-[40px] px-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink" id="category">
+<option selected="">Storage</option>
+<option>Seating</option>
+<option>Tables</option>
+<option>Lighting</option>
+</select>
+</div>
+<div class="col-span-3">
+<label class="block text-[14px] font-medium text-ink mb-2" for="price">Price</label>
+<input class="w-full h-[40px] px-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink tabular-nums" id="price" type="text" value="540.00"/>
+<p class="text-[13px] text-muted mt-2">Required to publish.</p>
+</div>
+<div class="col-span-3">
+<label class="block text-[14px] font-medium text-ink mb-2" for="currency">Currency</label>
+<select class="w-full h-[40px] px-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink" id="currency">
+<option selected="">EUR</option>
+<option>USD</option>
+<option>GBP</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- Card 2: Images -->
+<section class="bg-surface border border-hairline rounded-[2px] p-6" id="images">
+<div class="mb-5">
+<h2 class="text-[16px] leading-[1.4] font-semibold text-ink">Images</h2>
+<p class="text-[13px] text-muted mt-0.5">Product photos for the gallery. At least one is required to publish.</p>
+</div>
+<!-- Row of three 112px square photos + add images slot -->
+<div class="flex items-center gap-4">
+<!-- Photo 1: Front with Primary pill -->
+<div class="w-[112px] h-[112px] border border-hairline rounded-[2px] relative overflow-hidden bg-subtle shrink-0">
+<img alt="Alfama Bookcase front" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCa6G-zdi18XLRW6lkPEPqtnkF35knICDmPxQOcu9wrSFTHjIvaz79POReCquhQbPADW3eSJ_vtcsi-wByz-o5V1HI2JbZoCrfEju5OfDKGI7xL6mwqMVWZNGVe8skI2WPPWNiTPOPZZOqShiMw8Q-2OsIaVQN1HYjl2qC5ZxuSMd0aBhTWYGbVgEDFUXaV8EEUGAo58Xtf14WW3SXaISWVfu0Mqq7_Jh960B_3dx4tLwvDCsTcmKzsK1qh0eN1FirUgwe-F1qYRDG8"/>
+<span class="absolute bottom-2 left-2 h-[20px] px-1.5 inline-flex items-center text-[12px] font-medium bg-[#ECE7DD] text-[#3A352F] rounded-[2px] leading-none">
+                  Primary
+                </span>
+<button class="absolute top-1.5 right-1.5 w-[20px] h-[20px] bg-ink/70 hover:bg-ink text-chalk rounded-[2px] flex items-center justify-center transition-colors" title="Remove image" type="button">
+<svg class="w-[12px] h-[12px]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<line x1="18" x2="6" y1="6" y2="18"></line>
+<line x1="6" x2="18" y1="6" y2="18"></line>
+</svg>
+</button>
+</div>
+<!-- Photo 2: Side view -->
+<div class="w-[112px] h-[112px] border border-hairline rounded-[2px] relative overflow-hidden bg-subtle shrink-0">
+<img alt="Alfama Bookcase side" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuALFDKiP30wPp2oIVvqk-W-OWfRmR5ukb7kxCxJBCm9NeQ4VCEihUoAygssn_qXtfZIRGxxyjFNR_ysixQGugizraQCVOZ7kSLsfu0nURpGECQnnMTUabE7xpMO99WE0QBTCY4_7pP9L8g3JpOG22uQ0D8rOA4POmrb-T7WsjZk90a_tZRG17nsgvbNTNrgD24MsEMqPwJBjGlf4trs1F37wd8yrsW9GYqBppmfIGREg3vQsKT4oixXTgmzRK8_FuzFaTnwmi7zbSMZ"/>
+<button class="absolute top-1.5 right-1.5 w-[20px] h-[20px] bg-ink/70 hover:bg-ink text-chalk rounded-[2px] flex items-center justify-center transition-colors" title="Remove image" type="button">
+<svg class="w-[12px] h-[12px]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<line x1="18" x2="6" y1="6" y2="18"></line>
+<line x1="6" x2="18" y1="6" y2="18"></line>
+</svg>
+</button>
+</div>
+<!-- Photo 3: Shelf detail -->
+<div class="w-[112px] h-[112px] border border-hairline rounded-[2px] relative overflow-hidden bg-subtle shrink-0">
+<img alt="Alfama Bookcase shelf detail" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwZM6WtR-U4qXWrqNLgPXA0Bf4VCQCSxMPhx_0tb8fJFtT3-MPdxB8M0-C1tjQ9pwCv2qC7MYuun9OPZaFJ1EKcuz6jFF74VDn6_BB2CJo9CJ1X9XfmnT8giYIBP7zYVkpu-35JDvn7_6D6KTuQPqBBysy16uz8eJGAKIYfuLmHQVP_DV5bWd9tQx8M0b2G6rrelgPec7_HdZMOmpIRbdDQTthDny595wLi-gv4_nEZpDz8zyjDFYwERNoeVZU11P78ECi9rtx1ReH"/>
+<button class="absolute top-1.5 right-1.5 w-[20px] h-[20px] bg-ink/70 hover:bg-ink text-chalk rounded-[2px] flex items-center justify-center transition-colors" title="Remove image" type="button">
+<svg class="w-[12px] h-[12px]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<line x1="18" x2="6" y1="6" y2="18"></line>
+<line x1="6" x2="18" y1="6" y2="18"></line>
+</svg>
+</button>
+</div>
+<!-- Add Images Slot: 112px square dashed -->
+<button class="w-[112px] h-[112px] border border-dashed border-strongline rounded-[2px] flex flex-col items-center justify-center text-muted hover:text-ink hover:border-ink transition-colors bg-surface shrink-0" type="button">
+<svg class="w-[20px] h-[20px] mb-1.5 text-muted" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+<polyline points="17 8 12 3 7 8"></polyline>
+<line x1="12" x2="12" y1="3" y2="15"></line>
+</svg>
+<span class="text-[13px] font-medium leading-tight">Add images</span>
+</button>
+</div>
+<!-- Hairline divider -->
+<div class="border-t border-hairline my-6"></div>
+<!-- Additional Photos Sub-heading -->
+<div>
+<h3 class="text-[14px] leading-[20px] font-semibold text-ink">Additional photos</h3>
+<p class="text-[13px] text-muted mt-0.5 mb-3">Room shots, details and close-ups shown lower on the product page.</p>
+<!-- 64px tall dashed drop area -->
+<button class="w-full h-[64px] border border-dashed border-strongline rounded-[2px] flex items-center justify-center space-x-2 text-muted hover:text-ink hover:border-ink transition-colors bg-surface" type="button">
+<svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+<span class="text-[13px] font-medium">Add images</span>
+</button>
+</div>
+</section>
+<!-- Card 3: 3D Models -->
+<section class="bg-surface border border-hairline rounded-[2px] p-6" id="3d-models">
+<div class="mb-5">
+<h2 class="text-[16px] leading-[1.4] font-semibold text-ink">3D models</h2>
+<p class="text-[13px] text-muted mt-0.5">Optional. Products without a model show photos only.</p>
+</div>
+<!-- Neutral Notice (#ECE7DD, info icon, 13px) -->
+<div class="p-3.5 bg-subtle border border-hairline rounded-[2px] flex items-start space-x-3 mb-6">
+<svg class="w-[16px] h-[16px] text-muted shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<line x1="12" x2="12" y1="16" y2="12"></line>
+<line x1="12" x2="12.01" y1="8" y2="8"></line>
+</svg>
+<p class="text-[13px] text-bodytext leading-[18px]">
+                Upload the files your 3D artist delivered. GLB powers the 3D viewer and Android AR. USDZ is used by iPhone and iPad AR.
+              </p>
+</div>
+<!-- Two Upload Slots Side by Side -->
+<div class="grid grid-cols-2 gap-4 mb-6">
+<!-- GLB Model Box -->
+<div class="border border-hairline rounded-[2px] p-4 bg-surface flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1">
+<h3 class="text-[14px] font-semibold text-ink">GLB model</h3>
+<!-- Segmented control -->
+<div class="inline-flex border border-hairline rounded-[2px] overflow-hidden text-[12px] font-medium leading-none">
+<button class="px-2 py-1 bg-subtle text-ink font-medium" type="button">Uploaded file</button>
+<button class="px-2 py-1 bg-surface text-muted hover:text-ink border-l border-hairline" type="button">Remote URL</button>
+</div>
+</div>
+<p class="text-[13px] text-muted mb-3 leading-[18px]">
+                    Used for the interactive 3D viewer on every device and for AR on Android (Scene Viewer).
+                  </p>
+<!-- File Row -->
+<div class="p-2.5 bg-subtle/60 border border-hairline rounded-[2px] flex items-center justify-between mb-2 overflow-hidden"><div class="flex items-center gap-2 min-w-0"><svg class="w-[16px] h-[16px] text-muted shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg><span class="text-[14px] font-medium text-ink truncate">alfama-bookcase.glb</span><span class="text-[13px] text-muted tabular-nums shrink-0">4.2 MB</span></div><div class="flex items-center gap-4 shrink-0 pl-3"><button class="text-[13px] text-ink hover:underline font-medium leading-none" type="button">Replace</button><button class="text-[13px] text-[#A8362A] hover:underline font-medium leading-none" type="button">Remove</button></div></div>
+</div>
+<p class="text-[13px] text-muted mt-2">Stored in this browser session only. Real hosting needs backend storage.</p>
+</div>
+<!-- USDZ Model Box -->
+<div class="border border-hairline rounded-[2px] p-4 bg-surface flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1">
+<h3 class="text-[14px] font-semibold text-ink">USDZ model</h3>
+<!-- Segmented control -->
+<div class="inline-flex border border-hairline rounded-[2px] overflow-hidden text-[12px] font-medium leading-none">
+<button class="px-2 py-1 bg-subtle text-ink font-medium" type="button">Uploaded file</button>
+<button class="px-2 py-1 bg-surface text-muted hover:text-ink border-l border-hairline" type="button">Remote URL</button>
+</div>
+</div>
+<p class="text-[13px] text-muted mb-3 leading-[18px]">
+                    Used for AR on iPhone and iPad (AR Quick Look).
+                  </p>
+<!-- 88px Dashed Drop Area -->
+<button class="w-full h-[88px] border border-dashed border-strongline rounded-[2px] flex flex-col items-center justify-center text-muted hover:text-ink hover:border-ink transition-colors bg-surface" type="button">
+<svg class="w-[20px] h-[20px] mb-1.5 text-muted" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+<polyline points="17 8 12 3 7 8"></polyline>
+<line x1="12" x2="12" y1="3" y2="15"></line>
+</svg>
+<span class="text-[13px] font-medium">Upload USDZ</span>
+</button>
+</div>
+</div>
+</div>
+<!-- 3D Preview Stage (320px tall on #ECE7DD) -->
+<div class="w-full h-[320px] bg-subtle border border-hairline rounded-[2px] relative flex flex-col items-center justify-center overflow-hidden mb-3">
+<!-- Mode badge / hint -->
+<!-- Stylized Vector Render of Tall Open Oak Bookcase with 5 shelves -->
+<svg class="w-[240px] h-[240px] drop-shadow-md" fill="none" viewbox="0 0 320 280" xmlns="http://www.w3.org/2000/svg">
+<!-- Drop shadow on floor -->
+<ellipse cx="160" cy="256" fill="#1D1C1A" fill-opacity="0.12" rx="72" ry="10"></ellipse>
+<!-- Left Vertical Upright (warm solid oak tone) -->
+<rect fill="#A88B68" height="216" rx="1" width="12" x="94" y="32"></rect>
+<rect fill="#BD9F7B" height="216" rx="1" width="4" x="92" y="32"></rect>
+<!-- Right Vertical Upright -->
+<rect fill="#947856" height="216" rx="1" width="12" x="214" y="32"></rect>
+<rect fill="#A88B68" height="216" rx="1" width="4" x="212" y="32"></rect>
+<!-- Shelf 1 (Top) -->
+<path d="M92 48 L226 48 L224 56 L94 56 Z" fill="#BD9F7B"></path>
+<rect fill="#886C4B" height="4" width="130" x="94" y="54"></rect>
+<!-- Shelf 2 -->
+<path d="M92 92 L226 92 L224 100 L94 100 Z" fill="#BD9F7B"></path>
+<rect fill="#886C4B" height="4" width="130" x="94" y="98"></rect>
+<!-- Decorative ceramic vase on Shelf 2 -->
+<ellipse cx="190" cy="84" fill="#5A5148" rx="7" ry="9"></ellipse>
+<ellipse cx="190" cy="75" fill="#3A352F" rx="4" ry="2"></ellipse>
+<!-- Shelf 3 (Middle) -->
+<path d="M92 136 L226 136 L224 144 L94 144 Z" fill="#BD9F7B"></path>
+<rect fill="#886C4B" height="4" width="130" x="94" y="142"></rect>
+<!-- Small stack of curated art books -->
+<rect fill="#EAE3D6" height="10" rx="1" width="30" x="120" y="126"></rect>
+<rect fill="#8A765C" height="6" rx="1" width="26" x="122" y="120"></rect>
+<!-- Shelf 4 -->
+<path d="M92 180 L226 180 L224 188 L94 188 Z" fill="#BD9F7B"></path>
+<rect fill="#886C4B" height="4" width="130" x="94" y="186"></rect>
+<!-- Shelf 5 (Bottom) -->
+<path d="M92 224 L226 224 L224 232 L94 232 Z" fill="#BD9F7B"></path>
+<rect fill="#886C4B" height="4" width="130" x="94" y="230"></rect>
+<!-- Perspective subtle cross-bracing / back framing lines -->
+<line stroke="#6E5C45" stroke-linecap="round" stroke-width="3" x1="94" x2="94" y1="244" y2="252"></line>
+<line stroke="#6E5C45" stroke-linecap="round" stroke-width="3" x1="224" x2="224" y1="244" y2="252"></line>
+</svg>
+<!-- Stage footer interaction help -->
+</div>
+<!-- Scale verified check line -->
+<div class="flex items-center space-x-2 text-[13px] text-[#2F6B4F] mb-6">
+<svg class="w-[16px] h-[16px] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span class="font-normal text-bodytext">
+<strong class="font-medium text-[#2F6B4F]">Scale verified:</strong> the model matches the entered dimensions (within 5%, or 1 cm for small pieces).
+              </span>
+</div>
+<!-- AR Readiness Bordered Box -->
+<div class="border border-hairline rounded-[2px] p-4 bg-surface">
+<h3 class="text-[14px] font-semibold text-ink mb-3">AR readiness</h3>
+<div class="space-y-3">
+<!-- Row 1: 3D viewer -->
+<div class="flex items-center justify-between text-[13px]">
+<div class="flex items-center space-x-2.5">
+<svg class="w-[15px] h-[15px] text-[#2F6B4F]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span class="text-ink">3D viewer</span>
+</div>
+<span class="h-[20px] px-2 inline-flex items-center text-[12px] font-medium bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px] leading-none">
+                    Ready
+                  </span>
+</div>
+<!-- Row 2: Android AR -->
+<div class="flex items-center justify-between text-[13px]">
+<div class="flex items-center space-x-2.5">
+<svg class="w-[15px] h-[15px] text-[#2F6B4F]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span class="text-ink">Android AR</span>
+</div>
+<span class="h-[20px] px-2 inline-flex items-center text-[12px] font-medium bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px] leading-none">
+                    Ready
+                  </span>
+</div>
+<!-- Row 3: iPhone and iPad AR (Warning) -->
+<div>
+<div class="flex items-center justify-between text-[13px]">
+<div class="flex items-center space-x-2.5">
+<svg class="w-[15px] h-[15px] text-[#8F5A0B]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+<line x1="12" x2="12" y1="9" y2="13"></line>
+<line x1="12" x2="12.01" y1="17" y2="17"></line>
+</svg>
+<span class="text-ink">iPhone and iPad AR</span>
+</div>
+<span class="h-[20px] px-2 inline-flex items-center text-[12px] font-medium bg-[#F8EEDC] text-[#8F5A0B] rounded-[2px] leading-none">
+                      Needs attention
+                    </span>
+</div>
+<p class="text-[13px] text-muted ml-6 mt-1">
+                    No USDZ: the phone converts the GLB itself, which is slower and not guaranteed. Upload a USDZ.
+                  </p>
+</div>
+<!-- Row 4: True size -->
+<div class="flex items-center justify-between text-[13px]">
+<div class="flex items-center space-x-2.5">
+<svg class="w-[15px] h-[15px] text-[#2F6B4F]" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span class="text-ink">True size</span>
+</div>
+<span class="h-[20px] px-2 inline-flex items-center text-[12px] font-medium bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px] leading-none">
+                    Ready
+                  </span>
+</div>
+</div>
+</div>
+</section>
+<!-- Card 4: Dimensions & Specifications -->
+<section class="bg-surface border border-hairline rounded-[2px] p-6" id="dimensions">
+<div class="mb-5">
+<h2 class="text-[16px] leading-[1.4] font-semibold text-ink">Dimensions &amp; specifications</h2>
+<p class="text-[13px] text-muted mt-0.5">Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale.</p>
+</div>
+<div class="space-y-5">
+<!-- Measured in row -->
+<div class="flex items-center space-x-3 text-[14px]">
+<span class="font-medium text-ink">Measured in</span>
+<div class="inline-flex border border-hairline rounded-[2px] overflow-hidden text-[13px] font-medium leading-none">
+<button class="px-3 py-1.5 bg-subtle text-ink font-medium" type="button">Centimetres</button>
+<button class="px-3 py-1.5 bg-surface text-muted hover:text-ink border-l border-hairline" type="button">Inches</button>
+</div>
+</div>
+<!-- Row of 3 128px inputs: Width, Height, Depth -->
+<div class="flex items-center gap-4">
+<div class="w-[128px]">
+<label class="block text-[14px] font-medium text-ink mb-2" for="dim-width">Width</label>
+<div class="flex rounded-[2px] border border-hairline bg-surface overflow-hidden h-[40px]">
+<input class="w-full px-3 text-[14px] text-ink bg-transparent outline-none tabular-nums" id="dim-width" type="text" value="60"/>
+<span class="h-full px-2.5 bg-subtle flex items-center text-[13px] text-muted border-l border-hairline shrink-0">
+                      cm
+                    </span>
+</div>
+</div>
+<div class="w-[128px]">
+<label class="block text-[14px] font-medium text-ink mb-2" for="dim-height">Height</label>
+<div class="flex rounded-[2px] border border-hairline bg-surface overflow-hidden h-[40px]">
+<input class="w-full px-3 text-[14px] text-ink bg-transparent outline-none tabular-nums" id="dim-height" type="text" value="200"/>
+<span class="h-full px-2.5 bg-subtle flex items-center text-[13px] text-muted border-l border-hairline shrink-0">
+                      cm
+                    </span>
+</div>
+</div>
+<div class="w-[128px]">
+<label class="block text-[14px] font-medium text-ink mb-2" for="dim-depth">Depth</label>
+<div class="flex rounded-[2px] border border-hairline bg-surface overflow-hidden h-[40px]">
+<input class="w-full px-3 text-[14px] text-ink bg-transparent outline-none tabular-nums" id="dim-depth" type="text" value="32"/>
+<span class="h-full px-2.5 bg-subtle flex items-center text-[13px] text-muted border-l border-hairline shrink-0">
+                      cm
+                    </span>
+</div>
+</div>
+</div>
+<!-- Row: Material and Weight -->
+<div class="grid grid-cols-12 gap-4">
+<!-- Material with EN | PT -->
+<div class="col-span-8">
+<div class="flex items-center justify-between mb-2">
+<label class="text-[14px] font-medium text-ink" for="spec-material">Material</label>
+<div class="inline-flex border border-hairline rounded-[2px] overflow-hidden text-[12px] font-medium leading-none">
+<button class="px-2 py-1 bg-subtle text-ink font-medium" type="button">EN</button>
+<button class="px-2 py-1 bg-surface text-muted hover:text-ink border-l border-hairline" type="button">PT</button>
+</div>
+</div>
+<input class="w-full h-[40px] px-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink" id="spec-material" type="text" value="Solid oak"/>
+</div>
+<!-- Weight with Optional and kg select -->
+<div class="col-span-4">
+<div class="flex items-center space-x-1.5 mb-2"><input class="flex-1 px-3 text-[14px] text-ink bg-transparent outline-none tabular-nums" id="spec-weight" type="text" value="38"/><div class="relative w-[72px] h-full shrink-0 border-l border-hairline bg-subtle"><select class="w-full h-full pl-3 pr-6 bg-transparent text-[13px] text-muted outline-none appearance-none cursor-pointer"><option selected="">kg</option><option>lb</option></select><svg class="w-[12px] h-[12px] text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg></div></div>
+<div class="flex rounded-[2px] border border-hairline bg-surface overflow-hidden h-[40px]"><input class="flex-1 px-3 text-[14px] text-ink bg-transparent outline-none tabular-nums" id="spec-weight" type="text" value="38"/><div class="relative w-[72px] h-full shrink-0 border-l border-hairline bg-subtle"><select class="w-full h-full pl-3 pr-6 bg-transparent text-[13px] text-muted outline-none appearance-none cursor-pointer"><option selected="">kg</option><option>lb</option></select><svg class="w-[12px] h-[12px] text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg></div></div>
+</div>
+</div>
+<!-- Sub-heading: Colours and variants -->
+<div class="pt-4 border-t border-hairline">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="text-[14px] font-semibold text-ink">Colours and variants</h3>
+<p class="text-[13px] text-muted mt-0.5">No colours or options yet.</p>
+</div>
+<!-- Small secondary button -->
+<button class="h-[36px] px-3 bg-transparent border border-ink rounded-[2px] text-[14px] font-medium text-ink hover:bg-subtle/50 transition-colors" type="button">
+                    Add colour or option
+                  </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Card 5: Call to Action -->
+<section class="bg-surface border border-hairline rounded-[2px] p-6" id="cta">
+<div class="mb-5">
+<h2 class="text-[16px] leading-[1.4] font-semibold text-ink">Call to action</h2>
+<p class="text-[13px] text-muted mt-0.5">The main button on the product page, for example a contact form or WhatsApp link.</p>
+</div>
+<!-- Two Columns -->
+<div class="grid grid-cols-2 gap-6">
+<!-- Button label with EN | PT -->
+<div>
+<div class="flex items-center justify-between mb-2">
+<label class="text-[14px] font-medium text-ink" for="btn-label">Button label</label>
+<div class="inline-flex border border-hairline rounded-[2px] overflow-hidden text-[12px] font-medium leading-none">
+<button class="px-2 py-1 bg-subtle text-ink font-medium" type="button">EN</button>
+<button class="px-2 py-1 bg-surface text-muted hover:text-ink border-l border-hairline" type="button">PT</button>
+</div>
+</div>
+<input class="w-full h-[40px] px-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink" id="btn-label" type="text" value="Ask about this piece"/>
+</div>
+<!-- Button link with Optional and help text -->
+<div>
+<div class="flex items-center space-x-1.5 mb-2">
+<label class="text-[14px] font-medium text-ink" for="btn-link">Button link</label>
+<span class="text-hairline">·</span>
+<span class="text-[13px] text-muted font-normal">Optional</span>
+</div>
+<input class="w-full h-[40px] px-3 bg-surface border border-hairline rounded-[2px] text-[14px] text-ink" id="btn-link" placeholder="https://" type="text"/>
+<p class="text-[13px] text-muted mt-2">If empty, the button shows the store’s contact details.</p>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- Sticky Publish Bar (fixed to the bottom of the viewport, from the sidebar's right edge to the window edge) -->
+<footer class="fixed bottom-0 left-[256px] right-0 h-[64px] bg-surface border-t border-hairline px-10 flex items-center justify-between z-40" style="left: auto; width: 1184px;">
+<!-- Left status -->
+<div class="flex items-center space-x-3 text-[13px]">
+<span class="h-[20px] px-2 inline-flex items-center text-[12px] font-medium bg-[#ECE7DD] text-[#3A352F] rounded-[2px] leading-none">
+          Draft
+        </span>
+<span class="text-muted">Unsaved changes</span>
+</div>
+<!-- Right Action Buttons -->
+<div class="flex items-center space-x-3">
+<!-- Secondary "Preview" with external-link icon -->
+<button class="h-[40px] px-4 bg-transparent border border-ink rounded-[2px] text-[14px] font-medium text-ink hover:bg-subtle/50 transition-colors flex items-center space-x-2" type="button">
+<span>Preview</span>
+<svg class="w-[14px] h-[14px] text-ink" fill="none" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+<polyline points="15 3 21 3 21 9"></polyline>
+<line x1="10" x2="21" y1="14" y2="3"></line>
+</svg>
+</button>
+<!-- Secondary "Save draft" -->
+<button class="h-[40px] px-4 bg-transparent border border-ink rounded-[2px] text-[14px] font-medium text-ink hover:bg-subtle/50 transition-colors" type="button">
+          Save draft
+        </button>
+<!-- Primary "Publish" -->
+<button class="h-[40px] px-5 bg-ink text-chalk rounded-[2px] text-[14px] font-medium hover:bg-black transition-colors" type="button">
+          Publish
+        </button>
+</div>
+</footer>
+</div>
+</body>
+</html>

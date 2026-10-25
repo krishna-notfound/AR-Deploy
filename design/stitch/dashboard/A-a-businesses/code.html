@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Businesses</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#F3F0E9',
+            surface: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            ink: '#1D1C1A',
+            bodytext: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzetext: '#6E5C45',
+            softbronze: '#EAE3D6',
+            lightbronze: '#C9B79B',
+            sidebar: '#1D1C1A',
+            chalk: '#F3F0E9',
+            danger: '#A8362A',
+          },
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['"Inter"', 'sans-serif'],
+          },
+          borderRadius: {
+            DEFAULT: '2px',
+            sm: '2px',
+            md: '2px',
+            lg: '2px',
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    * {
+      border-radius: 2px !important;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F3F0E9;
+      color: #3A352F;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Custom non-rounded dropdown shadow */
+    .menu-shadow {
+      box-shadow: 0 4px 16px rgba(29, 28, 26, 0.08), 0 1px 3px rgba(29, 28, 26, 0.05);
+    }
+  </style>
+</head>
+<body class="bg-[#F3F0E9] text-[#3A352F] antialiased">
+<!-- 1440px Frame Container -->
+<div class="w-[1440px] min-h-screen flex mx-auto bg-[#F3F0E9]">
+<!-- LEFT SIDEBAR (256px, solid #1D1C1A, full height) -->
+<aside class="w-[256px] min-h-screen bg-[#1D1C1A] text-[#F3F0E9] flex flex-col justify-between shrink-0 select-none">
+<div>
+<!-- Wordmark & Console Header -->
+<div class="px-6 pt-7 pb-6 border-b border-white/10">
+<div class="text-[15px] font-normal tracking-[0.22em] text-[#F3F0E9] leading-none mb-2">
+            S A N C T U S
+          </div>
+<div class="text-[13px] text-[#F3F0E9]/70 font-normal">
+            Admin console
+          </div>
+</div>
+<!-- Navigation Menu -->
+<nav class="pt-3 px-0 space-y-0">
+<!-- Overview -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<rect height="7" width="7" x="14" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- Applications (with badge "3") -->
+<a class="h-[40px] px-6 flex items-center justify-between text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<div class="flex items-center gap-3">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+<polyline points="10 9 9 9 8 9"></polyline>
+</svg>
+<span>Applications</span>
+</div>
+<span class="inline-flex items-center justify-center h-[18px] px-1.5 bg-[#C9B79B] text-[#1D1C1A] text-[11px] font-semibold tabular-nums">
+              3
+            </span>
+</a>
+<!-- Businesses (ACTIVE ROW) -->
+<a class="relative h-[40px] px-6 flex items-center gap-3 text-[14px] font-medium text-[#F3F0E9] bg-white/[0.08]" href="#">
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></div>
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9] stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<rect height="20" rx="0" width="16" x="4" y="2"></rect>
+<line x1="9" x2="9" y1="22" y2="22.01"></line>
+<line x1="15" x2="15" y1="22" y2="22.01"></line>
+<line x1="8" x2="8.01" y1="6" y2="6"></line>
+<line x1="12" x2="12.01" y1="6" y2="6"></line>
+<line x1="16" x2="16.01" y1="6" y2="6"></line>
+<line x1="8" x2="8.01" y1="10" y2="10"></line>
+<line x1="12" x2="12.01" y1="10" y2="10"></line>
+<line x1="16" x2="16.01" y1="10" y2="10"></line>
+<line x1="8" x2="8.01" y1="14" y2="14"></line>
+<line x1="12" x2="12.01" y1="14" y2="14"></line>
+<line x1="16" x2="16.01" y1="14" y2="14"></line>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- All Products -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>All Products</span>
+</a>
+<!-- Analytics -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- Catalogs & QR Codes -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<rect height="3" width="3" x="14" y="14"></rect>
+<line x1="17" x2="21" y1="17" y2="17"></line>
+<line x1="17" x2="21" y1="21" y2="21"></line>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- Team & Access -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- Audit log -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- Settings -->
+<a class="h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom of Sidebar: Collapse & User block -->
+<div class="border-t border-white/10">
+<!-- Collapse Row -->
+<button class="w-full h-[40px] px-6 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors">
+<svg class="w-[18px] h-[18px] stroke-[#F3F0E9]/70 stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</button>
+<!-- User Block -->
+<div class="h-[52px] px-6 flex items-center justify-between border-t border-white/10">
+<span class="text-[13px] text-[#F3F0E9]/70 truncate max-w-[160px]">admin@platform.example</span>
+<button class="text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors p-1" title="Log out">
+<svg class="w-4 h-4 stroke-current stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- MAIN RIGHT PANE (1184px total width) -->
+<div class="flex-1 min-h-screen flex flex-col bg-[#F3F0E9]">
+<!-- TOP BAR (56px, solid #F3F0E9, 1px bottom hairline #D9D3C7) -->
+<header class="h-[56px] px-10 border-b border-[#D9D3C7] flex items-center justify-between bg-[#F3F0E9] shrink-0">
+<!-- Breadcrumb -->
+<div class="flex items-center text-[14px]">
+<span class="text-[#5A5148]">Sanctus Admin</span>
+<span class="mx-2 text-[#8A8073]">/</span>
+<span class="text-[#1D1C1A] font-medium">Businesses</span>
+</div>
+<!-- Right: Demo mode outlined tag -->
+<div class="h-[24px] px-2.5 inline-flex items-center text-[12px] text-[#5A5148] border border-[#8A8073] font-normal">
+          Demo mode
+        </div>
+</header>
+<!-- CONTENT AREA (Canvas #F3F0E9, 40px padding, content width 1104px) -->
+<main class="p-10 flex-1">
+<div class="w-[1104px] space-y-6">
+<!-- 1. PAGE HEADER -->
+<div class="flex items-start justify-between pb-2">
+<div>
+<h1 class="font-serif text-[32px] leading-[1.15] text-[#1D1C1A] font-medium tracking-normal mb-1.5">
+                Businesses
+              </h1>
+<p class="text-[15px] leading-[22px] text-[#5A5148] font-normal">
+                Furniture businesses and their catalogs. Views and AR are last-30-day sample figures.
+              </p>
+</div>
+<!-- ONE PRIMARY BUTTON: Create business (plus icon, solid #1D1C1A, 40px tall) -->
+<button class="h-[40px] px-4 bg-[#1D1C1A] text-[#F3F0E9] text-[14px] font-medium inline-flex items-center gap-2 hover:bg-[#3A352F] transition-colors shrink-0">
+<svg class="w-4 h-4 stroke-current stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+<span>Create business</span>
+</button>
+</div>
+<!-- 2. CARD WITH TABLE (#FAF8F3, 1px border #D9D3C7, 24px padding) -->
+<div class="bg-[#FAF8F3] border border-[#D9D3C7] p-6 relative">
+<!-- Toolbar Inside Card: Search & Status Filter (bottom-aligned) -->
+<div class="flex items-end gap-6 pb-6 border-b border-[#D9D3C7]">
+<!-- Search Field (320px) -->
+<div class="w-[320px]">
+<label class="block text-[13px] font-medium text-[#5A5148] mb-1.5">Search</label>
+<div class="relative">
+<input class="w-full h-[40px] pl-3.5 pr-8 bg-[#FAF8F3] border border-[#D9D3C7] text-[14px] text-[#1D1C1A] placeholder-[#5A5148]/60 focus:outline-none focus:border-[#1D1C1A]" placeholder="Search by name or address" type="text"/>
+</div>
+</div>
+<!-- Status Dropdown (176px) -->
+<div class="w-[176px]">
+<label class="block text-[13px] font-medium text-[#5A5148] mb-1.5">Status</label>
+<div class="relative">
+<select class="w-full h-[40px] pl-3.5 pr-8 bg-[#FAF8F3] border border-[#D9D3C7] text-[14px] text-[#1D1C1A] appearance-none focus:outline-none focus:border-[#1D1C1A] cursor-pointer">
+<option>All statuses</option>
+<option>Active</option>
+<option>Inactive</option>
+<option>Draft</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#5A5148]">
+<svg class="w-4 h-4 stroke-current stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+</div>
+</div>
+</div>
+</div>
+<!-- TABLE -->
+<div class="w-full">
+<table class="w-full text-left border-collapse table-fixed">
+<thead>
+<tr class="h-[40px] border-b border-[#D9D3C7]">
+<!-- Business (~34%) -->
+<th class="w-[34%] text-[13px] font-medium text-[#5A5148] pr-4 font-normal">Business</th>
+<!-- Products (right) -->
+<th class="w-[10%] text-right text-[13px] font-medium text-[#5A5148] px-3 font-normal">Products</th>
+<!-- Published (right) -->
+<th class="w-[10%] text-right text-[13px] font-medium text-[#5A5148] px-3 font-normal">Published</th>
+<!-- Views (right) -->
+<th class="w-[10%] text-right text-[13px] font-medium text-[#5A5148] px-3 font-normal">Views</th>
+<!-- AR (right) -->
+<th class="w-[9%] text-right text-[13px] font-medium text-[#5A5148] px-3 font-normal">AR</th>
+<!-- Status -->
+<th class="w-[11%] text-left text-[13px] font-medium text-[#5A5148] px-3 font-normal">Status</th>
+<!-- Last updated (right, with small down arrow) -->
+<th class="w-[12%] text-right text-[13px] font-medium text-[#5A5148] pl-3 pr-2 font-normal">
+<span class="inline-flex items-center gap-1 justify-end">
+<span>Last updated</span>
+<svg class="w-3.5 h-3.5 stroke-current stroke-[1.5] fill-none" viewbox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<polyline points="19 12 12 19 5 12"></polyline>
+</svg>
+</span>
+</th>
+<!-- Unlabelled Actions (48px) -->
+<th class="w-[4%] text-right pr-0 font-normal"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#ECE7DD]">
+<!-- ROW 1: Nordhaus Living (24 Oct 2026) -->
+<tr class="h-[60px] hover:bg-[#F3F0E9]/40 transition-colors">
+<!-- Business Cell -->
+<td class="pr-4 py-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-[#33597A] text-[#FAF8F3] text-[12px] font-medium flex items-center justify-center shrink-0">
+                          NL
+                        </div>
+<div class="truncate">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Nordhaus Living</div>
+<div class="text-[13px] text-[#5A5148] leading-tight mt-0.5">nordhaus.example.com</div>
+</div>
+</div>
+</td>
+<!-- Products -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">7</td>
+<!-- Published -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">6</td>
+<!-- Views -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">1,906</td>
+<!-- AR -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">291</td>
+<!-- Status Pill (Active: #2F6B4F on #E5F0E9) -->
+<td class="px-3">
+<span class="inline-flex items-center h-[20px] px-2 bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium leading-none">
+                        Active
+                      </span>
+</td>
+<!-- Last updated -->
+<td class="text-right pl-3 pr-2 text-[14px] text-[#1D1C1A] tabular-nums">24 Oct 2026</td>
+<!-- Row Action -->
+<td class="text-right pr-0">
+<button class="w-8 h-8 inline-flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors">
+<span class="text-[16px] leading-none mb-1 font-bold">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 2: Casa Lisboa Interiors (22 Oct 2026) - OPEN ROW MENU -->
+<tr class="h-[60px] bg-[#F3F0E9]/60 relative">
+<!-- Business Cell -->
+<td class="pr-4 py-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-[#8A765C] text-[#FAF8F3] text-[12px] font-medium flex items-center justify-center shrink-0">
+                          CL
+                        </div>
+<div class="truncate">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Casa Lisboa Interiors</div>
+<div class="text-[13px] text-[#5A5148] leading-tight mt-0.5">casa-lisboa.example.com</div>
+</div>
+</div>
+</td>
+<!-- Products -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">6</td>
+<!-- Published -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">5</td>
+<!-- Views -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">1,284</td>
+<!-- AR -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">212</td>
+<!-- Status Pill (Active) -->
+<td class="px-3">
+<span class="inline-flex items-center h-[20px] px-2 bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium leading-none">
+                        Active
+                      </span>
+</td>
+<!-- Last updated -->
+<td class="text-right pl-3 pr-2 text-[14px] text-[#1D1C1A] tabular-nums">22 Oct 2026</td>
+<!-- Row Action with OPEN DROPDOWN MENU -->
+<td class="text-right pr-0 relative">
+<button class="w-8 h-8 inline-flex items-center justify-center text-[#1D1C1A] bg-[#ECE7DD] transition-colors">
+<span class="text-[16px] leading-none mb-1 font-bold">⋯</span>
+</button>
+<!-- OPEN DROPDOWN MENU -->
+<div class="absolute right-2 top-[44px] w-[190px] bg-[#FAF8F3] border border-[#D9D3C7] menu-shadow z-30 text-left py-1"><a class="h-[36px] px-4 flex items-center text-[14px] text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors" href="#">Edit details</a><a class="h-[36px] px-4 flex items-center text-[14px] text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors" href="#">Open catalog</a><a class="h-[36px] px-4 flex items-center text-[14px] text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors" href="#">View products</a><a class="h-[36px] px-4 flex items-center text-[14px] text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors" href="#">View QR code</a><a class="h-[36px] px-4 flex items-center text-[14px] text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors" href="#">Deactivate catalog</a><div class="my-1 border-t border-[#D9D3C7]"></div><a class="h-[36px] px-4 flex items-center text-[14px] text-[#A8362A] hover:bg-[#F8E5E2] transition-colors" href="#">Delete business</a></div>
+</td>
+</tr>
+<!-- ROW 3: Atelier Verde (19 Oct 2026) -->
+<tr class="h-[60px] hover:bg-[#F3F0E9]/40 transition-colors">
+<!-- Business Cell -->
+<td class="pr-4 py-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-[#2F6B4F] text-[#FAF8F3] text-[12px] font-medium flex items-center justify-center shrink-0">
+                          AV
+                        </div>
+<div class="truncate">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Atelier Verde</div>
+<div class="text-[13px] text-[#5A5148] leading-tight mt-0.5">atelier-verde.example.com</div>
+</div>
+</div>
+</td>
+<!-- Products -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">6</td>
+<!-- Published -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">5</td>
+<!-- Views -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">1,672</td>
+<!-- AR -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">228</td>
+<!-- Status Pill (Active) -->
+<td class="px-3">
+<span class="inline-flex items-center h-[20px] px-2 bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium leading-none">
+                        Active
+                      </span>
+</td>
+<!-- Last updated -->
+<td class="text-right pl-3 pr-2 text-[14px] text-[#1D1C1A] tabular-nums">19 Oct 2026</td>
+<!-- Row Action -->
+<td class="text-right pr-0">
+<button class="w-8 h-8 inline-flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors">
+<span class="text-[16px] leading-none mb-1 font-bold">⋯</span>
+</button>
+</td>
+</tr>
+<!-- ROW 4: Oak & Ember Studio (5 Oct 2026) -->
+<tr class="h-[60px] hover:bg-[#F3F0E9]/40 transition-colors">
+<!-- Business Cell -->
+<td class="pr-4 py-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-[#5A5148] text-[#FAF8F3] text-[12px] font-medium flex items-center justify-center shrink-0">
+                          OE
+                        </div>
+<div class="truncate">
+<div class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Oak &amp; Ember Studio</div>
+<div class="text-[13px] text-[#5A5148] leading-tight mt-0.5">oak-ember.example.com</div>
+</div>
+</div>
+</td>
+<!-- Products -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">2</td>
+<!-- Published -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">2</td>
+<!-- Views -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">0</td>
+<!-- AR -->
+<td class="text-right px-3 text-[14px] text-[#1D1C1A] tabular-nums">0</td>
+<!-- Status Pill (Inactive: #8F5A0B on #F8EEDC) -->
+<td class="px-3">
+<span class="inline-flex items-center h-[20px] px-2 bg-[#F8EEDC] text-[#8F5A0B] text-[12px] font-medium leading-none">
+                        Inactive
+                      </span>
+</td>
+<!-- Last updated -->
+<td class="text-right pl-3 pr-2 text-[14px] text-[#1D1C1A] tabular-nums">5 Oct 2026</td>
+<!-- Row Action -->
+<td class="text-right pr-0">
+<button class="w-8 h-8 inline-flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] hover:bg-[#ECE7DD] transition-colors">
+<span class="text-[16px] leading-none mb-1 font-bold">⋯</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- CARD FOOTER (Hairline rule above) -->
+<div class="pt-4 mt-2 border-t border-[#D9D3C7] flex items-center justify-between">
+<!-- Left: Neutral tag "Sample data" (#3A352F on #ECE7DD, 20px tall) -->
+<span class="inline-flex items-center h-[20px] px-2 bg-[#ECE7DD] text-[#3A352F] text-[12px] font-medium leading-none">
+                Sample data
+              </span>
+<!-- Right: "Showing 1–4 of 4 businesses" -->
+<span class="text-[13px] text-[#5A5148] font-normal tabular-nums">
+                Showing 1–4 of 4 businesses
+              </span>
+</div>
+</div>
+<!-- Canvas bottom spacing to comfortably accommodate the open dropdown menu -->
+<div class="h-[120px]"></div>
+</div>
+</main>
+</div>
+</div>
+</body>
+</html>

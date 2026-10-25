@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1440, initial-scale=1.0">
+  <title>Dash v2 A – Audit log</title>
+  <!-- Google Fonts: Cormorant Garamond (500) & Inter (400, 500, 600) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F3F0E9;
+      color: #1D1C1A;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-cormorant {
+      font-family: 'Cormorant Garamond', serif;
+    }
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Precise custom classes adhering to the prompt rules */
+    .border-hairline {
+      border-color: #D9D3C7;
+    }
+    .border-subtle {
+      border-color: #ECE7DD;
+    }
+  </style>
+</head>
+<body class="w-[1440px] min-h-screen bg-[#F3F0E9] text-[#1D1C1A] flex flex-row">
+
+  <!-- LEFT SIDEBAR: 256px, solid #1D1C1A, full height -->
+  <aside class="w-[256px] min-h-screen bg-[#1D1C1A] text-[#F3F0E9] flex flex-col justify-between flex-shrink-0 z-20">
+    <div>
+      <!-- Brand header -->
+      <div class="px-6 pt-6 pb-5 border-b border-white/10">
+        <div class="text-[15px] font-medium tracking-[0.25em] text-[#F3F0E9] leading-none mb-2">S A N C T U S</div>
+        <div class="text-[13px] text-[#F3F0E9]/70 leading-none">Admin console</div>
+      </div>
+
+      <!-- Navigation items -->
+      <nav class="mt-4 flex flex-col space-y-0.5">
+        <!-- Overview -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span>Overview</span>
+        </a>
+
+        <!-- Applications (with count badge) -->
+        <a href="#" class="h-[40px] px-6 flex items-center justify-between text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+          <div class="flex items-center">
+            <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+            <span>Applications</span>
+          </div>
+          <span class="h-[18px] px-1.5 flex items-center justify-center bg-[#C9B79B] text-[#1D1C1A] text-[12px] font-medium rounded-[2px] tabular leading-none">3</span>
+        </a>
+
+        <!-- Businesses -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <span>Businesses</span>
+        </a>
+
+        <!-- All Products -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <span>All Products</span>
+        </a>
+
+        <!-- Analytics -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          <span>Analytics</span>
+        </a>
+
+        <!-- Catalogs & QR Codes -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+            <rect x="14" y="14" width="3" height="3"/>
+            <rect x="18" y="14" width="3" height="3"/>
+            <rect x="14" y="18" width="7" height="3"/>
+          </svg>
+          <span>Catalogs & QR Codes</span>
+        </a>
+
+        <!-- Team & Access -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>Team & Access</span>
+        </a>
+
+        <!-- Audit log (ACTIVE) -->
+        <a href="#" class="relative h-[40px] px-6 flex items-center bg-white/[0.08] text-[14px] font-medium text-[#F3F0E9]">
+          <div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></div>
+          <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5] text-[#F3F0E9]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span>Audit log</span>
+        </a>
+
+        <!-- Settings -->
+        <a href="#" class="h-[40px] px-6 flex items-center text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/5 transition-colors">
+          <svg class="w-[18px] h-[18px] mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Bottom sidebar controls -->
+    <div class="pb-6">
+      <!-- Collapse row -->
+      <a href="#" class="h-[40px] px-6 flex items-center text-[13px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors">
+        <svg class="w-4 h-4 mr-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <polyline points="11 17 6 12 11 7"/>
+          <polyline points="18 17 13 12 18 7"/>
+        </svg>
+        <span>Collapse</span>
+      </a>
+
+      <!-- User block with logout icon -->
+      <div class="mt-2 pt-4 px-6 border-t border-white/10 flex items-center justify-between">
+        <span class="text-[13px] text-[#F3F0E9]/70 truncate max-w-[170px]" title="admin@platform.example">admin@platform.example</span>
+        <button class="text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors p-1" title="Log out">
+          <svg class="w-4 h-4 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN COLUMN -->
+  <div class="flex-1 flex flex-col min-w-0">
+    <!-- TOP BAR: 56px, solid #F3F0E9, 1px bottom hairline -->
+    <header class="h-[56px] px-10 bg-[#F3F0E9] border-b border-[#D9D3C7] flex items-center justify-between flex-shrink-0">
+      <!-- Breadcrumb -->
+      <div class="text-[14px] flex items-center space-x-1.5 leading-none">
+        <span class="text-[#5A5148]">Sanctus Admin</span>
+        <span class="text-[#5A5148]">/</span>
+        <span class="text-[#1D1C1A] font-medium">Audit log</span>
+      </div>
+
+      <!-- Demo mode tag -->
+      <div class="h-[24px] px-2.5 flex items-center justify-center border border-[#8A8073] rounded-[2px] text-[12px] text-[#5A5148] leading-none">
+        Demo mode
+      </div>
+    </header>
+
+    <!-- CONTENT AREA: canvas #F3F0E9, 40px padding, content width 1104px -->
+    <main class="p-10 w-full flex flex-col">
+      <div class="w-[1104px] flex flex-col">
+        <!-- 1. Page Header -->
+        <div class="mb-6">
+          <h1 class="font-cormorant text-[32px] leading-[1.15] text-[#1D1C1A] font-normal tracking-tight">Audit log</h1>
+          <p class="text-[15px] leading-normal text-[#5A5148] mt-1.5">Who did what, recorded by the server. Entries cannot be edited or deleted.</p>
+        </div>
+
+        <!-- 2. One Card -->
+        <div class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] flex flex-col">
+          <!-- Card Header / Search bar -->
+          <div class="px-6 py-4 border-b border-[#D9D3C7]">
+            <label for="search-events" class="block text-[13px] font-medium text-[#1D1C1A] mb-1.5 leading-none">Search events</label>
+            <div class="relative w-[420px]">
+              <input 
+                id="search-events"
+                type="text" 
+                placeholder="Event, e.g. status, invitation, owner" 
+                class="w-full h-[40px] pl-3 pr-3 bg-white border border-[#D9D3C7] rounded-[2px] text-[14px] text-[#1D1C1A] placeholder-[#5A5148]/60 focus:outline-none focus:border-[#1D1C1A]"
+              >
+            </div>
+          </div>
+
+          <!-- Event List Rows (64px each, 24px side padding, hairline between) -->
+          <div class="flex flex-col divide-y divide-[#ECE7DD]">
+            
+            <!-- Row 1: 25 Oct 2026, 09:15 -->
+            <div class="h-[64px] px-6 flex items-center justify-between hover:bg-[#F3F0E9]/50 transition-colors">
+              <div class="flex items-center min-w-0">
+                <!-- Left: 150px date-time column -->
+                <div class="w-[150px] flex-shrink-0 text-[14px] text-[#1D1C1A] tabular">
+                  25 Oct 2026, 09:15
+                </div>
+                <!-- Middle: Event info -->
+                <div class="flex flex-col justify-center min-w-0">
+                  <div class="text-[14px] leading-tight">
+                    <span class="font-semibold text-[#1D1C1A]">Invitation requested</span>
+                  </div>
+                  <div class="text-[13px] text-[#6E5C45] leading-tight mt-1">
+                    <a href="#" class="hover:underline">Madeira Viva</a>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: Actor -->
+              <div class="text-[13px] text-[#5A5148] text-right flex-shrink-0 pl-4">
+                Demo Super Admin
+              </div>
+            </div>
+
+            <!-- Row 2: 24 Oct 2026, 16:20 -->
+            <div class="h-[64px] px-6 flex items-center justify-between hover:bg-[#F3F0E9]/50 transition-colors">
+              <div class="flex items-center min-w-0">
+                <!-- Left: 150px date-time column -->
+                <div class="w-[150px] flex-shrink-0 text-[14px] text-[#1D1C1A] tabular">
+                  24 Oct 2026, 16:20
+                </div>
+                <!-- Middle: Event info -->
+                <div class="flex flex-col justify-center min-w-0">
+                  <div class="text-[14px] leading-tight">
+                    <span class="font-semibold text-[#1D1C1A]">Status changed</span>
+                    <span class="font-normal text-[#1D1C1A]"> · Submitted → Under review</span>
+                  </div>
+                  <div class="text-[13px] text-[#6E5C45] leading-tight mt-1">
+                    <a href="#" class="hover:underline">Luz &amp; Forma · application #H5W2N6CE</a>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: Actor -->
+              <div class="text-[13px] text-[#5A5148] text-right flex-shrink-0 pl-4">
+                Demo Super Admin
+              </div>
+            </div>
+
+            <!-- Row 3: 24 Oct 2026, 10:42 -->
+            <div class="h-[64px] px-6 flex items-center justify-between hover:bg-[#F3F0E9]/50 transition-colors">
+              <div class="flex items-center min-w-0">
+                <!-- Left: 150px date-time column -->
+                <div class="w-[150px] flex-shrink-0 text-[14px] text-[#1D1C1A] tabular">
+                  24 Oct 2026, 10:42
+                </div>
+                <!-- Middle: Event info -->
+                <div class="flex flex-col justify-center min-w-0">
+                  <div class="text-[14px] leading-tight">
+                    <span class="font-semibold text-[#1D1C1A]">Application submitted</span>
+                  </div>
+                  <div class="text-[13px] text-[#6E5C45] leading-tight mt-1">
+                    <a href="#" class="hover:underline">Atelier Norte · application #K7Q2M9XA</a>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: Actor -->
+              <div class="text-[13px] text-[#5A5148] text-right flex-shrink-0 pl-4 tabular">
+                rita@ateliernorte.example
+              </div>
+            </div>
+
+            <!-- Row 4: 23 Oct 2026, 11:03 -->
+            <div class="h-[64px] px-6 flex items-center justify-between hover:bg-[#F3F0E9]/50 transition-colors">
+              <div class="flex items-center min-w-0">
+                <!-- Left: 150px date-time column -->
+                <div class="w-[150px] flex-shrink-0 text-[14px] text-[#1D1C1A] tabular">
+                  23 Oct 2026, 11:03
+                </div>
+                <!-- Middle: Event info -->
+                <div class="flex flex-col justify-center min-w-0">
+                  <div class="text-[14px] leading-tight">
+                    <span class="font-semibold text-[#1D1C1A]">Application submitted</span>
+                  </div>
+                  <div class="text-[13px] text-[#6E5C45] leading-tight mt-1">
+                    <a href="#" class="hover:underline">Casa do Linho · application #P3D8R1ZT</a>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: Actor -->
+              <div class="text-[13px] text-[#5A5148] text-right flex-shrink-0 pl-4 tabular">
+                ines@casadolinho.example
+              </div>
+            </div>
+
+            <!-- Row 5: 13 Oct 2026, 09:12 (Business created) -->
+            <div class="h-[64px] px-6 flex items-center justify-between hover:bg-[#F3F0E9]/50 transition-colors">
+              <div class="flex items-center min-w-0">
+                <!-- Left: 150px date-time column -->
+                <div class="w-[150px] flex-shrink-0 text-[14px] text-[#1D1C1A] tabular">
+                  13 Oct 2026, 09:12
+                </div>
+                <!-- Middle: Event info -->
+                <div class="flex flex-col justify-center min-w-0">
+                  <div class="text-[14px] leading-tight">
+                    <span class="font-semibold text-[#1D1C1A]">Business created</span>
+                  </div>
+                  <div class="text-[13px] text-[#6E5C45] leading-tight mt-1 space-x-1.5">
+                    <a href="#" class="hover:underline">Madeira Viva</a>
+                    <span class="text-[#5A5148] font-normal">and</span>
+                    <a href="#" class="hover:underline">Application #B9L4T7QS</a>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: Actor -->
+              <div class="text-[13px] text-[#5A5148] text-right flex-shrink-0 pl-4">
+                Demo Super Admin
+              </div>
+            </div>
+
+            <!-- Row 6: 13 Oct 2026, 09:12 (Status changed) -->
+            <div class="h-[64px] px-6 flex items-center justify-between hover:bg-[#F3F0E9]/50 transition-colors">
+              <div class="flex items-center min-w-0">
+                <!-- Left: 150px date-time column -->
+                <div class="w-[150px] flex-shrink-0 text-[14px] text-[#1D1C1A] tabular">
+                  13 Oct 2026, 09:12
+                </div>
+                <!-- Middle: Event info -->
+                <div class="flex flex-col justify-center min-w-0">
+                  <div class="text-[14px] leading-tight">
+                    <span class="font-semibold text-[#1D1C1A]">Status changed</span>
+                    <span class="font-normal text-[#1D1C1A]"> · Under review → Approved</span>
+                  </div>
+                  <div class="text-[13px] text-[#6E5C45] leading-tight mt-1">
+                    <a href="#" class="hover:underline">Madeira Viva · application #B9L4T7QS</a>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: Actor -->
+              <div class="text-[13px] text-[#5A5148] text-right flex-shrink-0 pl-4">
+                Demo Super Admin
+              </div>
+            </div>
+
+            <!-- Row 7: 9 Oct 2026, 14:30 -->
+            <div class="h-[64px] px-6 flex items-center justify-between hover:bg-[#F3F0E9]/50 transition-colors">
+              <div class="flex items-center min-w-0">
+                <!-- Left: 150px date-time column -->
+                <div class="w-[150px] flex-shrink-0 text-[14px] text-[#1D1C1A] tabular">
+                  9 Oct 2026, 14:30
+                </div>
+                <!-- Middle: Event info -->
+                <div class="flex flex-col justify-center min-w-0">
+                  <div class="text-[14px] leading-tight">
+                    <span class="font-semibold text-[#1D1C1A]">Status changed</span>
+                    <span class="font-normal text-[#1D1C1A]"> · Under review → Rejected</span>
+                  </div>
+                  <div class="text-[13px] text-[#6E5C45] leading-tight mt-1">
+                    <a href="#" class="hover:underline">Studio Brisa · application #M2X6F8KD</a>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: Actor -->
+              <div class="text-[13px] text-[#5A5148] text-right flex-shrink-0 pl-4">
+                Demo Super Admin
+              </div>
+            </div>
+
+            <!-- Row 8: 5 Oct 2026, 17:48 -->
+            <div class="h-[64px] px-6 flex items-center justify-between hover:bg-[#F3F0E9]/50 transition-colors">
+              <div class="flex items-center min-w-0">
+                <!-- Left: 150px date-time column -->
+                <div class="w-[150px] flex-shrink-0 text-[14px] text-[#1D1C1A] tabular">
+                  5 Oct 2026, 17:48
+                </div>
+                <!-- Middle: Event info -->
+                <div class="flex flex-col justify-center min-w-0">
+                  <div class="text-[14px] leading-tight">
+                    <span class="font-semibold text-[#1D1C1A]">Catalogue status changed</span>
+                    <span class="font-normal text-[#1D1C1A]"> · Active → Inactive</span>
+                  </div>
+                  <div class="text-[13px] text-[#6E5C45] leading-tight mt-1">
+                    <a href="#" class="hover:underline">Oak &amp; Ember Studio</a>
+                  </div>
+                </div>
+              </div>
+              <!-- Right: Actor -->
+              <div class="text-[13px] text-[#5A5148] text-right flex-shrink-0 pl-4">
+                Demo Super Admin
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Card Footer (Hairline above) -->
+          <div class="h-[48px] px-6 border-t border-[#D9D3C7] flex items-center justify-between bg-[#FAF8F3]">
+            <!-- Left: small neutral tag "Sample data" (20px tall, 2px corners, #3A352F on #ECE7DD) -->
+            <span class="h-[20px] px-2 flex items-center justify-center bg-[#ECE7DD] text-[#3A352F] text-[12px] font-medium rounded-[2px] leading-none">
+              Sample data
+            </span>
+            <!-- Right: 13px muted event count -->
+            <span class="text-[13px] text-[#5A5148] tabular leading-none">
+              Showing 1–8 of 8 events
+            </span>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1440, initial-scale=1.0">
+  <title>Dash v2 A – Business Detail</title>
+  <!-- Google Fonts: Cormorant Garamond 500, Inter 400, 500, 600 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#F3F0E9',
+            card: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            ink: '#1D1C1A',
+            body: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzeText: '#6E5C45',
+            softBronze: '#EAE3D6',
+            lightBronze: '#C9B79B',
+            // Pills
+            pillSuccessBg: '#E5F0E9',
+            pillSuccessText: '#2F6B4F',
+            pillWarningBg: '#F8EEDC',
+            pillWarningText: '#8F5A0B',
+            pillInfoBg: '#E5EDF4',
+            pillInfoText: '#33597A',
+            pillDangerBg: '#F8E5E2',
+            pillDangerText: '#A8362A',
+            pillNeutralBg: '#ECE7DD',
+            pillNeutralText: '#3A352F',
+          },
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+          },
+          borderRadius: {
+            'DEFAULT': '2px',
+            'sm': '2px',
+            'md': '2px',
+            'lg': '2px',
+            'xl': '2px',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F3F0E9;
+      color: #3A352F;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    input, textarea, select {
+      border-radius: 2px;
+      font-family: 'Inter', sans-serif;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: 1px solid #1D1C1A;
+      border-color: #1D1C1A;
+    }
+    /* Thin line icon stroke */
+    .icon {
+      stroke-width: 1.5px;
+    }
+  </style>
+</head>
+<body class="w-[1440px] min-h-screen flex bg-canvas text-body">
+
+  <!-- LEFT SIDEBAR (256px, solid #1D1C1A, full height) -->
+  <aside class="w-[256px] min-h-screen bg-[#1D1C1A] flex flex-col justify-between shrink-0 select-none">
+    <div class="flex flex-col">
+      <!-- Top Brand Block -->
+      <div class="p-6 pb-5">
+        <div class="text-[#F3F0E9] text-[15px] font-normal tracking-[0.22em] leading-none mb-2">S A N C T U S</div>
+        <div class="text-[#F3F0E9]/70 text-[13px] font-normal leading-none">Admin console</div>
+      </div>
+      <!-- Hairline divider: white 10% -->
+      <div class="h-[1px] bg-white/10 mx-6 mb-4"></div>
+
+      <!-- Navigation List -->
+      <nav class="flex flex-col space-y-[2px] px-3">
+        <!-- Overview -->
+        <a href="#" class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px]">
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>Overview</span>
+        </a>
+
+        <!-- Applications (with badge 3) -->
+        <a href="#" class="h-[40px] px-3 flex items-center justify-between text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px]">
+          <div class="flex items-center gap-3">
+            <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>Applications</span>
+          </div>
+          <span class="h-[18px] px-1.5 bg-[#C9B79B] text-[#1D1C1A] text-[11px] font-medium leading-[18px] rounded-[2px] tabular-nums">3</span>
+        </a>
+
+        <!-- Businesses (Active Row) -->
+        <a href="#" class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] font-medium bg-white/[0.08] relative rounded-[2px]">
+          <!-- 2px left bar in #C9B79B -->
+          <span class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></span>
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none text-[#F3F0E9]" viewBox="0 0 24 24" stroke="currentColor">
+            <rect x="4" y="2" width="16" height="20" rx="0"></rect>
+            <line x1="9" y1="22" x2="9" y2="22.01"></line>
+            <line x1="15" y1="22" x2="15" y2="22.01"></line>
+            <line x1="9" y1="6" x2="9" y2="6.01"></line>
+            <line x1="15" y1="6" x2="15" y2="6.01"></line>
+            <line x1="9" y1="10" x2="9" y2="10.01"></line>
+            <line x1="15" y1="10" x2="15" y2="10.01"></line>
+            <line x1="9" y1="14" x2="9" y2="14.01"></line>
+            <line x1="15" y1="14" x2="15" y2="14.01"></line>
+            <line x1="9" y1="18" x2="9" y2="18.01"></line>
+            <line x1="15" y1="18" x2="15" y2="18.01"></line>
+          </svg>
+          <span>Businesses</span>
+        </a>
+
+        <!-- All Products -->
+        <a href="#" class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px]">
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+          <span>All Products</span>
+        </a>
+
+        <!-- Analytics -->
+        <a href="#" class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px]">
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span>Analytics</span>
+        </a>
+
+        <!-- Catalogs & QR Codes -->
+        <a href="#" class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px]">
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+            <path d="M14 14h3v3h-3z"></path>
+            <path d="M20 14v3"></path>
+            <path d="M14 20h3"></path>
+            <path d="M20 20v.01"></path>
+          </svg>
+          <span>Catalogs & QR Codes</span>
+        </a>
+
+        <!-- Team & Access -->
+        <a href="#" class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px]">
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Team & Access</span>
+        </a>
+
+        <!-- Audit log -->
+        <a href="#" class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px]">
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Audit log</span>
+        </a>
+
+        <!-- Settings -->
+        <a href="#" class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px]">
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Bottom Sidebar Section -->
+    <div class="px-3 pb-6 flex flex-col space-y-1">
+      <!-- Collapse row -->
+      <button class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] hover:bg-white/[0.04] transition-colors rounded-[2px] w-full text-left">
+        <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+          <polyline points="11 17 6 12 11 7"></polyline>
+          <polyline points="18 17 13 12 18 7"></polyline>
+        </svg>
+        <span>Collapse</span>
+      </button>
+
+      <!-- User block with log-out icon button -->
+      <div class="h-[44px] px-3 flex items-center justify-between text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors rounded-[2px]">
+        <span class="text-[13px] truncate pr-2">admin@platform.example</span>
+        <button title="Log out" class="p-1 hover:text-[#F3F0E9] text-[#F3F0E9]/70 transition-colors">
+          <svg class="w-[18px] h-[18px] icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN COLUMN -->
+  <div class="flex-1 flex flex-col min-w-0 bg-canvas">
+
+    <!-- TOP BAR (56px, solid #F3F0E9, 1px bottom hairline) -->
+    <header class="h-[56px] px-10 flex items-center justify-between border-b border-hairline bg-canvas shrink-0">
+      <!-- Breadcrumb 14px -->
+      <nav class="flex items-center space-x-1.5 text-[14px]">
+        <span class="text-muted">Sanctus Admin</span>
+        <span class="text-muted">/</span>
+        <a href="#" class="text-muted hover:text-ink transition-colors">Businesses</a>
+        <span class="text-muted">/</span>
+        <span class="text-ink font-medium">Casa Lisboa Interiors</span>
+      </nav>
+
+      <!-- Right: Demo mode outlined tag -->
+      <div class="flex items-center">
+        <span class="px-2.5 py-0.5 text-[12px] text-muted border border-strongline rounded-[2px] leading-tight font-normal">
+          Demo mode
+        </span>
+      </div>
+    </header>
+
+    <!-- CONTENT AREA (40px padding, content width 1104px) -->
+    <main class="p-10 flex flex-col items-center">
+      <div class="w-[1104px] flex flex-col space-y-6">
+
+        <!-- 1. PAGE HEADER -->
+        <div class="flex items-start justify-between">
+          <div class="flex flex-col space-y-1.5">
+            <!-- H1 Page Title -->
+            <h1 class="font-serif text-[32px] font-normal leading-[1.15] text-ink">
+              Casa Lisboa Interiors
+            </h1>
+            <!-- Subtitle row: pill Active + URL -->
+            <div class="flex items-center gap-2.5 pt-0.5">
+              <span class="h-[20px] px-2 text-[12px] font-medium leading-[20px] bg-pillSuccessBg text-pillSuccessText rounded-[2px] inline-flex items-center">
+                Active
+              </span>
+              <span class="text-[13px] text-muted font-normal">
+                /catalog/casa-lisboa
+              </span>
+            </div>
+          </div>
+
+          <!-- Actions on the right (Secondary Open catalog, Secondary Deactivate, Ghost Danger Delete) -->
+          <div class="flex items-center gap-3">
+            <!-- Secondary: Open catalog -->
+            <button class="h-[40px] px-4 border border-ink text-ink text-[14px] font-medium rounded-[2px] hover:bg-black/[0.03] transition-colors flex items-center gap-2">
+              <span>Open catalog</span>
+              <svg class="w-4 h-4 icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </button>
+
+            <!-- Secondary: Deactivate -->
+            <button class="h-[40px] px-4 border border-ink text-ink text-[14px] font-medium rounded-[2px] hover:bg-black/[0.03] transition-colors">
+              Deactivate
+            </button>
+
+            <!-- Ghost Danger: Delete -->
+            <button class="h-[40px] px-3 text-pillDangerText text-[14px] font-medium rounded-[2px] hover:bg-pillDangerBg/50 transition-colors flex items-center gap-1.5">
+              <svg class="w-4 h-4 icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+              <span>Delete</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. UNDERLINE TABS -->
+        <div class="w-full border-b border-hairline flex items-center gap-8 text-[14px]">
+          <!-- Details (active) -->
+          <button class="pb-3 text-ink font-medium border-b-2 border-ink -mb-[1px] transition-colors">
+            Details
+          </button>
+          <!-- Products 6 -->
+          <button class="pb-3 text-muted hover:text-ink transition-colors flex items-center gap-1.5">
+            <span>Products</span>
+            <span class="text-[13px] text-muted tabular-nums">6</span>
+          </button>
+          <!-- Owner & history -->
+          <button class="pb-3 text-muted hover:text-ink transition-colors">
+            Owner & history
+          </button>
+          <!-- Catalog & QR -->
+          <button class="pb-3 text-muted hover:text-ink transition-colors">
+            Catalog & QR
+          </button>
+        </div>
+
+        <!-- 3. DETAILS TAB CONTENT: Two columns (form left, 340px preview right) -->
+        <div class="flex items-start gap-6">
+
+          <!-- LEFT COLUMN: FORM CARDS -->
+          <div class="flex-1 flex flex-col space-y-6">
+
+            <!-- Card 1: Business profile -->
+            <div class="bg-card border border-hairline p-6 rounded-[2px] flex flex-col space-y-5">
+              <h2 class="text-ink text-[16px] font-semibold leading-[1.4]">
+                Business profile
+              </h2>
+
+              <!-- Business name -->
+              <div class="flex flex-col space-y-1.5">
+                <label class="text-[13px] font-medium text-ink flex items-center gap-1">
+                  <span>Business name</span>
+                  <span class="text-muted font-normal">(Required)</span>
+                </label>
+                <input 
+                  type="text" 
+                  value="Casa Lisboa Interiors" 
+                  class="h-[40px] px-3 bg-card border border-hairline text-ink text-[14px] rounded-[2px] w-full"
+                >
+              </div>
+
+              <!-- Logo -->
+              <div class="flex flex-col space-y-1.5">
+                <label class="text-[13px] font-medium text-ink">Logo</label>
+                <div class="flex items-center gap-4">
+                  <!-- 64px square monogram "CL" in #F3F0E9 on #7A5C45 -->
+                  <div class="w-16 h-16 bg-[#7A5C45] text-[#F3F0E9] flex items-center justify-center font-serif text-[24px] font-medium rounded-[2px] shrink-0 select-none">
+                    CL
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <button type="button" class="h-[40px] px-3.5 border border-ink text-ink text-[14px] font-medium rounded-[2px] hover:bg-black/[0.03] transition-colors">
+                      Replace logo
+                    </button>
+                    <button type="button" class="h-[40px] px-2 text-muted hover:text-pillDangerText text-[14px] font-medium transition-colors">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                <p class="text-[13px] text-muted leading-normal pt-0.5">
+                  Square image works best. PNG, JPG or WebP up to 2 MB.
+                </p>
+              </div>
+
+              <!-- Description -->
+              <div class="flex flex-col space-y-1.5">
+                <label class="text-[13px] font-medium text-ink">Description</label>
+                <textarea 
+                  rows="3" 
+                  class="p-3 bg-card border border-hairline text-ink text-[14px] rounded-[2px] w-full resize-y leading-[20px]"
+                >Handcrafted upholstery and solid-wood pieces from a family workshop in Lisbon.</textarea>
+                <p class="text-[13px] text-muted leading-normal">
+                  Shown at the top of the public catalog.
+                </p>
+              </div>
+            </div>
+
+            <!-- Card 2: Contact -->
+            <div class="bg-card border border-hairline p-6 rounded-[2px] flex flex-col space-y-5">
+              <div class="flex flex-col space-y-1">
+                <h2 class="text-ink text-[16px] font-semibold leading-[1.4]">
+                  Contact
+                </h2>
+                <p class="text-[13px] text-muted leading-normal">
+                  Shown to customers when a product has no call-to-action link.
+                </p>
+              </div>
+
+              <!-- 2-column grid -->
+              <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+                <!-- Email -->
+                <div class="flex flex-col space-y-1.5">
+                  <label class="text-[13px] font-medium text-ink flex items-center gap-1">
+                    <span>Email</span>
+                    <span class="text-muted font-normal">Optional</span>
+                  </label>
+                  <input 
+                    type="email" 
+                    value="hello@casalisboa.example" 
+                    class="h-[40px] px-3 bg-card border border-hairline text-ink text-[14px] rounded-[2px] w-full"
+                  >
+                </div>
+
+                <!-- Phone -->
+                <div class="flex flex-col space-y-1.5">
+                  <label class="text-[13px] font-medium text-ink flex items-center gap-1">
+                    <span>Phone</span>
+                    <span class="text-muted font-normal">Optional</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value="+351 21 000 0000" 
+                    class="h-[40px] px-3 bg-card border border-hairline text-ink text-[14px] rounded-[2px] w-full tabular-nums"
+                  >
+                </div>
+
+                <!-- Website -->
+                <div class="flex flex-col space-y-1.5">
+                  <label class="text-[13px] font-medium text-ink flex items-center gap-1">
+                    <span>Website</span>
+                    <span class="text-muted font-normal">Optional</span>
+                  </label>
+                  <input 
+                    type="url" 
+                    value="https://casalisboa.example" 
+                    class="h-[40px] px-3 bg-card border border-hairline text-ink text-[14px] rounded-[2px] w-full"
+                  >
+                </div>
+
+                <!-- Address -->
+                <div class="flex flex-col space-y-1.5">
+                  <label class="text-[13px] font-medium text-ink flex items-center gap-1">
+                    <span>Address</span>
+                    <span class="text-muted font-normal">Optional</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value="Rua das Flores 12, Lisboa" 
+                    class="h-[40px] px-3 bg-card border border-hairline text-ink text-[14px] rounded-[2px] w-full"
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: Catalog -->
+            <div class="bg-card border border-hairline p-6 rounded-[2px] flex flex-col space-y-5">
+              <h2 class="text-ink text-[16px] font-semibold leading-[1.4]">
+                Catalog
+              </h2>
+
+              <!-- Catalog address -->
+              <div class="flex flex-col space-y-1.5">
+                <label class="text-[13px] font-medium text-ink flex items-center gap-1">
+                  <span>Catalog address</span>
+                  <span class="text-muted font-normal">(Required)</span>
+                </label>
+                <div class="flex items-center h-[40px] w-full border border-hairline bg-card rounded-[2px] focus-within:border-ink focus-within:outline focus-within:outline-1 focus-within:outline-ink">
+                  <span class="h-full px-3 bg-subtle border-r border-hairline text-[14px] text-muted flex items-center select-none">
+                    /catalog/
+                  </span>
+                  <input 
+                    type="text" 
+                    value="casa-lisboa" 
+                    class="h-full px-3 flex-1 bg-transparent text-ink text-[14px] border-none outline-none focus:outline-none"
+                  >
+                </div>
+                <p class="text-[13px] text-muted leading-normal">
+                  Changing this breaks printed QR codes and shared links. Demo only: no DNS or SSL is configured.
+                </p>
+              </div>
+
+              <!-- Status & Currency Row -->
+              <div class="grid grid-cols-2 gap-6">
+                <!-- Catalog status -->
+                <div class="flex flex-col space-y-1.5">
+                  <label class="text-[13px] font-medium text-ink">Catalog status</label>
+                  <select class="h-[40px] px-3 bg-card border border-hairline text-ink text-[14px] rounded-[2px] w-full">
+                    <option selected>Active</option>
+                    <option>Inactive</option>
+                  </select>
+                  <p class="text-[13px] text-muted leading-normal">
+                    Inactive catalogs are hidden from customers.
+                  </p>
+                </div>
+
+                <!-- Default currency -->
+                <div class="flex flex-col space-y-1.5">
+                  <label class="text-[13px] font-medium text-ink">Default currency</label>
+                  <select class="h-[40px] px-3 bg-card border border-hairline text-ink text-[14px] rounded-[2px] w-full">
+                    <option selected>EUR</option>
+                    <option>USD</option>
+                    <option>GBP</option>
+                    <option>BRL</option>
+                  </select>
+                  <p class="text-[13px] text-muted leading-normal">
+                    Used for new products.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Catalog accent colour -->
+              <div class="flex flex-col space-y-2 pt-1">
+                <div class="flex flex-col space-y-0.5">
+                  <label class="text-[13px] font-medium text-ink">Catalog accent colour</label>
+                  <p class="text-[13px] text-muted leading-normal">
+                    Used for buttons and links on the public catalog.
+                  </p>
+                </div>
+
+                <!-- 8 swatches + Custom button -->
+                <div class="flex items-center gap-2.5 pt-1">
+                  <!-- #7A5C45 (selected with 2px ink ring) -->
+                  <button type="button" class="w-[28px] h-[28px] rounded-[2px] bg-[#7A5C45] ring-2 ring-offset-2 ring-offset-card ring-ink transition-transform" title="#7A5C45"></button>
+                  <!-- #1D1C1A -->
+                  <button type="button" class="w-[28px] h-[28px] rounded-[2px] bg-[#1D1C1A] hover:scale-105 transition-transform" title="#1D1C1A"></button>
+                  <!-- #8A765C -->
+                  <button type="button" class="w-[28px] h-[28px] rounded-[2px] bg-[#8A765C] hover:scale-105 transition-transform" title="#8A765C"></button>
+                  <!-- #2F5D50 -->
+                  <button type="button" class="w-[28px] h-[28px] rounded-[2px] bg-[#2F5D50] hover:scale-105 transition-transform" title="#2F5D50"></button>
+                  <!-- #33597A -->
+                  <button type="button" class="w-[28px] h-[28px] rounded-[2px] bg-[#33597A] hover:scale-105 transition-transform" title="#33597A"></button>
+                  <!-- #6B4E71 -->
+                  <button type="button" class="w-[28px] h-[28px] rounded-[2px] bg-[#6B4E71] hover:scale-105 transition-transform" title="#6B4E71"></button>
+                  <!-- #A8362A -->
+                  <button type="button" class="w-[28px] h-[28px] rounded-[2px] bg-[#A8362A] hover:scale-105 transition-transform" title="#A8362A"></button>
+                  <!-- #5A5148 -->
+                  <button type="button" class="w-[28px] h-[28px] rounded-[2px] bg-[#5A5148] hover:scale-105 transition-transform" title="#5A5148"></button>
+
+                  <!-- Custom button -->
+                  <button type="button" class="h-[28px] px-2.5 border border-hairline text-ink text-[13px] font-medium rounded-[2px] hover:border-ink transition-colors ml-1">
+                    Custom
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Under the cards, right-aligned: ONE primary button "Save changes" -->
+            <div class="flex justify-end pt-2">
+              <button type="button" class="h-[40px] px-5 bg-[#1D1C1A] text-[#F3F0E9] text-[14px] font-medium rounded-[2px] hover:bg-black transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4 icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                  <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                <span>Save changes</span>
+              </button>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN: 340px "Catalog preview" card (sticky) -->
+          <div class="w-[340px] shrink-0 sticky top-6">
+            <div class="bg-card border border-hairline p-6 rounded-[2px] flex flex-col space-y-4">
+              <h2 class="text-ink text-[16px] font-semibold leading-[1.4]">
+                Catalog preview
+              </h2>
+
+              <!-- Thin browser mockup bar -->
+              <div class="border border-hairline rounded-[2px] overflow-hidden bg-white/40">
+                <!-- Browser top bar with URL -->
+                <div class="h-[32px] px-3 bg-subtle border-b border-hairline flex items-center gap-2">
+                  <div class="flex items-center gap-1 opacity-60">
+                    <span class="w-2 h-2 rounded-full bg-strongline"></span>
+                    <span class="w-2 h-2 rounded-full bg-strongline"></span>
+                    <span class="w-2 h-2 rounded-full bg-strongline"></span>
+                  </div>
+                  <div class="flex-1 text-center font-mono text-[12px] text-muted truncate">
+                    casa-lisboa.example.com
+                  </div>
+                </div>
+
+                <!-- Preview Content Body -->
+                <div class="p-4 flex flex-col space-y-3.5 bg-card">
+                  <!-- Header: Logo, Name, Category -->
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-[#7A5C45] text-[#F3F0E9] flex items-center justify-center font-serif text-[16px] font-medium rounded-[2px] shrink-0 select-none">
+                      CL
+                    </div>
+                    <div class="flex flex-col">
+                      <div class="text-[14px] font-semibold text-ink leading-tight">
+                        Casa Lisboa Interiors
+                      </div>
+                      <div class="text-[13px] text-muted leading-tight mt-0.5">
+                        Furniture catalog
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Description -->
+                  <p class="text-[13px] text-body leading-[18px]">
+                    Handcrafted upholstery and solid-wood pieces from a family workshop in Lisbon.
+                  </p>
+
+                  <!-- Search field -->
+                  <div class="h-[34px] px-3 bg-white border border-hairline rounded-[2px] flex items-center gap-2 text-muted">
+                    <svg class="w-3.5 h-3.5 icon stroke-current fill-none shrink-0" viewBox="0 0 24 24" stroke="currentColor">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <span class="text-[13px] text-muted/70 truncate">Search this catalog</span>
+                  </div>
+
+                  <!-- Two empty product tiles side by side (#ECE7DD) -->
+                  <div class="grid grid-cols-2 gap-3 pt-1">
+                    <!-- Tile 1 -->
+                    <div class="flex flex-col space-y-2">
+                      <div class="w-full aspect-square bg-[#ECE7DD] border border-hairline/60 rounded-[2px] flex items-center justify-center text-muted/40">
+                        <svg class="w-6 h-6 icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                          <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                      </div>
+                      <div class="h-2 w-3/4 bg-subtle rounded-[1px]"></div>
+                      <div class="h-2 w-1/2 bg-subtle rounded-[1px]"></div>
+                    </div>
+
+                    <!-- Tile 2 -->
+                    <div class="flex flex-col space-y-2">
+                      <div class="w-full aspect-square bg-[#ECE7DD] border border-hairline/60 rounded-[2px] flex items-center justify-center text-muted/40">
+                        <svg class="w-6 h-6 icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                          <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                      </div>
+                      <div class="h-2 w-3/4 bg-subtle rounded-[1px]"></div>
+                      <div class="h-2 w-1/2 bg-subtle rounded-[1px]"></div>
+                    </div>
+                  </div>
+
+                  <!-- Small button "View in AR" filled #7A5C45 with #F3F0E9 text -->
+                  <div class="pt-2">
+                    <button type="button" class="w-full h-[36px] bg-[#7A5C45] text-[#F3F0E9] text-[13px] font-medium rounded-[2px] flex items-center justify-center gap-1.5 hover:opacity-95 transition-opacity">
+                      <svg class="w-4 h-4 icon stroke-current fill-none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                      </svg>
+                      <span>View in AR</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>

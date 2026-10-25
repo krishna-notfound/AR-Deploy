@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Mobile Business Overview</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F3F0E9;
+      color: #1D1C1A;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-serif-title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    * {
+      border-radius: 2px !important;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body class="flex justify-center min-h-screen bg-[#F3F0E9] text-[#1D1C1A]">
+<!-- Mobile Container: 390px wide -->
+<div class="w-[390px] min-h-screen bg-[#F3F0E9] pb-12 flex flex-col">
+<!-- Top Bar: solid #F3F0E9, 56px, 1px bottom hairline #D9D3C7 -->
+<header class="h-[56px] w-full bg-[#F3F0E9] border-b border-[#D9D3C7] px-4 flex items-center justify-between sticky top-0 z-30">
+<div class="flex items-center space-x-3">
+<!-- 44px touch target menu button -->
+<button aria-label="Open menu" class="w-[44px] h-[44px] flex items-center justify-center text-[#1D1C1A] hover:opacity-80 active:opacity-60 -ml-2">
+<svg fill="none" height="22" stroke="#1D1C1A" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24" width="22">
+<line x1="3" x2="21" y1="12" y2="12"></line>
+<line x1="3" x2="21" y1="6" y2="6"></line>
+<line x1="3" x2="21" y1="18" y2="18"></line>
+</svg>
+</button>
+<!-- SANCTUS Wordmark -->
+<span class="text-[13px] tracking-[0.22em] text-[#1D1C1A] font-medium select-none">S A N C T U S</span>
+</div>
+<!-- Right link: Catalog ↗ -->
+<a class="text-[14px] font-medium text-[#1D1C1A] flex items-center h-[44px] px-1 hover:text-[#6E5C45]" href="#catalog">
+        Catalog ↗
+      </a>
+</header>
+<!-- Main Content Area: 16px horizontal padding -->
+<main class="p-4 space-y-4">
+<!-- SECTION 1: Header & Primary Action -->
+<div class="space-y-3 pt-1">
+<h1 class="font-serif-title text-[28px] leading-[1.15] text-[#1D1C1A] font-normal">
+          Overview
+        </h1>
+<!-- Subline: Active Pill + Tenant Name -->
+<div class="flex items-center space-x-2">
+<span class="inline-flex items-center px-2 h-[20px] bg-[#E5F0E9] text-[#2F6B4F] text-[12px] font-medium border border-[#2F6B4F]/10">
+            Active
+          </span>
+<span class="text-[14px] text-[#5A5148]">
+            Casa Lisboa Interiors
+          </span>
+</div>
+<!-- Full-width Primary Action Button: 44px, solid #1D1C1A, #F3F0E9 text, package-plus icon -->
+<button class="w-full h-[44px] bg-[#1D1C1A] text-[#F3F0E9] text-[14px] font-medium flex items-center justify-center space-x-2 active:bg-[#3A352F] transition-colors border border-[#1D1C1A]">
+<svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24" width="18">
+<path d="M16.5 9.4 7.55 4.24a1.78 1.78 0 0 0-2.5 1.55v12.42a1.78 1.78 0 0 0 2.5 1.55L16.5 14.6"></path>
+<path d="m21 16-4-2.5v5l4-2.5z"></path>
+<path d="M12 12h6"></path>
+<path d="M15 9v6"></path>
+</svg>
+<span>Add product</span>
+</button>
+</div>
+<!-- SECTION 2: Stat Card -->
+<section class="bg-[#FAF8F3] border border-[#D9D3C7] p-4">
+<!-- 2-column grid with 1px dividers -->
+<div class="grid grid-cols-2 gap-x-4 gap-y-4 pb-4">
+<!-- Stat 1 -->
+<div class="flex flex-col space-y-0.5">
+<span class="text-[13px] font-medium text-[#5A5148]">Products</span>
+<span class="text-[24px] font-medium text-[#1D1C1A] tabular-nums leading-tight">6</span>
+<span class="text-[13px] text-[#5A5148]">3 with a 3D model</span>
+</div>
+<!-- Stat 2 -->
+<div class="flex flex-col space-y-0.5 border-l border-[#D9D3C7] pl-4">
+<span class="text-[13px] font-medium text-[#5A5148]">Published</span>
+<span class="text-[24px] font-medium text-[#1D1C1A] tabular-nums leading-tight">5</span>
+<span class="text-[13px] text-[#5A5148]">In your catalog</span>
+</div>
+<!-- Divider horizontal -->
+<div class="col-span-2 border-t border-[#D9D3C7] my-0.5"></div>
+<!-- Stat 3 -->
+<div class="flex flex-col space-y-0.5">
+<span class="text-[13px] font-medium text-[#5A5148]">Drafts</span>
+<span class="text-[24px] font-medium text-[#1D1C1A] tabular-nums leading-tight">1</span>
+<span class="text-[13px] text-[#5A5148]">Not published yet</span>
+</div>
+<!-- Stat 4 -->
+<div class="flex flex-col space-y-0.5 border-l border-[#D9D3C7] pl-4">
+<span class="text-[13px] font-medium text-[#5A5148]">Product page views</span>
+<span class="text-[24px] font-medium text-[#1D1C1A] tabular-nums leading-tight">1,284</span>
+<span class="text-[13px] text-[#5A5148]">Last 30 days</span>
+</div>
+<!-- Divider horizontal -->
+<div class="col-span-2 border-t border-[#D9D3C7] my-0.5"></div>
+<!-- Stat 5: Full width of last row -->
+<div class="col-span-2 flex flex-col space-y-0.5">
+<span class="text-[13px] font-medium text-[#5A5148]">AR launch attempts</span>
+<span class="text-[24px] font-medium text-[#1D1C1A] tabular-nums leading-tight">212</span>
+<span class="text-[13px] text-[#5A5148]">Last 30 days · 16.5% of views</span>
+</div>
+</div>
+<!-- Footer row with hairline above -->
+<div class="border-t border-[#D9D3C7] pt-3 flex items-start space-x-2">
+<span class="inline-flex items-center px-1.5 h-[20px] bg-[#ECE7DD] text-[#3A352F] text-[12px] font-medium border border-[#D9D3C7] shrink-0">
+            Sample data
+          </span>
+<p class="text-[13px] text-[#5A5148] leading-[18px]">
+            Includes seeded sample data. Not live production analytics.
+          </p>
+</div>
+</section>
+<!-- SECTION 3: Next steps card -->
+<section class="bg-[#FAF8F3] border border-[#D9D3C7] p-4 space-y-3">
+<h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4]">
+          Next steps
+        </h2>
+<div class="divide-y divide-[#D9D3C7] border-t border-[#D9D3C7]">
+<!-- Row 1 -->
+<a class="min-h-[52px] py-3 flex items-center justify-between group active:bg-[#ECE7DD]/40" href="#step-1">
+<div class="flex items-center space-x-3 pr-2">
+<span class="w-[8px] h-[8px] rounded-full bg-[#8F5A0B] shrink-0"></span>
+<span class="text-[14px] text-[#1D1C1A] leading-[20px]">1 draft is not published</span>
+</div>
+<svg class="shrink-0" fill="none" height="18" stroke="#5A5148" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24" width="18">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</a>
+<!-- Row 2 -->
+<a class="min-h-[52px] py-3 flex items-center justify-between group active:bg-[#ECE7DD]/40" href="#step-2">
+<div class="flex items-center space-x-3 pr-2">
+<span class="w-[8px] h-[8px] rounded-full bg-[#8F5A0B] shrink-0"></span>
+<span class="text-[14px] text-[#1D1C1A] leading-[20px]">3 products have no 3D model (photos only)</span>
+</div>
+<svg class="shrink-0" fill="none" height="18" stroke="#5A5148" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24" width="18">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</a>
+<!-- Row 3 -->
+<a class="min-h-[52px] py-3 flex items-center justify-between group active:bg-[#ECE7DD]/40" href="#step-3">
+<div class="flex items-center space-x-3 pr-2">
+<span class="w-[8px] h-[8px] rounded-full bg-[#8F5A0B] shrink-0"></span>
+<span class="text-[14px] text-[#1D1C1A] leading-[20px]">1 model needs re-exporting for Android AR</span>
+</div>
+<svg class="shrink-0" fill="none" height="18" stroke="#5A5148" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24" width="18">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</a>
+<!-- Row 4 -->
+<a class="min-h-[52px] py-3 flex items-center justify-between group active:bg-[#ECE7DD]/40" href="#step-4">
+<div class="flex items-center space-x-3 pr-2">
+<span class="w-[8px] h-[8px] rounded-full bg-[#8F5A0B] shrink-0"></span>
+<span class="text-[14px] text-[#1D1C1A] leading-[20px]">2 products have no iPhone AR file (USDZ)</span>
+</div>
+<svg class="shrink-0" fill="none" height="18" stroke="#5A5148" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24" width="18">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</a>
+</div>
+</section>
+<!-- SECTION 4: Chart card -->
+<section class="bg-[#FAF8F3] border border-[#D9D3C7] p-4 space-y-3">
+<div class="space-y-1">
+<div class="flex items-baseline justify-between">
+<h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4]">
+              Views and AR launch attempts
+            </h2>
+</div>
+<p class="text-[13px] text-[#5A5148]">Last 30 days</p>
+<a class="inline-block text-[14px] font-medium text-[#6E5C45] hover:underline pt-0.5" href="#analytics">
+            Open analytics →
+          </a>
+</div>
+<!-- Legend dots -->
+<div class="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-[13px] text-[#3A352F]">
+<div class="flex items-center space-x-1.5">
+<span class="w-[8px] h-[8px] bg-[#1D1C1A] shrink-0"></span>
+<span>Product page views</span>
+</div>
+<div class="flex items-center space-x-1.5">
+<span class="w-[8px] h-[8px] bg-[#8A765C] shrink-0"></span>
+<span>AR launch attempts</span>
+</div>
+</div>
+<!-- Line chart: 180px tall, two 2px straight lines, 3 gridlines #ECE7DD, y-ticks 0, 30, 60 -->
+<div class="w-full h-[180px] pt-2 relative">
+<svg class="w-full h-full overflow-visible" viewbox="0 0 326 150">
+<!-- 3 Horizontal gridlines: y=15 (60), y=75 (30), y=135 (0) -->
+<line stroke="#ECE7DD" stroke-width="1" x1="28" x2="326" y1="15" y2="15"></line>
+<line stroke="#ECE7DD" stroke-width="1" x1="28" x2="326" y1="75" y2="75"></line>
+<line stroke="#ECE7DD" stroke-width="1" x1="28" x2="326" y1="135" y2="135"></line>
+<!-- Y Ticks -->
+<text class="tabular-nums" fill="#5A5148" font-family="Inter" font-size="12" x="0" y="19">60</text>
+<text class="tabular-nums" fill="#5A5148" font-family="Inter" font-size="12" x="0" y="79">30</text>
+<text class="tabular-nums" fill="#5A5148" font-family="Inter" font-size="12" x="7" y="139">0</text>
+<!-- Line 1: Product page views (30–55 per day) in #1D1C1A -->
+<polyline fill="none" points="
+                28,73 42,70 56,66 70,72 84,65 98,68 112,61 126,67 
+                140,58 154,64 168,54 182,57 196,50 210,55 224,48 
+                238,52 252,43 266,49 280,41 294,44 308,36 326,32
+              " stroke="#1D1C1A" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+<!-- Line 2: AR launch attempts (4–11 per day) in #8A765C -->
+<polyline fill="none" points="
+                28,127 42,125 56,126 70,123 84,124 98,120 112,122 126,119 
+                140,120 154,117 168,118 182,114 196,116 210,113 224,115 
+                238,111 252,112 266,108 280,110 294,106 308,107 326,103
+              " stroke="#8A765C" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+</svg>
+<!-- X Labels: Sep 26, Oct 10, Oct 24 -->
+<div class="flex justify-between pl-7 text-[12px] text-[#5A5148] pt-2">
+<span>Sep 26</span>
+<span>Oct 10</span>
+<span>Oct 24</span>
+</div>
+</div>
+</section>
+<!-- SECTION 5: Most viewed products card -->
+<section class="bg-[#FAF8F3] border border-[#D9D3C7] p-4 space-y-3">
+<div class="space-y-0.5">
+<h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4]">
+            Most viewed products
+          </h2>
+<p class="text-[13px] text-[#5A5148]">
+            Product page views, last 30 days
+          </p>
+</div>
+<div class="divide-y divide-[#ECE7DD] border-t border-[#D9D3C7]">
+<!-- Row 1: Glam Velvet Sofa -->
+<div class="flex items-center justify-between py-2.5 min-h-[52px]">
+<div class="flex items-center space-x-3 min-w-0 pr-2">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-3 shrink-0">1</span>
+<img alt="Glam Velvet Sofa" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1WC3SIGPRYXj8YiKAWCq_v3osyYmldR3WH_V5JzUDChH4ucr60CPtjjk_Y6vCg0YPnfBNI1Y4iGEYRWCoYwzdZn6wRG0zSez0N0BELSlCcKod8xp5xTOPLyjKdI5OuZ7coxqNgad6PU53YpqmWIJFNSWvfAKhI8dOTi1gNyVZR3j0OZ931Xqx_L6ycgPBdFn98UVV8v3-A94Wj8fU1g9dk0QhoalYKuprPeEw1e4VQ2wCJ9erF2r3TDEOgV"/>
+<div class="min-w-0 flex flex-col justify-center">
+<span class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Glam Velvet Sofa</span>
+<span class="text-[13px] text-[#5A5148] tabular-nums">€1,899</span>
+</div>
+</div>
+<div class="text-right shrink-0 flex flex-col justify-center pl-2">
+<span class="text-[14px] font-medium text-[#1D1C1A] tabular-nums leading-tight">412 views</span>
+<span class="text-[13px] text-[#5A5148] tabular-nums">88 AR attempts</span>
+</div>
+</div>
+<!-- Row 2: Wood & Leather Sofa -->
+<div class="flex items-center justify-between py-2.5 min-h-[52px]">
+<div class="flex items-center space-x-3 min-w-0 pr-2 flex-1">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-3 shrink-0">2</span>
+<img alt="Wood &amp; Leather Sofa" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VoghBCvIRLWFYopmFBcg3cSPhuKzeZ2OT59PR197ACa2mByJUVN-D5Ed6Ckn5j8O_AG1RaOCXRuPeQf4dIAx-dWeZqaA7hpbxWzkpjK448rTAEOIoFjZ1coPQlUTWlvw2g4xsD53TePK9bgSi3n_iz4CLW-J2iTTyF8Ossq9AO1q-Cq440t0NzNfqUcpmt_lRUqAl52jWKxD6xhRSP6EvVJC7pg_DDk8VuYZg4cnKTYKIcJHcAe2DDNKKT"/>
+<div class="min-w-0 flex flex-col justify-center">
+<span class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Alfama Carved Leather Sofa</span>
+<span class="text-[13px] text-[#5A5148] tabular-nums">€2,490</span>
+</div>
+</div>
+<div class="text-right shrink-0 flex flex-col justify-center pl-2">
+<span class="text-[14px] font-medium text-[#1D1C1A] tabular-nums leading-tight">318 views</span>
+<span class="text-[12px] text-[#5A5148] tabular-nums">61 AR attempts</span>
+</div>
+</div>
+<!-- Row 3: Atlantic Round Dining Table -->
+<div class="flex items-center justify-between py-2.5 min-h-[52px]">
+<div class="flex items-center space-x-3 min-w-0 pr-2">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-3 shrink-0">3</span>
+<img alt="Atlantic Round Dining Table" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VQ15ypp4vqCYV7APHVFoAWrNGv3C_cXvFGntUeU61CHuT2iHJkFTzi8qL_VTVauYBw2SoI_KcsB8zAj0O9RD0x0NMIJn8Ce3EoA8gUsseM16neIetftpbOiNc1bQibUKQ9TX_jF8Zxp8VlSdD_ApMEze0z-1U2JE_OzIpsyjn0mSKw5PA7jOrXeG87lBax9AMtIYjYoEEhA9s0IbKaLYPo6VpN5g3lKPGS1bKyyHGPuIU9FYiUg4JyTkZ-"/>
+<div class="min-w-0 flex flex-col justify-center">
+<span class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Atlantic Round Dining Table</span>
+<span class="text-[13px] text-[#5A5148] tabular-nums">€720</span>
+</div>
+</div>
+<div class="text-right shrink-0 flex flex-col justify-center pl-2">
+<span class="text-[14px] font-medium text-[#1D1C1A] tabular-nums leading-tight">241 views</span>
+<span class="text-[13px] text-[#5A5148]">No 3D model</span>
+</div>
+</div>
+<!-- Row 4: Mustard Tufted Armchair -->
+<div class="flex items-center justify-between py-2.5 min-h-[52px]">
+<div class="flex items-center space-x-3 min-w-0 pr-2">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-3 shrink-0">4</span>
+<img alt="Mustard Tufted Armchair" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VqcIUawrAuSSlybO8F3Qe_ygF9LxXFQSUvvcEhRiID5eZXYRbUBXR0h8azSovsVCtLky-Vw3ggaAoyjWm_e-4vF7HnCbZBbyh_dQDUqMIdTJODaLpdiD_9ndfzWOidSq42e8xITTxvQKwwUw5jVLs8WXYSVj1IzDWTnDSfKcipCVNKFpgzeSheKocwIJtrOiDLhSllaJ3-lV_kc6wI5CsDBB90NqZ7VblHuUv_gr14BADClwX5GRa6whvW"/>
+<div class="min-w-0 flex flex-col justify-center">
+<span class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Mustard Tufted Armchair</span>
+<span class="text-[13px] text-[#5A5148] tabular-nums">€649</span>
+</div>
+</div>
+<div class="text-right shrink-0 flex flex-col justify-center pl-2">
+<span class="text-[14px] font-medium text-[#1D1C1A] tabular-nums leading-tight">186 views</span>
+<span class="text-[13px] text-[#5A5148]">No 3D model</span>
+</div>
+</div>
+<!-- Row 5: Tejo Side Table -->
+<div class="flex items-center justify-between py-2.5 min-h-[52px]">
+<div class="flex items-center space-x-3 min-w-0 pr-2">
+<span class="text-[14px] text-[#5A5148] tabular-nums w-3 shrink-0">5</span>
+<img alt="Tejo Side Table" class="w-[44px] h-[44px] object-cover border border-[#D9D3C7] shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1Vdb2Oick5dVQn_mAvC0Zul3SfPkkW2FND0PNOpCkqX-hocCjnlorokCGLYmbO2zl9bcLNxxCiQ6zSdmx03vA4I-IlwtbQDy5AvTAZv73IkL9khMU8cLQ1qbZweLXb2rVNsgyYEyb8dHH0dfUY6vFNB2ULghuupIsLzDIxA1C6SufJ52kFqg72MWNpVDyRgNkaG0UbNbEH6Zguz6Ri6XVGjWYYsG0Z3O7y6D-etPdFH_EGiul21v1mTRkqC"/>
+<div class="min-w-0 flex flex-col justify-center">
+<span class="text-[14px] font-medium text-[#1D1C1A] leading-tight">Tejo Side Table</span>
+<span class="text-[13px] text-[#5A5148] tabular-nums">€189</span>
+</div>
+</div>
+<div class="text-right shrink-0 flex flex-col justify-center pl-2">
+<span class="text-[14px] font-medium text-[#1D1C1A] tabular-nums leading-tight">127 views</span>
+<span class="text-[13px] text-[#5A5148] tabular-nums">63 AR attempts</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 6: Recent activity card -->
+<section class="bg-[#FAF8F3] border border-[#D9D3C7] p-4 space-y-3">
+<h2 class="text-[16px] font-semibold text-[#1D1C1A] leading-[1.4]">
+          Recent activity
+        </h2>
+<div class="divide-y divide-[#ECE7DD] border-t border-[#D9D3C7]">
+<!-- Activity Item 1 -->
+<div class="py-3 flex flex-col space-y-0.5">
+<p class="text-[14px] text-[#1D1C1A] leading-[20px]">
+              Product “Tejo Side Table” was published
+            </p>
+<span class="text-[13px] text-[#5A5148] tabular-nums">2 days ago</span>
+</div>
+<!-- Activity Item 2 -->
+<div class="py-3 flex flex-col space-y-0.5">
+<p class="text-[14px] text-[#1D1C1A] leading-[20px]">Product “Alfama Tall Bookcase” was added</p>
+<span class="text-[13px] text-[#5A5148] tabular-nums">3 days ago</span>
+</div>
+<!-- Activity Item 3 -->
+<div class="py-3 flex flex-col space-y-0.5">
+<p class="text-[14px] text-[#1D1C1A] leading-[20px]">
+              Product “Atlantic Round Dining Table” was published
+            </p>
+<span class="text-[13px] text-[#5A5148] tabular-nums">6 days ago</span>
+</div>
+<!-- Activity Item 4 -->
+<div class="py-3 flex flex-col space-y-0.5">
+<p class="text-[14px] text-[#1D1C1A] leading-[20px]">
+              Product “Mustard Tufted Armchair” was published
+            </p>
+<span class="text-[13px] text-[#5A5148] tabular-nums">9 days ago</span>
+</div>
+<!-- Activity Item 5 -->
+<div class="py-3 flex flex-col space-y-0.5">
+<p class="text-[14px] text-[#1D1C1A] leading-[20px]">Product “Alfama Carved Leather Sofa” was published</p>
+<span class="text-[13px] text-[#5A5148] tabular-nums">12 days ago</span>
+</div>
+</div>
+</section>
+</main>
+</div>
+</body></html>

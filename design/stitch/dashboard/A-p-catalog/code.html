@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Public Catalogue</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&amp;family=Jost:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#F3F0E9',
+            surface: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            ink: '#1D1C1A',
+            body: '#3A352F',
+            muted: '#5A5148',
+            'bronze-text': '#6E5C45',
+            'business-accent': '#7A5C45',
+            obsidian: '#1D1C1A',
+            chalk: '#F3F0E9'
+          },
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['"Jost"', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      background-color: #F3F0E9;
+      color: #3A352F;
+      font-family: 'Jost', sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .font-tabular {
+      font-variant-numeric: tabular-nums;
+    }
+    /* 2px corners everywhere */
+    * {
+      border-radius: 2px !important;
+    }
+    /* Strictly flat, no shadows, 1px hairlines */
+  </style>
+</head>
+<body class="w-[1440px] mx-auto min-h-screen bg-canvas text-body">
+<!-- 1. HEADER BAR (80px, solid #F3F0E9, 1px bottom hairline) -->
+<header class="w-full h-[80px] bg-canvas border-b border-hairline px-[60px] flex items-center justify-between">
+<div class="flex items-center gap-3.5">
+<!-- 36px square logo: monogram "CL" #F3F0E9 on #7A5C45 -->
+<div class="w-[36px] h-[36px] bg-business-accent flex items-center justify-center text-chalk font-serif text-[15px] font-medium tracking-wide select-none">
+        CL
+      </div>
+<span class="font-serif font-medium text-[18px] text-ink tracking-[0.2em] uppercase select-none">
+        CASA LISBOA INTERIORS
+      </span>
+</div>
+<!-- Language switch "EN / PT" in Jost 13px (PT active in ink, EN in muted) -->
+<div class="flex items-center gap-1.5 text-[13px] font-sans font-medium tracking-wider select-none">
+<span class="text-muted cursor-pointer hover:text-ink transition-colors">EN</span>
+<span class="text-hairline">/</span>
+<span class="text-ink font-semibold">PT</span>
+</div>
+</header>
+<!-- MAIN CONTAINER (Content width 1320px, 60px side margins) -->
+<main class="w-[1320px] mx-auto px-0">
+<!-- 2. TITLE BLOCK (56px top padding, flex row between left brand info & right description) -->
+<section class="pt-[56px] pb-[44px] flex items-start justify-between">
+<div class="flex items-start gap-6">
+<!-- 64px logo -->
+<div class="w-[64px] h-[64px] bg-business-accent flex items-center justify-center text-chalk font-serif text-[26px] font-medium tracking-wider select-none shrink-0 mt-1">
+          CL
+        </div>
+<div class="flex flex-col">
+<!-- 13px bronze-text label "CATÁLOGO" (letter-spacing 0.12em) -->
+<span class="text-[13px] font-sans font-medium uppercase text-bronze-text tracking-[0.12em] mb-1">
+            CATÁLOGO
+          </span>
+<!-- h1 in Cormorant Garamond 500 at 52px/1.05 -->
+<h1 class="font-serif font-medium text-[52px] leading-[1.05] text-ink tracking-[-0.01em] mb-2">
+            Casa Lisboa Interiors
+          </h1>
+<!-- 13px muted label "5 PRODUTOS" -->
+<span class="text-[13px] font-sans font-medium uppercase text-muted tracking-[0.1em]">
+            5 PRODUTOS
+          </span>
+</div>
+</div>
+<!-- Right column: max 420px, description 16px #3A352F (owner's text in English) -->
+<div class="max-w-[420px] pt-3">
+<p class="text-[16px] leading-[1.6] text-body font-sans">
+          Handcrafted upholstery and solid-wood pieces from a family workshop in Lisbon.
+        </p>
+</div>
+</section>
+<!-- 3. FILTER BAR (1px hairline above and below, 64px tall) -->
+<section class="w-full h-[64px] border-y border-hairline flex items-center justify-between my-0">
+<!-- Category chips (40px tall, 2px corners, Jost 13px 500 uppercase letter-spacing 0.08em) -->
+<div class="flex items-center gap-2">
+<!-- TODOS (active: #1D1C1A fill, #F3F0E9 text) -->
+<button class="h-[40px] px-5 bg-obsidian text-chalk text-[13px] font-sans font-medium uppercase tracking-[0.08em] flex items-center justify-center transition-colors">
+          TODOS
+        </button>
+<!-- SOFÁS (outlined 1px #D9D3C7) -->
+<button class="h-[40px] px-5 bg-surface border border-hairline text-body text-[13px] font-sans font-medium uppercase tracking-[0.08em] flex items-center justify-center hover:border-muted hover:text-ink transition-colors">
+          SOFÁS
+        </button>
+<!-- CADEIRAS (outlined 1px #D9D3C7) -->
+<button class="h-[40px] px-5 bg-surface border border-hairline text-body text-[13px] font-sans font-medium uppercase tracking-[0.08em] flex items-center justify-center hover:border-muted hover:text-ink transition-colors">
+          CADEIRAS
+        </button>
+<!-- MESAS (outlined 1px #D9D3C7) -->
+<button class="h-[40px] px-5 bg-surface border border-hairline text-body text-[13px] font-sans font-medium uppercase tracking-[0.08em] flex items-center justify-center hover:border-muted hover:text-ink transition-colors">
+          MESAS
+        </button>
+</div>
+<!-- Right: 320px search field (1px border, search icon, placeholder "Pesquisar neste catálogo", 15px) -->
+<div class="relative w-[320px] h-[40px]">
+<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24">
+<circle cx="11" cy="11" r="7"></circle>
+<line x1="21" x2="16" y1="21" y2="16"></line>
+</svg>
+</div>
+<input class="w-full h-full pl-10 pr-3.5 bg-surface border border-hairline text-[15px] font-sans text-ink placeholder-muted focus:outline-none focus:border-ink transition-colors" placeholder="Pesquisar neste catálogo" type="text"/>
+</div>
+</section>
+<!-- 4. PRODUCT GRID (4 columns, 24px gaps, cards sorted alphabetically by name) -->
+<section class="py-[40px]">
+<div class="grid grid-cols-4 gap-[24px]"><!-- CARD 1: Sofá Alfama em Pele e Madeira Entalhada -->
+<article class="bg-surface border border-hairline flex flex-col justify-between group">
+<div>
+<!-- Photo area (4:5 ratio) with overlay chips -->
+<div class="relative w-full aspect-[4/5] bg-subtle overflow-hidden">
+<img alt="Sofá Alfama em Pele e Madeira Entalhada" class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida/AEtjO1VoghBCvIRLWFYopmFBcg3cSPhuKzeZ2OT59PR197ACa2mByJUVN-D5Ed6Ckn5j8O_AG1RaOCXRuPeQf4dIAx-dWeZqaA7hpbxWzkpjK448rTAEOIoFjZ1coPQlUTWlvw2g4xsD53TePK9bgSi3n_iz4CLW-J2iTTyF8Ossq9AO1q-Cq440t0NzNfqUcpmt_lRUqAl52jWKxD6xhRSP6EvVJC7pg_DDk8VuYZg4cnKTYKIcJHcAe2DDNKKT"/>
+<!-- Top-left category chip -->
+<span class="absolute top-3 left-3 bg-surface/95 text-body text-[12px] font-sans font-medium uppercase tracking-[0.08em] px-2.5 py-1 select-none">
+                SOFÁS
+              </span>
+<!-- Bottom-left 3D model chip (with cube icon) -->
+<span class="absolute bottom-3 left-3 bg-surface/95 text-bronze-text text-[12px] font-sans font-medium uppercase tracking-[0.08em] px-2.5 py-1 flex items-center gap-1.5 select-none border border-hairline/60">
+<svg class="w-3.5 h-3.5 text-bronze-text" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+                MODELO 3D
+              </span>
+</div>
+<!-- Content Area (20px padding) -->
+<div class="p-[20px] pb-3">
+<h2 class="font-serif font-medium text-[24px] leading-[1.15] text-ink min-h-[56px] flex items-start">
+                Sofá Alfama em Pele e Madeira Entalhada
+              </h2>
+<!-- Two-line short description -->
+<p class="text-[14px] leading-[1.45] text-muted min-h-[40px] mt-1.5 line-clamp-2">
+                Sofá tradicional de braços enrolados em pele castanha com madeira entalhada.
+              </p>
+</div>
+</div>
+<!-- Bottom bar: hairline, price left, link right -->
+<div class="px-[20px] pb-[20px]">
+<div class="w-full border-t border-hairline pt-3 flex items-center justify-between">
+<span class="font-sans font-medium text-[16px] text-ink font-tabular">
+                2490,00 €
+              </span>
+<a class="font-sans font-medium text-[14px] text-bronze-text hover:text-ink transition-colors inline-flex items-center gap-1" href="#">
+                Ver peça →
+              </a>
+</div>
+</div>
+</article>
+<!-- CARD 2: Mesa de Jantar Redonda Atlântico -->
+<article class="bg-surface border border-hairline flex flex-col justify-between group">
+<div>
+<!-- Photo area (4:5 ratio) with overlay chips -->
+<div class="relative w-full aspect-[4/5] bg-subtle overflow-hidden">
+<img alt="Mesa de Jantar Redonda Atlântico" class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida/AEtjO1VQ15ypp4vqCYV7APHVFoAWrNGv3C_cXvFGntUeU61CHuT2iHJkFTzi8qL_VTVauYBw2SoI_KcsB8zAj0O9RD0x0NMIJn8Ce3EoA8gUsseM16neIetftpbOiNc1bQibUKQ9TX_jF8Zxp8VlSdD_ApMEze0z-1U2JE_OzIpsyjn0mSKw5PA7jOrXeG87lBax9AMtIYjYoEEhA9s0IbKaLYPo6VpN5g3lKPGS1bKyyHGPuIU9FYiUg4JyTkZ-"/>
+<!-- Top-left category chip -->
+<span class="absolute top-3 left-3 bg-surface/95 text-body text-[12px] font-sans font-medium uppercase tracking-[0.08em] px-2.5 py-1 select-none">
+                MESAS
+              </span>
+<!-- No 3D model for this product -->
+</div>
+<!-- Content Area (20px padding) -->
+<div class="p-[20px] pb-3">
+<h2 class="font-serif font-medium text-[24px] leading-[1.15] text-ink min-h-[56px] flex items-start">
+                Mesa de Jantar Redonda Atlântico
+              </h2>
+<!-- Two-line short description -->
+<p class="text-[14px] leading-[1.45] text-muted min-h-[40px] mt-1.5 line-clamp-2">
+                Para quatro pessoas. Tampo lacado mate com pés em faia maciça.
+              </p>
+</div>
+</div>
+<!-- Bottom bar: hairline, price left, link right -->
+<div class="px-[20px] pb-[20px]">
+<div class="w-full border-t border-hairline pt-3 flex items-center justify-between">
+<span class="font-sans font-medium text-[16px] text-ink font-tabular">
+                720,00 €
+              </span>
+<a class="font-sans font-medium text-[14px] text-bronze-text hover:text-ink transition-colors inline-flex items-center gap-1" href="#">
+                Ver peça →
+              </a>
+</div>
+</div>
+</article>
+<!-- CARD 3: Sofá Glam em Veludo -->
+<article class="bg-surface border border-hairline flex flex-col justify-between group">
+<div>
+<!-- Photo area (4:5 ratio) with overlay chips -->
+<div class="relative w-full aspect-[4/5] bg-subtle overflow-hidden">
+<img alt="Sofá Glam em Veludo" class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida/AEtjO1VCMjENG-HxGjeyh0l7CJyYpk0w2LJFzOB87NMTdd6KdErRPcOt1oA0iq9lT5foTayP8GoEUGBjzBjojuJcNL83PZYOQz_NEb_7_Bk6wT_rgvRINLAOuwEGBOe5PW-6ZVdaoEaI_oDvnKh1Ey1ja0TuLbESBT25D9UHdODdqzjqo8fa902Hsk8UkBtiI1zaaffYd7ywdB9I3YBlojt7JHRJOgDeNsLznsc0_7HnJsmjuaduTPrJBJS8MR2Z"/>
+<!-- Top-left category chip -->
+<span class="absolute top-3 left-3 bg-surface/95 text-body text-[12px] font-sans font-medium uppercase tracking-[0.08em] px-2.5 py-1 select-none">
+                SOFÁS
+              </span>
+<!-- Bottom-left 3D model chip (with cube icon) -->
+<span class="absolute bottom-3 left-3 bg-surface/95 text-bronze-text text-[12px] font-sans font-medium uppercase tracking-[0.08em] px-2.5 py-1 flex items-center gap-1.5 select-none border border-hairline/60">
+<svg class="w-3.5 h-3.5 text-bronze-text" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+                MODELO 3D
+              </span>
+</div>
+<!-- Content Area (20px padding) -->
+<div class="p-[20px] pb-3">
+<h2 class="font-serif font-medium text-[24px] leading-[1.15] text-ink min-h-[56px] flex items-start">
+                Sofá Glam em Veludo
+              </h2>
+<!-- Two-line short description -->
+<p class="text-[14px] leading-[1.45] text-muted min-h-[40px] mt-1.5 line-clamp-2">
+                Sofá curvo em veludo com pés finos de ponta em latão.
+              </p>
+</div>
+</div>
+<!-- Bottom bar: hairline, price left, link right -->
+<div class="px-[20px] pb-[20px]">
+<div class="w-full border-t border-hairline pt-3 flex items-center justify-between">
+<span class="font-sans font-medium text-[16px] text-ink font-tabular">
+                1899,00 €
+              </span>
+<a class="font-sans font-medium text-[14px] text-bronze-text hover:text-ink transition-colors inline-flex items-center gap-1" href="#">
+                Ver peça →
+              </a>
+</div>
+</div>
+</article>
+<!-- CARD 4: Poltrona Capitonê Mostarda -->
+<article class="bg-surface border border-hairline flex flex-col justify-between group">
+<div>
+<!-- Photo area (4:5 ratio) with overlay chips -->
+<div class="relative w-full aspect-[4/5] bg-subtle overflow-hidden">
+<img alt="Poltrona Capitonê Mostarda" class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida/AEtjO1VqcIUawrAuSSlybO8F3Qe_ygF9LxXFQSUvvcEhRiID5eZXYRbUBXR0h8azSovsVCtLky-Vw3ggaAoyjWm_e-4vF7HnCbZBbyh_dQDUqMIdTJODaLpdiD_9ndfzWOidSq42e8xITTxvQKwwUw5jVLs8WXYSVj1IzDWTnDSfKcipCVNKFpgzeSheKocwIJtrOiDLhSllaJ3-lV_kc6wI5CsDBB90NqZ7VblHuUv_gr14BADClwX5GRa6whvW"/>
+<!-- Top-left category chip -->
+<span class="absolute top-3 left-3 bg-surface/95 text-body text-[12px] font-sans font-medium uppercase tracking-[0.08em] px-2.5 py-1 select-none">
+                CADEIRAS
+              </span>
+<!-- No 3D model for this product -->
+</div>
+<!-- Content Area (20px padding) -->
+<div class="p-[20px] pb-3">
+<h2 class="font-serif font-medium text-[24px] leading-[1.15] text-ink min-h-[56px] flex items-start">
+                Poltrona Capitonê Mostarda
+              </h2>
+<!-- Two-line short description -->
+<p class="text-[14px] leading-[1.45] text-muted min-h-[40px] mt-1.5 line-clamp-2">
+                Poltrona capitonê em veludo mostarda.
+              </p>
+</div>
+</div>
+<!-- Bottom bar: hairline, price left, link right -->
+<div class="px-[20px] pb-[20px]">
+<div class="w-full border-t border-hairline pt-3 flex items-center justify-between">
+<span class="font-sans font-medium text-[16px] text-ink font-tabular">
+                649,00 €
+              </span>
+<a class="font-sans font-medium text-[14px] text-bronze-text hover:text-ink transition-colors inline-flex items-center gap-1" href="#">
+                Ver peça →
+              </a>
+</div>
+</div>
+</article>
+<!-- CARD 5: Mesa de Apoio Tejo -->
+<article class="bg-surface border border-hairline flex flex-col justify-between group">
+<div>
+<!-- Photo area (4:5 ratio) with overlay chips -->
+<div class="relative w-full aspect-[4/5] bg-subtle overflow-hidden">
+<img alt="Mesa de Apoio Tejo" class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]" src="https://lh3.googleusercontent.com/aida/AEtjO1Vdb2Oick5dVQn_mAvC0Zul3SfPkkW2FND0PNOpCkqX-hocCjnlorokCGLYmbO2zl9bcLNxxCiQ6zSdmx03vA4I-IlwtbQDy5AvTAZv73IkL9khMU8cLQ1qbZweLXb2rVNsgyYEyb8dHH0dfUY6vFNB2ULghuupIsLzDIxA1C6SufJ52kFqg72MWNpVDyRgNkaG0UbNbEH6Zguz6Ri6XVGjWYYsG0Z3O7y6D-etPdFH_EGiul21v1mTRkqC"/>
+<!-- Top-left category chip -->
+<span class="absolute top-3 left-3 bg-surface/95 text-body text-[12px] font-sans font-medium uppercase tracking-[0.08em] px-2.5 py-1 select-none">
+                MESAS
+              </span>
+<!-- Bottom-left 3D model chip (with cube icon) -->
+<span class="absolute bottom-3 left-3 bg-surface/95 text-bronze-text text-[12px] font-sans font-medium uppercase tracking-[0.08em] px-2.5 py-1 flex items-center gap-1.5 select-none border border-hairline/60">
+<svg class="w-3.5 h-3.5 text-bronze-text" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+                MODELO 3D
+              </span>
+</div>
+<!-- Content Area (20px padding) -->
+<div class="p-[20px] pb-3">
+<h2 class="font-serif font-medium text-[24px] leading-[1.15] text-ink min-h-[56px] flex items-start">
+                Mesa de Apoio Tejo
+              </h2>
+<!-- Two-line short description (empty for Tejo as specified, placeholder height preserved for optical baseline) -->
+<p class="text-[14px] leading-[1.45] text-muted min-h-[40px] mt-1.5">
+<!-- Short description empty -->
+</p>
+</div>
+</div>
+<!-- Bottom bar: hairline, price left, link right -->
+<div class="px-[20px] pb-[20px]">
+<div class="w-full border-t border-hairline pt-3 flex items-center justify-between">
+<span class="font-sans font-medium text-[16px] text-ink font-tabular">
+                189,00 €
+              </span>
+<a class="font-sans font-medium text-[14px] text-bronze-text hover:text-ink transition-colors inline-flex items-center gap-1" href="#">
+                Ver peça →
+              </a>
+</div>
+</div>
+</article></div>
+</section>
+</main>
+<!-- 5. FOOTER (1px hairline above, 48px padding) -->
+<footer class="w-full border-t border-hairline py-[48px] px-[60px] mt-8 bg-canvas">
+<div class="w-[1320px] mx-auto flex items-center justify-between">
+<!-- Left: "© CASA LISBOA INTERIORS" Jost 12px muted letter-spacing 0.08em -->
+<div class="text-[12px] font-sans font-medium text-muted uppercase tracking-[0.08em]">
+        © CASA LISBOA INTERIORS
+      </div>
+<!-- Right: small "S A N C T U S" wordmark 11px, vertical rule, 13px muted sentence case -->
+<div class="flex items-center gap-3">
+<span class="text-[11px] font-serif font-medium text-ink tracking-[0.25em] uppercase select-none">
+          S A N C T U S
+        </span>
+<span class="w-[1px] h-3 bg-hairline"></span>
+<span class="text-[13px] font-sans text-muted">
+          Catálogo com tecnologia Sanctus (demonstração)
+        </span>
+</div>
+</div>
+</footer>
+</body>
+</html>

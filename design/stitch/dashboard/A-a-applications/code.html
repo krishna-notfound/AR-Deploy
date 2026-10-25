@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Applications</title>
+<!-- Google Fonts: Cormorant Garamond 500 & Inter 400, 500, 600 -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', 'serif'],
+            sans: ['"Inter"', 'sans-serif'],
+          },
+          colors: {
+            canvas: '#F3F0E9',
+            card: '#FAF8F3',
+            subtle: '#ECE7DD',
+            hairline: '#D9D3C7',
+            strongline: '#8A8073',
+            ink: '#1D1C1A',
+            body: '#3A352F',
+            muted: '#5A5148',
+            bronze: '#8A765C',
+            bronzeText: '#6E5C45',
+            softBronze: '#EAE3D6',
+            lightBronze: '#C9B79B',
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    * {
+      border-radius: 2px !important;
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      width: 1440px;
+      min-width: 1440px;
+      background-color: #F3F0E9;
+      color: #3A352F;
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Stroke styling for 1.5px clean line icons */
+    .icon-stroke {
+      stroke-width: 1.5px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body class="flex min-h-screen bg-canvas text-body">
+<!-- LEFT SIDEBAR: 256px, solid #1D1C1A, full height -->
+<aside class="w-[256px] min-w-[256px] bg-[#1D1C1A] flex flex-col justify-between shrink-0 min-h-screen select-none">
+<div class="flex flex-col">
+<!-- Wordmark Logo block -->
+<div class="px-6 pt-6 pb-5 border-b border-white/10">
+<div class="text-[15px] font-medium tracking-[0.25em] text-[#F3F0E9] leading-tight">
+          S A N C T U S
+        </div>
+<div class="text-[13px] text-[#F3F0E9]/70 mt-1 font-normal">
+          Admin console
+        </div>
+</div>
+<!-- Navigation links -->
+<nav class="flex flex-col py-3">
+<!-- Overview -->
+<a class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="14" y="14"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- Applications (ACTIVE) -->
+<a class="h-[40px] flex items-center justify-between px-6 bg-white/[0.08] text-[#F3F0E9] font-medium text-[14px] relative" href="#">
+<!-- 2px #C9B79B bar on left edge -->
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></div>
+<div class="flex items-center">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+<polyline points="10 9 9 9 8 9"></polyline>
+</svg>
+<span>Applications</span>
+</div>
+<!-- Badge count "3": #1D1C1A text on #C9B79B, 18px tall, 2px corners -->
+<span class="h-[18px] px-1.5 bg-[#C9B79B] text-[#1D1C1A] text-[12px] font-medium flex items-center justify-center tabular-nums leading-none">
+            3
+          </span>
+</a>
+<!-- Businesses -->
+<a class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M3 21h18"></path>
+<path d="M5 21V7l8-4v18"></path>
+<path d="M19 21V11l-6-4"></path>
+<path d="M9 9v.01"></path>
+<path d="M9 13v.01"></path>
+<path d="M9 17v.01"></path>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- All Products -->
+<a class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<path d="m7.5 4.27 9 5.15"></path>
+<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+<path d="m3.3 7 8.7 5 8.7-5"></path>
+<path d="M12 22V12"></path>
+</svg>
+<span>All Products</span>
+</a>
+<!-- Analytics -->
+<a class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- Catalogs & QR Codes -->
+<a class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<rect height="5" width="5" x="3" y="3"></rect>
+<rect height="5" width="5" x="16" y="3"></rect>
+<rect height="5" width="5" x="3" y="16"></rect>
+<path d="M21 16h-3a2 2 0 0 0-2 2v3"></path>
+<path d="M21 21v.01"></path>
+<path d="M12 7v3a2 2 0 0 1-2 2H7"></path>
+<path d="M3 12h.01"></path>
+<path d="M12 3h.01"></path>
+<path d="M12 16v.01"></path>
+<path d="M16 12h1"></path>
+<path d="M21 12v.01"></path>
+<path d="M12 21v-1"></path>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- Team & Access -->
+<a class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- Audit log -->
+<a class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- Settings -->
+<a class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+<circle cx="12" cy="12" r="3"></circle>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom sidebar controls -->
+<div class="border-t border-white/10 flex flex-col pb-2">
+<!-- Collapse row -->
+<button class="h-[40px] flex items-center px-6 text-[14px] text-[#F3F0E9]/70 hover:text-[#F3F0E9] transition-colors w-full text-left">
+<svg class="w-[18px] h-[18px] mr-3 icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</button>
+<!-- User row: admin@platform.example with log-out icon -->
+<div class="h-[48px] flex items-center justify-between px-6 text-[#F3F0E9]/90">
+<span class="text-[13px] font-normal truncate max-w-[160px]">admin@platform.example</span>
+<button class="text-[#F3F0E9]/70 hover:text-[#F3F0E9] p-1 transition-colors" title="Log out">
+<svg class="w-[16px] h-[16px] icon-stroke stroke-current fill-none" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- MAIN AREA (1184px remaining width) -->
+<div class="flex-1 flex flex-col min-w-0 bg-canvas">
+<!-- TOP BAR: 56px, solid #F3F0E9, 1px bottom hairline -->
+<header class="h-[56px] min-h-[56px] bg-canvas border-b border-hairline px-10 flex items-center justify-between select-none">
+<!-- Left: breadcrumb 14px "Sanctus Admin / Applications" -->
+<div class="flex items-center space-x-2 text-[14px]">
+<span class="text-muted">Sanctus Admin</span>
+<span class="text-muted">/</span>
+<span class="text-ink font-medium">Applications</span>
+</div>
+<!-- Right: small outlined tag "Demo mode" (12px muted, 1px #8A8073 border) -->
+<div class="border border-strongline text-muted text-[12px] px-2.5 py-1 font-normal">
+        Demo mode
+      </div>
+</header>
+<!-- CONTENT CONTAINER: 40px padding, content width 1104px (1184 - 80) -->
+<main class="p-10 flex flex-col gap-6 w-full max-w-[1184px]">
+<!-- 1. PAGE HEADER: h1 "Applications", 15px muted subtitle, no header buttons -->
+<div class="flex flex-col">
+<h1 class="font-serif text-[32px] font-normal text-ink leading-[1.15] m-0">
+          Applications
+        </h1>
+<p class="text-[15px] text-muted mt-1.5 mb-0 leading-normal">
+          Businesses that applied to join Sanctus. Approving one creates its business as a draft; then invite the owner.
+        </p>
+</div>
+<!-- 2. STATUS TABS: Segmented control (track #ECE7DD, 40px, 2px corners; active segment #FAF8F3 with 1px border and ink 500 text; counts muted tabular) -->
+<div class="h-[40px] bg-subtle p-1 flex items-center w-fit">
+<!-- All 5 (ACTIVE) -->
+<button class="h-[32px] px-3.5 bg-card border border-hairline text-ink font-medium text-[13px] flex items-center space-x-1.5">
+<span>All</span>
+<span class="text-muted tabular-nums">5</span>
+</button>
+<!-- Submitted 2 -->
+<button class="h-[32px] px-3.5 text-body hover:text-ink font-normal text-[13px] flex items-center space-x-1.5 transition-colors">
+<span>Submitted</span>
+<span class="text-muted tabular-nums">2</span>
+</button>
+<!-- Under review 1 -->
+<button class="h-[32px] px-3.5 text-body hover:text-ink font-normal text-[13px] flex items-center space-x-1.5 transition-colors">
+<span>Under review</span>
+<span class="text-muted tabular-nums">1</span>
+</button>
+<!-- Approved 1 -->
+<button class="h-[32px] px-3.5 text-body hover:text-ink font-normal text-[13px] flex items-center space-x-1.5 transition-colors">
+<span>Approved</span>
+<span class="text-muted tabular-nums">1</span>
+</button>
+<!-- Rejected 1 -->
+<button class="h-[32px] px-3.5 text-body hover:text-ink font-normal text-[13px] flex items-center space-x-1.5 transition-colors">
+<span>Rejected</span>
+<span class="text-muted tabular-nums">1</span>
+</button>
+</div>
+<!-- 3. ONE CARD WITH THE LIST: Cards #FAF8F3 with 1px #D9D3C7 border -->
+<div class="bg-card border border-hairline flex flex-col">
+<!-- Filter row inside the card (16px 24px padding, hairline below), bottom-aligned -->
+<div class="px-6 py-4 border-b border-hairline flex items-end gap-4">
+<!-- Search field (360px wide) -->
+<div class="flex flex-col w-[360px]">
+<label class="text-[13px] font-medium text-body mb-1.5">Search</label>
+<div class="relative flex items-center">
+<svg class="w-4 h-4 text-muted absolute left-3 icon-stroke stroke-current fill-none pointer-events-none" viewbox="0 0 24 24">
+<circle cx="11" cy="11" r="8"></circle>
+<line x1="21" x2="16.65" y1="21" y2="16.65"></line>
+</svg>
+<input class="w-full h-[40px] pl-9 pr-3 bg-card border border-hairline text-ink text-[14px] placeholder:text-muted/60 focus:outline-none focus:border-ink transition-colors font-sans" placeholder="Business, applicant, email or reference" type="text"/>
+</div>
+</div>
+<!-- Submitted from date field (160px wide) -->
+<div class="flex flex-col w-[160px]">
+<label class="text-[13px] font-medium text-body mb-1.5">Submitted from</label>
+<div class="relative flex items-center">
+<input class="w-full h-[40px] px-3 pr-8 bg-card border border-hairline text-muted text-[14px] tabular-nums focus:outline-none focus:border-ink transition-colors font-sans" type="text" value="dd/mm/yyyy"/>
+<svg class="w-4 h-4 text-muted absolute right-3 icon-stroke stroke-current fill-none pointer-events-none" viewbox="0 0 24 24">
+<rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect>
+<line x1="16" x2="16" y1="2" y2="6"></line>
+<line x1="8" x2="8" y1="2" y2="6"></line>
+<line x1="3" x2="21" y1="10" y2="10"></line>
+</svg>
+</div>
+</div>
+<!-- to date field (160px wide) -->
+<div class="flex flex-col w-[160px]">
+<label class="text-[13px] font-medium text-body mb-1.5">to</label>
+<div class="relative flex items-center">
+<input class="w-full h-[40px] px-3 pr-8 bg-card border border-hairline text-muted text-[14px] tabular-nums focus:outline-none focus:border-ink transition-colors font-sans" type="text" value="dd/mm/yyyy"/>
+<svg class="w-4 h-4 text-muted absolute right-3 icon-stroke stroke-current fill-none pointer-events-none" viewbox="0 0 24 24">
+<rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect>
+<line x1="16" x2="16" y1="2" y2="6"></line>
+<line x1="8" x2="8" y1="2" y2="6"></line>
+<line x1="3" x2="21" y1="10" y2="10"></line>
+</svg>
+</div>
+</div>
+</div>
+<!-- Applications Table -->
+<table class="w-full text-left border-collapse">
+<thead>
+<!-- Header row 40px, text 13px weight 500 #5A5148 sentence case with no fill, 1px #D9D3C7 rule below -->
+<tr class="h-[40px] border-b border-hairline"><th class="px-6 text-[13px] font-medium text-muted">Business</th>
+<th class="px-6 text-[13px] font-medium text-muted w-[230px]">Applicant</th>
+<th class="px-6 text-[13px] font-medium text-muted w-[140px] whitespace-nowrap">Status</th>
+<th class="px-6 text-[13px] font-medium text-muted w-[180px] min-w-[180px] text-right whitespace-nowrap">Submitted</th>
+<th class="px-6 text-[13px] font-medium text-muted w-[90px] text-right"></th></tr>
+</thead>
+<tbody class="divide-y divide-subtle">
+<!-- ROW 1: Atelier Norte (Submitted) -->
+<tr class="h-[60px] hover:bg-subtle/30 transition-colors">
+<td class="px-6 py-2">
+<div class="flex items-center space-x-3">
+<!-- 32px square monogram (initials, #F3F0E9 fill, 1px border) -->
+<div class="w-[32px] h-[32px] min-w-[32px] bg-canvas border border-hairline flex items-center justify-center text-[12px] font-medium text-ink">
+                    AN
+                  </div>
+<div class="flex flex-col min-w-0">
+<span class="text-[14px] font-medium text-ink leading-tight">Atelier Norte</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">#K7Q2M9XA · Furniture · Porto, Portugal</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-2">
+<div class="flex flex-col">
+<span class="text-[14px] text-ink leading-tight">Rita Sousa</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">rita@ateliernorte.example</span>
+</div>
+</td>
+<td class="px-6 py-2 whitespace-nowrap">
+<!-- Status Pill: Submitted = #6E5C45 on #EAE3D6 (20px tall, 2px corners) -->
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-softBronze text-bronzeText leading-none whitespace-nowrap">
+                  Submitted
+                </span>
+</td>
+<td class="px-6 py-2 text-right"><div class="flex flex-col items-end whitespace-nowrap">
+<span class="text-[14px] text-body tabular-nums leading-tight">24 Oct 2026</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">Updated 1 day ago</span>
+</div></td>
+<td class="px-6 py-2 text-right">
+<!-- Secondary button 32px tall, 1px #1D1C1A border -->
+<button class="h-[32px] px-3 bg-transparent border border-ink text-ink text-[14px] font-medium hover:bg-ink hover:text-[#F3F0E9] transition-colors leading-none">
+                  Review
+                </button>
+</td>
+</tr>
+<!-- ROW 2: Casa do Linho (Submitted) -->
+<tr class="h-[60px] hover:bg-subtle/30 transition-colors">
+<td class="px-6 py-2">
+<div class="flex items-center space-x-3">
+<div class="w-[32px] h-[32px] min-w-[32px] bg-canvas border border-hairline flex items-center justify-center text-[12px] font-medium text-ink">
+                    CL
+                  </div>
+<div class="flex flex-col min-w-0">
+<span class="text-[14px] font-medium text-ink leading-tight">Casa do Linho</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">#P3D8R1ZT · Decor · Braga, Portugal</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-2">
+<div class="flex flex-col">
+<span class="text-[14px] text-ink leading-tight">Inês Martins</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">ines@casadolinho.example</span>
+</div>
+</td>
+<td class="px-6 py-2 whitespace-nowrap">
+<!-- Status Pill: Submitted -->
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-softBronze text-bronzeText leading-none whitespace-nowrap">
+                  Submitted
+                </span>
+</td>
+<td class="px-6 py-2 text-right"><div class="flex flex-col items-end whitespace-nowrap">
+<span class="text-[14px] text-body tabular-nums leading-tight">23 Oct 2026</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">Updated 2 days ago</span>
+</div></td>
+<td class="px-6 py-2 text-right">
+<button class="h-[32px] px-3 bg-transparent border border-ink text-ink text-[14px] font-medium hover:bg-ink hover:text-[#F3F0E9] transition-colors leading-none">
+                  Review
+                </button>
+</td>
+</tr>
+<!-- ROW 3: Luz & Forma (Under review) -->
+<tr class="h-[60px] hover:bg-subtle/30 transition-colors">
+<td class="px-6 py-2">
+<div class="flex items-center space-x-3">
+<div class="w-[32px] h-[32px] min-w-[32px] bg-canvas border border-hairline flex items-center justify-center text-[12px] font-medium text-ink">
+                    LF
+                  </div>
+<div class="flex flex-col min-w-0">
+<span class="text-[14px] font-medium text-ink leading-tight">Luz &amp; Forma</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">#H5W2N6CE · Lighting · Lisboa, Portugal</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-2">
+<div class="flex flex-col">
+<span class="text-[14px] text-ink leading-tight">Tiago Ramos</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">tiago@luzeforma.example</span>
+</div>
+</td>
+<td class="px-6 py-2 whitespace-nowrap">
+<!-- Status Pill: Under review = #8F5A0B on #F8EEDC -->
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#F8EEDC] text-[#8F5A0B] leading-none whitespace-nowrap">
+                  Under review
+                </span>
+</td>
+<td class="px-6 py-2 text-right"><div class="flex flex-col items-end whitespace-nowrap">
+<span class="text-[14px] text-body tabular-nums leading-tight">21 Oct 2026</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">Updated 3 days ago</span>
+</div></td>
+<td class="px-6 py-2 text-right">
+<button class="h-[32px] px-3 bg-transparent border border-ink text-ink text-[14px] font-medium hover:bg-ink hover:text-[#F3F0E9] transition-colors leading-none">
+                  Review
+                </button>
+</td>
+</tr>
+<!-- ROW 4: Madeira Viva (Approved) -->
+<tr class="h-[60px] hover:bg-subtle/30 transition-colors">
+<td class="px-6 py-2">
+<div class="flex items-center space-x-3">
+<div class="w-[32px] h-[32px] min-w-[32px] bg-canvas border border-hairline flex items-center justify-center text-[12px] font-medium text-ink">
+                    MV
+                  </div>
+<div class="flex flex-col min-w-0">
+<span class="text-[14px] font-medium text-ink leading-tight">Madeira Viva</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">#B9L4T7QS · Furniture · Curitiba, Brazil</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-2">
+<div class="flex flex-col">
+<span class="text-[14px] text-ink leading-tight">Ana Paula Reis</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">ana@madeiraviva.example</span>
+</div>
+</td>
+<td class="px-6 py-2 whitespace-nowrap">
+<!-- Status Pill: Approved = #2F6B4F on #E5F0E9 -->
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#E5F0E9] text-[#2F6B4F] leading-none whitespace-nowrap">
+                  Approved
+                </span>
+</td>
+<td class="px-6 py-2 text-right"><div class="flex flex-col items-end whitespace-nowrap">
+<span class="text-[14px] text-body tabular-nums leading-tight">12 Oct 2026</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">Updated 11 days ago</span>
+</div></td>
+<td class="px-6 py-2 text-right">
+<!-- Plain ink text button for non-review rows -->
+<button class="text-ink hover:underline text-[14px] font-medium px-2 py-1 leading-none">
+                  View
+                </button>
+</td>
+</tr>
+<!-- ROW 5: Studio Brisa (Rejected) -->
+<tr class="h-[60px] hover:bg-subtle/30 transition-colors">
+<td class="px-6 py-2">
+<div class="flex items-center space-x-3">
+<div class="w-[32px] h-[32px] min-w-[32px] bg-canvas border border-hairline flex items-center justify-center text-[12px] font-medium text-ink">
+                    SB
+                  </div>
+<div class="flex flex-col min-w-0">
+<span class="text-[14px] font-medium text-ink leading-tight">Studio Brisa</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">#M2X6F8KD · Decor · Faro, Portugal</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-2">
+<div class="flex flex-col">
+<span class="text-[14px] text-ink leading-tight">Marco Vidal</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">marco@studiobrisa.example</span>
+</div>
+</td>
+<td class="px-6 py-2 whitespace-nowrap">
+<!-- Status Pill: Rejected = #A8362A on #F8E5E2 -->
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#F8E5E2] text-[#A8362A] leading-none whitespace-nowrap">
+                  Rejected
+                </span>
+</td>
+<td class="px-6 py-2 text-right"><div class="flex flex-col items-end whitespace-nowrap">
+<span class="text-[14px] text-body tabular-nums leading-tight">8 Oct 2026</span>
+<span class="text-[13px] text-muted mt-0.5 leading-tight">Updated 15 days ago</span>
+</div></td>
+<td class="px-6 py-2 text-right">
+<button class="text-ink hover:underline text-[14px] font-medium px-2 py-1 leading-none">
+                  View
+                </button>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Footer row (hairline above, 16px 24px padding): left "Sample data" tag, right muted count -->
+<div class="px-6 py-4 border-t border-hairline flex items-center justify-between">
+<!-- Neutral tag: #3A352F on #ECE7DD, 20px tall, 2px corners -->
+<span class="h-[20px] px-2 bg-subtle text-body text-[12px] font-medium flex items-center leading-none">
+            Sample data
+          </span>
+<span class="text-[13px] text-muted tabular-nums">
+            Showing 1–5 of 5 applications
+          </span>
+</div>
+</div>
+</main>
+</div>
+</body>
+</html>

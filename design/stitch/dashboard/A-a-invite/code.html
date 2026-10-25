@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=1440, initial-scale=1.0" name="viewport"/>
+<title>Dash v2 A – Invite member dialog</title>
+<!-- Google Fonts: Cormorant Garamond 500, Inter 400, 500, 600 -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F3F0E9;
+      color: #3A352F;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-serif-cormorant {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Exact colors specification */
+    :root {
+      --canvas: #F3F0E9;
+      --card: #FAF8F3;
+      --subtle: #ECE7DD;
+      --hairline: #D9D3C7;
+      --strong-line: #8A8073;
+      --ink: #1D1C1A;
+      --body: #3A352F;
+      --muted: #5A5148;
+      --bronze: #8A765C;
+      --bronze-text: #6E5C45;
+      --soft-bronze: #EAE3D6;
+      --light-bronze: #C9B79B;
+      --sidebar: #1D1C1A;
+      --chalk: #F3F0E9;
+    }
+    .dialog-shadow {
+      box-shadow: 0 16px 36px -8px rgba(29, 28, 26, 0.16), 0 4px 12px -2px rgba(29, 28, 26, 0.08);
+    }
+  </style>
+</head>
+<body class="w-[1440px] min-h-[960px] bg-[#F3F0E9] text-[#3A352F] antialiased relative overflow-x-hidden">
+<!-- MAIN APP CONTAINER -->
+<div class="flex min-h-screen">
+<!-- LEFT SIDEBAR: 256px, solid #1D1C1A -->
+<aside class="w-[256px] min-h-screen bg-[#1D1C1A] text-[#F3F0E9] flex flex-col justify-between shrink-0 select-none">
+<div>
+<!-- Brand Header -->
+<div class="pt-6 px-6 pb-5">
+<div class="text-[15px] font-medium tracking-[0.25em] text-[#F3F0E9] leading-tight">S A N C T U S</div>
+<div class="text-[13px] text-[#F3F0E9] opacity-70 mt-1">Admin console</div>
+</div>
+<div class="h-[1px] bg-white/10 mx-6 mb-3"></div>
+<!-- Navigation items -->
+<nav class="space-y-[1px] px-3">
+<!-- Overview -->
+<a class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<rect height="7" rx="1" width="7" x="3" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="14"></rect>
+<rect height="7" rx="1" width="7" x="3" y="14"></rect>
+</svg>
+<span>Overview</span>
+</a>
+<!-- Applications (with badge 3) -->
+<a class="h-[40px] px-3 flex items-center justify-between text-[14px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors" href="#">
+<div class="flex items-center gap-3">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
+<line x1="16" x2="8" y1="13" y2="13"></line>
+<line x1="16" x2="8" y1="17" y2="17"></line>
+<line x1="10" x2="8" y1="9" y2="9"></line>
+</svg>
+<span>Applications</span>
+</div>
+<span class="inline-flex items-center justify-center h-[18px] px-1.5 text-[12px] font-semibold bg-[#C9B79B] text-[#1D1C1A] rounded-[2px] tabular-nums">3</span>
+</a>
+<!-- Businesses -->
+<a class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3 21h18M3 7v14M21 7v14M6 21V11h4v10M14 21V11h4v10M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3M3 7h18"></path>
+</svg>
+<span>Businesses</span>
+</a>
+<!-- All Products -->
+<a class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+<span>All Products</span>
+</a>
+<!-- Analytics -->
+<a class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<line x1="18" x2="18" y1="20" y2="10"></line>
+<line x1="12" x2="12" y1="20" y2="4"></line>
+<line x1="6" x2="6" y1="20" y2="14"></line>
+</svg>
+<span>Analytics</span>
+</a>
+<!-- Catalogs & QR Codes -->
+<a class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+<rect height="3" width="3" x="14" y="14"></rect>
+<rect height="3" width="3" x="18" y="18"></rect>
+</svg>
+<span>Catalogs &amp; QR Codes</span>
+</a>
+<!-- Team & Access (ACTIVE) -->
+<a class="relative h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] font-medium bg-white/[0.08] rounded-[2px]" href="#">
+<span class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#C9B79B]"></span>
+<svg class="w-[18px] h-[18px] stroke-[1.5] text-[#F3F0E9]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+</svg>
+<span>Team &amp; Access</span>
+</a>
+<!-- Audit log -->
+<a class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Audit log</span>
+</a>
+<!-- Settings -->
+<a class="h-[40px] px-3 flex items-center gap-3 text-[14px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors" href="#">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Bottom of Sidebar -->
+<div class="px-3 pb-4">
+<!-- Collapse row -->
+<button class="w-full h-[40px] px-3 flex items-center gap-3 text-[13px] text-[#F3F0E9] opacity-70 hover:opacity-100 hover:bg-white/5 rounded-[2px] transition-colors mb-2">
+<svg class="w-[16px] h-[16px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="11 17 6 12 11 7"></polyline>
+<polyline points="18 17 13 12 18 7"></polyline>
+</svg>
+<span>Collapse</span>
+</button>
+<div class="h-[1px] bg-white/10 mx-2 mb-3"></div>
+<!-- User block with log-out icon button -->
+<div class="h-[40px] px-3 flex items-center justify-between text-[#F3F0E9] rounded-[2px]">
+<span class="text-[13px] truncate text-[#F3F0E9]/80 font-normal">admin@platform.example</span>
+<button class="w-7 h-7 flex items-center justify-center text-[#F3F0E9] opacity-70 hover:opacity-100 transition-opacity" title="Log out">
+<svg class="w-[16px] h-[16px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+<polyline points="16 17 21 12 16 7"></polyline>
+<line x1="21" x2="9" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- RIGHT MAIN COLUMN: TOP BAR + CONTENT AREA -->
+<div class="flex-1 min-w-0 flex flex-col">
+<!-- TOP BAR: 56px, solid #F3F0E9, 1px bottom hairline #D9D3C7 -->
+<header class="h-[56px] bg-[#F3F0E9] border-b border-[#D9D3C7] px-10 flex items-center justify-between shrink-0">
+<!-- Breadcrumb: 14px "Sanctus Admin / Team & Access" -->
+<div class="flex items-center gap-2 text-[14px]">
+<span class="text-[#5A5148]">Sanctus Admin</span>
+<span class="text-[#5A5148]/60">/</span>
+<span class="text-[#1D1C1A] font-medium">Team &amp; Access</span>
+</div>
+<!-- Right: small outlined tag "Demo mode" (12px muted, 1px #8A8073 border) -->
+<div class="inline-flex items-center h-[24px] px-2.5 text-[12px] font-medium text-[#5A5148] border border-[#8A8073] rounded-[2px]">
+          Demo mode
+        </div>
+</header>
+<!-- CONTENT AREA: canvas #F3F0E9, 40px padding, content width 1104px -->
+<main class="flex-1 p-10 bg-[#F3F0E9] overflow-auto">
+<div class="w-[1104px] mx-auto space-y-6">
+<!-- Page Header row -->
+<div class="flex items-start justify-between">
+<div>
+<h1 class="font-serif-cormorant text-[32px] font-medium text-[#1D1C1A] leading-[1.15]">Team &amp; Access</h1>
+<p class="text-[14px] text-[#5A5148] mt-1">Who can use the platform console, and what each role can do.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="h-[40px] px-4 border border-[#1D1C1A] text-[#1D1C1A] text-[14px] font-medium rounded-[2px] inline-flex items-center gap-2 hover:bg-[#FAF8F3]">
+<svg class="w-[16px] h-[16px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 2l-2 2m-6 6l7-7-2-2-7 7v4h4l7-7z"></path>
+<circle cx="7.5" cy="15.5" r="5.5"></circle>
+</svg>
+<span>Role permissions</span>
+</button>
+<button class="h-[40px] px-4 bg-[#1D1C1A] text-[#F3F0E9] text-[14px] font-medium rounded-[2px] inline-flex items-center gap-2 hover:bg-[#3A352F]">
+<svg class="w-[16px] h-[16px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+<circle cx="9" cy="7" r="4"></circle>
+<line x1="20" x2="20" y1="8" y2="14"></line>
+<line x1="23" x2="17" y1="11" y2="11"></line>
+</svg>
+<span>Invite member</span>
+</button>
+</div>
+</div>
+<!-- KPI Summary Card: #FAF8F3 with 1px #D9D3C7 border, 24px padding -->
+<div class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6">
+<div class="grid grid-cols-4 divide-x divide-[#ECE7DD]">
+<!-- Active members -->
+<div class="pr-6">
+<div class="text-[13px] font-medium text-[#5A5148]">Active members</div>
+<div class="text-[28px] font-medium text-[#1D1C1A] mt-1 tabular-nums">3</div>
+<div class="text-[13px] text-[#5A5148] mt-0.5">Owner included</div>
+</div>
+<!-- Pending invitations -->
+<div class="px-6">
+<div class="text-[13px] font-medium text-[#5A5148]">Pending invitations</div>
+<div class="text-[28px] font-medium text-[#1D1C1A] mt-1 tabular-nums">1</div>
+</div>
+<!-- Admins -->
+<div class="px-6">
+<div class="text-[13px] font-medium text-[#5A5148]">Admins</div>
+<div class="text-[28px] font-medium text-[#1D1C1A] mt-1 tabular-nums">2</div>
+</div>
+<!-- Team -->
+<div class="pl-6">
+<div class="text-[13px] font-medium text-[#5A5148]">Team</div>
+<div class="text-[28px] font-medium text-[#1D1C1A] mt-1 tabular-nums">2</div>
+</div>
+</div>
+</div>
+<!-- Members Table Container Card -->
+<div class="bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] p-6 space-y-4">
+<!-- Filter tabs -->
+<div class="flex items-center justify-between border-b border-[#ECE7DD] pb-3">
+<div class="flex items-center gap-6">
+<button class="text-[14px] font-semibold text-[#1D1C1A] border-b-2 border-[#1D1C1A] pb-3 -mb-3.5">Members 5</button>
+<button class="text-[14px] font-medium text-[#5A5148] pb-3 -mb-3.5 hover:text-[#1D1C1A]">Invitations 1</button>
+<button class="text-[14px] font-medium text-[#5A5148] pb-3 -mb-3.5 hover:text-[#1D1C1A]">Access history</button>
+</div>
+</div>
+<!-- Members Table -->
+<div class="w-full">
+<!-- Table Header -->
+<div class="h-[40px] grid grid-cols-12 items-center text-[13px] font-medium text-[#5A5148] border-b border-[#D9D3C7] px-3">
+<div class="col-span-4">Member</div>
+<div class="col-span-2">Role</div>
+<div class="col-span-2">Access</div>
+<div class="col-span-3 text-right">Joined or invited</div>
+<div class="col-span-1 text-right">Actions</div>
+</div>
+<!-- Row 1: Platform Admin -->
+<div class="min-h-[60px] grid grid-cols-12 items-center text-[14px] border-b border-[#ECE7DD] px-3 py-2">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-[2px] bg-[#ECE7DD] text-[#3A352F] font-medium text-[12px] flex items-center justify-center">PA</div>
+<div>
+<div class="font-medium text-[#1D1C1A]">Platform Admin</div>
+<div class="text-[13px] text-[#5A5148]">admin@platform.example</div>
+</div>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#1D1C1A] text-[#F3F0E9] rounded-[2px]">Owner</span>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px]">Active</span>
+</div>
+<div class="col-span-3 text-right text-[13px] text-[#5A5148] tabular-nums">27 Jun 2026 · now</div>
+<div class="col-span-1 text-right">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] rounded-[2px]">⋯</button>
+</div>
+</div>
+<!-- Row 2: Ana Ribeiro -->
+<div class="min-h-[60px] grid grid-cols-12 items-center text-[14px] border-b border-[#ECE7DD] px-3 py-2">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-[2px] bg-[#ECE7DD] text-[#3A352F] font-medium text-[12px] flex items-center justify-center">AR</div>
+<div>
+<div class="font-medium text-[#1D1C1A]">Ana Ribeiro</div>
+<div class="text-[13px] text-[#5A5148]">ana.ribeiro@sanctus.example</div>
+</div>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#ECE7DD] text-[#3A352F] rounded-[2px]">Admin</span>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px]">Active</span>
+</div>
+<div class="col-span-3 text-right text-[13px] text-[#5A5148] tabular-nums">16 Sep 2026 · yesterday</div>
+<div class="col-span-1 text-right">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] rounded-[2px]">⋯</button>
+</div>
+</div>
+<!-- Row 3: Pedro Alves -->
+<div class="min-h-[60px] grid grid-cols-12 items-center text-[14px] border-b border-[#ECE7DD] px-3 py-2">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-[2px] bg-[#ECE7DD] text-[#3A352F] font-medium text-[12px] flex items-center justify-center">PA</div>
+<div>
+<div class="font-medium text-[#1D1C1A]">Pedro Alves</div>
+<div class="text-[13px] text-[#5A5148]">pedro.alves@sanctus.example</div>
+</div>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#ECE7DD] text-[#3A352F] rounded-[2px]">Admin</span>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#ECE7DD] text-[#5A5148] rounded-[2px]">Deactivated</span>
+</div>
+<div class="col-span-3 text-right text-[13px] text-[#5A5148] tabular-nums">16 Sep 2026 · 9 days ago</div>
+<div class="col-span-1 text-right">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] rounded-[2px]">⋯</button>
+</div>
+</div>
+<!-- Row 4: João Costa -->
+<div class="min-h-[60px] grid grid-cols-12 items-center text-[14px] border-b border-[#ECE7DD] px-3 py-2">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-[2px] bg-[#ECE7DD] text-[#3A352F] font-medium text-[12px] flex items-center justify-center">JC</div>
+<div>
+<div class="font-medium text-[#1D1C1A]">João Costa</div>
+<div class="text-[13px] text-[#5A5148]">joao.costa@sanctus.example</div>
+</div>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#ECE7DD] text-[#3A352F] rounded-[2px]">Team</span>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#E5F0E9] text-[#2F6B4F] rounded-[2px]">Active</span>
+</div>
+<div class="col-span-3 text-right text-[13px] text-[#5A5148] tabular-nums">6 Oct 2026 · 3 days ago</div>
+<div class="col-span-1 text-right">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] rounded-[2px]">⋯</button>
+</div>
+</div>
+<!-- Row 5: Marta Lopes (Invited) -->
+<div class="min-h-[60px] grid grid-cols-12 items-center text-[14px] px-3 py-2">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-[2px] bg-[#ECE7DD] text-[#3A352F] font-medium text-[12px] flex items-center justify-center">ML</div>
+<div>
+<div class="font-medium text-[#5A5148] italic">Name not set yet</div>
+<div class="text-[13px] text-[#5A5148]">marta.lopes@sanctus.example</div>
+</div>
+</div>
+<div class="col-span-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#ECE7DD] text-[#3A352F] rounded-[2px]">Team</span>
+</div>
+<div class="col-span-2 flex items-center gap-1.5">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#E5EDF4] text-[#33597A] rounded-[2px]">Invited</span>
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#ECE7DD] text-[#5A5148] rounded-[2px]">Sent</span>
+</div>
+<div class="col-span-3 text-right text-[13px] text-[#5A5148] tabular-nums">24 Oct 2026 · Never</div>
+<div class="col-span-1 text-right">
+<button class="w-[32px] h-[32px] inline-flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] rounded-[2px]">⋯</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+<!-- FLAT SCRIM OVERLAY: #1D1C1A at 40% opacity (no blur) -->
+<div class="fixed inset-0 bg-[#1D1C1A]/40 z-40 pointer-events-auto"></div>
+<!-- DIALOGS CONTAINER ON TOP: Centered in content area, top-aligned, 32px apart -->
+<!-- Left margin matches sidebar (256px), centering the two 560px dialogs in remaining 1184px viewport -->
+<div class="fixed top-8 left-[256px] right-0 bottom-8 z-50 overflow-y-auto pointer-events-none flex justify-center items-start px-8">
+<div class="flex items-start gap-8 pointer-events-auto max-w-[1152px]">
+<!-- ========================================== -->
+<!-- LEFT DIALOG – FORM STEP (560px wide) -->
+<!-- ========================================== -->
+<section class="w-[560px] bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] dialog-shadow p-6 relative flex flex-col shrink-0">
+<!-- Close (x) icon button: 32px at top right -->
+<button class="absolute top-5 right-5 w-[32px] h-[32px] flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] rounded-[2px] transition-colors" title="Close">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<line x1="18" x2="6" y1="6" y2="18"></line>
+<line x1="6" x2="18" y1="6" y2="18"></line>
+</svg>
+</button>
+<!-- Header -->
+<div class="pr-8">
+<h2 class="text-[18px] font-semibold text-[#1D1C1A] leading-tight">Invite member</h2>
+<p class="text-[14px] text-[#5A5148] mt-1">They get an email with a link to create their account.</p>
+</div>
+<!-- Form Body -->
+<div class="mt-6 space-y-5">
+<!-- Email address field -->
+<div>
+<div class="flex items-baseline justify-between mb-1.5">
+<label class="text-[14px] font-medium text-[#1D1C1A]" for="invite-email">Email address</label>
+<span class="text-[13px] text-[#5A5148]">Required</span>
+</div>
+<input class="w-full h-[40px] px-3 bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] text-[14px] text-[#1D1C1A] focus:outline-none focus:border-[#1D1C1A]" id="invite-email" type="email" value="marta.lopes@sanctus.example"/>
+</div>
+<!-- Role field with two radio cards side by side -->
+<div>
+<label class="block text-[14px] font-medium text-[#1D1C1A] mb-2">Role</label>
+<div class="grid grid-cols-2 gap-3">
+<!-- Admin card (unselected) -->
+<div class="border border-[#D9D3C7] rounded-[2px] p-4 bg-[#FAF8F3] cursor-pointer hover:border-[#8A8073] transition-colors">
+<div class="flex items-start gap-2.5">
+<div class="w-4 h-4 rounded-full border border-[#8A8073] mt-0.5 flex items-center justify-center shrink-0">
+<!-- Unfilled -->
+</div>
+<div>
+<div class="text-[14px] font-semibold text-[#1D1C1A] leading-tight">Admin</div>
+<div class="text-[13px] text-[#5A5148] mt-1 leading-snug">Runs day-to-day operations with the permissions you set.</div>
+</div>
+</div>
+</div>
+<!-- Team card (selected: 2px #1D1C1A border and filled radio) -->
+<div class="border-2 border-[#1D1C1A] rounded-[2px] p-4 bg-[#FAF8F3] cursor-pointer relative">
+<div class="flex items-start gap-2.5">
+<div class="w-4 h-4 rounded-full border-2 border-[#1D1C1A] mt-0.5 flex items-center justify-center shrink-0">
+<div class="w-2 h-2 rounded-full bg-[#1D1C1A]"></div>
+</div>
+<div>
+<div class="text-[14px] font-semibold text-[#1D1C1A] leading-tight">Team</div>
+<div class="text-[13px] text-[#5A5148] mt-1 leading-snug">Helps with assigned tasks, usually with view and edit access only.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Read-only box: #F3F0E9, 1px border #D9D3C7, 16px padding -->
+<div class="bg-[#F3F0E9] border border-[#D9D3C7] rounded-[2px] p-4 space-y-3">
+<h3 class="text-[13px] font-semibold text-[#1D1C1A] leading-tight">What Team can do</h3>
+<!-- 2-column list of 13px items with small check icon -->
+<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] text-[#3A352F]">
+<div class="flex items-center gap-2">
+<svg class="w-3.5 h-3.5 stroke-[2] text-[#2F6B4F] shrink-0" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span>View businesses</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-3.5 h-3.5 stroke-[2] text-[#2F6B4F] shrink-0" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span>View applications</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-3.5 h-3.5 stroke-[2] text-[#2F6B4F] shrink-0" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span>View products and catalogues</span>
+</div>
+<div class="flex items-center gap-2">
+<svg class="w-3.5 h-3.5 stroke-[2] text-[#2F6B4F] shrink-0" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span>Create and edit products</span>
+</div>
+<div class="flex items-center gap-2 col-span-2">
+<svg class="w-3.5 h-3.5 stroke-[2] text-[#2F6B4F] shrink-0" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+<span>View analytics</span>
+</div>
+</div>
+<!-- Footer line: 13px muted "Permissions belong to the role." and link "Edit role permissions →" #6E5C45 -->
+<div class="pt-2 border-t border-[#D9D3C7] flex items-center justify-between text-[13px]">
+<span class="text-[#5A5148]">Permissions belong to the role.</span>
+<a class="text-[#6E5C45] font-medium hover:underline inline-flex items-center gap-1" href="#">Edit role permissions →</a>
+</div>
+</div>
+<!-- Note field -->
+<div>
+<div class="flex items-baseline justify-between mb-1.5">
+<label class="text-[14px] font-medium text-[#1D1C1A]" for="invite-note">Note</label>
+<span class="text-[13px] text-[#5A5148]">Optional</span>
+</div>
+<textarea class="w-full p-3 bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] text-[14px] text-[#1D1C1A] placeholder-[#5A5148]/50 focus:outline-none focus:border-[#1D1C1A] resize-none" id="invite-note" placeholder="" rows="3"></textarea>
+<div class="text-[13px] text-[#5A5148] mt-1 flex justify-between tabular-nums">
+<span>Added to the email.</span>
+<span>0/500</span>
+</div>
+</div>
+</div>
+<!-- Footer: hairline above, right-aligned: secondary "Cancel", primary "Review invitation" -->
+<div class="mt-6 pt-5 border-t border-[#D9D3C7] flex items-center justify-end gap-3">
+<button class="h-[40px] px-5 border border-[#1D1C1A] text-[#1D1C1A] text-[14px] font-medium rounded-[2px] hover:bg-[#ECE7DD] transition-colors">
+            Cancel
+          </button>
+<button class="h-[40px] px-5 bg-[#1D1C1A] text-[#F3F0E9] text-[14px] font-medium rounded-[2px] hover:bg-[#3A352F] transition-colors inline-flex items-center gap-2">
+<span>Review invitation</span>
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<line x1="5" x2="19" y1="12" y2="12"></line>
+<polyline points="12 5 19 12 12 19"></polyline>
+</svg>
+</button>
+</div>
+</section>
+<!-- ========================================== -->
+<!-- RIGHT DIALOG – REVIEW STEP (560px wide) -->
+<!-- ========================================== -->
+<section class="w-[560px] bg-[#FAF8F3] border border-[#D9D3C7] rounded-[2px] dialog-shadow p-6 relative flex flex-col shrink-0">
+<!-- Close (x) icon button: 32px at top right -->
+<button class="absolute top-5 right-5 w-[32px] h-[32px] flex items-center justify-center text-[#5A5148] hover:text-[#1D1C1A] rounded-[2px] transition-colors" title="Close">
+<svg class="w-[18px] h-[18px] stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<line x1="18" x2="6" y1="6" y2="18"></line>
+<line x1="6" x2="18" y1="6" y2="18"></line>
+</svg>
+</button>
+<!-- Header -->
+<div class="pr-8">
+<h2 class="text-[18px] font-semibold text-[#1D1C1A] leading-tight">Invite member</h2>
+<p class="text-[14px] text-[#5A5148] mt-1">They get an email with a link to create their account.</p>
+</div>
+<!-- Review Body -->
+<div class="mt-6 space-y-5">
+<!-- Sub-heading: "Check the invitation" 15px 600 -->
+<div class="text-[15px] font-semibold text-[#1D1C1A]">Check the invitation</div>
+<!-- Definition list: label 13px 500 muted in a 72px column, value 14px ink, rows 40px, hairlines -->
+<div class="border-t border-[#D9D3C7] divide-y divide-[#D9D3C7]">
+<!-- Row: To -->
+<div class="min-h-[40px] py-2 flex items-center text-[14px]">
+<div class="w-[72px] shrink-0 text-[13px] font-medium text-[#5A5148]">To</div>
+<div class="text-[#1D1C1A] font-medium">marta.lopes@sanctus.example</div>
+</div>
+<!-- Row: Role -->
+<div class="min-h-[40px] py-2 flex items-center text-[14px]">
+<div class="w-[72px] shrink-0 text-[13px] font-medium text-[#5A5148]">Role</div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center h-[20px] px-2 text-[12px] font-medium bg-[#ECE7DD] text-[#3A352F] rounded-[2px]">Team</span>
+</div>
+</div>
+<!-- Row: Can (multi-item list with separator dots) -->
+<div class="min-h-[40px] py-2.5 flex items-start text-[14px]">
+<div class="w-[72px] shrink-0 text-[13px] font-medium text-[#5A5148] pt-0.5">Can</div>
+<div class="text-[#1D1C1A] leading-relaxed">
+<span>View businesses</span>
+<span class="text-[#8A8073] mx-1.5">·</span>
+<span>View applications</span>
+<span class="text-[#8A8073] mx-1.5">·</span>
+<span>View products and catalogues</span>
+<span class="text-[#8A8073] mx-1.5">·</span>
+<span>Create and edit products</span>
+<span class="text-[#8A8073] mx-1.5">·</span>
+<span>View analytics</span>
+</div>
+</div>
+</div>
+<!-- Notice banner: 13px muted "The link works once and expires after 7 days." -->
+<div class="bg-[#F3F0E9] border border-[#D9D3C7] rounded-[2px] p-3.5 flex items-center gap-2.5 text-[13px] text-[#5A5148]">
+<svg class="w-4 h-4 stroke-[1.5] text-[#8A765C] shrink-0" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>The link works once and expires after 7 days.</span>
+</div>
+<!-- Visual email preview snippet container for context -->
+</div>
+<!-- Footer: hairline above, on the left ghost button "← Back", on the right primary "Send invitation" (send icon) -->
+<div class="mt-8 pt-5 border-t border-[#D9D3C7] flex items-center justify-between">
+<button class="h-[40px] px-3 text-[#5A5148] hover:text-[#1D1C1A] text-[14px] font-medium rounded-[2px] inline-flex items-center gap-1.5 transition-colors">
+<span>← Back</span>
+</button>
+<button class="h-[40px] px-5 bg-[#1D1C1A] text-[#F3F0E9] text-[14px] font-medium rounded-[2px] hover:bg-[#3A352F] transition-colors inline-flex items-center gap-2">
+<span>Send invitation</span>
+<svg class="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<line x1="22" x2="11" y1="2" y2="13"></line>
+<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+</svg>
+</button>
+</div>
+</section>
+</div>
+</div>
+</body>
+</html>
