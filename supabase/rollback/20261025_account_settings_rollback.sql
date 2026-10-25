@@ -88,8 +88,105 @@ drop function if exists private.requires_2fa(uuid);
 drop function if exists private.account_group(uuid);
 drop function if exists private.mfa_satisfied(text);
 
--- 3. Policies on shared tables.
+-- 3. Policies on shared tables, and the storage owner policies as the storage migration created them.
 drop policy if exists "Users read their own account events" on public.audit_events;
+drop index if exists public.audit_events_actor_type_created_idx;
+drop index if exists public.audit_events_account_subject_idx;
+drop policy if exists "Logo writers can read" on storage.objects;
+create policy "Logo writers can read" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  );
+drop policy if exists "Members and admins upload logos" on storage.objects;
+create policy "Members and admins upload logos" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  );
+drop policy if exists "Members and admins update logos" on storage.objects;
+create policy "Members and admins update logos" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  )
+  with check (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  );
+drop policy if exists "Members and admins delete logos" on storage.objects;
+create policy "Members and admins delete logos" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  );
+drop policy if exists "Members and admins read own media" on storage.objects;
+create policy "Members and admins read own media" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  );
+drop policy if exists "Members and admins upload media" on storage.objects;
+create policy "Members and admins upload media" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  );
+drop policy if exists "Members and admins update media" on storage.objects;
+create policy "Members and admins update media" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  )
+  with check (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  );
+drop policy if exists "Members and admins delete media" on storage.objects;
+create policy "Members and admins delete media" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]))
+  );
+
 drop policy if exists "Users read their own avatar files" on storage.objects;
 drop policy if exists "Users upload their own avatar" on storage.objects;
 drop policy if exists "Users replace their own avatar" on storage.objects;
@@ -97,6 +194,7 @@ drop policy if exists "Users delete their own avatar" on storage.objects;
 
 -- 4. Trigger on auth.users, then the tables (their own triggers and policies go with them).
 drop trigger if exists on_auth_user_created_profile on auth.users;
+drop trigger if exists businesses_closure_follow_status on public.businesses;
 drop table if exists public.account_closure_requests;
 drop table if exists private.recovery_codes;
 drop table if exists private.action_codes;
@@ -106,8 +204,18 @@ drop function if exists private.create_profile_for_new_user();
 drop function if exists private.profiles_valid_timezone();
 drop function if exists private.platform_settings_stamp();
 drop function if exists private.platform_settings_audit();
+drop function if exists private.closure_follow_status();
 
--- 5. The avatars bucket, only when empty.
+-- 5. The avatars bucket, only when empty. Hosted Storage blocks direct deletes from its tables unless
+-- storage.allow_delete_query is on (ignored where the setting does not exist, e.g. PGlite). If the delete is
+-- still refused, delete the empty bucket in the dashboard (Storage > avatars > Delete bucket).
+do $$
+begin
+  perform set_config('storage.allow_delete_query', 'true', true);
+exception when others then
+  null;
+end;
+$$;
 delete from storage.buckets b
  where b.id = 'avatars'
    and not exists (select 1 from storage.objects o where o.bucket_id = b.id);

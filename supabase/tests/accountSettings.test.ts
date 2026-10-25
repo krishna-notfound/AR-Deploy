@@ -30,6 +30,9 @@ const SUPABASE_STUBS = `
   create function storage.foldername(name text) returns text[] language sql immutable
     as $$ select (string_to_array(name, '/'))[1:cardinality(string_to_array(name, '/')) - 1] $$;
   grant usage on schema storage to anon, authenticated, service_role;
+  -- As on Supabase: new tables and functions in public are granted to the API roles unless a migration revokes them.
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+  alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 `
 
 const OWNER_U = '00000000-0000-0000-0000-0000000000a1'
@@ -630,6 +633,162 @@ describe('account settings: codes and closure (Task 2)', () => {
       await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_platform_team_roles_rollback.sql'), 'utf8'))
     } finally {
       await fresh.close()
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Review fixes, round 1
+// ---------------------------------------------------------------------------
+
+const STORAGE_POLICIES = [
+  'Logo writers can read', 'Members and admins upload logos', 'Members and admins update logos', 'Members and admins delete logos',
+  'Members and admins read own media', 'Members and admins upload media', 'Members and admins update media', 'Members and admins delete media',
+]
+const HELPERS = ['is_platform_admin', 'is_business_member', 'platform_can', 'is_platform_member']
+
+async function snapshot(target: PGlite) {
+  const fns = await target.query<J>(
+    `select p.proname, pg_get_functiondef(p.oid) as def, p.prosecdef, p.proconfig, p.proacl::text as acl
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = any($1) order by p.proname`, [HELPERS])
+  const policies = await target.query<J>(
+    `select policyname, permissive, roles::text as roles, cmd, qual, with_check from pg_policies
+      where schemaname = 'storage' and tablename = 'objects' and policyname = any($1) order by policyname`, [STORAGE_POLICIES])
+  // Function bodies keep the line endings of the checked-out file (CRLF on Windows checkouts): compare without them.
+  return { fns: fns.rows.map((f) => ({ ...f, def: String(f.def).replace(/\r\n/g, '\n') })), policies: policies.rows }
+}
+
+describe('account settings: review fixes (round 1)', () => {
+  const R_OWNER_U = '00000000-0000-0000-0000-0000000000d1'
+  const BIZ_R = '10000000-0000-0000-0000-0000000000d1'
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email) values ('${R_OWNER_U}', 'mod@shop.test');
+      insert into public.businesses (id, name, slug, status) values ('${BIZ_R}', 'Moderated Co', 'moderated-co', 'active');
+      insert into public.business_members (business_id, user_id) values ('${BIZ_R}', '${R_OWNER_U}');
+      insert into storage.objects (bucket_id, name) values ('business-logos', '${BIZ}/old.png'), ('product-media', '${BIZ}/old.glb');
+    `)
+  })
+
+  it('business policy on: storage writes for the business are refused at aal1 and allowed at aal2', async () => {
+    await withPolicy(false, true, async () => {
+      for (const bucket of ['business-logos', 'product-media']) {
+        const put = `insert into storage.objects (bucket_id, name) values ('${bucket}', '${BIZ}/new.png')`
+        await expect(probe(BIZ_OWNER_U, put, [], 'aal1')).rejects.toThrow(/row-level security/)
+        expect((await probe(BIZ_OWNER_U, put, [], 'aal2')).affectedRows).toBe(1)
+        const file = bucket === 'business-logos' ? `${BIZ}/old.png` : `${BIZ}/old.glb`
+        for (const sql of [`update storage.objects set metadata = '{}' where name = $1`, `delete from storage.objects where name = $1`]) {
+          expect(await affected(BIZ_OWNER_U, sql, [file], 'aal1')).toBe(0)
+          expect(await affected(BIZ_OWNER_U, sql, [file], 'aal2')).toBe(1)
+        }
+        expect(await count(BIZ_OWNER_U, `select count(*)::int as n from storage.objects where name = $1`, [file], 'aal1')).toBe(0)
+        expect(await count(BIZ_OWNER_U, `select count(*)::int as n from storage.objects where name = $1`, [file], 'aal2')).toBe(1)
+      }
+    })
+    // Policy off: aal1 works as before.
+    expect((await probe(BIZ_OWNER_U, `insert into storage.objects (bucket_id, name) values ('business-logos', '${BIZ}/n.png')`)).affectedRows).toBe(1)
+  })
+
+  it('no policy checks business_members directly without is_business_member', async () => {
+    const direct = await db.query<{ t: string; p: string }>(
+      `select schemaname || '.' || tablename as t, policyname as p from pg_policies
+        where coalesce(qual, '') || coalesce(with_check, '') like '%business_members%'
+          and coalesce(qual, '') || coalesce(with_check, '') not like '%is_business_member%'`)
+    expect(direct.rows).toEqual([])
+  })
+
+  it('the signup trigger truncates long names, accepts null metadata and never blocks a sign-up', async () => {
+    const long = '00000000-0000-0000-0000-0000000000d2'
+    const none = '00000000-0000-0000-0000-0000000000d3'
+    const broken = '00000000-0000-0000-0000-0000000000d4'
+    await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, 'long@test', $2)`, [long, { display_name: 'N'.repeat(120) }])
+    await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, 'none@test', null)`, [none])
+    const rows = (await db.query<{ user_id: string; n: number | null }>(
+      'select user_id, char_length(display_name) as n from public.profiles where user_id = any($1) order by user_id', [[long, none]])).rows
+    expect(rows).toEqual([{ user_id: long, n: 80 }, { user_id: none, n: null }])
+    await db.exec(`alter table public.profiles add constraint zz_reject_all check (false) not valid`)
+    try {
+      await db.query(`insert into auth.users (id, email) values ($1, 'broken@test')`, [broken])
+    } finally {
+      await db.exec(`alter table public.profiles drop constraint zz_reject_all`)
+    }
+    expect((await db.query('select 1 from auth.users where id = $1', [broken])).rows).toHaveLength(1)
+    expect((await db.query('select 1 from public.profiles where user_id = $1', [broken])).rows).toHaveLength(0)
+  })
+
+  it('a staff status change while a closure is pending becomes the status that cancel restores', async () => {
+    expect(await svc('select public.service_request_closure($1) as r', [R_OWNER_U])).toMatchObject({ ok: true, kind: 'business' })
+    const prev = async () => (await db.query<{ p: string }>('select previous_business_status as p from public.account_closure_requests where user_id = $1', [R_OWNER_U])).rows[0]!.p
+    expect(await prev()).toBe('active')
+    const setStatus = (s: string) => as(OWNER_U, (tx) => tx.query(`update public.businesses set status = $1 where id = $2`, [s, BIZ_R]), 'authenticated', 'aal2')
+    await setStatus('draft')
+    expect(await prev()).toBe('draft')
+    await setStatus('inactive')
+    expect(await prev()).toBe('inactive')
+    // A profile edit by the owner (no status change) leaves it alone.
+    await db.query(`update public.businesses set name = 'Moderated Co 2' where id = $1`, [BIZ_R])
+    expect(await prev()).toBe('inactive')
+    expect(await call(R_OWNER_U, 'select public.cancel_account_closure() as r', [], 'aal1')).toEqual({ ok: true })
+    expect((await db.query('select status from public.businesses where id = $1', [BIZ_R])).rows[0]).toEqual({ status: 'inactive' })
+  })
+
+  it('business policy on: cancel_account_closure needs aal2', async () => {
+    await db.query(`update public.businesses set status = 'active' where id = $1`, [BIZ_R])
+    expect(await svc('select public.service_request_closure($1) as r', [R_OWNER_U])).toMatchObject({ ok: true })
+    await withPolicy(false, true, async () => {
+      expect(await call(R_OWNER_U, 'select public.cancel_account_closure() as r', [], 'aal1')).toEqual({ error: 'aal2_required' })
+      expect((await db.query('select 1 from public.account_closure_requests where user_id = $1', [R_OWNER_U])).rows).toHaveLength(1)
+      expect(await call(R_OWNER_U, 'select public.cancel_account_closure() as r', [], 'aal2')).toEqual({ ok: true })
+    })
+    expect((await db.query('select status from public.businesses where id = $1', [BIZ_R])).rows[0]).toEqual({ status: 'active' })
+  })
+
+  it('audit_events has the account indexes', async () => {
+    const idx = (await db.query<{ indexdef: string }>(`select indexdef from pg_indexes where schemaname = 'public' and tablename = 'audit_events'`)).rows.map((r) => r.indexdef)
+    expect(idx.some((d) => /\(actor_id, event_type, created_at DESC\)/.test(d))).toBe(true)
+    expect(idx.some((d) => d.includes('subject_id') && d.includes('WHERE') && d.includes('account'))).toBe(true)
+  })
+
+  it('service_log_account_event refuses metadata over 4000 bytes', async () => {
+    expect(await svc('select public.service_log_account_event($1, $2, $3, $4) as r', [STRANGER_U, 'account_2fa_disabled', { pad: 'x'.repeat(5000) }, null]))
+      .toEqual({ error: 'invalid_request' })
+    expect((await db.query(`select 1 from public.audit_events where event_type = 'account_2fa_disabled'`)).rows).toHaveLength(0)
+  })
+
+  it('the Owner at aal2 can save the policy while the staff policy is already on', async () => {
+    await withPolicy(true, false, async () => {
+      const set = 'update public.platform_settings set require_2fa_business = true'
+      expect(await affected(OWNER_U, set, [], 'aal1')).toBe(0)
+      expect(await affected(OWNER_U, set, [], 'aal2')).toBe(1)
+    })
+  })
+
+  it('record_sign_in works at aal1 with the staff policy on', async () => {
+    await withPolicy(true, false, async () => {
+      expect(await call(OWNER_U, `select to_jsonb(public.record_sign_in('Firefox')) as r`, [], 'aal1')).toBe('recorded')
+    })
+  })
+
+  it('rollback restores the four helpers and the eight storage policies exactly', async () => {
+    const base = await PGlite.create()
+    const rolled = await PGlite.create()
+    try {
+      await base.exec(SUPABASE_STUBS)
+      await applyAll(base, (n) => n.slice(0, 14) <= '20261025070915')
+      await rolled.exec(SUPABASE_STUBS)
+      await applyAll(rolled, (n) => n <= ACCOUNT_MIGRATION)
+      const during = await snapshot(rolled)
+      await rolled.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_account_settings_rollback.sql'), 'utf8'))
+      const before = await snapshot(base)
+      expect(before.fns).toHaveLength(4)
+      expect(before.policies).toHaveLength(8)
+      expect(during.policies).not.toEqual(before.policies)
+      expect(await snapshot(rolled)).toEqual(before)
+    } finally {
+      await base.close()
+      await rolled.close()
     }
   })
 })

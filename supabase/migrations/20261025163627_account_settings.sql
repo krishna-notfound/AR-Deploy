@@ -52,6 +52,8 @@ create trigger profiles_valid_timezone before insert or update of timezone on pu
   for each row execute function private.profiles_valid_timezone();
 
 -- Every new auth user gets a profile; the display name comes from the sign-up metadata when present.
+-- A failure here must never block a sign-up: it is reported as a warning and the profile is created later
+-- (the service layer inserts the own row when it is missing).
 create function private.create_profile_for_new_user()
 returns trigger
 language plpgsql
@@ -59,9 +61,13 @@ security definer
 set search_path = ''
 as $$
 begin
-  insert into public.profiles (user_id, display_name)
-  values (new.id, nullif(left(btrim(coalesce(new.raw_user_meta_data ->> 'display_name', '')), 80), ''))
-  on conflict (user_id) do nothing;
+  begin
+    insert into public.profiles (user_id, display_name)
+    values (new.id, nullif(left(btrim(coalesce(new.raw_user_meta_data ->> 'display_name', '')), 80), ''))
+    on conflict (user_id) do nothing;
+  exception when others then
+    raise warning 'create_profile_for_new_user: profile not created for % (%)', new.id, sqlstate;
+  end;
   return new;
 end;
 $$;
@@ -403,11 +409,124 @@ alter table public.audit_events drop constraint audit_events_event_type_check;
 alter table public.audit_events add constraint audit_events_event_type_check
   check (event_type ~ '^[a-z][a-z0-9_]{2,59}$');
 
+-- The own-events queries (record_sign_in, log_account_event, list_my_security_events and the policy below).
+create index audit_events_actor_type_created_idx on public.audit_events (actor_id, event_type, created_at desc);
+create index audit_events_account_subject_idx on public.audit_events ((metadata ->> 'subject_id'))
+  where event_type like 'account\_%';
+
 -- Additive (ORed with the staff policies): a user reads their own account events.
 create policy "Users read their own account events" on public.audit_events
   for select to authenticated
   using (event_type like 'account\_%'
          and (actor_id = (select auth.uid()) or metadata ->> 'subject_id' = (select auth.uid())::text));
+
+-- The business-logos and product-media owner policies (storage migration) checked business_members directly,
+-- so the business 2FA policy did not reach Storage. Recreated with is_business_member (which carries the gate);
+-- the folder is still compared as text so non-uuid folders such as 'new' do not throw.
+drop policy "Logo writers can read" on storage.objects;
+create policy "Logo writers can read" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  );
+drop policy "Members and admins upload logos" on storage.objects;
+create policy "Members and admins upload logos" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  );
+drop policy "Members and admins update logos" on storage.objects;
+create policy "Members and admins update logos" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  )
+  with check (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  );
+drop policy "Members and admins delete logos" on storage.objects;
+create policy "Members and admins delete logos" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'business-logos'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  );
+drop policy "Members and admins read own media" on storage.objects;
+create policy "Members and admins read own media" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  );
+drop policy "Members and admins upload media" on storage.objects;
+create policy "Members and admins upload media" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  );
+drop policy "Members and admins update media" on storage.objects;
+create policy "Members and admins update media" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  )
+  with check (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  );
+drop policy "Members and admins delete media" on storage.objects;
+create policy "Members and admins delete media" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'product-media'
+    and ((select public.is_platform_admin())
+         or exists (select 1 from public.business_members m
+                    where m.user_id = (select auth.uid())
+                      and m.business_id::text = (storage.foldername(name))[1]
+                      and public.is_business_member(m.business_id)))
+  );
 
 -- Public read so <img> works without signed URLs (photos are not secret). Writes only in <user_id>/.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -653,6 +772,10 @@ begin
   if nullif(btrim(coalesce(p_ip, '')), '') is not null then
     v_meta := v_meta || jsonb_build_object('ip', left(btrim(p_ip), 64));
   end if;
+  -- audit_events allows 4096 bytes; answer instead of raising.
+  if pg_column_size(v_meta) > 4000 then
+    return jsonb_build_object('error', 'invalid_request');
+  end if;
   insert into public.audit_events (event_type, actor_id, metadata)
   values (p_event, (select u.id from auth.users u where u.id = p_user), v_meta);
   return jsonb_build_object('ok', true);
@@ -753,6 +876,7 @@ begin
   end if;
   insert into public.account_closure_requests (user_id, business_id, previous_business_status)
   values (p_user, v_biz.id, v_biz.status);
+  perform set_config('app.account_closure', 'on', true);
   update public.businesses set status = 'inactive' where id = v_biz.id and status <> 'inactive';
   return jsonb_build_object('ok', true, 'kind', 'business', 'business_id', v_biz.id);
 end;
@@ -777,6 +901,7 @@ begin
   end if;
   if v_req.business_id is not null then
     select status into v_old from public.businesses where id = v_req.business_id for update;
+    perform set_config('app.account_closure', 'on', true);
     update public.businesses set status = coalesce(v_req.previous_business_status, 'draft')
      where id = v_req.business_id and status = 'inactive'
     returning status into v_new;
@@ -804,6 +929,10 @@ begin
   if v_uid is null then
     raise exception 'not_signed_in' using errcode = '42501';
   end if;
+  -- Same gate as the business data: with the business 2FA policy on, cancelling needs aal2.
+  if exists (select 1 from public.business_members where user_id = v_uid) and not private.mfa_satisfied('business') then
+    return jsonb_build_object('error', 'aal2_required');
+  end if;
   if not private.undo_closure(v_uid, v_uid, 'account_closure_cancelled') then
     return jsonb_build_object('error', 'not_found');
   end if;
@@ -812,6 +941,26 @@ end;
 $$;
 revoke execute on function public.cancel_account_closure() from public, anon;
 grant execute on function public.cancel_account_closure() to authenticated;
+
+-- A status set by staff while a closure is pending (a suspension, a return to draft) becomes the status that
+-- cancel or restore brings back, so cancelling never undoes a moderation decision. The closure functions mark
+-- their own status changes with app.account_closure and are ignored here.
+create function private.closure_follow_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('app.account_closure', true), '') <> 'on' then
+    update public.account_closure_requests set previous_business_status = new.status where business_id = new.id;
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function private.closure_follow_status() from public, anon, authenticated;
+create trigger businesses_closure_follow_status after update of status on public.businesses
+  for each row when (old.status is distinct from new.status) execute function private.closure_follow_status();
 
 -- The Owner restores a request (through the Edge Function, which checks aal2).
 create function public.service_restore_closure(p_user uuid, p_actor uuid)
