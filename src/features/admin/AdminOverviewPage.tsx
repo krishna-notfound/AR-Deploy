@@ -1,6 +1,6 @@
 import { useCan } from '@/auth/usePermission'
 import { ArrowRight, PackagePlus, Plus, QrCode } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
 import { usePendingApplications } from '@/components/layout/dashboardContext'
 import { PageHeader, PanelHeader, panelLinkClass } from '@/components/layout/PageHeader'
@@ -21,6 +21,7 @@ import { useBusinesses } from '../products/useCatalogData'
 
 export default function AdminOverviewPage() {
   const can = useCan()
+  const navigate = useNavigate()
   const summary = useServiceQuery(() => service.getAnalytics(), [])
   const products = useServiceQuery(() => service.getProducts(), [])
   const { list: businesses, map: bizMap, query: bizQuery } = useBusinesses()
@@ -37,15 +38,19 @@ export default function AdminOverviewPage() {
       <PageHeader
         title="Overview"
         description="Applications, businesses, products and catalog activity across Sanctus."
+        more={[
+          ...(can('products.view') ? [{ label: 'View catalogs', icon: <QrCode aria-hidden />, onSelect: () => void navigate('/admin/catalogs') }] : []),
+          ...(can('products.edit') ? [{ label: 'Add product', icon: <PackagePlus aria-hidden />, onSelect: () => void navigate('/admin/products/new') }] : []),
+        ]}
         actions={
           <>
             {can('products.view') && (
-              <ButtonLink to="/admin/catalogs" variant="ghost" icon={<QrCode className="size-4" aria-hidden />}>
+              <ButtonLink to="/admin/catalogs" variant="ghost" className="max-sm:hidden" icon={<QrCode className="size-4" aria-hidden />}>
                 View catalogs
               </ButtonLink>
             )}
             {can('products.edit') && (
-              <ButtonLink to="/admin/products/new" variant="secondary" icon={<PackagePlus className="size-4" aria-hidden />}>
+              <ButtonLink to="/admin/products/new" variant="secondary" className="max-sm:hidden" icon={<PackagePlus className="size-4" aria-hidden />}>
                 Add product
               </ButtonLink>
             )}

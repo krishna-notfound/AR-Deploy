@@ -372,6 +372,8 @@ export function ProductEditorForm({
   const dimError = DIMS.map((k) => err(`dimensions.${k}`)).find(Boolean)
   const poster = primaryImage({ images: form.input.images } as Product)?.url
 
+  // Inline from sm; below sm the header's More menu holds it (same handler and gate).
+  const canDelete = !isNew && allowed('products.delete')
   const statusText = dirty ? 'Unsaved changes' : isNew ? 'Not saved yet' : 'All changes saved'
 
   return (
@@ -394,9 +396,10 @@ export function ProductEditorForm({
             )}
           </>
         }
+        more={canDelete ? [{ label: 'Delete', icon: <Trash2 aria-hidden />, destructive: true, disabled: !!busy, onSelect: () => void onDelete() }] : undefined}
         actions={
-          !isNew && allowed('products.delete') && (
-            <Button variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={onDelete} loading={busy === 'delete'} disabled={!!busy} className="text-danger! hover:bg-danger-soft">
+          canDelete && (
+            <Button variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={onDelete} loading={busy === 'delete'} disabled={!!busy} className="text-danger! hover:bg-danger-soft max-sm:hidden">
               Delete
             </Button>
           )
@@ -504,7 +507,8 @@ export function ProductEditorForm({
             </FormField>
             <LocalizedField label="Short description" value={form.input.shortDescription} onChange={(shortDescription) => setInput({ shortDescription })} maxLength={160} hint="One sentence shown under the price." />
             <LocalizedField label="Full description" multiline rows={5} value={form.input.description} onChange={(description) => setInput({ description })} />
-            <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
+            {/* Below sm: Category on its own row, then Price and a 96px Currency side by side. */}
+            <div className="grid grid-cols-[1fr_96px] gap-4 sm:grid-cols-[2fr_1fr_1fr] [&>*:first-child]:max-sm:col-span-2">
               <FormField label="Category">
                 <Select value={form.input.category} onChange={(e) => setInput({ category: e.target.value as Category })}>
                   {CATEGORIES.map((c) => (

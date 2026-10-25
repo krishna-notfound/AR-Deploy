@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { BusinessStatusBadge } from '@/components/ui/Badge'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import type { MenuItem } from '@/components/ui/Menu'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { Tabs } from '@/components/ui/Tabs'
 import { Package } from 'lucide-react'
@@ -60,6 +61,21 @@ export default function BusinessDetailPage() {
   const productCount = products.data?.length ?? catalog.data?.totalProductCount
   const bizMap = new Map([[b.id, b]])
 
+  // Same gates and handlers as the inline buttons; below sm these two live in the header's More menu.
+  const canToggle = can('businesses.status') && can('businesses.edit')
+  const canDelete = can('businesses.delete')
+  const toggleActive = () => void actions.setActive(b, b.status !== 'active')
+  const onDelete = async () => {
+    if (deleting) return
+    setDeleting(true)
+    const ok = await actions.remove(b, productCount, { after: '/admin/businesses' })
+    if (!ok) setDeleting(false)
+  }
+  const more: MenuItem[] = [
+    ...(canToggle ? [{ label: b.status === 'active' ? 'Deactivate' : 'Activate', onSelect: toggleActive }] : []),
+    ...(canDelete ? [{ label: 'Delete', icon: <Trash2 aria-hidden />, destructive: true, disabled: deleting, onSelect: () => void onDelete() }] : []),
+  ]
+
   return (
     <>
       <PageHeader
@@ -68,30 +84,27 @@ export default function BusinessDetailPage() {
         meta={
           <>
             <BusinessStatusBadge status={b.status} />
-            <span className="text-ui-small text-ink-muted">/catalog/{b.slug}</span>
+            <span className="min-w-0 truncate text-ui-small text-ink-muted">/catalog/{b.slug}</span>
           </>
         }
+        more={more}
         actions={
           <>
             <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b), '_blank', 'noopener')}>
               Open catalog
             </Button>
-            {can('businesses.status') && can('businesses.edit') && (
-              <Button onClick={() => void actions.setActive(b, b.status !== 'active')}>
+            {canToggle && (
+              <Button className="max-sm:hidden" onClick={toggleActive}>
                 {b.status === 'active' ? 'Deactivate' : 'Activate'}
               </Button>
             )}
-            {can('businesses.delete') && (
+            {canDelete && (
               <Button
                 variant="ghost"
-                className="text-danger! hover:bg-danger-soft!"
+                className="text-danger! hover:bg-danger-soft! max-sm:hidden"
                 icon={<Trash2 className="size-4" aria-hidden />}
                 loading={deleting}
-                onClick={async () => {
-                  setDeleting(true)
-                  const ok = await actions.remove(b, productCount, { after: '/admin/businesses' })
-                  if (!ok) setDeleting(false)
-                }}
+                onClick={onDelete}
               >
                 Delete
               </Button>

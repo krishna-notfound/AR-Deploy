@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { Building2, Package } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -7,6 +7,7 @@ import { DashboardContext } from '@/components/layout/dashboardContext'
 import { Badge } from './Badge'
 import { Button, ButtonLink } from './Button'
 import { StatGroup } from './StatGroup'
+import { Switch } from './Form'
 import { Tabs } from './Tabs'
 
 function InShell({ children }: { children: ReactNode }) {
@@ -159,5 +160,89 @@ describe('Tabs (pill)', () => {
     expect(cls).not.toMatch(/tracking-(?!normal)/)
     expect(cls).toContain('text-[14px]')
     expect(cls).toContain('tabular-nums')
+  })
+})
+
+describe('Tabs (pill) as a segmented control', () => {
+  const tabs = [
+    { value: 'a', label: 'All', badge: <span>3</span> },
+    { value: 'b', label: 'Active' },
+  ]
+  it('uses a light track with a raised selected segment inside the dashboard', () => {
+    render(
+      <InShell>
+        <Tabs tabs={tabs} value="a" onChange={() => {}} label="Filter" variant="pill" />
+      </InShell>,
+    )
+    const list = screen.getByRole('tablist')
+    for (const c of ['inline-flex', 'h-10', 'gap-1', 'rounded-[var(--radius-control)]', 'bg-subtle', 'p-1']) expect(list).toHaveClass(c)
+    const selected = screen.getByRole('tab', { name: /All/ })
+    for (const c of ['h-8', 'bg-surface', 'border', 'border-line', 'text-ink', 'font-medium']) expect(selected).toHaveClass(c)
+    expect(selected).not.toHaveClass('bg-obsidian')
+    const other = screen.getByRole('tab', { name: 'Active' })
+    for (const c of ['text-ink-muted', 'hover:text-ink']) expect(other).toHaveClass(c)
+    expect(other).not.toHaveClass('bg-surface')
+  })
+
+  it('keeps the pill and underline class strings byte-identical outside the dashboard', () => {
+    const { rerender } = render(<Tabs tabs={tabs} value="a" onChange={() => {}} label="Filter" variant="pill" />)
+    expect(screen.getByRole('tablist').className).toBe('flex gap-1 overflow-x-auto')
+    expect(screen.getByRole('tab', { name: /All/ }).className).toBe(
+      'inline-flex shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors text-[12px] tracking-[0.12em] uppercase min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11 bg-obsidian text-chalk',
+    )
+    expect(screen.getByRole('tab', { name: 'Active' }).className).toBe(
+      'inline-flex shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors text-[12px] tracking-[0.12em] uppercase min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11 text-ink-muted hover:bg-subtle hover:text-ink',
+    )
+    rerender(<Tabs tabs={tabs} value="a" onChange={() => {}} label="Filter" />)
+    expect(screen.getByRole('tablist').className).toBe('flex gap-1 overflow-x-auto border-b border-line')
+    expect(screen.getByRole('tab', { name: /All/ }).className).toBe(
+      'inline-flex shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors text-[12px] tracking-[0.12em] uppercase -mb-px min-h-11 border-b-2 px-3 border-ink text-ink',
+    )
+  })
+
+  it('fades the right edge only while the tab row can scroll further (dashboard)', () => {
+    render(
+      <InShell>
+        <Tabs tabs={tabs} value="a" onChange={() => {}} label="Sections" />
+      </InShell>,
+    )
+    const list = screen.getByRole('tablist')
+    const mask = /mask-image/
+    expect(list.className).not.toMatch(mask)
+    Object.defineProperty(list, 'scrollWidth', { configurable: true, value: 400 })
+    Object.defineProperty(list, 'clientWidth', { configurable: true, value: 300 })
+    list.scrollLeft = 0
+    fireEvent.scroll(list)
+    expect(list.className).toMatch(mask)
+    list.scrollLeft = 100
+    fireEvent.scroll(list)
+    expect(list.className).not.toMatch(mask)
+  })
+})
+
+describe('Switch off state', () => {
+  it('reads as off inside the dashboard: a light track with an inset ring', () => {
+    const { rerender } = render(
+      <InShell>
+        <Switch checked={false} onChange={() => {}} label="Show prices" />
+      </InShell>,
+    )
+    const sw = screen.getByRole('switch')
+    for (const c of ['bg-subtle', 'ring-1', 'ring-inset', 'ring-line-strong']) expect(sw).toHaveClass(c)
+    expect(sw).not.toHaveClass('bg-line-strong')
+    rerender(
+      <InShell>
+        <Switch checked onChange={() => {}} label="Show prices" />
+      </InShell>,
+    )
+    expect(screen.getByRole('switch')).toHaveClass('bg-accent')
+    expect(screen.getByRole('switch')).not.toHaveClass('ring-1')
+  })
+
+  it('keeps the original classes outside the dashboard', () => {
+    render(<Switch checked={false} onChange={() => {}} label="Show prices" />)
+    expect(screen.getByRole('switch').className).toBe(
+      'relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 bg-line-strong',
+    )
   })
 })
