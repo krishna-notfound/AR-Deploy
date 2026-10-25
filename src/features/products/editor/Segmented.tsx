@@ -33,7 +33,7 @@ export function Segmented<T extends string>({
             {...(kind === 'radio' ? { role: 'radio', 'aria-checked': on } : { 'aria-pressed': on })}
             onClick={() => onChange(o.value)}
             className={cn(
-              'relative inline-flex items-center gap-1 leading-none font-medium whitespace-nowrap transition-colors',
+              'relative inline-flex items-center gap-1 leading-none font-medium whitespace-nowrap transition-colors focus-visible:z-10',
               // Touch: at least 44px wide, and a hit area grown 12px up and 8px down. 8px is the gap to the input under
               // the label row, so the area never covers it.
               'pointer-coarse:min-w-11 pointer-coarse:justify-center pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-top-3 pointer-coarse:after:-bottom-2',

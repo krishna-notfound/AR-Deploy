@@ -104,7 +104,7 @@ export default function AdminOverviewPage() {
                 </Link>
               }
             />
-            <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact /> : <Skeleton className="h-32 w-full" />}</CardBody>
+            <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact emptyBody="Views and AR opens will appear here once people visit published catalogs." /> : <Skeleton className="h-32 w-full" />}</CardBody>
           </Card>
 
           {/* Grid items default to min-width: auto, so a long product name would widen the card past a phone screen. */}

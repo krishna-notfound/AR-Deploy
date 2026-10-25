@@ -12,7 +12,16 @@ const KEYS = Object.keys(SERIES) as SeriesKey[]
  * Views and AR launch attempts with a table view. `compact` (the overview cards, Stitch A-a-overview) draws one combined
  * chart with a series toggle above it; the analytics page keeps two aligned small multiples.
  */
-export function ActivityTrend({ data, compact }: { data: DailyPoint[]; compact?: boolean }) {
+export function ActivityTrend({
+  data,
+  compact,
+  emptyBody = 'Views and AR opens will appear here once people visit your catalog.',
+}: {
+  data: DailyPoint[]
+  compact?: boolean
+  /** The zero-activity body; the default speaks to one business, platform pages pass their own. */
+  emptyBody?: string
+}) {
   const [showTable, setShowTable] = useState(false)
   const [show, setShow] = useState<Record<SeriesKey, boolean>>({ views: true, ar: true })
   const lockedHint = useId()
@@ -25,7 +34,7 @@ export function ActivityTrend({ data, compact }: { data: DailyPoint[]; compact?:
   )
 
   // Nothing to plot: a month of zeros would only draw empty axes, so say so the way the other cards do.
-  if (views + ar === 0) return <EmptyState title="No activity in the last 30 days" body="Views and AR opens will appear here once people visit your catalog." />
+  if (views + ar === 0) return <EmptyState title="No activity in the last 30 days" body={emptyBody} />
 
   if (compact) {
     const visible = KEYS.filter((k) => show[k]).length

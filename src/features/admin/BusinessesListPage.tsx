@@ -126,7 +126,7 @@ export default function BusinessesListPage() {
       />
       <Card>
         <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-end sm:px-6">
-          <FormField label="Search">
+          <FormField label="Search businesses">
             <SearchInput value={q} onChange={(v) => setParam('q', v)} label="Search businesses" placeholder="Search by name or address" />
           </FormField>
           <FormField label="Status">

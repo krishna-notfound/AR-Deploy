@@ -143,7 +143,7 @@ export function AnalyticsView({
 
       <Card>
         <PanelHeader title="Views and AR launch attempts" description="Daily totals, last 30 days" actions={!onBusinessChange && s?.isSample ? <SampleDataTag /> : undefined} />
-        <CardBody className="sm:px-6 sm:pb-6">{loading || !s ? <Skeleton className="h-40 w-full" /> : <ActivityTrend data={s.series} />}</CardBody>
+        <CardBody className="sm:px-6 sm:pb-6">{loading || !s ? <Skeleton className="h-40 w-full" /> : <ActivityTrend data={s.series} {...(businessId ? {} : { emptyBody: 'Views and AR opens will appear here once people visit published catalogs.' })} />}</CardBody>
       </Card>
 
       <div className={showBusinessCol ? 'grid gap-6 lg:grid-cols-2 [&>*]:min-w-0' : ''}>

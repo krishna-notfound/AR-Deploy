@@ -44,14 +44,37 @@ describe('PageHeader inside the dashboard shell', () => {
   it('puts the breadcrumbs in the top bar, not in the page', { timeout: 20_000 }, async () => {
     openAsOwner('/admin/team/permissions')
     await screen.findByRole('heading', { level: 1 })
-    const crumbs = await screen.findByRole('navigation', { name: 'Breadcrumb' })
     const header = document.querySelector('header')!
+    const crumbs = (await screen.findAllByRole('navigation', { name: 'Breadcrumb' })).find((n) => header.contains(n))!
     expect(header).toContainElement(crumbs)
     expect(document.getElementById('main')).not.toContainElement(crumbs)
     expect(within(crumbs).getByRole('link', { name: 'Team & Access' })).toHaveAttribute('href', '/admin/team')
     expect(within(crumbs).getByText('Role permissions')).toHaveAttribute('aria-current', 'page')
     // One breadcrumb in the bar: the default "you are here" trail is replaced, not duplicated.
     expect(screen.queryByRole('navigation', { name: 'You are here' })).toBeNull()
+  })
+
+  it('below lg, shows a compact trail above the title so phones keep a way back', { timeout: 20_000 }, async () => {
+    openAsOwner('/admin/team/permissions')
+    const h1 = await screen.findByRole('heading', { level: 1 })
+    const inPage = (await screen.findAllByRole('navigation', { name: 'Breadcrumb' })).find((n) => document.getElementById('main')!.contains(n))
+    expect(inPage).toBeDefined()
+    expect(inPage).toHaveClass('lg:hidden')
+    expect(within(inPage!).getByRole('link', { name: 'Team & Access' })).toHaveAttribute('href', '/admin/team')
+    expect(within(inPage!).getByText('Role permissions')).toHaveAttribute('aria-current', 'page')
+    expect(inPage!.compareDocumentPosition(h1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps a trailing parent crumb as a link (error and loading headers pass only the parent)', () => {
+    render(
+      <MemoryRouter>
+        <DashboardContext.Provider value={{ variant: 'admin', home: 'Sanctus Admin', homeTo: '/admin', eyebrow: 'Platform admin' }}>
+          <PageHeader title="Team member" breadcrumbs={[{ label: 'Team & Access', to: '/admin/team' }]} />
+        </DashboardContext.Provider>
+      </MemoryRouter>,
+    )
+    const trail = screen.getByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(trail).getByRole('link', { name: 'Team & Access' })).toHaveAttribute('href', '/admin/team')
   })
 
   it('keeps the default trail in the top bar when the page passes no breadcrumbs', { timeout: 20_000 }, async () => {

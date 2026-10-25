@@ -409,7 +409,7 @@ export function ProductEditorForm({
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
         {/* Under lg a scrolling row of chips; from lg a 200px sticky list with a 2px ink bar on the active item. */}
         <nav aria-label="Editor sections" className="-mx-4 min-w-0 sm:-mx-6 lg:mx-0">
-          <ul ref={chipsRef} className="flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 lg:sticky lg:top-20 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0">
+          <ul ref={chipsRef} className="-my-1 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:px-6 lg:sticky lg:my-0 lg:py-0 lg:top-20 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0">
             {SECTIONS.map((s) => {
               const hasError = errorList.some(([k]) => FIELD_SECTION[k] === s.id)
               const active = activeSection === s.id

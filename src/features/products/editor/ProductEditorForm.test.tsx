@@ -202,6 +202,8 @@ describe('product editor: section index, language control and publish bar (BRIEF
     const buttons = within(group).getAllByRole('button')
     expect(buttons).toHaveLength(2)
     expect(within(group).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'true')
+    for (const b of buttons) expect(b).toHaveClass('focus-visible:z-10') // the focused segment's ring paints over its neighbour
+    expect(screen.getByRole('navigation', { name: 'Editor sections' }).querySelector('ul')).toHaveClass('py-1') // room for the chips' focus ring
     await user.type(screen.getByRole('textbox', { name: /^Product name/ }), 'Sofa')
     const pt = within(group).getByRole('button', { name: /^PT/ })
     expect(pt).toHaveTextContent('PT ·')

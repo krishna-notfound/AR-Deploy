@@ -60,6 +60,10 @@ describe('ActivityTrend', () => {
 
   describe('no activity in 30 days', () => {
     const zero = days(() => ({ views: 0, arActivations: 0 }))
+    it('takes the empty-state body from the caller (the platform overview is not "your catalog")', () => {
+      render(<ActivityTrend data={zero} compact emptyBody="Views and AR opens will appear here once people visit published catalogs." />)
+      expect(screen.getByText('Views and AR opens will appear here once people visit published catalogs.')).toBeInTheDocument()
+    })
     for (const [layout, compact] of [['overview (compact)', true], ['analytics (full size)', false]] as const) {
       for (const [what, rows] of [['all-zero data', zero], ['no data points', [] as DailyPoint[]]] as const) {
         it(`${layout}, ${what}: shows the empty state instead of empty axes`, () => {

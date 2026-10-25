@@ -25,11 +25,22 @@ export const BreadcrumbSlotContext = createContext<BreadcrumbSlot | null>(null)
 function TopBarCrumbs({ crumbs }: { crumbs: Crumb[] }) {
   const dashboard = useDashboard()
   const trail: Crumb[] = [{ label: dashboard?.home ?? 'Sanctus', to: dashboard?.homeTo ?? '/' }, ...crumbs]
+  return <CrumbTrail trail={trail} className="hidden min-w-0 lg:block" textClass="text-[length:var(--text-ui-body)]" />
+}
+
+/** Below lg the top bar has no room for the trail, so the page shows its own path above the title (13px). */
+function PageCrumbs({ crumbs }: { crumbs: Crumb[] }) {
+  return <CrumbTrail trail={crumbs} className="mb-2 min-w-0 lg:hidden" textClass="text-[length:var(--text-ui-small)]" />
+}
+
+function CrumbTrail({ trail, className, textClass }: { trail: Crumb[]; className: string; textClass: string }) {
   return (
-    <nav aria-label="Breadcrumb" className="hidden min-w-0 lg:block">
-      <ol className="flex min-w-0 items-center gap-x-1.5 text-[length:var(--text-ui-body)] text-ink-muted">
+    <nav aria-label="Breadcrumb" className={className}>
+      <ol className={cn('flex min-w-0 items-center gap-x-1.5 text-ink-muted', textClass)}>
         {trail.map((c, i) => {
-          const last = i === trail.length - 1
+          // The current page is the last crumb without a link; a trailing linked crumb (error and loading states pass only the
+          // parent) stays a link, so there is always a way back.
+          const last = i === trail.length - 1 && !c.to
           return (
             <li key={`${c.label}-${i}`} className={cn('flex items-center gap-x-1.5', last ? 'min-w-0' : 'shrink-0')}>
               {i > 0 && (
@@ -111,6 +122,7 @@ export function PageHeader({
     return (
       <div className="mb-8">
         {crumbs && slot?.slot && createPortal(<TopBarCrumbs crumbs={crumbs} />, slot.slot)}
+        {crumbs && <PageCrumbs crumbs={crumbs} />}
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 lg:flex-nowrap">
           <div data-header-title className={cn('min-w-0 lg:flex-1', hasMore && 'max-sm:w-full')}>
             <div className="flex items-start gap-3">
