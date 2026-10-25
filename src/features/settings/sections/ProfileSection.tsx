@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { MB } from '@/lib/files'
-import { squareResize } from '@/lib/image'
+import { ImageTooLargeError, squareResize } from '@/lib/image'
 import { ACCOUNT_ERRORS, DISPLAY_NAME_MAX, type Profile, account, isDemoMode } from '@/services'
 import { SectionHeader, SettingsCard } from '../SettingsUi'
 import { useMyProfile } from '../useMyProfile'
@@ -131,9 +131,9 @@ function PhotoCard({ profile, setProfile }: CardProps) {
     let square: Blob
     try {
       square = await squareResize(file, 256)
-    } catch {
+    } catch (err) {
       setBusy(null)
-      return setError("That image couldn't be read. Try another file.")
+      return setError(err instanceof ImageTooLargeError ? 'This photo is too large to process. Try a smaller one.' : "That image couldn't be read. Try another file.")
     }
     const r = await account.uploadAvatar(square)
     setBusy(null)

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { squareResize } from './image'
+import { ImageTooLargeError, squareResize } from './image'
 
 // jsdom has no canvas and no image decoding: both are mocked here, and the test checks what is asked of them.
 let drawImage: ReturnType<typeof vi.fn>
@@ -99,15 +99,27 @@ describe('squareResize', () => {
     expect(decode).toHaveBeenCalledTimes(2)
   })
 
-  it('refuses an image over 40 megapixels from its header, before decoding it', async () => {
+  it('refuses an image over 100 megapixels from its header as too large, before decoding it', async () => {
     const decode = vi.fn(async () => ({ width: 10, height: 10, close: vi.fn() }))
     vi.stubGlobal('createImageBitmap', decode)
-    for (const bomb of [jpeg(8000, 6000), png(20_000, 20_000), webpVp8x(16_383, 16_383)]) {
-      await expect(squareResize(bomb)).rejects.toThrow(/couldn't be read/)
+    for (const bomb of [jpeg(12_000, 9000), png(20_000, 20_000), webpVp8x(16_383, 16_383)]) {
+      const err = await squareResize(bomb).catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ImageTooLargeError)
     }
     expect(decode).not.toHaveBeenCalled()
-    // 40 MP exactly is still fine.
-    await expect(squareResize(png(8000, 5000))).resolves.toBeInstanceOf(Blob)
+  })
+
+  it('accepts phone-size photos up to 100 megapixels', async () => {
+    await expect(squareResize(jpeg(8160, 6120))).resolves.toBeInstanceOf(Blob) // 50 MP
+    await expect(squareResize(png(10_000, 10_000))).resolves.toBeInstanceOf(Blob) // exactly 100 MP
+  })
+
+  it('a corrupt file is unreadable, not too large', async () => {
+    const corrupt = new File([new Uint8Array([0xff, 0xd8, 0x12, 0x34, 0, 0, 0, 0, 0, 0, 0])], 'x.jpg', { type: 'image/jpeg' })
+    const err = await squareResize(corrupt).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(Error)
+    expect(err).not.toBeInstanceOf(ImageTooLargeError)
+    expect((err as Error).message).toMatch(/couldn't be read/)
   })
 
   it('refuses a file whose header has no image size', async () => {

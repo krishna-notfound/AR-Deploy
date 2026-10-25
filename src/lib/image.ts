@@ -1,20 +1,30 @@
 // Browser-side image helpers (canvas only, no dependency).
 
-/** Largest image we decode: 40 megapixels (a phone photo is 12 to 48 MP; 48 MP ones are refused). */
-export const MAX_PIXELS = 40_000_000
+/** Largest image we decode: 100 megapixels (phones take 12 to 50 MP photos; beyond this is a decode bomb). */
+export const MAX_PIXELS = 100_000_000
 const UNREADABLE = "The image couldn't be read."
+
+/** The image is readable but bigger than MAX_PIXELS, so it is not decoded. */
+export class ImageTooLargeError extends Error {
+  constructor() {
+    super('The image is too large to process.')
+    this.name = 'ImageTooLargeError'
+  }
+}
 /** The size header sits near the start; JPEG metadata (EXIF, ICC) can push it a few hundred KB in. */
 const HEAD_BYTES = 8 * 1024 * 1024
 
 /**
  * Crops an image to its centre square and scales it to `size` x `size` px, for profile photos. The result is WebP at
  * quality 0.9, or JPEG at 0.9 where the browser cannot write WebP (it then hands back PNG, which we do not keep).
- * Rejects when the file cannot be decoded as an image.
+ * Rejects with ImageTooLargeError above MAX_PIXELS (read from the header, before decoding), and with a plain Error
+ * when the file cannot be decoded as an image.
  */
 export async function squareResize(file: File, size = 256): Promise<Blob> {
   // Read the size from the header first: a small file can still claim a huge canvas (a decode bomb).
   const dims = readImageSize(await readHead(file))
-  if (!dims || !dims.width || !dims.height || dims.width * dims.height > MAX_PIXELS) throw new Error(UNREADABLE)
+  if (!dims || !dims.width || !dims.height) throw new Error(UNREADABLE)
+  if (dims.width * dims.height > MAX_PIXELS) throw new ImageTooLargeError()
   const source = await decode(file).catch(() => {
     throw new Error(UNREADABLE)
   })

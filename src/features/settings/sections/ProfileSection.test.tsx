@@ -8,8 +8,8 @@ import { resetMockAccount } from '@/services/mock/mockAccount'
 import { resetMyProfileStore } from '../useMyProfile'
 
 const resized = new Blob([new Uint8Array(2048)], { type: 'image/webp' })
-vi.mock('@/lib/image', () => ({ squareResize: vi.fn(async () => resized) }))
-const { squareResize } = await import('@/lib/image')
+vi.mock('@/lib/image', async (original) => ({ ...(await original<typeof import('@/lib/image')>()), squareResize: vi.fn(async () => resized) }))
+const { ImageTooLargeError, squareResize } = await import('@/lib/image')
 
 function open(url = '/dashboard/settings/profile') {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'business_admin', businessId: 'biz_casa' }))
@@ -141,6 +141,17 @@ describe('ProfileSection', () => {
     expect(await screen.findByText("That image couldn't be read. Try another file.")).toBeInTheDocument()
     expect(upload).not.toHaveBeenCalled()
     expect(preview().querySelector('img')).toBeNull()
+  })
+
+  it('photo: a photo over the size cap says it is too large, and uploads nothing', async () => {
+    const user = userEvent.setup()
+    open()
+    const upload = vi.spyOn(account, 'uploadAvatar')
+    vi.mocked(squareResize).mockRejectedValueOnce(new ImageTooLargeError())
+    await user.upload(await screen.findByLabelText('Upload photo'), goodPhoto())
+    expect(await screen.findByText('This photo is too large to process. Try a smaller one.')).toBeInTheDocument()
+    expect(screen.queryByText("That image couldn't be read. Try another file.")).toBeNull()
+    expect(upload).not.toHaveBeenCalled()
   })
 
   it('photo: shows the service message when the upload is refused', async () => {
