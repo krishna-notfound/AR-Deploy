@@ -831,6 +831,19 @@ as $$
         where m.user_id = p_user and m.status = 'active' and rp.permission = p_permission);
 $$;
 
+-- Signs a deactivated member out on every device: deleting the sessions revokes their refresh tokens (cascade);
+-- RLS already refuses the member on every request. plpgsql so creating it does not need auth.sessions to exist.
+create function public.service_end_sessions(p_user uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from auth.sessions where user_id = p_user;
+end;
+$$;
+
 do $$
 declare
   f text;
@@ -846,7 +859,7 @@ begin
   foreach f in array array[
     'public.service_log_access_denied(uuid, text)', 'public.service_create_member_invite(uuid, text, timestamptz, uuid)',
     'public.service_record_invite_email(uuid, boolean, text)', 'public.service_inspect_invite(text)',
-    'public.service_accept_invite(text, uuid, text)', 'public.service_user_can(uuid, text)'] loop
+    'public.service_accept_invite(text, uuid, text)', 'public.service_user_can(uuid, text)', 'public.service_end_sessions(uuid)'] loop
     execute format('revoke execute on function %s from public, anon, authenticated', f);
     execute format('grant execute on function %s to service_role', f);
   end loop;

@@ -470,3 +470,14 @@ describe('service_user_can (provision-owner caller check, Task 5)', () => {
     await expect(as(OWNER_U, (tx) => tx.query(`select public.service_user_can($1, 'owners.manage')`, [OWNER_U]))).rejects.toThrow(/permission denied/)
   })
 })
+
+describe('service_end_sessions (manage-member sign-out, Task 6)', () => {
+  it('deletes every session of the user and nobody else', async () => {
+    await db.exec(`create table if not exists auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid)`)
+    await db.exec(`insert into auth.sessions (user_id) values ('${TEAM_U}'), ('${TEAM_U}'), ('${ADMIN_U}')`)
+    await svc(`select to_jsonb(public.service_end_sessions($1)) as r`, [TEAM_U])
+    const left = await db.query<{ user_id: string }>('select user_id from auth.sessions')
+    expect(left.rows.map((r) => r.user_id)).toEqual([ADMIN_U])
+    await expect(as(OWNER_U, (tx) => tx.query(`select public.service_end_sessions($1)`, [TEAM_U]))).rejects.toThrow(/permission denied/)
+  })
+})

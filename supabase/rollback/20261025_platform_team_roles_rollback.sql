@@ -61,6 +61,7 @@ drop function if exists public.service_record_invite_email(uuid, boolean, text);
 drop function if exists public.service_inspect_invite(text);
 drop function if exists public.service_accept_invite(text, uuid, text);
 drop function if exists public.service_user_can(uuid, text);
+drop function if exists public.service_end_sessions(uuid);
 drop function if exists private.member_json(public.platform_members);
 drop function if exists private.invite_state(public.invite_status, timestamptz);
 drop function if exists private.owner_or_deny(text);
