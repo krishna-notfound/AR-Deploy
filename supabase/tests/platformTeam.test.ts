@@ -12,8 +12,10 @@ const MIGRATIONS = join(__dirname, '..', 'migrations')
 const SUPABASE_STUBS = `
   create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
   create schema auth;
-  create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, last_sign_in_at timestamptz);
+  create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, last_sign_in_at timestamptz,
+    raw_user_meta_data jsonb default '{}');
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
+  create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('test.jwt', true), ''), '{}')::jsonb $$;
   grant usage on schema auth to anon, authenticated, service_role;
   create schema storage;
   create table storage.buckets (id text primary key, name text not null, public boolean default false,
@@ -446,7 +448,9 @@ describe('rollback script for 20261025070915_platform_team_roles', () => {
   it('removes everything and restores the admin-only checks', async () => {
     const fresh = await PGlite.create()
     await fresh.exec(SUPABASE_STUBS)
-    for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()) await fresh.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
+    // Later migrations are rolled back first (their own rollback scripts), so apply only up to this one.
+    for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql') && n.slice(0, 14) <= '20261025070915').sort())
+      await fresh.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
     await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_platform_team_roles_rollback.sql'), 'utf8'))
     expect((await fresh.query(`select to_regclass('public.platform_members') as t`)).rows[0]).toEqual({ t: null })
     expect((await fresh.query(`select count(*)::int as n from pg_policies where policyname like 'Platform members%'`)).rows[0]).toEqual({ n: 0 })
