@@ -5,7 +5,6 @@ import { signInAsBusiness, signInAsSuperAdmin } from './helpers'
 // route: nothing under 12px inside <main>, no uppercase text in the dashboard scope (the wordmark is exempt) and,
 // at phone width, no horizontal page scroll. The mobile project only runs *.mobile.spec.ts, so the phone pass is a
 // describe block below with a 390px viewport.
-// Task 13b: product editor routes
 
 type Route = {
   name: string
@@ -62,6 +61,8 @@ const ADMIN_ROUTES: Route[] = [
   { name: 'team list', path: '/admin/team', ready: h1('Team & Access'), loaded: inMain('ana.ribeiro@sanctus.example') },
   { name: 'member detail', path: '/admin/team/mem_joao', ready: h1('João Costa'), loaded: inMain('joao.costa@sanctus.example') },
   { name: 'role permissions', path: '/admin/team/permissions', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('checkbox').first() },
+  { name: 'new product', path: '/admin/products/new', ready: h1(/./), loaded: field('Product name') },
+  { name: 'product editor', path: '/admin/products/prd_sheen_chair/edit', ready: h1(/./), loaded: field('Product name') },
   { name: 'page not found in the shell', path: '/admin/no-such-page', ready: h1('Page not found'), min: 3 },
 ]
 
@@ -71,6 +72,7 @@ const BUSINESS_ROUTES: Route[] = [
   { name: 'business catalog', path: '/dashboard/catalog', ready: h1(/./), loaded: qr },
   { name: 'business products', path: '/dashboard/products', ready: h1(/./), loaded: inMain('Glam Velvet Sofa') },
   { name: 'business analytics', path: '/dashboard/analytics', ready: h1('Analytics'), loaded: chart },
+  { name: 'business product editor', path: '/dashboard/products/prd_glam_sofa/edit', ready: h1('Glam Velvet Sofa'), loaded: field('Product name') },
   { name: 'business settings', path: '/dashboard/settings', ready: h1(/./), loaded: field('Business name') },
 ]
 
