@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { formatNumber } from '@/lib/format'
+import { useInDashboard } from '@/components/layout/dashboardContext'
 
 /** Page numbers to show: the first, the last and the current page with its neighbours; gaps become ellipses. */
 function pageList(page: number, pages: number): (number | 'gap')[] {
@@ -15,8 +16,8 @@ function pageList(page: number, pages: number): (number | 'gap')[] {
   return out
 }
 
-const stepClass =
-  'inline-flex h-8 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-[12px] font-medium text-ink hover:bg-subtle disabled:pointer-events-none disabled:opacity-40 pointer-coarse:h-11'
+const stepBase =
+  'inline-flex h-8 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 font-medium text-ink hover:bg-subtle disabled:pointer-events-none disabled:opacity-40 pointer-coarse:h-11'
 
 export function Pagination({
   page,
@@ -31,12 +32,18 @@ export function Pagination({
   onPage: (p: number) => void
   noun?: string
 }) {
+  const dash = useInDashboard()
+  const stepClass = cn(stepBase, dash ? 'text-sm' : 'text-[12px]')
   const pages = Math.max(1, Math.ceil(total / pageSize))
   if (total === 0) return null
   const from = (page - 1) * pageSize + 1
   const to = Math.min(total, page * pageSize)
   return (
-    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-[13px] text-ink-muted sm:px-6">
+    <nav aria-label="Pagination" className={cn(
+        'flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-ink-muted sm:px-6',
+        dash ? 'text-sm' : 'text-[13px]',
+      )}
+    >
       <p>
         Showing <span className="font-medium text-ink tabular-nums">{formatNumber(from)}–{formatNumber(to)}</span> of{' '}
         <span className="font-medium text-ink tabular-nums">{formatNumber(total)}</span> {noun}
@@ -61,7 +68,8 @@ export function Pagination({
                     aria-label={`Page ${p}`}
                     aria-current={p === page ? 'page' : undefined}
                     className={cn(
-                      'grid h-8 min-w-8 place-items-center rounded-[var(--radius-control)] px-2 text-[12px] font-medium tabular-nums',
+                      'grid h-8 min-w-8 place-items-center rounded-[var(--radius-control)] px-2 font-medium tabular-nums',
+                      dash ? 'text-sm' : 'text-[12px]',
                       p === page ? 'bg-obsidian text-chalk' : 'border border-line text-ink hover:bg-subtle',
                     )}
                   >
