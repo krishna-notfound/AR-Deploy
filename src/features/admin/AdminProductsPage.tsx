@@ -1,3 +1,4 @@
+import { useCan } from '@/auth/usePermission'
 import { Package, PackagePlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -14,6 +15,7 @@ import { ProductTable } from '../products/ProductTable'
 import { useBusinesses, useProductStats } from '../products/useCatalogData'
 
 export default function AdminProductsPage() {
+  const can = useCan()
   const [filters, update] = useProductFilterParams()
   const products = useServiceQuery(() => service.getProducts(), [])
   const { list: businesses, map: bizMap } = useBusinesses()
@@ -36,9 +38,11 @@ export default function AdminProductsPage() {
       <PageHeader
         title="All products"
         actions={
-          <Button variant="primary" icon={<PackagePlus className="size-4" aria-hidden />} onClick={addProduct}>
-            Add product
-          </Button>
+          can('products.edit') && (
+            <Button variant="primary" icon={<PackagePlus className="size-4" aria-hidden />} onClick={addProduct}>
+              Add product
+            </Button>
+          )
         }
       />
       <Card>

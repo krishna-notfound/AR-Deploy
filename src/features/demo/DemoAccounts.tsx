@@ -28,8 +28,8 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
     if (!businessId && catalogs.data?.[0]) setBusinessId(catalogs.data[0].business.id)
   }, [catalogs.data, businessId])
 
-  const enterAdmin = () => {
-    signInAs({ role: 'super_admin' })
+  const enterAdmin = (platformRole?: 'admin' | 'team') => {
+    signInAs(platformRole ? { role: 'super_admin', platformRole } : { role: 'super_admin' })
     navigate(next?.startsWith('/admin') ? next : '/admin')
   }
   const enterBusiness = () => {
@@ -56,9 +56,18 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
             <p className="mt-1.5 flex-1 text-sm leading-6 text-ink-muted">
               For the platform team. Manage every business, product, catalog and QR code, and see platform-wide analytics.
             </p>
-            <Button variant="primary" className="mt-6 self-start" onClick={enterAdmin}>
+            <Button variant="primary" className="mt-6 self-start" onClick={() => enterAdmin()}>
               Continue as Super Admin
             </Button>
+            {/* Sample platform staff with the role permissions set on Team & Access (ADR-0029). */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => enterAdmin('admin')}>
+                Continue as Admin (sample)
+              </Button>
+              <Button size="sm" onClick={() => enterAdmin('team')}>
+                Continue as Team (sample)
+              </Button>
+            </div>
           </section>
 
           <section className="flex flex-col border-t border-line py-8 md:border-t-0 md:pl-10" aria-labelledby="ba-title">

@@ -1,3 +1,4 @@
+import { useCan } from '@/auth/usePermission'
 import { scrollBehavior } from '@/lib/motion'
 import { ArrowDown, Building2, Check, Eye, FileX, X } from 'lucide-react'
 import { useRef, useState } from 'react'
@@ -80,6 +81,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
     }
   }
   const [rejectOpen, setRejectOpen] = useState(false)
+  const can = useCan()
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState<string | null>(null)
   const actions = availableActions(app.status)
@@ -122,17 +124,17 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
         }
         actions={
           <div className="flex flex-wrap gap-2">
-            {actions.includes('start_review') && (
+            {actions.includes('start_review') && can('applications.approve') && (
               <Button icon={<Eye className="size-4" aria-hidden />} loading={review.pending} onClick={() => void run('start_review')}>
                 {app.status === 'rejected' ? 'Reopen review' : 'Start review'}
               </Button>
             )}
-            {actions.includes('reject') && (
+            {actions.includes('reject') && can('applications.reject') && (
               <Button variant="danger" icon={<X className="size-4" aria-hidden />} onClick={() => setRejectOpen(true)}>
                 Reject
               </Button>
             )}
-            {actions.includes('approve') && (
+            {actions.includes('approve') && can('applications.approve') && (
               <Button variant="primary" icon={<Check className="size-4" aria-hidden />} loading={review.pending} onClick={() => void approve()}>
                 Approve
               </Button>

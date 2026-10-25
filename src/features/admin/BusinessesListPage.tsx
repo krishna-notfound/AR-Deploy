@@ -1,3 +1,4 @@
+import { useCan } from '@/auth/usePermission'
 import { Building2, ExternalLink, MoreHorizontal, Package, Pencil, Plus, Power, QrCode, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
@@ -34,6 +35,7 @@ interface Row {
 }
 
 export default function BusinessesListPage() {
+  const can = useCan()
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
   const status = (params.get('status') ?? '') as '' | BusinessStatus
@@ -61,15 +63,20 @@ export default function BusinessesListPage() {
   }, [catalogs.data, analytics.data, q, status])
 
   const menu = (b: Business, count: number): (MenuItem | 'separator')[] => [
-    { label: 'Edit details', icon: <Pencil />, onSelect: () => navigate(businessAdminPath(b.id)) },
+    { label: can('businesses.edit') ? 'Edit details' : 'View details', icon: <Pencil />, onSelect: () => navigate(businessAdminPath(b.id)) },
     { label: 'Open catalog', icon: <ExternalLink />, onSelect: () => window.open(catalogLocalPath(b), '_blank', 'noopener') },
     { label: 'View products', icon: <Package />, onSelect: () => navigate(`/admin/products?business=${b.id}`) },
     { label: 'View QR code', icon: <QrCode />, onSelect: () => navigate(`/admin/catalogs?business=${b.id}`) },
-    b.status === 'active'
-      ? { label: 'Deactivate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, false) }
-      : { label: 'Activate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, true) },
-    'separator',
-    { label: 'Delete business', icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(b, count) },
+    ...(!can(['businesses.status']) || !can('businesses.edit')
+      ? []
+      : [
+          b.status === 'active'
+            ? { label: 'Deactivate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, false) }
+            : { label: 'Activate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, true) },
+        ]),
+    ...(can('businesses.delete')
+      ? (['separator', { label: 'Delete business', icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(b, count) }] as const)
+      : []),
   ]
 
   const columns: Column<Row>[] = [
@@ -112,9 +119,9 @@ export default function BusinessesListPage() {
         title="Businesses"
         description={`Furniture businesses and their catalogs. Views and AR are last-30-day ${isDemoMode ? 'sample ' : ''}figures.`}
         actions={
-          <ButtonLink to="/admin/businesses/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+          can('businesses.edit') && (<ButtonLink to="/admin/businesses/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
             Create business
-          </ButtonLink>
+          </ButtonLink>)
         }
       />
       <Card>
@@ -149,9 +156,9 @@ export default function BusinessesListPage() {
                   title="No businesses yet"
                   body="Create the first business to set up its catalog and QR code."
                   action={
-                    <ButtonLink to="/admin/businesses/new" variant="primary">
+                    can('businesses.edit') && (<ButtonLink to="/admin/businesses/new" variant="primary">
                       Create business
-                    </ButtonLink>
+                    </ButtonLink>)
                   }
                 />
               )

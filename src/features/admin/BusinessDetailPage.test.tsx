@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import { service } from '@/services'
@@ -11,6 +12,8 @@ import BusinessDetailPage from './BusinessDetailPage'
 beforeEach(async () => {
   localStorage.clear()
   sessionStorage.clear()
+  // The page shows actions by platform permission (ADR-0029): sign in as the demo Owner.
+  localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
   await service.resetDemoData()
 })
 
@@ -21,11 +24,13 @@ afterEach(() => {
 function renderPage(tab = 'products') {
   const router = createMemoryRouter([{ path: '/admin/businesses/:businessId', element: <BusinessDetailPage /> }], { initialEntries: [`/admin/businesses/biz_nord?tab=${tab}`] })
   render(
-    <ToastProvider>
-      <ConfirmProvider>
-        <RouterProvider router={router} />
-      </ConfirmProvider>
-    </ToastProvider>,
+    <AccountProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <RouterProvider router={router} />
+        </ConfirmProvider>
+      </ToastProvider>
+    </AccountProvider>,
   )
 }
 

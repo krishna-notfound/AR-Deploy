@@ -1,3 +1,4 @@
+import { RequirePermission } from '@/auth/usePermission'
 import { lazy, Suspense } from 'react'
 import { Outlet, type RouteObject, createBrowserRouter } from 'react-router'
 import { RequireRole } from '@/auth/RequireRole'
@@ -69,18 +70,19 @@ const adminRoutes: RouteObject = {
   ),
   children: [
     { index: true, element: <AdminOverviewPage /> },
-    { path: 'applications', element: <ApplicationsPage /> },
-    { path: 'applications/:applicationId', element: <ApplicationDetailPage /> },
-    { path: 'businesses', element: <BusinessesListPage /> },
-    { path: 'businesses/new', element: <BusinessCreatePage /> },
-    { path: 'businesses/:businessId', element: <BusinessDetailPage /> },
-    { path: 'products', element: <AdminProductsPage /> },
-    { path: 'products/new', element: <ProductEditorPage scope="admin" /> },
-    { path: 'products/:productId/edit', element: <ProductEditorPage scope="admin" /> },
-    { path: 'analytics', element: <AdminAnalyticsPage /> },
-    { path: 'catalogs', element: <AdminCatalogsPage /> },
-    { path: 'activity', element: <AuditLogPage /> },
-    { path: 'settings', element: <AdminSettingsPage /> },
+    // Each page needs its permission (ADR-0029). UX only: the database enforces the same rules.
+    { path: 'applications', element: <RequirePermission need="applications.view"><ApplicationsPage /></RequirePermission> },
+    { path: 'applications/:applicationId', element: <RequirePermission need="applications.view"><ApplicationDetailPage /></RequirePermission> },
+    { path: 'businesses', element: <RequirePermission need="businesses.view"><BusinessesListPage /></RequirePermission> },
+    { path: 'businesses/new', element: <RequirePermission need="businesses.edit"><BusinessCreatePage /></RequirePermission> },
+    { path: 'businesses/:businessId', element: <RequirePermission need="businesses.view"><BusinessDetailPage /></RequirePermission> },
+    { path: 'products', element: <RequirePermission need="products.view"><AdminProductsPage /></RequirePermission> },
+    { path: 'products/new', element: <RequirePermission need="products.edit"><ProductEditorPage scope="admin" /></RequirePermission> },
+    { path: 'products/:productId/edit', element: <RequirePermission need="products.edit"><ProductEditorPage scope="admin" /></RequirePermission> },
+    { path: 'analytics', element: <RequirePermission need="analytics.view"><AdminAnalyticsPage /></RequirePermission> },
+    { path: 'catalogs', element: <RequirePermission need="products.view"><AdminCatalogsPage /></RequirePermission> },
+    { path: 'activity', element: <RequirePermission need={['records.view', 'access.view']}><AuditLogPage /></RequirePermission> },
+    { path: 'settings', element: <RequirePermission need="owner"><AdminSettingsPage /></RequirePermission> },
     { path: '*', element: <NotFoundPage inShell /> },
   ],
 }

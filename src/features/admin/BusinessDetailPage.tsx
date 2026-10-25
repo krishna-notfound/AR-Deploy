@@ -1,3 +1,4 @@
+import { useCan } from '@/auth/usePermission'
 import { ExternalLink, PackagePlus, Power, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router'
@@ -24,6 +25,7 @@ import { useProductStats } from '../products/useCatalogData'
 type Tab = 'details' | 'products' | 'owners' | 'qr'
 
 export default function BusinessDetailPage() {
+  const can = useCan()
   const { businessId = '' } = useParams()
   const [params, setParams] = useSearchParams()
   const tab = (['details', 'products', 'owners', 'qr'].includes(params.get('tab') ?? '') ? params.get('tab') : 'details') as Tab
@@ -74,22 +76,26 @@ export default function BusinessDetailPage() {
             <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b), '_blank', 'noopener')}>
               Open catalog
             </Button>
-            <Button icon={<Power className="size-4" aria-hidden />} onClick={() => void actions.setActive(b, b.status !== 'active')}>
-              {b.status === 'active' ? 'Deactivate' : 'Activate'}
-            </Button>
-            <Button
-              variant="ghost"
-              className="text-danger hover:bg-danger-soft"
-              icon={<Trash2 className="size-4" aria-hidden />}
-              loading={deleting}
-              onClick={async () => {
-                setDeleting(true)
-                const ok = await actions.remove(b, productCount, { after: '/admin/businesses' })
-                if (!ok) setDeleting(false)
-              }}
-            >
-              Delete
-            </Button>
+            {can('businesses.status') && can('businesses.edit') && (
+              <Button icon={<Power className="size-4" aria-hidden />} onClick={() => void actions.setActive(b, b.status !== 'active')}>
+                {b.status === 'active' ? 'Deactivate' : 'Activate'}
+              </Button>
+            )}
+            {can('businesses.delete') && (
+              <Button
+                variant="ghost"
+                className="text-danger hover:bg-danger-soft"
+                icon={<Trash2 className="size-4" aria-hidden />}
+                loading={deleting}
+                onClick={async () => {
+                  setDeleting(true)
+                  const ok = await actions.remove(b, productCount, { after: '/admin/businesses' })
+                  if (!ok) setDeleting(false)
+                }}
+              >
+                Delete
+              </Button>
+            )}
           </>
         }
       />

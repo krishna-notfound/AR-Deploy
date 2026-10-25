@@ -1,3 +1,4 @@
+import { useCan } from '@/auth/usePermission'
 import { AlertCircle, ExternalLink, Eye, EyeOff, Save, Trash2 } from 'lucide-react'
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useBlocker, useLocation, useNavigate } from 'react-router'
@@ -99,6 +100,9 @@ export function ProductEditorForm({
   const location = useLocation()
   const toast = useToast()
   const actions = useProductActions(scope)
+  // Business owners manage their own products; platform users see what their role allows (ADR-0029).
+  const can = useCan()
+  const allowed = (need: 'products.publish' | 'products.delete') => scope === 'business' || can(need)
   const isNew = !product
 
   const initialForm = useMemo<EditorForm>(() => {
@@ -310,7 +314,7 @@ export function ProductEditorForm({
           </>
         }
         actions={
-          !isNew && (
+          !isNew && allowed('products.delete') && (
             <Button variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={onDelete} loading={busy === 'delete'} disabled={!!busy} className="text-danger hover:bg-danger-soft">
               Delete
             </Button>
@@ -540,7 +544,7 @@ export function ProductEditorForm({
           <Button onClick={onSaveDraft} loading={busy === 'save'} disabled={!!busy || (!dirty && !isNew)} icon={<Save className="size-4" aria-hidden />}>
             {currentStatus === 'published' && !isNew ? 'Save changes' : 'Save draft'}
           </Button>
-          {currentStatus === 'published' && !isNew ? (
+          {!allowed('products.publish') ? null : currentStatus === 'published' && !isNew ? (
             <Button variant="secondary" onClick={onUnpublish} loading={busy === 'unpublish'} disabled={!!busy} icon={<EyeOff className="size-4" aria-hidden />}>
               Unpublish
             </Button>

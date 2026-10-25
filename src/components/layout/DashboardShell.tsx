@@ -1,3 +1,4 @@
+import { useCan } from '@/auth/usePermission'
 import { ArrowUpRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Repeat, X } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
@@ -28,7 +29,10 @@ function readCollapsed() {
   }
 }
 
-export function DashboardShell({ nav, variant }: { nav: NavItem[]; variant: Variant }) {
+export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; variant: Variant }) {
+  // Only the places this platform role may open (ADR-0029); business owners have no `requires` items.
+  const can = useCan()
+  const nav = useMemo(() => allNav.filter((i) => !i.requires || can(i.requires)), [allNav, can])
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()

@@ -1,3 +1,4 @@
+import { useCan } from '@/auth/usePermission'
 import { MailPlus, RefreshCw, Trash2, UserCheck, UserPlus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
@@ -25,6 +26,8 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
   const provision = useServiceMutation((email: string, language: Lang) => service.provisionOwner({ businessId: business.id, email, language, applicationId }))
   const resend = useServiceMutation((language: Lang) => service.resendOwnerInvitation(business.id, language))
   const removal = useServiceMutation((userId: ID) => service.removeBusinessMember(business.id, userId))
+  const can = useCan()
+  const manage = can('owners.manage')
   const confirm = useConfirm()
   const toast = useToast()
   const [email, setEmail] = useState(defaultEmail ?? '')
@@ -111,12 +114,14 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
                 ) : (
                   <Badge tone="warning">Invitation pending</Badge>
                 )}
-                <IconButton aria-label={`Remove ${owner.email}`} disabled={removal.pending} onClick={() => void remove()}>
-                  <Trash2 className="size-4" aria-hidden />
-                </IconButton>
+                {manage && (
+                  <IconButton aria-label={`Remove ${owner.email}`} disabled={removal.pending} onClick={() => void remove()}>
+                    <Trash2 className="size-4" aria-hidden />
+                  </IconButton>
+                )}
               </div>
             </div>
-            {!owner.acceptedAt && (
+            {!owner.acceptedAt && manage && (
               <div className="flex flex-wrap items-end gap-3">
                 <FormField label="Email language">
                   <Select value={language} onChange={(e) => setLanguage(e.target.value as Lang)}>
@@ -130,6 +135,8 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
               </div>
             )}
           </div>
+        ) : !manage ? (
+          <InlineNotice tone="neutral">No owner yet.</InlineNotice>
         ) : (
           <form onSubmit={submit} className="space-y-4" noValidate>
             <InlineNotice tone="neutral">No owner yet. Invite the person who will manage this catalogue.</InlineNotice>

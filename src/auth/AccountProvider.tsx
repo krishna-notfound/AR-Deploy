@@ -2,14 +2,14 @@
 // Supabase mode: the real Supabase Auth session, with the role read from platform_admins / business_members.
 // Either way this only drives navigation; access control is enforced by RLS in the database.
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import type { Business, ID, User } from '@/domain/types'
+import type { Business, ID, PlatformRole, User } from '@/domain/types'
 import { type AuthService, type SignedInAccount, auth, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { SUPER_ADMIN, businessAdminFor } from './accounts'
+import { DEMO_PLATFORM_USERS, SUPER_ADMIN, businessAdminFor } from './accounts'
 
 export const ACCOUNT_KEY = 'arfurn:account'
 
-export type Session = { role: 'super_admin' } | { role: 'business_admin'; businessId: ID }
+export type Session = { role: 'super_admin'; platformRole?: PlatformRole } | { role: 'business_admin'; businessId: ID }
 
 /** `signedOut` false: the session is still active. `error`: what to tell the user (also when signed out on this device only). */
 export type LogoutResult = { signedOut: boolean; error?: string }
@@ -21,7 +21,7 @@ function readSession(): Session | null {
     const v: unknown = JSON.parse(raw)
     if (typeof v !== 'object' || v === null) return null
     const s = v as Record<string, unknown>
-    if (s.role === 'super_admin') return { role: 'super_admin' }
+    if (s.role === 'super_admin') return s.platformRole === 'admin' || s.platformRole === 'team' ? { role: 'super_admin', platformRole: s.platformRole } : { role: 'super_admin' }
     if (s.role === 'business_admin' && typeof s.businessId === 'string') return { role: 'business_admin', businessId: s.businessId }
     return null
   } catch {
@@ -122,6 +122,9 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   const businessId = session?.role === 'business_admin' ? session.businessId : null
   const biz = useBusiness(businessId)
   const { refetch: refetchBusiness } = biz
+  const platformRole = session?.role === 'super_admin' ? (session.platformRole ?? 'owner') : null
+  // The demo role's permissions come from the demo team data, so changes on Team & Access apply straight away.
+  const access = useServiceQuery(() => (platformRole ? service.getMyAccess() : Promise.resolve({ ok: true as const, data: null })), [platformRole])
   const bizFailed = biz.status === 'error'
 
   const signInAs = useCallback(
@@ -148,15 +151,24 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AccountCtx>(() => {
     const base = { business: null, signInAs, logout, retry: refetchBusiness }
     if (!session) return { ...base, user: null }
-    if (session.role === 'super_admin') return { ...base, user: SUPER_ADMIN }
+    if (session.role === 'super_admin') {
+      if (!access.data || access.data.role !== platformRole) return access.status === 'error' ? { ...base, user: undefined, accountError: access.error.message } : { ...base, user: undefined }
+      const person = platformRole === 'owner' ? SUPER_ADMIN : DEMO_PLATFORM_USERS[platformRole as 'admin' | 'team']
+      return { ...base, user: { ...person, platform: access.data } }
+    }
     const business = biz.data?.id === businessId ? biz.data : null
     if (business) return { ...base, user: businessAdminFor(business), business }
     if (biz.status !== 'error') return { ...base, user: undefined }
     if (biz.error.code === 'NOT_FOUND') return { ...base, user: null }
     return { ...base, user: undefined, accountError: biz.error.message }
-  }, [session, businessId, biz.data, biz.status, biz.error, signInAs, logout, refetchBusiness])
+  }, [session, businessId, biz.data, biz.status, biz.error, signInAs, logout, refetchBusiness, platformRole, access.data, access.status, access.error])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+}
+
+/** The account, or null outside <AccountProvider> (standalone component tests). */
+export function useOptionalAccount(): AccountCtx | null {
+  return useContext(Ctx)
 }
 
 export function useAccount(): AccountCtx {

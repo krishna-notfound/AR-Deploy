@@ -1,3 +1,4 @@
+import { useCan } from '@/auth/usePermission'
 import { ArrowRight, Box, Building2, ClipboardList, Eye, Globe, Package, PackagePlus, PencilLine, Plus, QrCode } from 'lucide-react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
@@ -21,6 +22,7 @@ import { hasArModel } from '../products/productReadiness'
 import { useBusinesses } from '../products/useCatalogData'
 
 export default function AdminOverviewPage() {
+  const can = useCan()
   const summary = useServiceQuery(() => service.getAnalytics(), [])
   const products = useServiceQuery(() => service.getProducts(), [])
   const { list: businesses, map: bizMap, query: bizQuery } = useBusinesses()
@@ -41,15 +43,21 @@ export default function AdminOverviewPage() {
         description="Applications, businesses, products and catalog activity across Sanctus."
         actions={
           <>
-            <ButtonLink to="/admin/catalogs" icon={<QrCode className="size-4" aria-hidden />}>
-              View catalogs
-            </ButtonLink>
-            <ButtonLink to="/admin/products/new" icon={<PackagePlus className="size-4" aria-hidden />}>
-              Add product
-            </ButtonLink>
-            <ButtonLink to="/admin/businesses/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-              Create business
-            </ButtonLink>
+            {can('products.view') && (
+              <ButtonLink to="/admin/catalogs" icon={<QrCode className="size-4" aria-hidden />}>
+                View catalogs
+              </ButtonLink>
+            )}
+            {can('products.edit') && (
+              <ButtonLink to="/admin/products/new" icon={<PackagePlus className="size-4" aria-hidden />}>
+                Add product
+              </ButtonLink>
+            )}
+            {can('businesses.edit') && (
+              <ButtonLink to="/admin/businesses/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                Create business
+              </ButtonLink>
+            )}
           </>
         }
       />

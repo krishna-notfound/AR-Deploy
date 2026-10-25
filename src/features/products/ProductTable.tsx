@@ -1,3 +1,5 @@
+import { useCan } from '@/auth/usePermission'
+import type { Permission } from '@/domain/types'
 import { CodeXml, Copy, CopyPlus, ExternalLink, Eye, EyeOff, MoreHorizontal, Pencil, QrCode, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -55,23 +57,29 @@ export function ProductTable({
   onPageChange?: (p: number) => void
 }) {
   const actions = useProductActions(scope)
+  // Business owners manage their own products; platform users see what their role allows (ADR-0029).
+  const can = useCan()
+  const allowed = (need: Permission) => scope === 'business' || can(need)
   const [qrFor, setQrFor] = useState<Product | null>(null)
   const [embedFor, setEmbedFor] = useState<Product | null>(null)
 
   const menuItems = (p: Product): (MenuItem | 'separator')[] => {
     const b = businesses.get(p.businessId)
     return [
-      { label: 'Edit', icon: <Pencil />, onSelect: () => actions.edit(p) },
+      ...(allowed('products.edit') ? [{ label: 'Edit', icon: <Pencil />, onSelect: () => actions.edit(p) }] : []),
       { label: p.status === 'published' ? 'Open product page' : 'Preview draft', icon: <ExternalLink />, onSelect: () => actions.openPreview(p, b) },
       { label: 'Copy product URL', icon: <Copy />, onSelect: () => void actions.copyUrl(p, b) },
       { label: p.status === 'published' ? 'Product QR code' : 'Product QR code (not public yet)', icon: <QrCode />, onSelect: () => setQrFor(p) },
       { label: p.status === 'published' ? 'Embed on your website' : 'Embed on your website (not public yet)', icon: <CodeXml />, onSelect: () => setEmbedFor(p) },
-      { label: 'Duplicate', icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) },
-      p.status === 'published'
-        ? { label: 'Unpublish', icon: <EyeOff />, onSelect: () => void actions.unpublish(p) }
-        : { label: 'Publish', icon: <Eye />, onSelect: () => void actions.publish(p, b) },
-      'separator',
-      { label: 'Delete', icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(p) },
+      ...(allowed('products.edit') ? [{ label: 'Duplicate', icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) }] : []),
+      ...(!allowed('products.publish')
+        ? []
+        : [
+            p.status === 'published'
+              ? { label: 'Unpublish', icon: <EyeOff />, onSelect: () => void actions.unpublish(p) }
+              : { label: 'Publish', icon: <Eye />, onSelect: () => void actions.publish(p, b) },
+          ]),
+      ...(allowed('products.delete') ? (['separator', { label: 'Delete', icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(p) }] as const) : []),
     ]
   }
 
