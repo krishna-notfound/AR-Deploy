@@ -60,10 +60,10 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
 
   const name = (m: PlatformMember) => (
     <div className="flex min-w-0 items-center gap-3">
-      <Monogram name={m.fullName ?? m.email} />
+      <Monogram name={m.fullName ?? m.email} className="size-8! bg-subtle font-ui! text-[12px]! font-medium" />
       <div className="min-w-0">
-        <p className="truncate font-medium text-ink">{m.fullName ?? 'Name not set yet'}</p>
-        <p className="truncate text-xs text-ink-muted">{m.email}</p>
+        <p className={m.fullName ? 'truncate text-ui-body leading-5 font-medium text-ink' : 'truncate text-ui-body leading-5 text-ink-muted'}>{m.fullName ?? 'Name not set yet'}</p>
+        <p className="text-ui-small break-words text-ink-muted leading-[18px] sm:truncate">{m.email}</p>
       </div>
     </div>
   )
@@ -85,14 +85,16 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
     {
       key: 'since',
       header: 'Joined or invited',
-      cell: (m) => <span className="text-ink-muted">{formatDate(m.activatedAt ?? m.createdAt)}</span>,
+      align: 'right',
+      cell: (m) => <span className="whitespace-nowrap text-ink-muted">{formatDate(m.activatedAt ?? m.createdAt)}</span>,
       sortValue: (m) => m.activatedAt ?? m.createdAt,
       priority: 'low',
     },
     {
       key: 'seen',
       header: 'Last sign-in',
-      cell: (m) => <span className="text-ink-muted">{m.lastSignInAt ? formatRelative(m.lastSignInAt) : 'Never'}</span>,
+      align: 'right',
+      cell: (m) => <span className="whitespace-nowrap text-ink-muted">{m.lastSignInAt ? formatRelative(m.lastSignInAt) : 'Never'}</span>,
       sortValue: (m) => m.lastSignInAt ?? '',
       priority: 'low',
     },
@@ -101,8 +103,12 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
 
   return (
     <>
-      <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-end sm:px-6">
-        <SearchInput value={q} onChange={(v) => set('q', v)} label="Search members" placeholder="Name or email" className="sm:max-w-xs sm:flex-1" />
+      <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:items-end sm:px-6 sm:py-5">
+        <div className="flex flex-col gap-2">
+          <span aria-hidden className="text-ui-body font-medium text-ink">Search members</span>
+          <SearchInput value={q} onChange={(v) => set('q', v)} label="Search members" placeholder="Name or email" className="sm:w-80" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:contents">
         <FormField label="Role" className="sm:w-40">
           <Select value={role} onChange={(e) => set('role', e.target.value)}>
             <option value="">All roles</option>
@@ -119,6 +125,7 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
             <option value="deactivated">Deactivated</option>
           </Select>
         </FormField>
+        </div>
       </div>
       <DataTable
         rows={rows}
@@ -127,22 +134,27 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
         caption="Platform members"
         noun="members"
         pageSize={25}
+        twoLine
         initialSort={{ key: 'since', dir: 'asc' }}
         mobileRow={(m) => (
-          <div className="flex items-start justify-between gap-3 p-4">
+          // Two-line list item (BRIEF section 5): identity and actions, then badges, then the dates at 14px muted.
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-2">
               {name(m)}
               <div className="flex flex-wrap items-center gap-1.5">
                 <RoleBadge role={m.role} />
                 {statusCell(m)}
               </div>
+              <p className="text-ui-body text-ink-muted tabular-nums">
+                {m.activatedAt ? 'Joined' : 'Invited'} {formatDate(m.activatedAt ?? m.createdAt)} · Last sign-in {m.lastSignInAt ? formatRelative(m.lastSignInAt) : 'Never'}
+              </p>
             </div>
             {actionCell(m)}
           </div>
         )}
         empty={
           members.length === 0 ? (
-            <EmptyState icon={Users} title="No team members yet" body="Invite someone to help run the platform." action={<button type="button" className="text-sm font-medium text-accent-ink hover:underline" onClick={onInvite}>Invite member</button>} />
+            <EmptyState icon={Users} title="No team members yet" body="Invite someone to help run the platform." action={<button type="button" className="text-ui-body font-medium text-accent-ink hover:underline" onClick={onInvite}>Invite member</button>} />
           ) : (
             <EmptyState icon={Users} title="No members match" body="Try another name, role or status." />
           )

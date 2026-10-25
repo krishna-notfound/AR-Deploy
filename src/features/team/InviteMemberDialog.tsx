@@ -1,6 +1,6 @@
 // Invite a platform member (ADR-0030): email and role, then a review, then an honest result. The role's
 // permissions are shown read-only (they are set per role on Role permissions). A failed email is never shown as sent.
-import { ArrowLeft, Send } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Clock, Send } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/Button'
@@ -75,44 +75,47 @@ export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean
           </FormField>
 
           <fieldset>
-            <legend className="mb-2 text-[13px] font-medium text-ink">Role</legend>
+            <legend className="mb-2 text-ui-body font-medium text-ink">Role</legend>
             <div className="grid gap-3 sm:grid-cols-2">
               {(['admin', 'team'] as const).map((r) => (
                 <label
                   key={r}
                   className={cn(
                     'flex cursor-pointer gap-3 rounded-[var(--radius-card)] border p-4 transition-colors',
-                    role === r ? 'border-ink bg-surface' : 'border-line hover:border-line-strong',
+                    role === r ? 'border-ink bg-surface outline outline-1 outline-ink' : 'border-line hover:border-line-strong',
                   )}
                 >
-                  <input type="radio" name="role" value={r} checked={role === r} onChange={() => setRole(r)} className="mt-1 accent-[var(--color-ink)]" />
+                  <input type="radio" name="role" value={r} checked={role === r} onChange={() => setRole(r)} className="mt-1 self-start accent-[var(--color-ink)]" />
                   <span>
-                    <span className="block font-medium text-ink">{ROLE_LABEL[r]}</span>
-                    <span className="mt-0.5 block text-xs leading-5 text-ink-muted">{ROLE_DESCRIPTION[r]}</span>
+                    <span className="block text-ui-body font-medium text-ink">{ROLE_LABEL[r]}</span>
+                    <span className="mt-0.5 block text-ui-small text-ink-muted">{ROLE_DESCRIPTION[r]}</span>
                   </span>
                 </label>
               ))}
             </div>
           </fieldset>
 
-          <section aria-live="polite">
-            <h3 className="text-[11px] font-medium tracking-[0.16em] text-ink-muted uppercase">What {ROLE_LABEL[role]} can do</h3>
+          <section aria-live="polite" className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
+            <h3 className="text-ui-body font-semibold text-ink">What {ROLE_LABEL[role]} can do</h3>
             {perms.data ? (
               granted.length ? (
-                <ul aria-label={`${ROLE_LABEL[role]} permissions`} className="mt-2 grid gap-x-6 gap-y-1 text-sm text-ink-body sm:grid-cols-2">
+                <ul aria-label={`${ROLE_LABEL[role]} permissions`} className="mt-3 grid gap-x-6 gap-y-1.5 text-ui-body text-ink-body sm:grid-cols-2">
                   {granted.map((i) => (
-                    <li key={i.key}>{i.label}</li>
+                    <li key={i.key} className="flex items-start gap-2">
+                      <Check className="mt-0.5 size-4 shrink-0 text-ink-muted" aria-hidden />
+                      {i.label}
+                    </li>
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-sm text-ink-muted">Nothing yet. They could sign in but see no data.</p>
+                <p className="mt-2 text-ui-body text-ink-muted">Nothing yet. They could sign in but see no data.</p>
               )
             ) : (
-              <p className="mt-2 text-sm text-ink-muted">Loading…</p>
+              <p className="mt-2 text-ui-body text-ink-muted">Loading…</p>
             )}
-            <p className="mt-2 text-xs text-ink-muted">
-              Permissions belong to the role.{' '}
-              <Link to="/admin/team/permissions" className="font-medium text-accent-ink hover:underline" onClick={close}>
+            <p className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line pt-3 text-ui-small text-ink-muted">
+              <span>Permissions belong to the role.</span>
+              <Link to="/admin/team/permissions" className="font-medium text-ink hover:underline" onClick={close}>
                 Edit role permissions →
               </Link>
             </p>
@@ -125,7 +128,7 @@ export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean
           <div className="flex justify-end gap-2 border-t border-line pt-4">
             <Button onClick={close}>Cancel</Button>
             <Button type="submit" variant="primary">
-              Review invitation
+              Review invitation <ArrowRight className="size-4" aria-hidden />
             </Button>
           </div>
         </form>
@@ -133,8 +136,8 @@ export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean
 
       {step.kind === 'review' && (
         <div className="space-y-5">
-          <h3 className="font-display text-xl font-normal">Check the invitation</h3>
-          <dl className="grid gap-4 text-sm sm:grid-cols-[8rem_1fr]">
+          <h3 className="text-ui-card font-semibold text-ink">Check the invitation</h3>
+          <dl className="grid gap-x-4 gap-y-3 border-t border-line pt-3 text-ui-body sm:grid-cols-[8rem_1fr]">
             <dt className="text-ink-muted">To</dt>
             <dd className="font-medium text-ink">{clean}</dd>
             <dt className="text-ink-muted">Role</dt>
@@ -148,7 +151,10 @@ export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean
               </>
             )}
           </dl>
-          <p className="text-xs text-ink-muted">The link works once and expires after 7 days.</p>
+          <p className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-ui-body text-ink-muted">
+            <Clock className="size-4 shrink-0" aria-hidden />
+            The link works once and expires after 7 days.
+          </p>
           <div className="flex justify-between gap-2 border-t border-line pt-4">
             <Button icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => setStep({ kind: 'form' })} disabled={invite.pending}>
               Back
@@ -173,7 +179,7 @@ export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean
               now or later from the Invitations tab.
             </InlineNotice>
           )}
-          {error && <p className="text-sm text-danger">{error}</p>}
+          {error && <p className="text-ui-body text-danger">{error}</p>}
           <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
             {step.outcome.status === 'email_failed' && (
               <Button loading={resend.pending} onClick={() => void retry(step.outcome.memberId)}>

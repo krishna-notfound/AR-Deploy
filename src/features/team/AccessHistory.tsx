@@ -62,7 +62,10 @@ export function AccessHistory({ member }: { member?: string }) {
     <>
       {!member && (
         <div className="grid gap-3 border-b border-line p-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto_auto] lg:items-end">
-          <SearchInput value={q} onChange={(v) => set('hq', v)} label="Search by member email" placeholder="Member email" />
+          <div className="flex flex-col gap-2">
+            <span aria-hidden className="text-ui-body font-medium text-ink">Member</span>
+            <SearchInput value={q} onChange={(v) => set('hq', v)} label="Search by member email" placeholder="Member email" className="sm:w-full" />
+          </div>
           <FormField label="Action">
             <Select value={action ?? ''} onChange={(e) => set('action', e.target.value)}>
               <option value="">All actions</option>
@@ -115,8 +118,8 @@ export function AccessHistory({ member }: { member?: string }) {
 
 function EventRow({ e }: { e: AccessEvent }) {
   return (
-    <li className="grid gap-1 px-4 py-3.5 text-sm sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-start sm:gap-4 sm:px-6">
-      <time dateTime={e.at} className="text-xs text-ink-muted tabular-nums sm:pt-0.5">
+    <li className="grid gap-1 px-4 py-3.5 text-ui-body sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-start sm:gap-4 sm:px-6">
+      <time dateTime={e.at} className="text-ui-small text-ink-muted tabular-nums sm:pt-0.5">
         {formatDateTime(e.at)}
       </time>
       <div className="min-w-0">
@@ -131,8 +134,8 @@ function EventRow({ e }: { e: AccessEvent }) {
             </span>
           )}
         </p>
-        <p className="mt-0.5 text-xs text-ink-muted">{e.details}</p>
-        <p className="mt-0.5 text-xs text-ink-faint">By {e.actor ?? 'the system'}</p>
+        <p className="mt-0.5 text-ui-small text-ink-muted">{e.details}</p>
+        <p className="mt-0.5 text-ui-small text-ink-muted">By {e.actor ?? 'the system'}</p>
       </div>
       <div>{e.outcome === 'denied' ? <Badge tone="danger">Refused</Badge> : <Badge tone="success">Done</Badge>}</div>
     </li>

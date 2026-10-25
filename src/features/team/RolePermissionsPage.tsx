@@ -107,29 +107,30 @@ export default function RolePermissionsPage() {
         <div className="space-y-6 pb-28">
           {PERMISSION_GROUPS.map((g) => (
             <Card key={g.title}>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 border-b border-line px-4 py-3 sm:px-6">
-                <h2 className="font-display text-xl font-normal">{g.title}</h2>
-                <div className="hidden grid-cols-3 gap-2 text-center text-[10.5px] font-medium tracking-[0.16em] text-ink-muted uppercase sm:grid sm:w-56">
+              <h2 className="px-4 pt-6 pb-4 text-ui-card font-semibold text-ink sm:px-6">{g.title}</h2>
+              <div className="mx-4 hidden grid-cols-[minmax(0,1fr)_auto] gap-4 border-b border-line pb-3 text-ui-small font-medium text-ink-muted sm:mx-6 sm:grid">
+                <span>Permission</span>
+                <div className="grid grid-cols-3 gap-2 text-center sm:w-56">
                   <span>Owner</span>
                   <span>Admin</span>
                   <span>Team</span>
                 </div>
               </div>
-              <ul className="divide-y divide-line">
+              <ul className="divide-y divide-subtle pb-2">
                 {g.items.map((item) => (
-                  <li key={item.key} className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
+                  <li key={item.key} className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
                     <div className="min-w-0">
-                      <p className="font-medium text-ink">{item.label}</p>
-                      <p className="mt-0.5 text-sm text-ink-muted">{item.description}</p>
+                      <p className="text-ui-body font-medium text-ink">{item.label}</p>
+                      <p className="mt-0.5 text-ui-body text-ink-muted">{item.description}</p>
                       {item.warning && (
-                        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warning">
+                        <p className="mt-1.5 flex items-start gap-1.5 text-ui-small text-warning">
                           <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
                           {item.warning}
                         </p>
                       )}
                     </div>
-                    <div className="grid grid-cols-3 items-center gap-2 text-center text-sm sm:w-56">
-                      <span className="text-xs text-ink-muted" title="The Owner always has every permission">
+                    <div className="grid grid-cols-3 items-center gap-2 text-center text-ui-body sm:w-56">
+                      <span className="text-ui-small text-ink-muted" title="The Owner always has every permission">
                         <span className="sm:hidden">Owner: </span>All
                       </span>
                       {ROLES.map((r) => (
@@ -141,7 +142,7 @@ export default function RolePermissionsPage() {
                             onChange={() => toggle(r, item.key)}
                             aria-label={`${ROLE_LABEL[r]}: ${item.label}`}
                           />
-                          <span className="text-xs text-ink-muted sm:hidden">{ROLE_LABEL[r]}</span>
+                          <span className="text-ui-small text-ink-muted sm:hidden">{ROLE_LABEL[r]}</span>
                         </label>
                       ))}
                     </div>
@@ -156,7 +157,8 @@ export default function RolePermissionsPage() {
       {draft && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w)]">
           <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
-            <p className="text-sm text-ink-muted" aria-live="polite">
+            <p className="flex items-center gap-2 text-ui-body text-ink-muted" aria-live="polite">
+              {dirty && <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden />}
               {dirty ? `${changes} unsaved change${changes === 1 ? '' : 's'}` : 'All changes saved'}
             </p>
             <div className="flex flex-wrap gap-2">

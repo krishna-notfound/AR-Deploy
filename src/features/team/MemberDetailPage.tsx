@@ -1,7 +1,7 @@
 // One platform member (ADR-0029): who they are, their role and what it allows, their invitations and their
 // access history, with Change role, Deactivate or Reactivate. Only real recorded data is shown.
-import { ChevronDown, UserX } from 'lucide-react'
-import { useParams } from 'react-router'
+import { Check, ChevronDown, UserX } from 'lucide-react'
+import { Link, useParams } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -90,7 +90,7 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
                 <span id="role">
                   <DropdownMenu
                     label="Change role"
-                    triggerClassName="inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-4 text-sm font-medium text-ink hover:bg-subtle"
+                    triggerClassName="inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-4 text-ui-body font-medium text-ink hover:bg-subtle"
                     trigger={
                       <>
                         Change role <ChevronDown className="size-4" aria-hidden />
@@ -117,16 +117,16 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-        <Card className="p-5 sm:p-6">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <Card className="p-6">
           <div className="flex items-center gap-3">
             <Monogram name={m.fullName ?? m.email} />
             <div className="min-w-0">
-              <p className="truncate font-medium">{m.fullName ?? 'Name not set yet'}</p>
-              <p className="truncate text-sm text-ink-muted">{m.email}</p>
+              <p className="truncate text-ui-body font-medium text-ink">{m.fullName ?? 'Name not set yet'}</p>
+              <p className="truncate text-ui-body text-ink-muted">{m.email}</p>
             </div>
           </div>
-          <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+          <dl className="mt-5 divide-y divide-subtle border-t border-line text-ui-body">
             <Item label="Joined">{m.activatedAt ? formatDate(m.activatedAt) : 'Not yet'}</Item>
             <Item label="Last sign-in">{m.lastSignInAt ? formatRelative(m.lastSignInAt) : 'Never'}</Item>
             <Item label="Invited by">{m.invitedBy ?? '—'}</Item>
@@ -134,49 +134,60 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
           </dl>
         </Card>
 
-        <Card className="p-5 sm:p-6">
-          <h2 className="font-display text-xl font-normal">What {ROLE_LABEL[m.role]} can do</h2>
+        <Card className="p-6">
+          <h2 className="text-ui-card font-semibold text-ink">What {ROLE_LABEL[m.role]} can do</h2>
           {isOwner ? (
-            <p className="mt-3 text-sm text-ink-muted">The Owner always has every permission, including Team & Access and Settings. Ownership can't be changed here.</p>
+            <p className="mt-3 text-ui-body text-ink-muted">The Owner always has every permission, including Team & Access and Settings. Ownership can't be changed here.</p>
           ) : !granted ? (
             <SkeletonRows rows={3} />
           ) : granted.length === 0 ? (
-            <p className="mt-3 text-sm text-ink-muted">Nothing yet. They can sign in but see no data.</p>
+            <p className="mt-3 text-ui-body text-ink-muted">Nothing yet. They can sign in but see no data.</p>
           ) : (
-            <ul aria-label={`${ROLE_LABEL[m.role]} permissions`} className="mt-3 space-y-3 text-sm">
+            <ul aria-label={`${ROLE_LABEL[m.role]} permissions`} className="mt-4 space-y-5 text-ui-body">
               {granted.map((g) => (
-                <li key={g.title}>
-                  <p className="text-[11px] font-medium tracking-[0.16em] text-ink-muted uppercase">{g.title}</p>
-                  <ul className="mt-1 text-ink-body">
+                <li key={g.title} className="border-b border-subtle pb-5 last:border-b-0 last:pb-0">
+                  <p className="text-ui-body font-semibold text-ink">{g.title}</p>
+                  <ul className="mt-2 grid gap-x-6 gap-y-1.5 text-ink-body sm:grid-cols-2">
                     {g.items.map((i) => (
-                      <li key={i.key}>{i.label}</li>
+                      <li key={i.key} className="flex items-start gap-2">
+                        <Check className="mt-0.5 size-4 shrink-0 text-ink-muted" aria-hidden />
+                        {i.label}
+                      </li>
                     ))}
                   </ul>
                 </li>
               ))}
             </ul>
           )}
-          {!isOwner && <p className="mt-4 text-xs text-ink-muted">Permissions belong to the role. Change them on Role permissions.</p>}
+          {!isOwner && (
+            <p className="mt-5 border-t border-line pt-4 text-ui-small text-ink-muted">
+              Permissions belong to the role. Change them on{' '}
+              <Link to="/admin/team/permissions" className="text-ink underline">
+                Role permissions
+              </Link>
+              .
+            </p>
+          )}
         </Card>
       </div>
 
       {!isOwner && (
         <section aria-label="Invitations" className="mt-6">
           <Card>
-            <h2 className="border-b border-line px-4 py-3 font-display text-xl font-normal sm:px-6">Invitations</h2>
+            <h2 className="border-b border-line px-4 py-4 text-ui-card font-semibold text-ink sm:px-6">Invitations</h2>
             {invites.status === 'loading' && !invites.data ? (
               <SkeletonRows rows={2} />
             ) : invites.status === 'error' ? (
               <ErrorState message={invites.error.message} onRetry={invites.refetch} className="m-6" />
             ) : !invites.data?.length ? (
-              <p className="px-4 py-6 text-sm text-ink-muted sm:px-6">No invitations recorded.</p>
+              <p className="px-4 py-6 text-ui-body text-ink-muted sm:px-6">No invitations recorded.</p>
             ) : (
-              <ol className="divide-y divide-line">
+              <ol className="divide-y divide-subtle">
                 {invites.data.map((i) => (
-                  <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm sm:px-6">
+                  <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-ui-body sm:px-6">
                     <div>
                       <p className="text-ink">Created {formatDateTime(i.createdAt)}</p>
-                      <p className="text-xs text-ink-muted">
+                      <p className="text-ui-small text-ink-muted">
                         {i.acceptedAt ? `Accepted ${formatDateTime(i.acceptedAt)}` : i.revokedAt ? `Revoked ${formatDateTime(i.revokedAt)}` : `Expires ${formatDateTime(i.expiresAt)}`}
                         {i.lastEmailResult ? ` · Email: ${i.lastEmailResult}` : ''}
                       </p>
@@ -192,7 +203,7 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
 
       <section aria-label="Access history" className="mt-6">
         <Card>
-          <h2 className="border-b border-line px-4 py-3 font-display text-xl font-normal sm:px-6">Access history</h2>
+          <h2 className="border-b border-line px-4 py-4 text-ui-card font-semibold text-ink sm:px-6">Access history</h2>
           <AccessHistory member={m.email} />
         </Card>
       </section>
@@ -202,9 +213,9 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
 
 function Item({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <dt className="text-[11px] font-medium tracking-[0.16em] text-ink-muted uppercase">{label}</dt>
-      <dd className="mt-1 text-ink">{children}</dd>
+    <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-baseline gap-4 py-2.5">
+      <dt className="text-ink-muted">{label}</dt>
+      <dd className="min-w-0 break-words text-ink">{children}</dd>
     </div>
   )
 }

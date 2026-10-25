@@ -27,12 +27,12 @@ export function InvitationPanel({ member, onClose }: { member: PlatformMember | 
         <ErrorState message={`Could not load the invitation. ${invites.error.message}`} onRetry={invites.refetch} />
       ) : (
         <div className="space-y-6">
-          <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+          <dl className="grid gap-x-6 gap-y-4 text-ui-body sm:grid-cols-2">
             <Field label="Status">
               {latest ? (
                 <div className="space-y-1">
                   <InviteStatusBadge status={latest.status} />
-                  <p className="text-xs text-ink-muted">{INVITE_STATUS[latest.status].help}</p>
+                  <p className="text-ui-small text-ink-muted">{INVITE_STATUS[latest.status].help}</p>
                 </div>
               ) : (
                 'No invitation sent'
@@ -53,8 +53,8 @@ export function InvitationPanel({ member, onClose }: { member: PlatformMember | 
 
           {member.role !== 'owner' && perms.data && (
             <section>
-              <h3 className="text-[11px] font-medium tracking-[0.16em] text-ink-muted uppercase">What {ROLE_LABEL[member.role]} can do</h3>
-              <p className="mt-2 text-sm text-ink-body">{perms.data[member.role].map((p) => PERMISSION_LABEL[p]).join(' · ') || 'Nothing yet'}</p>
+              <h3 className="text-ui-body font-semibold text-ink">What {ROLE_LABEL[member.role]} can do</h3>
+              <p className="mt-2 text-ui-body text-ink-body">{perms.data[member.role].map((p) => PERMISSION_LABEL[p]).join(' · ') || 'Nothing yet'}</p>
             </section>
           )}
 
@@ -77,7 +77,7 @@ export function InvitationPanel({ member, onClose }: { member: PlatformMember | 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-[11px] font-medium tracking-[0.16em] text-ink-muted uppercase">{label}</dt>
+      <dt className="text-ui-small font-medium text-ink-muted">{label}</dt>
       <dd className="mt-1.5 text-ink">{children}</dd>
     </div>
   )
