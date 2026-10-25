@@ -1,5 +1,15 @@
 # Handoff: read this first in a new session (updated 2026-10-20)
 
+## Platform team roles (2026-10-25, branch `feature/sanctus-brand-design-system`)
+- **Roles:** Owner (`platform_admins`), Admin and Team (`platform_members`).
+- **Permissions:** 15 per role, enforced by additive RLS through `public.platform_can()`.
+- **Invitations:** link invitations to `/join`; only the SHA-256 of the secret is stored.
+- **References:** spec `docs/superpowers/specs/2026-10-25-platform-team-rbac-design.md`, plan `docs/superpowers/plans/2026-10-25-platform-team-rbac.md`, ADR-0029, ADR-0030.
+- **Not applied to Supabase yet.** The deploy steps are in `docs/OPERATIONS_RUNBOOK.md` ("Platform team roles"), and the rollback is `supabase/rollback/20261025_platform_team_roles_rollback.sql`.
+- **Before the migration:** sign-in falls back to `platform_admins`, and Team & Access says it isn't switched on.
+- **Demo mode:** `/demo` has "Continue as Admin (sample)" and "Continue as Team (sample)"; the sample invitation link is `/join#t=demo-invite-token`.
+- **Next:** add-ons A3, A2 and A1 (`System_arch/tasks/P12-team-roles-and-addons.md`).
+
 ## Next session: start here (2026-10-20)
 1. **The client now has Supabase Pro.** Next job: set up their **staging** and **production** projects. Follow `docs/OPERATIONS_RUNBOOK.md` ("Separate staging project", then "Deploying"). First ask the owner for the project refs and to be invited. Never reuse `pmnjchhrgvajtjpadpqo` (previous demo) or `bothonopxtznzviieoic` (Shringaar) for this.
 2. **Uncommitted changes on `main`:** doc and index edits from 2026-10-20, plus 6 project skills removed from `.claude/skills/`. Before committing, ask the owner which commit email to use: the personal Gmail must stay private and the repo is public (memory `commit-identity`).

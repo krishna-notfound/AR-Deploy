@@ -66,6 +66,12 @@ describe('Supabase team service', () => {
     expect(rpc).toHaveBeenCalledWith('admin_set_role_permissions', { p_role: 'team', p_permissions: ['products.view'] })
   })
 
+  it('says plainly when the database update has not been applied yet', async () => {
+    const sb = { rpc: async () => ({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } }) } as unknown as SupabaseClient
+    const r = await createSupabaseTeam(sb).listMembers()
+    expect(r).toEqual({ ok: false, error: { code: 'CONFIG', reason: 'not_enabled', message: "Team management isn't switched on yet: the database update has not been applied." } })
+  })
+
   it('maps 42501 to forbidden', () => {
     expect(mapDbError({ code: '42501', message: 'permission denied for table products' })).toEqual({
       ok: false,

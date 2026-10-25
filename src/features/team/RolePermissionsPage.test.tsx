@@ -51,6 +51,13 @@ describe('Role permissions (ADR-0029)', () => {
   it('confirms a removal, listing what is taken away, then saves', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const spy = vi.spyOn(service, 'setRolePermissions')
+    // Reads take a moment, as in the browser (the demo service adds latency outside tests).
+    const read = service.getRolePermissions.bind(service)
+    vi.spyOn(service, 'getRolePermissions').mockImplementation(async () => {
+      const r = await read()
+      await new Promise((res) => setTimeout(res, 120))
+      return r
+    })
     open()
     await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
     await user.click(box('Team', 'Create and edit products'))
@@ -61,6 +68,9 @@ describe('Role permissions (ADR-0029)', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(spy).toHaveBeenCalledWith('team', ['businesses.view', 'applications.view', 'products.view', 'analytics.view']))
     await waitFor(() => expect(screen.queryByText(/unsaved change/)).toBeNull())
+    // The saved state stays on screen (regression: the old set came back until the page reloaded).
+    await new Promise((r) => setTimeout(r, 400))
+    expect(box('Team', 'Create and edit products')).not.toBeChecked()
   })
 
   it('reset to defaults restores the default sets without saving', { timeout: 20_000 }, async () => {

@@ -32,6 +32,7 @@ This is the single place for **what is done, what is blocked and what decides th
 
 | Item | Status | Why not verified |
 |---|---|---|
+| **Platform team roles: Owner, Admin and Team (ADR-0029, ADR-0030)** | Built on the branch and tested in demo mode: 15 role permissions enforced by RLS, link invitations to `/join`, the Team & Access page, role permissions, member detail and access history. Migration `20261025070915_platform_team_roles.sql` and 3 Edge Functions are written and tested, but **not applied**. Until they are, the Preview works as before: Owners sign in through `platform_admins`, and Team & Access says it isn't switched on yet. | Applying it to `zggylkbgajamhriebdrg` needs the owner's go-ahead (plan Task 18). Invitation emails then reach real inboxes only once a sending domain is verified (B4). |
 
 ## 3. Blocked (exact missing input)
 
@@ -60,7 +61,11 @@ These are not to be decided silently.
 - **Analytics:** count every page view (today) or unique daily visitors.
 - **Landing quote attribution "— SANCTUS":** this is the client's reference copy, so the dash was kept.
 
-## 5. Test results (current tree, `26c03a5`, 2026-10-24)
+## 5. Test results
+
+Team roles, on the branch (2026-10-25): `npm test` **439 passed, 15 skipped** (database rules on PGlite included), `npm run test:e2e` **38 passed** (6 new team journeys), typecheck, lint and build pass.
+
+Earlier run (tree `26c03a5`, 2026-10-24):
 
 | Command | Result |
 |---|---|
@@ -89,6 +94,7 @@ These are not to be decided silently.
 
 ## 8. Next actions, in order
 
+1. Owner: go-ahead to apply team roles to the client project (migration plus 3 functions, `docs/OPERATIONS_RUNBOOK.md`), then a live invite-and-join test.
 1. Owner: manual test on the Preview, including B7 (Meshy model).
 2. Client: sending domain, sender address and admin inbox (B3, B4), then switch the Resend and SMTP sender to it.
 3. B7 (Meshy model) and B8 (device AR) tests.

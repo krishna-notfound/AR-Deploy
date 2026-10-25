@@ -211,6 +211,7 @@ export interface CatalogService {
 /** Team errors: one sentence per reason (spec section 7), shared by the demo and Supabase services. */
 export const TEAM_ERRORS: Record<string, { code: ServiceErrorCode; message: string }> = {
   forbidden: { code: 'PERMISSION', message: "You don't have permission to do this." },
+  not_enabled: { code: 'CONFIG', message: "Team management isn't switched on yet: the database update has not been applied." },
   already_member: { code: 'CONFLICT', message: 'This email already has platform access.' },
   business_owner: { code: 'CONFLICT', message: "This email owns a business. Business owners can't join the platform team." },
   owner_protected: { code: 'CONFLICT', message: "The platform owner can't be changed here." },

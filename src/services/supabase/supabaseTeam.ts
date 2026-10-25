@@ -79,7 +79,7 @@ export function createSupabaseTeam(sb: SupabaseClient): TeamMethods {
   async function call(fn: string, args?: Record<string, unknown>): Promise<Result<Answer>> {
     try {
       const { data, error } = await sb.rpc(fn, args)
-      if (error) return teamFail(error.code === '42501' ? 'forbidden' : 'unknown')
+      if (error) return teamFail(error.code === '42501' ? 'forbidden' : error.code === 'PGRST202' ? 'not_enabled' : 'unknown')
       const a = (data ?? {}) as Answer
       return a.error ? teamFail(a.error) : ok(a)
     } catch {
@@ -132,7 +132,7 @@ export function createSupabaseTeam(sb: SupabaseClient): TeamMethods {
     async getRolePermissions() {
       try {
         const { data, error } = await sb.from('platform_role_permissions').select('role, permission')
-        if (error) return teamFail(error.code === '42501' ? 'forbidden' : 'unknown')
+        if (error) return teamFail(error.code === '42501' ? 'forbidden' : error.code === '42P01' || error.code === 'PGRST205' ? 'not_enabled' : 'unknown')
         const out: RolePermissions = { admin: [], team: [] }
         for (const r of (data ?? []) as { role: 'admin' | 'team'; permission: RolePermissions['admin'][number] }[]) out[r.role].push(r.permission)
         return ok(out)

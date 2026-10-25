@@ -1,5 +1,6 @@
 // Real authentication (Supabase mode only). The demo account picker never touches this.
 // Roles come from tables users cannot write to (platform_admins and platform_members via my_platform_access, business_members): see supabase/migrations.
+import { ALL_PERMISSIONS } from '@/domain/permissions'
 import type { PlatformAccess } from '@/domain/types'
 import { type Session, type SupabaseClient, isAuthRetryableFetchError } from '@supabase/supabase-js'
 import type { User } from '@/domain/types'
@@ -86,12 +87,18 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
         sb.rpc('my_platform_access'),
         sb.from('business_members').select('business_id').eq('user_id', u.id).order('created_at', { ascending: false }).limit(1).maybeSingle<{ business_id: string }>(),
       ])
-      const err = admin.error ?? member.error
-      if (err) return mapDbError(err)
+      // Until the team-roles migration is applied, my_platform_access does not exist (PostgREST PGRST202): an Owner
+      // (platform_admins) is then still recognised, with every permission, so sign-in keeps working during the rollout.
+      let platform = admin.data as PlatformAccess | null
+      if (admin.error?.code === 'PGRST202') {
+        const owner = await sb.from('platform_admins').select('user_id').eq('user_id', u.id).maybeSingle()
+        if (owner.error) return mapDbError(owner.error)
+        platform = owner.data ? { role: 'owner', permissions: [...ALL_PERMISSIONS] } : null
+      } else if (admin.error) return mapDbError(admin.error)
+      if (member.error) return mapDbError(member.error)
       const meta = (u.user_metadata ?? {}) as { display_name?: unknown }
       const displayName = typeof meta.display_name === 'string' && meta.display_name.trim() ? meta.display_name.trim() : undefined
       const base = { id: u.id, name: displayName ?? (email || 'Signed-in user'), email }
-      const platform = admin.data as PlatformAccess | null
       if (platform) return ok({ email, user: { ...base, role: 'super_admin', platform } })
       // A business has exactly one owner (ADR-0024); a user owning several businesses gets the newest one until a switcher exists.
       if (member.data) return ok({ email, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })

@@ -23,22 +23,28 @@ const diff = (from: Permission[], to: Permission[]) => ({ added: to.filter((p) =
 export default function RolePermissionsPage() {
   const saved = useServiceQuery(() => service.getRolePermissions(), [])
   const members = useServiceQuery(() => service.listMembers(), [])
+  // `base` is the last saved state this page knows of; it is set from the first load and from each save, so a slow
+  // reload can never put an older state back on screen.
+  const [base, setBase] = useState<RolePermissions | null>(null)
   const [draft, setDraft] = useState<RolePermissions | null>(null)
   const [saving, setSaving] = useState(false)
   const confirm = useConfirm()
   const toast = useToast()
 
   useEffect(() => {
-    if (saved.data && !draft) setDraft({ admin: [...saved.data.admin], team: [...saved.data.team] })
-  }, [saved.data, draft])
+    if (saved.data && !base) {
+      setBase({ admin: [...saved.data.admin], team: [...saved.data.team] })
+      setDraft({ admin: [...saved.data.admin], team: [...saved.data.team] })
+    }
+  }, [saved.data, base])
 
   const changes = useMemo(() => {
-    if (!saved.data || !draft) return 0
+    if (!base || !draft) return 0
     return ROLES.reduce((n, r) => {
-      const d = diff(saved.data![r], draft[r])
+      const d = diff(base[r], draft[r])
       return n + d.added.length + d.removed.length
     }, 0)
-  }, [saved.data, draft])
+  }, [base, draft])
   const dirty = changes > 0
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && !saving && currentLocation.pathname !== nextLocation.pathname)
 
@@ -48,9 +54,9 @@ export default function RolePermissionsPage() {
   const activeIn = (role: MemberRole) => (members.data ?? []).filter((m) => m.role === role && m.status === 'active').length
 
   const save = async () => {
-    if (!saved.data || !draft) return
-    const changed = ROLES.filter((r) => !same(saved.data![r], draft[r]))
-    const removals = changed.map((r) => ({ role: r, removed: diff(saved.data![r], draft[r]).removed })).filter((x) => x.removed.length)
+    if (!base || !draft) return
+    const changed = ROLES.filter((r) => !same(base[r], draft[r]))
+    const removals = changed.map((r) => ({ role: r, removed: diff(base[r], draft[r]).removed })).filter((x) => x.removed.length)
     if (removals.length) {
       const yes = await confirm({
         title: 'Remove permissions?',
@@ -80,8 +86,7 @@ export default function RolePermissionsPage() {
     }
     setSaving(false)
     toast.success('Permissions saved', 'They apply to each member on their next action.')
-    setDraft(null)
-    saved.refetch()
+    setBase({ admin: [...draft.admin], team: [...draft.team] })
   }
 
   return (
@@ -158,7 +163,7 @@ export default function RolePermissionsPage() {
               <Button icon={<RotateCcw className="size-4" aria-hidden />} onClick={() => setDraft({ admin: [...DEFAULT_ROLE_PERMISSIONS.admin], team: [...DEFAULT_ROLE_PERMISSIONS.team] })} disabled={saving}>
                 Reset to defaults
               </Button>
-              <Button onClick={() => setDraft(null)} disabled={!dirty || saving}>
+              <Button onClick={() => base && setDraft({ admin: [...base.admin], team: [...base.team] })} disabled={!dirty || saving}>
                 Cancel
               </Button>
               <Button variant="primary" icon={<Save className="size-4" aria-hidden />} onClick={() => void save()} disabled={!dirty} loading={saving}>

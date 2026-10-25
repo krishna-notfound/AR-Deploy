@@ -7,7 +7,7 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
 - Spec (approved 2026-10-25): `docs/superpowers/specs/2026-10-25-platform-team-rbac-design.md`
 - Plan (18 tasks): `docs/superpowers/plans/2026-10-25-platform-team-rbac.md`
 - Decisions: ADR-0029 and ADR-0030 (written in Task 1 of the plan)
-- Status: plan written and waiting for the owner to choose how it runs (subagent-driven or native). Not started.
+- Status (2026-10-25): **Tasks 1–17 done on the branch** (native execution). All tests pass: 439 unit, 38 browser. Task 18 (apply to `zggylkbgajamhriebdrg` and check live) waits for the owner's go-ahead.
 
 ## Add-ons (agreed 2026-10-25, after P12.0)
 

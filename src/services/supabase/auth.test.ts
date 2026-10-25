@@ -36,6 +36,17 @@ describe('Supabase auth: getCurrentUser', () => {
     expect(r.ok && r.data?.user).toEqual({ id: 'u1', name: 'Ana', email: 'owner@test', role: 'business_admin', businessId: 'b1' })
   })
 
+  it('before the team-roles migration is applied, an Owner still signs in (falls back to platform_admins)', async () => {
+    const q = { select: () => q, eq: () => q, order: () => q, limit: () => q, maybeSingle: async () => ({ data: { user_id: 'u1' }, error: null }) }
+    const sb = {
+      auth: { getUser: async () => user() },
+      rpc: async () => ({ data: null, error: { code: 'PGRST202', message: 'Could not find the function public.my_platform_access' } }),
+      from: (table: string) => (table === 'platform_admins' ? q : { ...q, maybeSingle: async () => ({ data: null, error: null }) }),
+    } as unknown as SupabaseClient
+    const r = await createSupabaseAuthService(sb).getCurrentUser()
+    expect(r.ok && r.data?.user).toMatchObject({ role: 'super_admin', platform: { role: 'owner' } })
+  })
+
   it('a platform Team member signs in as a platform user with their role and permissions', async () => {
     const r = await createSupabaseAuthService(stub(() => user(), { platform: { role: 'team', permissions: ['products.view', 'products.edit'] } })).getCurrentUser()
     expect(r.ok && r.data?.user).toEqual({ id: 'u1', name: 'owner@test', email: 'owner@test', role: 'super_admin', platform: { role: 'team', permissions: ['products.view', 'products.edit'] } })
