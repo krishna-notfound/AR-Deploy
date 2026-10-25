@@ -125,11 +125,11 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
           <div className="flex min-w-0 items-start gap-5">
             {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
             <div className="min-w-0">
-              <p className="text-eyebrow text-accent-ink">{t('catalog.eyebrow')}</p>
+              <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t('catalog.eyebrow')}</p>
               <h1 className="mt-3 text-headline break-words">{b.name}</h1>
               {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
               {products.status === 'success' && (
-                <p className="mt-4 text-label text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
+                <p className="mt-4 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
               )}
             </div>
           </div>
@@ -150,7 +150,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   onClick={() => setParam('category', c)}
                   className={cn(
                     TAP_TARGET,
-                    'h-9 shrink-0 rounded-[2px] border px-4 text-label transition-colors',
+                    'h-9 shrink-0 rounded-[2px] border px-4 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase transition-colors',
                     cat === c ? 'border-obsidian bg-obsidian text-chalk' : 'border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink',
                   )}
                 >
@@ -179,9 +179,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
           />
         ) : (
           <ul className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-            {visible.map((p, i) => (
+            {visible.map((p) => (
               <li key={p.id} className="min-w-0">
-                <ProductCard product={p} index={i + 1} href={productHref(p)} />
+                <ProductCard product={p} href={productHref(p)} />
               </li>
             ))}
           </ul>
@@ -191,19 +191,18 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   )
 }
 
-/** A catalogue card in the landing's collection-card style: hairline frame, photo with an index chip, serif name. */
-function ProductCard({ product: p, index, href }: { product: Product; index: number; href: string }) {
+/** A catalogue card in the landing's collection-card style: hairline frame, photo with a category chip, serif name. */
+function ProductCard({ product: p, href }: { product: Product; href: string }) {
   const { t, lang, localized } = useI18n()
   return (
     <Link to={href} className="group flex h-full flex-col border border-line bg-surface p-3 transition-colors hover:border-line-strong focus-visible:outline-offset-4 sm:p-4">
       <div className="relative overflow-hidden bg-subtle">
         <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
-        <span className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate bg-surface px-2 py-1 text-[10px] leading-4 font-medium tracking-[0.18em] text-ink uppercase">
-          <span aria-hidden>{String(index).padStart(2, '0')} // </span>
+        <span className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate bg-surface px-2 py-1 text-xs leading-4 font-medium tracking-[0.08em] text-ink uppercase">
           {t(`category.${p.category}`)}
         </span>
         {hasAny3d(p) && (
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 bg-surface px-2 py-1 text-[10px] leading-4 font-medium tracking-[0.18em] text-accent-ink uppercase">
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 bg-surface px-2 py-1 text-xs leading-4 font-medium tracking-[0.08em] text-accent-ink uppercase">
             <Box className="size-3" strokeWidth={1.5} aria-hidden />
             {t('catalog.has3d')}
           </span>
@@ -213,7 +212,7 @@ function ProductCard({ product: p, index, href }: { product: Product; index: num
       <LocalizedSpan as="p" text={p.shortDescription} className="mt-1.5 mb-5 line-clamp-2 text-[13px] leading-5 text-ink-muted" />
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-4">
         <span className="text-[14px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(initialPrice(p), p.currency, lang)}</span>
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-label text-ink transition-colors group-hover:text-accent-ink">
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-[14px] leading-5 font-medium text-ink transition-colors group-hover:text-accent-ink">
           {t('catalog.viewPiece')}
           <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden />
         </span>

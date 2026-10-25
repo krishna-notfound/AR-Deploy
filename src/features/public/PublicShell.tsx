@@ -10,11 +10,12 @@ import { InAppNotice } from './InAppNotice'
 import { TAP_TARGET } from './tapTarget'
 
 /** "EN / PT" as in the reference header: a two-option radio group styled as spaced text. */
-export function LanguageSwitcher({ className }: { className?: string }) {
+/** `clear` sets the labels at 12px with 0.08em tracking (tenant catalogues); the platform pages keep the original text-label style. */
+export function LanguageSwitcher({ className, clear }: { className?: string; clear?: boolean }) {
   const { lang, setLang, t } = useI18n()
   const options: Lang[] = ['en', 'pt']
   return (
-    <div role="radiogroup" aria-label={t('nav.language')} className={cn('flex items-center text-label', className)}>
+    <div role="radiogroup" aria-label={t('nav.language')} className={cn('flex items-center', clear ? 'text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase' : 'text-label', className)}>
       {options.map((l, i) => (
         <span key={l} className="flex items-center">
           {i > 0 && (
@@ -55,14 +56,14 @@ export function PublicShell({ business, catalogHref, children }: { business?: Bu
           ) : (
             <span />
           )}
-          <LanguageSwitcher className="ml-auto text-ink" />
+          <LanguageSwitcher clear className="ml-auto text-ink" />
         </div>
       </header>
       {/* Catalog (where QR codes land) and product pages: AR may be limited in Instagram/Facebook/WhatsApp browsers. */}
       <InAppNotice />
       <div className="flex-1">{children}</div>
       <footer className="mt-auto border-t border-line bg-canvas">
-        <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-x-8 gap-y-4 px-5 py-8 text-label text-ink-muted sm:px-10 sm:py-10">
+        <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-x-8 gap-y-4 px-5 py-8 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted sm:px-10 sm:py-10">
           <span>{business ? `© ${business.name}` : ''}</span>
           <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <Wordmark size={9} />

@@ -48,7 +48,7 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
 
   if (availability === 'available')
     return (
-      <button type="button" onClick={onShowTips} className={cn(TAP_TARGET, 'self-start text-label text-ink-muted underline-offset-4 transition-colors hover:text-ink hover:underline')}>
+      <button type="button" onClick={onShowTips} className={cn(TAP_TARGET, 'self-start text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted underline-offset-4 transition-colors hover:text-ink hover:underline')}>
         {t('ar.tipsLink')}
       </button>
     )
@@ -60,7 +60,7 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
           <Smartphone className="size-4 text-accent-ink" strokeWidth={1.4} aria-hidden />
         </span>
         <div className="min-w-0">
-          <p className="text-eyebrow text-ink">{t('ar.unsupportedTitle')}</p>
+          <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">{t('ar.unsupportedTitle')}</p>
           <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t('ar.unsupportedBody')}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <CopyLink size="sm" />
