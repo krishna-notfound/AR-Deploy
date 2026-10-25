@@ -159,16 +159,38 @@ describe('product editor: section index, language control and publish bar (BRIEF
     expect(within(publishBar(edit)).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
   })
 
+  it('announces only the save status, not the status badge', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    const live = publishBar().querySelectorAll('[aria-live]')
+    expect(live).toHaveLength(1)
+    expect(live[0]).toHaveTextContent(/^Not saved yet$/)
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), 'Sofa')
+    expect(publishBar().querySelector('[aria-live]')).toHaveTextContent(/^Unsaved changes$/)
+  })
+
+  it('marks the clicked index item as the current location', async () => {
+    const user = userEvent.setup()
+    renderNew()
+    const index = screen.getByRole('navigation', { name: 'Editor sections' })
+    expect(within(index).getByRole('link', { name: 'Basic information' })).toHaveAttribute('aria-current', 'location')
+    await user.click(within(index).getByRole('link', { name: 'Dimensions & specs' }))
+    expect(within(index).getByRole('link', { name: 'Dimensions & specs' })).toHaveAttribute('aria-current', 'location')
+    expect(within(index).getByRole('link', { name: 'Basic information' })).not.toHaveAttribute('aria-current')
+  })
+
   it('marks the index item of a section with errors, and only those', async () => {
     const user = userEvent.setup()
     renderNew()
     const index = screen.getByRole('navigation', { name: 'Editor sections' })
     expect(within(index).getByRole('link', { name: 'Basic information' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish' }))
-    expect(within(index).getByRole('link', { name: 'Basic information (has errors)' })).toHaveClass('text-danger')
+    expect(within(index).getByRole('link', { name: 'Basic information (has errors)' })).toBeInTheDocument()
     expect(within(index).getByRole('link', { name: 'Images (has errors)' })).toBeInTheDocument()
     expect(within(index).getByRole('link', { name: 'Dimensions & specs (has errors)' })).toBeInTheDocument()
-    expect(within(index).getByRole('link', { name: 'Call to action' })).not.toHaveClass('text-danger')
+    expect(within(index).getByRole('link', { name: 'Call to action' })).toBeInTheDocument()
+    expect(within(index).getByRole('link', { name: '3D models' })).toBeInTheDocument()
+    expect(within(index).queryAllByRole('link', { name: /\(has errors\)$/ })).toHaveLength(3)
     // The COR-12 summary text is unchanged.
     expect(within(summary()).getByText('Fix these 5 issues to continue')).toBeInTheDocument()
   })

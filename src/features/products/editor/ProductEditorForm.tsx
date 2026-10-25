@@ -100,8 +100,8 @@ function useActiveSection(): [SectionId, (id: SectionId) => void] {
       if (picked.current) return setActive(picked.current)
       let current: SectionId = SECTIONS[0].id
       for (const s of SECTIONS) {
-        const el = document.getElementById(s.id)
-        if (el && el.getBoundingClientRect().top <= STICKY_TOP + 40) current = s.id
+        const box = document.getElementById(s.id)?.getBoundingClientRect()
+        if (box && box.height > 0 && box.top <= STICKY_TOP + 40) current = s.id
       }
       const doc = document.documentElement
       if (window.scrollY > 0 && window.innerHeight + window.scrollY >= doc.scrollHeight - 2) current = SECTIONS[SECTIONS.length - 1]!.id
@@ -183,6 +183,20 @@ export function ProductEditorForm({
   const prevForm = useRef(form)
   const dimErrId = useId()
   const [activeSection, pickSection] = useActiveSection()
+  const chipsRef = useRef<HTMLUListElement>(null)
+
+  // Phones: keep the active chip in view. The row scrolls sideways inside itself; the page never scrolls, because
+  // the chip row is usually off-screen while the user reads further down.
+  useEffect(() => {
+    const row = chipsRef.current
+    if (!row || row.scrollWidth <= row.clientWidth || window.matchMedia?.('(min-width: 1024px)').matches) return
+    const chip = row.querySelector<HTMLElement>('[aria-current="location"]')?.parentElement
+    if (!chip) return
+    const pad = 16
+    const left = chip.offsetLeft - row.offsetLeft
+    if (left - pad < row.scrollLeft) row.scrollTo?.({ left: left - pad, behavior: 'smooth' })
+    else if (left + chip.offsetWidth + pad > row.scrollLeft + row.clientWidth) row.scrollTo?.({ left: left + chip.offsetWidth + pad - row.clientWidth, behavior: 'smooth' })
+  }, [activeSection])
 
   const dirty = JSON.stringify(form) !== snapshot
   const business = businesses.find((b) => b.id === form.input.businessId) ?? fixedBusiness
@@ -389,10 +403,10 @@ export function ProductEditorForm({
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
         {/* Under lg a scrolling row of chips; from lg a 200px sticky list with a 2px ink bar on the active item. */}
         <nav aria-label="Editor sections" className="-mx-4 min-w-0 sm:-mx-6 lg:mx-0">
-          <ul className="flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 lg:sticky lg:top-20 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0">
+          <ul ref={chipsRef} className="flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 lg:sticky lg:top-20 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0">
             {SECTIONS.map((s) => {
               const hasError = errorList.some(([k]) => FIELD_SECTION[k] === s.id)
               const active = activeSection === s.id
@@ -623,9 +637,11 @@ export function ProductEditorForm({
       {/* Sticky publishing bar (BRIEF section 6): 64px from sm; on phones the status sits above three equal buttons. */}
       <section aria-label="Save and publish" className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w,0)]">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-2.5 px-4 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-0 lg:px-10">
-          <p aria-live="polite" className="flex min-w-0 items-center gap-2.5 text-[13px] text-ink-muted">
+          <p className="flex min-w-0 items-center gap-2.5 text-[13px] text-ink-muted">
             <ProductStatusBadge status={isNew ? 'draft' : currentStatus} />
-            <span className={cn(dirty && 'max-sm:font-medium max-sm:text-warning')}>{statusText}</span>
+            <span aria-live="polite" className={cn(dirty && 'max-sm:font-medium max-sm:text-warning')}>
+              {statusText}
+            </span>
           </p>
           <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:items-center sm:gap-3">
             <Button onClick={onPreview} loading={busy === 'preview'} disabled={!!busy || !business} className="max-sm:px-2">
