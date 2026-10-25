@@ -87,10 +87,10 @@ export function ProductTable({
     <div className="flex min-w-0 items-center gap-3">
       <Thumb src={primaryImage(p)?.url} alt="" />
       <div className="min-w-0">
-        <Link to={editPath(scope, p)} className="block truncate font-medium text-ink hover:underline">
+        <Link to={editPath(scope, p)} title={p.name.en} className="block truncate font-medium text-ink hover:underline">
           {p.name.en}
         </Link>
-        <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+        <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[length:var(--text-ui-small)] leading-[1.15] text-ink-muted">
           <span className="capitalize">{p.category}</span>
           <ArReadinessPill product={p} />
         </span>
@@ -105,12 +105,20 @@ export function ProductTable({
           {
             key: 'business',
             header: 'Business',
-            cell: (p: Product) => <span className="text-ink-muted">{businesses.get(p.businessId)?.name ?? 'Unknown'}</span>,
+            cell: (p: Product) => {
+              const n = businesses.get(p.businessId)?.name ?? 'Unknown'
+              return (
+                <span className="block truncate text-ink" title={n}>
+                  {n}
+                </span>
+              )
+            },
+            className: 'max-w-[220px]',
             sortValue: (p: Product) => businesses.get(p.businessId)?.name ?? '',
           } satisfies Column<Product>,
         ]
       : []),
-    { key: 'price', header: 'Price', cell: (p) => formatMoney(p.price, p.currency), sortValue: (p) => p.price, align: 'right' },
+    { key: 'price', header: 'Price', cell: (p) => <span className="whitespace-nowrap">{formatMoney(p.price, p.currency)}</span>, sortValue: (p) => p.price, align: 'right' },
     { key: 'status', header: 'Status', cell: (p) => <ProductStatusBadge status={p.status} />, sortValue: (p) => p.status },
     { key: 'views', header: 'Views', cell: (p) => formatNumber(stats.get(p.id)?.views ?? 0), sortValue: (p) => stats.get(p.id)?.views ?? 0, align: 'right', priority: 'low' },
     {
@@ -121,7 +129,7 @@ export function ProductTable({
       align: 'right',
       priority: 'low',
     },
-    { key: 'updated', header: 'Updated', cell: (p) => <span className="text-ink-muted">{formatDate(p.updatedAt)}</span>, sortValue: (p) => p.updatedAt },
+    { key: 'updated', header: 'Updated', cell: (p) => <span className="whitespace-nowrap tabular-nums">{formatDate(p.updatedAt)}</span>, sortValue: (p) => p.updatedAt },
     {
       key: 'actions',
       header: 'Actions',
@@ -141,6 +149,7 @@ export function ProductTable({
         empty={empty}
         caption="Products"
         noun="products"
+        twoLine
         initialSort={{ key: 'updated', dir: 'desc' }}
         page={page}
         onPageChange={onPageChange}
