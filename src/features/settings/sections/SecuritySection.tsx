@@ -65,6 +65,11 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
     focusTitle()
   }
 
+  const cancelSetup = () => {
+    setSettingUp(false)
+    focusTitle()
+  }
+
   const regenerate = async (code: string) => {
     const r = await account.generateRecoveryCodes(code)
     if (r.ok) {
@@ -109,7 +114,7 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
           </div>
 
           {settingUp && (
-            <TotpSetup email={email} onDone={() => void finishSetup()} onCancel={() => setSettingUp(false)} onEnabled={() => setJustEnabled(true)} />
+            <TotpSetup email={email} onDone={() => void finishSetup()} onCancel={cancelSetup} onEnabled={() => setJustEnabled(true)} />
           )}
 
           {!on && !settingUp && (

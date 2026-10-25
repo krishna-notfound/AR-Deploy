@@ -100,6 +100,7 @@ describe('Security & 2FA section', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.getByRole('button', { name: 'Turn on 2FA' })).toBeInTheDocument()
     expect(screen.queryByLabelText('6-digit code')).not.toBeInTheDocument()
+    await waitFor(() => expect(cardHeading()).toHaveFocus())
   })
 
   it("2FA on: shows 'On', recovery codes left, Regenerate (action code), Turn off (action code)", async () => {
