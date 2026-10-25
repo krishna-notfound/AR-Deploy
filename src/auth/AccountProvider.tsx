@@ -77,6 +77,13 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     if (bizRef.current.status === 'error') bizRef.current.refetch()
   }, [auth])
 
+  // Retry is also how a page asks for fresh data after it changed something (e.g. a cancelled closure restores the
+  // business status), so it reloads the business even when the last lookup succeeded.
+  const retry = useCallback(() => {
+    if (bizRef.current.status !== 'error') bizRef.current.refetch()
+    load()
+  }, [load])
+
   useEffect(() => {
     const ids = loadId
     load()
@@ -100,7 +107,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
 
   const value = useMemo<AccountCtx>(() => {
     const noRole = !!account && !account.user
-    const base = { business: null, signInAs, logout, retry: load, accountError, signedInEmail: noRole ? account.email : undefined }
+    const base = { business: null, signInAs, logout, retry, accountError, signedInEmail: noRole ? account.email : undefined }
     if (account === undefined) return { ...base, user: undefined }
     const user = account?.user ?? null
     if (!user?.businessId) return { ...base, user }
@@ -112,7 +119,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     // Only a missing business means "no business"; any other failure is reported with a retry.
     if (biz.error.code === 'NOT_FOUND') return { ...base, user: null, signedInEmail: account?.email }
     return { ...base, user: undefined, accountError: biz.error.message }
-  }, [account, accountError, biz.data, biz.status, biz.error, signInAs, logout, load])
+  }, [account, accountError, biz.data, biz.status, biz.error, signInAs, logout, retry])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

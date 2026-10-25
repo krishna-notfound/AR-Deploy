@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -50,13 +50,17 @@ const owner: SignedInAccount = { email: 'rui@test', user: { id: 'u2', name: 'Rui
 
 let logoutResult: LogoutResult | undefined
 function Probe() {
-  const { user, business, accountError, signedInEmail, logout } = useAccount()
+  const { user, business, accountError, signedInEmail, logout, retry } = useAccount()
   return (
     <div>
       <p>user:{user === undefined ? 'loading' : user === null ? 'none' : user.name}</p>
       <p>business:{business?.id ?? '-'}</p>
       <p>error:{accountError ?? '-'}</p>
       <p>email:{signedInEmail ?? '-'}</p>
+      <p>status:{business?.status ?? '-'}</p>
+      <button type="button" onClick={retry}>
+        retry
+      </button>
       <button type="button" onClick={async () => (logoutResult = await logout())}>
         logout
       </button>
@@ -105,6 +109,21 @@ describe('SupabaseAccountProvider', () => {
     expect(await screen.findByText('user:Rui', undefined, { timeout: 15_000 })).toBeInTheDocument()
     expect(screen.getByText('business:biz_casa')).toBeInTheDocument()
     expect(screen.getByText('error:-')).toBeInTheDocument()
+  })
+
+  it('retry reloads the business even after a successful load, so a changed status shows (closure cancel)', async () => {
+    const user = userEvent.setup()
+    const spy = vi.spyOn(service, 'getBusinessById')
+    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(owner)) })
+    render(
+      <SupabaseAccountProvider auth={auth}>
+        <Probe />
+      </SupabaseAccountProvider>,
+    )
+    expect(await screen.findByText('business:biz_casa', undefined, { timeout: 15_000 })).toBeInTheDocument()
+    const calls = spy.mock.calls.length
+    await user.click(screen.getByRole('button', { name: 'retry' }))
+    await waitFor(() => expect(spy.mock.calls.length).toBeGreaterThan(calls))
   })
 
   it('treats only a missing business as "no business"', async () => {
