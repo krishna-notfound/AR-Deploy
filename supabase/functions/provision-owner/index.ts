@@ -1,5 +1,5 @@
 // Supabase Edge Function: owner invitations (ADR-0024). JWT verification stays on (supabase/config.toml) and the
-// handler re-checks platform_admins. Uses the service role for auth.admin.generateLink and the service_* functions.
+// handler re-checks the caller (Owner, or a member with owners.manage). Uses the service role for auth.admin.generateLink and the service_* functions.
 // Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
@@ -18,8 +18,9 @@ Deno.serve((req) =>
       return error ? null : (data.user?.id ?? null)
     },
     async isPlatformAdmin(userId) {
-      const { data, error } = await admin.from('platform_admins').select('user_id').eq('user_id', userId).maybeSingle()
-      return !error && !!data
+      // Owners, and active Admin/Team members whose role has owners.manage (ADR-0029).
+      const { data, error } = await admin.rpc('service_user_can', { p_user: userId, p_permission: 'owners.manage' })
+      return !error && data === true
     },
     async getBusiness(id) {
       const { data, error } = await admin.from('businesses').select('id, name').eq('id', id).maybeSingle()

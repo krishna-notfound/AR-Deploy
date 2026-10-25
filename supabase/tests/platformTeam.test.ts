@@ -459,3 +459,14 @@ describe('rollback script for 20261025070915_platform_team_roles', () => {
     await fresh.close()
   })
 })
+
+describe('service_user_can (provision-owner caller check, Task 5)', () => {
+  it('answers for owners, active members with the permission, and nobody else', async () => {
+    const ask = (u: string, perm: string) => svc(`select to_jsonb(public.service_user_can($1, $2)) as r`, [u, perm])
+    expect(await ask(OWNER_U, 'owners.manage')).toBe(true)
+    expect(await ask(ADMIN_U, 'owners.manage')).toBe(true)
+    expect(await ask(TEAM_U, 'owners.manage')).toBe(false)
+    expect(await ask(DEACT_U, 'owners.manage')).toBe(false)
+    await expect(as(OWNER_U, (tx) => tx.query(`select public.service_user_can($1, 'owners.manage')`, [OWNER_U]))).rejects.toThrow(/permission denied/)
+  })
+})

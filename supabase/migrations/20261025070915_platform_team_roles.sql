@@ -815,6 +815,22 @@ begin
 end;
 $$;
 
+-- For edge functions that act for a signed-in user with the service role (provision-owner): the same rule as
+-- platform_can, for a given user.
+create function public.service_user_can(p_user uuid, p_permission text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.platform_admins where user_id = p_user)
+      or exists (
+        select 1 from public.platform_members m
+        join public.platform_role_permissions rp on rp.role = m.role
+        where m.user_id = p_user and m.status = 'active' and rp.permission = p_permission);
+$$;
+
 do $$
 declare
   f text;
@@ -830,7 +846,7 @@ begin
   foreach f in array array[
     'public.service_log_access_denied(uuid, text)', 'public.service_create_member_invite(uuid, text, timestamptz, uuid)',
     'public.service_record_invite_email(uuid, boolean, text)', 'public.service_inspect_invite(text)',
-    'public.service_accept_invite(text, uuid, text)'] loop
+    'public.service_accept_invite(text, uuid, text)', 'public.service_user_can(uuid, text)'] loop
     execute format('revoke execute on function %s from public, anon, authenticated', f);
     execute format('grant execute on function %s to service_role', f);
   end loop;
