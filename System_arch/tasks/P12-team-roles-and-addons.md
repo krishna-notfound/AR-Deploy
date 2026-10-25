@@ -85,6 +85,25 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
     - **Pixel guard:** it can fail on glyph edges under parallel load. Run it with `--workers=1`.
   - **Decision to confirm with the owner:** the Team stat strip now counts only active Admins and Team members. Counting deactivated people misstated who has access.
 
+## P13: Settings, platform control, application form builder, 3D model requests (owner request, 2026-10-25)
+
+**The owner's words (verbatim):**
+- "now we need to work on logical things ... what we can add in settings coz this is production level app we need to make proper setting where use can update his email update paddword enable 2fa profile name more preference"
+- On 2FA: "2fa mean code on email that all so it can verify also it should be enforce on login and delation part ... it have button to enable in setting of bith and supper admin as welll". The owner then chose: **app-based 2FA (authenticator) with an on/off switch in settings, plus an emailed code before risky actions.**
+- On deletion, the owner chose: **request closure, then the platform confirms.**
+- On extras: "Email notifications, Profile photo, Recent security activity, Timezone & date format, can set deshboard catelog public more things ... when new owner come it ask like complete your profile like divide everything into section like how discord settings look took inspraction from discord setting"
+- On layout, the owner chose: **B, a full-screen settings view like Discord** (× / Esc back).
+- "both admin side and business side admin side have super feature write off admin have whole website control"
+- Platform controls chosen: Applications open/closed, Security policy, Email settings, Maintenance mode, Data export, Legal links, Site info & SEO, New-business defaults.
+- Application form: "application form values , apply form value can be handle by like owner can decide what kind of value client submit while summiting things detail in form this is important can be implement appication sesstion weith eddit form button on top and these form value will be stored in db i want admin have more control over values"
+- 3D models (this is A3): "allow client to upload there own 3d model if this allow it will for for per business default business can request 3d model and cn only wait for 3dmodel should be made vide admin side when 3dmodel down and upload from admin side client get notification that 3dmodel is done can it can be show on catelog side left 3d model part will be hidden only business see upload multiple photo there are should be 2 section first which is show to use in without 3d mode second section will be apply for 3model with upload aleast 2-3page can and can so up as my client can do last 10 this should be a different section business side so admin have full control over 3d models"
+
+**Split into sub-projects**, each with its own spec → plan → build:
+- **S1:** a settings hub (full-screen, Discord-style) plus "Your account" for every role: profile and photo, email change, password, authenticator 2FA, an emailed code for risky actions, notifications, timezone and date format, security activity, the deletion request, and "complete your profile" onboarding. Also the Platform → Security policy (2FA requirement).
+- **S2:** Platform site controls (applications open/closed, email settings, maintenance mode, site info and SEO, legal links, new-business defaults, data export) plus Business → Catalog & public page.
+- **S3:** an application form builder: the Owner edits the fields, and the values are stored in the database.
+- **S4:** 3D model requests (A3): a per-business "allow own 3D upload" setting, separate catalog and request photos (2–10), admin upload, notification to the business, and the 3D part hidden until the model is ready.
+
 ## Log
 
 | Date | Note |
