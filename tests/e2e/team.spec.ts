@@ -61,7 +61,7 @@ test('the Owner removes a Team permission after confirming', async ({ page }) =>
   await expect(page.getByText('1 unsaved change')).toBeVisible()
   await page.getByRole('button', { name: 'Save changes' }).click()
   await confirmDialog(page, 'Save changes')
-  await expect(page.getByText('All changes saved')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save changes' })).toBeHidden()
   await expect(page.getByRole('checkbox', { name: 'Team: Create and edit products' })).not.toBeChecked()
 })
 

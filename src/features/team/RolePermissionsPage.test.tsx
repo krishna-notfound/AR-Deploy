@@ -37,6 +37,19 @@ describe('Role permissions (ADR-0029)', () => {
     expect(screen.getAllByText("Deletes the product and its media. This can't be undone.").length).toBeGreaterThan(0)
   })
 
+  it('shows the save bar only while there are unsaved changes', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
+    expect(screen.queryByText('All changes saved')).toBeNull()
+    await user.click(box('Team', 'Publish and unpublish'))
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
+  })
+
   it('counts unsaved changes, and Cancel puts them back', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open()

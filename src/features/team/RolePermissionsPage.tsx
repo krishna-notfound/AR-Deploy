@@ -94,6 +94,18 @@ export default function RolePermissionsPage() {
       <PageHeader
         title="Role permissions"
         description="Choose what Admin and Team members can do. The Owner always has every permission."
+        actions={
+          draft ? (
+            <Button
+              variant="ghost"
+              icon={<RotateCcw className="size-4" aria-hidden />}
+              onClick={() => setDraft({ admin: [...DEFAULT_ROLE_PERMISSIONS.admin], team: [...DEFAULT_ROLE_PERMISSIONS.team] })}
+              disabled={saving}
+            >
+              Reset to defaults
+            </Button>
+          ) : undefined
+        }
         breadcrumbs={[{ label: 'Team & Access', to: '/admin/team' }, { label: 'Role permissions' }]}
       />
 
@@ -104,7 +116,7 @@ export default function RolePermissionsPage() {
       ) : saved.status === 'error' && !draft ? (
         <ErrorState message={`Could not load the permissions. ${saved.error.message}`} onRetry={saved.refetch} />
       ) : draft ? (
-        <div className="space-y-6 pb-28">
+        <div className={dirty || saving ? 'space-y-6 pb-28' : 'space-y-6'}>
           {PERMISSION_GROUPS.map((g) => (
             <Card key={g.title}>
               <h2 className="px-4 pt-6 pb-4 text-ui-card font-semibold text-ink sm:px-6">{g.title}</h2>
@@ -154,17 +166,15 @@ export default function RolePermissionsPage() {
         </div>
       ) : null}
 
-      {draft && (
+      {draft && (dirty || saving) && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w)]">
-          <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
-            <p className="flex items-center gap-2 text-ui-body text-ink-muted" aria-live="polite">
-              {dirty && <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden />}
-              {dirty ? `${changes} unsaved change${changes === 1 ? '' : 's'}` : 'All changes saved'}
+          <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-3 px-4 py-3 sm:px-8">
+            <p className="flex min-w-0 items-center gap-2 text-ui-body text-ink-muted" aria-live="polite">
+              <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden />
+              <span className="truncate max-sm:hidden">{`${changes} unsaved change${changes === 1 ? '' : 's'}`}</span>
+              <span className="sm:hidden" aria-hidden>{`${changes} unsaved`}</span>
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button icon={<RotateCcw className="size-4" aria-hidden />} onClick={() => setDraft({ admin: [...DEFAULT_ROLE_PERMISSIONS.admin], team: [...DEFAULT_ROLE_PERMISSIONS.team] })} disabled={saving}>
-                Reset to defaults
-              </Button>
+            <div className="flex shrink-0 gap-2">
               <Button onClick={() => base && setDraft({ admin: [...base.admin], team: [...base.team] })} disabled={!dirty || saving}>
                 Cancel
               </Button>

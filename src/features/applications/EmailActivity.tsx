@@ -25,7 +25,7 @@ export function EmailActivity({ applicationId, businessId }: { applicationId?: I
         ) : (
           <ul className="divide-y divide-subtle border-y border-line">
             {q.data.map((e) => (
-              <li key={e.id} className="grid gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-4">
+              <li key={e.id} className="grid justify-items-start gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-start sm:justify-items-end sm:gap-4">
                 <div className="min-w-0">
                   <p className="text-ui-body font-medium text-ink">
                     {EMAIL_KIND_LABEL[e.kind] ?? e.kind}

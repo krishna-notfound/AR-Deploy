@@ -76,7 +76,7 @@ export default function ApplicationsPage() {
       <Card>
         <div className="grid grid-cols-2 items-end gap-3 border-b border-line p-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_10rem_10rem]">
           <FormField label="Search" className="col-span-2 md:col-span-1">
-            <SearchInput value={search} onChange={(v) => setParam('q', v)} label="Search applications" placeholder="Business, applicant, email or reference" className="w-full" />
+            <SearchInput value={search} onChange={(v) => setParam('q', v)} label="Search applications" placeholder="Search applications" className="w-full" />
           </FormField>
           <FormField label="Submitted from">
             <Input type="date" value={from} max={to || undefined} onChange={(e) => setParam('from', e.target.value)} />

@@ -74,4 +74,14 @@ describe('BusinessDetailPage', () => {
     const n = catalog.data.totalProductCount
     expect(within(await screen.findByRole('dialog')).getByText(new RegExp(`${n} product${n === 1 ? '' : 's'}\\.`))).toBeInTheDocument()
   })
+
+  it('scopes the products tab to one business: no Business column, no repeated name, short panel subtitle', async () => {
+    renderPage()
+    const table = await screen.findByRole('table')
+    await within(table).findByRole('link', { name: 'Sheen Lounge Chair' })
+    expect(within(table).queryByRole('columnheader', { name: 'Business' })).toBeNull()
+    expect(within(table).queryByText('Nordhaus Living')).toBeNull()
+    expect(screen.getByText('Products', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.queryByText(/’s catalog/)).toBeNull()
+  })
 })

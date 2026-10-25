@@ -37,8 +37,9 @@ describe('Team & Access page (ADR-0029)', () => {
     const stat = (label: string) => screen.getByText(label, { selector: 'dt' }).parentElement!.parentElement as HTMLElement
     await waitFor(() => expect(within(stat('Active members')).getByText('3')).toBeInTheDocument())
     expect(within(stat('Pending invitations')).getByText('1')).toBeInTheDocument()
-    expect(within(stat('Admins')).getByText('2')).toBeInTheDocument()
-    expect(within(stat('Team')).getByText('2')).toBeInTheDocument()
+    // Admins and Team count active members only: not the deactivated Admin, not the pending Team invitation.
+    expect(within(stat('Admins')).getByText('1')).toBeInTheDocument()
+    expect(within(stat('Team')).getByText('1')).toBeInTheDocument()
   })
 
   it('styles role badges per the design: Owner is obsidian, no badge is uppercase, member rows are two-line (60px)', { timeout: 20_000 }, async () => {

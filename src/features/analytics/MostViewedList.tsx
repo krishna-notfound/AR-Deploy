@@ -32,7 +32,8 @@ export function MostViewedList({
         const p = products.get(r.productId)
         if (!p) return null
         const attempts = arAttempts(p, r)
-        const sub = [businesses?.get(p.businessId)?.name, formatMoney(p.price, p.currency)].filter(Boolean).join(' · ')
+        const businessName = businesses?.get(p.businessId)?.name
+        const price = Number.isFinite(p.price) ? formatMoney(p.price, p.currency) : null
         return (
           <li key={r.productId} className="grid grid-cols-[1.25rem_auto_minmax(0,1fr)_auto] items-center gap-3 py-3">
             <span className="text-ui-body text-ink-muted tabular-nums" aria-hidden>
@@ -43,7 +44,15 @@ export function MostViewedList({
               <Link to={`${editBase}/${p.id}/edit`} className="block truncate text-ui-body font-medium text-ink hover:underline max-sm:whitespace-normal max-sm:[overflow-wrap:anywhere]">
                 {p.name.en}
               </Link>
-              <p className="truncate text-ui-small text-ink-muted">{sub}</p>
+              <p className="flex min-w-0 text-ui-small text-ink-muted" title={[businessName, price].filter(Boolean).join(' · ')}>
+                {businessName && <span className="truncate">{businessName}</span>}
+                {businessName && price && (
+                  <span className="shrink-0 whitespace-pre" aria-hidden>
+                    {' · '}
+                  </span>
+                )}
+                {price && <span className="shrink-0 tabular-nums">{price}</span>}
+              </p>
             </div>
             <p className="text-right text-ui-small text-ink-muted tabular-nums">
               <span className="block text-ui-body font-medium text-ink">{formatNumber(r.views)} views</span>

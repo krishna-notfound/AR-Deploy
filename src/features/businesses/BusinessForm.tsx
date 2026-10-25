@@ -175,7 +175,9 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
             {isOwner ? (
               <div>
                 <p className="text-ui-body font-medium">Catalog address</p>
-                <p className="mt-1.5 flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-ui-body break-all">{catalogPublicUrl(data)}</p>
+                <p className="mt-1.5 flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-ui-body" title={catalogPublicUrl(data)}>
+                  <span className="min-w-0 truncate">{catalogPublicUrl(data)}</span>
+                </p>
                 <InlineNotice className="mt-3" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
                   Changing your catalog address requires platform support. Editing your profile does not change the address.
                 </InlineNotice>

@@ -20,6 +20,8 @@ export default function MyProductsPage() {
   const bizMap = useMemo(() => new Map([[business.id, business]]), [business])
   const filtered = useMemo(() => applyProductFilters(products.data ?? [], { ...filters, business: '' }), [products.data, filters])
   const hasFilters = hasProductFilters({ ...filters, business: '' })
+  // Nothing to filter yet: a loaded, empty catalogue (not merely an empty result).
+  const hasNoProducts = products.status === 'success' && (products.data?.length ?? 0) === 0
 
   return (
     <>
@@ -32,7 +34,7 @@ export default function MyProductsPage() {
         }
       />
       <Card>
-        <ProductFilterBar state={filters} update={update} />
+        {!hasNoProducts && <ProductFilterBar state={filters} update={update} />}
         {products.status === 'error' && !products.data ? (
           <ErrorState message={products.error.message} onRetry={products.refetch} />
         ) : (
@@ -51,12 +53,7 @@ export default function MyProductsPage() {
                 <EmptyState
                   icon={Package}
                   title="Add your first product"
-                  body="Upload photos and a 3D model so customers can see it in their room."
-                  action={
-                    <ButtonLink to="/dashboard/products/new" variant="primary">
-                      Add product
-                    </ButtonLink>
-                  }
+                  body="Upload photos and a 3D model so customers can see it in their room. Use Add product at the top of the page."
                 />
               )
             }

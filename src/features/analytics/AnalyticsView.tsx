@@ -72,7 +72,7 @@ export function AnalyticsView({
       },
     },
     ...(showBusinessCol
-      ? [{ key: 'business', header: 'Business', sortValue: (r: ProductAnalytics) => bizMap.get(r.businessId)?.name ?? '', cell: (r: ProductAnalytics) => <span className="text-ink-muted">{bizMap.get(r.businessId)?.name}</span> } satisfies Column<ProductAnalytics>]
+      ? [{ key: 'business', header: 'Business', sortValue: (r: ProductAnalytics) => bizMap.get(r.businessId)?.name ?? '', className: 'max-w-[240px]', cell: (r: ProductAnalytics) => <span className="block truncate text-ink-muted" title={bizMap.get(r.businessId)?.name}>{bizMap.get(r.businessId)?.name}</span> } satisfies Column<ProductAnalytics>]
       : []),
     { key: 'views', header: 'Views', align: 'right', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
     {
@@ -210,24 +210,29 @@ export function AnalyticsView({
   )
 }
 
-/** Views per business: the name on one truncated line (full name on hover), then a bar and its value. */
-function BusinessBars({ rows }: { rows: { label: string; value: number }[] }) {
-  const max = Math.max(1, ...rows.map((r) => r.value))
+/** Views per business: one row each (name, bar track, value), most views first; businesses with none fold into one line. */
+export function BusinessBars({ rows }: { rows: { label: string; value: number }[] }) {
+  const withViews = rows.filter((r) => r.value > 0).sort((a, b) => b.value - a.value)
+  const quiet = rows.length - withViews.length
+  const max = Math.max(1, ...withViews.map((r) => r.value))
   return (
-    <ul className="space-y-4" aria-label="Views by business">
-      {rows.map((r, i) => (
-        <li key={`${r.label}-${i}`}>
-          <p className="truncate text-ui-body text-ink" title={r.label}>
-            {r.label}
-          </p>
-          <div className="mt-1.5 flex items-center gap-3">
-            <div className="h-2 min-w-0 flex-1">
-              <div className="h-full" style={{ width: `${(r.value / max) * 100}%`, background: SERIES.views.color }} aria-hidden />
-            </div>
-            <span className="w-14 shrink-0 text-right text-ui-small text-ink-muted tabular-nums">{formatNumber(r.value)}</span>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div>
+      {withViews.length > 0 && (
+        <ul className="space-y-3" aria-label="Views by business">
+          {withViews.map((r, i) => (
+            <li key={`${r.label}-${i}`} className="flex items-center gap-3">
+              <span className="w-[38%] min-w-0 shrink-0 truncate text-ui-body text-ink" title={r.label}>
+                {r.label}
+              </span>
+              <div className="h-2 min-w-0 flex-1 rounded-full bg-subtle">
+                <div className="h-full rounded-full" style={{ width: `${(r.value / max) * 100}%`, background: SERIES.views.color }} aria-hidden />
+              </div>
+              <span className="w-12 shrink-0 text-right text-ui-body text-ink tabular-nums">{formatNumber(r.value)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {quiet > 0 && <p className={`text-ui-small text-ink-muted${withViews.length > 0 ? ' mt-4' : ''}`}>{quiet === 1 ? '1 business with no views' : `${quiet} businesses with no views`}</p>}
+    </div>
   )
 }
