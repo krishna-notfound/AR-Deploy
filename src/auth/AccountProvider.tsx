@@ -47,6 +47,11 @@ interface AccountCtx {
   /** Loads the security state again (after a 2FA change). A failed first load also retries by itself. */
   refreshSecurity: () => Promise<void>
   /**
+   * Loads the security state again unless it was loaded in the last 30 s (on route changes: a policy turned on
+   * mid-session reaches a session that raised no auth event since).
+   */
+  refreshSecurityIfStale: () => void
+  /**
    * Updates the known security state in place after a change the server accepted. The patch holds over later reloads
    * until one confirms it (a lagging session refresh can't bring the old values back), for at most a minute.
    */
@@ -150,8 +155,11 @@ function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
     if (notify) onChangeRef.current?.(next)
   }, [])
 
+  // When the last load started (drives refreshIfStale).
+  const lastLoadAt = useRef(0)
   const refresh = useCallback(async () => {
     const id = ++loadId.current
+    lastLoadAt.current = Date.now()
     const [r, a] = await Promise.all([accountApi.getSecurityState(), accountApi.getAssurance()])
     if (id !== loadId.current) return
     const prev = secRef.current
@@ -204,10 +212,49 @@ function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
     }
   }, [error, failures, refresh])
 
-  return { security: sec, refresh, patch, clear }
+  // The state only reloads on auth events otherwise, so a policy the Owner turns on mid-session would leave a
+  // signed-in user at aal1 on empty tables. Known state only: signed out there is nothing to reload, and a failed
+  // first load has its own retry above.
+  const refreshIfStale = useCallback(() => {
+    if (!secRef.current.state) return
+    if (Date.now() - lastLoadAt.current < STALE_AFTER_MS) return
+    void refresh()
+  }, [refresh])
+
+  const known = !!sec.state
+  useEffect(() => {
+    if (!known) return
+    const onFocus = () => refreshIfStale()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshIfStale()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [known, refreshIfStale])
+
+  // A session at aal1 is the one the 2FA rules can lock out: also reload every few minutes while the tab is shown
+  // (a hidden tab catches up when it becomes visible). Stops at aal2, on sign-out (clear) and on unmount.
+  const atAal1 = !!sec.state && (sec.assurance?.currentLevel ?? sec.state.aal) === 'aal1'
+  useEffect(() => {
+    if (!atAal1) return
+    const timer = setInterval(() => {
+      if (document.visibilityState !== 'hidden') void refresh()
+    }, AAL1_RELOAD_MS)
+    return () => clearInterval(timer)
+  }, [atAal1, refresh])
+
+  return { security: sec, refresh, refreshIfStale, patch, clear }
 }
 
 const PATCH_HOLD_MS = 60_000
+/** Focus, visibility and route changes reload the security state at most this often. */
+const STALE_AFTER_MS = 30_000
+/** At aal1 the security state also reloads on its own this often. */
+const AAL1_RELOAD_MS = 3 * 60_000
 
 function applyPatch(info: Pick<SecurityInfo, 'state' | 'assurance'>, p: SecurityPatch): Pick<SecurityInfo, 'state' | 'assurance'> {
   return {
@@ -245,7 +292,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     setHiddenRefetch(shownWithoutBusiness.current ? (accountRef.current?.user?.businessId ?? null) : null)
     b.refetch()
   }, [])
-  const { security, refresh: refreshSecurity, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader((info) => {
+  const { security, refresh: refreshSecurity, refreshIfStale: refreshSecurityIfStale, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader((info) => {
     if (!info.loaded || !info.state) return
     // A business hidden while a 2FA step was due is fetched again once the step is done.
     if (!twoFactorDue(info)) refetchFailedBusiness()
@@ -323,6 +370,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       signedInEmail: noRole ? account.email : undefined,
       security,
       refreshSecurity,
+      refreshSecurityIfStale,
       patchSecurity,
       holdGate,
       gateHeld,
@@ -349,7 +397,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       return { ...base, user: null, signedInEmail: account?.email }
     }
     return { ...base, user: undefined, accountError: biz.error.message }
-  }, [account, accountError, biz.data, biz.status, biz.error, signInAs, logout, retry, security, refreshSecurity, patchSecurity, holdGate, gateHeld, hiddenRefetch])
+  }, [account, accountError, biz.data, biz.status, biz.error, signInAs, logout, retry, security, refreshSecurity, refreshSecurityIfStale, patchSecurity, holdGate, gateHeld, hiddenRefetch])
 
   useEffect(() => {
     shownWithoutBusiness.current = !!value.user?.businessId && !value.business
@@ -367,7 +415,7 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   // The demo role's permissions come from the demo team data, so changes on Team & Access apply straight away.
   const access = useServiceQuery(() => (platformRole ? service.getMyAccess() : Promise.resolve({ ok: true as const, data: null })), [platformRole])
   const bizFailed = biz.status === 'error'
-  const { security, refresh: refreshSecurity, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader()
+  const { security, refresh: refreshSecurity, refreshIfStale: refreshSecurityIfStale, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader()
   const [gateHeld, setGateHeld] = useState(false)
   const holdGate = useCallback((on: boolean) => setGateHeld(on), [])
   // The demo security state follows the chosen account (the staff and business policies differ).
@@ -410,6 +458,7 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
       retry: refetchBusiness,
       security,
       refreshSecurity,
+      refreshSecurityIfStale,
       patchSecurity,
       holdGate,
       gateHeld,
@@ -440,6 +489,7 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
     access.error,
     security,
     refreshSecurity,
+    refreshSecurityIfStale,
     patchSecurity,
     holdGate,
     gateHeld,

@@ -49,7 +49,8 @@ const MISSING = new Set(['PGRST202', 'PGRST205', '42P01', '42883'])
 function dbFail<T = never>(error: DbError): Result<T> {
   const code = error?.code ?? ''
   if (MISSING.has(code)) return accountFail('not_enabled')
-  if (code === '42501') return accountFail('not_allowed')
+  // A gated read (list_my_security_events) refuses a session that does not meet 2FA with this message.
+  if (code === '42501') return accountFail(error?.message === 'aal2_required' ? 'aal2_required' : 'not_allowed')
   // check_violation, invalid parameter (timezone trigger), raise_exception from a validation trigger
   if (code === '23514' || code === '22023' || code === 'P0001') return accountFail('invalid_request')
   return accountFail('unknown')

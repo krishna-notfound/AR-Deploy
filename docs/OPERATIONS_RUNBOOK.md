@@ -111,13 +111,21 @@ Settings hub, profile, email and password change, authenticator-app 2FA, recover
 
 ### Release order
 
-1. **Preflight.** Run `supabase/checks/preflight_readonly.sql`. Confirm the Owner has an authenticator app ready, because the Owner will be asked to set up 2FA first (step 7).
-2. **Dashboard settings** (next subsection), so the emails and the redirects work as soon as the code is live.
-3. **Migrations and frontend together.** Apply both migrations in one go: `20261025163627_account_settings.sql` and `20261025180600_account_settings_optin_2fa.sql` (`npx supabase db push --linked`). Merge the frontend that has the 2FA gate (`src/auth/SecurityGate.tsx`) straight after. **Never apply the migrations earlier than that frontend.** The second migration makes the database refuse a person who has a verified factor but is signed in at `aal1`, and only the new app shows them the code step. With the old app they would see empty tables.
-4. **Edge Functions.** Deploy after the migrations, because `account-security` calls the new `service_*` functions: `npx supabase functions deploy account-security submit-application --project-ref zggylkbgajamhriebdrg`. `account-security` is new (`verify_jwt = true`). `submit-application` is updated (it now reads the staff recipients) and keeps `verify_jwt = false`. Both come from `supabase/config.toml`.
-5. **Secrets.** `account-security` uses `RESEND_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL` and `EMAIL_TEST_RECIPIENTS`, which already exist. It also reads `SUPABASE_URL`, `SUPABASE_ANON_KEY` and the service key that Supabase provides. No new secret.
-6. **Types.** `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
-7. **Check after deploy.** Sign in as the Owner and open Settings. Turn 2FA on with an authenticator app and save the recovery codes. Sign out and in again and confirm the code step appears. Only then consider the Security policy switches. Send yourself an action code (Security, turn 2FA off) and confirm the email arrives.
+1. **Preflight.** Run `supabase/checks/preflight_readonly.sql`. Confirm the Owner has an authenticator app ready, because the Owner will be asked to set up 2FA first (step 8).
+2. **Dashboard settings** (see "Supabase dashboard settings" below), so the emails and the redirects work as soon as the code is live.
+
+Steps 3 to 5 run in this order, one straight after the other, in one release window:
+
+3. **Migrations.** Apply both in one go: `20261025163627_account_settings.sql` and `20261025180600_account_settings_optin_2fa.sql` (`npx supabase db push --linked`).
+4. **Edge Functions**, straight after the migrations (`account-security` calls the new `service_*` functions) and before the frontend (the new app calls `account-security`): `npx supabase functions deploy account-security submit-application --project-ref zggylkbgajamhriebdrg`. `account-security` is new (`verify_jwt = true`). `submit-application` is updated (it now reads the staff recipients) and keeps `verify_jwt = false`. Both come from `supabase/config.toml`.
+5. **Frontend**, straight after the functions: merge the frontend that has the 2FA gate (`src/auth/SecurityGate.tsx`). **Never leave the migrations live without that frontend.** The second migration makes the database refuse a person who has a verified factor, or whose group's policy is on, while they are signed in at `aal1`. Only the new app shows them the code step; with the old app they would see empty tables.
+6. **Secrets.** `account-security` uses `RESEND_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL` and `EMAIL_TEST_RECIPIENTS`, which already exist, and `ADMIN_NOTIFICATION_EMAIL` for closure alerts (if it is not set, no closure alert is sent). It also reads `SUPABASE_URL` and the service key (`SUPABASE_SECRET_KEYS`, or the legacy `SUPABASE_SERVICE_ROLE_KEY`), which Supabase provides. It does not use the anon key. No new secret.
+7. **Types.** `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+8. **Check after deploy.** Sign in as the Owner and open Settings. Turn 2FA on with an authenticator app and save the recovery codes. Sign out and in again and confirm the code step appears. Only then consider the Security policy switches. Send yourself an action code (Security, turn 2FA off) and confirm the email arrives. Then run the password check under "Supabase dashboard settings" (step 2) if it was not run yet.
+
+### Release notes
+
+- **New-application emails.** Every staff member with `applications.view` now gets one email per new application by default. Each person can turn it off under Settings → Notifications. Tell the team before the release.
 
 ### Supabase dashboard settings (the owner sets these)
 
@@ -128,6 +136,7 @@ Project `zggylkbgajamhriebdrg`. Change nothing else. Do not use the CLI for thes
    - Turn on **Secure email change**, so a change must be confirmed from both the old and the new address.
    - Turn on **Secure password change** (sometimes shown as "Require current password when updating"). A password change then needs a recent sign-in.
    - Turn on **Require current password when updating** if it is listed as its own switch. Save.
+   - **Test straight after saving.** This switch can also apply to the flows that set a password without knowing the old one. Right away, run a **forgot-password** reset (`/reset-password`, from the email code to a new password and a sign-in) and an **owner-invite onboarding** (invite a test owner, accept, set the password, reach the dashboard). If either fails, turn **Require current password when updating** off again at once, save, and repeat the test.
 3. **Authentication → Emails → Notification emails** (security notifications). Turn on all four: **Password changed**, **Email address changed**, **MFA method added** and **MFA method removed**. Save each.
 4. **Authentication → URL Configuration → Redirect URLs.** Add:
    - `https://sanctus.warpkit.online/dashboard/settings/account`
@@ -152,8 +161,8 @@ Supabase moves these screens now and then. If a label differs, find the setting 
 
 Run in the SQL editor as the database owner, **in this order**:
 
-1. `supabase/rollback/20261025_account_settings_optin_2fa_rollback.sql` first. It restores the policy-only 2FA rule and drops `caller_has_verified_factor()`.
-2. `supabase/rollback/20261025_account_settings_rollback.sql` next. It drops profiles, the policy, action and recovery codes and closure requests, and restores the access helpers without the 2FA clause. (If the first step was skipped it also drops `caller_has_verified_factor()`.) The platform-team-roles rollback, if wanted, comes after this one.
+1. `supabase/rollback/20261025_account_settings_optin_2fa_rollback.sql` first. It restores the policy-only 2FA rule and the ungated own security activity, and drops `caller_has_verified_factor()` and `caller_mfa_satisfied()`.
+2. `supabase/rollback/20261025_account_settings_rollback.sql` next. It drops profiles, the policy, action and recovery codes and closure requests, and restores the access helpers without the 2FA clause. (If the first step was skipped it also drops `caller_has_verified_factor()` and `caller_mfa_satisfied()`.) If hosted Storage refuses to delete the empty `avatars` bucket, the script only raises a notice and the rest still commits; delete the bucket in the dashboard then. The platform-team-roles rollback, if wanted, comes after this one.
 
 What stays: audit rows, the wider audit `event_type` check, the email-log kinds, the `avatars` bucket when it still holds files (empty it through the Storage API, then drop it), and TOTP factors in Supabase Auth. Businesses that a pending closure took offline stay `inactive`. List them first: `select business_id, previous_business_status from public.account_closure_requests;`. The `account-security` function can be deleted from Edge Functions afterwards. Restore the previous frontend with Vercel Instant Rollback.
 

@@ -310,9 +310,13 @@ describe('account settings: profiles and policy (Task 1)', () => {
     const times = rows.map((r) => new Date(r.created_at).getTime())
     expect([...times].sort((a, b) => b - a)).toEqual(times)
     // The additive read policy: the user's own account events are readable directly, nothing else is.
+    expect(await count(me, `select count(*)::int as n from public.audit_events`, [], 'aal1')).toBe(56)
+    // Under the staff policy the own events need aal2 too (sign-in IPs and devices are not readable with a password alone).
     await withPolicy(true, false, async () => {
-      const seen = await count(me, `select count(*)::int as n from public.audit_events`, [], 'aal1')
-      expect(seen).toBe(56)
+      expect(await count(me, `select count(*)::int as n from public.audit_events`, [], 'aal1')).toBe(0)
+      await expect(probe(me, 'select * from public.list_my_security_events()', [], 'aal1')).rejects.toThrow(/aal2_required/)
+      expect(await count(me, `select count(*)::int as n from public.audit_events`, [], 'aal2')).toBe(56)
+      expect(await count(me, `select count(*)::int as n from public.list_my_security_events()`, [], 'aal2')).toBe(50)
     })
     expect(await count(STRANGER_U, `select count(*)::int as n from public.audit_events where actor_id <> $1`, [STRANGER_U])).toBe(0)
   })
@@ -662,6 +666,26 @@ async function snapshot(target: PGlite) {
   return { fns: fns.rows.map((f) => ({ ...f, def: String(f.def).replace(/\r\n/g, '\n') })), policies: policies.rows }
 }
 
+describe('account settings: final review fixes', () => {
+  it('a refused avatars bucket delete only raises a notice: the rest of the rollback still commits', async () => {
+    const fresh = await PGlite.create()
+    try {
+      await fresh.exec(SUPABASE_STUBS)
+      await applyAll(fresh, (n) => n <= ACCOUNT_MIGRATION)
+      // Hosted Storage refuses direct deletes from its tables (storage.protect_delete); stand in with a trigger.
+      await fresh.exec(`
+        create function storage.refuse_delete() returns trigger language plpgsql as $$
+        begin raise exception 'Direct deletion from storage tables is not allowed'; end; $$;
+        create trigger refuse_delete before delete on storage.buckets for each row execute function storage.refuse_delete();`)
+      await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_account_settings_rollback.sql'), 'utf8'))
+      expect((await fresh.query(`select to_regclass('public.profiles') as t`)).rows[0]).toEqual({ t: null })
+      expect((await fresh.query(`select 1 from storage.buckets where id = 'avatars'`)).rows).toHaveLength(1)
+    } finally {
+      await fresh.close()
+    }
+  })
+})
+
 describe('account settings: review fixes (round 1)', () => {
   const R_OWNER_U = '00000000-0000-0000-0000-0000000000d1'
   const BIZ_R = '10000000-0000-0000-0000-0000000000d1'
@@ -905,6 +929,48 @@ describe('opt-in 2FA (follow-up)', () => {
     expect((await db.query('select status from public.businesses where id = $1', [F_BIZ])).rows[0]).toEqual({ status: 'active' })
   })
 
+  it('security activity: a verified factor at aal1 cannot read its own account events (function or table); aal2 can', async () => {
+    await db.query(`insert into public.audit_events (event_type, actor_id, metadata) values ('account_signed_in', $1, '{"ip":"198.51.100.4","user_agent":"Safari"}')`, [F_TEAM_U])
+    await expect(probe(F_TEAM_U, 'select * from public.list_my_security_events()', [], 'aal1')).rejects.toThrow(/aal2_required/)
+    expect(await count(F_TEAM_U, 'select count(*)::int as n from public.audit_events where actor_id = $1', [F_TEAM_U], 'aal1')).toBe(0)
+    const rows = (await probe(F_TEAM_U, 'select * from public.list_my_security_events()', [], 'aal2')).rows as { metadata: J }[]
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows[0]!.metadata).toMatchObject({ ip: '198.51.100.4' })
+    expect(await count(F_TEAM_U, 'select count(*)::int as n from public.audit_events where actor_id = $1', [F_TEAM_U], 'aal2')).toBeGreaterThan(0)
+  })
+
+  it('security activity: no factor and no policy, or only an unverified factor, reads at aal1; the business policy gates business owners only', async () => {
+    await db.query(`insert into public.audit_events (event_type, actor_id) values ('account_signed_in', $1), ('account_signed_in', $2), ('account_signed_in', $3)`,
+      [UNVERIFIED_U, BIZ_OWNER_U, STRANGER_U])
+    expect(await count(UNVERIFIED_U, 'select count(*)::int as n from public.list_my_security_events()', [], 'aal1')).toBeGreaterThan(0)
+    expect(await count(BIZ_OWNER_U, 'select count(*)::int as n from public.list_my_security_events()', [], 'aal1')).toBeGreaterThan(0)
+    expect(await count(STRANGER_U, 'select count(*)::int as n from public.audit_events', [], 'aal1')).toBeGreaterThan(0)
+    await withPolicy(false, true, async () => {
+      await expect(probe(BIZ_OWNER_U, 'select * from public.list_my_security_events()', [], 'aal1')).rejects.toThrow(/aal2_required/)
+      expect(await count(BIZ_OWNER_U, 'select count(*)::int as n from public.audit_events', [], 'aal1')).toBe(0)
+      expect(await count(BIZ_OWNER_U, 'select count(*)::int as n from public.list_my_security_events()', [], 'aal2')).toBeGreaterThan(0)
+      // Staff and users with no group are not under the business policy.
+      expect(await count(TEAM_U, 'select count(*)::int as n from public.list_my_security_events()', [], 'aal1')).toBeGreaterThan(0)
+      expect(await count(STRANGER_U, 'select count(*)::int as n from public.list_my_security_events()', [], 'aal1')).toBeGreaterThan(0)
+    })
+    expect(await flag(F_BIZ_U, 'public.caller_mfa_satisfied()', 'aal1')).toBe(false)
+    expect(await flag(F_BIZ_U, 'public.caller_mfa_satisfied()', 'aal2')).toBe(true)
+    await expect(probe('', 'select public.caller_mfa_satisfied()', [], null, 'anon')).rejects.toThrow(/permission denied/)
+  })
+
+  it('the main rollback also applies straight after the opt-in migration (without the opt-in rollback first)', async () => {
+    const fresh = await PGlite.create()
+    try {
+      await fresh.exec(SUPABASE_STUBS)
+      await applyAll(fresh, (n) => n <= OPTIN_MIGRATION)
+      await fresh.exec(readFileSync(join(__dirname, '..', 'rollback', '20261025_account_settings_rollback.sql'), 'utf8'))
+      expect((await fresh.query(`select proname from pg_proc where proname in ('caller_has_verified_factor', 'caller_mfa_satisfied', 'list_my_security_events')`)).rows).toEqual([])
+      expect((await fresh.query(`select 1 from pg_policies where policyname = 'Users read their own account events'`)).rows).toEqual([])
+    } finally {
+      await fresh.close()
+    }
+  })
+
   it('the opt-in rollback restores the policy-only rule, and the main rollback still applies after it', async () => {
     const fresh = await PGlite.create()
     try {
@@ -919,7 +985,13 @@ describe('opt-in 2FA (follow-up)', () => {
         expect(r.d).not.toContain('caller_has_verified_factor')
         expect(r.d).toContain('platform_settings')
       }
-      expect((await fresh.query(`select 1 from pg_proc where proname = 'caller_has_verified_factor'`)).rows).toEqual([])
+      expect((await fresh.query(`select 1 from pg_proc where proname in ('caller_has_verified_factor', 'caller_mfa_satisfied')`)).rows).toEqual([])
+      // The own-events read is back to the main migration's rule.
+      const list = (await fresh.query<{ d: string }>(`select pg_get_functiondef('public.list_my_security_events'::regproc) as d`)).rows[0]!.d
+      expect(list).not.toContain('caller_mfa_satisfied')
+      const own = (await fresh.query<{ qual: string }>(`select qual from pg_policies where policyname = 'Users read their own account events'`)).rows
+      expect(own).toHaveLength(1)
+      expect(own[0]!.qual).not.toContain('caller_mfa_satisfied')
       await fresh.exec(`
         insert into auth.users (id, email) values ('${F_BIZ_U}', 'f@test');
         insert into public.businesses (id, name, slug, status) values ('${F_BIZ}', 'Factor Co', 'factor-co', 'active');

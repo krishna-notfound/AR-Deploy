@@ -100,7 +100,8 @@ describe('Sign-in with 2FA (Supabase mode)', () => {
     const field = screen.getByLabelText('6-digit code')
     expect(field).toHaveAttribute('inputmode', 'numeric')
     expect(field).toHaveAttribute('autocomplete', 'one-time-code')
-    expect(field).toHaveAttribute('maxlength', '6')
+    // No maxLength: a pasted '123 456' must keep all six digits (the field strips the rest).
+    expect(field).not.toHaveAttribute('maxlength')
 
     // A wrong code is refused and the step stays.
     await user.type(field, '000000')
@@ -112,6 +113,17 @@ describe('Sign-in with 2FA (Supabase mode)', () => {
     expect(await screen.findByText('Admin home')).toBeInTheDocument()
     expect(acc.impl.verifyTotpForSignIn).toHaveBeenLastCalledWith(TOTP)
     await waitFor(() => expect(acc.impl.recordSignIn).toHaveBeenCalledTimes(1))
+  })
+
+  it("a pasted code with a space ('123 456') keeps all six digits and submits", async () => {
+    const acc = setup({ factor: true, aal: 'aal1' })
+    renderLogin()
+    const user = await signIn()
+    const field = await screen.findByLabelText('6-digit code')
+    await user.click(field)
+    await user.paste('123 456')
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    expect(acc.impl.verifyTotpForSignIn).toHaveBeenLastCalledWith('123456')
   })
 
   it('shows a verify error other than a wrong code in its own words (rate_limited)', async () => {
