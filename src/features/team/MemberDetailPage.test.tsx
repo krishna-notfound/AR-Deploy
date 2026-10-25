@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
-import { service } from '@/services'
+import { account, service } from '@/services'
+import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
 
 function open(url: string) {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
@@ -17,6 +18,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   localStorage.clear()
+  resetMockAccount()
   await service.resetDemoData()
 })
 afterEach(() => {
@@ -96,5 +98,55 @@ describe('Member detail (ADR-0029)', () => {
     unmount()
     open('/admin/team/nobody')
     expect(await screen.findByText('This team member does not exist')).toBeInTheDocument()
+  })
+})
+
+describe('Member detail: Reset 2FA (Owner only)', () => {
+  /** The demo Owner sets up their own authenticator, which leaves the session at aal2. */
+  async function ownerAtAal2() {
+    const e = await account.startTotpEnrollment()
+    if (!e.ok) throw new Error('enrollment did not start')
+    await account.confirmTotpEnrollment(e.data.factorId, DEMO_CODE)
+  }
+
+  it("Reset 2FA on a member opens the action-code dialog and toasts 'Their 2FA was reset. They were emailed.'", { timeout: 20_000 }, async () => {
+    await ownerAtAal2()
+    const reset = vi.spyOn(account, 'ownerReset2fa')
+    const user = userEvent.setup()
+    open('/admin/team/mem_ana')
+    await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
+    await user.click(screen.getByRole('button', { name: 'Reset 2FA' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Reset 2FA for Ana Ribeiro?' })
+    expect(within(dialog).getByText(/removes their authenticator and recovery codes/)).toBeInTheDocument()
+    await within(dialog).findByText(/We emailed a 6-digit code/)
+    await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(within(dialog).getByRole('button', { name: 'Reset 2FA' }))
+    expect(await screen.findByText('Their 2FA was reset. They were emailed.')).toBeInTheDocument()
+    expect(reset).toHaveBeenCalledWith('usr_mem_ana', DEMO_CODE)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('keeps the dialog open with the reason when the reset is refused', { timeout: 20_000 }, async () => {
+    // Signed in without 2FA: the server refuses (aal2_required) and nothing is reset.
+    const user = userEvent.setup()
+    open('/admin/team/mem_joao')
+    await screen.findByRole('heading', { level: 1, name: 'João Costa' })
+    await user.click(screen.getByRole('button', { name: 'Reset 2FA' }))
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText(/We emailed a 6-digit code/)
+    await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(within(dialog).getByRole('button', { name: 'Reset 2FA' }))
+    expect(await within(dialog).findByText(/This needs 2FA/)).toBeInTheDocument()
+    expect(screen.queryByText('Their 2FA was reset. They were emailed.')).toBeNull()
+  })
+
+  it('is not offered for an invited member with no account yet, nor for the Owner', { timeout: 20_000 }, async () => {
+    const { unmount } = open('/admin/team/mem_marta')
+    await screen.findByRole('heading', { level: 1, name: 'marta.lopes@sanctus.example' })
+    expect(screen.queryByRole('button', { name: 'Reset 2FA' })).toBeNull()
+    unmount()
+    open('/admin/team/usr_platform')
+    await screen.findByRole('heading', { level: 1, name: 'Platform Admin' })
+    expect(screen.queryByRole('button', { name: 'Reset 2FA' })).toBeNull()
   })
 })

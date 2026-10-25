@@ -3,8 +3,8 @@ import { Building2, ExternalLink, MoreHorizontal, Package, Pencil, Plus, Power, 
 import { useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { BusinessStatusBadge } from '@/components/ui/Badge'
-import { ButtonLink } from '@/components/ui/Button'
+import { Badge, BusinessStatusBadge } from '@/components/ui/Badge'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { type Column, DataTable } from '@/components/ui/DataTable'
 import { FormField, Select } from '@/components/ui/Form'
@@ -12,11 +12,11 @@ import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { EmptyState, ErrorState } from '@/components/ui/States'
-import type { Business, BusinessCatalog, BusinessStatus } from '@/domain/types'
+import type { Business, BusinessCatalog, BusinessStatus, ClosureRequest } from '@/domain/types'
 import { formatDate, formatNumber } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
-import { isDemoMode, service } from '@/services'
+import { account, isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useBusinessActions } from '../businesses/useBusinessActions'
 import { Monogram } from '../applications/Monogram'
@@ -42,6 +42,9 @@ export default function BusinessesListPage() {
   const q = params.get('q') ?? ''
   const status = (params.get('status') ?? '') as '' | BusinessStatus
   const page = Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1)
+  // Closure requests are the Owner's to handle (spec 8): the filter and its count are hidden, and not loaded, for anyone else.
+  const isPlatformOwner = can('owner')
+  const closureOnly = isPlatformOwner && params.get('closure') === '1'
   const setParam = (k: string, v: string) => {
     const next = new URLSearchParams(params)
     if (v) next.set(k, v)
@@ -52,17 +55,28 @@ export default function BusinessesListPage() {
 
   const catalogs = useServiceQuery(() => service.getCatalogs(), [])
   const analytics = useServiceQuery(() => service.getAnalytics(), [])
+  const closures = useServiceQuery(
+    () => (isPlatformOwner ? account.listClosureRequests() : Promise.resolve({ ok: true as const, data: [] as ClosureRequest[] })),
+    [isPlatformOwner],
+  )
   const actions = useBusinessActions()
   const navigate = useNavigate()
+
+  // Businesses with an open closure request (a staff closure has no business and is never listed here).
+  const closing = useMemo(() => {
+    const ids = new Set((closures.data ?? []).flatMap((r) => (r.businessId ? [r.businessId] : [])))
+    return new Set((catalogs.data ?? []).filter((c) => ids.has(c.business.id)).map((c) => c.business.id))
+  }, [closures.data, catalogs.data])
 
   const rows = useMemo<Row[]>(() => {
     const perf = new Map((analytics.data?.byBusiness ?? []).map((b) => [b.businessId, b]))
     const term = q.trim().toLowerCase()
     return (catalogs.data ?? [])
+      .filter((c) => !closureOnly || closing.has(c.business.id))
       .filter((c) => !status || c.business.status === status)
       .filter((c) => !term || c.business.name.toLowerCase().includes(term) || c.business.slug.includes(term))
       .map((c) => ({ catalog: c, views: perf.get(c.business.id)?.views ?? 0, ar: perf.get(c.business.id)?.arActivations ?? 0 }))
-  }, [catalogs.data, analytics.data, q, status])
+  }, [catalogs.data, analytics.data, q, status, closureOnly, closing])
 
   const menu = (b: Business, count: number): (MenuItem | 'separator')[] => [
     { label: can('businesses.edit') ? 'Edit details' : 'View details', icon: <Pencil />, onSelect: () => navigate(businessAdminPath(b.id)) },
@@ -139,15 +153,23 @@ export default function BusinessesListPage() {
               <option value="draft">Draft</option>
             </Select>
           </FormField>
+          {isPlatformOwner && (
+            <Button aria-pressed={closureOnly} variant={closureOnly ? 'primary' : 'secondary'} onClick={() => setParam('closure', closureOnly ? '' : '1')}>
+              Closure requested{' '}
+              {catalogs.data && closures.data && <Badge tone={closing.size > 0 ? 'warning' : 'neutral'}>{formatNumber(closing.size)}</Badge>}
+            </Button>
+          )}
         </div>
         {catalogs.status === 'error' && !catalogs.data ? (
           <ErrorState message={catalogs.error.message} onRetry={catalogs.refetch} />
+        ) : closureOnly && closures.status === 'error' && !closures.data ? (
+          <ErrorState message={`Could not load the closure requests. ${closures.error.message}`} onRetry={closures.refetch} />
         ) : (
           <DataTable
             rows={rows}
             columns={columns}
             rowKey={(r) => r.catalog.business.id}
-            loading={catalogs.status === 'loading' && !catalogs.data}
+            loading={(catalogs.status === 'loading' && !catalogs.data) || (closureOnly && closures.status === 'loading' && !closures.data)}
             caption="Businesses"
             noun="businesses"
             twoLine
@@ -155,7 +177,9 @@ export default function BusinessesListPage() {
             page={page}
             onPageChange={(p) => setParam('page', p > 1 ? String(p) : '')}
             empty={
-              q || status ? (
+              closureOnly && !q && !status ? (
+                <EmptyState title="No closure requests" body="When a business owner asks to close their account, their business shows here." />
+              ) : q || status || closureOnly ? (
                 <EmptyState title="No businesses match" body="Try a different search or status." />
               ) : (
                 <EmptyState

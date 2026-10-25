@@ -1,5 +1,5 @@
 import { useCan } from '@/auth/usePermission'
-import { MailPlus, RefreshCw, Trash2, UserCheck, UserPlus } from 'lucide-react'
+import { KeyRound, MailPlus, RefreshCw, Trash2, UserCheck, UserPlus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button, IconButton } from '@/components/ui/Button'
@@ -13,10 +13,11 @@ import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, ID, Lang } from '@/domain/types'
 import { formatDate } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
-import { service } from '@/services'
+import { account, service } from '@/services'
 import type { ProvisionOutcome } from '@/services/catalogService'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { emailReason } from '../applications/labels'
+import { ActionCodeDialog } from '../settings/ActionCodeDialog'
 
 /**
  * The business's single owner (ADR-0024): invite, resend the invitation, or remove.
@@ -30,12 +31,16 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
   const removal = useServiceMutation((userId: ID) => service.removeBusinessMember(business.id, userId))
   const can = useCan()
   const manage = can('owners.manage')
+  const isPlatformOwner = can('owner')
+  const [resetting, setResetting] = useState(false)
   const confirm = useConfirm()
   const toast = useToast()
   const [email, setEmail] = useState(defaultEmail ?? '')
   const [language, setLanguage] = useState<Lang>(defaultLanguage)
   const [error, setError] = useState<string | null>(null)
   const owner = members.data?.[0]
+  // Owner support action (spec 8): only once the owner has an account of their own (invitation accepted).
+  const canReset = isPlatformOwner && !!owner?.acceptedAt
 
   // The owner record exists either way; the toast says exactly what happened to the email.
   const report = (o: ProvisionOutcome, what: string) => {
@@ -116,6 +121,11 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
                 ) : (
                   <Badge tone="warning">Invitation pending</Badge>
                 )}
+                {canReset && (
+                  <IconButton aria-label={`Reset 2FA for ${owner.email}`} title="Reset 2FA" onClick={() => setResetting(true)}>
+                    <KeyRound className="size-4" aria-hidden />
+                  </IconButton>
+                )}
                 {manage && (
                   <IconButton aria-label={`Remove ${owner.email}`} disabled={removal.pending} onClick={() => void remove()}>
                     <Trash2 className="size-4" aria-hidden />
@@ -163,6 +173,22 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
           </form>
         )}
       </CardBody>
+      {owner && canReset && (
+        <ActionCodeDialog
+          open={resetting}
+          purpose="owner_reset_2fa"
+          title={`Reset 2FA for ${owner.email}?`}
+          description="This removes their authenticator and recovery codes. They sign in with their password and set up 2FA again. We email them to say it was reset."
+          confirmLabel="Reset 2FA"
+          destructive
+          onClose={() => setResetting(false)}
+          onConfirm={async (code) => {
+            const r = await account.ownerReset2fa(owner.userId, code)
+            if (r.ok) toast.success('Their 2FA was reset. They were emailed.')
+            return r
+          }}
+        />
+      )}
     </Card>
   )
 }

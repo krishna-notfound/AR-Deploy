@@ -1,7 +1,9 @@
 // One platform member (ADR-0029): who they are, their role and what it allows, their invitations and their
 // access history, with Change role, Deactivate or Reactivate. Only real recorded data is shown.
 import { Check, ChevronDown, UserX } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { useCan } from '@/auth/usePermission'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button, ButtonLink } from '@/components/ui/Button'
@@ -12,8 +14,10 @@ import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { MemberRole, PlatformMember } from '@/domain/types'
 import { formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
-import { service } from '@/services'
+import { useToast } from '@/components/ui/ToastProvider'
+import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
+import { ActionCodeDialog } from '../settings/ActionCodeDialog'
 import { AccessHistory } from './AccessHistory'
 import { PERMISSION_GROUPS, ROLE_LABEL } from './permissions'
 import { InviteStatusBadge, MemberStatusBadge, RoleBadge } from './teamLabels'
@@ -62,6 +66,9 @@ export default function MemberDetailPage() {
 function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Record<MemberRole, string[]> | null; onChanged: () => void; crumbs: { label: string; to?: string }[] }) {
   const prefs = usePreferences()
   const actions = useMemberActions()
+  const can = useCan()
+  const toast = useToast()
+  const [resetting, setResetting] = useState(false)
   const invites = useServiceQuery(() => (m.role === 'owner' ? Promise.resolve({ ok: true as const, data: [] }) : service.listMemberInvites(m.id)), [m.id, m.role])
   const isOwner = m.role === 'owner'
   const granted = isOwner ? null : PERMISSION_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => perms?.[m.role as MemberRole].includes(i.key)) })).filter((g) => g.items.length)
@@ -73,6 +80,9 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
     after(actions.changeRole(m, otherRole, from.filter((p) => !to.includes(p)), to.filter((p) => !from.includes(p))))
   }
   const live = m.invite && ['pending', 'sent', 'email_failed'].includes(m.invite.status)
+  // Owner support action (spec 8): only for someone with an account (an invited member has none yet), never the Owner.
+  const resetTarget = can('owner') && !isOwner ? m.userId : null
+  const name = m.fullName ?? m.email
 
   return (
     <>
@@ -92,7 +102,7 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
                 <span id="role">
                   <DropdownMenu
                     label="Change role"
-                    triggerClassName="inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-4 text-ui-body font-medium text-ink hover:bg-subtle"
+                    triggerClassName="inline-flex h-10! w-auto! items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-4 text-ui-body font-medium text-ink hover:bg-subtle"
                     trigger={
                       <>
                         Change role <ChevronDown className="size-4" aria-hidden />
@@ -114,10 +124,27 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
                 </Button>
               )}
               {m.status === 'deactivated' && <Button onClick={() => after(actions.reactivate(m))}>Reactivate</Button>}
+              {resetTarget && <Button onClick={() => setResetting(true)}>Reset 2FA</Button>}
             </>
           )
         }
       />
+      {resetTarget && (
+        <ActionCodeDialog
+          open={resetting}
+          purpose="owner_reset_2fa"
+          title={`Reset 2FA for ${name}?`}
+          description="This removes their authenticator and recovery codes. They sign in with their password and set up 2FA again. We email them to say it was reset."
+          confirmLabel="Reset 2FA"
+          destructive
+          onClose={() => setResetting(false)}
+          onConfirm={async (code) => {
+            const r = await account.ownerReset2fa(resetTarget, code)
+            if (r.ok) toast.success('Their 2FA was reset. They were emailed.')
+            return r
+          }}
+        />
+      )}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Card className="p-6">
