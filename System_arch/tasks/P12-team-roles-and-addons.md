@@ -100,6 +100,22 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
 
 **Split into sub-projects**, each with its own spec → plan → build:
 - **S1:** a settings hub (full-screen, Discord-style) plus "Your account" for every role: profile and photo, email change, password, authenticator 2FA, an emailed code for risky actions, notifications, timezone and date format, security activity, the deletion request, and "complete your profile" onboarding. Also the Platform → Security policy (2FA requirement).
+  - **Status (2026-10-26):** built on the branch; not yet applied to Supabase. The ADR is ADR-0032; the runbook has the release order ("Account settings and 2FA (S1)"). The release needs the owner's go-ahead.
+  - **Deferred minors** (none blocks release):
+    - clear the `app.account_closure` flag right after the closure's own update;
+    - recovery-code redemption has no throttle or failed-attempt audit;
+    - a retry after a crash between deleting the business and the storage sweep skips the sweep;
+    - a failed staff delete leaves an orphan login that the Owner removes;
+    - the kind-mismatch refusal in the closure function runs after the SQL state change;
+    - sign-ins started from an invite or a password reset are not recorded;
+    - `unavailableAccount` is exported only for a test (move the `unavailable*` helpers to `services/unavailable.ts`);
+    - a non-platform user at `aal1` gets `aal2_required` instead of `not_allowed` (the UI never shows it);
+    - `RequireRole` needs a "leaving on purpose" flag so deleted staff land on a clean `/login`;
+    - the "2FA reset by the platform owner" label for the Owner's own reset needs `subject_id`, and the hub shows a brief default date format before the profile loads;
+    - `BusinessSection` descendant overrides should become container queries in `BusinessForm`, and `DropdownMenu` should take a `side` prop;
+    - one shared closure-complete dialog for business and orphan requests, and the Change role trigger sizing;
+    - on phones the section list has no main column, so the security notice shows only inside a section;
+    - spec §6 and `design/19` wording for opt-in 2FA still to update.
 - **S2:** Platform site controls (applications open/closed, email settings, maintenance mode, site info and SEO, legal links, new-business defaults, data export) plus Business → Catalog & public page.
 - **S3:** an application form builder: the Owner edits the fields, and the values are stored in the database.
 - **S4:** 3D model requests (A3): a per-business "allow own 3D upload" setting, separate catalog and request photos (2–10), admin upload, notification to the business, and the 3D part hidden until the model is ready.
