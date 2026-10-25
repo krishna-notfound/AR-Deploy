@@ -16,8 +16,10 @@ function pageList(page: number, pages: number): (number | 'gap')[] {
   return out
 }
 
-const stepBase =
-  'inline-flex h-8 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 font-medium text-ink hover:bg-subtle disabled:pointer-events-none disabled:opacity-40 pointer-coarse:h-11'
+const stepClassBase =
+  'inline-flex h-8 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-[12px] font-medium text-ink hover:bg-subtle disabled:pointer-events-none disabled:opacity-40 pointer-coarse:h-11'
+/** Dashboard: the same control at 14px. */
+const stepClassDash = stepClassBase.replace('text-[12px]', 'text-sm')
 
 export function Pagination({
   page,
@@ -33,16 +35,17 @@ export function Pagination({
   noun?: string
 }) {
   const dash = useInDashboard()
-  const stepClass = cn(stepBase, dash ? 'text-sm' : 'text-[12px]')
+  const stepClass = dash ? stepClassDash : stepClassBase
   const pages = Math.max(1, Math.ceil(total / pageSize))
   if (total === 0) return null
   const from = (page - 1) * pageSize + 1
   const to = Math.min(total, page * pageSize)
   return (
-    <nav aria-label="Pagination" className={cn(
-        'flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-ink-muted sm:px-6',
-        dash ? 'text-sm' : 'text-[13px]',
-      )}
+    <nav aria-label="Pagination" className={
+        dash
+          ? 'flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm text-ink-muted sm:px-6'
+          : 'flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-[13px] text-ink-muted sm:px-6'
+      }
     >
       <p>
         Showing <span className="font-medium text-ink tabular-nums">{formatNumber(from)}–{formatNumber(to)}</span> of{' '}
@@ -68,8 +71,9 @@ export function Pagination({
                     aria-label={`Page ${p}`}
                     aria-current={p === page ? 'page' : undefined}
                     className={cn(
-                      'grid h-8 min-w-8 place-items-center rounded-[var(--radius-control)] px-2 font-medium tabular-nums',
-                      dash ? 'text-sm' : 'text-[12px]',
+                      dash
+                        ? 'grid h-8 min-w-8 place-items-center rounded-[var(--radius-control)] px-2 text-sm font-medium tabular-nums'
+                        : 'grid h-8 min-w-8 place-items-center rounded-[var(--radius-control)] px-2 text-[12px] font-medium tabular-nums',
                       p === page ? 'bg-obsidian text-chalk' : 'border border-line text-ink hover:bg-subtle',
                     )}
                   >

@@ -33,6 +33,7 @@ export function DataTable<T>({
   initialSort,
   caption,
   noun,
+  twoLine,
   page: controlledPage,
   onPageChange,
 }: {
@@ -46,6 +47,8 @@ export function DataTable<T>({
   initialSort?: SortState
   caption: string
   noun?: string
+  /** Rows carry a two-line identity (name plus detail): 60px rows in the dashboard instead of 52px. */
+  twoLine?: boolean
   page?: number
   onPageChange?: (p: number) => void
 }) {
@@ -99,7 +102,7 @@ export function DataTable<T>({
       {/* Mobile cards */}
       <ul className={cn(dash ? 'divide-y divide-subtle sm:hidden' : 'divide-y divide-line md:hidden')} aria-label={caption}>
         {visible.map((row) => (
-          <li key={rowKey(row)} className={cn('min-w-0', dash ? 'px-4 py-3 break-words' : 'px-4 py-3.5')}>
+          <li key={rowKey(row)} className={cn('min-w-0', dash ? 'px-4 py-3 break-words [overflow-wrap:anywhere]' : 'px-4 py-3.5')}>
             {mobileRow(row)}
           </li>
         ))}
@@ -115,7 +118,7 @@ export function DataTable<T>({
                 dash ? 'text-[13px] leading-[18px] font-medium' : 'bg-canvas/50 text-[10.5px] tracking-[0.16em] uppercase',
               )}
             >
-              {columns.map((c) => {
+              {columns.map((c, ci) => {
                 const active = sort?.key === c.key
                 const ariaSort = active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : c.sortValue ? 'none' : undefined
                 return (
@@ -125,6 +128,7 @@ export function DataTable<T>({
                     aria-sort={ariaSort}
                     className={cn(
                       dash ? 'h-10 px-4 py-0 font-medium whitespace-nowrap first:pl-6 last:pr-6' : 'px-4 py-3 font-medium whitespace-nowrap first:pl-6 last:pr-6',
+                      dash && ci === 0 && 'w-[35%]',
                       dash && c.srOnlyHeader && 'w-12 !px-2',
                       c.align === 'right' && 'text-right',
                       c.priority === 'low' && 'hidden lg:table-cell',
@@ -153,13 +157,13 @@ export function DataTable<T>({
           </thead>
           <tbody className={cn('divide-y', dash ? 'divide-subtle' : 'divide-line')}>
             {visible.map((row) => (
-              <tr key={rowKey(row)} className={cn('transition-colors hover:bg-canvas/70', dash && 'h-[52px]')}>
+              <tr key={rowKey(row)} className={cn('transition-colors hover:bg-canvas/70', dash && (twoLine ? 'h-[60px]' : 'h-[52px]'))}>
                 {columns.map((c, ci) => (
                   <td
                     key={c.key}
                     className={cn(
                       dash ? 'px-4 py-[11px] align-middle first:pl-6 last:pr-6' : 'px-4 py-3.5 align-middle first:pl-6 last:pr-6',
-                      dash && ci === 0 && 'max-w-[26rem] min-w-0 break-words [overflow-wrap:anywhere]',
+                      dash && ci === 0 && 'min-w-0 break-words [overflow-wrap:anywhere]',
                       dash && c.srOnlyHeader && 'w-12 !px-2 text-right',
                       c.align === 'right' && 'text-right tabular-nums',
                       c.priority === 'low' && 'hidden lg:table-cell',

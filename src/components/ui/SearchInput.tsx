@@ -36,7 +36,7 @@ export function SearchInput({
   }, [draft, value, delay])
 
   return (
-    <div className={cn('relative', dash && !hasWidth(className) && 'sm:w-80', className)}>
+    <div className={dash ? cn('relative', !hasWidth(className) && 'sm:w-80', className) : cn('relative', className)}>
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" aria-hidden />
       <input
         type="search"
@@ -44,10 +44,11 @@ export function SearchInput({
         value={draft}
         placeholder={placeholder}
         onChange={(e) => setDraft(e.target.value)}
-        className={cn(
-          'h-10 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface pr-9 pl-9 placeholder:text-ink-faint hover:border-ink-faint focus-visible:border-accent focus-visible:outline-offset-0 [&::-webkit-search-cancel-button]:hidden',
-          dash ? 'text-base sm:text-sm' : 'text-sm',
-        )}
+        className={
+          dash
+            ? 'h-10 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface pr-9 pl-9 text-base placeholder:text-ink-faint hover:border-ink-faint focus-visible:border-accent focus-visible:outline-offset-0 sm:text-sm [&::-webkit-search-cancel-button]:hidden'
+            : 'h-10 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface pr-9 pl-9 text-sm placeholder:text-ink-faint hover:border-ink-faint focus-visible:border-accent focus-visible:outline-offset-0 [&::-webkit-search-cancel-button]:hidden'
+        }
       />
       {draft && (
         <button
