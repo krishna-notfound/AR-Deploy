@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useInDashboard } from '@/components/layout/dashboardContext'
 import { cn } from '@/lib/cn'
 import { Skeleton } from './Skeleton'
 
@@ -7,15 +8,39 @@ export interface Stat {
   label: string
   value: ReactNode
   hint?: ReactNode
-  /** A small line icon shown top right. */
+  /** A small line icon shown top right on the public-style cards. The dashboard strip never renders it (BRIEF section 4). */
   icon?: LucideIcon
 }
 
 /**
- * Key figures as a row of stat cards: an uppercase label with a small line icon, a large serif number and a muted
- * sub-line. The optional footer (e.g. the sample-data label) sits under the row.
+ * Key figures. In the dashboard: one card split into equal columns by hairline dividers (a 2-column grid on phones),
+ * each with a muted label, a 28px tabular value and a muted hint; the optional footer (e.g. the sample-data label)
+ * is a row inside the same card. Outside the dashboard: a row of separate stat cards.
  */
 export function StatGroup({ stats, loading, className, footer }: { stats: Stat[]; loading?: boolean; className?: string; footer?: ReactNode }) {
+  const inDashboard = useInDashboard()
+  if (inDashboard) {
+    return (
+      <section className={className} aria-label="Key figures">
+        <div className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
+          <dl className="grid grid-cols-2 gap-px bg-line xl:grid-flow-col xl:auto-cols-fr xl:grid-cols-none xl:gap-0 xl:divide-x xl:divide-line">
+            {stats.map((s) => (
+              <div key={s.label} className="flex min-w-0 flex-col bg-surface px-4 py-5 sm:px-5 xl:px-6 xl:py-6 max-xl:[&:last-child:nth-child(odd)]:col-span-2">
+                <div>
+                  <dt className="text-ui-small font-medium text-ink-muted">{s.label}</dt>
+                </div>
+                <dd className="mt-2.5 text-ui-kpi font-medium tracking-[-0.01em] text-ink tabular-nums">
+                  {loading ? <Skeleton className="h-7 w-16" /> : s.value}
+                </dd>
+                {s.hint && !loading && <dd className="mt-1.5 text-ui-small text-ink-muted">{s.hint}</dd>}
+              </div>
+            ))}
+          </dl>
+          {footer && <div className="border-t border-line px-4 py-3 text-ui-small text-ink-muted sm:px-6">{footer}</div>}
+        </div>
+      </section>
+    )
+  }
   return (
     <section className={className} aria-label="Key figures">
       <dl

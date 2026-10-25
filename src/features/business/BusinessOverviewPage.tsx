@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, Box, CheckCircle2, ChevronRight, Circle, ExternalLink, Eye, Globe, Package, PackagePlus, PencilLine } from 'lucide-react'
+import { ArrowRight, BarChart3, CheckCircle2, ChevronRight, Circle, ExternalLink, Package, PackagePlus } from 'lucide-react'
 import { Link } from 'react-router'
 import { useCurrentBusiness } from '@/auth/AccountProvider'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
@@ -60,13 +60,12 @@ export default function BusinessOverviewPage() {
           <StatGroup
             loading={!s}
             stats={[
-              { label: 'Products', icon: Package, value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
-              { label: 'Published', icon: Globe, value: formatNumber(s?.totals.published ?? 0), hint: isPublic ? 'In your catalog' : 'Catalog not public yet' },
-              { label: 'Drafts', icon: PencilLine, value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
-              { label: 'Product page views', icon: Eye, value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+              { label: 'Products', value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
+              { label: 'Published', value: formatNumber(s?.totals.published ?? 0), hint: isPublic ? 'In your catalog' : 'Catalog not public yet' },
+              { label: 'Drafts', value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
+              { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
               {
                 label: 'AR launch attempts',
-                icon: Box,
                 value: formatNumber(s?.totals.arActivations ?? 0),
                 hint: s && s.totals.views ? `Last 30 days · ${formatPercent(s.totals.arActivations / s.totals.views)} of views` : 'Last 30 days',
               },
