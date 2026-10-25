@@ -53,6 +53,11 @@ Status: built and reviewed on a branch, not yet applied to Supabase. Migrations 
 - **Opt-in 2FA.** Found in review: with the policy off, a person who had turned 2FA on was still readable with only a password. Fixed by the second migration, with tests for policy off, policy on, half-enrolled factors and staff.
 - **Retry-safe closure.** `account_closure_requests.business_id` is `on delete set null` and `service_closure_target` does not inner-join `businesses`, so a retry after a failed login delete does not delete the business twice or lose the request. The Owner account is refused as a target. Cancelling a request restores the previous business status, not "active".
 - **Action-code limits.** The per-hour cap counts replaced and voided codes too, so a failing mail provider cannot be used to send more. Creating a code and replacing a recovery set take per-user advisory locks, and checking a code or redeeming a recovery code locks the row (no races on attempts or on single use).
+- **Final review (whole branch):**
+  - **Closure needs the second factor.** A closure request now needs `aal2` when the person has a verified factor or the policy covers them. Without this, someone who controlled only the inbox could reset the password and close a 2FA-protected account with an emailed code.
+  - **Security activity needs the second factor.** `list_my_security_events` and the own-events policy now follow the caller's 2FA rule, so a password-only session can't read sign-in times, devices or IPs.
+  - **No actor IP on someone else's events.** Events about another person (an Owner's 2FA reset, closure steps) no longer store the actor's IP.
+  - **Mid-session checks.** The app re-checks the security state on focus, visibility and route changes (at most every 30 s) and every 3 minutes at `aal1`. A policy switched on mid-session therefore reaches people already signed in, instead of leaving them on empty tables.
 - **Other:** the sign-up trigger never blocks a sign-up; `record_sign_in` is limited to 1 per 60 s per user and the user agent is cut to 200 characters; `log_account_event` allows only two client events.
 
 ### Accepted risks and open items
