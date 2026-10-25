@@ -128,3 +128,179 @@ describe('membership tables and platform_can (Task 1)', () => {
     await expect(as(STRANGER_U, (tx) => tx.query('select * from public.platform_members'), 'anon')).rejects.toThrow()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Task 2: permission rules on the existing tables
+// ---------------------------------------------------------------------------
+
+const ROLLBACK = new Error('rollback')
+/** Runs one statement as `uid` and always rolls back. Returns the result, or rejects with the DB error. */
+async function probe(uid: string, sql: string, params: unknown[] = []) {
+  let res: Awaited<ReturnType<Transaction['query']>> | undefined
+  try {
+    await as(uid, async (tx) => {
+      res = await tx.query(sql, params)
+      throw ROLLBACK
+    })
+  } catch (e) {
+    if (e !== ROLLBACK) throw e
+  }
+  return res!
+}
+const count = async (uid: string, sql: string, params: unknown[] = []) => ((await probe(uid, sql, params)).rows[0] as { n: number }).n
+const affected = async (uid: string, sql: string, params: unknown[] = []) => (await probe(uid, sql, params)).affectedRows ?? 0
+const ACCESS_EVENTS = `select count(*)::int as n from public.audit_events where event_type like 'access%'`
+const OTHER_EVENTS = `select count(*)::int as n from public.audit_events where event_type not like 'access%'`
+
+describe('permission matrix (Task 2)', () => {
+  let product = ''
+  let application = ''
+
+  beforeAll(async () => {
+    const { toSaveProductArgs } = await import('../../src/services/supabase/supabaseCatalogService')
+    const args = toSaveProductArgs(null, {
+      businessId: BIZ, slug: 'chair', name: { en: 'Chair' }, shortDescription: { en: '' }, description: { en: '' }, category: 'chair',
+      price: 100, currency: 'EUR', images: [{ id: 'i1', url: 'https://img.test/a.jpg', isPrimary: true, kind: 'gallery' }], models: {},
+      dimensions: { width: 80, height: 70, depth: 60, unit: 'cm' }, material: { en: '' }, variants: [], cta: { label: { en: 'Contact' } },
+    } as never)
+    product = (await as(BIZ_OWNER_U, (tx) => tx.query<{ id: string }>('select public.save_product($1, $2, $3, $4) as id', [args.p_product, args.p_images, args.p_models, args.p_variants]))).rows[0]!.id
+    application = (await db.query<{ id: string }>(
+      `insert into public.business_applications (business_name, applicant_name, applicant_email, country, city, category, submission_key, answers)
+       values ('Casa', 'Ana', 'ana@example.test', 'Portugal', 'Lisboa', 'Lighting', gen_random_uuid(), '{"description":"Lamps"}') returning id`,
+    )).rows[0]!.id
+    await db.exec(`
+      insert into public.product_analytics (product_id, business_id, event_type) values ('${product}', '${BIZ}', 'view');
+      insert into public.email_log (kind, recipient, subject, status) values ('test', 'x@y.z', 'T', 'accepted');
+      insert into public.audit_events (event_type, metadata) values ('business_updated', '{}'), ('access_role_changed', '{}');
+    `)
+  })
+
+  async function asDraftBusiness(fn: () => Promise<void>) {
+    await db.exec(`update public.businesses set status = 'draft' where id = '${BIZ}'`)
+    try {
+      await fn()
+    } finally {
+      await db.exec(`update public.businesses set status = 'active' where id = '${BIZ}'`)
+    }
+  }
+
+  it('businesses.view: team reads a draft business, deactivated and strangers do not', async () => {
+    await asDraftBusiness(async () => {
+      expect(await count(TEAM_U, 'select count(*)::int as n from public.businesses')).toBe(1)
+      expect(await count(DEACT_U, 'select count(*)::int as n from public.businesses')).toBe(0)
+      expect(await count(STRANGER_U, 'select count(*)::int as n from public.businesses')).toBe(0)
+    })
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.business_members')).toBe(1)
+  })
+
+  it('businesses.edit: admin renames, team cannot', async () => {
+    expect(await affected(ADMIN_U, `update public.businesses set name = 'X' where id = $1`, [BIZ])).toBe(1)
+    expect(await affected(TEAM_U, `update public.businesses set name = 'X' where id = $1`, [BIZ])).toBe(0)
+  })
+
+  it('businesses.status: an admin without it can rename but not change the status', async () => {
+    await db.exec(`delete from public.platform_role_permissions where role = 'admin' and permission = 'businesses.status'`)
+    try {
+      expect(await affected(ADMIN_U, `update public.businesses set name = 'Y' where id = $1`, [BIZ])).toBe(1)
+      await expect(probe(ADMIN_U, `update public.businesses set status = 'inactive' where id = $1`, [BIZ])).rejects.toThrow()
+    } finally {
+      await db.exec(`insert into public.platform_role_permissions values ('admin', 'businesses.status')`)
+    }
+    expect(await affected(ADMIN_U, `update public.businesses set status = 'inactive' where id = $1`, [BIZ])).toBe(1)
+  })
+
+  it('businesses.delete: admin may delete, team may not', async () => {
+    expect(await affected(ADMIN_U, 'delete from public.businesses where id = $1', [BIZ])).toBe(1)
+    expect(await affected(TEAM_U, 'delete from public.businesses where id = $1', [BIZ])).toBe(0)
+  })
+
+  it('applications.view: team reads applications, deactivated does not', async () => {
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.business_applications')).toBe(1)
+    expect(await count(DEACT_U, 'select count(*)::int as n from public.business_applications')).toBe(0)
+  })
+
+  it('applications.approve / reject: admin may review, team may not', async () => {
+    const r = await probe(ADMIN_U, `select status from public.admin_review_application($1, 'start_review')`, [application])
+    expect((r.rows[0] as { status: string }).status).toBe('under_review')
+    await expect(probe(TEAM_U, `select public.admin_review_application($1, 'start_review')`, [application])).rejects.toThrow(/platform_admin_only/)
+    await expect(probe(TEAM_U, `select public.admin_review_application($1, 'reject', 'No')`, [application])).rejects.toThrow(/platform_admin_only/)
+  })
+
+  it('products.view: team reads drafts, deactivated does not', async () => {
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.products')).toBe(1)
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.product_images')).toBe(1)
+    expect(await count(DEACT_U, 'select count(*)::int as n from public.products')).toBe(0)
+  })
+
+  it('products.edit: team edits products, deactivated cannot', async () => {
+    expect(await affected(TEAM_U, `update public.products set price = 200 where id = $1`, [product])).toBe(1)
+    expect(await affected(DEACT_U, `update public.products set price = 200 where id = $1`, [product])).toBe(0)
+  })
+
+  it('team cannot publish through a direct update; admin can', async () => {
+    await expect(probe(TEAM_U, `update public.products set status = 'published' where id = $1`, [product])).rejects.toThrow(/publish/)
+    expect(await affected(ADMIN_U, `update public.products set status = 'published' where id = $1`, [product])).toBe(1)
+  })
+
+  it('products.delete: admin may delete, team may not', async () => {
+    expect(await affected(ADMIN_U, 'delete from public.products where id = $1', [product])).toBe(1)
+    expect(await affected(TEAM_U, 'delete from public.products where id = $1', [product])).toBe(0)
+  })
+
+  it('analytics.view: team reads analytics, deactivated does not', async () => {
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.product_analytics')).toBe(1)
+    expect(await count(DEACT_U, 'select count(*)::int as n from public.product_analytics')).toBe(0)
+  })
+
+  it('records.view and access.view split the audit log', async () => {
+    expect(await count(ADMIN_U, 'select count(*)::int as n from public.email_log')).toBe(1)
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.email_log')).toBe(0)
+    expect(await count(ADMIN_U, ACCESS_EVENTS)).toBeGreaterThan(0)
+    expect(await count(ADMIN_U, OTHER_EVENTS)).toBeGreaterThan(0)
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.audit_events')).toBe(0)
+    await db.exec(`delete from public.platform_role_permissions where role = 'admin' and permission = 'access.view'`)
+    try {
+      expect(await count(ADMIN_U, ACCESS_EVENTS)).toBe(0)
+      expect(await count(ADMIN_U, OTHER_EVENTS)).toBeGreaterThan(0)
+    } finally {
+      await db.exec(`insert into public.platform_role_permissions values ('admin', 'access.view')`)
+    }
+  })
+
+  it('owners.manage: admin may remove a business owner, team may not; team may list owners', async () => {
+    expect(await affected(ADMIN_U, 'delete from public.business_members where business_id = $1', [BIZ])).toBe(1)
+    expect(await affected(TEAM_U, 'delete from public.business_members where business_id = $1', [BIZ])).toBe(0)
+    expect((await probe(TEAM_U, 'select * from public.admin_list_business_members($1)', [BIZ])).rows).toHaveLength(1)
+    await expect(probe(DEACT_U, 'select * from public.admin_list_business_members($1)', [BIZ])).rejects.toThrow(/platform_admin_only/)
+  })
+
+  it('storage: team uploads product media, deactivated cannot', async () => {
+    await db.exec(`insert into storage.buckets (id, name) values ('product-media', 'product-media') on conflict do nothing`)
+    const path = `${BIZ}/00000000-0000-4000-8000-000000000001.png`
+    expect(await affected(TEAM_U, `insert into storage.objects (bucket_id, name) values ('product-media', $1)`, [path])).toBe(1)
+    await expect(probe(DEACT_U, `insert into storage.objects (bucket_id, name) values ('product-media', $1)`, [path])).rejects.toThrow()
+  })
+
+  it('deactivated admin reads zero businesses', async () => {
+    await asDraftBusiness(async () => {
+      expect(await count(DEACT_U, 'select count(*)::int as n from public.businesses')).toBe(0)
+    })
+  })
+
+  it('business owner still edits own products and sees nothing platform-wide', async () => {
+    expect(await affected(BIZ_OWNER_U, `update public.products set price = 300 where id = $1`, [product])).toBe(1)
+    expect(await count(BIZ_OWNER_U, 'select count(*)::int as n from public.business_applications')).toBe(0)
+    expect(await count(BIZ_OWNER_U, 'select count(*)::int as n from public.email_log')).toBe(0)
+  })
+
+  it('owner keeps full access', async () => {
+    expect(await affected(OWNER_U, `update public.products set status = 'published' where id = $1`, [product])).toBe(1)
+    expect(await count(OWNER_U, 'select count(*)::int as n from public.email_log')).toBe(1)
+  })
+
+  it('a platform member cannot become a business owner, and a business owner cannot become a member', async () => {
+    await db.exec(`insert into public.businesses (id, name, slug, status) values ('10000000-0000-0000-0000-0000000000b9', 'Spare', 'spare', 'draft') on conflict do nothing`)
+    await expect(db.query(`insert into public.business_members (business_id, user_id) values ('10000000-0000-0000-0000-0000000000b9', $1)`, [TEAM_U])).rejects.toThrow(/platform_member_cannot_own/)
+    await expect(db.query(`insert into public.platform_members (user_id, email, role) values ($1, 'bizowner@test', 'team')`, [BIZ_OWNER_U])).rejects.toThrow(/business_owner/)
+  })
+})
