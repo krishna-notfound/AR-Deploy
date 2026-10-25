@@ -3,6 +3,7 @@ import { useId, useState } from 'react'
 import type { DailyPoint } from '@/domain/types'
 import { formatNumber } from '@/lib/format'
 import { Button } from '../ui/Button'
+import { EmptyState } from '../ui/States'
 import { CombinedTrendChart, SERIES, type SeriesKey, SeriesTable, TrendChart } from './Charts'
 
 const KEYS = Object.keys(SERIES) as SeriesKey[]
@@ -22,6 +23,9 @@ export function ActivityTrend({ data, compact }: { data: DailyPoint[]; compact?:
       {showTable ? 'Show charts' : 'Show as table'}
     </Button>
   )
+
+  // Nothing to plot: a month of zeros would only draw empty axes, so say so the way the other cards do.
+  if (views + ar === 0) return <EmptyState title="No activity in the last 30 days" body="Views and AR opens will appear here once people visit your catalog." />
 
   if (compact) {
     const visible = KEYS.filter((k) => show[k]).length

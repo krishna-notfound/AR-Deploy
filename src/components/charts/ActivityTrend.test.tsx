@@ -58,6 +58,23 @@ describe('ActivityTrend', () => {
     expect(head?.className).not.toMatch(/uppercase|tracking-/)
   })
 
+  describe('no activity in 30 days', () => {
+    const zero = days(() => ({ views: 0, arActivations: 0 }))
+    for (const [layout, compact] of [['overview (compact)', true], ['analytics (full size)', false]] as const) {
+      for (const [what, rows] of [['all-zero data', zero], ['no data points', [] as DailyPoint[]]] as const) {
+        it(`${layout}, ${what}: shows the empty state instead of empty axes`, () => {
+          const { container } = render(<ActivityTrend data={rows} compact={compact} />)
+          expect(screen.getByRole('heading', { name: 'No activity in the last 30 days' })).toBeInTheDocument()
+          expect(screen.getByText('Views and AR opens will appear here once people visit your catalog.')).toBeInTheDocument()
+          expect(screen.queryByRole('img')).toBeNull()
+          expect(screen.queryByRole('group', { name: 'Series shown in the chart' })).toBeNull()
+          expect(screen.queryByRole('button', { name: 'Show as table' })).toBeNull()
+          expect(container.innerHTML).not.toMatch(/NaN|Infinity/)
+        })
+      }
+    }
+  })
+
   describe('with a measured container (the chart draws its axes)', () => {
     beforeEach(() => {
       // jsdom has no layout: give recharts' ResponsiveContainer a real size so the SVG and its ticks render.
@@ -80,22 +97,14 @@ describe('ActivityTrend', () => {
       vi.restoreAllMocks()
     })
 
-    it('all-zero data draws a chart with a labelled axis and no NaN', async () => {
-      const { container } = render(<ActivityTrend data={days(() => ({ views: 0, arActivations: 0 }))} compact />)
+    it('a single visit in 30 days still draws the chart on a labelled axis, with no NaN', async () => {
+      const { container } = render(<ActivityTrend data={days((i) => ({ views: i === 29 ? 1 : 0, arActivations: 0 }))} compact />)
       expect(screen.getAllByRole('img')).toHaveLength(1)
       await waitFor(() => expect(container.querySelectorAll('.recharts-line-curve').length).toBe(2))
       const ticks = Array.from(container.querySelectorAll('.recharts-yAxis-tick-labels text')).map((t) => t.textContent)
-      // A flat zero line still sits on a readable scale (0 at the bottom, not a lone or missing tick).
       expect(ticks.length).toBeGreaterThan(1)
       expect(ticks).toContain('0')
       expect(container.querySelectorAll('.recharts-xAxis-tick-labels text').length).toBeGreaterThan(0)
-      expect(container.innerHTML).not.toMatch(/NaN|Infinity/)
-    })
-
-    it('empty data still renders the card controls and no NaN', () => {
-      const { container } = render(<ActivityTrend data={[]} compact />)
-      expect(screen.getAllByRole('img')).toHaveLength(1)
-      expect(screen.getByRole('button', { name: 'Show as table' })).toBeInTheDocument()
       expect(container.innerHTML).not.toMatch(/NaN|Infinity/)
     })
   })
