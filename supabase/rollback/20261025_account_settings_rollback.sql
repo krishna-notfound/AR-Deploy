@@ -87,6 +87,8 @@ drop function if exists private.undo_closure(uuid, uuid, text);
 drop function if exists private.requires_2fa(uuid);
 drop function if exists private.account_group(uuid);
 drop function if exists private.mfa_satisfied(text);
+-- Added by 20261025180600_account_settings_optin_2fa (normally removed by its own rollback first).
+drop function if exists public.caller_has_verified_factor();
 
 -- 3. Policies on shared tables, and the storage owner policies as the storage migration created them.
 drop policy if exists "Users read their own account events" on public.audit_events;
