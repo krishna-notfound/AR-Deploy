@@ -1,6 +1,7 @@
 // SAMPLE DATA for the demo. Not real businesses, prices, or analytics.
 // 3D models: Khronos glTF-Sample-Assets (CC BY 4.0 and CC0, creators named). See src/services/mock/credits.ts.
 // Photos: Unsplash (Unsplash License).
+import { createDemoTeam } from './teamSeed'
 import type {
   Business,
   Category,
@@ -641,6 +642,7 @@ export function createSeed(now: number = Date.now()): Db {
       now,
     ),
     activity: deriveActivity(businesses, products),
+    team: createDemoTeam(now),
   }
 }
 

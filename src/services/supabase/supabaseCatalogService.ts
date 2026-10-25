@@ -1,6 +1,7 @@
 // Supabase implementation of CatalogService: same contract as the mock, different storage.
 // Access control is enforced by RLS and storage policies in supabase/migrations; checks here are for UX only.
 // Every failure is returned as an error Result. Nothing falls back to demo data.
+import { createSupabaseTeam } from './supabaseTeam'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   ApplicationStatus,
@@ -674,6 +675,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
   }
 
   return {
+    ...createSupabaseTeam(sb),
+
     // ---------------- businesses ----------------
     getBusinesses: () =>
       guard(async () => {

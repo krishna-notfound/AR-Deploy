@@ -11,6 +11,7 @@ import { MAX_INVITATION_ATTEMPTS, RESEND_COOLDOWN_SECONDS, applyReview } from '.
 import { type CatalogService, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
 import { summarize } from '../analytics'
 import type { Db } from './db'
+import { createMockTeam } from './mockTeam'
 import { createSeed } from './seed'
 import { store } from './store'
 import { normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
@@ -91,6 +92,8 @@ function toCatalog(db: Db, b: Business): BusinessCatalog {
 const byUpdatedDesc = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt)
 
 export const mockCatalogService: CatalogService = {
+  ...createMockTeam(run),
+
   // ---------------- businesses ----------------
   getBusinesses: () => run(() => ok([...store.get().businesses].sort(byUpdatedDesc))),
 

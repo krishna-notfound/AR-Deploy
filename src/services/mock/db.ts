@@ -1,5 +1,6 @@
 import type { ActivityItem, AnalyticsEvent, AuditEvent, Business, BusinessApplication, EmailAttempt, ID, Product } from '@/domain/types'
 import type { DailyStat } from '../analytics'
+import type { DemoTeam } from './teamSeed'
 
 export type { DailyStat }
 
@@ -21,6 +22,8 @@ export interface Db {
   emails?: EmailAttempt[]
   /** Demo owners: there are no real accounts in demo mode, so only the invitation state is kept. */
   owners?: Record<ID, { email: string; invitedAt: string; acceptedAt?: string }>
+  /** Sample platform team (ADR-0029). Optional so demo data saved earlier stays valid. */
+  team?: DemoTeam
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)

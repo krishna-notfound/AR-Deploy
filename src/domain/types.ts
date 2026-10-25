@@ -180,6 +180,8 @@ export interface User {
   email: string
   role: Role
   businessId?: ID
+  /** Platform users (role 'super_admin'): Owner, Admin or Team and what that role may do (ADR-0029). */
+  platform?: PlatformAccess
 }
 
 export type ActivityKind =
@@ -279,4 +281,88 @@ export interface EmailAttempt {
   businessId?: ID
   workflow?: string
   attempt: number
+}
+
+// ---------------------------------------------------------------------------
+// Platform team roles (ADR-0029, ADR-0030)
+// ---------------------------------------------------------------------------
+
+export type Permission =
+  | 'businesses.view' | 'businesses.edit' | 'businesses.status' | 'businesses.delete' | 'owners.manage'
+  | 'applications.view' | 'applications.approve' | 'applications.reject'
+  | 'products.view' | 'products.edit' | 'products.publish' | 'products.delete'
+  | 'analytics.view' | 'records.view' | 'access.view'
+export type PlatformRole = 'owner' | 'admin' | 'team'
+export type MemberRole = Exclude<PlatformRole, 'owner'>
+export interface PlatformAccess {
+  role: PlatformRole
+  permissions: Permission[]
+}
+export type MemberStatus = 'invited' | 'active' | 'deactivated'
+export type InviteStatus = 'pending' | 'sent' | 'email_failed' | 'accepted' | 'expired' | 'revoked'
+export interface PlatformMember {
+  id: ID
+  userId: ID | null
+  email: string
+  fullName: string | null
+  role: PlatformRole
+  status: MemberStatus
+  /** Email of whoever invited them. */
+  invitedBy: string | null
+  createdAt: ISODate
+  activatedAt: ISODate | null
+  deactivatedAt: ISODate | null
+  lastSignInAt: ISODate | null
+  invite: { status: InviteStatus; expiresAt: ISODate } | null
+}
+export interface MemberInvite {
+  id: ID
+  status: InviteStatus
+  createdAt: ISODate
+  expiresAt: ISODate
+  createdBy: string | null
+  lastEmailAt: ISODate | null
+  lastEmailResult: string | null
+  acceptedAt: ISODate | null
+  revokedAt: ISODate | null
+}
+export interface InviteOutcome {
+  memberId: ID
+  status: 'sent' | 'email_failed'
+  sentAt: ISODate
+  expiresAt: ISODate
+  error?: string
+}
+export type RolePermissions = Record<MemberRole, Permission[]>
+export type AccessAction =
+  | 'invite_created' | 'invite_email_sent' | 'invite_email_failed' | 'invite_accepted' | 'invite_revoked' | 'invite_expired_attempt'
+  | 'role_changed' | 'permissions_changed' | 'member_deactivated' | 'member_reactivated' | 'denied'
+export interface AccessEvent {
+  id: ID
+  at: ISODate
+  actor: string | null
+  member: string | null
+  action: AccessAction
+  fromRole?: string
+  toRole?: string
+  outcome: 'ok' | 'denied'
+  details: string
+}
+export interface AccessQuery {
+  q?: string
+  action?: AccessAction
+  outcome?: 'ok' | 'denied'
+  from?: string
+  to?: string
+  page?: number
+  pageSize?: number
+}
+export type InviteState = 'valid' | 'expired' | 'revoked' | 'used' | 'invalid'
+export interface InviteInspection {
+  state: InviteState
+  email?: string
+  role?: MemberRole
+  invitedBy?: string
+  expiresAt?: ISODate
+  accountExists?: boolean
 }
