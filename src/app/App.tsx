@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router'
 import { AccountProvider } from '@/auth/AccountProvider'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+import { PreferencesProvider } from '@/lib/preferences'
 import { backend } from '@/services'
 import { BackendConfigError } from './BackendConfigError'
 import { createAppRouter } from './router'
@@ -14,7 +15,9 @@ export function App() {
     <ToastProvider>
       <ConfirmProvider>
         <AccountProvider>
-          <RouterProvider router={router} />
+          <PreferencesProvider>
+            <RouterProvider router={router} />
+          </PreferencesProvider>
         </AccountProvider>
       </ConfirmProvider>
     </ToastProvider>

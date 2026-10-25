@@ -406,6 +406,8 @@ export interface SecurityEvent {
   at: string
   userAgent: string | null
   ip: string | null
+  /** An account_deleted logged after the deletion itself failed (metadata delete_failed): the account still exists. */
+  deleteFailed?: boolean
 }
 export interface PlatformSettings {
   require2faStaff: boolean

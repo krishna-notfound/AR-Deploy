@@ -15,3 +15,31 @@ export function isIOS(ua: string = navigator.userAgent): boolean {
 export function isAndroid(ua: string = navigator.userAgent): boolean {
   return /Android/i.test(ua)
 }
+
+// Order matters: Edge, Opera and Samsung Internet also say "Chrome"; Chrome on iOS says "Safari"; every iOS browser is WebKit.
+const BROWSERS: [RegExp, string][] = [
+  [/Edg(e|A|iOS)?\//, 'Edge'],
+  [/OPR\/|Opera/, 'Opera'],
+  [/SamsungBrowser\//, 'Samsung Internet'],
+  [/Firefox\/|FxiOS\//, 'Firefox'],
+  [/Chrome\/|CriOS\/|Chromium\//, 'Chrome'],
+  [/Version\/[\d.]+.*Safari\/|Mobile\/\w+ Safari\//, 'Safari'],
+]
+const SYSTEMS: [RegExp, string][] = [
+  [/iPhone|iPod/, 'iPhone'],
+  [/iPad/, 'iPad'],
+  [/Android/, 'Android'],
+  [/Windows/, 'Windows'],
+  [/CrOS/, 'ChromeOS'],
+  [/Mac OS X|Macintosh/, 'macOS'],
+  [/Linux/, 'Linux'],
+]
+
+/** "Chrome on Windows", "Safari on iPhone" from a stored user-agent string; "Unknown device" when it cannot tell. */
+export function describeUserAgent(ua: string | null | undefined): string {
+  if (!ua) return 'Unknown device'
+  const browser = BROWSERS.find(([re]) => re.test(ua))?.[1]
+  const system = SYSTEMS.find(([re]) => re.test(ua))?.[1]
+  if (browser && system) return `${browser} on ${system}`
+  return browser ?? system ?? 'Unknown device'
+}

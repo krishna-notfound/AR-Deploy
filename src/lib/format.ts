@@ -1,4 +1,4 @@
-import type { Currency, Dimensions, Lang, LengthUnit } from '@/domain/types'
+import type { Currency, DateFormatPref, Dimensions, Lang, LengthUnit } from '@/domain/types'
 
 const CURRENCY_LOCALE: Record<Lang, string> = { en: 'en-US', pt: 'pt-PT' }
 
@@ -30,18 +30,66 @@ export function formatPercent(ratio: number): string {
   return `${(ratio * 100).toFixed(1)}%`
 }
 
-export function formatDate(iso: string, lang: Lang = 'en'): string {
+/** A signed-in person's date settings (Settings → Preferences). Dashboards pass `usePreferences()`. */
+export interface DatePrefs {
+  timezone: string
+  dateFormat: DateFormatPref
+  clock: '24h' | '12h'
+}
+
+const FALLBACK_ZONE = 'Europe/Lisbon'
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const zoneFormatters = new Map<string, Intl.DateTimeFormat>()
+
+/** Numeric year, month, day, hour (0-23) and minute of an instant in `zone`. An unknown zone falls back to Lisbon. */
+function partsIn(iso: string, zone: string) {
+  let f = zoneFormatters.get(zone)
+  if (!f) {
+    const opts: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }
+    try {
+      f = new Intl.DateTimeFormat('en-US', { ...opts, timeZone: zone })
+    } catch {
+      f = new Intl.DateTimeFormat('en-US', { ...opts, timeZone: FALLBACK_ZONE })
+    }
+    zoneFormatters.set(zone, f)
+  }
+  const n: Record<string, number> = {}
+  for (const p of f.formatToParts(new Date(iso))) if (p.type !== 'literal') n[p.type] = Number(p.value)
+  return { y: n.year ?? 0, m: n.month ?? 1, d: n.day ?? 1, h: (n.hour ?? 0) % 24, min: n.minute ?? 0 }
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+
+function prefDate({ y, m, d }: { y: number; m: number; d: number }, format: DateFormatPref): string {
+  if (format === 'dd/MM/yyyy') return `${pad(d)}/${pad(m)}/${y}`
+  if (format === 'yyyy-MM-dd') return `${y}-${pad(m)}-${pad(d)}`
+  return `${d} ${MONTHS[m - 1]} ${y}`
+}
+
+function prefTime({ h, min }: { h: number; min: number }, clock: DatePrefs['clock']): string {
+  if (clock === '24h') return `${pad(h)}:${pad(min)}`
+  return `${h % 12 || 12}:${pad(min)} ${h < 12 ? 'am' : 'pm'}`
+}
+
+/** Without `prefs` (public pages, signed-out views): the original locale format, unchanged. */
+export function formatDate(iso: string, lang: Lang = 'en', prefs?: DatePrefs): string {
+  if (prefs) return prefDate(partsIn(iso, prefs.timezone), prefs.dateFormat)
   return new Intl.DateTimeFormat(CURRENCY_LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric' }).format(
     new Date(iso),
   )
 }
 
-/** Date and time, e.g. "20 Oct 2026, 14:05" (admin history views). */
-export function formatDateTime(iso: string, lang: Lang = 'en'): string {
+/** Date and time, e.g. "20 Oct 2026, 14:05" (admin history views). With `prefs`: the person's zone, format and clock. */
+export function formatDateTime(iso: string, lang: Lang = 'en', prefs?: DatePrefs): string {
+  if (prefs) {
+    const p = partsIn(iso, prefs.timezone)
+    return `${prefDate(p, prefs.dateFormat)}, ${prefTime(p, prefs.clock)}`
+  }
   return new Intl.DateTimeFormat(CURRENCY_LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 }
 
-export function formatRelative(iso: string, now: Date = new Date()): string {
+/** "3 hours ago"; older than 30 days, the date (in the person's format with `prefs`). */
+export function formatRelative(iso: string, now: Date = new Date(), prefs?: DatePrefs): string {
   const diffSec = Math.round((new Date(iso).getTime() - now.getTime()) / 1000)
   const abs = Math.abs(diffSec)
   const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
@@ -49,7 +97,7 @@ export function formatRelative(iso: string, now: Date = new Date()): string {
   if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute')
   if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), 'hour')
   if (abs < 86400 * 30) return rtf.format(Math.round(diffSec / 86400), 'day')
-  return formatDate(iso)
+  return formatDate(iso, 'en', prefs)
 }
 
 export function formatFileSize(bytes: number): string {

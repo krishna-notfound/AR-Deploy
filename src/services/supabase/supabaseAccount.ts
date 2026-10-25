@@ -327,6 +327,7 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
           at: e.created_at,
           userAgent: str(e.metadata?.user_agent),
           ip: str(e.metadata?.ip),
+          ...(e.metadata?.delete_failed === true ? { deleteFailed: true } : {}),
         })),
       )
     },
