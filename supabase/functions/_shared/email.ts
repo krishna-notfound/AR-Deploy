@@ -1,7 +1,7 @@
 // Server-side email through Resend (design/23-email.md). Web-standard APIs only (fetch, no SDK, no Deno globals),
 // so it runs in Edge Functions and under Vitest. The API key is an Edge Function secret and never reaches a browser.
 
-export type EmailKind = 'owner_invitation' | 'invitation_resend' | 'application_confirmation' | 'admin_notification' | 'test'
+export type EmailKind = 'owner_invitation' | 'invitation_resend' | 'application_confirmation' | 'admin_notification' | 'team_invitation' | 'test'
 
 /** Same values as the email_log.status check constraint. */
 export type EmailStatus = 'blocked' | 'failed' | 'accepted' | 'sent' | 'delivered' | 'delayed' | 'bounced' | 'complained'

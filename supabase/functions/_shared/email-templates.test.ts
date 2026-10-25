@@ -18,3 +18,24 @@ describe('invitation email with a code (ADR-0027)', () => {
     expect(() => renderEmail('owner_invitation', 'en', { code: '<b>1</b>' })).toThrow()
   })
 })
+
+describe('team invitation email (ADR-0030)', () => {
+  const data = { role: 'admin' as const, actionUrl: 'https://x.app/join#t=abc', expiresAt: '2026-11-01T12:00:00Z', note: '<b>hi</b>', inviterName: 'Owner' }
+
+  it('names the role, lists what it can do, escapes the note and gives the expiry', () => {
+    const e = renderEmail('team_invitation', 'en', data)
+    expect(e.subject).toBe("You're invited to Sanctus")
+    expect(e.html).toContain('as <strong>Admin</strong>')
+    expect(e.html).toContain('Review and approve business applications')
+    expect(e.html).toContain('&lt;b&gt;hi&lt;/b&gt;')
+    expect(e.html).not.toContain('<b>hi</b>')
+    expect(e.html).toContain('Accept invitation')
+    expect(e.html).toContain('1 November 2026')
+    expect(e.html).toContain('contact the platform owner')
+    expect(e.text).toContain('https://x.app/join#t=abc')
+  })
+
+  it('refuses a note over 500 characters', () => {
+    expect(() => renderEmail('team_invitation', 'en', { ...data, note: 'x'.repeat(501) })).toThrow()
+  })
+})
