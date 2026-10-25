@@ -41,6 +41,26 @@ describe('Team & Access page (ADR-0029)', () => {
     expect(within(stat('Team')).getByText('2')).toBeInTheDocument()
   })
 
+  it('styles role badges per the design: Owner is obsidian, no badge is uppercase, member rows are two-line (60px)', { timeout: 20_000 }, async () => {
+    open('/admin/team')
+    await within(await screen.findByRole('table')).findByText('ana.ribeiro@sanctus.example')
+    const owner = within(rowFor('admin@platform.example')).getByText('Owner')
+    expect(owner.className).toContain('bg-obsidian')
+    expect(owner.className).not.toContain('uppercase')
+    expect(within(rowFor('ana.ribeiro@sanctus.example')).getByText('Admin').className).not.toContain('uppercase')
+    expect(rowFor('ana.ribeiro@sanctus.example').className).toContain('h-[60px]')
+  })
+
+  it('renders each member as a two-line mobile list item with the dates line', { timeout: 20_000 }, async () => {
+    open('/admin/team')
+    const list = await screen.findByRole('list', { name: 'Platform members' })
+    const item = within(list).getByText('marta.lopes@sanctus.example').closest('li') as HTMLElement
+    expect(item.textContent).toMatch(/Invited .*· Last sign-in Never/)
+    expect(item.textContent).toContain('Team')
+    const ana = within(list).getByText('ana.ribeiro@sanctus.example').closest('li') as HTMLElement
+    expect(ana.textContent).toMatch(/Joined .*· Last sign-in/)
+  })
+
   it('searches and filters members', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open('/admin/team')

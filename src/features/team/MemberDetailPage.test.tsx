@@ -36,6 +36,15 @@ describe('Member detail (ADR-0029)', () => {
     expect(await screen.findByText('Invited as Team')).toBeInTheDocument() // this member's access events
   })
 
+  it('shows the header avatar as a 48px Inter square (overriding the serif default)', { timeout: 20_000 }, async () => {
+    open('/admin/team/mem_ana')
+    await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
+    const avatar = screen.getByText('AR')
+    expect(avatar.className).toContain('size-12!')
+    expect(avatar.className).toContain('font-ui!')
+    expect(avatar.className).toContain('bg-canvas!') // the shared Monogram still carries font-display; font-ui! (important) overrides it
+  })
+
   it('lists the invitation history', { timeout: 20_000 }, async () => {
     open('/admin/team/mem_marta')
     const history = await screen.findByRole('region', { name: 'Invitations' })

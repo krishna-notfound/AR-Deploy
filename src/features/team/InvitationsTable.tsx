@@ -30,7 +30,7 @@ export function InvitationsTable({ members, onOpen }: { members: PlatformMember[
       key: 'email',
       header: 'Invited email',
       cell: (m) => (
-        <button type="button" className="font-medium text-ink hover:underline" onClick={() => onOpen(m)}>
+        <button type="button" className="text-left text-ui-body font-medium text-ink hover:underline" onClick={() => onOpen(m)}>
           {m.email}
         </button>
       ),
@@ -38,7 +38,7 @@ export function InvitationsTable({ members, onOpen }: { members: PlatformMember[
     },
     { key: 'role', header: 'Role', cell: (m) => <RoleBadge role={m.role} /> },
     { key: 'status', header: 'Invitation', cell: (m) => (m.invite ? <InviteStatusBadge status={m.invite.status} /> : <span className="text-ink-muted">Not sent</span>) },
-    { key: 'expires', header: 'Expires', cell: (m) => <span className="text-ink-muted">{m.invite ? formatDate(m.invite.expiresAt) : '—'}</span>, sortValue: (m) => m.invite?.expiresAt ?? '' },
+    { key: 'expires', header: 'Expires', align: 'right', cell: (m) => <span className="whitespace-nowrap text-ink-muted">{m.invite ? formatDate(m.invite.expiresAt) : '—'}</span>, sortValue: (m) => m.invite?.expiresAt ?? '' },
     { key: 'by', header: 'Invited by', cell: (m) => <span className="text-ink-muted">{m.invitedBy ?? '—'}</span>, priority: 'low' },
     { key: 'actions', header: 'Actions', srOnlyHeader: true, align: 'right', cell: menu },
   ]
@@ -52,13 +52,17 @@ export function InvitationsTable({ members, onOpen }: { members: PlatformMember[
       noun="invitations"
       pageSize={25}
       mobileRow={(m) => (
-        <div className="flex items-start justify-between gap-3 p-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
-            <p className="truncate font-medium">{m.email}</p>
+            <p className="text-ui-body font-medium text-ink">{m.email}</p>
             <div className="flex flex-wrap gap-1.5">
               <RoleBadge role={m.role} />
               {m.invite && <InviteStatusBadge status={m.invite.status} />}
             </div>
+            <p className="text-ui-body text-ink-muted tabular-nums">
+              {m.invite ? `Expires ${formatDate(m.invite.expiresAt)}` : 'Not sent'}
+              {m.invitedBy ? ` · Invited by ${m.invitedBy}` : ''}
+            </p>
           </div>
           {menu(m)}
         </div>
