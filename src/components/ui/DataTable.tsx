@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
 import { cn } from '@/lib/cn'
+import { useInDashboard } from '@/components/layout/dashboardContext'
 import { Pagination, paginate } from './Pagination'
 import { Skeleton } from './Skeleton'
 
@@ -32,6 +33,7 @@ export function DataTable<T>({
   initialSort,
   caption,
   noun,
+  twoLine,
   page: controlledPage,
   onPageChange,
 }: {
@@ -45,9 +47,12 @@ export function DataTable<T>({
   initialSort?: SortState
   caption: string
   noun?: string
+  /** Rows carry a two-line identity (name plus detail): 60px rows in the dashboard instead of 52px. */
+  twoLine?: boolean
   page?: number
   onPageChange?: (p: number) => void
 }) {
+  const dash = useInDashboard()
   const [sort, setSort] = useState<SortState | undefined>(initialSort)
   const [localPage, setLocalPage] = useState(1)
   const page = controlledPage ?? localPage
@@ -95,20 +100,25 @@ export function DataTable<T>({
   return (
     <div>
       {/* Mobile cards */}
-      <ul className="divide-y divide-line md:hidden" aria-label={caption}>
+      <ul className={cn(dash ? 'divide-y divide-subtle sm:hidden' : 'divide-y divide-line md:hidden')} aria-label={caption}>
         {visible.map((row) => (
-          <li key={rowKey(row)} className="px-4 py-3.5">
+          <li key={rowKey(row)} className={cn('min-w-0', dash ? 'px-4 py-3 break-words [overflow-wrap:anywhere]' : 'px-4 py-3.5')}>
             {mobileRow(row)}
           </li>
         ))}
       </ul>
       {/* Table */}
-      <div className="hidden overflow-x-auto md:block">
+      <div className={cn('hidden overflow-x-auto', dash ? 'sm:block' : 'md:block')}>
         <table className="w-full text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-line bg-canvas/50 text-left text-[10.5px] tracking-[0.16em] text-ink-muted uppercase">
-              {columns.map((c) => {
+            <tr
+              className={cn(
+                'border-b border-line text-left text-ink-muted',
+                dash ? 'text-[13px] leading-[18px] font-medium' : 'bg-canvas/50 text-[10.5px] tracking-[0.16em] uppercase',
+              )}
+            >
+              {columns.map((c, ci) => {
                 const active = sort?.key === c.key
                 const ariaSort = active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : c.sortValue ? 'none' : undefined
                 return (
@@ -117,7 +127,9 @@ export function DataTable<T>({
                     scope="col"
                     aria-sort={ariaSort}
                     className={cn(
-                      'px-4 py-3 font-medium whitespace-nowrap first:pl-6 last:pr-6',
+                      dash ? 'h-10 px-4 py-0 font-medium whitespace-nowrap first:pl-6 last:pr-6' : 'px-4 py-3 font-medium whitespace-nowrap first:pl-6 last:pr-6',
+                      dash && ci === 0 && 'w-[35%]',
+                      dash && c.srOnlyHeader && 'w-12 !px-2',
                       c.align === 'right' && 'text-right',
                       c.priority === 'low' && 'hidden lg:table-cell',
                     )}
@@ -126,13 +138,13 @@ export function DataTable<T>({
                       <button
                         type="button"
                         onClick={() => toggleSort(c.key)}
-                        className={cn('inline-flex items-center gap-1 rounded uppercase hover:text-ink', c.align === 'right' && 'flex-row-reverse')}
+                        className={cn('group inline-flex items-center gap-1 rounded hover:text-ink', !dash && 'uppercase', c.align === 'right' && 'flex-row-reverse')}
                       >
                         {c.header}
                         {active ? (
                           sort.dir === 'asc' ? <ArrowUp className="size-3.5" aria-hidden /> : <ArrowDown className="size-3.5" aria-hidden />
                         ) : (
-                          <ChevronsUpDown className="size-3.5 opacity-50" aria-hidden />
+                          <ChevronsUpDown className={cn('size-3.5', dash ? 'opacity-0 group-hover:opacity-60 group-focus-visible:opacity-60' : 'opacity-50')} aria-hidden />
                         )}
                       </button>
                     ) : (
@@ -143,14 +155,16 @@ export function DataTable<T>({
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-line">
+          <tbody className={cn('divide-y', dash ? 'divide-subtle' : 'divide-line')}>
             {visible.map((row) => (
-              <tr key={rowKey(row)} className="transition-colors hover:bg-canvas/70">
-                {columns.map((c) => (
+              <tr key={rowKey(row)} className={cn('transition-colors hover:bg-canvas/70', dash && (twoLine ? 'h-[60px]' : 'h-[52px]'))}>
+                {columns.map((c, ci) => (
                   <td
                     key={c.key}
                     className={cn(
-                      'px-4 py-3.5 align-middle first:pl-6 last:pr-6',
+                      dash ? 'px-4 py-[11px] align-middle first:pl-6 last:pr-6' : 'px-4 py-3.5 align-middle first:pl-6 last:pr-6',
+                      dash && ci === 0 && 'min-w-0 break-words [overflow-wrap:anywhere]',
+                      dash && c.srOnlyHeader && 'w-12 !px-2 text-right',
                       c.align === 'right' && 'text-right tabular-nums',
                       c.priority === 'low' && 'hidden lg:table-cell',
                       c.className,

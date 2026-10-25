@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { cn } from '@/lib/cn'
+import { useInDashboard } from '@/components/layout/dashboardContext'
 
 export interface MenuItem {
   label: string
@@ -23,6 +24,7 @@ export function DropdownMenu({
   align?: 'start' | 'end'
   triggerClassName?: string
 }) {
+  const dash = useInDashboard()
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -102,7 +104,8 @@ export function DropdownMenu({
                   item.onSelect()
                 }}
                 className={cn(
-                  'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm outline-none hover:bg-subtle focus-visible:bg-subtle disabled:opacity-50',
+                  'flex w-full items-center gap-2.5 px-3 text-left text-sm outline-none hover:bg-subtle focus-visible:bg-subtle disabled:opacity-50',
+                  dash ? 'h-9 whitespace-nowrap' : 'py-2',
                   item.destructive ? 'text-danger' : 'text-ink',
                 )}
               >
