@@ -203,4 +203,71 @@ describe('Settings hub', () => {
     // The old Profile card (name, email, role) moved to the account sections.
     expect(screen.queryByText('Role', { selector: 'dt' })).toBeNull()
   })
+
+  it('Esc inside the Reset demo data confirm closes only the dialog; a second Esc closes settings', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    open(OWNER, '/admin/settings/platform')
+    await screen.findByRole('heading', { level: 1, name: 'General' })
+    await user.click(screen.getByRole('button', { name: 'Reset demo data' }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(window.location.pathname).toBe('/admin/settings/platform')
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(window.location.pathname).toBe('/admin'))
+  })
+
+  it('Esc with unsaved business changes asks before leaving', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    open(BUSINESS, '/dashboard/settings/business')
+    const name = await screen.findByLabelText(/^Business name/)
+    await user.type(name, ' Studio')
+    await user.click(screen.getByRole('heading', { level: 1, name: 'Business profile' }))
+    await user.keyboard('{Escape}')
+    expect(await screen.findByRole('dialog', { name: 'Leave without saving?' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/dashboard/settings/business')
+  })
+
+  it('removes data-surface from body when settings closes', { timeout: 20_000 }, async () => {
+    const r = open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    expect(document.body.dataset.surface).toBe('dashboard')
+    r.unmount()
+    expect(document.body.dataset.surface).toBeUndefined()
+  })
+
+  it('a narrow deep link to a section shows that section only', { timeout: 20_000 }, async () => {
+    mockNarrow()
+    open(BUSINESS, '/dashboard/settings/business')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Business profile' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Settings sections' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/dashboard/settings')
+    expect(window.location.pathname).toBe('/dashboard/settings/business')
+  })
+
+  it('the narrow list screen is a main landmark named Settings', { timeout: 20_000 }, async () => {
+    mockNarrow()
+    open(BUSINESS, '/dashboard/settings')
+    const main = await screen.findByRole('main', { name: 'Settings' })
+    expect(within(main).getByRole('navigation', { name: 'Settings sections' })).toBeInTheDocument()
+  })
+
+  it('moving to a section focuses its title; going back on a phone focuses that section in the list', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    const wide = open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    await user.click(within(sections()).getByRole('link', { name: 'Preferences' }))
+    const title = await screen.findByRole('heading', { level: 1, name: 'Preferences' })
+    await waitFor(() => expect(title).toHaveFocus())
+    expect(title).toHaveAttribute('tabindex', '-1')
+    wide.unmount()
+
+    mockNarrow()
+    open(BUSINESS, '/dashboard/settings')
+    await user.click(within(await screen.findByRole('navigation', { name: 'Settings sections' })).getByRole('link', { name: 'Notifications' }))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Notifications' })).toHaveFocus())
+    await user.click(screen.getByRole('link', { name: 'Settings' }))
+    const link = within(await screen.findByRole('navigation', { name: 'Settings sections' })).getByRole('link', { name: 'Notifications' })
+    await waitFor(() => expect(link).toHaveFocus())
+  })
 })

@@ -2,7 +2,7 @@
 // section on the right, and a close button (and Esc) that returns to the page that opened it. Below 640px the
 // list is its own first screen and a section opens with a "Settings" back link.
 import { ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
@@ -12,16 +12,16 @@ import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
 import { IconButton } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { readReturnState, settingsReturnState } from '@/lib/settingsReturn'
 import { settingsPath } from '@/lib/urls'
 import { isDemoMode } from '@/services'
 import { SettingsSectionPage } from './SettingsSectionPage'
+import { TitleFocusContext } from './SettingsUi'
 import {
   SETTINGS_GROUPS,
   type SettingsScope,
   SettingsScopeContext,
   type SettingsSectionDef,
-  readReturnState,
-  settingsReturnState,
   visibleSections,
 } from './sections'
 
@@ -52,6 +52,18 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
   const returnState = from ? settingsReturnState(from) : undefined
   const mainRef = useRef<HTMLElement>(null)
   const shownSection = useRef(current?.id)
+  const titleFocus = useRef(false)
+  // True once for the first section title to mount after a section change.
+  const takeTitleFocus = useMemo(
+    () => ({
+      take: () => {
+        const want = titleFocus.current
+        titleFocus.current = false
+        return want
+      },
+    }),
+    [],
+  )
 
   const close = useCallback(() => navigate(from ?? home), [navigate, from, home])
 
@@ -66,7 +78,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
   // Esc closes settings, unless a dialog or menu used it first.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return
       if (document.querySelector('[aria-modal="true"], [role="menu"]')) return
       close()
     }
@@ -74,12 +86,22 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [close])
 
-  // A new section starts at the top, with focus on it for keyboard and screen-reader users.
+  // A new section starts at the top with focus on its title, for keyboard and screen-reader users. Back on the phone
+  // list, focus returns to the link of the section just left.
   useEffect(() => {
-    if (!current || shownSection.current === current.id) return
-    shownSection.current = current.id
+    const prev = shownSection.current
+    const next = current?.id
+    if (prev === next) return
+    shownSection.current = next
     window.scrollTo({ top: 0 })
-    mainRef.current?.focus({ preventScroll: true })
+    if (next) {
+      // Already loaded: the title is here now. Still loading: SectionHeader takes focus when it mounts.
+      const title = mainRef.current?.querySelector<HTMLElement>('h1')
+      if (title) title.focus({ preventScroll: true })
+      else titleFocus.current = true
+    } else if (prev) {
+      document.querySelector<HTMLElement>(`[data-section-link="${prev}"]`)?.focus({ preventScroll: true })
+    }
   }, [current])
 
   const dashboard = useMemo<DashboardContextValue>(
@@ -104,6 +126,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
   return (
     <DashboardContext.Provider value={dashboard}>
       <SettingsScopeContext.Provider value={scope}>
+        <TitleFocusContext.Provider value={takeTitleFocus}>
         <div data-surface="dashboard" data-settings-root className="flex min-h-dvh bg-canvas text-ink-body">
           {(wide || !current) && (
             <SectionList
@@ -157,6 +180,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
             </div>
           )}
         </div>
+        </TitleFocusContext.Provider>
       </SettingsScopeContext.Provider>
     </DashboardContext.Provider>
   )
@@ -183,9 +207,13 @@ function SectionList({
 }) {
   // Below 640px the list is a screen of its own, so it carries the page title; on wide screens the section's title is it.
   useDocumentTitle(wide ? undefined : 'Settings')
+  const titleId = useId()
+  // Below 640px the list is the whole screen, so it is the page's main landmark; beside a section it is not.
+  const Root = wide ? 'div' : 'main'
   const groups = SETTINGS_GROUPS.map((g) => ({ group: g, items: sections.filter((s) => s.group === g) })).filter((g) => g.items.length > 0)
   return (
-    <div
+    <Root
+      aria-labelledby={wide ? undefined : titleId}
       className={cn(
         'flex bg-surface',
         wide ? 'sticky top-0 h-dvh flex-[1_0_272px] justify-end overflow-y-auto border-r border-line' : 'w-full flex-col',
@@ -196,7 +224,7 @@ function SectionList({
           <p className="px-3 pb-4 text-ui-small text-ink-muted">Settings</p>
         ) : (
           <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
-            <h1 className="font-display text-[1.75rem] leading-[1.15] font-medium tracking-[-0.01em] text-ink">Settings</h1>
+            <h1 id={titleId} className="font-display text-[1.75rem] leading-[1.15] font-medium tracking-[-0.01em] text-ink">Settings</h1>
             {closeButton}
           </div>
         )}
@@ -224,6 +252,7 @@ function SectionList({
                       <Link
                         to={settingsPath(scope, s.id)}
                         state={returnState}
+                        data-section-link={s.id}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
                           'flex items-center justify-between gap-2 rounded-[var(--radius-control)] px-3 text-ui-body transition-colors',
@@ -255,6 +284,6 @@ function SectionList({
           </button>
         </div>
       </div>
-    </div>
+    </Root>
   )
 }

@@ -1,6 +1,5 @@
 // The only place URLs are composed. See System_arch/design/08-tenancy-urls.md.
-import type { Business, Lang, Product } from '@/domain/types'
-import type { SettingsSection } from '@/features/settings/sections'
+import type { Business, Lang, Product, SettingsSection } from '@/domain/types'
 
 type Sluggable = Pick<Business, 'slug'>
 type ProductSluggable = Pick<Product, 'slug'>

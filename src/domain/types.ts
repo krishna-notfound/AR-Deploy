@@ -366,3 +366,5 @@ export interface InviteInspection {
   expiresAt?: ISODate
   accountExists?: boolean
 }
+
+export type SettingsSection = 'account' | 'profile' | 'security' | 'notifications' | 'preferences' | 'activity' | 'business' | 'platform' | 'security-policy'

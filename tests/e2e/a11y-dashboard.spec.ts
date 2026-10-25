@@ -15,6 +15,8 @@ type Route = {
   act?: (page: Page) => Promise<void>
   /** Fewest text elements the audit must measure inside <main>, so an empty or half-rendered page cannot pass. */
   min?: number
+  /** Only exists at phone width (the settings section list is its own screen below 640px). */
+  phoneOnly?: boolean
 }
 
 const h1 = (name: string | RegExp) => async (page: Page) => {
@@ -74,6 +76,7 @@ const BUSINESS_ROUTES: Route[] = [
   { name: 'business analytics', path: '/dashboard/analytics', ready: h1('Analytics'), loaded: chart },
   { name: 'business product editor', path: '/dashboard/products/prd_glam_sofa/edit', ready: h1('Glam Velvet Sofa'), loaded: field('Product name') },
   { name: 'settings: business profile', path: '/dashboard/settings/business', ready: h1('Business profile'), loaded: field('Business name') },
+  { name: 'settings: section list', path: '/dashboard/settings', ready: h1('Settings'), loaded: inMain('Business profile'), min: 10, phoneOnly: true },
 ]
 
 /** Demo has no seeded applications: send one through the public form so the detail page has a record. */
@@ -247,7 +250,7 @@ function suite(mobile: boolean) {
     await checkRoute(page, route, mobile)
   })
 
-  for (const route of BUSINESS_ROUTES) {
+  for (const route of BUSINESS_ROUTES.filter((r) => mobile || !r.phoneOnly)) {
     test(`${route.name} (biz_casa owner)`, async ({ page }) => {
       await signInAsBusiness(page, 'Casa Lisboa Interiors')
       await checkRoute(page, route, mobile)
