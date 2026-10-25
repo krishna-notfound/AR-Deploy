@@ -120,9 +120,9 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Card className="p-6">
           <div className="flex items-center gap-3">
-            <Monogram name={m.fullName ?? m.email} />
+            <Monogram name={m.fullName ?? m.email} className="size-12! bg-canvas! font-ui! text-[15px]! font-medium" />
             <div className="min-w-0">
-              <p className="truncate text-ui-body font-medium text-ink">{m.fullName ?? 'Name not set yet'}</p>
+              <p className="truncate text-[length:var(--text-ui-card)] font-medium text-ink">{m.fullName ?? 'Name not set yet'}</p>
               <p className="truncate text-ui-body text-ink-muted">{m.email}</p>
             </div>
           </div>

@@ -60,7 +60,7 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
 
   const name = (m: PlatformMember) => (
     <div className="flex min-w-0 items-center gap-3">
-      <Monogram name={m.fullName ?? m.email} className="size-8! bg-subtle font-ui! text-[12px]! font-medium" />
+      <Monogram name={m.fullName ?? m.email} className="size-8! bg-subtle! font-ui! text-[12px]! font-medium" />
       <div className="min-w-0">
         <p className={m.fullName ? 'truncate text-ui-body leading-5 font-medium text-ink' : 'truncate text-ui-body leading-5 text-ink-muted'}>{m.fullName ?? 'Name not set yet'}</p>
         <p className="text-ui-small break-words text-ink-muted leading-[18px] sm:truncate">{m.email}</p>
