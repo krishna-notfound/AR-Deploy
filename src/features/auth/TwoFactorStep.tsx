@@ -70,8 +70,9 @@ export function TwoFactorStep({
       setCode('')
       return refuse(r.error.reason === 'invalid_code' ? WRONG_CODE : r.error.message)
     }
-    // The button keeps spinning until the caller has moved on.
+    // The button spins while the caller moves on; if this step is still shown afterwards, it is usable again.
     await onVerified()
+    if (mounted.current) setBusy(false)
   }
 
   const redeem = async () => {
@@ -84,6 +85,7 @@ export function TwoFactorStep({
     if (!mounted.current) return
     if (!r.ok) return refuse(r.error.reason === 'invalid_code' ? WRONG_RECOVERY : r.error.message)
     await onRecovered()
+    if (mounted.current) setBusy(false)
   }
 
   const submit = (e: FormEvent) => {

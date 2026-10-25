@@ -270,6 +270,19 @@ describe('Supabase account service', () => {
     expect(!b.ok && b.error.reason).toBe('not_enabled')
   })
 
+  it('getAssurance reads the local assurance level (mfa.getAuthenticatorAssuranceLevel) and reports a failure', async () => {
+    const f = fake({ mfa: { getAuthenticatorAssuranceLevel: () => ({ data: { currentLevel: 'aal1', nextLevel: 'aal2' }, error: null }) } })
+    expect(await account(f).getAssurance()).toEqual({ ok: true, data: { currentLevel: 'aal1', nextLevel: 'aal2' } })
+    const up = fake({ mfa: { getAuthenticatorAssuranceLevel: () => ({ data: { currentLevel: 'aal2', nextLevel: 'aal2' }, error: null }) } })
+    expect(await account(up).getAssurance()).toEqual({ ok: true, data: { currentLevel: 'aal2', nextLevel: 'aal2' } })
+    // No session yet (null levels) reads as aal1, never as aal2.
+    const empty = fake({ mfa: { getAuthenticatorAssuranceLevel: () => ({ data: { currentLevel: null, nextLevel: null }, error: null }) } })
+    expect(await account(empty).getAssurance()).toEqual({ ok: true, data: { currentLevel: 'aal1', nextLevel: 'aal1' } })
+    const broken = fake({ mfa: { getAuthenticatorAssuranceLevel: () => ({ data: null, error: { message: 'boom' } }) } })
+    const b = await account(broken).getAssurance()
+    expect(b.ok).toBe(false)
+  })
+
   it('startTotpEnrollment removes stale unverified factors before mfa.enroll; confirmTotpEnrollment uses challengeAndVerify and maps a wrong code to invalid_code', async () => {
     const stale = { id: 'old', factor_type: 'totp', status: 'unverified' }
     const f = fake({

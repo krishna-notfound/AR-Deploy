@@ -311,6 +311,18 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
       return ok(result)
     },
 
+    async getAssurance() {
+      try {
+        const { data, error } = await sb.auth.mfa.getAuthenticatorAssuranceLevel()
+        if (error || !data) return accountFail('unknown')
+        // Unknown levels (no session) read as aal1, never as aal2.
+        const level = (l: unknown) => (l === 'aal2' ? ('aal2' as const) : ('aal1' as const))
+        return ok({ currentLevel: level(data.currentLevel), nextLevel: level(data.nextLevel) })
+      } catch {
+        return accountFail('unknown')
+      }
+    },
+
     async recordSignIn() {
       // 'recorded' or 'rate_limited' (at most one per minute): both are fine for the caller.
       return voidOf(await call('record_sign_in', { p_user_agent: userAgent() }))

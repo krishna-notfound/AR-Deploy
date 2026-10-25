@@ -6,6 +6,13 @@ import type { Result, ServiceErrorCode } from './catalogService'
 
 export type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, SettingsSection, TotpEnrollment } from '@/domain/types'
 
+/** The session's assurance levels, read locally (supabase-js mfa.getAuthenticatorAssuranceLevel, spec §8). */
+export interface AssuranceLevels {
+  currentLevel: 'aal1' | 'aal2'
+  /** aal2 when the account has a verified factor: the sign-in needs the code step while currentLevel is aal1. */
+  nextLevel: 'aal1' | 'aal2'
+}
+
 export type ProfilePatch = Partial<Pick<Profile, 'displayName' | 'timezone' | 'dateFormat' | 'clock' | 'notifyNewApplications'>>
 
 export interface AccountService {
@@ -16,6 +23,7 @@ export interface AccountService {
   removeAvatar(): Promise<Result<Profile>>
   setOnboarding(state: 'completed' | 'dismissed'): Promise<Result<void>>
   getSecurityState(): Promise<Result<SecurityState>>
+  getAssurance(): Promise<Result<AssuranceLevels>>
   recordSignIn(): Promise<Result<void>>
   listSecurityEvents(): Promise<Result<SecurityEvent[]>>
   /** Reasons: current_password_mismatch | same_password | weak_password | reauthentication_needed. */

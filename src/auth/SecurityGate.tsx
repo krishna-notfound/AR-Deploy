@@ -8,25 +8,33 @@ import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { DashboardContext, type DashboardContextValue } from '@/components/layout/dashboardContext'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { SecurityState, User } from '@/domain/types'
+import type { User } from '@/domain/types'
 import { RECOVERED_NOTICE, TwoFactorStep } from '@/features/auth/TwoFactorStep'
 import { TotpSetup } from '@/features/settings/TotpSetup'
 import { settingsPath } from '@/lib/urls'
-import { useAccount, useSecurityState } from './AccountProvider'
+import {
+  ENABLED_PATCH,
+  RECOVERED_PATCH,
+  type SecurityInfo,
+  type SecurityPatch,
+  VERIFIED_PATCH,
+  needsCodeStep,
+  needsTwoFactorSetup,
+  useAccount,
+  useSecurityState,
+} from './AccountProvider'
 import { useLeaveAccount } from './RequireRole'
 
-/** Signed in with the password only, but the account has an authenticator: the code step comes first. */
-export const needsCodeStep = (s: SecurityState) => s.hasVerifiedFactor && s.aal === 'aal1'
-/** The policy requires 2FA and the account has none yet. */
-export const needsTwoFactorSetup = (s: SecurityState) => s.requires2fa && s.aal === 'aal1' && !s.hasVerifiedFactor
+export { needsCodeStep, needsTwoFactorSetup }
 
 export interface GateContext {
-  state: SecurityState
+  /** What is known. After a failed load the state may be missing: the app then goes through, and the loader retries. */
+  security: SecurityInfo
   user: User
   scope: 'admin' | 'business'
   refresh: () => Promise<void>
+  patch: (p: SecurityPatch) => void
 }
 
 export interface GateScreenProps {
@@ -54,7 +62,7 @@ function GateHeading({ title, children }: { title: string; children: ReactNode }
 }
 
 /** A session at aal1 with an authenticator (for example a reload before the code was given): ask for the code. */
-function CodeGate({ ctx }: GateScreenProps) {
+function CodeGate({ ctx, hold }: GateScreenProps) {
   const leave = useLeaveAccount()
   const navigate = useNavigate()
   const toast = useToast()
@@ -63,11 +71,19 @@ function CodeGate({ ctx }: GateScreenProps) {
       <GateHeading title="Two-step verification">Your account is protected with an authenticator app.</GateHeading>
       <Card className="p-5 sm:p-6">
         <TwoFactorStep
-          onVerified={ctx.refresh}
+          onVerified={async () => {
+            // Known at once; the reload confirms it (and a failed reload keeps it).
+            ctx.patch(VERIFIED_PATCH)
+            await ctx.refresh()
+          }}
           onRecovered={async () => {
+            hold(true)
             toast.show({ tone: 'info', title: RECOVERED_NOTICE }, 10_000)
+            ctx.patch(RECOVERED_PATCH)
             await ctx.refresh()
             navigate(settingsPath(ctx.scope, 'security'))
+            // Under the 2FA policy the setup gate takes over there.
+            hold(false)
           }}
           onSignOut={() => void leave({ signOut: true })}
         />
@@ -90,6 +106,7 @@ function SetupGate({ ctx, hold }: GateScreenProps) {
           // The session is aal2 as soon as the code is accepted; stay until the recovery codes are saved.
           onEnabled={() => hold(true)}
           onDone={() => {
+            ctx.patch(ENABLED_PATCH)
             void ctx.refresh().then(() => hold(false))
           }}
         />
@@ -103,8 +120,8 @@ function SetupGate({ ctx, hold }: GateScreenProps) {
 
 /** The gate checks, in order: the first that applies is shown. */
 export const GATE_CHECKS: readonly GateCheck[] = [
-  { id: '2fa-code', applies: ({ state }) => needsCodeStep(state), Screen: CodeGate },
-  { id: '2fa-setup', applies: ({ state }) => needsTwoFactorSetup(state), Screen: SetupGate },
+  { id: '2fa-code', applies: ({ security }) => needsCodeStep(security), Screen: CodeGate },
+  { id: '2fa-setup', applies: ({ security }) => needsTwoFactorSetup(security), Screen: SetupGate },
 ]
 
 function GateFrame({ scope, children }: { scope: 'admin' | 'business'; children: ReactNode }) {
@@ -131,27 +148,15 @@ function GateFrame({ scope, children }: { scope: 'admin' | 'business'; children:
  */
 export function SecurityGate({ children, checks = GATE_CHECKS }: { children: ReactNode; checks?: readonly GateCheck[] }) {
   const { user } = useAccount()
-  const { state, error, refresh } = useSecurityState()
-  const leave = useLeaveAccount()
+  const { refresh, patch, ...security } = useSecurityState()
   const [held, setHeld] = useState<string | null>(null)
 
   // Signed out or still resolving: RequireRole decides.
   if (!user) return <>{children}</>
+  // A failed check never blocks: the checks decide from what is known, and the loader retries in the background.
+  if (!security.loaded) return <FullPageSpinner />
   const scope = user.role === 'super_admin' ? 'admin' : 'business'
-  if (!state) {
-    if (!error) return <FullPageSpinner />
-    return (
-      <GateFrame scope={scope}>
-        <ErrorState message={`We could not check your sign-in security. ${error}`} onRetry={() => void refresh()} />
-        <div className="mt-4 flex justify-center">
-          <Button variant="ghost" onClick={() => void leave({ signOut: true })}>
-            Sign out
-          </Button>
-        </div>
-      </GateFrame>
-    )
-  }
-  const ctx: GateContext = { state, user, scope, refresh }
+  const ctx: GateContext = { security, user, scope, refresh, patch }
   const active = (held ? checks.find((c) => c.id === held) : undefined) ?? checks.find((c) => c.applies(ctx))
   if (!active) return <>{children}</>
   const { Screen } = active

@@ -154,6 +154,8 @@ export const mockAccountService: AccountService = {
       return ok(s)
     }),
 
+  getAssurance: () => run(() => ok({ currentLevel: state.aal, nextLevel: state.factor?.verified ? ('aal2' as const) : ('aal1' as const) })),
+
   recordSignIn: () =>
     run(() => {
       record('account_signed_in')

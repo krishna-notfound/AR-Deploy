@@ -11,8 +11,11 @@ export const TOTP = '123456'
 export const RECOVERY = 'ABCDE-FGHJK'
 
 export const ADMIN: SignedInAccount = { email: 'ana@test', user: { id: 'u1', name: 'Ana', email: 'ana@test', role: 'super_admin' } }
+/** A business owner whose business is a draft: at aal1 under 2FA rules the database hides it (NOT_FOUND). */
+export const DRAFT_OWNER: SignedInAccount = { email: 'rui@test', user: { id: 'u2', name: 'Rui', email: 'rui@test', role: 'business_admin', businessId: 'biz_draft' } }
 
-export function fakeAuth(initial: SignedInAccount | null = null) {
+/** `signsInAs`: the account a right password ("right-password") signs in. */
+export function fakeAuth(initial: SignedInAccount | null = null, signsInAs: SignedInAccount = ADMIN) {
   const listeners = new Set<() => void>()
   let session: SignedInAccount | null = initial
   /** Fires an auth event (SIGNED_IN, TOKEN_REFRESHED…): the provider reloads the account. */
@@ -22,7 +25,7 @@ export function fakeAuth(initial: SignedInAccount | null = null) {
     getCurrentUser: vi.fn(async () => ok(session)),
     signInWithPassword: vi.fn(async (_email: string, password: string) => {
       if (password !== 'right-password') return { ok: false as const, error: { code: 'VALIDATION' as const, message: 'Email or password is incorrect.', reason: 'invalid_credentials' } }
-      session = ADMIN
+      session = signsInAs
       setTimeout(() => listeners.forEach((l) => l()), 0) // SIGNED_IN
       return ok(undefined)
     }),
@@ -66,6 +69,7 @@ export function fakeAccount(start: Partial<FakeSecurity> = {}) {
   let pendingFactor: string | null = null
   const impl: Partial<AccountService> = {
     getSecurityState: vi.fn(async () => ok(state())),
+    getAssurance: vi.fn(async () => ok({ currentLevel: s.aal, nextLevel: s.factor ? ('aal2' as const) : ('aal1' as const) })),
     recordSignIn: vi.fn(async () => ok(undefined)),
     verifyTotpForSignIn: vi.fn(async (code: string) => {
       if (!s.factor) return accountFail('not_found')
