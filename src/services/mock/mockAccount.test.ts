@@ -66,6 +66,14 @@ describe('demo account service', () => {
     expect(ev.ok && ev.data[0]?.type).toBe('account_closure_cancelled')
   })
 
+  it('getAssurance follows the demo factor and session level', async () => {
+    expect(await a.getAssurance()).toEqual({ ok: true, data: { currentLevel: 'aal1', nextLevel: 'aal1' } })
+    const e = await a.startTotpEnrollment()
+    if (!e.ok) throw new Error('enrol failed')
+    await a.confirmTotpEnrollment(e.data.factorId, DEMO_CODE)
+    expect(await a.getAssurance()).toEqual({ ok: true, data: { currentLevel: 'aal2', nextLevel: 'aal2' } })
+  })
+
   it('refuses the platform policy at aal1 and accepts it at aal2', async () => {
     const refused = await a.updatePlatformSettings({ require2faStaff: true })
     expect(!refused.ok && refused.error.reason).toBe('aal2_required')

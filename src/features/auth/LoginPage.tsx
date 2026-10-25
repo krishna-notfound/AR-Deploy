@@ -1,17 +1,19 @@
 import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
-import { useAccount } from '@/auth/AccountProvider'
+import { RECOVERED_PATCH, VERIFIED_PATCH, clearPasswordSignIn, markPasswordSignIn, needsCodeStep, useAccount, useSecurityState } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
+import { useToast } from '@/components/ui/ToastProvider'
 import { auth } from '@/services'
-import { APPLY_PATH } from '@/lib/urls'
+import { APPLY_PATH, settingsPath } from '@/lib/urls'
 import { cn } from '@/lib/cn'
 import { TAP_TARGET } from '../public/tapTarget'
 import { AuthHeading, AuthLayout, authFieldsClass } from './AuthLayout'
+import { RECOVERED_NOTICE, TwoFactorStep } from './TwoFactorStep'
 
 /** Real sign-in (Supabase mode). In demo mode this route forwards to the demo account picker. */
 export default function LoginPage() {
@@ -19,24 +21,66 @@ export default function LoginPage() {
   const [params] = useSearchParams()
   const next = params.get('next')
   const { user, signedInEmail, accountError } = useAccount()
+  const security = useSecurityState()
   const leave = useLeaveAccount()
+  const toast = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  // 'verifying'/'recovering': the step stays up while the account reloads after the code; then on to the app.
+  const [stage, setStage] = useState<'idle' | 'verifying' | 'recovering' | 'recovered'>('idle')
 
   const authService = auth
   if (!authService) return <Navigate to={`/demo${next ? `?next=${encodeURIComponent(next)}` : ''}`} replace />
-  if (user) {
-    const home = user.role === 'super_admin' ? '/admin' : '/dashboard'
+  // Signed in: once the security state has answered, either the code step or the app. A failed check goes on to the
+  // app: the database still refuses data, and the 2FA gate there retries the check in the background.
+  const checking = !!user && !security.loaded
+  const codeStep = stage === 'recovering' || (stage === 'verifying' && !user) || (!!user && !checking && stage === 'idle' && needsCodeStep(security))
+  if (user && !checking && !codeStep) {
+    const scope = user.role === 'super_admin' ? 'admin' : 'business'
+    if (stage === 'recovered') return <Navigate to={settingsPath(scope, 'security')} replace />
+    const home = scope === 'admin' ? '/admin' : '/dashboard'
     return <Navigate to={next?.startsWith(home) ? next : home} replace />
+  }
+  if (codeStep) {
+    return (
+      <AuthLayout>
+        <AuthHeading eyebrow="Platform access" title="Two-step verification">
+          <p>Your account is protected with an authenticator app.</p>
+        </AuthHeading>
+        <TwoFactorStep
+          className={cn('mt-8', authFieldsClass)}
+          onVerified={async () => {
+            setStage('verifying')
+            // Known at once; the reload confirms it (and a failed reload keeps it).
+            security.patch(VERIFIED_PATCH)
+            await security.refresh()
+          }}
+          onRecovered={async () => {
+            setStage('recovering')
+            toast.show({ tone: 'info', title: RECOVERED_NOTICE }, 10_000)
+            security.patch(RECOVERED_PATCH)
+            await security.refresh()
+            setStage('recovered')
+          }}
+          onSignOut={() => {
+            setStage('idle')
+            void leave({ signOut: true })
+          }}
+        />
+      </AuthLayout>
+    )
   }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setPending(true)
+    // This tab records the sign-in once it is complete (after the code step, also across a reload).
+    markPasswordSignIn()
     const res = await authService.signInWithPassword(email.trim(), password)
     setPending(false)
+    if (!res.ok) clearPasswordSignIn()
     // On success the auth listener reloads the account and the redirect above takes over.
     setError(res.ok ? null : res.error.message)
   }
@@ -78,9 +122,9 @@ export default function LoginPage() {
           >
             <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </FormField>
-          <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending} disabled={!email || !password}>
+          <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending || checking} disabled={!email || !password}>
             Sign in
-            {!pending && <ArrowRight className="size-4" aria-hidden />}
+            {!pending && !checking && <ArrowRight className="size-4" aria-hidden />}
           </Button>
           <div className="flex items-center gap-3 text-xs text-ink-muted" aria-hidden>
             <span className="h-px flex-1 bg-line" />

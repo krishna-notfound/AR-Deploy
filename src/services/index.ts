@@ -50,7 +50,7 @@ export const account: AccountService = SUPABASE_BUILD
     : unavailableAccount(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
 
 export { backend, isDemoMode } from './backend'
-export type { AccountService, ProfilePatch } from './accountService'
+export type { AccountService, AssuranceLevels, ProfilePatch } from './accountService'
 export { ACCOUNT_ERRORS, AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, PASSWORD_MAX, PASSWORD_MIN } from './accountService'
 export type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, SettingsSection, TotpEnrollment } from '@/domain/types'
 export type { AuthError, AuthResult, AuthService, SignedInAccount } from './supabase/auth'
