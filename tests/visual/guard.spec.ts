@@ -41,6 +41,8 @@ for (const [slug, path] of PAGES) {
     test(`${slug} at ${width}px is unchanged`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 })
       await page.goto(path)
+      // In demo mode the sign-in and reset forms redirect to /demo: assert the redirect itself.
+      if (slug === 'login' || slug === 'reset-password') await expect(page).toHaveURL(/\/demo/)
       // Routes are lazy-loaded: wait until the full-page "Loading" spinner has gone.
       await expect(page.getByRole('status').filter({ hasText: /^Loading$/ })).toHaveCount(0)
       await expect(page.locator('#root')).not.toBeEmpty()

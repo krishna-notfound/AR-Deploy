@@ -43,6 +43,7 @@ The owner reviewed two type variants in Stitch (round 1) and every in-scope scre
 - Good: the scoped selectors plus the pixel guard make "landing and sign-in pages are unchanged" something the tests prove.
 - Trade-off: the dashboards now use a second sans (Inter) beside Jost on the public pages. One more font family is loaded (three weights).
 - Trade-off: the guard's snapshots are tied to the platform and fonts they were recorded on (the file names carry the OS). They are recorded on the developer's machine, not in CI.
+- Limit: in demo mode `/login` and `/reset-password` redirect to `/demo`, so the real sign-in and reset forms render only in Supabase mode and are not covered by the guard. The guard asserts the redirect instead; the dashboard scope makes those forms unreachable to the new styles by construction.
 - This ADR amends ADR-0023's "serif for display/headline/title and Jost for the rest" and ADR-0028's dashboard typography, inside the dashboard scope only.
 
 ## Alternatives rejected

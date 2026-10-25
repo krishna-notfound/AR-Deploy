@@ -22,7 +22,7 @@ export default defineConfig({
       testDir: './tests/visual',
       testMatch: /visual[\\/]guard\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
-      expect: { toHaveScreenshot: { maxDiffPixels: 0, animations: 'disabled' } },
+      expect: { toHaveScreenshot: { maxDiffPixels: 0, threshold: 0, animations: 'disabled' } },
     },
   ],
   webServer: {
