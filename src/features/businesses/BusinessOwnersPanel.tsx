@@ -97,8 +97,8 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-3 border-y border-line py-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{owner.email}</p>
-                <p className="mt-0.5 text-xs text-ink-muted">
+                <p className="truncate text-ui-body font-medium text-ink">{owner.email}</p>
+                <p className="mt-0.5 text-ui-small text-ink-muted tabular-nums">
                   {owner.acceptedAt
                     ? `Active since ${formatDate(owner.acceptedAt)}`
                     : owner.invitedAt
@@ -154,7 +154,7 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
             <Button type="submit" variant="primary" loading={provision.pending} icon={<UserPlus className="size-4" aria-hidden />} disabled={!email.trim()}>
               Invite owner
             </Button>
-            <p className="flex items-start gap-1.5 text-xs text-ink-muted">
+            <p className="flex items-start gap-1.5 border-t border-line pt-4 text-ui-small text-ink-muted">
               <MailPlus className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               The invitation link is created by Supabase Auth and sent by email; it is never shown here.
             </p>
