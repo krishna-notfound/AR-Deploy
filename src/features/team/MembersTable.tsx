@@ -10,6 +10,7 @@ import { SearchInput } from '@/components/ui/SearchInput'
 import { EmptyState } from '@/components/ui/States'
 import type { MemberStatus, PlatformMember, PlatformRole } from '@/domain/types'
 import { formatDate, formatRelative } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { Monogram } from '../applications/Monogram'
 import { InviteStatusBadge, MemberStatusBadge, RoleBadge } from './teamLabels'
 import { useMemberActions } from './useMemberActions'
@@ -18,6 +19,7 @@ const ROLES: PlatformRole[] = ['owner', 'admin', 'team']
 const STATUSES: MemberStatus[] = ['active', 'invited', 'deactivated']
 
 export function MembersTable({ members, onInvite, onOpenInvite }: { members: PlatformMember[]; onInvite: () => void; onOpenInvite: (m: PlatformMember) => void }) {
+  const prefs = usePreferences()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const actions = useMemberActions()
@@ -88,7 +90,7 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
       key: 'since',
       header: 'Joined or invited',
       align: 'right',
-      cell: (m) => <span className="whitespace-nowrap text-ink-muted">{formatDate(m.activatedAt ?? m.createdAt)}</span>,
+      cell: (m) => <span className="whitespace-nowrap text-ink-muted">{formatDate(m.activatedAt ?? m.createdAt, 'en', prefs)}</span>,
       sortValue: (m) => m.activatedAt ?? m.createdAt,
       priority: 'low',
     },
@@ -96,7 +98,7 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
       key: 'seen',
       header: 'Last sign-in',
       align: 'right',
-      cell: (m) => <span className="whitespace-nowrap text-ink-muted">{m.lastSignInAt ? formatRelative(m.lastSignInAt) : 'Never'}</span>,
+      cell: (m) => <span className="whitespace-nowrap text-ink-muted">{m.lastSignInAt ? formatRelative(m.lastSignInAt, undefined, prefs) : 'Never'}</span>,
       sortValue: (m) => m.lastSignInAt ?? '',
       priority: 'low',
     },
@@ -147,7 +149,7 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
                 {statusCell(m)}
               </div>
               <p className="text-ui-body text-ink-muted tabular-nums">
-                {m.activatedAt ? 'Joined' : 'Invited'} {formatDate(m.activatedAt ?? m.createdAt)} · Last sign-in {m.lastSignInAt ? formatRelative(m.lastSignInAt) : 'Never'}
+                {m.activatedAt ? 'Joined' : 'Invited'} {formatDate(m.activatedAt ?? m.createdAt, 'en', prefs)} · Last sign-in {m.lastSignInAt ? formatRelative(m.lastSignInAt, undefined, prefs) : 'Never'}
               </p>
             </div>
             {actionCell(m)}

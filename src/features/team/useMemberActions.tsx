@@ -5,6 +5,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { InviteOutcome, MemberRole, PlatformMember } from '@/domain/types'
 import { formatDate } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import type { Result } from '@/services/catalogService'
 import { PERMISSION_LABEL, ROLE_LABEL } from './permissions'
@@ -12,6 +13,7 @@ import { PERMISSION_LABEL, ROLE_LABEL } from './permissions'
 export function useMemberActions() {
   const confirm = useConfirm()
   const toast = useToast()
+  const prefs = usePreferences()
 
   const report = useCallback(
     <T,>(r: Result<T>, success: string, body?: string): boolean => {
@@ -32,10 +34,10 @@ export function useMemberActions() {
         toast.error('Invitation saved, but the email was not delivered', r.data.error ?? 'Try resending it.')
         return true
       }
-      toast.success(`Invitation sent to ${email}`, `The link works once and expires on ${formatDate(r.data.expiresAt)}.`)
+      toast.success(`Invitation sent to ${email}`, `The link works once and expires on ${formatDate(r.data.expiresAt, 'en', prefs)}.`)
       return true
     },
-    [toast],
+    [toast, prefs],
   )
 
   const resend = useCallback(

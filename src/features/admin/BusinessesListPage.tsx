@@ -14,6 +14,7 @@ import { SmartImage } from '@/components/ui/SmartImage'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { Business, BusinessCatalog, BusinessStatus } from '@/domain/types'
 import { formatDate, formatNumber } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
 import { isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
@@ -35,6 +36,7 @@ interface Row {
 }
 
 export default function BusinessesListPage() {
+  const prefs = usePreferences()
   const can = useCan()
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
@@ -101,7 +103,7 @@ export default function BusinessesListPage() {
     { key: 'views', header: 'Views', align: 'right', priority: 'low', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
     { key: 'ar', header: 'AR', align: 'right', priority: 'low', sortValue: (r) => r.ar, cell: (r) => formatNumber(r.ar) },
     { key: 'status', header: 'Status', sortValue: (r) => r.catalog.business.status, cell: (r) => <BusinessStatusBadge status={r.catalog.business.status} /> },
-    { key: 'updated', header: 'Last updated', align: 'right', sortValue: (r) => r.catalog.business.updatedAt, cell: (r) => <span className="whitespace-nowrap">{formatDate(r.catalog.business.updatedAt)}</span> },
+    { key: 'updated', header: 'Last updated', align: 'right', sortValue: (r) => r.catalog.business.updatedAt, cell: (r) => <span className="whitespace-nowrap">{formatDate(r.catalog.business.updatedAt, 'en', prefs)}</span> },
     {
       key: 'actions',
       header: 'Actions',

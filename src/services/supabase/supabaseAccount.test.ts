@@ -475,7 +475,7 @@ describe('Supabase account service', () => {
   it('reads security events, closure requests and records sign-ins through the database functions', async () => {
     const f = fake({
       rpc: {
-        list_my_security_events: { data: [{ id: 'e1', event_type: 'account_signed_in', created_at: '2026-10-25T09:00:00Z', metadata: { user_agent: 'Firefox', ip: '1.2.3.4' } }, { id: 'e2', event_type: 'account_password_changed', created_at: '2026-10-24T09:00:00Z', metadata: {} }] },
+        list_my_security_events: { data: [{ id: 'e1', event_type: 'account_signed_in', created_at: '2026-10-25T09:00:00Z', metadata: { user_agent: 'Firefox', ip: '1.2.3.4' } }, { id: 'e2', event_type: 'account_password_changed', created_at: '2026-10-24T09:00:00Z', metadata: {} }, { id: 'e3', event_type: 'account_deleted', created_at: '2026-10-23T09:00:00Z', metadata: { delete_failed: true } }] },
         admin_list_closure_requests: { data: [{ user_id: 'u2', email: 'b@x.pt', business_id: 'b2', business_name: 'Casa', requested_at: '2026-10-20T00:00:00Z' }] },
         cancel_account_closure: { data: { error: 'not_found' } },
         record_sign_in: { data: 'rate_limited' },
@@ -487,6 +487,7 @@ describe('Supabase account service', () => {
       data: [
         { id: 'e1', type: 'account_signed_in', at: '2026-10-25T09:00:00Z', userAgent: 'Firefox', ip: '1.2.3.4' },
         { id: 'e2', type: 'account_password_changed', at: '2026-10-24T09:00:00Z', userAgent: null, ip: null },
+        { id: 'e3', type: 'account_deleted', at: '2026-10-23T09:00:00Z', userAgent: null, ip: null, deleteFailed: true },
       ],
     })
     expect(await a.listClosureRequests()).toEqual({ ok: true, data: [{ userId: 'u2', email: 'b@x.pt', businessId: 'b2', businessName: 'Casa', requestedAt: '2026-10-20T00:00:00Z' }] })

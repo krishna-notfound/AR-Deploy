@@ -11,6 +11,7 @@ import { EmptyState, ErrorState } from '@/components/ui/States'
 import { Tabs } from '@/components/ui/Tabs'
 import { APPLICATION_STATUSES, type ApplicationStatus, type BusinessApplication } from '@/domain/types'
 import { formatDate, formatNumber, formatRelative } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { applicationAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
@@ -25,6 +26,7 @@ const isOpen = (s: ApplicationStatus) => s === 'submitted' || s === 'under_revie
 
 /** Business applications from the public wizard (platform admins; rows come from the database). */
 export default function ApplicationsPage() {
+  const prefs = usePreferences()
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
   const status = (APPLICATION_STATUSES as readonly string[]).includes(params.get('status') ?? '') ? (params.get('status') as ApplicationStatus) : undefined
@@ -123,7 +125,7 @@ export default function ApplicationsPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-muted">
                       <ApplicationStatusBadge status={a.status} />
-                      <span className="tabular-nums">Submitted {formatDate(a.createdAt)}</span>
+                      <span className="tabular-nums">Submitted {formatDate(a.createdAt, 'en', prefs)}</span>
                     </div>
                   </div>
                 </li>
@@ -168,6 +170,7 @@ export default function ApplicationsPage() {
 }
 
 function ApplicationRow({ a }: { a: BusinessApplication }) {
+  const prefs = usePreferences()
   const nameId = `app-${a.id}`
   return (
     <tr className="h-[60px] transition-colors hover:bg-canvas/70">
@@ -192,8 +195,8 @@ function ApplicationRow({ a }: { a: BusinessApplication }) {
         <ApplicationStatusBadge status={a.status} />
       </td>
       <td className="hidden px-4 py-[11px] text-right align-middle whitespace-nowrap tabular-nums lg:table-cell">
-        <p className="text-sm leading-5 text-ink">{formatDate(a.createdAt)}</p>
-        <p className="text-[13px] leading-[18px] text-ink-muted">Updated {formatRelative(a.updatedAt)}</p>
+        <p className="text-sm leading-5 text-ink">{formatDate(a.createdAt, 'en', prefs)}</p>
+        <p className="text-[13px] leading-[18px] text-ink-muted">Updated {formatRelative(a.updatedAt, undefined, prefs)}</p>
       </td>
       <td className="py-[11px] pr-6 pl-4 text-right align-middle">
         <ButtonLink to={applicationAdminPath(a.id)} size="sm" variant={isOpen(a.status) ? 'secondary' : 'ghost'} aria-describedby={nameId}>

@@ -10,6 +10,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { MemberRole, PlatformMember } from '@/domain/types'
 import { formatDate, formatDateTime, formatRelative } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { Monogram } from '../applications/Monogram'
@@ -59,6 +60,7 @@ export default function MemberDetailPage() {
 }
 
 function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Record<MemberRole, string[]> | null; onChanged: () => void; crumbs: { label: string; to?: string }[] }) {
+  const prefs = usePreferences()
   const actions = useMemberActions()
   const invites = useServiceQuery(() => (m.role === 'owner' ? Promise.resolve({ ok: true as const, data: [] }) : service.listMemberInvites(m.id)), [m.id, m.role])
   const isOwner = m.role === 'owner'
@@ -127,10 +129,10 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
             </div>
           </div>
           <dl className="mt-5 divide-y divide-subtle border-t border-line text-ui-body">
-            <Item label="Joined">{m.activatedAt ? formatDate(m.activatedAt) : 'Not yet'}</Item>
-            <Item label="Last sign-in">{m.lastSignInAt ? formatRelative(m.lastSignInAt) : 'Never'}</Item>
+            <Item label="Joined">{m.activatedAt ? formatDate(m.activatedAt, 'en', prefs) : 'Not yet'}</Item>
+            <Item label="Last sign-in">{m.lastSignInAt ? formatRelative(m.lastSignInAt, undefined, prefs) : 'Never'}</Item>
             <Item label="Invited by">{m.invitedBy ?? '—'}</Item>
-            {m.deactivatedAt && <Item label="Deactivated">{formatDate(m.deactivatedAt)}</Item>}
+            {m.deactivatedAt && <Item label="Deactivated">{formatDate(m.deactivatedAt, 'en', prefs)}</Item>}
           </dl>
         </Card>
 
@@ -186,9 +188,9 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
                 {invites.data.map((i) => (
                   <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-ui-body sm:px-6">
                     <div>
-                      <p className="text-ink">Created {formatDateTime(i.createdAt)}</p>
+                      <p className="text-ink">Created {formatDateTime(i.createdAt, 'en', prefs)}</p>
                       <p className="text-ui-small text-ink-muted">
-                        {i.acceptedAt ? `Accepted ${formatDateTime(i.acceptedAt)}` : i.revokedAt ? `Revoked ${formatDateTime(i.revokedAt)}` : `Expires ${formatDateTime(i.expiresAt)}`}
+                        {i.acceptedAt ? `Accepted ${formatDateTime(i.acceptedAt, 'en', prefs)}` : i.revokedAt ? `Revoked ${formatDateTime(i.revokedAt, 'en', prefs)}` : `Expires ${formatDateTime(i.expiresAt, 'en', prefs)}`}
                         {i.lastEmailResult ? ` · Email: ${i.lastEmailResult}` : ''}
                       </p>
                     </div>

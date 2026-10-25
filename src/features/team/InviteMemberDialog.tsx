@@ -10,6 +10,7 @@ import { InlineNotice } from '@/components/ui/States'
 import type { InviteOutcome, MemberRole } from '@/domain/types'
 import { cn } from '@/lib/cn'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { isDemoMode, service } from '@/services'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { PERMISSION_GROUPS, ROLE_DESCRIPTION, ROLE_LABEL } from './permissions'
@@ -21,6 +22,7 @@ const ORDER = PERMISSION_GROUPS.flatMap((g) => g.items)
 type Step = { kind: 'form' } | { kind: 'review' } | { kind: 'done'; outcome: InviteOutcome }
 
 export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean; onClose: () => void; onInvited?: (memberId: string) => void }) {
+  const prefs = usePreferences()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<MemberRole>('team')
   const [note, setNote] = useState('')
@@ -170,8 +172,8 @@ export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean
         <div className="space-y-5">
           {step.outcome.status === 'sent' ? (
             <InlineNotice tone="info">
-              <strong className="font-medium">Invitation sent to {clean}</strong> at {formatDateTime(step.outcome.sentAt)}. The link expires on{' '}
-              {formatDate(step.outcome.expiresAt)}.{isDemoMode && ' Demo: no email is actually sent.'}
+              <strong className="font-medium">Invitation sent to {clean}</strong> at {formatDateTime(step.outcome.sentAt, 'en', prefs)}. The link expires on{' '}
+              {formatDate(step.outcome.expiresAt, 'en', prefs)}.{isDemoMode && ' Demo: no email is actually sent.'}
             </InlineNotice>
           ) : (
             <InlineNotice tone="warning">

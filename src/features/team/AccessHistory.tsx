@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { AccessAction, AccessEvent } from '@/domain/types'
 import { formatDateTime } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ROLE_LABEL } from './permissions'
@@ -117,10 +118,11 @@ export function AccessHistory({ member }: { member?: string }) {
 }
 
 function EventRow({ e }: { e: AccessEvent }) {
+  const prefs = usePreferences()
   return (
     <li className="grid gap-1 px-4 py-3.5 text-ui-body sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-start sm:gap-4 sm:px-6">
       <time dateTime={e.at} className="text-ui-small text-ink-muted tabular-nums sm:pt-0.5">
-        {formatDateTime(e.at)}
+        {formatDateTime(e.at, 'en', prefs)}
       </time>
       <div className="min-w-0">
         <p className="text-ink">

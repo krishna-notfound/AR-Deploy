@@ -7,6 +7,7 @@ import { SearchInput } from '@/components/ui/SearchInput'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { formatDateTime } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { applicationAdminPath, businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import type { AuditEntry } from '@/services/catalogService'
@@ -20,6 +21,7 @@ const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** Administrative audit trail (append-only, written on the server). */
 export default function AuditLogPage() {
+  const prefs = usePreferences()
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
   const page = Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1)
@@ -102,7 +104,7 @@ export default function AuditLogPage() {
                       dateTime={e.createdAt}
                       className="text-[length:var(--text-ui-small)] text-ink-muted tabular-nums max-md:order-2 md:text-[length:var(--text-ui-body)] md:text-ink"
                     >
-                      {formatDateTime(e.createdAt)}
+                      {formatDateTime(e.createdAt, 'en', prefs)}
                     </time>
                     <div className="min-w-0 max-md:order-1 max-md:col-span-2">
                       <p className="text-[length:var(--text-ui-body)] leading-5 text-ink">

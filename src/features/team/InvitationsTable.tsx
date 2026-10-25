@@ -5,10 +5,12 @@ import { DropdownMenu } from '@/components/ui/Menu'
 import { EmptyState } from '@/components/ui/States'
 import type { PlatformMember } from '@/domain/types'
 import { formatDate } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { InviteStatusBadge, RoleBadge } from './teamLabels'
 import { useMemberActions } from './useMemberActions'
 
 export function InvitationsTable({ members, onOpen }: { members: PlatformMember[]; onOpen: (m: PlatformMember) => void }) {
+  const prefs = usePreferences()
   const actions = useMemberActions()
   const rows = members.filter((m) => m.status === 'invited')
   const live = (m: PlatformMember) => !!m.invite && ['pending', 'sent', 'email_failed'].includes(m.invite.status)
@@ -39,7 +41,7 @@ export function InvitationsTable({ members, onOpen }: { members: PlatformMember[
     },
     { key: 'role', header: 'Role', cell: (m) => <RoleBadge role={m.role} /> },
     { key: 'status', header: 'Invitation', cell: (m) => (m.invite ? <InviteStatusBadge status={m.invite.status} /> : <span className="text-ink-muted">Not sent</span>) },
-    { key: 'expires', header: 'Expires', align: 'right', cell: (m) => <span className="whitespace-nowrap text-ink-muted">{m.invite ? formatDate(m.invite.expiresAt) : '—'}</span>, sortValue: (m) => m.invite?.expiresAt ?? '' },
+    { key: 'expires', header: 'Expires', align: 'right', cell: (m) => <span className="whitespace-nowrap text-ink-muted">{m.invite ? formatDate(m.invite.expiresAt, 'en', prefs) : '—'}</span>, sortValue: (m) => m.invite?.expiresAt ?? '' },
     { key: 'by', header: 'Invited by', cell: (m) => <span className="text-ink-muted">{m.invitedBy ?? '—'}</span>, priority: 'low' },
     { key: 'actions', header: 'Actions', srOnlyHeader: true, align: 'right', cell: menu },
   ]
@@ -63,7 +65,7 @@ export function InvitationsTable({ members, onOpen }: { members: PlatformMember[
               {m.invite && <InviteStatusBadge status={m.invite.status} />}
             </div>
             <p className="text-ui-body text-ink-muted tabular-nums">
-              {m.invite ? `Expires ${formatDate(m.invite.expiresAt)}` : 'Not sent'}
+              {m.invite ? `Expires ${formatDate(m.invite.expiresAt, 'en', prefs)}` : 'Not sent'}
               {m.invitedBy ? ` · Invited by ${m.invitedBy}` : ''}
             </p>
           </div>
