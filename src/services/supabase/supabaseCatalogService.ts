@@ -31,7 +31,7 @@ import { localDayBounds } from '@/lib/format'
 import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, isoDay, summarize } from '../analytics'
-import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok } from '../catalogService'
+import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok, teamFail } from '../catalogService'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
@@ -177,7 +177,7 @@ export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictFiel
         ? fail('CONFLICT', 'Please fix the highlighted fields.', { slug: SLUG_TAKEN[ctx.conflictField] })
         : fail('CONFLICT', 'This record already exists.')
     case '42501':
-      return fail('PERMISSION', 'Your account is not allowed to do this.')
+      return teamFail('forbidden')
     case '23514':
     case '23502':
     case '22P02':

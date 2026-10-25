@@ -3,16 +3,17 @@ import { AuthApiError, AuthRetryableFetchError, AuthSessionMissingError } from '
 import { describe, expect, it, vi } from 'vitest'
 import { authMessage, createSupabaseAuthService } from './auth'
 
-/** Just enough of supabase-js for getCurrentUser: auth.getUser and the two role lookups. */
-function stub(getUser: () => unknown, roles: { admin?: boolean; businessId?: string } = {}) {
+/** Just enough of supabase-js for getCurrentUser: auth.getUser, my_platform_access and the business lookup. */
+function stub(getUser: () => unknown, roles: { admin?: boolean; platform?: { role: string; permissions: string[] }; businessId?: string } = {}) {
   const query = (data: unknown) => {
     const q = { select: () => q, eq: () => q, order: () => q, limit: () => q, maybeSingle: async () => ({ data, error: null }) }
     return q
   }
+  const platform = roles.platform ?? (roles.admin ? { role: 'owner', permissions: ['products.view'] } : null)
   return {
     auth: { getUser: async () => getUser() },
-    from: (table: string) =>
-      table === 'platform_admins' ? query(roles.admin ? { user_id: 'u1' } : null) : query(roles.businessId ? { business_id: roles.businessId } : null),
+    rpc: async () => ({ data: platform, error: null }),
+    from: () => query(roles.businessId ? { business_id: roles.businessId } : null),
   } as unknown as SupabaseClient
 }
 const user = (meta: Record<string, unknown> = {}) => ({ data: { user: { id: 'u1', email: 'owner@test', user_metadata: meta } }, error: null })
@@ -33,6 +34,11 @@ describe('Supabase auth: getCurrentUser', () => {
   it('uses the display name in the dashboard and takes the role from the tables, never the metadata', async () => {
     const r = await createSupabaseAuthService(stub(() => user({ display_name: '  Ana  ', role: 'super_admin' }), { businessId: 'b1' })).getCurrentUser()
     expect(r.ok && r.data?.user).toEqual({ id: 'u1', name: 'Ana', email: 'owner@test', role: 'business_admin', businessId: 'b1' })
+  })
+
+  it('a platform Team member signs in as a platform user with their role and permissions', async () => {
+    const r = await createSupabaseAuthService(stub(() => user(), { platform: { role: 'team', permissions: ['products.view', 'products.edit'] } })).getCurrentUser()
+    expect(r.ok && r.data?.user).toEqual({ id: 'u1', name: 'owner@test', email: 'owner@test', role: 'super_admin', platform: { role: 'team', permissions: ['products.view', 'products.edit'] } })
   })
 
   it('treats a network or server failure as an error, not as signed out', async () => {

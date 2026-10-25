@@ -1,5 +1,6 @@
 // Real authentication (Supabase mode only). The demo account picker never touches this.
-// Roles come from tables users cannot write to (platform_admins, business_members): see supabase/migrations.
+// Roles come from tables users cannot write to (platform_admins and platform_members via my_platform_access, business_members): see supabase/migrations.
+import type { PlatformAccess } from '@/domain/types'
 import { type Session, type SupabaseClient, isAuthRetryableFetchError } from '@supabase/supabase-js'
 import type { User } from '@/domain/types'
 import { type Result, type ServiceError, type ServiceErrorCode, fail, ok } from '../catalogService'
@@ -80,8 +81,9 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       if (error || !data.user) return ok(null)
       const u = data.user
       const email = u.email ?? ''
+      // Platform role and permissions (ADR-0029) come from the database, never from the token's metadata.
       const [admin, member] = await Promise.all([
-        sb.from('platform_admins').select('user_id').eq('user_id', u.id).maybeSingle(),
+        sb.rpc('my_platform_access'),
         sb.from('business_members').select('business_id').eq('user_id', u.id).order('created_at', { ascending: false }).limit(1).maybeSingle<{ business_id: string }>(),
       ])
       const err = admin.error ?? member.error
@@ -89,7 +91,8 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       const meta = (u.user_metadata ?? {}) as { display_name?: unknown }
       const displayName = typeof meta.display_name === 'string' && meta.display_name.trim() ? meta.display_name.trim() : undefined
       const base = { id: u.id, name: displayName ?? (email || 'Signed-in user'), email }
-      if (admin.data) return ok({ email, user: { ...base, role: 'super_admin' } })
+      const platform = admin.data as PlatformAccess | null
+      if (platform) return ok({ email, user: { ...base, role: 'super_admin', platform } })
       // A business has exactly one owner (ADR-0024); a user owning several businesses gets the newest one until a switcher exists.
       if (member.data) return ok({ email, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
       return ok({ email, user: null })
