@@ -1,5 +1,5 @@
 import { useCan } from '@/auth/usePermission'
-import { ExternalLink, PackagePlus, Power, Trash2 } from 'lucide-react'
+import { ExternalLink, PackagePlus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
@@ -68,7 +68,7 @@ export default function BusinessDetailPage() {
         meta={
           <>
             <BusinessStatusBadge status={b.status} />
-            <span className="text-[13px] text-ink-muted">/catalog/{b.slug}</span>
+            <span className="text-ui-small text-ink-muted">/catalog/{b.slug}</span>
           </>
         }
         actions={
@@ -77,14 +77,14 @@ export default function BusinessDetailPage() {
               Open catalog
             </Button>
             {can('businesses.status') && can('businesses.edit') && (
-              <Button icon={<Power className="size-4" aria-hidden />} onClick={() => void actions.setActive(b, b.status !== 'active')}>
+              <Button onClick={() => void actions.setActive(b, b.status !== 'active')}>
                 {b.status === 'active' ? 'Deactivate' : 'Activate'}
               </Button>
             )}
             {can('businesses.delete') && (
               <Button
                 variant="ghost"
-                className="text-danger hover:bg-danger-soft"
+                className="text-danger! hover:bg-danger-soft!"
                 icon={<Trash2 className="size-4" aria-hidden />}
                 loading={deleting}
                 onClick={async () => {
@@ -106,7 +106,7 @@ export default function BusinessDetailPage() {
         className="mb-6"
         tabs={[
           { value: 'details', label: 'Details' },
-          { value: 'products', label: 'Products', badge: productCount === undefined ? undefined : <span className="rounded-full bg-subtle px-1.5 text-xs text-ink-muted tabular-nums">{productCount}</span> },
+          { value: 'products', label: 'Products', badge: productCount === undefined ? undefined : <span className="text-ink-muted">{productCount}</span> },
           { value: 'owners', label: 'Owner & history' },
           { value: 'qr', label: 'Catalog & QR' },
         ]}
@@ -115,7 +115,7 @@ export default function BusinessDetailPage() {
       {tab === 'products' && (
         <Card>
           <div className="flex items-center justify-between gap-3 border-b border-line p-4">
-            <p className="text-sm text-ink-muted">Products in {b.name}’s catalog</p>
+            <p className="text-ui-body text-ink-muted">Products in {b.name}’s catalog</p>
             <ButtonLink to={`/admin/products/new?business=${b.id}`} size="sm" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
               Add product
             </ButtonLink>
@@ -146,7 +146,7 @@ export default function BusinessDetailPage() {
         </Card>
       )}
       {tab === 'owners' && (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <BusinessOwnersPanel business={b} />
           <div className="space-y-6">
             <AuditTimeline businessId={b.id} />

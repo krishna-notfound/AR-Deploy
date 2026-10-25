@@ -63,7 +63,7 @@ export default function ApplicationsPage() {
     return {
       value: v,
       label: v === 'all' ? 'All' : applicationStatusLabel(v),
-      badge: n === undefined ? undefined : <span className="tabular-nums opacity-75">({formatNumber(n)})</span>,
+      badge: n === undefined ? undefined : formatNumber(n),
     }
   })
 
@@ -71,10 +71,12 @@ export default function ApplicationsPage() {
     <>
       <PageHeader title="Applications" description="Businesses that applied to join Sanctus. Approving one creates its business as a draft; then invite the owner." />
 
+      <Tabs<TabValue> label="Filter by status" variant="pill" tabs={tabs} value={status ?? 'all'} onChange={(v) => setParam('status', v === 'all' ? '' : v)} className="mb-6" />
+
       <Card>
         <div className="grid grid-cols-2 items-end gap-3 border-b border-line p-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_10rem_10rem]">
           <FormField label="Search" className="col-span-2 md:col-span-1">
-            <SearchInput value={search} onChange={(v) => setParam('q', v)} label="Search applications" placeholder="Business, applicant, email or reference" />
+            <SearchInput value={search} onChange={(v) => setParam('q', v)} label="Search applications" placeholder="Business, applicant, email or reference" className="w-full" />
           </FormField>
           <FormField label="Submitted from">
             <Input type="date" value={from} max={to || undefined} onChange={(e) => setParam('from', e.target.value)} />
@@ -83,10 +85,6 @@ export default function ApplicationsPage() {
             <Input type="date" value={to} min={from || undefined} onChange={(e) => setParam('to', e.target.value)} />
           </FormField>
         </div>
-        <div className="border-b border-line px-4 py-3 sm:px-6">
-          <Tabs<TabValue> label="Filter by status" variant="pill" tabs={tabs} value={status ?? 'all'} onChange={(v) => setParam('status', v === 'all' ? '' : v)} />
-        </div>
-
         <h2 className="sr-only">Results</h2>
         {q.status === 'loading' && !q.data ? (
           <div className="p-5 sm:px-6">
@@ -111,50 +109,50 @@ export default function ApplicationsPage() {
           />
         ) : (
           <>
-            {/* Phones: one card per application. */}
-            <ul className="divide-y divide-line md:hidden" aria-label="Business applications">
+            {/* Phones: one two-line row per application. */}
+            <ul className="divide-y divide-subtle sm:hidden" aria-label="Business applications">
               {q.data.items.map((a) => (
-                <li key={a.id} className="flex items-start gap-3 px-4 py-4">
+                <li key={a.id} className="flex items-start gap-3 px-4 py-3 break-words [overflow-wrap:anywhere]">
                   <Monogram name={a.businessName} />
                   <div className="min-w-0 flex-1">
-                    <Link to={applicationAdminPath(a.id)} className="block truncate text-sm font-medium text-ink hover:underline">
+                    <Link to={applicationAdminPath(a.id)} className="block text-sm leading-5 font-medium text-ink hover:underline">
                       {a.businessName}
                     </Link>
-                    <p className="truncate text-xs text-ink-muted">
+                    <p className="text-[13px] leading-[18px] text-ink-muted">
                       {a.applicantName} · {a.city}, {a.country}
                     </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-muted">
                       <ApplicationStatusBadge status={a.status} />
-                      <span>Submitted {formatDate(a.createdAt)}</span>
+                      <span className="tabular-nums">Submitted {formatDate(a.createdAt)}</span>
                     </div>
                   </div>
                 </li>
               ))}
             </ul>
 
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full text-left text-sm">
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="w-full text-sm">
                 <caption className="sr-only">Business applications</caption>
-                <thead className="border-b border-line bg-canvas/50 text-[10.5px] tracking-[0.16em] text-ink-muted uppercase">
-                  <tr>
-                    <th scope="col" className="py-3 pr-4 pl-6 font-medium">
+                <thead>
+                  <tr className="border-b border-line text-left text-[13px] leading-[18px] font-medium text-ink-muted">
+                    <th scope="col" className="h-10 w-[35%] px-4 py-0 pl-6 font-medium whitespace-nowrap">
                       Business
                     </th>
-                    <th scope="col" className="px-4 py-3 font-medium">
+                    <th scope="col" className="h-10 px-4 py-0 font-medium whitespace-nowrap">
                       Applicant
                     </th>
-                    <th scope="col" className="px-4 py-3 font-medium">
+                    <th scope="col" className="h-10 px-4 py-0 font-medium whitespace-nowrap">
                       Status
                     </th>
-                    <th scope="col" className="hidden px-4 py-3 font-medium lg:table-cell">
+                    <th scope="col" className="hidden h-10 px-4 py-0 text-right font-medium whitespace-nowrap lg:table-cell">
                       Submitted
                     </th>
-                    <th scope="col" className="py-3 pr-6 pl-4 text-right font-medium">
+                    <th scope="col" className="h-10 w-12 py-0 pr-6 pl-4 text-right font-medium whitespace-nowrap">
                       <span className="sr-only">Actions</span>
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody className="divide-y divide-subtle">
                   {q.data.items.map((a) => (
                     <ApplicationRow key={a.id} a={a} />
                   ))}
@@ -172,33 +170,33 @@ export default function ApplicationsPage() {
 function ApplicationRow({ a }: { a: BusinessApplication }) {
   const nameId = `app-${a.id}`
   return (
-    <tr className="transition-colors hover:bg-canvas/70">
-      <td className="py-4 pr-4 pl-6">
+    <tr className="h-[60px] transition-colors hover:bg-canvas/70">
+      <td className="min-w-0 py-[11px] pr-4 pl-6 align-middle break-words [overflow-wrap:anywhere]">
         <div className="flex items-center gap-3">
           <Monogram name={a.businessName} />
           <div className="min-w-0">
-            <Link id={nameId} to={applicationAdminPath(a.id)} className="font-medium text-ink hover:underline">
+            <Link id={nameId} to={applicationAdminPath(a.id)} className="text-sm leading-5 font-medium text-ink hover:underline">
               {a.businessName}
             </Link>
-            <p className="text-xs text-ink-muted">
+            <p className="text-[13px] leading-[18px] text-ink-muted">
               #{a.reference} · <span className="capitalize">{a.category}</span> · {a.city}, {a.country}
             </p>
           </div>
         </div>
       </td>
-      <td className="px-4 py-4">
-        <p className="text-ink-body">{a.applicantName}</p>
-        <p className="max-w-[16rem] truncate text-xs text-ink-muted">{a.applicantEmail}</p>
+      <td className="px-4 py-[11px] align-middle">
+        <p className="text-sm leading-5 text-ink">{a.applicantName}</p>
+        <p className="max-w-[16rem] truncate text-[13px] leading-[18px] text-ink-muted">{a.applicantEmail}</p>
       </td>
-      <td className="px-4 py-4">
+      <td className="px-4 py-[11px] align-middle">
         <ApplicationStatusBadge status={a.status} />
       </td>
-      <td className="hidden px-4 py-4 whitespace-nowrap lg:table-cell">
-        <p className="text-ink-body">{formatDate(a.createdAt)}</p>
-        <p className="text-xs text-ink-muted">Updated {formatRelative(a.updatedAt)}</p>
+      <td className="hidden px-4 py-[11px] text-right align-middle whitespace-nowrap tabular-nums lg:table-cell">
+        <p className="text-sm leading-5 text-ink">{formatDate(a.createdAt)}</p>
+        <p className="text-[13px] leading-[18px] text-ink-muted">Updated {formatRelative(a.updatedAt)}</p>
       </td>
-      <td className="py-4 pr-6 pl-4 text-right">
-        <ButtonLink to={applicationAdminPath(a.id)} size="sm" variant={isOpen(a.status) ? 'primary' : 'secondary'} aria-describedby={nameId}>
+      <td className="py-[11px] pr-6 pl-4 text-right align-middle">
+        <ButtonLink to={applicationAdminPath(a.id)} size="sm" variant={isOpen(a.status) ? 'secondary' : 'ghost'} aria-describedby={nameId}>
           {isOpen(a.status) ? 'Review' : 'View'}
         </ButtonLink>
       </td>

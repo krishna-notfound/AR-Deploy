@@ -7,7 +7,7 @@ import { BusinessStatusBadge } from '@/components/ui/Badge'
 import { ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { type Column, DataTable } from '@/components/ui/DataTable'
-import { Select } from '@/components/ui/Form'
+import { FormField, Select } from '@/components/ui/Form'
 import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
@@ -22,7 +22,7 @@ import { Monogram } from '../applications/Monogram'
 
 function BusinessMark({ b, className }: { b: Business; className?: string }) {
   return b.logoUrl ? (
-    <SmartImage src={b.logoUrl} alt="" className={`size-10 shrink-0 border border-line bg-surface object-contain p-0.5 ${className ?? ''}`} />
+    <SmartImage src={b.logoUrl} alt="" className={`size-8 shrink-0 border border-line bg-surface object-contain p-0.5 ${className ?? ''}`} />
   ) : (
     <Monogram name={b.name} className={className} />
   )
@@ -87,11 +87,11 @@ export default function BusinessesListPage() {
       cell: (r) => (
         <div className="flex items-center gap-3">
           <BusinessMark b={r.catalog.business} />
-          <div className="min-w-0">
-            <Link to={businessAdminPath(r.catalog.business.id)} className="block truncate font-medium hover:underline">
+          <div className="max-w-[24rem] min-w-0">
+            <Link to={businessAdminPath(r.catalog.business.id)} className="block truncate text-sm leading-5 font-medium hover:underline">
               {r.catalog.business.name}
             </Link>
-            <span className="block truncate text-xs text-ink-muted">{r.catalog.catalogUrl.replace('https://', '')}</span>
+            <span className="block truncate text-ui-small text-ink-muted">{r.catalog.catalogUrl.replace(/^https?:\/\//, '')}</span>
           </div>
         </div>
       ),
@@ -101,7 +101,7 @@ export default function BusinessesListPage() {
     { key: 'views', header: 'Views', align: 'right', priority: 'low', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
     { key: 'ar', header: 'AR', align: 'right', priority: 'low', sortValue: (r) => r.ar, cell: (r) => formatNumber(r.ar) },
     { key: 'status', header: 'Status', sortValue: (r) => r.catalog.business.status, cell: (r) => <BusinessStatusBadge status={r.catalog.business.status} /> },
-    { key: 'updated', header: 'Last updated', sortValue: (r) => r.catalog.business.updatedAt, cell: (r) => <span className="text-ink-muted">{formatDate(r.catalog.business.updatedAt)}</span> },
+    { key: 'updated', header: 'Last updated', align: 'right', sortValue: (r) => r.catalog.business.updatedAt, cell: (r) => <span className="whitespace-nowrap">{formatDate(r.catalog.business.updatedAt)}</span> },
     {
       key: 'actions',
       header: 'Actions',
@@ -125,14 +125,18 @@ export default function BusinessesListPage() {
         }
       />
       <Card>
-        <div className="flex flex-col gap-2 border-b border-line p-4 sm:flex-row sm:items-center sm:px-6">
-          <SearchInput value={q} onChange={(v) => setParam('q', v)} label="Search businesses" placeholder="Search by name or address" className="sm:w-72" />
-          <Select aria-label="Filter by status" value={status} onChange={(e) => setParam('status', e.target.value)} className="sm:w-44">
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="draft">Draft</option>
-          </Select>
+        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-end sm:px-6">
+          <FormField label="Search">
+            <SearchInput value={q} onChange={(v) => setParam('q', v)} label="Search businesses" placeholder="Search by name or address" />
+          </FormField>
+          <FormField label="Status">
+            <Select aria-label="Filter by status" value={status} onChange={(e) => setParam('status', e.target.value)} className="sm:w-44">
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="draft">Draft</option>
+            </Select>
+          </FormField>
         </div>
         {catalogs.status === 'error' && !catalogs.data ? (
           <ErrorState message={catalogs.error.message} onRetry={catalogs.refetch} />
@@ -144,6 +148,7 @@ export default function BusinessesListPage() {
             loading={catalogs.status === 'loading' && !catalogs.data}
             caption="Businesses"
             noun="businesses"
+            twoLine
             initialSort={{ key: 'updated', dir: 'desc' }}
             page={page}
             onPageChange={(p) => setParam('page', p > 1 ? String(p) : '')}
@@ -165,12 +170,12 @@ export default function BusinessesListPage() {
             }
             mobileRow={(r) => (
               <div className="flex items-center gap-3">
-                <BusinessMark b={r.catalog.business} className="size-11" />
+                <BusinessMark b={r.catalog.business} />
                 <div className="min-w-0 flex-1">
-                  <Link to={businessAdminPath(r.catalog.business.id)} className="block truncate text-sm font-medium">
+                  <Link to={businessAdminPath(r.catalog.business.id)} className="block text-sm leading-5 font-medium">
                     {r.catalog.business.name}
                   </Link>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-small text-ink-muted tabular-nums">
                     <BusinessStatusBadge status={r.catalog.business.status} />
                     <span>
                       {r.catalog.publishedProductCount}/{r.catalog.totalProductCount} published

@@ -30,8 +30,8 @@ export function AuditTimeline({ applicationId, businessId, title = 'History' }: 
           <ol className="relative space-y-4 border-l border-line pl-5">
             {items.map((e) => (
               <li key={e.id} className="relative">
-                <span className="absolute top-1.5 -left-[25px] size-2 rounded-full bg-accent" aria-hidden />
-                <p className="text-sm text-ink">
+                <span className="absolute top-2 -left-[25px] size-2 rounded-full bg-ink" aria-hidden />
+                <p className="text-ui-body text-ink">
                   <span className="font-medium">{eventLabel(e.eventType)}</span>
                   {e.toStatus && (
                     <span className="text-ink-muted">
@@ -41,10 +41,10 @@ export function AuditTimeline({ applicationId, businessId, title = 'History' }: 
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-ink-muted">
+                <p className="text-ui-small text-ink-muted tabular-nums">
                   {formatDateTime(e.createdAt)} · {e.actorEmail ?? (e.actorId ? `User ${e.actorId.slice(0, 8)}` : 'System')}
                 </p>
-                {typeof e.metadata.reason === 'string' && <p className="mt-1 text-xs text-ink-body">Reason: {e.metadata.reason}</p>}
+                {typeof e.metadata.reason === 'string' && <p className="mt-1 text-ui-small text-ink-body">Reason: {e.metadata.reason}</p>}
               </li>
             ))}
           </ol>

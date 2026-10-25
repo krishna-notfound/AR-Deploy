@@ -117,7 +117,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
         meta={
           <>
             <ApplicationStatusBadge status={app.status} />
-            <span className="text-xs text-ink-muted">
+            <span className="text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
               #{app.reference} · submitted {formatDateTime(app.createdAt)}
             </span>
           </>
@@ -130,7 +130,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               </Button>
             )}
             {actions.includes('reject') && can('applications.reject') && (
-              <Button variant="danger" icon={<X className="size-4" aria-hidden />} onClick={() => setRejectOpen(true)}>
+              <Button variant="secondary" className="border-danger! text-danger! hover:bg-danger-soft!" icon={<X className="size-4" aria-hidden />} onClick={() => setRejectOpen(true)}>
                 Reject
               </Button>
             )}
@@ -143,7 +143,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           {needsOwner && (
             <InlineNotice tone="info">
@@ -216,17 +216,21 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               />
               <CardBody>
                 {business.data ? (
-                  <p className="flex flex-wrap items-center gap-2 text-sm">
-                    <Link to={businessAdminPath(business.data.id)} className="font-medium text-ink hover:underline">
-                      {business.data.name}
-                    </Link>
-                    <BusinessStatusBadge status={business.data.status} />
-                    <span className="text-xs text-ink-muted">Catalogue address: {business.data.slug}</span>
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[var(--radius-control)] bg-subtle px-4 py-3 text-ui-body">
+                    <p className="flex flex-wrap items-center gap-2">
+                      <Link to={businessAdminPath(business.data.id)} className="font-medium text-ink hover:underline">
+                        {business.data.name}
+                      </Link>
+                      <BusinessStatusBadge status={business.data.status} />
+                    </p>
+                    <span className="text-ink-muted">
+                      Catalogue address: <span className="text-ink">{business.data.slug}</span>
+                    </span>
+                  </div>
                 ) : business.status === 'error' ? (
                   <ErrorState message={business.error.message} onRetry={business.refetch} />
                 ) : (
-                  <p className="text-sm text-ink-muted">Loading…</p>
+                  <p className="text-ui-body text-ink-muted">Loading…</p>
                 )}
               </CardBody>
             </Card>
@@ -281,11 +285,11 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
 
 function Answers({ rows }: { rows: [string, React.ReactNode | undefined][] }) {
   return (
-    <dl className="divide-y divide-line">
+    <dl className="divide-y divide-subtle">
       {rows.map(([label, value]) => (
-        <div key={label} className="grid gap-1 py-2.5 sm:grid-cols-[180px_1fr] sm:gap-4">
-          <dt className="text-xs text-ink-muted">{label}</dt>
-          <dd className="text-sm break-words whitespace-pre-line text-ink-body">{value || <span className="text-ink-faint">Not given</span>}</dd>
+        <div key={label} className="grid gap-1 py-2.5 sm:grid-cols-[160px_1fr] sm:gap-4">
+          <dt className="text-ui-body text-ink-muted">{label}</dt>
+          <dd className="text-ui-body break-words whitespace-pre-line text-ink">{value || <span className="text-ink-muted italic">Not given</span>}</dd>
         </div>
       ))}
     </dl>

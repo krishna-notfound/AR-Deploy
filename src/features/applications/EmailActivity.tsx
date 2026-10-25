@@ -23,18 +23,18 @@ export function EmailActivity({ applicationId, businessId }: { applicationId?: I
         ) : !q.data?.length ? (
           <EmptyState icon={Mail} title="No emails yet" body="Confirmation, notification and invitation emails will appear here." className="py-6" />
         ) : (
-          <ul className="divide-y divide-line border-y border-line">
+          <ul className="divide-y divide-subtle border-y border-line">
             {q.data.map((e) => (
               <li key={e.id} className="grid gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-4">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink">
+                  <p className="text-ui-body font-medium text-ink">
                     {EMAIL_KIND_LABEL[e.kind] ?? e.kind}
-                    {e.attempt > 1 && <span className="ml-2 text-xs font-normal text-ink-muted">attempt {e.attempt}</span>}
+                    {e.attempt > 1 && <span className="ml-2 text-ui-small font-normal text-ink-muted">attempt {e.attempt}</span>}
                   </p>
-                  <p className="truncate text-xs text-ink-muted">
+                  <p className="text-ui-small [overflow-wrap:anywhere] text-ink-muted tabular-nums">
                     To {e.recipient} · {formatDateTime(e.createdAt)}
                   </p>
-                  {emailReason(e.error) && <p className="mt-1 text-xs text-ink-muted">{emailReason(e.error)}</p>}
+                  {emailReason(e.error) && <p className="mt-1 text-ui-small text-ink-muted">{emailReason(e.error)}</p>}
                 </div>
                 <EmailStatusBadge status={e.status} />
               </li>
