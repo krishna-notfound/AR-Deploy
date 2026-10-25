@@ -101,7 +101,8 @@ describe('SupabaseAccountProvider', () => {
     expect(await screen.findByText('error:Database unavailable')).toBeInTheDocument()
     expect(screen.getByText('user:loading')).toBeInTheDocument()
     await emit() // signing in again with the same session
-    expect(await screen.findByText('user:Rui')).toBeInTheDocument()
+    // The reload goes through the demo service's simulated latency; under a full parallel run that can pass 5 s.
+    expect(await screen.findByText('user:Rui', undefined, { timeout: 15_000 })).toBeInTheDocument()
     expect(screen.getByText('business:biz_casa')).toBeInTheDocument()
     expect(screen.getByText('error:-')).toBeInTheDocument()
   })
