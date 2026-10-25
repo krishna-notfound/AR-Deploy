@@ -31,6 +31,7 @@ const AdminSettingsPage = lazy(() => import('@/features/admin/AdminSettingsPage'
 const ApplicationsPage = lazy(() => import('@/features/admin/ApplicationsPage'))
 const ApplicationDetailPage = lazy(() => import('@/features/admin/ApplicationDetailPage'))
 const AuditLogPage = lazy(() => import('@/features/admin/AuditLogPage'))
+const TeamPage = lazy(() => import('@/features/team/TeamPage'))
 const ProductEditorPage = lazy(() => import('@/features/products/ProductEditorPage'))
 
 const BusinessOverviewPage = lazy(() => import('@/features/business/BusinessOverviewPage'))
@@ -81,6 +82,7 @@ const adminRoutes: RouteObject = {
     { path: 'products/:productId/edit', element: <RequirePermission need="products.edit"><ProductEditorPage scope="admin" /></RequirePermission> },
     { path: 'analytics', element: <RequirePermission need="analytics.view"><AdminAnalyticsPage /></RequirePermission> },
     { path: 'catalogs', element: <RequirePermission need="products.view"><AdminCatalogsPage /></RequirePermission> },
+    { path: 'team', element: <RequirePermission need="owner"><TeamPage /></RequirePermission> },
     { path: 'activity', element: <RequirePermission need={['records.view', 'access.view']}><AuditLogPage /></RequirePermission> },
     { path: 'settings', element: <RequirePermission need="owner"><AdminSettingsPage /></RequirePermission> },
     { path: '*', element: <NotFoundPage inShell /> },

@@ -1,0 +1,120 @@
+// Member actions shared by the team list, the invitation panel and the member page (ADR-0029): each one confirms
+// what will happen, calls the service, and says what actually happened (an email failure is never shown as sent).
+import { useCallback } from 'react'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { useToast } from '@/components/ui/ToastProvider'
+import type { InviteOutcome, MemberRole, PlatformMember } from '@/domain/types'
+import { formatDate } from '@/lib/format'
+import { service } from '@/services'
+import type { Result } from '@/services/catalogService'
+import { PERMISSION_LABEL, ROLE_LABEL } from './permissions'
+
+export function useMemberActions() {
+  const confirm = useConfirm()
+  const toast = useToast()
+
+  const report = useCallback(
+    <T,>(r: Result<T>, success: string, body?: string): boolean => {
+      if (r.ok) toast.success(success, body)
+      else toast.error('Not changed', r.error.message)
+      return r.ok
+    },
+    [toast],
+  )
+
+  const reportInvite = useCallback(
+    (r: Result<InviteOutcome>, email: string): boolean => {
+      if (!r.ok) {
+        toast.error('Invitation not sent', r.error.message)
+        return false
+      }
+      if (r.data.status === 'email_failed') {
+        toast.error('Invitation saved, but the email was not delivered', r.data.error ?? 'Try resending it.')
+        return true
+      }
+      toast.success(`Invitation sent to ${email}`, `The link works once and expires on ${formatDate(r.data.expiresAt)}.`)
+      return true
+    },
+    [toast],
+  )
+
+  const resend = useCallback(
+    async (m: PlatformMember) => {
+      const yes = await confirm({
+        title: `Send a new invitation to ${m.email}?`,
+        body: 'The earlier link stops working. The new one works once and expires in 7 days.',
+        confirmLabel: 'Resend invitation',
+      })
+      if (!yes) return false
+      return reportInvite(await service.resendMemberInvite(m.id), m.email)
+    },
+    [confirm, reportInvite],
+  )
+
+  const revoke = useCallback(
+    async (m: PlatformMember) => {
+      const yes = await confirm({
+        title: `Revoke the invitation for ${m.email}?`,
+        body: 'The link stops working straight away. You can invite them again later.',
+        confirmLabel: 'Revoke invitation',
+        destructive: true,
+      })
+      if (!yes) return false
+      return report(await service.revokeMemberInvite(m.id), 'Invitation revoked')
+    },
+    [confirm, report],
+  )
+
+  const deactivate = useCallback(
+    async (m: PlatformMember) => {
+      const who = m.fullName ?? m.email
+      const yes = await confirm({
+        title: `Deactivate ${who}?`,
+        body: `${who} loses access immediately and is signed out on every device. You can reactivate them later.`,
+        confirmLabel: 'Deactivate',
+        destructive: true,
+      })
+      if (!yes) return false
+      return report(await service.deactivateMember(m.id), `${who} deactivated`)
+    },
+    [confirm, report],
+  )
+
+  const reactivate = useCallback(
+    async (m: PlatformMember) => {
+      const who = m.fullName ?? m.email
+      const yes = await confirm({
+        title: `Reactivate ${who}?`,
+        body: m.userId
+          ? `${who} gets the ${ROLE_LABEL[m.role]} permissions back and can sign in again.`
+          : `${who} never accepted. They go back to "invited" and need a new invitation.`,
+        confirmLabel: 'Reactivate',
+      })
+      if (!yes) return false
+      return report(await service.reactivateMember(m.id), `${who} reactivated`)
+    },
+    [confirm, report],
+  )
+
+  const changeRole = useCallback(
+    async (m: PlatformMember, role: MemberRole, lost: string[], gained: string[]) => {
+      const who = m.fullName ?? m.email
+      const yes = await confirm({
+        title: `Make ${who} ${ROLE_LABEL[role]}?`,
+        body: (
+          <div className="space-y-2">
+            {lost.length > 0 && <p>Loses: {lost.map((p) => PERMISSION_LABEL[p as keyof typeof PERMISSION_LABEL] ?? p).join(', ')}.</p>}
+            {gained.length > 0 && <p>Gains: {gained.map((p) => PERMISSION_LABEL[p as keyof typeof PERMISSION_LABEL] ?? p).join(', ')}.</p>}
+            <p>This applies to their next action.</p>
+          </div>
+        ),
+        confirmLabel: `Make ${ROLE_LABEL[role]}`,
+      })
+      if (!yes) return false
+      return report(await service.setMemberRole(m.id, role), `${who} is now ${ROLE_LABEL[role]}`)
+    },
+    [confirm, report],
+  )
+
+  return { resend, revoke, deactivate, reactivate, changeRole, reportInvite }
+}
