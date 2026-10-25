@@ -1,18 +1,23 @@
 import { useCan } from '@/auth/usePermission'
 import { ExternalLink, PackagePlus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
-import { useParams, useSearchParams } from 'react-router'
+import { useId, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { BusinessStatusBadge } from '@/components/ui/Badge'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { MenuItem } from '@/components/ui/Menu'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { Tabs } from '@/components/ui/Tabs'
+import { useToast } from '@/components/ui/ToastProvider'
 import { Package } from 'lucide-react'
+import type { Business, ClosureRequest } from '@/domain/types'
+import { formatDate } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { catalogLocalPath } from '@/lib/urls'
-import { service } from '@/services'
+import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
 import { AuditTimeline } from '../applications/AuditTimeline'
@@ -22,6 +27,7 @@ import { useBusinessActions } from '../businesses/useBusinessActions'
 import { CatalogQrPanel } from '../catalogs/CatalogQrPanel'
 import { ProductTable } from '../products/ProductTable'
 import { useProductStats } from '../products/useCatalogData'
+import { ActionCodeDialog } from '../settings/ActionCodeDialog'
 
 type Tab = 'details' | 'products' | 'owners' | 'qr'
 
@@ -39,6 +45,12 @@ export default function BusinessDetailPage() {
   const stats = useProductStats(businessId)
   const actions = useBusinessActions()
   const [deleting, setDeleting] = useState(false)
+  // Closure requests are the Owner's to complete or restore (spec 8); nobody else sees or loads them.
+  const isPlatformOwner = can('owner')
+  const closures = useServiceQuery(
+    () => (isPlatformOwner ? account.listClosureRequests() : Promise.resolve({ ok: true as const, data: [] as ClosureRequest[] })),
+    [isPlatformOwner],
+  )
 
   if (business.status === 'loading' && !b) return <FullPageSpinner />
   if (!b) {
@@ -75,6 +87,7 @@ export default function BusinessDetailPage() {
     ...(canToggle ? [{ label: b.status === 'active' ? 'Deactivate' : 'Activate', onSelect: toggleActive }] : []),
     ...(canDelete ? [{ label: 'Delete', icon: <Trash2 aria-hidden />, destructive: true, disabled: deleting, onSelect: () => void onDelete() }] : []),
   ]
+  const closure = closures.data?.find((r) => r.businessId === b.id)
 
   return (
     <>
@@ -112,6 +125,21 @@ export default function BusinessDetailPage() {
           </>
         }
       />
+      {isPlatformOwner && closures.status === 'error' && !closures.data && (
+        <Card className="mb-6">
+          <ErrorState message={`Could not check for a closure request. ${closures.error.message}`} onRetry={closures.refetch} />
+        </Card>
+      )}
+      {closure && (
+        <ClosureBanner
+          business={b}
+          request={closure}
+          onRestored={() => {
+            closures.refetch()
+            business.refetch()
+          }}
+        />
+      )}
       <Tabs
         label="Business sections"
         value={tab}
@@ -179,5 +207,87 @@ export default function BusinessDetailPage() {
           <FullPageSpinner />
         ))}
     </>
+  )
+}
+
+const ALREADY_HANDLED = 'This closure was already handled.'
+
+/** A business owner asked to close their account (spec 8): the catalog is offline until the Owner completes or restores. */
+function ClosureBanner({ business, request, onRestored }: { business: Business; request: ClosureRequest; onRestored: () => void }) {
+  const prefs = usePreferences()
+  const confirm = useConfirm()
+  const toast = useToast()
+  const navigate = useNavigate()
+  const titleId = useId()
+  const [completing, setCompleting] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+
+  // Completed or restored elsewhere (another tab or Owner session) since this page loaded: say so and reload.
+  const alreadyHandled = () => {
+    toast.info(ALREADY_HANDLED)
+    onRestored()
+  }
+
+  const restore = async () => {
+    if (restoring) return
+    const ok = await confirm({
+      title: `Restore ${business.name}?`,
+      body: 'The closure request is removed and the catalog goes back to the status it had before. We email the owner.',
+      confirmLabel: 'Restore',
+    })
+    if (!ok) return
+    setRestoring(true)
+    const r = await account.restoreClosure(request.userId)
+    setRestoring(false)
+    if (r.ok) {
+      toast.success('Business restored', 'The catalog is back at its previous status and the owner was emailed.')
+      onRestored()
+    } else if (r.error.reason === 'not_found') alreadyHandled()
+    else toast.error('Could not restore the business', r.error.message)
+  }
+
+  return (
+    <Card role="region" aria-labelledby={titleId} className="mb-6 border border-warning/40 p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 max-w-2xl">
+          <h2 id={titleId} className="text-ui-card font-semibold text-ink">
+            Closure requested
+          </h2>
+          <p className="mt-1 text-ui-body break-words text-ink-body">
+            {request.email} asked to close their account on {formatDate(request.requestedAt, 'en', prefs)}. The catalog is offline until you complete the closure,
+            which deletes the business and their account, or restore it.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => void restore()} loading={restoring} disabled={completing}>
+            Restore
+          </Button>
+          <Button variant="danger" onClick={() => setCompleting(true)} disabled={restoring}>
+            Complete closure
+          </Button>
+        </div>
+      </div>
+      <ActionCodeDialog
+        open={completing}
+        purpose="complete_closure"
+        title={`Complete closure of ${business.name}?`}
+        description="This deletes the business with its products, photos and models, and the owner's account. It can't be undone. We email the owner a final notice."
+        confirmLabel="Complete closure"
+        destructive
+        onClose={() => setCompleting(false)}
+        onConfirm={async (code) => {
+          const r = await account.completeClosure(request.userId, code)
+          if (r.ok) {
+            toast.success('Closure completed', `${business.name} and its owner's account were deleted.`)
+            navigate('/admin/businesses')
+          } else if (r.error.reason === 'not_found') {
+            // Nothing left to complete: close the dialog (an ok answer closes it) and show the current state.
+            alreadyHandled()
+            return { ok: true as const, data: undefined }
+          }
+          return r
+        }}
+      />
+    </Card>
   )
 }

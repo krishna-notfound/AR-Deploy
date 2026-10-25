@@ -1,21 +1,29 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { DashboardContext } from '@/components/layout/dashboardContext'
 import { Monogram } from '../applications/Monogram'
 import { ToastProvider } from '@/components/ui/ToastProvider'
-import { service } from '@/services'
+import { account, service } from '@/services'
+import { ok } from '@/services/catalogService'
+import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
 import AdminOverviewPage from './AdminOverviewPage'
 import ApplicationsPage from './ApplicationsPage'
+import BusinessesListPage from './BusinessesListPage'
 
 beforeEach(async () => {
   localStorage.clear()
   sessionStorage.clear()
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
+  resetMockAccount()
   await service.resetDemoData()
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 /** The demo seed has no applications: submit one so the list has an open row (a "Review" button). */
@@ -131,5 +139,79 @@ describe('AdminOverviewPage header at narrow widths', () => {
     await user.click(screen.getByRole('button', { name: 'More actions' }))
     const menu = screen.getByRole('menu', { name: 'More actions' })
     expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent?.trim())).toEqual(['View catalogs', 'Add product'])
+  })
+})
+
+describe('BusinessesListPage: closure requests (Owner only)', () => {
+  /** The demo's one closure request, pointed at a seeded business (Oak & Ember, inactive). */
+  function closureOn(businessId: string) {
+    const original = account.listClosureRequests.bind(account)
+    return vi.spyOn(account, 'listClosureRequests').mockImplementation(async () => {
+      const r = await original()
+      return r.ok ? ok(r.data.map((x) => ({ ...x, businessId }))) : r
+    })
+  }
+
+  it('Businesses: Closure requested filter lists requested businesses', async () => {
+    closureOn('biz_oak')
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    expect((await screen.findAllByText('Nordhaus Living')).length).toBeGreaterThan(0)
+    const chip = await screen.findByRole('button', { name: 'Closure requested 1' })
+    expect(chip).toHaveAttribute('aria-pressed', 'false')
+    await user.click(chip)
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByText('Oak & Ember Studio').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Nordhaus Living')).toHaveLength(0)
+    expect(screen.queryAllByText('Casa Lisboa Interiors')).toHaveLength(0)
+    // Off again: every business.
+    await user.click(chip)
+    expect(screen.getAllByText('Nordhaus Living').length).toBeGreaterThan(0)
+  })
+
+  it('says so when no business has asked to close', async () => {
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([]))
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    const chip = await screen.findByRole('button', { name: 'Closure requested 0' })
+    await user.click(chip)
+    expect(await screen.findByText('No closure requests')).toBeInTheDocument()
+  })
+
+  it('none of these appear for Admin or Team', async () => {
+    const list = closureOn('biz_oak')
+    for (const platformRole of ['admin', 'team'] as const) {
+      localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole }))
+      const { unmount } = renderAt('/admin/businesses', <BusinessesListPage />)
+      expect((await screen.findAllByText('Nordhaus Living')).length).toBeGreaterThan(0)
+      expect(screen.queryByRole('button', { name: /Closure requested/ })).toBeNull()
+      expect(screen.queryByRole('region', { name: 'Requests without a business' })).toBeNull()
+      unmount()
+    }
+    expect(list).not.toHaveBeenCalled()
+  })
+
+  it('lists a closure request whose business is gone, and completes it with the action code', async () => {
+    // The demo request names a business that is not on the platform (as after a partly finished closure).
+    const e = await account.startTotpEnrollment()
+    if (!e.ok) throw new Error('enrollment did not start')
+    await account.confirmTotpEnrollment(e.data.factorId, DEMO_CODE)
+    const complete = vi.spyOn(account, 'completeClosure')
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    const chip = await screen.findByRole('button', { name: 'Closure requested 1' })
+    expect(screen.queryByRole('region', { name: 'Requests without a business' })).toBeNull()
+    await user.click(chip)
+    const orphans = await screen.findByRole('region', { name: 'Requests without a business' })
+    expect(within(orphans).getByText('closing@demo.example')).toBeInTheDocument()
+    await user.click(within(orphans).getByRole('button', { name: 'Complete closure for closing@demo.example' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Complete closure for closing@demo.example?' })
+    await within(dialog).findByText(/We emailed a 6-digit code/)
+    await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(within(dialog).getByRole('button', { name: 'Complete closure' }))
+    expect(await screen.findByText('Closure completed')).toBeInTheDocument()
+    expect(complete).toHaveBeenCalledWith('demo-closing-owner', DEMO_CODE)
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Requests without a business' })).toBeNull())
+    expect(screen.getByRole('button', { name: 'Closure requested 0' })).toBeInTheDocument()
   })
 })
