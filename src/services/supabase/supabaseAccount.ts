@@ -190,8 +190,21 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     }
   }
 
-  /** The session's assurance level changes when factors are removed: pick up the new token. */
-  const refresh = () => sb.auth.refreshSession().catch(() => undefined)
+  /**
+   * The session's assurance level changes when factors are removed: pick up the new token. One retry when the first
+   * refresh fails; the change itself was accepted either way (the UI keeps "no factor" until a reload confirms it).
+   */
+  const refresh = async () => {
+    const once = async () => {
+      try {
+        const { error } = await sb.auth.refreshSession()
+        return !error
+      } catch {
+        return false
+      }
+    }
+    if (!(await once())) await once()
+  }
   /** Client-side audit events; a logging failure never undoes the change the user made. */
   const logEvent = (p_event: 'account_password_changed' | 'account_email_change_requested') => sb.rpc('log_account_event', { p_event }).then(() => undefined, () => undefined)
   const voidOf = (r: Result<unknown>): Result<void> => (r.ok ? ok(undefined) : r)

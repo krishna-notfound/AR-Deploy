@@ -3,7 +3,7 @@
 import { act } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { SecurityState } from '@/domain/types'
-import type { AccountService, AuthService, SignedInAccount } from '@/services'
+import type { AccountService, AssuranceLevels, AuthService, SignedInAccount } from '@/services'
 import { accountFail } from '@/services/accountService'
 import { fail, ok } from '@/services/catalogService'
 
@@ -20,13 +20,15 @@ export function fakeAuth(initial: SignedInAccount | null = null, signsInAs: Sign
   let session: SignedInAccount | null = initial
   /** Fires an auth event (SIGNED_IN, TOKEN_REFRESHED…): the provider reloads the account. */
   const emit = () => act(() => listeners.forEach((l) => l()))
+  /** An auth event raised by supabase-js itself (MFA_CHALLENGE_VERIFIED, TOKEN_REFRESHED): delivered a tick later. */
+  const fire = () => void setTimeout(() => listeners.forEach((l) => l()), 0)
   const auth: AuthService = {
     getSession: vi.fn(async () => ok(null)),
     getCurrentUser: vi.fn(async () => ok(session)),
     signInWithPassword: vi.fn(async (_email: string, password: string) => {
       if (password !== 'right-password') return { ok: false as const, error: { code: 'VALIDATION' as const, message: 'Email or password is incorrect.', reason: 'invalid_credentials' } }
       session = signsInAs
-      setTimeout(() => listeners.forEach((l) => l()), 0) // SIGNED_IN
+      fire() // SIGNED_IN
       return ok(undefined)
     }),
     signOut: vi.fn(async () => {
@@ -43,7 +45,7 @@ export function fakeAuth(initial: SignedInAccount | null = null, signsInAs: Sign
       return () => listeners.delete(l)
     }),
   }
-  return { auth, emit, setSession: (s: SignedInAccount | null) => (session = s) }
+  return { auth, emit, fire, setSession: (s: SignedInAccount | null) => (session = s) }
 }
 
 export interface FakeSecurity {
@@ -51,10 +53,18 @@ export interface FakeSecurity {
   aal: 'aal1' | 'aal2'
   requires2fa: boolean
   recovery: string[]
+  /**
+   * What the local session reports (mfa.getAuthenticatorAssuranceLevel) when it differs from the server state: a
+   * stale value, or 'fail'. Undefined: derived from factor and aal. A verified code makes the local value current.
+   */
+  local?: AssuranceLevels | 'fail'
 }
 
-/** An account service with just the 2FA methods; every other method fails loudly. */
-export function fakeAccount(start: Partial<FakeSecurity> = {}) {
+/**
+ * An account service with just the 2FA methods; every other method fails loudly. `fire` raises the auth events the
+ * real supabase-js raises: MFA_CHALLENGE_VERIFIED after a verified code, TOKEN_REFRESHED after a recovery code.
+ */
+export function fakeAccount(start: Partial<FakeSecurity> = {}, fire: () => void = () => {}) {
   const s: FakeSecurity = { factor: false, aal: 'aal1', requires2fa: false, recovery: [RECOVERY], ...start }
   const normalise = (c: string) => c.toUpperCase().replace(/[\s-]/g, '')
   const state = (): SecurityState => ({
@@ -69,12 +79,17 @@ export function fakeAccount(start: Partial<FakeSecurity> = {}) {
   let pendingFactor: string | null = null
   const impl: Partial<AccountService> = {
     getSecurityState: vi.fn(async () => ok(state())),
-    getAssurance: vi.fn(async () => ok({ currentLevel: s.aal, nextLevel: s.factor ? ('aal2' as const) : ('aal1' as const) })),
+    getAssurance: vi.fn(async () => {
+      if (s.local === 'fail') return accountFail('unknown')
+      return ok(s.local ?? { currentLevel: s.aal, nextLevel: s.factor ? ('aal2' as const) : ('aal1' as const) })
+    }),
     recordSignIn: vi.fn(async () => ok(undefined)),
     verifyTotpForSignIn: vi.fn(async (code: string) => {
       if (!s.factor) return accountFail('not_found')
       if (code !== TOTP) return accountFail('invalid_code')
       s.aal = 'aal2'
+      if (s.local !== 'fail') s.local = undefined
+      fire()
       return ok(undefined)
     }),
     redeemRecoveryCode: vi.fn(async (code: string) => {
@@ -83,6 +98,8 @@ export function fakeAccount(start: Partial<FakeSecurity> = {}) {
       s.recovery.splice(i, 1)
       s.factor = false
       s.aal = 'aal1'
+      if (s.local !== 'fail') s.local = undefined
+      fire()
       return ok(undefined)
     }),
     startTotpEnrollment: vi.fn(async () => {
@@ -94,6 +111,8 @@ export function fakeAccount(start: Partial<FakeSecurity> = {}) {
       if (code !== TOTP) return accountFail('invalid_code')
       s.factor = true
       s.aal = 'aal2'
+      if (s.local !== 'fail') s.local = undefined
+      fire()
       return ok(undefined)
     }),
     generateRecoveryCodes: vi.fn(async () => ok(['AAAAA-AAAAA', 'BBBBB-BBBBB', 'CCCCC-CCCCC', 'DDDDD-DDDDD', 'EEEEE-EEEEE', 'FFFFF-FFFFF', 'GGGGG-GGGGG', 'HHHHH-HHHHH'])),

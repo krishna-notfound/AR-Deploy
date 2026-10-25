@@ -2,7 +2,7 @@
 // security boundary: with the 2FA policy on, RLS refuses an aal1 session's data requests; this gate explains why and
 // offers the way through instead of empty tables. Task 12 adds the onboarding checklist as a later check.
 import { ShieldCheck } from 'lucide-react'
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { DashboardContext, type DashboardContextValue } from '@/components/layout/dashboardContext'
@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import type { User } from '@/domain/types'
 import { RECOVERED_NOTICE, TwoFactorStep } from '@/features/auth/TwoFactorStep'
 import { TotpSetup } from '@/features/settings/TotpSetup'
+import { cn } from '@/lib/cn'
 import { settingsPath } from '@/lib/urls'
 import {
   ENABLED_PATCH,
@@ -118,6 +119,30 @@ function SetupGate({ ctx, hold }: GateScreenProps) {
   )
 }
 
+export const CHECK_FAILED = "We couldn't check your sign-in security. Some data may not load."
+
+/**
+ * Both checks failed: a small notice (never blocking; the loader keeps retrying too). `floating`: pinned to the
+ * bottom of the window over the app, above the dashboard's fixed sidebar.
+ */
+function CheckFailedBanner({ onRetry, floating = false }: { onRetry: () => void; floating?: boolean }) {
+  return (
+    <div
+      role="status"
+      data-surface="dashboard"
+      className={cn(
+        'flex flex-wrap items-center justify-between gap-x-4 bg-warning-soft px-4 text-ui-small text-ink',
+        floating && 'fixed inset-x-0 bottom-0 z-50 border-t border-line pb-[env(safe-area-inset-bottom)]',
+      )}
+    >
+      <span className="py-2">{CHECK_FAILED}</span>
+      <button type="button" onClick={onRetry} className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-2 hover:no-underline">
+        Retry
+      </button>
+    </div>
+  )
+}
+
 /** The gate checks, in order: the first that applies is shown. */
 export const GATE_CHECKS: readonly GateCheck[] = [
   { id: '2fa-code', applies: ({ security }) => needsCodeStep(security), Screen: CodeGate },
@@ -147,9 +172,11 @@ function GateFrame({ scope, children }: { scope: 'admin' | 'business'; children:
  * applies to the signed-in user instead of the app; with none, the app.
  */
 export function SecurityGate({ children, checks = GATE_CHECKS }: { children: ReactNode; checks?: readonly GateCheck[] }) {
-  const { user } = useAccount()
+  const { user, business, holdGate } = useAccount()
   const { refresh, patch, ...security } = useSecurityState()
   const [held, setHeld] = useState<string | null>(null)
+  // A screen that holds also keeps the account mounted (AccountProvider); let go when this gate goes away.
+  useEffect(() => () => holdGate(false), [holdGate])
 
   // Signed out or still resolving: RequireRole decides.
   if (!user) return <>{children}</>
@@ -158,11 +185,41 @@ export function SecurityGate({ children, checks = GATE_CHECKS }: { children: Rea
   const scope = user.role === 'super_admin' ? 'admin' : 'business'
   const ctx: GateContext = { security, user, scope, refresh, patch }
   const active = (held ? checks.find((c) => c.id === held) : undefined) ?? checks.find((c) => c.applies(ctx))
-  if (!active) return <>{children}</>
+  const retry = () => void refresh()
+  if (!active) {
+    // A business owner shown without their business (the 2FA rules hid it, or the check could not answer): the
+    // dashboard needs the business, so wait for it, or say why it can't be checked.
+    if (user.role === 'business_admin' && !business) {
+      if (security.state) return <FullPageSpinner />
+      return (
+        <GateFrame scope={scope}>
+          <CheckFailedBanner onRetry={retry} />
+        </GateFrame>
+      )
+    }
+    if (!security.state && !security.assurance) {
+      return (
+        <>
+          {children}
+          {/* Room for the pinned notice, so it never covers the end of the page. */}
+          <div aria-hidden className="h-16" />
+          <CheckFailedBanner onRetry={retry} floating />
+        </>
+      )
+    }
+    return <>{children}</>
+  }
   const { Screen } = active
   return (
     <GateFrame scope={scope}>
-      <Screen key={active.id} ctx={ctx} hold={(on) => setHeld(on ? active.id : null)} />
+      <Screen
+        key={active.id}
+        ctx={ctx}
+        hold={(on) => {
+          setHeld(on ? active.id : null)
+          holdGate(on)
+        }}
+      />
     </GateFrame>
   )
 }

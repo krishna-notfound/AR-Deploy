@@ -46,8 +46,15 @@ interface AccountCtx {
   security: SecurityInfo
   /** Loads the security state again (after a 2FA change). A failed first load also retries by itself. */
   refreshSecurity: () => Promise<void>
-  /** Updates the known security state in place after a change the server accepted (before the reload confirms it). */
+  /**
+   * Updates the known security state in place after a change the server accepted. The patch holds over later reloads
+   * until one confirms it (a lagging session refresh can't bring the old values back), for at most a minute.
+   */
   patchSecurity: (patch: SecurityPatch) => void
+  /** The 2FA gate is finishing a step (e.g. showing new recovery codes): the account must stay mounted meanwhile. */
+  holdGate: (on: boolean) => void
+  /** The 2FA gate holds: see holdGate. */
+  gateHeld: boolean
 }
 
 export interface SecurityInfo {
@@ -71,12 +78,14 @@ export interface SecurityPatch {
 const NO_SECURITY: SecurityInfo = { loaded: false, failures: 0 }
 
 /**
- * The sign-in needs the authenticator code: decided from the session's assurance level (aal1 now, aal2 possible).
- * When the level can't be read, an account with a factor is asked for the code (fail toward asking).
+ * The sign-in needs the authenticator code: the session's assurance level says aal1 now and aal2 possible, or the
+ * server knows a verified factor while the session is at aal1 (a stale local factor list must not skip the step).
+ * The current level comes from the session, or from the server state when the session can't be read.
  */
 export function needsCodeStep(info: Pick<SecurityInfo, 'state' | 'assurance'>): boolean {
-  if (info.assurance) return info.assurance.currentLevel === 'aal1' && info.assurance.nextLevel === 'aal2'
-  return info.state?.hasVerifiedFactor === true
+  const { assurance: a, state: st } = info
+  if (a && a.currentLevel === 'aal1' && a.nextLevel === 'aal2') return true
+  return !!st?.hasVerifiedFactor && (a?.currentLevel ?? st.aal) === 'aal1'
 }
 
 /** The policy requires 2FA and the account has none yet. */
@@ -130,6 +139,8 @@ function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
   useEffect(() => {
     onChangeRef.current = onChange
   })
+  // The last patch, held over reloads until one confirms it (or a minute has passed).
+  const pending = useRef<{ patch: SecurityPatch; at: number } | null>(null)
   const commit = useCallback((next: SecurityInfo, notify: boolean) => {
     secRef.current = next
     setSec(next)
@@ -141,14 +152,21 @@ function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
     const [r, a] = await Promise.all([accountApi.getSecurityState(), accountApi.getAssurance()])
     if (id !== loadId.current) return
     const prev = secRef.current
-    const state = r.ok ? r.data : prev.state
+    let known: Pick<SecurityInfo, 'state' | 'assurance'> = { state: r.ok ? r.data : prev.state, assurance: a.ok ? a.data : prev.assurance }
+    const held = pending.current
+    if (held) {
+      const confirmed =
+        Object.entries(held.patch.state ?? {}).every(([k, v]) => r.ok && r.data[k as keyof SecurityState] === v) &&
+        Object.entries(held.patch.assurance ?? {}).every(([k, v]) => a.ok && a.data[k as keyof AssuranceLevels] === v)
+      if (confirmed || Date.now() - held.at > PATCH_HOLD_MS) pending.current = null
+      else known = applyPatch(known, held.patch)
+    }
     commit(
       {
-        state,
-        assurance: a.ok ? a.data : prev.assurance,
+        ...known,
         loaded: true,
-        error: state ? undefined : !r.ok ? r.error.message : undefined,
-        failures: state ? 0 : prev.failures + 1,
+        error: known.state ? undefined : !r.ok ? r.error.message : undefined,
+        failures: known.state ? 0 : prev.failures + 1,
       },
       true,
     )
@@ -157,21 +175,16 @@ function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
   const patch = useCallback(
     (p: SecurityPatch) => {
       loadId.current++ // a load still in flight predates the change
+      pending.current = { patch: p, at: Date.now() }
       const prev = secRef.current
-      commit(
-        {
-          ...prev,
-          state: prev.state && p.state ? { ...prev.state, ...p.state } : prev.state,
-          assurance: p.assurance ? { currentLevel: 'aal1', nextLevel: 'aal1', ...prev.assurance, ...p.assurance } : prev.assurance,
-        },
-        true,
-      )
+      commit({ ...prev, ...applyPatch(prev, p) }, true)
     },
     [commit],
   )
 
   const clear = useCallback(() => {
     loadId.current++ // drop a load still in flight
+    pending.current = null
     commit(NO_SECURITY, false)
   }, [commit])
 
@@ -191,6 +204,15 @@ function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
   return { security: sec, refresh, patch, clear }
 }
 
+const PATCH_HOLD_MS = 60_000
+
+function applyPatch(info: Pick<SecurityInfo, 'state' | 'assurance'>, p: SecurityPatch): Pick<SecurityInfo, 'state' | 'assurance'> {
+  return {
+    state: info.state && p.state ? { ...info.state, ...p.state } : info.state,
+    assurance: p.assurance ? { currentLevel: 'aal1', nextLevel: 'aal1', ...info.assurance, ...p.assurance } : info.assurance,
+  }
+}
+
 function useBusiness(businessId: ID | null) {
   return useServiceQuery(() => (businessId ? service.getBusinessById(businessId) : Promise.resolve({ ok: true as const, data: null })), [businessId])
 }
@@ -207,11 +229,24 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
   const loadId = useRef(0)
   // The last account lookup that succeeded: undefined before the first one, null when signed out.
   const accountRef = useRef<SignedInAccount | null | undefined>(undefined)
+  const [gateHeld, setGateHeld] = useState(false)
+  const holdGate = useCallback((on: boolean) => setGateHeld(on), [])
+  // The business id being fetched again after the 2FA rules hid it: the user stays shown (without the business)
+  // meanwhile, so the 2FA gate and what it shows (new recovery codes) stay mounted.
+  const [hiddenRefetch, setHiddenRefetch] = useState<ID | null>(null)
+  // Whether the last render showed the user without their business (set after each render).
+  const shownWithoutBusiness = useRef(false)
+  const refetchFailedBusiness = useCallback(() => {
+    const b = bizRef.current
+    if (b.status !== 'error') return
+    setHiddenRefetch(shownWithoutBusiness.current ? (accountRef.current?.user?.businessId ?? null) : null)
+    b.refetch()
+  }, [])
   const { security, refresh: refreshSecurity, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader((info) => {
-    if (!info.loaded) return
+    if (!info.loaded || !info.state) return
     // A business hidden while a 2FA step was due is fetched again once the step is done.
-    if (bizRef.current.status === 'error' && !twoFactorDue(info)) bizRef.current.refetch()
-    // The password sign-in of this tab is complete (no code step left): record it once.
+    if (!twoFactorDue(info)) refetchFailedBusiness()
+    // The password sign-in of this tab is complete (state known, no code step left): record it once.
     if (passwordSignInPending() && !needsCodeStep(info)) {
       clearPasswordSignIn()
       // At most one per minute on the server; a failure to record never blocks the user.
@@ -238,8 +273,8 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       setAccountError(r.ok ? undefined : r.error.message)
     })
     // Signing in again keeps the same business id, so a failed business lookup has to be retried here.
-    if (bizRef.current.status === 'error') bizRef.current.refetch()
-  }, [auth, clearSecurity, refreshSecurity])
+    refetchFailedBusiness()
+  }, [auth, clearSecurity, refreshSecurity, refetchFailedBusiness])
 
   // Retry is also how a page asks for fresh data after it changed something (e.g. a cancelled closure restores the
   // business status), so it reloads the business even when the last lookup succeeded.
@@ -266,6 +301,8 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     accountRef.current = null
     clearPasswordSignIn()
     clearSecurity()
+    setGateHeld(false)
+    setHiddenRefetch(null)
     setAccount(null)
     setAccountError(undefined)
     return global.ok ? { signedOut: true } : { signedOut: true, error: 'Signed out on this device only. Other devices stay signed in until their session expires.' }
@@ -284,6 +321,8 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       security,
       refreshSecurity,
       patchSecurity,
+      holdGate,
+      gateHeld,
     }
     if (account === undefined) return { ...base, user: undefined }
     const user = account?.user ?? null
@@ -292,17 +331,26 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     // previous business id must not read as "signed out" and bounce the user to /login).
     const business = biz.data?.id === user.businessId ? biz.data : null
     if (business) return { ...base, user, business }
-    if (biz.status !== 'error') return { ...base, user: undefined }
+    // Shown without the business (the gate decides what to show): never drop back to loading while the gate holds,
+    // nor while a business the 2FA rules hid is fetched again.
+    const withoutBusiness = { ...base, user }
+    if (biz.status !== 'error') return gateHeld || hiddenRefetch === user.businessId ? withoutBusiness : { ...base, user: undefined }
+    if (gateHeld) return withoutBusiness
     // Only a missing business means "no business"; any other failure is reported with a retry.
     if (biz.error.code === 'NOT_FOUND') {
       // Under 2FA rules an aal1 session can't see its business (a draft or inactive one is not public either). While a
-      // 2FA step is due, the user goes on without the business so the 2FA gate can run; it is fetched again after.
+      // 2FA step is due, or the security check could not answer, the user goes on without the business: the gate shows
+      // the step or a notice, and the business is fetched again after.
       if (!security.loaded) return { ...base, user: undefined }
-      if (twoFactorDue(security)) return { ...base, user }
+      if (twoFactorDue(security) || !security.state) return withoutBusiness
       return { ...base, user: null, signedInEmail: account?.email }
     }
     return { ...base, user: undefined, accountError: biz.error.message }
-  }, [account, accountError, biz.data, biz.status, biz.error, signInAs, logout, retry, security, refreshSecurity, patchSecurity])
+  }, [account, accountError, biz.data, biz.status, biz.error, signInAs, logout, retry, security, refreshSecurity, patchSecurity, holdGate, gateHeld, hiddenRefetch])
+
+  useEffect(() => {
+    shownWithoutBusiness.current = !!value.user?.businessId && !value.business
+  })
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
@@ -317,6 +365,8 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   const access = useServiceQuery(() => (platformRole ? service.getMyAccess() : Promise.resolve({ ok: true as const, data: null })), [platformRole])
   const bizFailed = biz.status === 'error'
   const { security, refresh: refreshSecurity, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader()
+  const [gateHeld, setGateHeld] = useState(false)
+  const holdGate = useCallback((on: boolean) => setGateHeld(on), [])
   // The demo security state follows the chosen account (the staff and business policies differ).
   const sessionKey = session ? JSON.stringify(session) : null
   useEffect(() => {
@@ -327,13 +377,15 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   const signInAs = useCallback(
     (s: Session) => {
       localStorage.setItem(ACCOUNT_KEY, JSON.stringify(s))
+      // Another demo account: the previous one's security state must not decide for it (reloaded by the effect).
+      if (JSON.stringify(s) !== sessionKey) clearSecurity()
       setSession(s)
       // Choosing a demo account is the demo's sign-in: it shows in Security activity.
       void accountApi.recordSignIn()
       // Same business after a failed lookup: the query deps do not change, so load it again.
       if (s.role === 'business_admin' && s.businessId === businessId && bizFailed) refetchBusiness()
     },
-    [businessId, bizFailed, refetchBusiness],
+    [businessId, bizFailed, refetchBusiness, sessionKey, clearSecurity],
   )
 
   const logout = useCallback(async (): Promise<LogoutResult> => {
@@ -356,6 +408,8 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
       security,
       refreshSecurity,
       patchSecurity,
+      holdGate,
+      gateHeld,
     }
     if (!session) return { ...base, user: null }
     if (session.role === 'super_admin') {
@@ -384,6 +438,8 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
     security,
     refreshSecurity,
     patchSecurity,
+    holdGate,
+    gateHeld,
   ])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

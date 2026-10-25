@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,7 +46,7 @@ function renderGate(path = '/admin') {
 
 function setup(start: Parameters<typeof fakeAccount>[0], session = ADMIN) {
   const a = fakeAuth(session)
-  const acc = fakeAccount(start)
+  const acc = fakeAccount(start, a.fire)
   fake.auth = a.auth
   fake.account = acc.account
   return { ...a, ...acc }
@@ -181,6 +181,95 @@ describe('SecurityGate', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }))
     // The business is fetched again at aal2.
     expect(await screen.findByText('Business home')).toBeInTheDocument()
+  })
+
+  it('a draft owner keeps the recovery codes on screen through the auth events of setup (MFA_CHALLENGE_VERIFIED, token refresh)', async () => {
+    const acc = setup({ requires2fa: true, factor: false, aal: 'aal1' }, DRAFT_OWNER)
+    vi.spyOn(service, 'getBusinessById').mockImplementation(async (id) =>
+      acc.s.aal === 'aal2' ? ok({ id, name: 'Draft studio', slug: 'draft-studio', status: 'draft' } as Business) : fail('NOT_FOUND', 'Business not found'),
+    )
+    renderGate('/dashboard')
+    const user = userEvent.setup()
+    // A token refresh before the code: the setup stays where it is.
+    const field = await screen.findByLabelText('6-digit code')
+    await acc.emit()
+    expect(screen.getByLabelText('6-digit code')).toBe(field)
+    await user.type(field, TOTP)
+    await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
+    // confirmTotpEnrollment raised MFA_CHALLENGE_VERIFIED: the account and the hidden business reload meanwhile.
+    expect(await screen.findByText('AAAAA-AAAAA')).toBeInTheDocument()
+    await waitFor(() => expect(vi.mocked(service.getBusinessById).mock.calls.length).toBeGreaterThan(1))
+    await act(() => new Promise((r) => setTimeout(r, 30)))
+    await acc.emit() // and a token refresh while the codes are shown
+    await act(() => new Promise((r) => setTimeout(r, 30)))
+    expect(screen.getByText('AAAAA-AAAAA')).toBeInTheDocument()
+    expect(screen.queryByText('Business home')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(await screen.findByText('Business home')).toBeInTheDocument()
+  })
+
+  it('a stale local assurance level (aal1/aal1) does not skip the code step when the server knows a factor at aal1', async () => {
+    setup({ requires2fa: false, factor: true, aal: 'aal1', local: { currentLevel: 'aal1', nextLevel: 'aal1' } })
+    renderGate()
+    expect(await screen.findByText('Enter the 6-digit code from your authenticator app')).toBeInTheDocument()
+    await userEvent.setup().type(screen.getByLabelText('6-digit code'), TOTP)
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+  })
+
+  it('an unknown local level falls back to the server aal: a factor at aal2 is not asked again', async () => {
+    setup({ requires2fa: false, factor: true, aal: 'aal2', local: 'fail' })
+    renderGate()
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    expect(screen.queryByText('Enter the 6-digit code from your authenticator app')).not.toBeInTheDocument()
+  })
+
+  it('when both checks fail, a banner says so over the app and offers Retry', async () => {
+    const acc = setup({ requires2fa: false })
+    vi.mocked(acc.impl.getSecurityState!).mockResolvedValueOnce(fail('UNKNOWN', 'Database unavailable'))
+    vi.mocked(acc.impl.getAssurance!).mockResolvedValueOnce(accountFail('unknown'))
+    renderGate()
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    expect(screen.getByText("We couldn't check your sign-in security. Some data may not load.")).toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(screen.queryByText("We couldn't check your sign-in security. Some data may not load.")).not.toBeInTheDocument())
+    expect(screen.getByText('Admin home')).toBeInTheDocument()
+  })
+
+  it('a draft owner whose checks fail is not sent to the sign-in page: the banner shows instead', async () => {
+    const acc = setup({ requires2fa: true, factor: false, aal: 'aal1' }, DRAFT_OWNER)
+    vi.mocked(acc.impl.getSecurityState!).mockResolvedValue(fail('UNKNOWN', 'Database unavailable'))
+    vi.mocked(acc.impl.getAssurance!).mockResolvedValue(accountFail('unknown'))
+    vi.spyOn(service, 'getBusinessById').mockResolvedValue(fail('NOT_FOUND', 'Business not found'))
+    renderGate('/dashboard')
+    expect(await screen.findByText("We couldn't check your sign-in security. Some data may not load.")).toBeInTheDocument()
+    expect(screen.queryByText('Demo account picker')).not.toBeInTheDocument()
+    // Once the check answers, the setup gate takes over.
+    vi.mocked(acc.impl.getSecurityState!).mockImplementation(async () =>
+      ok({ requires2fa: true, aal: 'aal1', hasVerifiedFactor: false, recoveryCodesLeft: null, pendingEmail: null, closure: null, onboarding: { completedAt: null, dismissedAt: null } }),
+    )
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Set up 2FA to continue' })).toBeInTheDocument()
+  })
+
+  it('after a recovery code, a stale reload (factor still listed) does not bring the code step back', async () => {
+    const acc = setup({ requires2fa: false, factor: true, aal: 'aal1' })
+    renderGate()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Use a recovery code' }))
+    // The session refresh after the redeem lags: the next reload still reports the old factor once.
+    const stale = { requires2fa: false, aal: 'aal1' as const, hasVerifiedFactor: true, recoveryCodesLeft: 1, pendingEmail: null, closure: null, onboarding: { completedAt: null, dismissedAt: null } }
+    vi.mocked(acc.impl.getSecurityState!).mockResolvedValueOnce(ok(stale)).mockResolvedValueOnce(ok(stale))
+    vi.mocked(acc.impl.getAssurance!).mockResolvedValueOnce(ok({ currentLevel: 'aal1', nextLevel: 'aal2' })).mockResolvedValueOnce(ok({ currentLevel: 'aal1', nextLevel: 'aal2' }))
+    await user.type(screen.getByLabelText('Recovery code'), 'ABCDE-FGHJK')
+    await user.click(screen.getByRole('button', { name: 'Sign in with recovery code' }))
+    expect(await screen.findByText('Settings page')).toBeInTheDocument()
+    await act(() => new Promise((r) => setTimeout(r, 30)))
+    expect(screen.queryByText('Enter the 6-digit code from your authenticator app')).not.toBeInTheDocument()
+    // A later reload that confirms "no factor" settles it.
+    await acc.emit()
+    await act(() => new Promise((r) => setTimeout(r, 30)))
+    expect(screen.getByText('Settings page')).toBeInTheDocument()
   })
 
   it('a business that is really gone still reads as "no business" when no 2FA step is due', async () => {

@@ -337,6 +337,27 @@ describe('Supabase account service', () => {
     expect(!u.ok && u.error.reason).toBe('unknown')
   })
 
+  it('redeemRecoveryCode refreshes the session after the factor is removed, and tries once more when that refresh fails', async () => {
+    let calls = 0
+    const f = fake({
+      invoke: { data: { ok: true } },
+      auth: { refreshSession: () => (++calls === 1 ? { data: {}, error: { message: 'offline' } } : { data: {}, error: null }) },
+    })
+    expect((await account(f).redeemRecoveryCode('ABCDE-FGHJK')).ok).toBe(true)
+    expect(f.auth.refreshSession).toHaveBeenCalledTimes(2)
+    // A refresh that throws is retried as well, and the accepted code still counts as ok.
+    const thrown = fake({
+      invoke: { data: { ok: true } },
+      auth: {
+        refreshSession: () => {
+          throw new Error('network')
+        },
+      },
+    })
+    expect((await account(thrown).redeemRecoveryCode('ABCDE-FGHJK')).ok).toBe(true)
+    expect(thrown.auth.refreshSession).toHaveBeenCalledTimes(2)
+  })
+
   it('function-backed methods post { action, ... } to account-security and map { ok:false, error } to ServiceError.reason', async () => {
     const f = fake({ invoke: { data: { ok: true, sentTo: 'a•••@studio.pt' } } })
     const a = account(f)

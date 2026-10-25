@@ -61,7 +61,7 @@ async function signIn() {
 
 function setup(start: Parameters<typeof fakeAccount>[0], session: Parameters<typeof fakeAuth>[0] = null, signsInAs = ADMIN) {
   const a = fakeAuth(session, signsInAs)
-  const acc = fakeAccount(start)
+  const acc = fakeAccount(start, a.fire)
   fake.auth = a.auth
   fake.account = acc.account
   return { ...a, ...acc }
@@ -229,6 +229,19 @@ describe('Sign-in recording', () => {
     await acc.emit()
     await waitFor(() => expect(vi.mocked(acc.impl.getSecurityState!).mock.calls.length).toBe(calls + 2))
     expect(acc.impl.recordSignIn).toHaveBeenCalledTimes(1)
+  })
+
+  it('is not recorded while the security state is unknown; it is once a retry knows it', async () => {
+    const acc = setup({ factor: false })
+    vi.mocked(acc.impl.getSecurityState!).mockResolvedValueOnce(fail('UNKNOWN', 'Database unavailable'))
+    vi.mocked(acc.impl.getAssurance!).mockResolvedValueOnce(accountFail('unknown'))
+    renderLogin()
+    const user = await signIn()
+    expect(await screen.findByText('Admin home')).toBeInTheDocument()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(acc.impl.recordSignIn).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(acc.impl.recordSignIn).toHaveBeenCalledTimes(1))
   })
 
   it('a session gained without a password sign-in in this tab (another tab, a page load) is not recorded', async () => {
