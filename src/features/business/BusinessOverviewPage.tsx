@@ -1,19 +1,21 @@
 import { ArrowRight, BarChart3, CheckCircle2, ChevronRight, PackagePlus } from 'lucide-react'
+import { useCallback } from 'react'
 import { Link } from 'react-router'
-import { useCurrentBusiness } from '@/auth/AccountProvider'
+import { useAccount, useCurrentBusiness } from '@/auth/AccountProvider'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
 import { PageHeader, PanelHeader, panelLinkClass } from '@/components/layout/PageHeader'
 import { BusinessStatusBadge, SampleDataTag } from '@/components/ui/Badge'
-import { ButtonLink } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { StatGroup } from '@/components/ui/StatGroup'
 import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { Business, Product } from '@/domain/types'
-import { formatNumber, formatPercent } from '@/lib/format'
+import { formatDate, formatNumber, formatPercent } from '@/lib/format'
 import { myProductsPath } from '@/lib/urls'
-import { service } from '@/services'
+import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
+import { useCancelClosure } from '../settings/useCancelClosure'
 import { ActivityList } from '../shared/ActivityList'
 import { MostViewedList } from '../analytics/MostViewedList'
 import { hasArModel, productArReadiness } from '../products/productReadiness'
@@ -44,6 +46,7 @@ export default function BusinessOverviewPage() {
           </ButtonLink>
         }
       />
+      <ClosureBanner />
       {summary.status === 'error' && !s ? (
         <Card>
           <ErrorState message={summary.error.message} onRetry={summary.refetch} />
@@ -206,5 +209,34 @@ function StepsCard({ title, steps, ordered, className }: { title: string; steps:
         })}
       </List>
     </Card>
+  )
+}
+
+/**
+ * The owner asked to close the account (spec 8): the catalog is offline until the platform completes the closure,
+ * and the owner can still withdraw the request here or in settings. Nothing shows while loading or on a failed check:
+ * the closure state is not this page's data, and My account shows its own error.
+ */
+function ClosureBanner() {
+  const { retry } = useAccount()
+  const security = useServiceQuery(() => account.getSecurityState(), [])
+  const { refetch } = security
+  // The business status comes back too: load the business again so the status badge follows.
+  const { cancel, cancelling } = useCancelClosure(
+    useCallback(() => {
+      refetch()
+      retry()
+    }, [refetch, retry]),
+  )
+  const closure = security.data?.closure
+  if (!closure) return null
+
+  return (
+    <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] bg-warning-soft px-4 py-3 text-ui-body text-warning">
+      <p className="min-w-0">Closure requested on {formatDate(closure.requestedAt)} · Your catalog is offline.</p>
+      <Button size="sm" onClick={() => void cancel()} loading={cancelling}>
+        Cancel request
+      </Button>
+    </div>
   )
 }
