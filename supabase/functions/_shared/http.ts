@@ -11,7 +11,11 @@ export const reply = (status: number, body?: Record<string, unknown>) =>
 
 export const bearerToken = (req: Request) => req.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() ?? ''
 
-/** First address in X-Forwarded-For (set by the Supabase edge), else 'unknown'. Never stored. */
+/**
+ * First address in X-Forwarded-For, else 'unknown'. The first value is client-controlled (a caller can send any
+ * X-Forwarded-For), so treat it as a hint, never as proof. account-security stores it with account events for the
+ * security activity view; submit-application only hashes it with a salt.
+ */
 export const clientIp = (req: Request) => req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

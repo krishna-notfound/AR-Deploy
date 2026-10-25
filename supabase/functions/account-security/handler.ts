@@ -13,7 +13,8 @@ export type ActionPurpose = (typeof ACTION_PURPOSES)[number]
 /** Codes only the platform Owner may ask for (their actions refuse everyone else anyway). */
 const OWNER_PURPOSES: ReadonlySet<string> = new Set(['owner_reset_2fa', 'complete_closure'])
 
-/** Recovery-code alphabet: no I, L, O, 0 or 1, so a code read aloud or handwritten is unambiguous. */
+/** Recovery-code alphabet: 31 characters (no I, L, O, 0 or 1, so a code read aloud or handwritten is unambiguous).
+ * 10 characters give about 49.5 bits per code. */
 export const RECOVERY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 export const RECOVERY_CODES_PER_SET = 8
 const RECOVERY_LENGTH = 10
@@ -57,8 +58,10 @@ export interface AccountSecurityDeps {
   listFactors(userId: string): Promise<Factor[]>
   deleteFactor(userId: string, factorId: string): Promise<void>
   deleteUser(userId: string): Promise<void>
-  /** Deletes the business row (related rows cascade) and its product-media and business-logos folders. */
+  /** Deletes the business row; related rows cascade (a closure request keeps its row, with business_id set null). */
   deleteBusiness(businessId: string): Promise<void>
+  /** Removes the business's product-media and business-logos folders. Throws when it could not remove everything. */
+  sweepBusinessStorage(businessId: string): Promise<void>
   userEmail(userId: string): Promise<string | null>
   /** sendAndLog: sends through Resend and writes one email_log row. */
   send(email: SecurityEmail): Promise<SendAndLogResult>
@@ -195,11 +198,13 @@ const ACTIONS: Record<string, Action> = {
     const kind = await classify(ctx, userId)
     if (kind === 'owner') throw new Refusal('owner_cannot_close')
     if (kind !== 'business' && kind !== 'staff') throw new Refusal('not_allowed')
+    // An open request is refused before the code is checked, so the code stays usable.
+    if ((await deps.rpc('service_closure_target', { p_user: userId }))?.ok === true) throw new Refusal('already_requested')
     await checkCode(ctx, 'request_closure', body.code)
     const email = await deps.userEmail(userId)
     const r = await sql(ctx, 'service_request_closure', { p_user: userId })
 
-    if (r.kind === 'business') {
+    if (r.kind === 'business' && kind === 'business') {
       const businessId = typeof r.business_id === 'string' ? r.business_id : undefined
       await logEvent(ctx, userId, 'account_closure_requested', businessId ? { business_id: businessId } : {})
       await notify(ctx, userId, 'closure_requested', email)
@@ -216,10 +221,19 @@ const ACTIONS: Record<string, Action> = {
       return done({ kind: 'business' })
     }
 
+    // Anything but a staff answer for a staff caller deletes nobody.
+    if (r.kind !== 'staff' || kind !== 'staff') throw new Refusal('unknown')
     // Admin or Team member: the SQL deactivated the membership and ended the sessions; the account goes now.
-    // Logged first, while the user still exists, with the address replaced by its hash.
-    await logEvent(ctx, userId, 'account_deleted', email ? { email_sha256: await emailHash(email) } : {})
-    await deps.deleteUser(userId)
+    // Logged first, while the user still exists (audit actor_id is a foreign key), with the address hashed.
+    const hashed = email ? { email_sha256: await emailHash(email) } : {}
+    await logEvent(ctx, userId, 'account_deleted', hashed)
+    try {
+      await deps.deleteUser(userId)
+    } catch (e) {
+      console.error(`account-security: staff self-delete failed (${errorName(e)})`)
+      await logEvent(ctx, userId, 'account_deleted', { ...hashed, delete_failed: true })
+      throw new Refusal('unknown')
+    }
     return done({ kind: 'staff' })
   },
 
@@ -242,18 +256,37 @@ const ACTIONS: Record<string, Action> = {
     const target = targetUser(ctx)
     await requireOwnerAal2(ctx)
     if (target === ctx.userId) throw new Refusal('not_allowed')
+    if ((await classify(ctx, target)) === 'owner') throw new Refusal('not_allowed')
     const t = await sql(ctx, 'service_closure_target', { p_user: target })
     await checkCode(ctx, 'complete_closure', ctx.body.code)
     const email = typeof t.email === 'string' ? t.email : await deps.userEmail(target)
+    // null once the business is gone (business_id is on delete set null), e.g. on a retry after a failed user delete.
     const businessId = typeof t.business_id === 'string' ? t.business_id : null
-
-    if (businessId) await deps.deleteBusiness(businessId)
-    await deps.deleteUser(target)
-    await logEvent(ctx, ctx.userId, 'account_closure_completed', {
+    const metadata: Record<string, unknown> = {
       subject_id: target,
       ...(businessId ? { business_id: businessId } : {}),
       ...(email ? { email_sha256: await emailHash(email) } : {}),
-    })
+    }
+
+    if (businessId) {
+      await deps.deleteBusiness(businessId)
+      // Best effort: the rows are gone either way; leftover files are noted in the audit event.
+      try {
+        await deps.sweepBusinessStorage(businessId)
+      } catch (e) {
+        console.error(`account-security: storage sweep incomplete (${errorName(e)})`)
+        metadata.storage_sweep_incomplete = true
+      }
+    }
+    try {
+      await deps.deleteUser(target)
+    } catch (e) {
+      // The request row stays, so the Owner can retry with a new code; the business is not deleted twice.
+      console.error(`account-security: closure user delete failed (${errorName(e)})`)
+      await logEvent(ctx, ctx.userId, 'account_closure_completed', { ...metadata, user_delete_failed: true })
+      throw new Refusal('unknown')
+    }
+    await logEvent(ctx, ctx.userId, 'account_closure_completed', metadata)
     if (email) await notify(ctx, target, 'closure_completed', email)
     return done()
   },
@@ -306,16 +339,12 @@ async function checkCode(ctx: Ctx, purpose: ActionPurpose, raw: unknown) {
 }
 
 /**
- * After a failed send, store one more code whose plain value is 32 random bytes: a newer code replaces the older
- * ones, and no 6-digit guess can match this one. If even that is refused (rate limit), the unsent code was never
+ * After a failed send, every open code for that purpose stops working. If even that fails, the unsent code was never
  * shown to anyone and expires in 10 minutes.
  */
 async function voidCodes(ctx: Ctx, purpose: string) {
   try {
-    const salt = hex(ctx.deps.random(16))
-    await ctx.deps.rpc('service_create_action_code', {
-      p_user: ctx.userId, p_purpose: purpose, p_code_hash: await sha256Hex(salt + hex(ctx.deps.random(32))), p_salt: salt,
-    })
+    await ctx.deps.rpc('service_void_action_codes', { p_user: ctx.userId, p_purpose: purpose })
   } catch (e) {
     console.error(`account-security: could not void an unsent code (${errorName(e)})`)
   }

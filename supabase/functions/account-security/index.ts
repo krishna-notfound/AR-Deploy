@@ -63,11 +63,14 @@ Deno.serve((req) =>
       if (error) throw new Error(`deleteUser failed: ${error.name}`)
     },
     // The same path as the console's delete (supabaseCatalogService.deleteBusiness): the row goes, related rows
-    // cascade, then the business's Storage folders are swept.
+    // cascade, then the business's Storage folders are swept (best effort, reported by the handler).
     async deleteBusiness(businessId) {
       const { error } = await admin.from('businesses').delete().eq('id', businessId)
       if (error) throw new Error(`business delete failed: ${error.code ?? 'unknown'}`)
-      await Promise.all([removeFolder(MEDIA_BUCKET, businessId), removeFolder(LOGO_BUCKET, businessId)])
+    },
+    async sweepBusinessStorage(businessId) {
+      const results = await Promise.allSettled([removeFolder(MEDIA_BUCKET, businessId), removeFolder(LOGO_BUCKET, businessId)])
+      if (results.some((r) => r.status === 'rejected')) throw new Error('storage sweep incomplete')
     },
     async userEmail(userId) {
       const { data, error } = await admin.auth.admin.getUserById(userId)

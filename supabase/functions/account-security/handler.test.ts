@@ -8,6 +8,7 @@ const OWNER = '00000000-0000-4000-8000-000000000001'
 const STAFF = '00000000-0000-4000-8000-000000000002'
 const BIZ_OWNER = '00000000-0000-4000-8000-000000000003'
 const STAFF_2 = '00000000-0000-4000-8000-000000000004'
+const OWNER_2 = '00000000-0000-4000-8000-000000000005'
 const BUSINESS_ID = '10000000-0000-4000-8000-000000000001'
 const NOW = new Date('2026-10-25T12:00:00Z')
 
@@ -15,6 +16,7 @@ const USERS: Record<string, { email: string; kind: 'owner' | 'staff' | 'business
   [OWNER]: { email: 'owner@sanctus.test', kind: 'owner' },
   [STAFF]: { email: 'staff@sanctus.test', kind: 'staff' },
   [STAFF_2]: { email: 'team@sanctus.test', kind: 'staff' },
+  [OWNER_2]: { email: 'owner2@sanctus.test', kind: 'owner' },
   [BIZ_OWNER]: { email: 'maria@studio.pt', kind: 'business' },
 }
 
@@ -52,9 +54,12 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
     closures: {} as Record<string, { businessId: string | null }>,
     rateLimited: false,
     failSend: false,
+    attempts: [] as { to: string; text: string }[],
+    order: [] as string[],
   }
   const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
     const b = JSON.parse(String(init?.body)) as { to: string[]; subject: string; text: string; html: string }
+    s.attempts.push({ to: b.to[0]!, text: b.text })
     if (s.failSend) return new Response(JSON.stringify({ message: 'provider down' }), { status: 500 })
     s.sends.push({ to: b.to[0]!, subject: b.subject, text: b.text, html: b.html })
     return new Response(JSON.stringify({ id: `msg-${s.sends.length}` }), { status: 200 })
@@ -71,6 +76,9 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
         s.codes.push(row)
         return { ok: true, id: row.id }
       }
+      case 'service_void_action_codes':
+        s.codes.filter((c) => c.user === user && c.purpose === a.p_purpose).forEach((c) => (c.consumed = true))
+        return { ok: true }
       case 'service_check_action_code': {
         const row = [...s.codes].reverse().find((c) => c.user === user && c.purpose === a.p_purpose && !c.consumed)
         if (!row) return { error: 'invalid_code' }
@@ -118,6 +126,7 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
           s.closures[user] = { businessId: BUSINESS_ID }
           return { ok: true, kind: 'business', business_id: BUSINESS_ID }
         }
+        s.order.push('service_request_closure')
         return { ok: true, kind: 'staff' }
       }
       case 'service_closure_target': {
@@ -144,8 +153,17 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
       s.deletedFactors.push(id)
       s.factors[u] = (s.factors[u] ?? []).filter((f) => f.id !== id)
     },
-    deleteUser: async (u) => void s.deletedUsers.push(u),
-    deleteBusiness: async (b) => void s.deletedBusinesses.push(b),
+    deleteUser: async (u) => {
+      s.order.push(`deleteUser:${u}`)
+      s.deletedUsers.push(u)
+    },
+    deleteBusiness: async (b) => {
+      s.order.push(`deleteBusiness:${b}`)
+      s.deletedBusinesses.push(b)
+      // account_closure_requests.business_id is on delete set null.
+      for (const c of Object.values(s.closures)) if (c.businessId === b) c.businessId = null
+    },
+    sweepBusinessStorage: async (b) => void s.order.push(`sweep:${b}`),
     userEmail: async (u) => USERS[u]?.email ?? null,
     send: (e) => sendAndLog({ config: CONFIG, fetch: fetchFn as unknown as typeof fetch, log: async (l) => (s.logs.push(l), `log-${s.logs.length}`) }, e),
     random: (n) => crypto.getRandomValues(new Uint8Array(n)),
@@ -234,13 +252,13 @@ describe('account-security', () => {
     expect(r.status).toBe(400)
     expect(await json(r)).toEqual({ ok: false, error: 'email_failed' })
     expect(s.logs.map((l) => [l.kind, l.status])).toEqual([['security_code', 'failed']])
-    // Every stored code for that purpose is either replaced or unmatchable by any 6-digit guess.
-    const live = s.codes.filter((c) => !c.consumed)
-    expect(live).toHaveLength(1)
-    expect(live[0]!.hash).not.toBe(s.codes[0]!.hash)
-    // The plain code never left the function, and the replacement hash matches no 6-digit code.
+    expect(s.codes.filter((c) => !c.consumed)).toHaveLength(0)
+    expect(s.rpcCalls.filter((c) => c.fn === 'service_create_action_code')).toHaveLength(1)
+    expect(s.rpcCalls.at(-1)).toEqual({ fn: 'service_void_action_codes', args: { p_user: STAFF, p_purpose: 'disable_2fa' } })
+    // The code in the email that did not go out is refused.
+    const unsent = /\b(\d{6})\b/.exec(s.attempts.at(-1)!.text)![1]!
     s.failSend = false
-    const tried = await call(d, tok(STAFF, 'aal2'), { action: 'disable_2fa', code: '000000' })
+    const tried = await call(d, tok(STAFF, 'aal2'), { action: 'disable_2fa', code: unsent })
     expect(await json(tried)).toEqual({ ok: false, error: 'invalid_code' })
     expect(s.factors[STAFF]).toHaveLength(1)
   })
@@ -374,11 +392,15 @@ describe('account-security', () => {
 
     const again = await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1')
     expect(await json(await call(d, tok(BIZ_OWNER), { action: 'request_closure', code: again }))).toEqual({ ok: false, error: 'already_requested' })
+    // Refused before the code was checked, so the code is still usable.
+    expect(s.codes.find((c) => c.user === BIZ_OWNER && !c.consumed)).toBeDefined()
 
     const staffCode = await codeFor(d, s, STAFF, 'request_closure')
     expect(await json(await call(d, tok(STAFF, 'aal2'), { action: 'request_closure', code: staffCode }))).toEqual({ ok: true, kind: 'staff' })
     expect(s.rpcCalls.filter((c) => c.fn === 'service_request_closure').map((c) => c.args.p_user)).toContain(STAFF)
     expect(s.deletedUsers).toEqual([STAFF])
+    // service_request_closure deactivates the membership and ends the sessions before the account goes.
+    expect(s.order).toEqual(['service_request_closure', `deleteUser:${STAFF}`])
     const deleted = s.events.find((e) => e.event === 'account_deleted')!
     expect(deleted.user).toBe(STAFF)
     expect(JSON.stringify(deleted.metadata)).not.toContain('staff@sanctus.test')
@@ -409,9 +431,6 @@ describe('account-security', () => {
   it('complete_closure: Owner at aal2 with a code; deletes the business, then the user; logs with email removed', async () => {
     const { d, s } = deps()
     s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
-    const order: string[] = []
-    d.deleteBusiness = async (b) => void order.push(`business:${b}`)
-    d.deleteUser = async (u) => void order.push(`user:${u}`)
 
     expect(await json(await call(d, tok(STAFF, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: '123456' }))).toEqual({ ok: false, error: 'not_allowed' })
     const code = await codeFor(d, s, OWNER, 'complete_closure')
@@ -420,12 +439,84 @@ describe('account-security', () => {
     const fresh = await codeFor(d, s, OWNER, 'complete_closure')
     s.sends.length = 0
     expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: fresh }))).toEqual({ ok: true })
-    expect(order).toEqual([`business:${BUSINESS_ID}`, `user:${BIZ_OWNER}`])
+    expect(s.order).toEqual([`deleteBusiness:${BUSINESS_ID}`, `sweep:${BUSINESS_ID}`, `deleteUser:${BIZ_OWNER}`])
     const ev = s.events.find((e) => e.event === 'account_closure_completed')!
+    expect(ev.metadata.storage_sweep_incomplete).toBeUndefined()
     expect(ev.user).toBe(OWNER)
     expect(JSON.stringify(ev.metadata)).not.toContain('maria@studio.pt')
     expect(ev.metadata.email_sha256).toBe(await sha256Hex('maria@studio.pt'))
     expect(s.sends.map((m) => m.to)).toEqual(['maria@studio.pt'])
+  })
+
+  it('complete_closure: never on another Owner', async () => {
+    const { d, s } = deps()
+    s.closures[OWNER_2] = { businessId: null }
+    const code = await codeFor(d, s, OWNER, 'complete_closure')
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: OWNER_2, code }))).toEqual({ ok: false, error: 'not_allowed' })
+    expect(s.deletedUsers).toEqual([])
+    expect(s.codes.find((c) => c.user === OWNER && !c.consumed)).toBeDefined()
+  })
+
+  it('complete_closure: a failed user delete is logged and can be retried without deleting the business again', async () => {
+    const { d, s } = deps()
+    s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
+    const realDelete = d.deleteUser
+    d.deleteUser = async () => Promise.reject(new Error('auth down'))
+    const first = await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: await codeFor(d, s, OWNER, 'complete_closure') })
+    expect(first.status).toBe(500)
+    expect(await json(first)).toEqual({ ok: false, error: 'unknown' })
+    expect(s.deletedBusinesses).toEqual([BUSINESS_ID])
+    expect(s.events.at(-1)).toMatchObject({ user: OWNER, event: 'account_closure_completed', metadata: { user_delete_failed: true } })
+
+    d.deleteUser = realDelete
+    s.sends.length = 0
+    const retry = await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: await codeFor(d, s, OWNER, 'complete_closure') })
+    expect(await json(retry)).toEqual({ ok: true })
+    expect(s.deletedBusinesses).toEqual([BUSINESS_ID])
+    expect(s.deletedUsers).toEqual([BIZ_OWNER])
+    expect(s.events.at(-1)!.metadata.user_delete_failed).toBeUndefined()
+    expect(s.sends.map((m) => m.to)).toEqual(['owner@sanctus.test', 'maria@studio.pt'])
+  })
+
+  it('complete_closure: a failed storage sweep is noted and the closure still completes', async () => {
+    const { d, s } = deps()
+    s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
+    d.sweepBusinessStorage = async () => Promise.reject(new Error('storage down'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: await codeFor(d, s, OWNER, 'complete_closure') })
+    vi.mocked(console.error).mockRestore()
+    expect(await json(r)).toEqual({ ok: true })
+    expect(s.deletedUsers).toEqual([BIZ_OWNER])
+    expect(s.events.at(-1)).toMatchObject({ event: 'account_closure_completed', metadata: { storage_sweep_incomplete: true } })
+  })
+
+  it('request_closure: an unexpected kind from SQL deletes nobody', async () => {
+    const { d, s } = deps()
+    const base = d.rpc
+    d.rpc = async (fn, a) => (fn === 'service_request_closure' ? { ok: true, kind: 'something_else' } : base(fn, a))
+    const r = await call(d, tok(STAFF, 'aal2'), { action: 'request_closure', code: await codeFor(d, s, STAFF, 'request_closure') })
+    expect(r.status).toBe(500)
+    expect(await json(r)).toEqual({ ok: false, error: 'unknown' })
+    expect(s.deletedUsers).toEqual([])
+    expect(s.events.some((e) => e.event === 'account_deleted')).toBe(false)
+  })
+
+  it('request_closure: a staff kind for a caller who is not staff deletes nobody', async () => {
+    const { d, s } = deps()
+    const base = d.rpc
+    d.rpc = async (fn, a) => (fn === 'service_request_closure' ? { ok: true, kind: 'staff' } : base(fn, a))
+    const r = await call(d, tok(BIZ_OWNER), { action: 'request_closure', code: await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1') })
+    expect(await json(r)).toEqual({ ok: false, error: 'unknown' })
+    expect(s.deletedUsers).toEqual([])
+  })
+
+  it('request_closure: a failed staff self-delete is logged and answers unknown', async () => {
+    const { d, s } = deps()
+    d.deleteUser = async () => Promise.reject(new Error('auth down'))
+    const r = await call(d, tok(STAFF, 'aal2'), { action: 'request_closure', code: await codeFor(d, s, STAFF, 'request_closure') })
+    expect(r.status).toBe(500)
+    expect(await json(r)).toEqual({ ok: false, error: 'unknown' })
+    expect(s.events.at(-1)).toMatchObject({ user: STAFF, event: 'account_deleted', metadata: { delete_failed: true } })
   })
 
   it('restore_closure: Owner at aal2 only', async () => {
