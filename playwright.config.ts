@@ -24,7 +24,12 @@ export default defineConfig({
       name: 'guard',
       testDir: './tests/visual',
       testMatch: /visual[\\/]guard\.spec\.ts$/,
-      use: { ...devices['Desktop Chrome'] },
+      // Software rendering with fixed font hinting: GPU text anti-aliasing varies run to run, which made a
+      // zero-tolerance comparison flaky on glyph edges only.
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: { args: ['--disable-gpu', '--font-render-hinting=none', '--disable-lcd-text', '--force-color-profile=srgb'] },
+      },
       expect: { toHaveScreenshot: { maxDiffPixels: 0, threshold: 0, animations: 'disabled' } },
     },
   ],
