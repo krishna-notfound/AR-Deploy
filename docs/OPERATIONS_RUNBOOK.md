@@ -94,6 +94,17 @@ Once the ref exists, follow "Separate staging project" below, then point Vercel 
 - Database changes go first (`npx supabase db push` to the verified target), app second. Every migration so far is additive, so the old app keeps working against the new schema.
 - After deploying: open the production URL, a catalog, a product (3D loads), sign in as admin, check the dashboard; check the commit SHA in Vercel → Deployments.
 
+## Platform team roles (ADR-0029, ADR-0030)
+
+Deploy only with the owner's explicit go-ahead, and only to the client project `zggylkbgajamhriebdrg`. Never touch `pmnjchhrgvajtjpadpqo`, and never run `supabase config push`.
+
+1. Run the read-only preflight (`supabase/checks/preflight_readonly.sql`), and confirm that `platform_admins` lists the expected Owners.
+2. Apply the migration: `npx supabase db push --linked`. This applies migrations only, and `20261025070915_platform_team_roles.sql` is the new one.
+3. Deploy the functions: `npx supabase functions deploy invite-member manage-member accept-member-invite --project-ref zggylkbgajamhriebdrg`. The `verify_jwt` settings come from `supabase/config.toml` (true, true, false).
+4. Required secrets: `APP_BASE_URL` (the site that hosts `/join`; invite-member refuses to send without it), `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TEST_RECIPIENTS`. The functions also read `SUPABASE_URL`, `SUPABASE_ANON_KEY` and the service key that Supabase provides.
+5. Regenerate the types: `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+6. **Rollback:** `supabase/rollback/20261025_platform_team_roles_rollback.sql`. Admin and Team members lose access, Owners are untouched, and access audit rows are kept.
+
 ## Rollback
 
 | What | How | Data effect |

@@ -436,6 +436,17 @@ verify_jwt = false
 [functions.provision-owner]
 verify_jwt = true
 
+# Platform team (ADR-0029, ADR-0030). invite-member and manage-member need a signed-in caller; accept-member-invite is
+# public (the link secret is the credential) and checks the JWT itself for "accept".
+[functions.invite-member]
+verify_jwt = true
+
+[functions.manage-member]
+verify_jwt = true
+
+[functions.accept-member-invite]
+verify_jwt = false
+
 # Resend delivery events: authenticated by the svix signature (RESEND_WEBHOOK_SECRET), not a Supabase JWT.
 [functions.resend-webhook]
 verify_jwt = false
