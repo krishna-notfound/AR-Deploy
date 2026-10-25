@@ -1,12 +1,43 @@
-// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-20 after migration 20261020143507 (Supabase type generator).
-// Only `Json` and `Database` are kept; regenerate with `npm run db:types` after any migration.
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-25 after migration 20261025070915
+// (Supabase type generator). Regenerate after any migration: npx supabase gen types typescript --project-id <ref>.
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.18'
+    PostgrestVersion: "14.18"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -46,18 +77,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_events_application_id_fkey'
-            columns: ['application_id']
+            foreignKeyName: "audit_events_application_id_fkey"
+            columns: ["application_id"]
             isOneToOne: false
-            referencedRelation: 'business_applications'
-            referencedColumns: ['id']
+            referencedRelation: "business_applications"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_events_business_id_fkey'
-            columns: ['business_id']
+            foreignKeyName: "audit_events_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: 'businesses'
-            referencedColumns: ['id']
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -133,11 +164,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'business_applications_business_id_fkey'
-            columns: ['business_id']
+            foreignKeyName: "business_applications_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: true
-            referencedRelation: 'businesses'
-            referencedColumns: ['id']
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -171,11 +202,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'business_members_business_id_fkey'
-            columns: ['business_id']
+            foreignKeyName: "business_members_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: 'businesses'
-            referencedColumns: ['id']
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -284,18 +315,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'email_log_application_id_fkey'
-            columns: ['application_id']
+            foreignKeyName: "email_log_application_id_fkey"
+            columns: ["application_id"]
             isOneToOne: false
-            referencedRelation: 'business_applications'
-            referencedColumns: ['id']
+            referencedRelation: "business_applications"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'email_log_business_id_fkey'
-            columns: ['business_id']
+            foreignKeyName: "email_log_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: 'businesses'
-            referencedColumns: ['id']
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -311,6 +342,63 @@ export type Database = {
         Update: {
           created_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      platform_members: {
+        Row: {
+          activated_at: string | null
+          created_at: string
+          deactivated_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["platform_role"]
+          status: Database["public"]["Enums"]["member_status"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          created_at?: string
+          deactivated_at?: string | null
+          email: string
+          full_name?: string | null
+          id?: string
+          invited_by?: string | null
+          role: Database["public"]["Enums"]["platform_role"]
+          status?: Database["public"]["Enums"]["member_status"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          created_at?: string
+          deactivated_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["platform_role"]
+          status?: Database["public"]["Enums"]["member_status"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      platform_role_permissions: {
+        Row: {
+          permission: string
+          role: Database["public"]["Enums"]["platform_role"]
+        }
+        Insert: {
+          permission: string
+          role: Database["public"]["Enums"]["platform_role"]
+        }
+        Update: {
+          permission?: string
+          role?: Database["public"]["Enums"]["platform_role"]
         }
         Relationships: []
       }
@@ -338,11 +426,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_analytics_product_id_business_id_fkey'
-            columns: ['product_id', 'business_id']
+            foreignKeyName: "product_analytics_product_id_business_id_fkey"
+            columns: ["product_id", "business_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id', 'business_id']
+            referencedRelation: "products"
+            referencedColumns: ["id", "business_id"]
           },
         ]
       }
@@ -382,11 +470,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_images_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -423,11 +511,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_models_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "product_models_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -464,11 +552,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_variant_images_variant_id_product_id_fkey'
-            columns: ['variant_id', 'product_id']
+            foreignKeyName: "product_variant_images_variant_id_product_id_fkey"
+            columns: ["variant_id", "product_id"]
             isOneToOne: false
-            referencedRelation: 'product_variants'
-            referencedColumns: ['id', 'product_id']
+            referencedRelation: "product_variants"
+            referencedColumns: ["id", "product_id"]
           },
         ]
       }
@@ -505,11 +593,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_variant_models_variant_id_product_id_fkey'
-            columns: ['variant_id', 'product_id']
+            foreignKeyName: "product_variant_models_variant_id_product_id_fkey"
+            columns: ["variant_id", "product_id"]
             isOneToOne: false
-            referencedRelation: 'product_variants'
-            referencedColumns: ['id', 'product_id']
+            referencedRelation: "product_variants"
+            referencedColumns: ["id", "product_id"]
           },
         ]
       }
@@ -546,11 +634,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_variants_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "product_variants_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -629,11 +717,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'products_business_id_fkey'
-            columns: ['business_id']
+            foreignKeyName: "products_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: 'businesses'
-            referencedColumns: ['id']
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -650,16 +738,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'product_analytics_product_id_business_id_fkey'
-            columns: ['product_id', 'business_id']
+            foreignKeyName: "product_analytics_product_id_business_id_fkey"
+            columns: ["product_id", "business_id"]
             isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id', 'business_id']
+            referencedRelation: "products"
+            referencedColumns: ["id", "business_id"]
           },
         ]
       }
     }
     Functions: {
+      admin_deactivate_member: { Args: { p_member: string }; Returns: Json }
+      admin_get_member: { Args: { p_member: string }; Returns: Json }
+      admin_invite_member: {
+        Args: {
+          p_email: string
+          p_role: Database["public"]["Enums"]["platform_role"]
+        }
+        Returns: Json
+      }
       admin_list_business_members: {
         Args: { p_business_id: string }
         Returns: {
@@ -671,6 +768,9 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_list_member_invites: { Args: { p_member: string }; Returns: Json }
+      admin_list_members: { Args: never; Returns: Json }
+      admin_reactivate_member: { Args: { p_member: string }; Returns: Json }
       admin_review_application: {
         Args: { p_action: string; p_application_id: string; p_reason?: string }
         Returns: {
@@ -697,11 +797,26 @@ export type Database = {
           website: string | null
         }
         SetofOptions: {
-          from: '*'
-          to: 'business_applications'
+          from: "*"
+          to: "business_applications"
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      admin_revoke_member_invite: { Args: { p_member: string }; Returns: Json }
+      admin_set_member_role: {
+        Args: {
+          p_member: string
+          p_role: Database["public"]["Enums"]["platform_role"]
+        }
+        Returns: Json
+      }
+      admin_set_role_permissions: {
+        Args: {
+          p_permissions: string[]
+          p_role: Database["public"]["Enums"]["platform_role"]
+        }
+        Returns: Json
       }
       admin_user_emails: {
         Args: { p_ids: string[] }
@@ -713,6 +828,9 @@ export type Database = {
       complete_owner_onboarding: { Args: never; Returns: string }
       is_business_member: { Args: { bid: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      is_platform_member: { Args: never; Returns: boolean }
+      my_platform_access: { Args: never; Returns: Json }
+      platform_can: { Args: { p_permission: string }; Returns: boolean }
       record_event_limited: {
         Args: {
           p_business_id: string
@@ -731,6 +849,21 @@ export type Database = {
         }
         Returns: string
       }
+      service_accept_invite: {
+        Args: { p_full_name?: string; p_token_hash: string; p_user: string }
+        Returns: string
+      }
+      service_create_member_invite: {
+        Args: {
+          p_actor: string
+          p_expires_at: string
+          p_member: string
+          p_token_hash: string
+        }
+        Returns: Json
+      }
+      service_end_sessions: { Args: { p_user: string }; Returns: undefined }
+      service_inspect_invite: { Args: { p_token_hash: string }; Returns: Json }
       service_link_owner: {
         Args: {
           p_actor: string
@@ -740,6 +873,10 @@ export type Database = {
         }
         Returns: string
       }
+      service_log_access_denied: {
+        Args: { p_action: string; p_actor: string }
+        Returns: undefined
+      }
       service_record_email_event: {
         Args: {
           p_event_type: string
@@ -748,13 +885,166 @@ export type Database = {
         }
         Returns: boolean
       }
+      service_record_invite_email: {
+        Args: { p_detail: string; p_invite: string; p_ok: boolean }
+        Returns: undefined
+      }
+      service_user_can: {
+        Args: { p_permission: string; p_user: string }
+        Returns: boolean
+      }
       service_user_id_by_email: { Args: { p_email: string }; Returns: string }
     }
     Enums: {
-      [_ in never]: never
+      invite_status:
+        | "pending"
+        | "sent"
+        | "email_failed"
+        | "accepted"
+        | "expired"
+        | "revoked"
+      member_status: "invited" | "active" | "deactivated"
+      platform_role: "admin" | "team"
     }
     CompositeTypes: {
       [_ in never]: never
     }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {
+      invite_status: [
+        "pending",
+        "sent",
+        "email_failed",
+        "accepted",
+        "expired",
+        "revoked",
+      ],
+      member_status: ["invited", "active", "deactivated"],
+      platform_role: ["admin", "team"],
+    },
+  },
+} as const
