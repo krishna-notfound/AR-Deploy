@@ -2,7 +2,7 @@
 // SecurityGate after its 2FA checks, and the "Finish your setup · n of m" card on Overview. Every step's done-ness
 // comes from real data (onboardingSteps). UX only: nothing here is a security boundary.
 import { CheckCircle2, ChevronRight, Circle, ListChecks } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
@@ -92,6 +92,9 @@ function stepName(s: Step): string {
   return s.level === 'optional' ? `${s.label}, not done` : `${s.label}, not done, ${s.level}`
 }
 
+/** A click that opens the step in this tab: not a ctrl/cmd/shift/alt or middle click (a new tab or window). */
+const isPlainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+
 function StepRow({ step, onOpen, linkState }: { step: Step; onOpen?: () => void; linkState?: unknown }) {
   const marker = step.done ? (
     <CheckCircle2 className="size-5 shrink-0 text-success" aria-hidden />
@@ -114,7 +117,7 @@ function StepRow({ step, onOpen, linkState }: { step: Step; onOpen?: () => void;
   return (
     <li aria-label={stepName(step)}>
       {!step.done && step.to ? (
-        <Link to={step.to} state={linkState} onClick={onOpen} className={`${row} -mx-2 rounded-[var(--radius-control)] px-2 hover:bg-canvas/70`}>
+        <Link to={step.to} state={linkState} onClick={(e) => isPlainClick(e) && onOpen?.()} className={`${row} -mx-2 rounded-[var(--radius-control)] px-2 hover:bg-canvas/70`}>
           {body}
           <ChevronRight className="size-4 shrink-0 text-ink-muted" aria-hidden />
         </Link>
@@ -241,24 +244,30 @@ export const ONBOARDING_CHECK: GateCheck = {
 
 // ---- Overview card ----------------------------------------------------------------------------------------------
 
-/** "Finish your setup · n of m" on Overview until the setup is completed; completes it once every step is done. */
+/**
+ * "Finish your setup · n of m" on Overview until the setup is completed; completes it once every step is done.
+ * A completed setup (or a state not known yet) renders nothing and fetches nothing.
+ */
 export function SetupProgressCard({ scope, className }: { scope: OnboardingScope; className?: string }) {
-  const { security } = useAccount()
+  const onboarding = useAccount().security.state?.onboarding
+  if (!onboarding || onboarding.completedAt) return null
+  return <OpenSetupProgressCard scope={scope} className={className} />
+}
+
+function OpenSetupProgressCard({ scope, className }: { scope: OnboardingScope; className?: string }) {
   const data = useOnboarding(scope)
   const save = useSetOnboarding()
-  const onboarding = security.state?.onboarding
-  const completed = !onboarding || !!onboarding.completedAt
   const allDone = data.status === 'ready' && data.progress.allDone
   const sent = useRef(false)
   useEffect(() => {
-    if (completed || !allDone || sent.current) return
+    if (!allDone || sent.current) return
     sent.current = true
     void save('completed').then((saved) => {
       if (!saved) sent.current = false
     })
-  }, [completed, allDone, save])
+  }, [allDone, save])
 
-  if (completed || allDone || data.status === 'unknown') return null
+  if (allDone || data.status === 'unknown') return null
   const title = data.status === 'ready' ? `Finish your setup · ${data.progress.done} of ${data.progress.total}` : 'Finish your setup'
   return (
     <section aria-label="Finish your setup" className={className}>

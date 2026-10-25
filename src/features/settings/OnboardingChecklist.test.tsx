@@ -1,13 +1,14 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
-import { ACCOUNT_KEY } from '@/auth/AccountProvider'
+import { MemoryRouter } from 'react-router'
+import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
 import { account, service } from '@/services'
 import { accountFail } from '@/services/accountService'
 import { ok } from '@/services/catalogService'
 import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
-import { resetOnboardingVisits } from './OnboardingChecklist'
+import { SetupProgressCard, resetOnboardingVisits } from './OnboardingChecklist'
 import { resetMyProfileStore } from './useMyProfile'
 
 type As = { role: 'super_admin' } | { role: 'business_admin'; businessId: string }
@@ -180,6 +181,57 @@ describe('Complete your setup', () => {
     expect(screen.queryByRole('heading', { name: 'Complete your setup' })).not.toBeInTheDocument()
     // Not dismissed: only this visit.
     expect((await onboarding()).dismissedAt).toBeNull()
+  })
+
+  it('the Overview card makes no fetches for a user whose setup is completed', { timeout: 20_000 }, async () => {
+    const card = () =>
+      render(
+        <AccountProvider>
+          <MemoryRouter>
+            <SetupProgressCard scope="business" />
+          </MemoryRouter>
+        </AccountProvider>,
+      )
+    // A new account first: the card loads the profile and the products and shows what is left.
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(BUSINESS))
+    const products = vi.spyOn(service, 'getProducts')
+    const profile = vi.spyOn(account, 'getProfile')
+    const state = vi.spyOn(account, 'getSecurityState')
+    const first = card()
+    expect(await screen.findByRole('region', { name: 'Finish your setup' }, { timeout: 10_000 })).toBeInTheDocument()
+    expect(products).toHaveBeenCalled()
+    expect(profile).toHaveBeenCalled()
+    first.unmount()
+
+    // Completed: nothing is fetched for the card.
+    resetMockAccount()
+    resetMyProfileStore()
+    products.mockClear()
+    profile.mockClear()
+    state.mockClear()
+    card()
+    await waitFor(() => expect(state).toHaveBeenCalled())
+    const r = await state.mock.results[0]!.value
+    expect(r.ok && r.data.onboarding.completedAt).toBeTruthy()
+    await new Promise((done) => setTimeout(done, 50))
+    expect(screen.queryByRole('region', { name: 'Finish your setup' })).toBeNull()
+    expect(products).not.toHaveBeenCalled()
+    expect(profile).not.toHaveBeenCalled()
+  })
+
+  it('a ctrl, cmd, shift or middle click on a step (a new tab or window) does not let this tab through', { timeout: 20_000 }, async () => {
+    vi.spyOn(service, 'getProducts').mockResolvedValue(ok([]))
+    await account.updateProfile({ displayName: 'Rui Costa' })
+    open(BUSINESS, '/dashboard')
+    await checklist()
+    const link = () => within(step('Add your first product, not done')).getByRole('link')
+    for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { button: 1 }]) {
+      fireEvent.click(link(), init)
+      expect(screen.getByRole('heading', { level: 1, name: 'Complete your setup' })).toBeInTheDocument()
+    }
+    // A plain click still goes on to the step.
+    await userEvent.setup().click(link())
+    expect(await screen.findByRole('heading', { level: 1, name: 'Add product' }, { timeout: 10_000 })).toBeInTheDocument()
   })
 
   it('a profile that cannot load shows the error with Retry and a way on to the dashboard', { timeout: 20_000 }, async () => {
