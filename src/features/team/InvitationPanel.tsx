@@ -6,6 +6,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
 import type { PlatformMember } from '@/domain/types'
 import { formatDateTime } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { PERMISSION_LABEL, ROLE_LABEL } from './permissions'
@@ -13,6 +14,7 @@ import { INVITE_STATUS, InviteStatusBadge, RoleBadge } from './teamLabels'
 import { useMemberActions } from './useMemberActions'
 
 export function InvitationPanel({ member, onClose }: { member: PlatformMember | null; onClose: () => void }) {
+  const prefs = usePreferences()
   const actions = useMemberActions()
   const invites = useServiceQuery(() => (member ? service.listMemberInvites(member.id) : Promise.resolve({ ok: true as const, data: [] })), [member?.id])
   const perms = useServiceQuery(() => service.getRolePermissions(), [])
@@ -42,13 +44,13 @@ export function InvitationPanel({ member, onClose }: { member: PlatformMember | 
               <RoleBadge role={member.role} />
             </Field>
             <Field label="Invited by">{latest?.createdBy ?? member.invitedBy ?? 'Unknown'}</Field>
-            <Field label="Created">{latest ? formatDateTime(latest.createdAt) : '—'}</Field>
+            <Field label="Created">{latest ? formatDateTime(latest.createdAt, 'en', prefs) : '—'}</Field>
             <Field label="Last email attempt">
-              {latest?.lastEmailAt ? `${formatDateTime(latest.lastEmailAt)} · ${latest.lastEmailResult ?? ''}` : 'Not sent'}
+              {latest?.lastEmailAt ? `${formatDateTime(latest.lastEmailAt, 'en', prefs)} · ${latest.lastEmailResult ?? ''}` : 'Not sent'}
             </Field>
-            <Field label="Expires">{latest ? formatDateTime(latest.expiresAt) : '—'}</Field>
-            {latest?.acceptedAt && <Field label="Accepted">{formatDateTime(latest.acceptedAt)}</Field>}
-            {latest?.revokedAt && <Field label="Revoked">{formatDateTime(latest.revokedAt)}</Field>}
+            <Field label="Expires">{latest ? formatDateTime(latest.expiresAt, 'en', prefs) : '—'}</Field>
+            {latest?.acceptedAt && <Field label="Accepted">{formatDateTime(latest.acceptedAt, 'en', prefs)}</Field>}
+            {latest?.revokedAt && <Field label="Revoked">{formatDateTime(latest.revokedAt, 'en', prefs)}</Field>}
           </dl>
 
           {member.role !== 'owner' && perms.data && (

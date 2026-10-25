@@ -95,6 +95,25 @@ describe('Preferences section', () => {
     expect(screen.getByRole('radio', { name: '25/10/2026' })).toBeChecked()
   })
 
+  it('says the time zone is not supported when the server refuses it', { timeout: 20_000 }, async () => {
+    open('/admin/settings/preferences')
+    const select = await screen.findByRole('combobox', { name: 'Time zone' })
+    await waitFor(() => expect(select).toHaveValue('Europe/Lisbon'))
+    const update = vi.spyOn(account, 'updateProfile').mockResolvedValue(accountFail('invalid_request'))
+    await userEvent.selectOptions(select, 'Asia/Tokyo')
+    await userEvent.click(screen.getByRole('button', { name: 'Save preferences' }))
+    expect(await screen.findByText("That time zone isn't supported. Choose a nearby one.")).toBeInTheDocument()
+    expect(select).toHaveValue('Asia/Tokyo')
+
+    // The same refusal without a time zone change keeps the general message.
+    update.mockClear()
+    await userEvent.selectOptions(select, 'Europe/Lisbon')
+    await userEvent.click(screen.getByRole('radio', { name: '25/10/2026' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save preferences' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('Could not save your preferences')).toBeInTheDocument()
+  })
+
   it('shows loading, then an error with a retry when the profile cannot be loaded', { timeout: 20_000 }, async () => {
     const spy = vi.spyOn(account, 'getProfile').mockResolvedValue(accountFail('unknown'))
     open('/admin/settings/preferences')

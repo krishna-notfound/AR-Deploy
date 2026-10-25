@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type DatePrefs, formatDate, formatDateTime, formatRelative } from './format'
+import { type DatePrefs, formatDate, formatDateTime, formatRelative, formatTime } from './format'
 
 const LISBON: DatePrefs = { timezone: 'Europe/Lisbon', dateFormat: 'd MMM yyyy', clock: '24h' }
 const at = (p: Partial<DatePrefs>): DatePrefs => ({ ...LISBON, ...p })
@@ -32,6 +32,12 @@ describe('preference-aware dates', () => {
     expect(formatDateTime('2026-07-24T23:00:00Z', 'en', at({ clock: '12h' }))).toBe('25 Jul 2026, 12:00 am')
     expect(formatDateTime('2026-07-24T23:00:00Z', 'en', at({ clock: '24h' }))).toBe('25 Jul 2026, 00:00')
     expect(formatDateTime('2026-01-10T12:30:00Z', 'en', at({ clock: '12h' }))).toBe('10 Jan 2026, 12:30 pm')
+  })
+
+  it('formatTime gives only the time, in the zone and clock of the preference', () => {
+    expect(formatTime('2026-07-25T13:05:00Z', at({ clock: '24h' }))).toBe('14:05')
+    expect(formatTime('2026-07-25T13:05:00Z', at({ clock: '12h' }))).toBe('2:05 pm')
+    expect(formatTime('2026-10-25T14:05:00Z', at({ timezone: 'UTC', clock: '12h' }))).toBe('2:05 pm')
   })
 
   it('falls back to Europe/Lisbon for a zone this browser does not know', () => {

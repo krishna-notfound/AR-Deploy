@@ -11,6 +11,8 @@ export type ProfileState = { status: 'loading' } | { status: 'error'; message: s
 interface PreferencesCtx {
   state: ProfileState
   prefs: DatePrefs | undefined
+  /** True until the signed-in person's profile has loaded (or failed): dates show the default format meanwhile. */
+  loading: boolean
   reload: () => void
   /** Saves to the profile; on success every page sees the new values. */
   save: (patch: ProfilePatch) => Promise<Result<Profile>>
@@ -58,7 +60,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     [timezone, dateFormat, clock],
   )
 
-  const value = useMemo(() => ({ state, prefs, reload, save }), [state, prefs, reload, save])
+  const loading = !!key && state.status === 'loading'
+  const value = useMemo(() => ({ state, prefs, loading, reload, save }), [state, prefs, loading, reload, save])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 

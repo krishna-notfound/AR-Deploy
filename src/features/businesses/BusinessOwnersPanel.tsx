@@ -12,6 +12,7 @@ import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, ID, Lang } from '@/domain/types'
 import { formatDate } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import type { ProvisionOutcome } from '@/services/catalogService'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
@@ -22,6 +23,7 @@ import { emailReason } from '../applications/labels'
  * Authorization is enforced by the provision-owner Edge Function and the database, not by this panel.
  */
 export function BusinessOwnersPanel({ business, applicationId, defaultEmail, defaultLanguage = 'en' }: { business: Business; applicationId?: ID; defaultEmail?: string; defaultLanguage?: Lang }) {
+  const prefs = usePreferences()
   const members = useServiceQuery(() => service.getBusinessMembers(business.id), [business.id])
   const provision = useServiceMutation((email: string, language: Lang) => service.provisionOwner({ businessId: business.id, email, language, applicationId }))
   const resend = useServiceMutation((language: Lang) => service.resendOwnerInvitation(business.id, language))
@@ -100,10 +102,10 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
                 <p className="truncate text-ui-body font-medium text-ink">{owner.email}</p>
                 <p className="mt-0.5 text-ui-small text-ink-muted tabular-nums">
                   {owner.acceptedAt
-                    ? `Active since ${formatDate(owner.acceptedAt)}`
+                    ? `Active since ${formatDate(owner.acceptedAt, 'en', prefs)}`
                     : owner.invitedAt
-                      ? `Invited ${formatDate(owner.invitedAt)} · has not set a password yet`
-                      : `Added ${formatDate(owner.addedAt)}`}
+                      ? `Invited ${formatDate(owner.invitedAt, 'en', prefs)} · has not set a password yet`
+                      : `Added ${formatDate(owner.addedAt, 'en', prefs)}`}
                 </p>
               </div>
               <div className="flex items-center gap-2">

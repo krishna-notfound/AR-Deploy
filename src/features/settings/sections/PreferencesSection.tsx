@@ -6,7 +6,7 @@ import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { DateFormatPref, Profile } from '@/domain/types'
 import { cn } from '@/lib/cn'
-import { type DatePrefs, formatDate, formatDateTime } from '@/lib/format'
+import { type DatePrefs, formatDate, formatDateTime, formatTime } from '@/lib/format'
 import { browserTimeZone, timeZoneList, useProfileSettings } from '@/lib/preferences'
 import { SectionHeader, SettingsCard } from '../SettingsUi'
 
@@ -63,6 +63,8 @@ function PreferencesForm({ profile }: { profile: Profile }) {
     const r = await save(draft)
     setSaving(false)
     if (r.ok) toast.success('Preferences saved', 'Dates across the dashboard now use these settings.')
+    // The database checks the zone against its own list, which can lag behind this browser's (spec 6).
+    else if (r.error.reason === 'invalid_request' && draft.timezone !== profile.timezone) toast.error("That time zone isn't supported. Choose a nearby one.")
     else toast.error('Could not save your preferences', r.error.message)
   }
 
@@ -102,8 +104,8 @@ function PreferencesForm({ profile }: { profile: Profile }) {
             value={draft.clock}
             onChange={(v) => setDraft((d) => ({ ...d, clock: v }))}
             options={[
-              { value: '24h' as const, label: formatDateTime(SAMPLE, 'en', sample({ clock: '24h' })).split(', ')[1] ?? '14:05', hint: '24-hour' },
-              { value: '12h' as const, label: formatDateTime(SAMPLE, 'en', sample({ clock: '12h' })).split(', ')[1] ?? '2:05 pm', hint: '12-hour' },
+              { value: '24h' as const, label: formatTime(SAMPLE, sample({ clock: '24h' })), hint: '24-hour' },
+              { value: '12h' as const, label: formatTime(SAMPLE, sample({ clock: '12h' })), hint: '12-hour' },
             ]}
           />
           <p className="text-ui-small text-ink-muted">

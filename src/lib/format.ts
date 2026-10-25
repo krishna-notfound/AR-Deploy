@@ -88,6 +88,11 @@ export function formatDateTime(iso: string, lang: Lang = 'en', prefs?: DatePrefs
   return new Intl.DateTimeFormat(CURRENCY_LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 }
 
+/** Only the time of day, in the person's zone and clock: "14:05" or "2:05 pm". */
+export function formatTime(iso: string, prefs: DatePrefs): string {
+  return prefTime(partsIn(iso, prefs.timezone), prefs.clock)
+}
+
 /** "3 hours ago"; older than 30 days, the date (in the person's format with `prefs`). */
 export function formatRelative(iso: string, now: Date = new Date(), prefs?: DatePrefs): string {
   const diffSec = Math.round((new Date(iso).getTime() - now.getTime()) / 1000)

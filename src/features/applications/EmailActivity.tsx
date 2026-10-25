@@ -5,12 +5,14 @@ import { SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { ID } from '@/domain/types'
 import { formatDateTime } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { EMAIL_KIND_LABEL, EmailStatusBadge, emailReason } from './labels'
 
 /** Every email attempt for an application or a business, newest first. Resends are new rows; nothing is overwritten. */
 export function EmailActivity({ applicationId, businessId }: { applicationId?: ID; businessId?: ID }) {
+  const prefs = usePreferences()
   const q = useServiceQuery(() => service.getEmailAttempts({ applicationId, businessId }), [applicationId, businessId])
   return (
     <Card>
@@ -32,7 +34,7 @@ export function EmailActivity({ applicationId, businessId }: { applicationId?: I
                     {e.attempt > 1 && <span className="ml-2 text-ui-small font-normal text-ink-muted">attempt {e.attempt}</span>}
                   </p>
                   <p className="text-ui-small [overflow-wrap:anywhere] text-ink-muted tabular-nums">
-                    To {e.recipient} · {formatDateTime(e.createdAt)}
+                    To {e.recipient} · {formatDateTime(e.createdAt, 'en', prefs)}
                   </p>
                   {emailReason(e.error) && <p className="mt-1 text-ui-small text-ink-muted">{emailReason(e.error)}</p>}
                 </div>

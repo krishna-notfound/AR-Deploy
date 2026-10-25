@@ -9,6 +9,7 @@ import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { Thumb } from '@/components/ui/SmartImage'
 import type { Business, Product, ProductAnalytics } from '@/domain/types'
 import { formatDate, formatMoney, formatNumber } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { primaryImage } from '@/lib/product'
 import { AR_READINESS_HINT, AR_READINESS_LABEL, type ProductArReadiness, hasArModel, productArReadiness } from './productReadiness'
 import { EmbedCodeDialog } from './EmbedCodeDialog'
@@ -59,6 +60,7 @@ export function ProductTable({
   page?: number
   onPageChange?: (p: number) => void
 }) {
+  const prefs = usePreferences()
   const actions = useProductActions(scope)
   // Business owners manage their own products; platform users see what their role allows (ADR-0029).
   const can = useCan()
@@ -132,7 +134,7 @@ export function ProductTable({
       align: 'right',
       priority: 'low',
     },
-    { key: 'updated', header: 'Updated', cell: (p) => <span className="whitespace-nowrap tabular-nums">{formatDate(p.updatedAt)}</span>, sortValue: (p) => p.updatedAt },
+    { key: 'updated', header: 'Updated', cell: (p) => <span className="whitespace-nowrap tabular-nums">{formatDate(p.updatedAt, 'en', prefs)}</span>, sortValue: (p) => p.updatedAt },
     {
       key: 'actions',
       header: 'Actions',

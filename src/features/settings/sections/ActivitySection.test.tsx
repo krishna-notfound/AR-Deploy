@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
@@ -51,7 +51,8 @@ describe('Security activity section', () => {
     const items = within(list).getAllByRole('listitem')
     expect(items).toHaveLength(4)
     expect(items[0]).toHaveTextContent('2FA turned on')
-    expect(items[0]).toHaveTextContent('25 Jul 2026, 14:05') // the default preference: d MMM yyyy, 24h, Europe/Lisbon
+    // The default preference (d MMM yyyy, 24h, Europe/Lisbon) applies once the profile has loaded.
+    await waitFor(() => expect(items[0]).toHaveTextContent('25 Jul 2026, 14:05'))
     expect(items[0]).toHaveTextContent('Safari on iPhone')
     expect(items[0]).toHaveTextContent('203.0.113.7')
     expect(items[1]).toHaveTextContent('Password changed')

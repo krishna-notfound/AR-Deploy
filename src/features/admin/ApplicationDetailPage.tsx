@@ -15,6 +15,7 @@ import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessApplication, ReviewAction } from '@/domain/types'
 import { formatDateTime } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { availableActions } from '@/services/applicationRules'
@@ -57,6 +58,7 @@ export default function ApplicationDetailPage() {
 }
 
 function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChanged: () => void }) {
+  const prefs = usePreferences()
   const confirm = useConfirm()
   const toast = useToast()
   const review = useServiceMutation((action: ReviewAction, reason?: string) => service.reviewApplication(app.id, action, reason))
@@ -118,7 +120,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
           <>
             <ApplicationStatusBadge status={app.status} />
             <span className="text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
-              #{app.reference} · submitted {formatDateTime(app.createdAt)}
+              #{app.reference} · submitted {formatDateTime(app.createdAt, 'en', prefs)}
             </span>
           </>
         }
@@ -160,7 +162,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
           {app.status === 'rejected' && app.decisionReason && (
             <InlineNotice tone="warning">
               <strong className="font-medium">Rejected</strong>
-              {app.reviewedAt ? ` on ${formatDateTime(app.reviewedAt)}` : ''}: {app.decisionReason}
+              {app.reviewedAt ? ` on ${formatDateTime(app.reviewedAt, 'en', prefs)}` : ''}: {app.decisionReason}
             </InlineNotice>
           )}
           <Card>
