@@ -44,6 +44,22 @@ To remove an owner, use the remove (bin) icon next to their email on the **Owner
 
 ---
 
+### Your account and security
+
+Open **Settings** from the dashboard menu. Everything about you is in the "Your account" group, and your business details are in **Settings → Business profile**.
+
+- **Your details.** Add your name and a photo, and choose your time zone and how dates look.
+- **Email and password.** To change your email, enter your password and the new address, then confirm from both inboxes. To change your password, enter the current one first. We email you whenever either changes, so you notice if it was not you.
+- **Two-step sign-in (2FA).** Under **Security & 2FA** you can turn on a second check with an authenticator app on your phone. Scan the code on screen, type the 6 digits the app shows, and you are done. From then on you enter a fresh code each time you sign in.
+- **Recovery codes.** When you turn on two-step sign-in you get 8 recovery codes. Each works once if you lose your phone. Keep them somewhere safe, such as a password manager or a printed copy. You see them only once, but you can make a new set later (the old set then stops working).
+- **Extra check for big actions.** Turning 2FA off, making new recovery codes and closing your account each need a 6-digit code that we email you. It lasts 10 minutes.
+- **Closing your account.** Under **My account** choose **Request closure**. Your catalog goes offline straight away and the platform team reviews your request. You can choose **Cancel request** until it is completed, and your catalog comes back as it was. Once the platform confirms, your catalog and sign-in are deleted for good.
+- **Security activity.** See your recent sign-ins and security changes. Under **Security & 2FA** you can sign out of your other devices.
+
+The platform owner may require two-step sign-in for everyone. If so, you will be asked to set it up the next time you sign in.
+
+---
+
 ## 3. Creating a business (Super Admin)
 
 Go to **Businesses**, then **New business**. Fill in:
@@ -62,7 +78,7 @@ Then click either:
 
 Later you can change the **Catalog status** to Active, Inactive or Draft. Inactive and draft catalogs are hidden from customers.
 
-Owners can change their business name, logo, description and contact details in **Business Settings**. Only a platform admin can change the catalog address, status or accent colour.
+Owners can change their business name, logo, description and contact details in **Settings → Business profile**. Only a platform admin can change the catalog address, status or accent colour.
 
 ---
 

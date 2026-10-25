@@ -105,12 +105,69 @@ Deploy only with the owner's explicit go-ahead, and only to the client project `
 5. Regenerate the types: `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
 6. **Rollback:** `supabase/rollback/20261025_platform_team_roles_rollback.sql`. Admin and Team members lose access, Owners are untouched, and access audit rows are kept.
 
+## Account settings and 2FA (S1)
+
+Settings hub, profile, email and password change, authenticator-app 2FA, recovery codes, the Owner's Security policy and account closure requests (ADR-0032). Deploy only with the owner's explicit go-ahead, and only to the client project `zggylkbgajamhriebdrg`. Status: built and reviewed on a branch, **not yet applied to Supabase**.
+
+### Release order
+
+1. **Preflight.** Run `supabase/checks/preflight_readonly.sql`. Confirm the Owner has an authenticator app ready, because the Owner will be asked to set up 2FA first (step 7).
+2. **Dashboard settings** (next subsection), so the emails and the redirects work as soon as the code is live.
+3. **Migrations and frontend together.** Apply both migrations in one go: `20261025163627_account_settings.sql` and `20261025180600_account_settings_optin_2fa.sql` (`npx supabase db push --linked`). Merge the frontend that has the 2FA gate (`src/auth/SecurityGate.tsx`) straight after. **Never apply the migrations earlier than that frontend.** The second migration makes the database refuse a person who has a verified factor but is signed in at `aal1`, and only the new app shows them the code step. With the old app they would see empty tables.
+4. **Edge Functions.** Deploy after the migrations, because `account-security` calls the new `service_*` functions: `npx supabase functions deploy account-security submit-application --project-ref zggylkbgajamhriebdrg`. `account-security` is new (`verify_jwt = true`). `submit-application` is updated (it now reads the staff recipients) and keeps `verify_jwt = false`. Both come from `supabase/config.toml`.
+5. **Secrets.** `account-security` uses `RESEND_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL` and `EMAIL_TEST_RECIPIENTS`, which already exist. It also reads `SUPABASE_URL`, `SUPABASE_ANON_KEY` and the service key that Supabase provides. No new secret.
+6. **Types.** `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+7. **Check after deploy.** Sign in as the Owner and open Settings. Turn 2FA on with an authenticator app and save the recovery codes. Sign out and in again and confirm the code step appears. Only then consider the Security policy switches. Send yourself an action code (Security, turn 2FA off) and confirm the email arrives.
+
+### Supabase dashboard settings (the owner sets these)
+
+Project `zggylkbgajamhriebdrg`. Change nothing else. Do not use the CLI for these (see "Never config push").
+
+1. **Authentication → Multi-Factor (MFA).** Under TOTP (App Authenticator), turn on both **Enroll** and **Verify**. Leave the maximum at the default of 10 factors. Leave phone MFA off.
+2. **Authentication → Sign In / Providers → Email.**
+   - Turn on **Secure email change**, so a change must be confirmed from both the old and the new address.
+   - Turn on **Secure password change** (sometimes shown as "Require current password when updating"). A password change then needs a recent sign-in.
+   - Turn on **Require current password when updating** if it is listed as its own switch. Save.
+3. **Authentication → Emails → Notification emails** (security notifications). Turn on all four: **Password changed**, **Email address changed**, **MFA method added** and **MFA method removed**. Save each.
+4. **Authentication → URL Configuration → Redirect URLs.** Add:
+   - `https://sanctus.warpkit.online/dashboard/settings/account`
+   - `https://sanctus.warpkit.online/admin/settings/account`
+
+   Keep the existing entries (including `/reset-password`).
+5. Not available on the current plan, so leave them: the **leaked password protection** check and **session time-boxes / inactivity timeout** (Pro plan only).
+
+Supabase moves these screens now and then. If a label differs, find the setting by its name above and check it against the docs rather than skipping it.
+
+### Owner lockout guard and recovery
+
+- **Guard.** "Require 2FA for staff" cannot be saved until the Owner's own 2FA is on and the session is at `aal2` (the switch is disabled and says why, and the database refuses the update at `aal1` as well). The Owner cannot lock themselves out by turning the policy on.
+- **When the Owner still loses access** (device lost, recovery codes lost, and the staff policy on), no screen can help, since only the Owner can change the policy. Recover from the Supabase SQL editor, which runs as the database owner. Look up the Owner's user id first: `select user_id from public.platform_admins;`.
+  1. Clear the policy: `update public.platform_settings set require_2fa_staff = false, require_2fa_business = false where id;` The audit trigger writes a `platform_security_policy_changed` row with no actor.
+  2. Remove the lost second factor. Opt-in 2FA means a verified factor still needs `aal2` even with the policy off, so clearing the policy alone is not enough. In the dashboard, open Authentication → Users → the Owner → remove the factor. Or in SQL: `delete from auth.mfa_factors where user_id = '<owner id>';` then `delete from private.recovery_codes where user_id = '<owner id>';`.
+  3. The Owner signs in with the password, sets 2FA up again, saves the new recovery codes and turns the policy back on.
+- **Alternative that undoes the whole opt-in rule at once:** run `supabase/rollback/20261025_account_settings_optin_2fa_rollback.sql`. Policy-off then means no 2FA is enforced for anyone. Use it only if many people are locked out, and re-apply the migration afterwards.
+- **A team member or business owner** who loses both device and recovery codes: the Owner uses **Reset 2FA** on the person's detail page (the team member's page, or the business's page for its owner). An emailed code is needed. No SQL.
+
+### Rollback
+
+Run in the SQL editor as the database owner, **in this order**:
+
+1. `supabase/rollback/20261025_account_settings_optin_2fa_rollback.sql` first. It restores the policy-only 2FA rule and drops `caller_has_verified_factor()`.
+2. `supabase/rollback/20261025_account_settings_rollback.sql` next. It drops profiles, the policy, action and recovery codes and closure requests, and restores the access helpers without the 2FA clause. (If the first step was skipped it also drops `caller_has_verified_factor()`.) The platform-team-roles rollback, if wanted, comes after this one.
+
+What stays: audit rows, the wider audit `event_type` check, the email-log kinds, the `avatars` bucket when it still holds files (empty it through the Storage API, then drop it), and TOTP factors in Supabase Auth. Businesses that a pending closure took offline stay `inactive`. List them first: `select business_id, previous_business_status from public.account_closure_requests;`. The `account-security` function can be deleted from Edge Functions afterwards. Restore the previous frontend with Vercel Instant Rollback.
+
+### Never `config push`
+
+Never run `supabase config push` from this repo. It would push the local development Auth settings (`supabase/config.toml`) over the hosted project's Auth, including the settings above. Change Auth only in the dashboard.
+
 ## Rollback
 
 | What | How | Data effect |
 |---|---|---|
 | App | Vercel → Deployments → previous production deployment → **Instant Rollback** (or revert the merge commit on `main`) | none |
 | Migrations `20261013093006` + `20261013144121` | Run `supabase/rollback/20261013_publish_rules_and_claims_rollback.sql` in the SQL editor (tested in PGlite) | drops claim links; keeps businesses, products and owner links |
+| Migrations `20261025163627` + `20261025180600` (account settings, 2FA) | Run `supabase/rollback/20261025_account_settings_optin_2fa_rollback.sql` first, then `supabase/rollback/20261025_account_settings_rollback.sql` (see "Account settings and 2FA (S1)") | drops profiles, the 2FA policy, codes and closure requests; keeps audit rows, TOTP factors and the avatars bucket if it has files |
 | Earlier migrations | `supabase/rollback/20261012_p8_rollback.sql` | **destructive** (drops all tables): backup first |
 | Data | Supabase → Database → Backups (daily on paid plans; on Free take a manual dump: `npx supabase db dump --data-only -f backup.sql`) | — |
 
