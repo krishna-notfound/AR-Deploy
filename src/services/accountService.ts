@@ -79,8 +79,12 @@ export const ACCOUNT_ERRORS: Record<string, { code: ServiceErrorCode; message: s
   not_enabled: { code: 'CONFIG', message: "This isn't switched on yet: the database update has not been applied." },
 }
 
+/** Other names the database functions use for a known reason (admin_* functions answer {"error":"forbidden"}). */
+const ALIASES: Record<string, string> = { forbidden: 'not_allowed' }
+
 /** A failed Result whose `reason` is the error code; unknown codes become 'unknown' (never raw text). */
-export function accountFail<T = never>(reason: string): Result<T> {
+export function accountFail<T = never>(code: string): Result<T> {
+  const reason = Object.hasOwn(ALIASES, code) ? (ALIASES[code] as string) : code
   const known = Object.hasOwn(ACCOUNT_ERRORS, reason) ? reason : 'unknown'
   const e = ACCOUNT_ERRORS[known] ?? { code: 'UNKNOWN' as const, message: 'Something went wrong. Try again.' }
   return { ok: false, error: { code: e.code, message: e.message, reason: known } }

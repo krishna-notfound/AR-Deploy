@@ -12,7 +12,8 @@ import { createSupabaseCatalogService } from './supabase/supabaseCatalogService'
 /** Every call fails with the configuration problem, so a half-configured app never shows fake data. */
 export function unavailableService(problem: string): CatalogService {
   return new Proxy({} as CatalogService, {
-    get: (_, key) => (key === 'subscribe' ? () => () => {} : async () => fail('CONFIG', problem)),
+    // 'then' stays undefined: otherwise awaiting the proxy (or returning it from an async function) never settles.
+    get: (_, key) => (key === 'then' ? undefined : key === 'subscribe' ? () => () => {} : async () => fail('CONFIG', problem)),
   })
 }
 
@@ -35,8 +36,8 @@ export const service: CatalogService = SUPABASE_BUILD
 export const auth: AuthService | null = SUPABASE_BUILD && backend.mode === 'supabase' ? createSupabaseAuthService(getSupabaseClient(backend)) : null
 
 /** Every account call fails with the configuration problem (never demo data in a half-configured Supabase build). */
-function unavailableAccount(problem: string): AccountService {
-  return new Proxy({} as AccountService, { get: () => async () => fail('CONFIG', problem) })
+export function unavailableAccount(problem: string): AccountService {
+  return new Proxy({} as AccountService, { get: (_, key) => (key === 'then' ? undefined : async () => fail('CONFIG', problem)) })
 }
 
 /** Account settings, security and 2FA (S1). Demo: an in-memory test harness labelled Demo in the UI. */
@@ -60,4 +61,3 @@ export type { CatalogService, Result, ServiceError, BusinessInput, ProductInput,
 export { FAIL_RATE_KEY } from './mock/mockCatalogService'
 export { MODEL_CREDITS, PHOTO_CREDIT } from './mock/credits'
 export { store as demoStore } from './mock/store'
-export { DEMO_CODE } from './mock/mockAccount'

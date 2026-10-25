@@ -56,12 +56,25 @@ function dbFail<T = never>(error: DbError): Result<T> {
 }
 
 /** Supabase Auth codes for TOTP being switched off in the dashboard. */
-const MFA_OFF = new Set(['mfa_totp_enroll_not_enabled', 'mfa_totp_verify_not_enabled', 'mfa_verification_rejected'])
+const MFA_OFF = new Set(['mfa_totp_enroll_not_enabled', 'mfa_totp_verify_not_enabled'])
+const isRateLimit = (e: AuthErr) => e?.status === 429 || e?.code === 'over_request_rate_limit'
+
+/** Verifying a 6-digit code (challengeAndVerify). */
 const mfaFail = <T = never>(e: AuthErr): Result<T> => {
   if (e?.code && MFA_OFF.has(e.code)) return accountFail('mfa_not_enabled')
-  // A wrong, expired or reused code: the Auth server answers 4xx (mfa_verification_failed, mfa_challenge_expired, ...).
-  if (e && (e.status ?? 0) >= 400 && (e.status ?? 0) < 500 && e.code !== 'over_request_rate_limit') return accountFail('invalid_code')
-  if (e?.code === 'over_request_rate_limit') return accountFail('rate_limited')
+  if (isRateLimit(e)) return accountFail('rate_limited')
+  // A wrong, expired, reused or rejected code: the Auth server answers 4xx (mfa_verification_failed,
+  // mfa_verification_rejected, mfa_challenge_expired, ...).
+  if (e && (e.status ?? 0) >= 400 && (e.status ?? 0) < 500) return accountFail('invalid_code')
+  return accountFail('unknown')
+}
+
+/** Listing, removing and enrolling factors: no code is involved, so never invalid_code. */
+const enrolFail = <T = never>(e: AuthErr): Result<T> => {
+  if (e?.code && MFA_OFF.has(e.code)) return accountFail('mfa_not_enabled')
+  if (e?.code === 'insufficient_aal') return accountFail('aal2_required')
+  if (isRateLimit(e)) return accountFail('rate_limited')
+  // too_many_enrolled_mfa_factors, a name conflict and any other refusal
   return accountFail('unknown')
 }
 
@@ -71,24 +84,34 @@ const origin = () => (typeof window !== 'undefined' ? window.location.origin : '
 const userAgent = () => (typeof navigator !== 'undefined' ? navigator.userAgent : '').slice(0, 200)
 const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null)
 
-/** Checks a password without touching the main session (see verifyCurrentPassword). */
-export type VerifyCurrentPassword = (email: string, password: string) => Promise<boolean>
+export type PasswordCheck = 'ok' | 'password_incorrect' | 'rate_limited' | 'unknown'
+/** Checks a password without touching the main session (see makeVerifyCurrentPassword). */
+export type VerifyCurrentPassword = (email: string, password: string) => Promise<PasswordCheck>
 
 /**
  * verifyCurrentPassword(email, password): signs in on a new throwaway client (client.ts createPasswordCheckClient),
- * then signs that client out at once (scope local), which revokes the extra session. True only when the password is
- * right; any failure (wrong password, network, rate limit) is false. The main client is never used.
+ * then signs that client out at once (scope local), which revokes the extra session. The main client is never used.
+ * - 'ok': the password is right;
+ * - 'password_incorrect': invalid_credentials (400);
+ * - 'rate_limited': 429 or over_request_rate_limit;
+ * - 'unknown': a thrown or fetch error, a 5xx or anything else.
+ * The answer is also a reason accountFail knows.
  */
 export function makeVerifyCurrentPassword(newClient: () => SupabaseClient): VerifyCurrentPassword {
   return async (email, password) => {
     try {
       const check = newClient()
       const { error } = await check.auth.signInWithPassword({ email, password })
-      if (error) return false
+      if (error) {
+        const e = error as AuthErr
+        if (isRateLimit(e)) return 'rate_limited'
+        if (e?.code === 'invalid_credentials') return 'password_incorrect'
+        return 'unknown'
+      }
       await check.auth.signOut({ scope: 'local' }).catch(() => undefined)
-      return true
+      return 'ok'
     } catch {
-      return false
+      return 'unknown'
     }
   }
 }
@@ -153,6 +176,8 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
         if (ctx instanceof Response) {
           const body = (await ctx.json().catch(() => null)) as FnAnswer | null
           if (typeof body?.error === 'string') return accountFail(body.error)
+          // The gateway refused the JWT (expired or missing) before the function ran.
+          if (ctx.status === 401) return accountFail('not_signed_in')
           if (ctx.status === 404) return accountFail('not_enabled')
         }
         return accountFail('unknown')
@@ -174,7 +199,7 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
   async function listTotp(): Promise<Result<{ all: { id: string; factor_type: string; status: string }[]; verified: { id: string }[] }>> {
     try {
       const { data, error } = await sb.auth.mfa.listFactors()
-      if (error || !data) return mfaFail(error as AuthErr)
+      if (error || !data) return enrolFail(error as AuthErr)
       return ok({ all: data.all ?? [], verified: data.totp ?? [] })
     } catch {
       return accountFail('unknown')
@@ -333,7 +358,8 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
       if (!me.ok) return me
       try {
         // Checked on a throwaway client: signing in on the main one would replace this session (and drop aal2).
-        if (!(await deps.verifyCurrentPassword(me.data.email, currentPassword))) return accountFail('password_incorrect')
+        const check = await deps.verifyCurrentPassword(me.data.email, currentPassword)
+        if (check !== 'ok') return accountFail(check)
         const { error } = await sb.auth.updateUser({ email }, { emailRedirectTo: origin() + settingsPath(currentScope(), 'account') })
         if (error) {
           const code = (error as AuthErr)?.code ?? ''
@@ -378,11 +404,11 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
         for (const f of factors.data.all) {
           if (f.status !== 'verified') {
             const { error } = await sb.auth.mfa.unenroll({ factorId: f.id })
-            if (error) return mfaFail(error as AuthErr)
+            if (error) return enrolFail(error as AuthErr)
           }
         }
         const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Authenticator' })
-        if (error || !data) return mfaFail(error as AuthErr)
+        if (error || !data) return enrolFail(error as AuthErr)
         const enrolled: TotpEnrollment = { factorId: data.id, qrSvg: data.totp.qr_code, secret: data.totp.secret }
         return ok(enrolled)
       } catch {
@@ -449,6 +475,11 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
       if (error && error.code !== '42501') return dbFail(error)
       if (!row) {
         // RLS refused the update (no row updated, or 42501). The policy needs the Owner at aal2: say which part failed.
+        // A platform Admin or Team member is refused for their role. When the role can't be read (no access row, which
+        // the 2FA policy itself can cause at aal1), the aal decides.
+        const access = await Promise.resolve(sb.rpc('my_platform_access')).catch(() => null)
+        const role = (access?.data as { role?: unknown } | null | undefined)?.role
+        if (typeof role === 'string' && role !== 'owner') return accountFail('not_allowed')
         const aal = await sb.auth.mfa.getAuthenticatorAssuranceLevel().catch(() => null)
         return accountFail(aal?.data?.currentLevel === 'aal2' ? 'not_allowed' : 'aal2_required')
       }
