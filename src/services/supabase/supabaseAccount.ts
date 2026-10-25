@@ -71,7 +71,29 @@ const origin = () => (typeof window !== 'undefined' ? window.location.origin : '
 const userAgent = () => (typeof navigator !== 'undefined' ? navigator.userAgent : '').slice(0, 200)
 const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null)
 
-export function createSupabaseAccount(sb: SupabaseClient): AccountService {
+/** Checks a password without touching the main session (see verifyCurrentPassword). */
+export type VerifyCurrentPassword = (email: string, password: string) => Promise<boolean>
+
+/**
+ * verifyCurrentPassword(email, password): signs in on a new throwaway client (client.ts createPasswordCheckClient),
+ * then signs that client out at once (scope local), which revokes the extra session. True only when the password is
+ * right; any failure (wrong password, network, rate limit) is false. The main client is never used.
+ */
+export function makeVerifyCurrentPassword(newClient: () => SupabaseClient): VerifyCurrentPassword {
+  return async (email, password) => {
+    try {
+      const check = newClient()
+      const { error } = await check.auth.signInWithPassword({ email, password })
+      if (error) return false
+      await check.auth.signOut({ scope: 'local' }).catch(() => undefined)
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
+export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentPassword: VerifyCurrentPassword }): AccountService {
   const avatarUrl = (path: string | null) => (path ? sb.storage.from(AVATARS).getPublicUrl(path).data.publicUrl : null)
 
   function toProfile(r: ProfileRow): Profile {
@@ -310,11 +332,8 @@ export function createSupabaseAccount(sb: SupabaseClient): AccountService {
       const me = await currentUser()
       if (!me.ok) return me
       try {
-        const check = await sb.auth.signInWithPassword({ email: me.data.email, password: currentPassword })
-        if (check.error) {
-          const code = (check.error as AuthErr)?.code
-          return accountFail(code === 'invalid_credentials' ? 'password_incorrect' : code === 'over_request_rate_limit' ? 'rate_limited' : 'unknown')
-        }
+        // Checked on a throwaway client: signing in on the main one would replace this session (and drop aal2).
+        if (!(await deps.verifyCurrentPassword(me.data.email, currentPassword))) return accountFail('password_incorrect')
         const { error } = await sb.auth.updateUser({ email }, { emailRedirectTo: origin() + settingsPath(currentScope(), 'account') })
         if (error) {
           const code = (error as AuthErr)?.code ?? ''

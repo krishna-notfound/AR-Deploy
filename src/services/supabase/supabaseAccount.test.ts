@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { describe, expect, it, vi } from 'vitest'
 import { settingsPath } from '@/lib/urls'
-import { createSupabaseAccount } from './supabaseAccount'
+import { createSupabaseAccount, makeVerifyCurrentPassword } from './supabaseAccount'
 
 type Answer = { data?: unknown; error?: unknown }
 type Call = [string, ...unknown[]]
@@ -22,6 +22,8 @@ function fake(opts: {
   auth?: Partial<Record<string, (...args: unknown[]) => unknown>>
   mfa?: Partial<Record<string, (...args: unknown[]) => unknown>>
   storage?: Partial<Record<string, (...args: unknown[]) => unknown>>
+  /** How the throwaway password-check client answers signInWithPassword. */
+  password?: 'ok' | 'wrong'
 } = {}) {
   const log: Call[] = []
   const queries: { table: string; calls: Call[] }[] = []
@@ -79,10 +81,21 @@ function fake(opts: {
     return bucket
   })
   const sb = { rpc, functions: { invoke }, from, auth, storage: { from: storageFrom } } as unknown as SupabaseClient
-  return { sb, log, queries, rpc, invoke, auth, bucket }
+  // The throwaway client the password check runs on (never the main session).
+  const pwAuth = {
+    signInWithPassword: rec('pw.signInWithPassword', () =>
+      opts.password === 'wrong' ? { data: { session: null }, error: authError('invalid_credentials', 400) } : { data: { session: {} }, error: null },
+    ),
+    signOut: rec('pw.signOut', () => ({ error: null })),
+  }
+  const pw = { auth: pwAuth } as unknown as SupabaseClient
+  const newPasswordClient = vi.fn(() => pw)
+  const deps = { verifyCurrentPassword: makeVerifyCurrentPassword(newPasswordClient) }
+  return { sb, log, queries, rpc, invoke, auth, bucket, pwAuth, newPasswordClient, deps }
 }
 
 const names = (log: Call[]) => log.map((c) => c[0])
+const account = (f: ReturnType<typeof fake>) => createSupabaseAccount(f.sb, f.deps)
 
 const PROFILE_ROW = {
   user_id: UID,
@@ -99,7 +112,7 @@ const PROFILE_ROW = {
 describe('Supabase account service', () => {
   it('changePassword calls updateUser with current_password and then signOut scope others; maps current_password_mismatch and same_password', async () => {
     const f = fake()
-    expect(await createSupabaseAccount(f.sb).changePassword('old-password-1', 'new-password-12')).toEqual({ ok: true, data: undefined })
+    expect(await account(f).changePassword('old-password-1', 'new-password-12')).toEqual({ ok: true, data: undefined })
     expect(f.auth.updateUser).toHaveBeenCalledWith({ password: 'new-password-12', current_password: 'old-password-1' })
     expect(f.auth.signOut).toHaveBeenCalledWith({ scope: 'others' })
     const order = names(f.log)
@@ -108,7 +121,7 @@ describe('Supabase account service', () => {
 
     for (const code of ['current_password_mismatch', 'same_password']) {
       const g = fake({ auth: { updateUser: () => ({ data: { user: null }, error: authError(code) }) } })
-      const r = await createSupabaseAccount(g.sb).changePassword('old-password-1', 'new-password-12')
+      const r = await account(g).changePassword('old-password-1', 'new-password-12')
       expect(r.ok).toBe(false)
       if (!r.ok) {
         expect(r.error.reason).toBe(code)
@@ -117,36 +130,67 @@ describe('Supabase account service', () => {
       expect(g.auth.signOut).not.toHaveBeenCalled()
     }
 
-    const short = await createSupabaseAccount(fake().sb).changePassword('old', 'short')
+    const short = await account(fake()).changePassword('old', 'short')
     expect(!short.ok && short.error.reason).toBe('weak_password')
   })
 
-  it("requestEmailChange verifies the password with signInWithPassword first and maps a failure to password_incorrect; then calls updateUser({ email }, { emailRedirectTo: origin + settingsPath('business'|'admin','account') }) and logs account_email_change_requested", async () => {
-    const bad = fake({ auth: { signInWithPassword: () => ({ data: {}, error: authError('invalid_credentials', 400) }) } })
-    const r = await createSupabaseAccount(bad.sb).requestEmailChange('wrong', 'new@studio.pt')
+  it("requestEmailChange verifies the password on a throwaway client first and maps a failure to password_incorrect; then calls updateUser({ email }, { emailRedirectTo: origin + settingsPath('business'|'admin','account') }) and logs account_email_change_requested", async () => {
+    const bad = fake({ password: 'wrong' })
+    const r = await account(bad).requestEmailChange('wrong', 'new@studio.pt')
     expect(!r.ok && r.error.reason).toBe('password_incorrect')
     expect(bad.auth.updateUser).not.toHaveBeenCalled()
 
     history.replaceState(null, '', '/dashboard/settings/account')
     const f = fake()
-    expect((await createSupabaseAccount(f.sb).requestEmailChange('right', 'new@studio.pt')).ok).toBe(true)
-    expect(f.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'ana@studio.pt', password: 'right' })
+    expect((await account(f).requestEmailChange('right', 'new@studio.pt')).ok).toBe(true)
+    expect(f.pwAuth.signInWithPassword).toHaveBeenCalledWith({ email: 'ana@studio.pt', password: 'right' })
     expect(f.auth.updateUser).toHaveBeenCalledWith({ email: 'new@studio.pt' }, { emailRedirectTo: location.origin + settingsPath('business', 'account') })
     const order = names(f.log)
-    expect(order.indexOf('auth.signInWithPassword')).toBeLessThan(order.indexOf('auth.updateUser'))
+    expect(order.indexOf('pw.signInWithPassword')).toBeLessThan(order.indexOf('auth.updateUser'))
     expect(f.rpc).toHaveBeenCalledWith('log_account_event', { p_event: 'account_email_change_requested' })
 
     history.replaceState(null, '', '/admin/settings/account')
     const s = fake()
-    await createSupabaseAccount(s.sb).requestEmailChange('right', 'new@studio.pt')
+    await account(s).requestEmailChange('right', 'new@studio.pt')
     expect(s.auth.updateUser).toHaveBeenCalledWith({ email: 'new@studio.pt' }, { emailRedirectTo: location.origin + settingsPath('admin', 'account') })
     history.replaceState(null, '', '/')
 
     const taken = fake({ auth: { updateUser: () => ({ data: { user: null }, error: authError('email_exists') }) } })
-    const t = await createSupabaseAccount(taken.sb).requestEmailChange('right', 'used@studio.pt')
+    const t = await account(taken).requestEmailChange('right', 'used@studio.pt')
     expect(!t.ok && t.error.reason).toBe('email_taken')
-    const invalid = await createSupabaseAccount(fake().sb).requestEmailChange('right', 'nope')
+    const invalid = await account(fake()).requestEmailChange('right', 'nope')
     expect(!invalid.ok && invalid.error.reason).toBe('invalid_email')
+  })
+
+  it("requestEmailChange never calls signInWithPassword on the main client, so the main session and its aal stay as they were", async () => {
+    for (const password of ['ok', 'wrong'] as const) {
+      const f = fake({ password })
+      await account(f).requestEmailChange('pw', 'new@studio.pt')
+      expect(f.auth.signInWithPassword).not.toHaveBeenCalled()
+      expect(f.auth.signOut).not.toHaveBeenCalled()
+      expect(f.auth.refreshSession).not.toHaveBeenCalled()
+      expect(f.pwAuth.signInWithPassword).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('verifyCurrentPassword uses a new throwaway client per call and signs it out (scope local) right after a successful check', async () => {
+    const f = fake()
+    expect(await f.deps.verifyCurrentPassword('ana@studio.pt', 'right')).toBe(true)
+    expect(await f.deps.verifyCurrentPassword('ana@studio.pt', 'right')).toBe(true)
+    expect(f.newPasswordClient).toHaveBeenCalledTimes(2)
+    expect(f.pwAuth.signOut).toHaveBeenCalledTimes(2)
+    expect(f.pwAuth.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    const order = names(f.log)
+    expect(order.indexOf('pw.signInWithPassword')).toBeLessThan(order.indexOf('pw.signOut'))
+
+    const wrong = fake({ password: 'wrong' })
+    expect(await wrong.deps.verifyCurrentPassword('ana@studio.pt', 'nope')).toBe(false)
+    expect(wrong.pwAuth.signOut).not.toHaveBeenCalled()
+
+    const throws = makeVerifyCurrentPassword(() => {
+      throw new Error('offline')
+    })
+    expect(await throws('ana@studio.pt', 'x')).toBe(false)
   })
 
   it('getSecurityState combines my_security_state, mfa.listFactors (verified totp), my_recovery_codes_left and user.new_email', async () => {
@@ -159,7 +203,7 @@ describe('Supabase account service', () => {
       auth: { getUser: () => ({ data: { user: { id: UID, email: 'ana@studio.pt', new_email: 'new@studio.pt' } }, error: null }) },
       mfa: { listFactors: () => ({ data: { all: [verified, { id: 'f2', factor_type: 'totp', status: 'unverified' }], totp: [verified], phone: [] }, error: null }) },
     })
-    expect(await createSupabaseAccount(f.sb).getSecurityState()).toEqual({
+    expect(await account(f).getSecurityState()).toEqual({
       ok: true,
       data: {
         requires2fa: true,
@@ -174,12 +218,12 @@ describe('Supabase account service', () => {
 
     // Without a verified factor the recovery-code count does not apply.
     const none = fake({ rpc: { my_security_state: { data: { requires_2fa: false, aal: 'aal1', closure: null, onboarding: { completed_at: null, dismissed_at: null } } } } })
-    const r = await createSupabaseAccount(none.sb).getSecurityState()
+    const r = await account(none).getSecurityState()
     expect(r.ok && r.data).toMatchObject({ requires2fa: false, aal: 'aal1', hasVerifiedFactor: false, recoveryCodesLeft: null, pendingEmail: null, closure: null })
 
     // A database failure is reported, never replaced by defaults.
     const broken = fake({ rpc: { my_security_state: { error: { code: 'PGRST202', message: 'not found' } } } })
-    const b = await createSupabaseAccount(broken.sb).getSecurityState()
+    const b = await account(broken).getSecurityState()
     expect(!b.ok && b.error.reason).toBe('not_enabled')
   })
 
@@ -191,7 +235,7 @@ describe('Supabase account service', () => {
         enroll: () => ({ data: { id: 'new', type: 'totp', totp: { qr_code: '<svg>qr</svg>', secret: 'SECRET', uri: 'otpauth://x' } }, error: null }),
       },
     })
-    const a = createSupabaseAccount(f.sb)
+    const a = account(f)
     expect(await a.startTotpEnrollment()).toEqual({ ok: true, data: { factorId: 'new', qrSvg: '<svg>qr</svg>', secret: 'SECRET' } })
     expect(f.auth.mfa.unenroll).toHaveBeenCalledTimes(1)
     expect(f.auth.mfa.unenroll).toHaveBeenCalledWith({ factorId: 'old' })
@@ -203,17 +247,17 @@ describe('Supabase account service', () => {
     expect(f.auth.mfa.challengeAndVerify).toHaveBeenCalledWith({ factorId: 'new', code: '123456' })
 
     const wrong = fake({ mfa: { challengeAndVerify: () => ({ data: null, error: authError('mfa_verification_failed') }) } })
-    const r = await createSupabaseAccount(wrong.sb).confirmTotpEnrollment('new', '000000')
+    const r = await account(wrong).confirmTotpEnrollment('new', '000000')
     expect(!r.ok && r.error.reason).toBe('invalid_code')
 
     const off = fake({ mfa: { enroll: () => ({ data: null, error: authError('mfa_totp_enroll_not_enabled') }) } })
-    const o = await createSupabaseAccount(off.sb).startTotpEnrollment()
+    const o = await account(off).startTotpEnrollment()
     expect(!o.ok && o.error.reason).toBe('mfa_not_enabled')
   })
 
   it('function-backed methods post { action, ... } to account-security and map { ok:false, error } to ServiceError.reason', async () => {
     const f = fake({ invoke: { data: { ok: true, sentTo: 'a•••@studio.pt' } } })
-    const a = createSupabaseAccount(f.sb)
+    const a = account(f)
     expect(await a.sendActionCode('disable_2fa')).toEqual({ ok: true, data: { sentTo: 'a•••@studio.pt' } })
     expect(f.invoke).toHaveBeenLastCalledWith('account-security', { body: { action: 'send_code', purpose: 'disable_2fa' } })
     await a.disable2fa('123456')
@@ -232,15 +276,15 @@ describe('Supabase account service', () => {
     expect(f.invoke).toHaveBeenLastCalledWith('account-security', { body: { action: 'restore_closure', target_user_id: 'u2' } })
 
     const codes = fake({ invoke: { data: { ok: true, codes: ['AAAAA-BBBBB'] } } })
-    expect(await createSupabaseAccount(codes.sb).generateRecoveryCodes()).toEqual({ ok: true, data: ['AAAAA-BBBBB'] })
+    expect(await account(codes).generateRecoveryCodes()).toEqual({ ok: true, data: ['AAAAA-BBBBB'] })
     const closure = fake({ invoke: { data: { ok: true, kind: 'business' } } })
-    expect(await createSupabaseAccount(closure.sb).requestClosure('123456')).toEqual({ ok: true, data: { kind: 'business' } })
+    expect(await account(closure).requestClosure('123456')).toEqual({ ok: true, data: { kind: 'business' } })
     expect(closure.invoke).toHaveBeenCalledWith('account-security', { body: { action: 'request_closure', code: '123456' } })
 
     // Non-2xx: the reason comes from the JSON body; raw text is never shown.
     for (const [status, code] of [[400, 'invalid_code'], [400, 'code_expired'], [429, 'too_many_attempts'], [429, 'rate_limited'], [403, 'aal2_required'], [403, 'policy_requires_2fa'], [400, 'owner_cannot_close'], [502, 'email_failed']] as const) {
       const g = fake({ invoke: { error: httpError(status, { ok: false, error: code, message: 'raw provider text' }) } })
-      const r = await createSupabaseAccount(g.sb).disable2fa('123456')
+      const r = await account(g).disable2fa('123456')
       expect(r.ok).toBe(false)
       if (!r.ok) {
         expect(r.error.reason).toBe(code)
@@ -249,19 +293,19 @@ describe('Supabase account service', () => {
     }
     // A 200 answer that still says ok:false is a failure too.
     const soft = fake({ invoke: { data: { ok: false, error: 'not_allowed' } } })
-    const s = await createSupabaseAccount(soft.sb).restoreClosure('u2')
+    const s = await account(soft).restoreClosure('u2')
     expect(!s.ok && s.error.reason).toBe('not_allowed')
     // An unknown code or an unreadable body is 'unknown'.
     const odd = fake({ invoke: { error: httpError(500, { ok: false, error: 'something_new' }) } })
-    const o = await createSupabaseAccount(odd.sb).disable2fa('1')
+    const o = await account(odd).disable2fa('1')
     expect(!o.ok && o.error).toMatchObject({ code: 'UNKNOWN', reason: 'unknown' })
     const relay = fake({ invoke: { error: { name: 'FunctionsFetchError', context: new Error('offline') } } })
-    const x = await createSupabaseAccount(relay.sb).disable2fa('1')
+    const x = await account(relay).disable2fa('1')
     expect(!x.ok && x.error.reason).toBe('unknown')
 
     // After 2FA is removed the session is refreshed, so the new assurance level is picked up.
     const ok = fake({ invoke: { data: { ok: true } } })
-    await createSupabaseAccount(ok.sb).redeemRecoveryCode('ABCDE-FGHJK')
+    await account(ok).redeemRecoveryCode('ABCDE-FGHJK')
     expect(ok.auth.refreshSession).toHaveBeenCalled()
   })
 
@@ -276,7 +320,7 @@ describe('Supabase account service', () => {
       },
     })
     const file = new Blob(['img'], { type: 'image/webp' })
-    const r = await createSupabaseAccount(f.sb).uploadAvatar(file)
+    const r = await account(f).uploadAvatar(file)
     expect(r.ok).toBe(true)
     expect(f.log).toContainEqual(['storage.from', 'avatars'])
     const upload = f.bucket.upload.mock.calls[0] as unknown as [string, Blob, { contentType: string }]
@@ -288,16 +332,16 @@ describe('Supabase account service', () => {
     expect(f.bucket.remove).toHaveBeenCalledWith([`${UID}/previous.webp`])
     expect(r.ok && r.data.avatarUrl).toBe(`https://cdn.test/avatars/${upload[0]}`)
 
-    const big = await createSupabaseAccount(fake().sb).uploadAvatar(new Blob([new Uint8Array(512 * 1024 + 1)], { type: 'image/webp' }))
+    const big = await account(fake()).uploadAvatar(new Blob([new Uint8Array(512 * 1024 + 1)], { type: 'image/webp' }))
     expect(!big.ok && big.error.reason).toBe('invalid_avatar')
-    const gif = await createSupabaseAccount(fake().sb).uploadAvatar(new Blob(['x'], { type: 'image/gif' }))
+    const gif = await account(fake()).uploadAvatar(new Blob(['x'], { type: 'image/gif' }))
     expect(!gif.ok && gif.error.reason).toBe('invalid_avatar')
 
     // A failed profile write removes the object just uploaded and keeps the previous one.
     const g = fake({
       tables: { profiles: (calls) => (calls.some((c) => c[0] === 'upsert') ? { error: { code: '42501', message: 'denied' } } : { data: { ...PROFILE_ROW, avatar_path: `${UID}/previous.webp` } }) },
     })
-    const failed = await createSupabaseAccount(g.sb).uploadAvatar(file)
+    const failed = await account(g).uploadAvatar(file)
     expect(failed.ok).toBe(false)
     const uploaded = (g.bucket.upload.mock.calls[0] as unknown as [string])[0]
     expect(g.bucket.remove).toHaveBeenCalledWith([uploaded])
@@ -307,20 +351,20 @@ describe('Supabase account service', () => {
   it('updatePlatformSettings maps an RLS refusal at aal1 to aal2_required', async () => {
     // RLS hides the row from an update that fails the policy, so PostgREST answers with no rows.
     const f = fake({ tables: { platform_settings: () => ({ data: [] }) } })
-    const r = await createSupabaseAccount(f.sb).updatePlatformSettings({ require2faStaff: true })
+    const r = await account(f).updatePlatformSettings({ require2faStaff: true })
     expect(!r.ok && r.error.reason).toBe('aal2_required')
 
     const denied = fake({
       tables: { platform_settings: () => ({ error: { code: '42501', message: 'permission denied' } }) },
       mfa: { getAuthenticatorAssuranceLevel: () => ({ data: { currentLevel: 'aal2', nextLevel: 'aal2' }, error: null }) },
     })
-    const d = await createSupabaseAccount(denied.sb).updatePlatformSettings({ require2faStaff: true })
+    const d = await account(denied).updatePlatformSettings({ require2faStaff: true })
     expect(!d.ok && d.error.reason).toBe('not_allowed')
 
     const saved = fake({
       tables: { platform_settings: () => ({ data: [{ require_2fa_staff: true, require_2fa_business: false, updated_at: '2026-10-25T10:00:00Z' }] }) },
     })
-    expect(await createSupabaseAccount(saved.sb).updatePlatformSettings({ require2faStaff: true })).toEqual({
+    expect(await account(saved).updatePlatformSettings({ require2faStaff: true })).toEqual({
       ok: true,
       data: { require2faStaff: true, require2faBusiness: false, updatedAt: '2026-10-25T10:00:00Z' },
     })
@@ -331,13 +375,13 @@ describe('Supabase account service', () => {
 
   it('updateProfile writes profiles and keeps user_metadata.display_name in step', async () => {
     const f = fake({ tables: { profiles: (calls) => ({ data: { ...PROFILE_ROW, ...(calls.find((c) => c[0] === 'upsert')?.[1] as object) } }) } })
-    const r = await createSupabaseAccount(f.sb).updateProfile({ displayName: '  Ana Silva ', clock: '12h' })
+    const r = await account(f).updateProfile({ displayName: '  Ana Silva ', clock: '12h' })
     expect(r.ok && r.data).toMatchObject({ userId: UID, displayName: 'Ana Silva', clock: '12h', avatarUrl: null })
     const q = f.queries.find((x) => x.table === 'profiles')
     expect(q?.calls.find((c) => c[0] === 'upsert')?.[1]).toEqual({ user_id: UID, display_name: 'Ana Silva', clock: '12h' })
     expect(f.auth.updateUser).toHaveBeenCalledWith({ data: { display_name: 'Ana Silva' } })
 
-    const tooLong = await createSupabaseAccount(fake().sb).updateProfile({ displayName: 'x'.repeat(81) })
+    const tooLong = await account(fake()).updateProfile({ displayName: 'x'.repeat(81) })
     expect(!tooLong.ok && tooLong.error.reason).toBe('invalid_name')
   })
 
@@ -350,7 +394,7 @@ describe('Supabase account service', () => {
         record_sign_in: { data: 'rate_limited' },
       },
     })
-    const a = createSupabaseAccount(f.sb)
+    const a = account(f)
     expect(await a.listSecurityEvents()).toEqual({
       ok: true,
       data: [

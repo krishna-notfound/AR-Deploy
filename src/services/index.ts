@@ -5,8 +5,8 @@ import { type CatalogService, fail } from './catalogService'
 import { mockAccountService } from './mock/mockAccount'
 import { mockCatalogService } from './mock/mockCatalogService'
 import { type AuthService, createSupabaseAuthService } from './supabase/auth'
-import { getSupabaseClient } from './supabase/client'
-import { createSupabaseAccount } from './supabase/supabaseAccount'
+import { createPasswordCheckClient, getSupabaseClient } from './supabase/client'
+import { createSupabaseAccount, makeVerifyCurrentPassword } from './supabase/supabaseAccount'
 import { createSupabaseCatalogService } from './supabase/supabaseCatalogService'
 
 /** Every call fails with the configuration problem, so a half-configured app never shows fake data. */
@@ -42,7 +42,7 @@ function unavailableAccount(problem: string): AccountService {
 /** Account settings, security and 2FA (S1). Demo: an in-memory test harness labelled Demo in the UI. */
 export const account: AccountService = SUPABASE_BUILD
   ? backend.mode === 'supabase'
-    ? createSupabaseAccount(getSupabaseClient(backend))
+    ? createSupabaseAccount(getSupabaseClient(backend), { verifyCurrentPassword: makeVerifyCurrentPassword(() => createPasswordCheckClient(backend)) })
     : unavailableAccount(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
   : backend.mode === 'demo'
     ? mockAccountService
