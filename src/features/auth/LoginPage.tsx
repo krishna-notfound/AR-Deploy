@@ -3,32 +3,61 @@ import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
+import { needsCodeStep } from '@/auth/SecurityGate'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
+import { useToast } from '@/components/ui/ToastProvider'
 import { auth } from '@/services'
-import { APPLY_PATH } from '@/lib/urls'
+import { APPLY_PATH, settingsPath } from '@/lib/urls'
 import { cn } from '@/lib/cn'
 import { TAP_TARGET } from '../public/tapTarget'
 import { AuthHeading, AuthLayout, authFieldsClass } from './AuthLayout'
+import { RECOVERED_NOTICE, TwoFactorStep } from './TwoFactorStep'
 
 /** Real sign-in (Supabase mode). In demo mode this route forwards to the demo account picker. */
 export default function LoginPage() {
   useDocumentTitle('Sign in')
   const [params] = useSearchParams()
   const next = params.get('next')
-  const { user, signedInEmail, accountError } = useAccount()
+  const { user, signedInEmail, accountError, securityState, securityError, refreshSecurity } = useAccount()
   const leave = useLeaveAccount()
+  const toast = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [recovered, setRecovered] = useState(false)
 
   const authService = auth
   if (!authService) return <Navigate to={`/demo${next ? `?next=${encodeURIComponent(next)}` : ''}`} replace />
-  if (user) {
-    const home = user.role === 'super_admin' ? '/admin' : '/dashboard'
+  // Signed in: once the security state is known, either the code step or the dashboard. A failed check goes on to
+  // the dashboard, whose 2FA gate reports it with a retry.
+  const checking = !!user && !securityState && !securityError
+  if (user && !checking) {
+    const scope = user.role === 'super_admin' ? 'admin' : 'business'
+    if (recovered) return <Navigate to={settingsPath(scope, 'security')} replace />
+    if (securityState && needsCodeStep(securityState)) {
+      return (
+        <AuthLayout>
+          <AuthHeading eyebrow="Platform access" title="Two-step verification">
+            <p>Your account is protected with an authenticator app.</p>
+          </AuthHeading>
+          <TwoFactorStep
+            className={cn('mt-8', authFieldsClass)}
+            onVerified={refreshSecurity}
+            onRecovered={async () => {
+              toast.show({ tone: 'info', title: RECOVERED_NOTICE }, 10_000)
+              setRecovered(true)
+              await refreshSecurity()
+            }}
+            onSignOut={() => void leave({ signOut: true })}
+          />
+        </AuthLayout>
+      )
+    }
+    const home = scope === 'admin' ? '/admin' : '/dashboard'
     return <Navigate to={next?.startsWith(home) ? next : home} replace />
   }
 
@@ -78,9 +107,9 @@ export default function LoginPage() {
           >
             <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </FormField>
-          <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending} disabled={!email || !password}>
+          <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending || checking} disabled={!email || !password}>
             Sign in
-            {!pending && <ArrowRight className="size-4" aria-hidden />}
+            {!pending && !checking && <ArrowRight className="size-4" aria-hidden />}
           </Button>
           <div className="flex items-center gap-3 text-xs text-ink-muted" aria-hidden>
             <span className="h-px flex-1 bg-line" />

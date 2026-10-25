@@ -3,6 +3,7 @@ import { JOIN_PATH } from '@/lib/urls'
 import { lazy, Suspense } from 'react'
 import { Outlet, type RouteObject, createBrowserRouter } from 'react-router'
 import { RequireRole } from '@/auth/RequireRole'
+import { SecurityGate } from '@/auth/SecurityGate'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { adminNav, businessNav } from '@/components/layout/nav'
@@ -69,7 +70,9 @@ const adminRoutes: RouteObject = {
   path: '/admin',
   element: (
     <RequireRole allow="super_admin">
-      <DashboardShell nav={adminNav} variant="admin" />
+      <SecurityGate>
+        <DashboardShell nav={adminNav} variant="admin" />
+      </SecurityGate>
     </RequireRole>
   ),
   children: [
@@ -97,7 +100,9 @@ const businessRoutes: RouteObject = {
   path: '/dashboard',
   element: (
     <RequireRole allow="business_admin">
-      <DashboardShell nav={businessNav} variant="business" />
+      <SecurityGate>
+        <DashboardShell nav={businessNav} variant="business" />
+      </SecurityGate>
     </RequireRole>
   ),
   children: [
@@ -111,14 +116,16 @@ const businessRoutes: RouteObject = {
   ],
 }
 
-// The settings hub is full-screen, outside DashboardShell but behind the same role guard. Every platform role
+// The settings hub is full-screen, outside DashboardShell but behind the same role guard and 2FA gate. Every platform role
 // reaches its account sections; the Owner-only sections are hidden by the section registry, not by the route.
 const settingsRoutes: RouteObject[] = [
   {
     path: '/admin/settings/:section?',
     element: (
       <RequireRole allow="super_admin">
-        <SettingsLayout scope="admin" />
+        <SecurityGate>
+          <SettingsLayout scope="admin" />
+        </SecurityGate>
       </RequireRole>
     ),
   },
@@ -126,7 +133,9 @@ const settingsRoutes: RouteObject[] = [
     path: '/dashboard/settings/:section?',
     element: (
       <RequireRole allow="business_admin">
-        <SettingsLayout scope="business" />
+        <SecurityGate>
+          <SettingsLayout scope="business" />
+        </SecurityGate>
       </RequireRole>
     ),
   },
