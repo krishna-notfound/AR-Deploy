@@ -38,4 +38,9 @@ describe('Views by business bars', () => {
     render(<BusinessBars rows={[{ label: 'A', value: 0 }, { label: 'B', value: 0 }]} />)
     expect(screen.getByText('2 businesses with no views')).toBeInTheDocument()
   })
+
+  it('shows a muted "No views yet" line when there are no rows at all', () => {
+    render(<BusinessBars rows={[]} />)
+    expect(screen.getByText('No views yet')).toBeInTheDocument()
+  })
 })

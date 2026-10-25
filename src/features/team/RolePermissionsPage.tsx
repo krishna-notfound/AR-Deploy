@@ -46,6 +46,17 @@ export default function RolePermissionsPage() {
     }, 0)
   }, [base, draft])
   const dirty = changes > 0
+  const statusText = dirty ? `${changes} unsaved change${changes === 1 ? '' : 's'}` : ''
+  // After a save the bar unmounts; focus the page heading so keyboard and screen reader users keep their place.
+  const [savedTick, setSavedTick] = useState(0)
+  useEffect(() => {
+    if (!savedTick) return
+    const h1 = document.querySelector('h1')
+    if (h1) {
+      h1.setAttribute('tabindex', '-1')
+      h1.focus({ preventScroll: true })
+    }
+  }, [savedTick])
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && !saving && currentLocation.pathname !== nextLocation.pathname)
 
   const toggle = (role: MemberRole, p: Permission) =>
@@ -87,6 +98,7 @@ export default function RolePermissionsPage() {
     setSaving(false)
     toast.success('Permissions saved', 'They apply to each member on their next action.')
     setBase({ admin: [...draft.admin], team: [...draft.team] })
+    setSavedTick((n) => n + 1)
   }
 
   return (
@@ -166,13 +178,20 @@ export default function RolePermissionsPage() {
         </div>
       ) : null}
 
+      {/* Always mounted, so a change of text is announced; the bar below is only the visual copy. */}
+      {draft && (
+        <p className="sr-only" role="status" aria-live="polite" data-save-status>
+          {statusText}
+        </p>
+      )}
+
       {draft && (dirty || saving) && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w)]">
           <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-3 px-4 py-3 sm:px-8">
-            <p className="flex min-w-0 items-center gap-2 text-ui-body text-ink-muted" aria-live="polite">
-              <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden />
-              <span className="truncate max-sm:hidden">{`${changes} unsaved change${changes === 1 ? '' : 's'}`}</span>
-              <span className="sm:hidden" aria-hidden>{`${changes} unsaved`}</span>
+            <p className="flex min-w-0 items-center gap-2 text-ui-body text-ink-muted" aria-hidden>
+              <span className="size-1.5 shrink-0 rounded-full bg-warning" />
+              <span className="truncate max-sm:hidden">{statusText}</span>
+              <span className="sm:hidden">{`${changes} unsaved`}</span>
             </p>
             <div className="flex shrink-0 gap-2">
               <Button onClick={() => base && setDraft({ admin: [...base.admin], team: [...base.team] })} disabled={!dirty || saving}>

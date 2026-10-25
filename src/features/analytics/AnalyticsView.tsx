@@ -215,6 +215,7 @@ export function BusinessBars({ rows }: { rows: { label: string; value: number }[
   const withViews = rows.filter((r) => r.value > 0).sort((a, b) => b.value - a.value)
   const quiet = rows.length - withViews.length
   const max = Math.max(1, ...withViews.map((r) => r.value))
+  if (rows.length === 0) return <p className="text-ui-small text-ink-muted">No views yet</p>
   return (
     <div>
       {withViews.length > 0 && (

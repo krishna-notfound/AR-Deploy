@@ -35,6 +35,7 @@ export function InvitationsTable({ members, onOpen }: { members: PlatformMember[
         </button>
       ),
       sortValue: (m) => m.email,
+      className: 'max-w-[280px]',
     },
     { key: 'role', header: 'Role', cell: (m) => <RoleBadge role={m.role} /> },
     { key: 'status', header: 'Invitation', cell: (m) => (m.invite ? <InviteStatusBadge status={m.invite.status} /> : <span className="text-ink-muted">Not sent</span>) },

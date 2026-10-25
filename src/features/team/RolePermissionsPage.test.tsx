@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
 import { service } from '@/services'
+import { fail } from '@/services/catalogService'
 
 function open(url = '/admin/team/permissions') {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
@@ -50,12 +51,52 @@ describe('Role permissions (ADR-0029)', () => {
     expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
   })
 
+  it('keeps one always-mounted polite live region that holds the full status text, even when the bar is hidden', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    const region = document.querySelector('[aria-live="polite"][data-save-status]') as HTMLElement
+    expect(region).not.toBeNull()
+    expect(region).toHaveTextContent('')
+    await user.click(box('Team', 'Publish and unpublish'))
+    // The same node is updated (never remounted), so assistive tech announces the change.
+    expect(document.querySelector('[aria-live="polite"][data-save-status]')).toBe(region)
+    expect(region).toHaveTextContent('1 unsaved change')
+    // The visual copies (short and full) are hidden from assistive tech.
+    for (const el of screen.getAllByText(/unsaved/).filter((e) => e !== region)) expect(el.closest('[aria-hidden="true"]')).not.toBeNull()
+  })
+
+  it('keeps the bar visible with an error when a save fails', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    vi.spyOn(service, 'setRolePermissions').mockResolvedValue(fail('UNKNOWN', 'Network down.'))
+    open()
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await user.click(box('Team', 'Publish and unpublish'))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Permissions not saved')).toBeInTheDocument()
+    expect(screen.getByText('Network down.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
+  })
+
+  it('moves focus to the page heading when a successful save removes the bar', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await user.click(box('Team', 'Publish and unpublish'))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull())
+    const h1 = screen.getByRole('heading', { level: 1, name: 'Role permissions' })
+    await waitFor(() => expect(h1).toHaveFocus())
+    expect(h1).toHaveAttribute('tabindex', '-1')
+  })
+
   it('counts unsaved changes, and Cancel puts them back', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open()
     await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
     await user.click(box('Team', 'Publish and unpublish'))
-    expect(screen.getByText('1 unsaved change')).toBeInTheDocument()
+    expect(screen.getAllByText('1 unsaved change').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(box('Team', 'Publish and unpublish')).not.toBeChecked()
     expect(screen.queryByText(/unsaved change/)).toBeNull()
@@ -94,7 +135,9 @@ describe('Role permissions (ADR-0029)', () => {
     await waitFor(() => expect(box('Team', 'View businesses')).not.toBeChecked())
     await user.click(screen.getByRole('button', { name: 'Reset to defaults' }))
     expect(box('Team', 'View businesses')).toBeChecked()
-    expect(screen.getByText(/unsaved change/)).toBeInTheDocument()
+    expect(screen.getAllByText(/unsaved change/).length).toBeGreaterThan(0)
+    // Nothing was dirty before, so the reset itself reveals the save bar.
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
   })
 
   it('asks before leaving with unsaved changes', { timeout: 20_000 }, async () => {
