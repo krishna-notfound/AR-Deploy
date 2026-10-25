@@ -114,7 +114,7 @@ export function PageHeader({
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 lg:flex-nowrap">
           <div data-header-title className={cn('min-w-0 lg:flex-1', hasMore && 'max-sm:w-full')}>
             <div className="flex items-start gap-3">
-              <h1 className="min-w-0 flex-1 font-display text-[length:var(--text-ui-h1)] leading-[1.15] font-medium tracking-[-0.01em] break-words text-ink lg:line-clamp-2">
+              <h1 className="min-w-0 flex-1 font-display text-[length:var(--text-ui-h1)] leading-[1.15] font-medium tracking-[-0.01em] break-words text-ink lg:line-clamp-2" title={typeof title === 'string' ? title : undefined}>
                 {title}
               </h1>
               {moreMenu}

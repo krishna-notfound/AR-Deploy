@@ -66,6 +66,8 @@ export function Tabs<T extends string>({
           ? 'inline-flex h-10 max-w-full gap-1 overflow-x-auto rounded-[var(--radius-control)] bg-subtle p-1 [scrollbar-width:none] pointer-coarse:h-[52px]'
           : 'flex gap-1 overflow-x-auto',
         variant === 'underline' && 'border-b border-line',
+        // scroll padding keeps a keyboard-focused tab clear of the 24px fade
+        inDashboard && 'scroll-pe-6',
         inDashboard && moreRight && '[mask-image:linear-gradient(to_right,#000_calc(100%-24px),transparent)]',
         className,
       )}
