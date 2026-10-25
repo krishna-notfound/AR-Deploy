@@ -3,37 +3,78 @@ import { useState } from 'react'
 import type { DailyPoint } from '@/domain/types'
 import { formatNumber } from '@/lib/format'
 import { Button } from '../ui/Button'
-import { SERIES, SeriesTable, TrendChart } from './Charts'
+import { CombinedTrendChart, SERIES, type SeriesKey, SeriesTable, TrendChart } from './Charts'
 
-/** Views and AR launch attempts as two aligned small multiples, with a table view. */
+const KEYS = Object.keys(SERIES) as SeriesKey[]
+
+/**
+ * Views and AR launch attempts with a table view. `compact` (the overview cards, Stitch A-a-overview) draws one combined
+ * chart with a series toggle above it; the analytics page keeps two aligned small multiples.
+ */
 export function ActivityTrend({ data, compact }: { data: DailyPoint[]; compact?: boolean }) {
   const [showTable, setShowTable] = useState(false)
+  const [show, setShow] = useState<Record<SeriesKey, boolean>>({ views: true, ar: true })
   const views = data.reduce((s, d) => s + d.views, 0)
   const ar = data.reduce((s, d) => s + d.arActivations, 0)
-  const h = compact ? 120 : 160
+  const tableToggle = (
+    <Button size="sm" variant="ghost" icon={<Table2 className="size-4" aria-hidden />} onClick={() => setShowTable((v) => !v)} aria-pressed={showTable}>
+      {showTable ? 'Show charts' : 'Show as table'}
+    </Button>
+  )
+
+  if (compact) {
+    const visible = KEYS.filter((k) => show[k]).length
+    return (
+      <div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          {!showTable && (
+            <div role="group" aria-label="Series shown in the chart" className="-ml-2 flex flex-wrap items-center gap-x-1 gap-y-1">
+              {KEYS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={show[k]}
+                  // The chart is never empty: the last visible series stays on.
+                  disabled={show[k] && visible === 1}
+                  onClick={() => setShow((s) => ({ ...s, [k]: !s[k] }))}
+                  className="inline-flex h-8 items-center gap-2 rounded-[var(--radius-control)] px-2 text-[length:var(--text-ui-small)] text-ink-muted transition-colors hover:bg-subtle hover:text-ink disabled:cursor-default disabled:hover:bg-transparent aria-[pressed=false]:text-ink-faint"
+                >
+                  <span
+                    className="size-2 shrink-0 rounded-full border-[1.5px]"
+                    style={{ borderColor: SERIES[k].color, background: show[k] ? SERIES[k].color : 'transparent' }}
+                    aria-hidden
+                  />
+                  {SERIES[k].label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="ml-auto">{tableToggle}</div>
+        </div>
+        {showTable ? <SeriesTable data={data} /> : <CombinedTrendChart data={data} show={show} height={220} />}
+      </div>
+    )
+  }
+
   return (
     <div>
       {showTable ? (
         <SeriesTable data={data} />
       ) : (
         <div className="grid gap-8 lg:grid-cols-2">
-          {(['views', 'ar'] as const).map((k) => (
+          {KEYS.map((k) => (
             <div key={k}>
               <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
                 <span className="inline-block h-0.5 w-4 shrink-0" style={{ background: SERIES[k].color }} aria-hidden />
                 <span className="font-medium text-ink">{SERIES[k].label}</span>
                 <span className="text-ink-muted tabular-nums">{formatNumber(k === 'views' ? views : ar)} in 30 days</span>
               </div>
-              <TrendChart data={data} series={k} height={h} />
+              <TrendChart data={data} series={k} height={160} />
             </div>
           ))}
         </div>
       )}
-      <div className="mt-3 flex justify-end">
-        <Button size="sm" variant="ghost" icon={<Table2 className="size-4" aria-hidden />} onClick={() => setShowTable((v) => !v)} aria-pressed={showTable}>
-          {showTable ? 'Show charts' : 'Show as table'}
-        </Button>
-      </div>
+      <div className="mt-3 flex justify-end">{tableToggle}</div>
     </div>
   )
 }

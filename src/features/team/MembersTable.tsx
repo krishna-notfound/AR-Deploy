@@ -104,10 +104,9 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
   return (
     <>
       <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:items-end sm:px-6 sm:py-5">
-        <div className="flex flex-col gap-2">
-          <span aria-hidden className="text-ui-body font-medium text-ink">Search members</span>
-          <SearchInput value={q} onChange={(v) => set('q', v)} label="Search members" placeholder="Name or email" className="sm:w-80" />
-        </div>
+        <FormField label="Search members" className="sm:w-80">
+          <SearchInput value={q} onChange={(v) => set('q', v)} label="Search members" placeholder="Name or email" className="w-full" />
+        </FormField>
         <div className="grid grid-cols-2 gap-3 sm:contents">
         <FormField label="Role" className="sm:w-40">
           <Select value={role} onChange={(e) => set('role', e.target.value)}>

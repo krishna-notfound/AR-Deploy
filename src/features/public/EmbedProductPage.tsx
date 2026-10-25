@@ -109,7 +109,7 @@ function EmbedProductView({ business, product, tenant }: { business: Business; p
 
   const price = product.price + (variant?.priceDelta ?? 0)
   const pageUrl = embedProductPageUrl(business, product, { tenant, variantId, lang })
-  const linkClass = 'inline-flex min-h-11 w-full items-center justify-center gap-2 border border-ink px-4 py-2 text-center text-label text-ink transition-colors hover:bg-ink hover:text-chalk'
+  const linkClass = 'inline-flex min-h-11 w-full items-center justify-center gap-2 border border-ink px-4 py-2 text-center text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink transition-colors hover:bg-ink hover:text-chalk'
 
   return (
     <EmbedFrame business={business}>
@@ -134,7 +134,7 @@ function EmbedProductView({ business, product, tenant }: { business: Business; p
               type="button"
               onClick={() => setMode(mode === '3d' ? 'photos' : '3d')}
               aria-pressed={mode === '3d'}
-              className="absolute top-3 left-3 inline-flex h-10 items-center gap-2 bg-ink px-4 text-label text-chalk transition-colors hover:bg-umber"
+              className="absolute top-3 left-3 inline-flex h-10 items-center gap-2 bg-ink px-4 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-chalk transition-colors hover:bg-umber"
             >
               {mode === '3d' ? <Images className="size-4" strokeWidth={1.4} aria-hidden /> : <Box className="size-4" strokeWidth={1.4} aria-hidden />}
               {mode === '3d' ? t('product.viewPhotos') : t('product.view3d')}
@@ -142,7 +142,7 @@ function EmbedProductView({ business, product, tenant }: { business: Business; p
           )}
         </div>
         <div className="shrink-0 px-4 py-4 sm:flex sm:w-[min(42%,380px)] sm:flex-col sm:justify-center sm:px-7">
-          <p className="truncate text-eyebrow text-ink-muted">{business.name}</p>
+          <p className="truncate text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink-muted">{business.name}</p>
           <LocalizedSpan as="h1" text={product.name} className="mt-1 font-display text-[1.5rem] leading-[1.1] font-normal text-balance text-ink sm:text-[2rem]" />
           <p className="mt-1.5 text-[15px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
           <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="mt-4" />
