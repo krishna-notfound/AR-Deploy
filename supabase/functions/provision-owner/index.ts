@@ -22,6 +22,16 @@ Deno.serve((req) =>
       const { data, error } = await admin.rpc('service_user_can', { p_user: userId, p_permission: 'owners.manage' })
       return !error && data === true
     },
+    async isPlatformStaff(userId) {
+      const [owner, member] = await Promise.all([
+        admin.from('platform_admins').select('user_id').eq('user_id', userId).maybeSingle(),
+        admin.from('platform_members').select('id').eq('user_id', userId).maybeSingle(),
+      ])
+      if (owner.error) throw new Error(`staff lookup failed: ${owner.error.message}`)
+      // Before the team-roles migration the table does not exist (42P01): only Owners are staff then.
+      if (member.error && member.error.code !== '42P01' && member.error.code !== 'PGRST205') throw new Error(`staff lookup failed: ${member.error.message}`)
+      return !!owner.data || !!member.data
+    },
     async getBusiness(id) {
       const { data, error } = await admin.from('businesses').select('id, name').eq('id', id).maybeSingle()
       if (error) throw new Error(`business lookup failed: ${error.message}`)

@@ -18,7 +18,10 @@ export interface ProvisionDeps {
   fetch: typeof fetch
   now?: () => Date
   userIdFromToken(token: string): Promise<string | null>
+  /** The caller may manage business owners: an Owner, or an active member with owners.manage (ADR-0029). */
   isPlatformAdmin(userId: string): Promise<boolean>
+  /** Anyone with platform access (an Owner or any platform member): they can never own a business. */
+  isPlatformStaff(userId: string): Promise<boolean>
   getBusiness(id: string): Promise<{ id: string; name: string } | null>
   getOwner(businessId: string): Promise<{ userId: string; email: string; acceptedAt: string | null } | null>
   /**
@@ -71,7 +74,7 @@ export async function handleProvisionOwner(req: Request, deps: ProvisionDeps): P
     if (owner) return resend(req, deps, { actorId, business, owner, lang, applicationId })
 
     const existing = await deps.accountByEmail(email)
-    if (existing && (await deps.isPlatformAdmin(existing.id))) return reply(409, { error: 'email_is_admin' })
+    if (existing && (await deps.isPlatformStaff(existing.id))) return reply(409, { error: 'email_is_admin' })
     // The dashboard serves one business per owner, and complete_owner_onboarding expects a single pending membership.
     if (existing?.ownsBusiness) return reply(409, { error: 'email_owns_business' })
     // An account this platform did not invite was registered by someone else (or before sign-ups were closed). Linking

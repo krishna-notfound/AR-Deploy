@@ -481,3 +481,20 @@ describe('service_end_sessions (manage-member sign-out, Task 6)', () => {
     await expect(as(OWNER_U, (tx) => tx.query(`select public.service_end_sessions($1)`, [TEAM_U]))).rejects.toThrow(/permission denied/)
   })
 })
+
+describe('final review fixes', () => {
+  it('the email log accepts team invitations (review C1)', async () => {
+    const r = await svc(`with x as (insert into public.email_log (kind, recipient, subject, status) values ('team_invitation', 'a@studio.test', 'You are invited', 'accepted') returning id) select to_jsonb(id) as r from x`)
+    expect(r).toBeTruthy()
+  })
+
+  it('creating an active business needs businesses.status too (review)', async () => {
+    await db.exec(`delete from public.platform_role_permissions where role = 'admin' and permission = 'businesses.status'`)
+    try {
+      await expect(probe(ADMIN_U, `insert into public.businesses (name, slug, status) values ('New', 'new-live', 'active')`)).rejects.toThrow()
+      expect(await affected(ADMIN_U, `insert into public.businesses (name, slug, status) values ('New', 'new-draft', 'draft')`)).toBe(1)
+    } finally {
+      await db.exec(`insert into public.platform_role_permissions values ('admin', 'businesses.status')`)
+    }
+  })
+})

@@ -75,7 +75,13 @@ export function useMemberActions() {
         destructive: true,
       })
       if (!yes) return false
-      return report(await service.deactivateMember(m.id), `${who} deactivated`)
+      const r = await service.deactivateMember(m.id)
+      if (r.ok && r.data.signOut === 'failed') {
+        // Honest: access is already refused by the database, but their open sessions could not be ended.
+        toast.error(`${who} deactivated, but not signed out`, 'They can no longer see or change anything; their open sessions end when they expire.')
+        return true
+      }
+      return report(r, `${who} deactivated`, 'Access was removed and they were signed out on every device.')
     },
     [confirm, report],
   )

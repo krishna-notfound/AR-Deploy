@@ -27,6 +27,8 @@ $$;
 
 -- 2. Triggers and the policies the migration added.
 drop trigger if exists products_publish_permission on public.products;
+drop trigger if exists businesses_insert_status_permission on public.businesses;
+-- email_log_kind_check keeps 'team_invitation': rows of that kind may exist and stay valid.
 drop trigger if exists business_members_not_platform on public.business_members;
 drop trigger if exists platform_members_not_business_owner on public.platform_members;
 
@@ -69,6 +71,7 @@ drop function if exists public.service_log_access_denied(uuid, text);
 drop function if exists private.products_publish_permission();
 drop function if exists private.business_owner_not_platform_member();
 drop function if exists private.platform_member_not_business_owner();
+drop function if exists private.businesses_insert_status_permission();
 
 -- 4. Tables, access checks and types.
 drop table if exists private.platform_invites;

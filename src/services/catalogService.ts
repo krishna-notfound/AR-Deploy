@@ -195,7 +195,8 @@ export interface CatalogService {
   resendMemberInvite(id: ID): Promise<Result<InviteOutcome>>
   revokeMemberInvite(id: ID): Promise<Result<void>>
   setMemberRole(id: ID, role: MemberRole): Promise<Result<void>>
-  deactivateMember(id: ID): Promise<Result<void>>
+  /** `signOut: 'failed'`: deactivated (the database refuses them), but ending their sessions failed. */
+  deactivateMember(id: ID): Promise<Result<{ signOut?: 'failed' }>>
   reactivateMember(id: ID): Promise<Result<void>>
   getRolePermissions(): Promise<Result<RolePermissions>>
   setRolePermissions(role: MemberRole, permissions: Permission[]): Promise<Result<void>>

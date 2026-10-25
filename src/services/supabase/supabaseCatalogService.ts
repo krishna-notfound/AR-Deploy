@@ -667,15 +667,26 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     )
   }
 
+  /**
+   * A write that changed no rows: RLS refused it if the caller can still read the row (ADR-0029: a member without the
+   * permission), otherwise the row is gone. Reported as "no permission" or "not found" accordingly.
+   */
+  const refusedOrMissing = async <T,>(table: 'businesses' | 'products' | 'business_members', match: Record<string, string>, notFound: string): Promise<Result<T>> => {
+    let q = sb.from(table).select('id')
+    for (const [k, v] of Object.entries(match)) q = q.eq(k, v)
+    const { data } = await q.maybeSingle()
+    return data ? teamFail<T>('forbidden') : fail<T>('NOT_FOUND', notFound)
+  }
+
   const updateProductRow = async (id: ID, patch: Partial<ProductRow>): Promise<Result<Product>> => {
     const { data, error } = await sb.from('products').update(patch).eq('id', id).select('id').maybeSingle()
     if (error) return mapDbError(error)
-    if (!data) return fail('NOT_FOUND', 'Product not found, or your account cannot change it.')
+    if (!data) return refusedOrMissing('products', { id }, 'Product not found.')
     return productById(id)
   }
 
   return {
-    ...createSupabaseTeam(sb),
+    ...createSupabaseTeam(sb, () => listeners.forEach((l) => l())),
 
     // ---------------- businesses ----------------
     getBusinesses: () =>
@@ -706,7 +717,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
         const { data, error } = await sb.from('businesses').update(fromBusinessInput(patch)).eq('id', id).select('*').maybeSingle<BusinessRow>()
         if (error) return mapDbError(error, { conflictField: 'business' })
-        if (!data) return fail('NOT_FOUND', 'Business not found, or your account cannot change it.')
+        if (!data) return refusedOrMissing('businesses', { id }, 'Business not found.')
         // A replaced or removed logo is deleted only if it sits in this business's own folder: logo_url is
         // writable by members, so it could point at another business's file (security audit P1-07).
         const oldLogo = ownedLogoPath(current.data.logoUrl, id)
@@ -717,14 +728,14 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       guard(async () => {
         const { data, error } = await sb.from('businesses').update({ status }).eq('id', id).select('*').maybeSingle<BusinessRow>()
         if (error) return mapDbError(error)
-        return changed(data ? ok(toBusiness(data)) : fail('NOT_FOUND', 'Business not found, or your account cannot change it.'))
+        return changed(data ? ok(toBusiness(data)) : await refusedOrMissing<Business>('businesses', { id }, 'Business not found.'))
       }),
     deleteBusiness: (id) =>
       guard(async () => {
         const current = await businessById(id)
         const { data, error } = await sb.from('businesses').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
-        if (!data.length) return fail('NOT_FOUND', 'Business not found, or your account cannot delete it.')
+        if (!data.length) return refusedOrMissing('businesses', { id }, 'Business not found.')
         // Rows cascade in the database; files live in Storage and are removed here (folder = business id).
         await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id)])
         const logo = current.ok ? ownedLogoPath(current.data.logoUrl, id) : null
@@ -802,7 +813,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const current = await productById(id)
         const { data, error } = await sb.from('products').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
-        if (!data.length) return fail('NOT_FOUND', 'Product not found, or your account cannot delete it.')
+        if (!data.length) return refusedOrMissing('products', { id }, 'Product not found.')
         if (current.ok) await removeUnreferencedMedia(mediaPaths(current.data))
         return changed(ok(undefined))
       }),
@@ -871,7 +882,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       guard(async () => {
         const { data, error } = await sb.from('business_members').delete().eq('business_id', businessId).eq('user_id', userId).select('id')
         if (error) return mapDbError(error)
-        return changed(data.length ? ok(undefined) : fail('NOT_FOUND', 'This owner was not found, or your account cannot remove owners.'))
+        return changed(data.length ? ok(undefined) : await refusedOrMissing<void>('business_members', { business_id: businessId, user_id: userId }, 'This owner was not found.'))
       }),
     provisionOwner: ({ businessId, email, language, applicationId }) =>
       guard(async () => changed(await invokeFunction<ProvisionOutcome>(PROVISION_OWNER_FUNCTION, { action: 'provision', businessId, email, language, applicationId }))),

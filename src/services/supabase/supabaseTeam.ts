@@ -74,7 +74,8 @@ function details(action: AccessAction, m: Record<string, unknown>, to?: string |
   }
 }
 
-export function createSupabaseTeam(sb: SupabaseClient): TeamMethods {
+/** `notify` tells open queries to refetch after a successful change (the service's subscribe listeners). */
+export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () => {}): TeamMethods {
   /** Calls a database function that answers { ok: true, ... } or { error }. */
   async function call(fn: string, args?: Record<string, unknown>): Promise<Result<Answer>> {
     try {
@@ -97,7 +98,15 @@ export function createSupabaseTeam(sb: SupabaseClient): TeamMethods {
     }
   }
 
-  const done = (r: Result<unknown>): Result<void> => (r.ok ? ok(undefined) : r)
+  const done = (r: Result<unknown>): Result<void> => {
+    if (!r.ok) return r
+    notify()
+    return ok(undefined)
+  }
+  const changed = <T,>(r: Result<T>): Result<T> => {
+    if (r.ok) notify()
+    return r
+  }
 
   return {
     async getMyAccess() {
@@ -122,11 +131,14 @@ export function createSupabaseTeam(sb: SupabaseClient): TeamMethods {
       return r.ok ? ok((r.data.invites ?? []) as MemberInvite[]) : r
     },
 
-    inviteMember: ({ email, role, note }) => invoke<InviteOutcome>('invite-member', { action: 'invite', email, role, ...(note ? { note } : {}) }),
-    resendMemberInvite: (id) => invoke<InviteOutcome>('invite-member', { action: 'resend', memberId: id }),
+    inviteMember: async ({ email, role, note }) => changed(await invoke<InviteOutcome>('invite-member', { action: 'invite', email, role, ...(note ? { note } : {}) })),
+    resendMemberInvite: async (id) => changed(await invoke<InviteOutcome>('invite-member', { action: 'resend', memberId: id })),
     revokeMemberInvite: async (id) => done(await invoke('manage-member', { action: 'revoke_invite', memberId: id })),
     setMemberRole: async (id, role) => done(await invoke('manage-member', { action: 'set_role', memberId: id, role })),
-    deactivateMember: async (id) => done(await invoke('manage-member', { action: 'deactivate', memberId: id })),
+    deactivateMember: async (id) => {
+      const r = changed(await invoke<{ signOut?: string }>('manage-member', { action: 'deactivate', memberId: id }))
+      return r.ok ? ok(r.data?.signOut === 'failed' ? { signOut: 'failed' as const } : {}) : r
+    },
     reactivateMember: async (id) => done(await invoke('manage-member', { action: 'reactivate', memberId: id })),
 
     async getRolePermissions() {

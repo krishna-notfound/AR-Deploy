@@ -178,7 +178,7 @@ export function createMockTeam(run: Run): TeamMethods {
         const m = team(store.get()).members.find((x) => x.id === id)
         if (!m) return teamFail('not_found')
         if (m.role === 'owner') return teamFail('owner_protected')
-        if (m.status === 'deactivated') return ok(undefined)
+        if (m.status === 'deactivated') return ok({})
         store.update((d) => {
           const tt = team(d)
           const mm = tt.members.find((x) => x.id === id)!
@@ -186,7 +186,7 @@ export function createMockTeam(run: Run): TeamMethods {
           Object.assign(mm, { status: 'deactivated', deactivatedAt: nowIso() })
           record(tt, { action: 'member_deactivated', member: mm.email, fromRole: mm.role, details: 'Deactivated and signed out' })
         })
-        return ok(undefined)
+        return ok({})
       }),
 
     reactivateMember: (id) =>

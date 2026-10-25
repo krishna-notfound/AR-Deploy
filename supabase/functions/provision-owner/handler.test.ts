@@ -31,9 +31,11 @@ function deps(over: Partial<ProvisionDeps> = {}) {
     now: () => NOW,
     userIdFromToken: async (t) => (t === 'admin-token' ? 'admin-id' : t === 'owner-token' ? 'owner-id' : null),
     isPlatformAdmin: async (id) => id === 'admin-id',
+    isPlatformStaff: async (id) => id === 'admin-id' || id === 'team-id',
     getBusiness: async (id) => (id === BIZ ? { id, name: 'Casa Lisboa' } : null),
     getOwner: async () => owner,
-    accountByEmail: async (e) => (e === 'admin@platform.test' ? { id: 'admin-id', invited: false, ownsBusiness: false } : null),
+    accountByEmail: async (e) =>
+      e === 'admin@platform.test' ? { id: 'admin-id', invited: false, ownsBusiness: false } : e === 'team@platform.test' ? { id: 'team-id', invited: true, ownsBusiness: false } : null,
     generateCode: async (type, email) => (links.push({ type, email }), { ok: true, code: CODE, userId: 'new-user' }),
     linkOwner: async (_b, userId) => {
       if (owner && owner.userId !== userId) return 'business_has_owner'
@@ -93,6 +95,10 @@ describe('provision-owner', () => {
   it('refuses to make a platform admin an owner, and validates input', async () => {
     const { d } = deps()
     expect((await handleProvisionOwner(post(provision({ email: 'admin@platform.test' })), d)).status).toBe(409)
+    // A Team member without owners.manage is still platform staff: refused the same way (ADR-0029 separation).
+    const team = await handleProvisionOwner(post(provision({ email: 'team@platform.test' })), d)
+    expect(team.status).toBe(409)
+    expect(await team.json()).toEqual({ error: 'email_is_admin' })
     expect((await handleProvisionOwner(post(provision({ email: 'nope' })), d)).status).toBe(400)
     expect((await handleProvisionOwner(post(provision({ businessId: 'x' })), d)).status).toBe(400)
     expect((await handleProvisionOwner(post(provision({ businessId: '33333333-3333-4333-8333-333333333333' })), d)).status).toBe(404)

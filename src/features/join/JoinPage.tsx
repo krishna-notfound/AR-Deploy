@@ -151,7 +151,6 @@ function CreateAccount({ token, invite }: { token: string; invite: InviteInspect
 }
 
 function AcceptWithLogin({ token, invite }: { token: string; invite: InviteInspection }) {
-  const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -170,7 +169,8 @@ function AcceptWithLogin({ token, invite }: { token: string; invite: InviteInspe
       setPending(false)
       return setError(r.error.message)
     }
-    navigate('/admin', { replace: true })
+    // The account was loaded at sign-in, before the membership existed: a full load picks up the new role.
+    window.location.assign('/admin')
   }
 
   return (

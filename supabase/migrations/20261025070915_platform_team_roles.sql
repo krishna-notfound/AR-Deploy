@@ -865,3 +865,27 @@ begin
   end loop;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 9. Email log accepts team invitations; creating a live business needs businesses.status
+-- ---------------------------------------------------------------------------
+alter table public.email_log drop constraint email_log_kind_check;
+alter table public.email_log add constraint email_log_kind_check
+  check (kind in ('owner_invitation', 'invitation_resend', 'application_confirmation', 'admin_notification', 'team_invitation', 'test'));
+
+-- The update guard (guard_business_admin_fields) covers status changes; this covers a business created already live.
+create function private.businesses_insert_status_permission()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user in ('anon', 'authenticated') and new.status <> 'draft'
+     and not public.is_platform_admin() and not public.platform_can('businesses.status') then
+    raise exception 'Only platform admins can change a catalog address or status' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+create trigger businesses_insert_status_permission before insert on public.businesses
+  for each row execute function private.businesses_insert_status_permission();

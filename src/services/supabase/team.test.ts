@@ -72,6 +72,24 @@ describe('Supabase team service', () => {
     expect(r).toEqual({ ok: false, error: { code: 'CONFIG', reason: 'not_enabled', message: "Team management isn't switched on yet: the database update has not been applied." } })
   })
 
+  it('tells open pages to refresh after a successful change, and only then (review I3)', async () => {
+    const notify = vi.fn()
+    const okStub = stub({ admin_set_role_permissions: { ok: true } }, { data: { ok: true } })
+    const team = createSupabaseTeam(okStub.sb, notify)
+    await team.deactivateMember('m1')
+    await team.setRolePermissions('team', ['products.view'])
+    expect(notify).toHaveBeenCalledTimes(2)
+    const failing = createSupabaseTeam(stub({}, { error: httpError(403, { error: 'forbidden' }) }).sb, notify)
+    await failing.revokeMemberInvite('m1')
+    expect(notify).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports a failed sign-out instead of claiming success (review)', async () => {
+    const { sb } = stub({}, { data: { ok: true, signOut: 'failed' } })
+    const r = await createSupabaseTeam(sb).deactivateMember('m1')
+    expect(r).toEqual({ ok: true, data: { signOut: 'failed' } })
+  })
+
   it('maps 42501 to forbidden', () => {
     expect(mapDbError({ code: '42501', message: 'permission denied for table products' })).toEqual({
       ok: false,
