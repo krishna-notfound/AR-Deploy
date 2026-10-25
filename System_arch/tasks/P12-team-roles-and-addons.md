@@ -64,6 +64,26 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
     - every page was checked on real client data, read-only, against its Stitch screen;
     - `tests/e2e/a11y-dashboard.spec.ts` enforces no text under 12px, no uppercase and no horizontal scroll at 390.
   - **Not done (deferred):** an Uploaded/Remote URL switch on the 3D model slots, and folding the editor's segmented control into the shared one.
+  - **Follow-ups from the reviews** (polish only; nothing a user is blocked by):
+    - **Buttons:** add `danger-ghost` and `danger-outline` Button variants, which would remove the `text-danger!` and `border-danger!` overrides in four places.
+    - **Monogram:** give it `size` and `tone` props, replacing the `!` overrides in the Team pages.
+    - **Search labels:** use FormField with SearchInput on the audit log and on access history. The access-history label is currently an `aria-hidden` span that does nothing when clicked. The SearchInput `label` prop is ignored inside a FormField.
+    - **StatGroup:** fix the invalid `dt` wrapper. Remove the old card branch and the `icon` prop, which are now unused, and the unused `eyebrow` in the dashboard context.
+    - **Tabs:** the fade mask can go stale when badge counts load. Watch the last tab, not only the list.
+    - **Overview "More" menu:** its items use `navigate()`, not links. Take the paths from `lib/urls`.
+    - **Role permissions:** after saving, the focused h1 shows a focus ring until the next click.
+    - **Toast:** one raised in the dashboard keeps the dashboard sizes after you leave it.
+    - **Product editor:** after an index click, the active mark is not released on scrollbar drag.
+    - **Tests:**
+      - the scope test unmounts the app instead of navigating to a public page;
+      - a few 390px tests assert class names only;
+      - the a11y skeleton wait matches Skeleton's class string, so a `data-skeleton` attribute would be sturdier;
+      - dialogs and toasts sit outside `main`, so the a11y spec does not check them.
+    - **Analytics:** the value column in "Views by business" is tight for values of 100,000 or more.
+    - **My products:** with filters in the URL and 0 products, it says "No products match these filters".
+    - **Audit log:** the search placeholder clips at 390.
+    - **Pixel guard:** it can fail on glyph edges under parallel load. Run it with `--workers=1`.
+  - **Decision to confirm with the owner:** the Team stat strip now counts only active Admins and Team members. Counting deactivated people misstated who has access.
 
 ## Log
 
