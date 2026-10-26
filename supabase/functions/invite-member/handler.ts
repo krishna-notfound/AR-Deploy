@@ -6,7 +6,7 @@
 // returned, logged or put in the audit log. A provider failure is reported as email_failed, never as sent.
 // The email lists the role's permissions at send time; the note is stored on the invite, and a resend reuses the
 // newest invite's note (R-W6-5).
-import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
+import { type ConfigResult, type LogEntry, SAFE_EMAIL_REASONS, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
@@ -123,6 +123,7 @@ export async function handleInviteMember(req: Request, deps: InviteDeps): Promis
     status: ok ? 'sent' : 'email_failed',
     sentAt: now.toISOString(),
     expiresAt,
-    ...(ok ? {} : { error: sent.error ?? sent.status }),
+    // Only a fixed reason code reaches the browser; provider text stays in email_log.
+    ...(!ok && sent.error && SAFE_EMAIL_REASONS.has(sent.error) ? { error: sent.error } : {}),
   })
 }

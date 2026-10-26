@@ -55,7 +55,7 @@ export function useMemberActions() {
         return false
       }
       if (r.data.status === 'email_failed') {
-        toast.error('Invitation saved, but the email was not delivered', r.data.error ?? 'Try resending it.')
+        toast.error('Invitation saved, but the email was not delivered', knownEmailReason(r.data.error) ?? 'The email service did not take it. Try resending it.')
         return true
       }
       toast.success(`Invitation sent to ${email}`, `The link works once and expires on ${formatDate(r.data.expiresAt, 'en', prefs)}.`)
@@ -140,7 +140,11 @@ export function useMemberActions() {
       if (!yes) return false
       // The toast says what happened to the login (manage-member keeps one that still owns a business, or that it could not delete).
       const r = await service.removeMember(m.id)
-      const login = r.ok && r.data.loginDeleted ? 'Their login was deleted too.' : 'Their login was kept: it still owns a business, or it could not be deleted.'
+      const login = !m.userId
+        ? 'They never signed in, so there was no login to delete.'
+        : r.ok && r.data.loginDeleted
+          ? 'Their login was deleted too.'
+          : 'Their login was kept: it still owns a business, or it could not be deleted.'
       return report(r, `${m.email} was removed.`, login)
     },
     [confirm, report],

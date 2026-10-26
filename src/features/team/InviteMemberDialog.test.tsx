@@ -79,6 +79,8 @@ describe('Invite member dialog (ADR-0030)', () => {
     await user.click(await d.findByRole('button', { name: 'Send invitation' }))
     expect(await d.findByText(/Invitation saved, but the email wasn't delivered/)).toBeInTheDocument()
     expect(d.queryByText(/Invitation sent to/)).toBeNull()
+    // Final review: the provider's own words are never shown.
+    expect(d.queryByText(/provider down/)).toBeNull()
     expect(d.getByRole('button', { name: 'Try sending again' })).toBeInTheDocument()
   })
 
