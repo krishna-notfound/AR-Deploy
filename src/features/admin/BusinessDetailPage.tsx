@@ -103,8 +103,8 @@ export default function BusinessDetailPage() {
         more={more}
         actions={
           <>
-            <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b), '_blank', 'noopener')}>
-              Open catalog
+            <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b, { preview: b.status !== 'active' }), '_blank', 'noopener')}>
+              {b.status === 'active' ? 'Open catalog' : 'Preview catalog'}
             </Button>
             {canToggle && (
               <Button className="max-sm:hidden" onClick={toggleActive}>

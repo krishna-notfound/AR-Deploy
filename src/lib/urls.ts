@@ -1,5 +1,5 @@
 // The only place URLs are composed. See System_arch/design/08-tenancy-urls.md.
-import type { Business, Lang, Product, SettingsSection } from '@/domain/types'
+import type { Business, BusinessStatus, Lang, Product, ProductStatus, SettingsSection } from '@/domain/types'
 
 type Sluggable = Pick<Business, 'slug'>
 type ProductSluggable = Pick<Product, 'slug'>
@@ -51,6 +51,14 @@ export function withVariantParam(search: URLSearchParams, variantId: string | un
  */
 export function catalogLocalPath(b: Sluggable, opts?: { preview?: boolean }): string {
   return `/catalog/${b.slug}${opts?.preview ? '?preview=1' : ''}`
+}
+
+/**
+ * True when this product's public page is not live for customers yet: the product is not published, or its
+ * business is not active. Owner and admin links to such a page carry `?preview=1` (R-W4-1); all of them use this helper.
+ */
+export function needsPreview(product: { status: ProductStatus }, business: { status: BusinessStatus }): boolean {
+  return product.status !== 'published' || business.status !== 'active'
 }
 
 /** Catalogue route on a business's own subdomain. */

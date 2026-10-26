@@ -17,7 +17,7 @@ import { cn } from '@/lib/cn'
 import { sceneViewerUnsupported } from '@/lib/files'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
-import { VARIANT_PARAM, withVariantParam } from '@/lib/urls'
+import { VARIANT_PARAM, needsPreview, withVariantParam } from '@/lib/urls'
 import { isAndroid } from '@/lib/userAgent'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
@@ -70,7 +70,7 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   useRefreshWhenStale(res.refetch, MEDIA_REFRESH_MS, res.data)
   const catalogHref = tenantSlug ? '/' : `/catalog/${businessSlug}`
   // A business admin may only preview their own unpublished products.
-  const hiddenFromPublic = !!res.data && (res.data.product.status !== 'published' || res.data.business.status !== 'active')
+  const hiddenFromPublic = !!res.data && needsPreview(res.data.product, res.data.business)
   const ownerMismatch = canPreview && hiddenFromPublic && user?.role === 'business_admin' && res.data?.business.id !== user.businessId
 
   if (res.status === 'loading' && !res.data)
@@ -102,7 +102,7 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
     )
   }
 
-  return <ProductView key={res.data.product.id} business={res.data.business} product={res.data.product} catalogHref={catalogHref} isPreview={canPreview && (res.data.product.status !== 'published' || res.data.business.status !== 'active')} />
+  return <ProductView key={res.data.product.id} business={res.data.business} product={res.data.product} catalogHref={catalogHref} isPreview={canPreview && needsPreview(res.data.product, res.data.business)} />
 }
 
 function ProductView({ business, product, catalogHref, isPreview }: { business: Business; product: Product; catalogHref: string; isPreview: boolean }) {
@@ -222,7 +222,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
         <div className="border-b border-warning/30 bg-warning-soft">
           <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-10">
             <Eye className="size-4 shrink-0" aria-hidden />
-            {t('product.draftPreview')}
+            {business.status !== 'active' ? t('catalog.previewBanner') : t('product.draftPreview')}
           </p>
         </div>
       )}

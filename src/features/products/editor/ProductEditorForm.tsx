@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { type Business, CATEGORIES, CURRENCIES, type Category, type Currency, type Product, type ProductStatus } from '@/domain/types'
 import { cn } from '@/lib/cn'
 import { PRODUCT_SLUG_MAX, slugInput, slugify } from '@/lib/slug'
-import { PUBLIC_URLS_ARE_LIVE, productLocalPath, productPublicUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import { validateForPublish } from '@/services/validation'
 import { primaryImage } from '@/lib/product'
@@ -330,7 +330,7 @@ export function ProductEditorForm({
       toast.info('Saved before previewing')
     }
     if (!target || !business) return
-    window.open(productLocalPath(business, target, { preview: currentStatus !== 'published' }), '_blank', 'noopener')
+    window.open(productLocalPath(business, target, { preview: needsPreview({ status: currentStatus }, business) }), '_blank', 'noopener')
     if (isNew) goToEdit(target)
   }
 
@@ -681,7 +681,7 @@ export function ProductEditorForm({
           <>
             <Button onClick={() => setPublishedOpen(false)}>Keep editing</Button>
             {latest && business && (
-              <Button variant="primary" icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(productLocalPath(business, latest, { preview: business.status !== 'active' }), '_blank', 'noopener')}>
+              <Button variant="primary" icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(productLocalPath(business, latest, { preview: needsPreview(latest, business) }), '_blank', 'noopener')}>
                 Open product page
               </Button>
             )}

@@ -87,6 +87,29 @@ describe('draft preview (COR-09)', () => {
   })
 })
 
+describe('preview banner by cause (R-W4-1, PUB-01)', () => {
+  const BUSINESS_BANNER = 'Preview. Customers cannot see this catalog until it is activated.'
+  const PRODUCT_BANNER = 'Draft preview. Customers cannot see this page until it is published.'
+
+  it("a published product in a draft business shows 'Preview. Customers cannot see this catalog until it is activated.'", async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'business_admin', businessId: 'biz_nord' }))
+    expect((await service.setBusinessStatus('biz_nord', 'draft')).ok).toBe(true)
+    const products = await service.getProductsByBusiness('biz_nord')
+    if (!products.ok) throw new Error('seed missing')
+    const published = products.data.find((p) => p.status === 'published')!
+    openApp(`/products/nordhaus/${published.slug}?preview=1`)
+    expect(await screen.findByText(BUSINESS_BANNER, undefined, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.queryByText(PRODUCT_BANNER)).not.toBeInTheDocument()
+  })
+
+  it("a draft product in an active business shows 'Draft preview. Customers cannot see this page until it is published.'", async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'business_admin', businessId: 'biz_nord' }))
+    openApp('/products/nordhaus/oslo-bar-stool?preview=1')
+    expect(await screen.findByText(PRODUCT_BANNER, undefined, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.queryByText(BUSINESS_BANNER)).not.toBeInTheDocument()
+  })
+})
+
 describe('scale note copy (COR-10)', () => {
   it('claims real size in AR only when no separate, unmeasured USDZ is used for iPhone', () => {
     expect(scaleNoteKeys(true, false)).toEqual({ title: 'ar.scaleVerified', help: 'ar.scaleVerifiedHelp' })
