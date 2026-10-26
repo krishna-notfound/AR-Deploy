@@ -490,6 +490,13 @@ create policy "Business owners read platform changes to their business" on publi
 -- =============================================================================
 -- S4 Task 7: review-model-request Edge Function and the owner email (R-S4-15)
 -- =============================================================================
+-- §8.5: the email kind review-model-request sends to the business owner.
+alter table public.email_log drop constraint email_log_kind_check;
+alter table public.email_log add constraint email_log_kind_check
+  check (kind in ('owner_invitation', 'invitation_resend', 'application_confirmation', 'admin_notification', 'team_invitation', 'test',
+                  'security_code', 'security_notice', 'closure_request',
+                  'application_decision', 'business_notice', 'team_notice',
+                  'model_request_update'));
 -- ---- end S4 Task 7 ----
 
 -- =============================================================================

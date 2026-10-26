@@ -28,6 +28,19 @@ begin;
 -- =============================================================================
 -- S4 Task 7 rollback: review-model-request Edge Function and the owner email (R-S4-15)
 -- =============================================================================
+-- Back to the 12 kinds of S1.5, unless a model_request_update row exists: email_log rows are kept, so the wider
+-- check stays (the function that wrote them is gone with the release, and no new row of that kind can arrive).
+do $$
+begin
+  if not exists (select 1 from public.email_log where kind = 'model_request_update') then
+    alter table public.email_log drop constraint email_log_kind_check;
+    alter table public.email_log add constraint email_log_kind_check
+      check (kind in ('owner_invitation', 'invitation_resend', 'application_confirmation', 'admin_notification', 'team_invitation', 'test',
+                      'security_code', 'security_notice', 'closure_request',
+                      'application_decision', 'business_notice', 'team_notice'));
+  end if;
+end;
+$$;
 -- ---- end S4 Task 7 rollback ----
 
 -- =============================================================================

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { applicationDecisionEmail, businessNoticeEmail, closureCancelledEmail, renderEmail, teamNoticeEmail } from './email-templates'
+import { REASON_MAX_LENGTH, applicationDecisionEmail, businessNoticeEmail, closureCancelledEmail, modelRequestUpdateEmail, renderEmail, teamNoticeEmail } from './email-templates'
 
 describe('invitation email with a code (ADR-0027)', () => {
   it('shows the code in the HTML and text, in both languages, with a plain page link', () => {
@@ -141,5 +141,45 @@ describe('S1.5 Task 13: staff emails (§11.3)', () => {
     expect(e.html).toContain('Casa &amp; Co')
     expect(closureCancelledEmail('Casa', 'draft').text).toContain('The catalog is back to draft.')
     expect(closureCancelledEmail('Casa', 'inactive').text).toContain('The catalog is back to paused.')
+  })
+})
+
+describe('S4 Task 7: model_request_update (R-S4-15, §9.2)', () => {
+  const END = { en: 'Contact the Sanctus team if you have questions.', pt: 'Contacte a equipa Sanctus se tiver dúvidas.' }
+  const name = (opt?: string) => `Oslo sofa${opt ? ` (${opt})` : ''}`
+  const CASES = [
+    ['delivered_published', 'en', 'The 3D model for Oslo sofa is ready', 'The Sanctus team finished the 3D model for {n}. It is now attached to the product, and customers can view it in 3D and in AR on the product page.'],
+    ['delivered_published', 'pt', 'O modelo 3D de Oslo sofa está pronto', 'A equipa Sanctus terminou o modelo 3D de {n}. Já está associado ao produto, e os clientes podem vê-lo em 3D e em AR na página do produto.'],
+    ['delivered_draft', 'en', 'The 3D model for Oslo sofa is ready', "The Sanctus team finished the 3D model for {n}. It is attached to the product in your dashboard. Publish the product when you're ready, and customers can view it in 3D and in AR."],
+    ['delivered_draft', 'pt', 'O modelo 3D de Oslo sofa está pronto', 'A equipa Sanctus terminou o modelo 3D de {n}. Já está associado ao produto no seu painel. Publique o produto quando quiser, e os clientes poderão vê-lo em 3D e em AR.'],
+    ['declined', 'en', 'Your 3D model request for Oslo sofa', "The Sanctus team couldn't make the 3D model for {n} from this request. Reason: Too blurry. You can send a new request from the product in your dashboard."],
+    ['declined', 'pt', 'O seu pedido de modelo 3D para Oslo sofa', 'A equipa Sanctus não conseguiu criar o modelo 3D de {n} com este pedido. Motivo: Too blurry. Pode enviar um novo pedido a partir do produto no seu painel.'],
+  ] as const
+
+  it.each(CASES.flatMap((c) => [[...c, undefined], [...c, 'Walnut']] as const))('%s (%s), option %s: subject, body and closing line', (event, lang, subject, body, option) => {
+    const e = modelRequestUpdateEmail(lang, event, { productName: 'Oslo sofa', optionName: option, reason: 'Too blurry' })
+    expect(e.subject).toBe(subject)
+    expect(e.text).toContain(body.replace('{n}', name(option)).replace('Reason: Too blurry.', 'Reason: Too blurry.'))
+    expect(e.text).toContain(END[lang])
+    expect(e.html).toContain(END[lang])
+  })
+
+  it('a reason with markup and newlines is escaped in html and kept in text', () => {
+    const reason = '<b>Too</b> blurry\nTry "again" & resend'
+    const e = modelRequestUpdateEmail('en', 'declined', { productName: 'Sofa', reason })
+    expect(e.html).not.toContain('<b>Too</b>')
+    expect(e.html).toContain('&lt;b&gt;Too&lt;/b&gt; blurry')
+    expect(e.html).toContain('&amp; resend')
+    expect(e.text).toContain(reason)
+  })
+
+  it('a reason over REASON_MAX_LENGTH throws', () => {
+    expect(() => modelRequestUpdateEmail('en', 'declined', { productName: 'Sofa', reason: 'x'.repeat(REASON_MAX_LENGTH + 1) })).toThrow(/reason/)
+    expect(() => modelRequestUpdateEmail('en', 'declined', { productName: 'Sofa', reason: 'x'.repeat(REASON_MAX_LENGTH) })).not.toThrow()
+  })
+
+  it('product and option names are escaped in the html', () => {
+    const e = modelRequestUpdateEmail('pt', 'delivered_published', { productName: '<i>Sofa</i>', optionName: 'A&B' })
+    expect(e.html).toContain('&lt;i&gt;Sofa&lt;/i&gt; (A&amp;B)')
   })
 })

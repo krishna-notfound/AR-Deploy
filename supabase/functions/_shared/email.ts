@@ -16,6 +16,8 @@ export type EmailKind =
   | 'application_decision'
   | 'business_notice'
   | 'team_notice'
+  // S4 (spec section 8.5): the owner is told a 3D model request was delivered or declined.
+  | 'model_request_update'
 
 /** Same values as the email_log.status check constraint. */
 export type EmailStatus = 'blocked' | 'failed' | 'accepted' | 'sent' | 'delivered' | 'delayed' | 'bounced' | 'complained'
