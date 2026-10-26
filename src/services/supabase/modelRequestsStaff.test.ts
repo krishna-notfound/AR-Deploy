@@ -53,6 +53,13 @@ describe('S4 Task 6: Supabase staff model request calls', () => {
     expect(notify).toHaveBeenCalled()
   })
 
+  it('deliver asks sync-ar-models to refresh the public AR copies of the request product (review fix)', async () => {
+    const f = fake({ invoke: { data: { ok: true, status: 'delivered', replacedPaths: [], email: { status: 'accepted' } }, error: null }, tables: { model_requests: { data: { product_id: 'p1' }, error: null } } })
+    await createSupabaseModelRequestsStaff(f.sb, () => {}).deliverModelRequest(REQ)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(f.invoke).toHaveBeenCalledWith('sync-ar-models', { body: { productId: 'p1' } })
+  })
+
   it('reject sends the reason and removes stagedPaths; start sends no reason', async () => {
     const f = fake({ invoke: { data: { ok: true, status: 'rejected', stagedPaths: ['b1/s.glb'], email: { status: 'failed', error: 'email_not_configured' } }, error: null } })
     const svc = createSupabaseModelRequestsStaff(f.sb, () => {})

@@ -14,7 +14,7 @@ const BASE = 'https://ref.supabase.co/storage/v1/object/public/ar-models/'
 
 type Rpcs = { mfa?: boolean; canSync?: boolean }
 
-function world(product: SyncProduct | null, opts: { rpcs?: Rpcs; files?: string[]; failCopy?: string } = {}) {
+function world(product: SyncProduct | null, opts: { rpcs?: Rpcs; files?: string[]; failCopy?: string; onCopy?: (products: Map<string, SyncProduct>) => void } = {}) {
   const files = new Set(opts.files ?? [])
   const rpcCalls: [string, Record<string, unknown> | undefined][] = []
   const copies: [string, string][] = []
@@ -38,6 +38,7 @@ function world(product: SyncProduct | null, opts: { rpcs?: Rpcs; files?: string[
       if (from === opts.failCopy) throw new Error('copy failed')
       copies.push([from, to])
       files.add(to)
+      opts.onCopy?.(products)
     },
     remove: async (paths) => {
       for (const p of paths) (files.delete(p), removed.push(p))
@@ -49,13 +50,14 @@ function world(product: SyncProduct | null, opts: { rpcs?: Rpcs; files?: string[
       touched.push(key)
     },
   }
-  return { deps, files, rpcCalls, copies, removed, urls, touched }
+  return { deps, files, rpcCalls, copies, removed, urls, touched, products }
 }
 
 const product = (status: string, over: Partial<SyncProduct> = {}): SyncProduct => ({
   id: PID,
   businessId: BIZ,
   status,
+  businessStatus: 'active',
   models: [
     { variantId: null, format: 'glb', storagePath: SRC_GLB, url: null, publicUrl: null },
     { variantId: null, format: 'usdz', storagePath: SRC_USDZ, url: null, publicUrl: null },
@@ -222,5 +224,54 @@ describe('publicPath', () => {
   it('names the variant or base folder and the source file id; refuses an odd source name', () => {
     expect(publicPath({ id: PID, businessId: BIZ }, { variantId: null, format: 'usdz', storagePath: SRC_USDZ })).toBe(USDZ_PATH)
     expect(publicPath({ id: PID, businessId: BIZ }, { variantId: null, format: 'glb', storagePath: `${BIZ}/../x y.glb` })).toBeNull()
+  })
+})
+
+describe('sync-ar-models: business status and overlapping syncs (review fixes)', () => {
+  it('a published product of an inactive business is not public: its copies are removed and nothing is copied', async () => {
+    const w = world(product('published', { businessStatus: 'inactive' }), { files: [GLB_PATH] })
+    const r = await handleSyncArModels(post({ productId: PID }), w.deps)
+    expect(await json(r)).toEqual({ ok: true, copied: 0, removed: 1, failed: 0 })
+    expect(w.copies).toEqual([])
+    expect(w.files.size).toBe(0)
+  })
+
+  it('a product unpublished while its files were being copied ends with no public copies and no public_url', async () => {
+    const w = world(product('published'), {
+      onCopy: (products) => products.set(PID, { ...products.get(PID)!, status: 'draft', models: products.get(PID)!.models.map((m) => ({ ...m, publicUrl: `${BASE}x` })) }),
+    })
+    await handleSyncArModels(post({ productId: PID }), w.deps)
+    expect(w.files.size).toBe(0)
+    expect(Object.values(w.urls).every((u) => u === null)).toBe(true)
+  })
+
+  it('a file replaced by a newer save during the sync is not kept: only files the latest rows name stay', async () => {
+    const NEW_GLB = `${BIZ}/aaaaaaaa-0000-4000-8000-000000000009.glb`
+    let swapped = false
+    const w = world(product('published'), {
+      onCopy: (products) => {
+        if (swapped) return
+        swapped = true
+        const p = products.get(PID)!
+        products.set(PID, { ...p, models: p.models.map((m) => (m.variantId === null && m.format === 'glb' ? { ...m, storagePath: NEW_GLB } : m)) })
+      },
+    })
+    await handleSyncArModels(post({ productId: PID }), w.deps)
+    expect(w.files.has(GLB_PATH)).toBe(false)
+    expect(w.files.has(USDZ_PATH)).toBe(true)
+    expect(w.files.has(VAR_PATH)).toBe(true)
+  })
+
+  it('the backfill counts a product whose sync throws as failed and goes on', async () => {
+    const w = world(product('published'))
+    const other = { ...product('published'), id: GONE }
+    w.products.set(GONE, other)
+    const realProduct = w.deps.product
+    w.deps.product = async (id) => {
+      if (id === GONE) throw new Error('boom')
+      return realProduct(id)
+    }
+    const r = await handleSyncArModels(post({ all: true }, 'owner-token'), w.deps)
+    expect(await json(r)).toEqual({ ok: true, copied: 3, removed: 0, failed: 1 })
   })
 })

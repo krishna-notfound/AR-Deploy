@@ -8,7 +8,7 @@ import type { ModelAsset, ModelFormat } from '@/domain/types'
 import { type CatalogService, MEDIA_URL_TTL_SECONDS, type Result, fail, ok } from '../catalogService'
 import { modelRequestError } from '../modelRequestRules'
 import { MODEL_REQUEST_SELECT, type ModelRequestRow, mapModelRequestError, toModelRequest } from './modelRequestsRead'
-import { MEDIA_BUCKET, PRODUCT_SELECT, type ProductRow, toProduct } from './supabaseCatalogService'
+import { MEDIA_BUCKET, PRODUCT_SELECT, type ProductRow, SYNC_AR_MODELS_FUNCTION, toProduct } from './supabaseCatalogService'
 
 type StaffMethods = Pick<CatalogService, 'getModelRequest' | 'startModelRequest' | 'stageModelFile' | 'unstageModelFile' | 'deliverModelRequest' | 'rejectModelRequest'>
 
@@ -63,6 +63,16 @@ export function createSupabaseModelRequestsStaff(sb: SupabaseClient, notify: () 
     const payload = res && typeof res.json === 'function' ? ((await res.json().catch(() => ({}))) as { error?: unknown }) : {}
     const known = typeof payload.error === 'string' ? modelRequestError(payload.error) : undefined
     return known ? { ok: false, error: known } : fail('UNKNOWN', 'The request could not be completed. Try again in a moment.')
+  }
+
+  /** A delivery replaces the product's 3D files: refresh its public AR copies (fire-and-forget, like the editor). */
+  const syncDeliveredProduct = (requestId: string): void => {
+    void Promise.resolve()
+      .then(async () => {
+        const { data } = await sb.from('model_requests').select('product_id').eq('id', requestId).maybeSingle<{ product_id: string }>()
+        if (data?.product_id) await sb.functions.invoke(SYNC_AR_MODELS_FUNCTION, { body: { productId: data.product_id } })
+      })
+      .catch(() => undefined)
   }
 
   const outcome = async (r: Result<ReviewAnswer>, paths: (a: ReviewAnswer) => string[] | undefined): Promise<Result<ModelRequestOutcome>> => {
@@ -146,7 +156,12 @@ export function createSupabaseModelRequestsStaff(sb: SupabaseClient, notify: () 
       }),
 
     startModelRequest: (id) => guard(async () => outcome(await review(id, 'start'), () => [])),
-    deliverModelRequest: (id) => guard(async () => outcome(await review(id, 'deliver'), (a) => a.replacedPaths)),
+    deliverModelRequest: (id) =>
+      guard(async () => {
+        const r = await review(id, 'deliver')
+        if (r.ok) syncDeliveredProduct(id)
+        return outcome(r, (a) => a.replacedPaths)
+      }),
     rejectModelRequest: (id, reason) => guard(async () => outcome(await review(id, 'reject', reason), (a) => a.stagedPaths)),
 
     stageModelFile: (id, format, asset) =>

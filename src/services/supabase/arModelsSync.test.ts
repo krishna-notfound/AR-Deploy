@@ -35,6 +35,10 @@ function stub(start: 'draft' | 'published', invoke: (name: string, o: unknown) =
         if (op === 'update') return { data: { id: PID }, error: null }
         return { data: row(status), error: null }
       }
+      if (table === 'businesses') {
+        const biz = { id: BIZ, name: 'B', slug: 'b', status: 'active', description: null, logo_url: null, contact: {}, created_at: 'x', updated_at: 'x' }
+        return { data: op === 'delete' ? [{ id: BIZ }] : biz, error: null }
+      }
       return { data: [], error: null }
     }
     b.single = () => Promise.resolve(result())
@@ -53,6 +57,7 @@ function stub(start: 'draft' | 'published', invoke: (name: string, o: unknown) =
       from: () => ({
         createSignedUrls: async (paths: string[]) => ({ data: paths.map((path) => ({ path, signedUrl: `https://x.supabase.co/sign/${path}?token=t` })), error: null }),
         remove: async () => ({ data: [], error: null }),
+        list: async () => ({ data: [], error: null }),
       }),
     },
     functions: { invoke: invokeSpy },
@@ -124,5 +129,22 @@ describe('sync-ar-models after product actions (Supabase service)', () => {
     const r = await svc.getProductById(PID)
     if (!r.ok) throw new Error(r.error.message)
     expect(r.data.models.glb).toMatchObject({ url: 'https://x.supabase.co/sign/b1/m.glb?token=t', publicUrl: PUBLIC_GLB })
+  })
+})
+
+describe('sync-ar-models after business actions (review fixes)', () => {
+  it('setBusinessStatus asks for a sync of each published product of the business, with the business id', async () => {
+    const t = stub('published')
+    expect((await t.svc.setBusinessStatus(BIZ, 'inactive')).ok).toBe(true)
+    await flush()
+    await flush()
+    expect(syncCalls(t.invoke)).toEqual([{ body: { productId: PID, businessId: BIZ } }])
+  })
+
+  it('deleteBusiness asks for a sync of each published product it had, so the public copies are removed', async () => {
+    const t = stub('published')
+    expect((await t.svc.deleteBusiness(BIZ)).ok).toBe(true)
+    await flush()
+    expect(syncCalls(t.invoke)).toEqual([{ body: { productId: PID, businessId: BIZ } }])
   })
 })

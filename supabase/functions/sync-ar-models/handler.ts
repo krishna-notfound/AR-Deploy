@@ -27,6 +27,8 @@ export interface SyncProduct {
   id: string
   businessId: string
   status: string
+  /** The business's status; only an active business's published products are public. */
+  businessStatus: string
   models: ModelRef[]
 }
 
@@ -42,11 +44,12 @@ export interface SyncDeps {
   publishedProductIds(): Promise<string[]>
   /** Every object path in ar-models under `folder` (sub-folders included). */
   listFolder(folder: string): Promise<string[]>
-  /** Copies product-media `from` to ar-models `to`, replacing an object already there. Rejects on failure. */
+  /** Copies product-media `from` to ar-models `to` (with the model content type), replacing an object already there. Rejects on failure. */
   copy(from: string, to: string, format: ModelFormat): Promise<void>
   remove(paths: string[]): Promise<void>
   publicUrl(path: string): string
-  setPublicUrl(productId: string, model: Pick<ModelRef, 'variantId' | 'format'>, url: string | null): Promise<void>
+  /** Sets public_url on the row, only while the row still points at model.storagePath (a newer save wins). */
+  setPublicUrl(productId: string, model: Pick<ModelRef, 'variantId' | 'format' | 'storagePath'>, url: string | null): Promise<void>
 }
 
 /**
@@ -82,21 +85,30 @@ async function clearFolder(deps: SyncDeps, folder: string): Promise<number> {
   return existing.length
 }
 
-/** Brings one product's public copies in line with its status. */
+/** Public only while the product is published and its business is active (the anon catalog rule). */
+export const isPublic = (p: SyncProduct | null): p is SyncProduct => !!p && p.status === 'published' && p.businessStatus === 'active'
+
+async function unpublish(deps: SyncDeps, folder: string, product: SyncProduct | null): Promise<number> {
+  const removed = await clearFolder(deps, folder)
+  for (const m of product?.models ?? []) if (m.publicUrl !== null) await deps.setPublicUrl(product!.id, m, null)
+  return removed
+}
+
+/**
+ * Brings one product's public copies in line with its status. Two syncs of one product can overlap (publish then a
+ * quick unpublish, or two quick saves), so the product is read again after copying: a product that stopped being
+ * public is cleared, and only files the latest rows still name are kept. setPublicUrl only links a row that still
+ * points at the copied file.
+ */
 export async function syncProduct(deps: SyncDeps, productId: string, businessId: string | null): Promise<SyncCounts> {
   const product = await deps.product(productId)
   const owner = product?.businessId ?? businessId
   if (!owner) return { copied: 0, removed: 0, failed: 0 }
   const folder = `${owner}/${productId}`
 
-  if (!product || product.status !== 'published') {
-    const removed = await clearFolder(deps, folder)
-    for (const m of product?.models ?? []) if (m.publicUrl !== null) await deps.setPublicUrl(productId, m, null)
-    return { copied: 0, removed, failed: 0 }
-  }
+  if (!isPublic(product)) return { copied: 0, removed: await unpublish(deps, folder, product), failed: 0 }
 
   const existing = new Set(await deps.listFolder(folder))
-  const wanted = new Set<string>()
   let copied = 0
   let failed = 0
   for (const m of product.models) {
@@ -107,7 +119,6 @@ export async function syncProduct(deps: SyncDeps, productId: string, businessId:
       const target = publicPath(product, m)
       next = null
       if (target) {
-        wanted.add(target)
         try {
           if (!existing.has(target)) {
             await deps.copy(m.storagePath, target, m.format)
@@ -121,7 +132,10 @@ export async function syncProduct(deps: SyncDeps, productId: string, businessId:
     }
     if (next !== m.publicUrl) await deps.setPublicUrl(productId, m, next)
   }
-  const stale = [...existing].filter((p) => !wanted.has(p))
+  const latest = await deps.product(productId)
+  if (!isPublic(latest)) return { copied, removed: await unpublish(deps, folder, latest), failed }
+  const keep = new Set(latest.models.map((m) => (m.storagePath ? publicPath(latest, m) : null)).filter((p): p is string => !!p))
+  const stale = (await deps.listFolder(folder)).filter((p) => !keep.has(p))
   if (stale.length) await deps.remove(stale)
   return { copied, removed: stale.length, failed }
 }
@@ -142,7 +156,8 @@ export async function handleSyncArModels(req: Request, deps: SyncDeps): Promise<
     if (gate !== 'ok') return gateReply(gate)
     const total: SyncCounts = { copied: 0, removed: 0, failed: 0 }
     for (const pid of await deps.publishedProductIds()) {
-      const c = await syncProduct(deps, pid, null)
+      // One product's error is counted, not fatal: the backfill goes on with the rest.
+      const c = await syncProduct(deps, pid, null).catch(() => ({ copied: 0, removed: 0, failed: 1 }))
       total.copied += c.copied
       total.removed += c.removed
       total.failed += c.failed

@@ -21,6 +21,7 @@ type ProductRow = {
   id: string
   business_id: string
   status: string
+  businesses: { status: string } | null
   product_models: ModelRow[] | null
   product_variants: { id: string; product_variant_models: ModelRow[] | null }[] | null
 }
@@ -51,7 +52,7 @@ Deno.serve((req) =>
     async product(productId) {
       const { data, error } = await admin
         .from('products')
-        .select('id, business_id, status, product_models(format, storage_path, url, public_url), product_variants(id, product_variant_models(format, storage_path, public_url))')
+        .select('id, business_id, status, businesses(status), product_models(format, storage_path, url, public_url), product_variants(id, product_variant_models(format, storage_path, public_url))')
         .eq('id', productId)
         .maybeSingle<ProductRow>()
       if (error) throw fail('product lookup', error)
@@ -60,7 +61,7 @@ Deno.serve((req) =>
       const variants = (data.product_variants ?? []).flatMap((v) =>
         (v.product_variant_models ?? []).map((m) => ({ variantId: v.id, format: m.format, storagePath: m.storage_path, url: null, publicUrl: m.public_url })),
       )
-      return { id: data.id, businessId: data.business_id, status: data.status, models: [...own, ...variants] } satisfies SyncProduct
+      return { id: data.id, businessId: data.business_id, status: data.status, businessStatus: data.businesses?.status ?? '', models: [...own, ...variants] } satisfies SyncProduct
     },
     async publishedProductIds() {
       const { data, error } = await admin.from('products').select('id').eq('status', 'published').limit(5000)
@@ -74,13 +75,11 @@ Deno.serve((req) =>
       return [...top.files, ...nested.flatMap((n) => n.files)]
     },
     async copy(from, to, format) {
-      // Cross-bucket copy first; when it is refused (an object already at `to`, or no cross-bucket copy), download
-      // and upload with upsert.
-      const copied = await admin.storage.from(MEDIA_BUCKET).copy(from, to, { destinationBucket: AR_BUCKET })
-      if (!copied.error) return
+      // Download and upload (not a storage copy): a copy keeps the source's content type, and Quick Look and Scene
+      // Viewer need the model type. A short cache, so an unpublished file stops being served soon.
       const file = await admin.storage.from(MEDIA_BUCKET).download(from)
       if (file.error || !file.data) throw fail('download', file.error as { name?: string })
-      const up = await admin.storage.from(AR_BUCKET).upload(to, file.data, { upsert: true, contentType: CONTENT_TYPE[format], cacheControl: '31536000' })
+      const up = await admin.storage.from(AR_BUCKET).upload(to, file.data, { upsert: true, contentType: CONTENT_TYPE[format], cacheControl: '3600' })
       if (up.error) throw fail('upload', up.error as { name?: string })
     },
     async remove(paths) {
@@ -94,7 +93,7 @@ Deno.serve((req) =>
       const q = m.variantId
         ? admin.from('product_variant_models').update({ public_url: value }).eq('variant_id', m.variantId).eq('product_id', productId).eq('format', m.format)
         : admin.from('product_models').update({ public_url: value }).eq('product_id', productId).eq('format', m.format)
-      const { error } = await q
+      const { error } = await (m.storagePath ? q.eq('storage_path', m.storagePath) : q)
       if (error) throw fail('public_url update', error)
     },
   }).catch((e) => {
