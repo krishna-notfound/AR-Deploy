@@ -485,6 +485,269 @@ create policy "Business owners read platform changes to their business" on publi
 -- =============================================================================
 -- S4 Task 6: Staff detail, staging, deliver and decline (R-S4-11, R-S4-12, R-S4-13, R-S4-14, R-S4-16)
 -- =============================================================================
+
+-- Staff handle a request through these five functions. Each starts with require_models_manage(), locks the request
+-- row, and refuses: model_request_not_found (P0002) for an unknown id, invalid_transition (22023) for a wrong status.
+-- Audit rows carry business_id and {request_id, product_id, variant_id} (see the header).
+
+-- The paths of `p_paths` that no product, option or staged row references any more, sorted and without duplicates.
+-- A duplicated product shares its files, so a replaced file is removed from storage only when nothing else uses it.
+create function private.unreferenced_media_paths(p_paths text[])
+returns text[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(array_agg(distinct x.path order by x.path), '{}'::text[])
+    from unnest(p_paths) as x(path)
+   where x.path is not null
+     and not exists (select 1 from public.product_images i where i.storage_path = x.path)
+     and not exists (select 1 from public.product_models m where m.storage_path = x.path)
+     and not exists (select 1 from public.product_variant_images vi where vi.storage_path = x.path)
+     and not exists (select 1 from public.product_variant_models vm where vm.storage_path = x.path)
+     and not exists (select 1 from public.model_request_files s where s.storage_path = x.path);
+$$;
+revoke execute on function private.unreferenced_media_paths(text[]) from public, anon, authenticated;
+
+-- R-S4-12: Start work. requested → in_progress.
+create function public.admin_start_model_request(p_request uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v public.model_requests;
+begin
+  perform private.require_models_manage();
+  select * into v from public.model_requests r where r.id = p_request for update;
+  if not found then
+    raise exception 'model_request_not_found' using errcode = 'P0002';
+  end if;
+  if v.status <> 'requested' then
+    raise exception 'invalid_transition' using errcode = '22023';
+  end if;
+  update public.model_requests
+     set status = 'in_progress', started_at = now(), handled_by = (select auth.uid())
+   where id = p_request;
+  insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status, metadata)
+  values ('model_request_started', (select auth.uid()), v.business_id, 'requested', 'in_progress',
+          jsonb_build_object('request_id', v.id, 'product_id', v.product_id, 'variant_id', v.variant_id));
+  return jsonb_build_object('status', 'in_progress');
+end;
+$$;
+revoke execute on function public.admin_start_model_request(uuid) from public, anon;
+grant execute on function public.admin_start_model_request(uuid) to authenticated;
+
+-- R-S4-12: stage an uploaded GLB or USDZ on an open request (a requested one moves to in_progress, audited as
+-- started). The object must be {business_id}/{uuid}.{format} in product-media and exist. One file per format:
+-- staging again replaces it and returns the earlier path for the caller to remove (when nothing else uses it).
+create function public.admin_stage_model_file(
+  p_request uuid,
+  p_format text,
+  p_storage_path text,
+  p_file_name text,
+  p_size_bytes bigint,
+  p_required_extensions text[]
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v public.model_requests;
+  v_old text;
+begin
+  perform private.require_models_manage();
+  select * into v from public.model_requests r where r.id = p_request for update;
+  if not found then
+    raise exception 'model_request_not_found' using errcode = 'P0002';
+  end if;
+  if v.status not in ('requested', 'in_progress') then
+    raise exception 'invalid_transition' using errcode = '22023';
+  end if;
+  if p_format is null or p_format not in ('glb', 'usdz')
+     or p_storage_path is null
+     or p_storage_path !~ ('^' || v.business_id::text || '/[0-9a-f-]{36}\.' || p_format || '$')
+     or not exists (select 1 from storage.objects o where o.bucket_id = 'product-media' and o.name = p_storage_path)
+     or p_file_name is null or char_length(btrim(p_file_name)) not between 1 and 255
+     or (p_size_bytes is not null and p_size_bytes < 0) then
+    raise exception 'model_request_file_invalid' using errcode = '22023';
+  end if;
+
+  if v.status = 'requested' then
+    update public.model_requests
+       set status = 'in_progress', started_at = now(), handled_by = (select auth.uid())
+     where id = p_request;
+    insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status, metadata)
+    values ('model_request_started', (select auth.uid()), v.business_id, 'requested', 'in_progress',
+            jsonb_build_object('request_id', v.id, 'product_id', v.product_id, 'variant_id', v.variant_id));
+  end if;
+
+  select f.storage_path into v_old from public.model_request_files f where f.request_id = p_request and f.format = p_format;
+  insert into public.model_request_files (request_id, format, storage_path, file_name, size_bytes, required_extensions, uploaded_by)
+  values (p_request, p_format, p_storage_path, btrim(p_file_name), p_size_bytes, p_required_extensions, (select auth.uid()))
+  on conflict (request_id, format) do update
+     set storage_path = excluded.storage_path, file_name = excluded.file_name, size_bytes = excluded.size_bytes,
+         required_extensions = excluded.required_extensions, uploaded_by = excluded.uploaded_by, created_at = now();
+
+  return jsonb_build_object(
+    'status', 'in_progress',
+    'replaced_path', case when v_old is distinct from p_storage_path
+                          then (private.unreferenced_media_paths(array[v_old]))[1] end);
+end;
+$$;
+revoke execute on function public.admin_stage_model_file(uuid, text, text, text, bigint, text[]) from public, anon;
+grant execute on function public.admin_stage_model_file(uuid, text, text, text, bigint, text[]) to authenticated;
+
+-- R-S4-12: remove a staged file from an open request; returns its path (null when none was staged).
+create function public.admin_unstage_model_file(p_request uuid, p_format text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v public.model_requests;
+  v_path text;
+begin
+  perform private.require_models_manage();
+  select * into v from public.model_requests r where r.id = p_request for update;
+  if not found then
+    raise exception 'model_request_not_found' using errcode = 'P0002';
+  end if;
+  if v.status not in ('requested', 'in_progress') then
+    raise exception 'invalid_transition' using errcode = '22023';
+  end if;
+  delete from public.model_request_files f where f.request_id = p_request and f.format = p_format
+  returning f.storage_path into v_path;
+  return jsonb_build_object('path', (private.unreferenced_media_paths(array[v_path]))[1]);
+end;
+$$;
+revoke execute on function public.admin_unstage_model_file(uuid, text) from public, anon;
+grant execute on function public.admin_unstage_model_file(uuid, text) to authenticated;
+
+-- R-S4-13: deliver. In one transaction the staged files replace the target's WHOLE model set (the product's
+-- product_models, or the option's product_variant_models): a format that is not staged is removed, so a GLB never
+-- pairs with an older USDZ of another model. app.model_delivery lets the own-models guard pass for a business whose
+-- switch is off. replaced_paths lists the old files nothing else references, for the caller to remove.
+create function public.admin_deliver_model_request(p_request uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v public.model_requests;
+  v_old text[];
+  v_formats text[];
+  v_product_status text;
+  v_target text;
+begin
+  perform private.require_models_manage();
+  select * into v from public.model_requests r where r.id = p_request for update;
+  if not found then
+    raise exception 'model_request_not_found' using errcode = 'P0002';
+  end if;
+  if v.status <> 'in_progress' then
+    raise exception 'invalid_transition' using errcode = '22023';
+  end if;
+  if not exists (select 1 from public.model_request_files f where f.request_id = p_request and f.format = 'glb') then
+    raise exception 'model_request_needs_glb' using errcode = '22023';
+  end if;
+  select array_agg(f.format order by f.format) into v_formats from public.model_request_files f where f.request_id = p_request;
+  v_target := case when v.variant_id is null then 'product' else 'option' end;
+
+  perform set_config('app.model_delivery', 'on', true);
+  if v.variant_id is null then
+    select array_agg(m.storage_path) into v_old from public.product_models m where m.product_id = v.product_id;
+    delete from public.product_models m where m.product_id = v.product_id;
+    insert into public.product_models (product_id, format, url, storage_path, file_name, size_bytes, required_extensions)
+    select v.product_id, f.format, null, f.storage_path, f.file_name, f.size_bytes, f.required_extensions
+      from public.model_request_files f where f.request_id = p_request;
+  else
+    select array_agg(m.storage_path) into v_old from public.product_variant_models m where m.variant_id = v.variant_id;
+    delete from public.product_variant_models m where m.variant_id = v.variant_id;
+    insert into public.product_variant_models (variant_id, product_id, format, storage_path, file_name, size_bytes, required_extensions)
+    select v.variant_id, v.product_id, f.format, f.storage_path, f.file_name, f.size_bytes, f.required_extensions
+      from public.model_request_files f where f.request_id = p_request;
+  end if;
+  perform set_config('app.model_delivery', '', true);
+
+  update public.products p set models_changed_at = now(), updated_at = now()
+   where p.id = v.product_id
+  returning p.status into v_product_status;
+  update public.model_requests
+     set status = 'delivered', delivered_at = now(), closed_at = now(), handled_by = (select auth.uid())
+   where id = p_request;
+  delete from public.model_request_files f where f.request_id = p_request;
+  insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status, metadata)
+  values ('model_request_delivered', (select auth.uid()), v.business_id, 'in_progress', 'delivered',
+          jsonb_build_object('request_id', v.id, 'product_id', v.product_id, 'variant_id', v.variant_id,
+                             'formats', to_jsonb(v_formats), 'target', v_target));
+
+  return jsonb_build_object('status', 'delivered', 'replaced_paths', to_jsonb(private.unreferenced_media_paths(v_old)),
+                            'product_status', v_product_status, 'target', v_target);
+end;
+$$;
+revoke execute on function public.admin_deliver_model_request(uuid) from public, anon;
+grant execute on function public.admin_deliver_model_request(uuid) to authenticated;
+
+-- R-S4-14: decline with a reason (trimmed, 1 to 1000 characters), which is sent to the business. The staged rows go;
+-- their paths are returned for clean-up. The audit row says only that a reason was given.
+create function public.admin_reject_model_request(p_request uuid, p_reason text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v public.model_requests;
+  v_reason text := btrim(coalesce(p_reason, ''));
+  v_staged text[];
+begin
+  perform private.require_models_manage();
+  select * into v from public.model_requests r where r.id = p_request for update;
+  if not found then
+    raise exception 'model_request_not_found' using errcode = 'P0002';
+  end if;
+  if v.status not in ('requested', 'in_progress') then
+    raise exception 'invalid_transition' using errcode = '22023';
+  end if;
+  if char_length(v_reason) not between 1 and 1000 then
+    raise exception 'reason_required' using errcode = '22023';
+  end if;
+  with gone as (delete from public.model_request_files f where f.request_id = p_request returning f.storage_path)
+  select array_agg(g.storage_path) into v_staged from gone g;
+  update public.model_requests
+     set status = 'rejected', reason = v_reason, closed_at = now(), handled_by = (select auth.uid())
+   where id = p_request;
+  insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status, metadata)
+  values ('model_request_rejected', (select auth.uid()), v.business_id, v.status, 'rejected',
+          jsonb_build_object('request_id', v.id, 'product_id', v.product_id, 'variant_id', v.variant_id, 'has_reason', true));
+  return jsonb_build_object('status', 'rejected', 'staged_paths', to_jsonb(private.unreferenced_media_paths(v_staged)));
+end;
+$$;
+revoke execute on function public.admin_reject_model_request(uuid, text) from public, anon;
+grant execute on function public.admin_reject_model_request(uuid, text) to authenticated;
+
+-- R-S4-12 storage: model staff upload GLB and USDZ files to {business_id}/{uuid}.{glb|usdz} in product-media, and
+-- delete such files (a replaced staged file, a replaced delivered file). Other media stay with the S1.5 rule.
+create policy "Model staff upload models" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'product-media'
+              and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f-]{36}\.(glb|usdz)$'
+              and (select public.platform_can('models.manage')));
+-- Body from S1.5 Task 5, plus models.manage for model files.
+drop policy "Platform members delete media" on storage.objects;
+create policy "Platform members delete media" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'product-media'
+         and ((select public.platform_can('products.edit')) or (select public.platform_can('products.delete'))
+              or (select public.platform_can('businesses.delete'))
+              or (name ~ '\.(glb|usdz)$' and (select public.platform_can('models.manage')))));
 -- ---- end S4 Task 6 ----
 
 -- =============================================================================

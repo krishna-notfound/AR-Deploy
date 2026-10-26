@@ -14,6 +14,8 @@ import { formatFileSize } from '@/lib/format'
 import { type ScaleCheck, type ScaleMismatchReason, checkScale } from '@/lib/scale'
 import { MODEL_OPTIMIZATION_ENABLED, optimizeModel } from './modelOptimizeClient'
 
+type ModelContext = 'product' | 'variant' | 'request'
+
 const FORMAT_INFO: Record<ModelFormat, { title: string; use: string }> = {
   glb: { title: 'GLB model', use: 'Used for the interactive 3D viewer on every device and for AR on Android (Scene Viewer).' },
   usdz: { title: 'USDZ model', use: 'Used for AR on iPhone and iPad (AR Quick Look).' },
@@ -22,6 +24,8 @@ const FORMAT_INFO: Record<ModelFormat, { title: string; use: string }> = {
 /**
  * GLB + USDZ slots with the 3D preview, scale check and AR readiness. Used for the product and, with
  * context="variant", for each colour or option (upload only: variant files are always stored owner uploads).
+ * context="request" is the staff side of a 3D model request (S4 R-S4-12): upload only, the same checks, preview and
+ * readiness, against the product's dimensions; the files are staged on the request until it is delivered.
  */
 export function ModelSection({
   models,
@@ -39,7 +43,7 @@ export function ModelSection({
   poster?: string
   name: string
   businessId?: string
-  context?: 'product' | 'variant'
+  context?: ModelContext
 }) {
   return (
     <div className="space-y-5">
@@ -47,6 +51,11 @@ export function ModelSection({
         <InlineNotice tone="neutral" className="border border-line text-ink-body" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
           Upload the files your 3D artist delivered. <strong className="font-medium">GLB</strong> powers the 3D viewer and Android AR.{' '}
           <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are optimized for size before upload; USDZ files are stored as uploaded. Nothing is converted.' : 'Files are stored as uploaded: they are not converted or compressed.'}
+        </InlineNotice>
+      )}
+      {context === 'request' && (
+        <InlineNotice tone="neutral" className="border border-line text-ink-body" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
+          Upload the GLB and USDZ made for this request. Each file gets the same checks as in the product editor. Files stay with the request, not the product, until you deliver it.
         </InlineNotice>
       )}
       {/* GLB and USDZ side by side, stacked on phones (BRIEF section 6). */}
@@ -245,7 +254,7 @@ export function ModelPreview({
   dimensions: Dimensions
   poster?: string
   name: string
-  context?: 'product' | 'variant'
+  context?: ModelContext
 }) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [progress, setProgress] = useState(0)
@@ -273,9 +282,11 @@ export function ModelPreview({
         <p className="mt-1 max-w-md text-[13px] leading-[1.45] text-ink-muted">
           {context === 'variant'
             ? 'Customers who pick this option see the product’s main 3D model, with a note that this finish may look different. Upload a GLB (and a USDZ for iPhone) made for this option to show it in 3D and AR.'
-            : 'Add a GLB model to show the 3D viewer and the “View in my home” AR button. Without one, customers see the photo gallery only.'}
+            : context === 'request'
+              ? 'Upload a GLB to preview the model and check its size against the product’s dimensions.'
+              : 'Add a GLB model to show the 3D viewer and the “View in my home” AR button. Without one, customers see the photo gallery only.'}
         </p>
-        {context === 'product' || usdz ? readiness : null}
+        {context !== 'variant' || usdz ? readiness : null}
       </div>
     )
   }
