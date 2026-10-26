@@ -48,7 +48,7 @@ export const NOTIFY_OWNER_FUNCTION = 'notify-business-owner'
 // 12 h: anonymous visitors can already sign any published product's media (storage policy), so a longer
 // lifetime only widens the window in which a just-unpublished file stays reachable by an old link.
 const SIGNED_URL_TTL_SECONDS = MEDIA_URL_TTL_SECONDS
-const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*, product_variant_images(*), product_variant_models(*))'
+export const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*, product_variant_images(*), product_variant_models(*))'
 
 // Hand-written row shapes matching supabase/migrations; schemaDrift.check.ts compares them with the
 // schema is applied (`npm run db:types`, see design/19-supabase.md).
@@ -286,7 +286,7 @@ function toVariant(v: VariantRow, resolve: Resolve): ProductVariant {
   }
 }
 
-function toProduct(r: ProductRow, signed: Map<string, string>): Product {
+export function toProduct(r: ProductRow, signed: Map<string, string>): Product {
   const resolve: Resolve = (x) => (x.storage_path ? (signed.get(x.storage_path) ?? '') : (x.url ?? ''))
   const models = toModels(r.product_models ?? [], resolve)
   return {

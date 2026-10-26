@@ -47,6 +47,20 @@ $$;
 -- =============================================================================
 -- S4 Task 6 rollback: Staff detail, staging, deliver and decline (R-S4-11, R-S4-12, R-S4-13, R-S4-14, R-S4-16)
 -- =============================================================================
+-- Model rows delivered by these functions stay (ordinary product rows); staged rows go with Task 1's tables.
+drop policy if exists "Model staff upload models" on storage.objects;
+drop policy if exists "Platform members delete media" on storage.objects;
+create policy "Platform members delete media" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'product-media'
+         and ((select public.platform_can('products.edit')) or (select public.platform_can('products.delete'))
+              or (select public.platform_can('businesses.delete'))));
+drop function if exists public.admin_reject_model_request(uuid, text);
+drop function if exists public.admin_deliver_model_request(uuid);
+drop function if exists public.admin_unstage_model_file(uuid, text);
+drop function if exists public.admin_stage_model_file(uuid, text, text, text, bigint, text[]);
+drop function if exists public.admin_start_model_request(uuid);
+drop function if exists private.unreferenced_media_paths(text[]);
 -- ---- end S4 Task 6 rollback ----
 
 -- =============================================================================

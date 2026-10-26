@@ -891,6 +891,291 @@ describe('S4 Task 4: request and cancel', () => {
 // ---- end S4 Task 4 tests ----
 
 // ---- S4 Task 6 tests ----
+describe('S4 Task 6: staff handling', () => {
+  GONE_AFTER_ROLLBACK.push(
+    'public.admin_start_model_request(uuid)',
+    'public.admin_stage_model_file(uuid, text, text, text, bigint, text[])',
+    'public.admin_unstage_model_file(uuid, text)',
+    'public.admin_deliver_model_request(uuid)',
+    'public.admin_reject_model_request(uuid, text)',
+    'private.unreferenced_media_paths(text[])',
+    'Model staff upload models',
+  )
+  let f: S4Fixture
+  let next = 50
+  /** A fresh request id of this describe (free(50..99), one per call). */
+  const rid = () => f.free(next++)
+  const MEDIA = 'product-media'
+  /** A product-media object name in the business folder (the uploadAsset shape), stored as the database owner. */
+  const stored = async (biz: string, ext: string) => {
+    const name = `${biz}/${crypto.randomUUID()}.${ext}`
+    await putObject(db, MEDIA, name)
+    return name
+  }
+  const START = 'select public.admin_start_model_request($1) as r'
+  const STAGE = 'select public.admin_stage_model_file($1, $2, $3, $4, $5, $6::text[]) as r'
+  const UNSTAGE = 'select public.admin_unstage_model_file($1, $2) as r'
+  const DELIVER = 'select public.admin_deliver_model_request($1) as r'
+  const REJECT = 'select public.admin_reject_model_request($1, $2) as r'
+  const stage = (who: string, req: string, format: string, path: string, ext: string[] | null = null) =>
+    h.call(who, STAGE, [req, format, path, `m.${format}`, 1234, ext])
+  const status = async (req: string) => (await db.query<{ s: string }>('select status as s from public.model_requests where id = $1', [req])).rows[0]?.s
+  const productModels = async (product: string) =>
+    (await db.query<{ format: string; storage_path: string; required_extensions: string[] | null }>(
+      'select format, storage_path, required_extensions from public.product_models where product_id = $1 order by format', [product])).rows
+  const variantModels = async (variant: string) =>
+    (await db.query<{ format: string; storage_path: string }>('select format, storage_path from public.product_variant_models where variant_id = $1 order by format', [variant])).rows
+  const putModel = (product: string, format: string, path: string) =>
+    db.query('insert into public.product_models (product_id, format, storage_path, file_name) values ($1, $2, $3, $4)', [product, format, path, `old.${format}`])
+  const clearModels = async () => {
+    await db.query('delete from public.product_models where product_id in ($1, $2, $3)', [f.productP, f.productQ, f.productR])
+    await db.query('delete from public.product_variant_models where variant_id = $1', [f.variantV])
+    await db.query('delete from public.model_requests where business_id in ($1, $2)', [f.bizA, f.bizB])
+  }
+
+  beforeAll(async () => {
+    f = await seedS4(db, 6)
+  })
+
+  it('each function is gated: Team without models.manage → forbidden; Admin at aal1 with the staff 2FA policy → aal2_required', async () => {
+    const id = f.free(99)
+    await expectStaffGate(h, f, START, [id])
+    await expectStaffGate(h, f, STAGE, [id, 'glb', `${f.bizA}/${id}.glb`, 'm.glb', 1, null])
+    await expectStaffGate(h, f, UNSTAGE, [id, 'glb'])
+    await expectStaffGate(h, f, DELIVER, [id])
+    await expectStaffGate(h, f, REJECT, [id, 'Too dark'])
+  })
+
+  it('Team with only models.manage (and its prerequisites) can call each', async () => {
+    const [a, b] = [rid(), rid()]
+    try {
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'requested' })
+      await insertRequest(db, { id: b, business: f.bizA, product: f.productQ, status: 'requested' })
+      const glb = await stored(f.bizA, 'glb')
+      await withTeam(MODEL_STAFF, async () => {
+        expect(await h.call(f.team, START, [a])).toEqual({ status: 'in_progress' })
+        expect(await stage(f.team, a, 'glb', glb)).toEqual({ status: 'in_progress', replaced_path: null })
+        expect(await h.call(f.team, UNSTAGE, [a, 'glb'])).toEqual({ path: glb })
+        await stage(f.team, a, 'glb', glb)
+        expect(await h.call(f.team, DELIVER, [a])).toMatchObject({ status: 'delivered', product_status: 'draft', target: 'product' })
+        expect(await h.call(f.team, REJECT, [b, 'Too dark'])).toEqual({ status: 'rejected', staged_paths: [] })
+      })
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it('start: requested → in_progress; from in_progress → invalid_transition; an unknown id → model_request_not_found', async () => {
+    const a = rid()
+    try {
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'requested' })
+      expect(await h.call(f.admin, START, [a])).toEqual({ status: 'in_progress' })
+      const row = (await db.query<{ status: string; started: boolean; handled_by: string }>(
+        'select status, started_at is not null as started, handled_by from public.model_requests where id = $1', [a])).rows[0]
+      expect(row).toEqual({ status: 'in_progress', started: true, handled_by: f.admin })
+      const audit = (await db.query<{ actor_id: string; business_id: string; metadata: Record<string, unknown> }>(
+        `select actor_id, business_id, metadata from public.audit_events where event_type = 'model_request_started' and metadata ->> 'request_id' = $1`, [a])).rows
+      expect(audit).toEqual([{ actor_id: f.admin, business_id: f.bizA, metadata: expect.objectContaining({ request_id: a, product_id: f.productP, variant_id: null }) }])
+      await expect(h.probe(f.admin, START, [a])).rejects.toMatchObject({ message: 'invalid_transition', code: '22023' })
+      await expect(h.probe(f.admin, START, [f.free(98)])).rejects.toMatchObject({ message: 'model_request_not_found', code: 'P0002' })
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it('stage: a requested request moves to in_progress; a path in another business folder, a .png name, a format/extension mismatch and a missing object → model_request_file_invalid; staging glb twice returns the first path as replaced_path; unstage removes the row and returns the path', async () => {
+    const a = rid()
+    try {
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'requested' })
+      const first = await stored(f.bizA, 'glb')
+      const second = await stored(f.bizA, 'glb')
+      const invalid = { message: 'model_request_file_invalid', code: '22023' }
+      await expect(h.probe(f.admin, STAGE, [a, 'glb', await stored(f.bizB, 'glb'), 'm.glb', 1, null])).rejects.toMatchObject(invalid)
+      await expect(h.probe(f.admin, STAGE, [a, 'glb', await stored(f.bizA, 'png'), 'm.glb', 1, null])).rejects.toMatchObject(invalid)
+      await expect(h.probe(f.admin, STAGE, [a, 'usdz', first, 'm.usdz', 1, null])).rejects.toMatchObject(invalid)
+      await expect(h.probe(f.admin, STAGE, [a, 'glb', `${f.bizA}/${crypto.randomUUID()}.glb`, 'm.glb', 1, null])).rejects.toMatchObject(invalid)
+      expect(await status(a)).toBe('requested')
+
+      expect(await stage(f.admin, a, 'glb', first, ['KHR_draco_mesh_compression'])).toEqual({ status: 'in_progress', replaced_path: null })
+      expect(await status(a)).toBe('in_progress')
+      expect((await db.query(`select 1 from public.audit_events where event_type = 'model_request_started' and metadata ->> 'request_id' = $1`, [a])).rows).toHaveLength(1)
+      expect(await stage(f.admin, a, 'glb', second)).toEqual({ status: 'in_progress', replaced_path: first })
+      const staged = (await db.query('select format, storage_path, uploaded_by from public.model_request_files where request_id = $1', [a])).rows
+      expect(staged).toEqual([{ format: 'glb', storage_path: second, uploaded_by: f.admin }])
+
+      expect(await h.call(f.admin, UNSTAGE, [a, 'glb'])).toEqual({ path: second })
+      expect((await db.query('select 1 from public.model_request_files where request_id = $1', [a])).rows).toEqual([])
+      expect(await h.call(f.admin, UNSTAGE, [a, 'glb'])).toEqual({ path: null })
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it('deliver, GLB only, to a switch-off business: the target has the GLB, its old USDZ row is gone, both old paths are in replaced_paths, models_changed_at is bumped, the request is closed and audited', async () => {
+    const a = rid()
+    try {
+      expect((await db.query('select allow_own_models as on from public.businesses where id = $1', [f.bizA])).rows[0]).toEqual({ on: false })
+      const [oldGlb, oldUsdz] = [await stored(f.bizA, 'glb'), await stored(f.bizA, 'usdz')]
+      await putModel(f.productP, 'glb', oldGlb)
+      await putModel(f.productP, 'usdz', oldUsdz)
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'in_progress' })
+      const glb = await stored(f.bizA, 'glb')
+      await stage(f.admin, a, 'glb', glb, ['KHR_materials_variants'])
+      expect(await h.call(f.admin, DELIVER, [a])).toEqual({ status: 'delivered', replaced_paths: [oldGlb, oldUsdz].sort(), product_status: 'draft', target: 'product' })
+      expect(await productModels(f.productP)).toEqual([{ format: 'glb', storage_path: glb, required_extensions: ['KHR_materials_variants'] }])
+      const p = (await db.query(`select models_changed_at > now() - interval '1 minute' as changed from public.products where id = $1`, [f.productP])).rows[0]
+      expect(p).toEqual({ changed: true })
+      const req = (await db.query('select status, delivered_at is not null as delivered, closed_at is not null as closed, handled_by from public.model_requests where id = $1', [a])).rows[0]
+      expect(req).toEqual({ status: 'delivered', delivered: true, closed: true, handled_by: f.admin })
+      expect((await db.query('select 1 from public.model_request_files where request_id = $1', [a])).rows).toEqual([])
+      const audit = (await db.query<{ metadata: Record<string, unknown> }>(
+        `select metadata from public.audit_events where event_type = 'model_request_delivered' and metadata ->> 'request_id' = $1`, [a])).rows
+      expect(audit).toEqual([{ metadata: expect.objectContaining({ formats: ['glb'], target: 'product', product_id: f.productP }) }])
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it('deliver with both formats → both rows with the staged required_extensions', async () => {
+    const a = rid()
+    try {
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'in_progress' })
+      const [glb, usdz] = [await stored(f.bizA, 'glb'), await stored(f.bizA, 'usdz')]
+      await stage(f.admin, a, 'glb', glb, ['KHR_texture_basisu'])
+      await stage(f.admin, a, 'usdz', usdz)
+      expect(await h.call(f.admin, DELIVER, [a])).toMatchObject({ status: 'delivered', replaced_paths: [] })
+      expect(await productModels(f.productP)).toEqual([
+        { format: 'glb', storage_path: glb, required_extensions: ['KHR_texture_basisu'] },
+        { format: 'usdz', storage_path: usdz, required_extensions: null },
+      ])
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it("an option target replaces only that option's set", async () => {
+    const a = rid()
+    try {
+      const productGlb = await stored(f.bizA, 'glb')
+      const oldVariant = await stored(f.bizA, 'usdz')
+      await putModel(f.productP, 'glb', productGlb)
+      await db.query(`insert into public.product_variant_models (variant_id, product_id, format, storage_path, file_name) values ($1, $2, 'usdz', $3, 'v.usdz')`, [f.variantV, f.productP, oldVariant])
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, variant: f.variantV, status: 'in_progress' })
+      const glb = await stored(f.bizA, 'glb')
+      await stage(f.admin, a, 'glb', glb)
+      expect(await h.call(f.admin, DELIVER, [a])).toEqual({ status: 'delivered', replaced_paths: [oldVariant], product_status: 'draft', target: 'option' })
+      expect(await variantModels(f.variantV)).toEqual([{ format: 'glb', storage_path: glb }])
+      expect((await productModels(f.productP)).map((m) => m.storage_path)).toEqual([productGlb])
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it('deliver from requested → invalid_transition; without a staged GLB → model_request_needs_glb; unknown → model_request_not_found', async () => {
+    const [a, b] = [rid(), rid()]
+    try {
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'requested' })
+      await insertRequest(db, { id: b, business: f.bizA, product: f.productQ, status: 'in_progress' })
+      await expect(h.probe(f.admin, DELIVER, [a])).rejects.toMatchObject({ message: 'invalid_transition', code: '22023' })
+      await stage(f.admin, b, 'usdz', await stored(f.bizA, 'usdz'))
+      await expect(h.probe(f.admin, DELIVER, [b])).rejects.toMatchObject({ message: 'model_request_needs_glb', code: '22023' })
+      await expect(h.probe(f.admin, DELIVER, [f.free(98)])).rejects.toMatchObject({ message: 'model_request_not_found', code: 'P0002' })
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it('a replaced path another product still uses is not in replaced_paths', async () => {
+    const a = rid()
+    try {
+      const shared = await stored(f.bizA, 'glb')
+      const own = await stored(f.bizA, 'usdz')
+      await putModel(f.productP, 'glb', shared)
+      await putModel(f.productP, 'usdz', own)
+      await putModel(f.productQ, 'glb', shared) // a duplicated product shares the file
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'in_progress' })
+      await stage(f.admin, a, 'glb', await stored(f.bizA, 'glb'))
+      expect(await h.call(f.admin, DELIVER, [a])).toMatchObject({ replaced_paths: [own] })
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it('R-S4-16: anon reads the delivered GLB object for a published product of an active business, not before delivery, and never a staged object', async () => {
+    const [a, b] = [rid(), rid()]
+    const read = `select count(*)::int as n from storage.objects where bucket_id = '${MEDIA}' and name = $1`
+    try {
+      await db.query(`insert into public.product_images (product_id, storage_path, is_primary) values ($1, $2, true)`, [f.productP, await stored(f.bizA, 'jpg')])
+      await db.query(`update public.products set status = 'published', published_at = now() where id = $1`, [f.productP])
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'in_progress' })
+      const [glb, usdz] = [await stored(f.bizA, 'glb'), await stored(f.bizA, 'usdz')]
+      await stage(f.admin, a, 'glb', glb)
+      await stage(f.admin, a, 'usdz', usdz)
+      expect(await h.count('', read, [glb], null, 'anon')).toBe(0)
+      expect(await h.count('', read, [usdz], null, 'anon')).toBe(0)
+      expect(await h.call(f.admin, DELIVER, [a])).toMatchObject({ product_status: 'published' })
+      expect(await h.count('', read, [glb], null, 'anon')).toBe(1)
+      expect(await h.count('', read, [usdz], null, 'anon')).toBe(1)
+      // A staged object of another open request stays private.
+      await insertRequest(db, { id: b, business: f.bizA, product: f.productQ, status: 'in_progress' })
+      const other = await stored(f.bizA, 'glb')
+      await stage(f.admin, b, 'glb', other)
+      expect(await h.count('', read, [other], null, 'anon')).toBe(0)
+    } finally {
+      await db.query(`update public.products set status = 'draft', published_at = null where id = $1`, [f.productP])
+      await db.query('delete from public.product_images where product_id = $1', [f.productP])
+      await clearModels()
+    }
+  })
+
+  it('reject: empty or blank reason → reason_required; from delivered → invalid_transition; staged rows are gone and their paths returned; the audit metadata has has_reason and no reason text', async () => {
+    const [a, d, b] = [rid(), rid(), rid()]
+    try {
+      await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'in_progress' })
+      await insertRequest(db, { id: d, business: f.bizA, product: f.productQ, status: 'delivered' })
+      for (const reason of ['', '   ', null, 'x'.repeat(1001)])
+        await expect(h.probe(f.admin, REJECT, [a, reason])).rejects.toMatchObject({ message: 'reason_required', code: '22023' })
+      await expect(h.probe(f.admin, REJECT, [d, 'Too dark'])).rejects.toMatchObject({ message: 'invalid_transition', code: '22023' })
+      const [glb, usdz] = [await stored(f.bizA, 'glb'), await stored(f.bizA, 'usdz')]
+      await stage(f.admin, a, 'glb', glb)
+      await stage(f.admin, a, 'usdz', usdz)
+      const r = (await h.call(f.admin, REJECT, [a, '  The photos are too dark.  '])) as { status: string; staged_paths: string[] }
+      expect({ ...r, staged_paths: [...r.staged_paths].sort() }).toEqual({ status: 'rejected', staged_paths: [glb, usdz].sort() })
+      expect((await db.query('select 1 from public.model_request_files where request_id = $1', [a])).rows).toEqual([])
+      expect((await db.query('select status, reason, closed_at is not null as closed, handled_by from public.model_requests where id = $1', [a])).rows[0])
+        .toEqual({ status: 'rejected', reason: 'The photos are too dark.', closed: true, handled_by: f.admin })
+      const audit = (await db.query<{ metadata: Record<string, unknown> }>(
+        `select metadata from public.audit_events where event_type = 'model_request_rejected' and metadata ->> 'request_id' = $1`, [a])).rows
+      expect(audit).toHaveLength(1)
+      expect(audit[0]!.metadata).toMatchObject({ has_reason: true, request_id: a })
+      expect(JSON.stringify(audit[0]!.metadata)).not.toContain('too dark')
+      // A request that was not started can be declined too.
+      await insertRequest(db, { id: b, business: f.bizA, product: f.productP, status: 'requested' })
+      expect(await h.call(f.admin, REJECT, [b, 'No'])).toEqual({ status: 'rejected', staged_paths: [] })
+    } finally {
+      await clearModels()
+    }
+  })
+
+  it('storage: Team with only models.manage can insert {business}/{uuid}.glb into product-media and not .png, and can delete .glb but not .png', async () => {
+    const insert = (name: string) => `insert into storage.objects (bucket_id, name) values ('${MEDIA}', '${name}')`
+    const del = (name: string) => `delete from storage.objects where bucket_id = '${MEDIA}' and name = '${name}'`
+    const glb = await stored(f.bizA, 'glb')
+    const png = await stored(f.bizA, 'png')
+    await withTeam(MODEL_STAFF, async () => {
+      expect(await h.affected(f.team, insert(`${f.bizA}/${crypto.randomUUID()}.glb`))).toBe(1)
+      expect(await h.affected(f.team, insert(`${f.bizA}/${crypto.randomUUID()}.usdz`))).toBe(1)
+      await expect(h.probe(f.team, insert(`${f.bizA}/${crypto.randomUUID()}.png`))).rejects.toThrow(/row-level security/)
+      await expect(h.probe(f.team, insert(`not-a-business/${crypto.randomUUID()}.glb`))).rejects.toThrow(/row-level security/)
+      expect(await h.affected(f.team, del(glb))).toBe(1)
+      expect(await h.affected(f.team, del(png))).toBe(0)
+    })
+    // Without the key (and without products.edit), the same upload is refused.
+    await withTeam(['analytics.view', 'businesses.view', 'products.view'], async () => {
+      await expect(h.probe(f.team, insert(`${f.bizA}/${crypto.randomUUID()}.glb`))).rejects.toThrow(/row-level security/)
+    })
+  })
+})
 // ---- end S4 Task 6 tests ----
 
 // ---- S4 Task 7 tests ----
