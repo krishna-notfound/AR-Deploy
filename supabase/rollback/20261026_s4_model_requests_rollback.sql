@@ -38,6 +38,8 @@ begin;
 -- =============================================================================
 -- S4 Task 4 rollback: The business request: send, cancel, and the request panel (R-S4-6, R-S4-7, R-S4-8)
 -- =============================================================================
+drop function if exists public.cancel_model_request(uuid);
+drop function if exists public.request_model(uuid, uuid, uuid, text, jsonb);
 -- ---- end S4 Task 4 rollback ----
 
 -- =============================================================================

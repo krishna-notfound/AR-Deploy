@@ -6,6 +6,7 @@
 // Slots: Task 1 owns the fixtures, its describe and the rollback describe. Tasks 3, 4, 6, 7 and 8 put their whole
 // describe between their own `// ---- S4 Task N tests ----` markers at the end of this file, and call
 // GONE_AFTER_ROLLBACK.push(...) at their describe's body level.
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
@@ -554,6 +555,160 @@ describe('S4 rollback', () => {
 // ---- end S4 Task 3 tests ----
 
 // ---- S4 Task 4 tests ----
+describe('S4 Task 4: request and cancel', () => {
+  GONE_AFTER_ROLLBACK.push('public.request_model(uuid,uuid,uuid,text,jsonb)', 'public.cancel_model_request(uuid)')
+  const B = 'model-request-photos'
+  const SEND = 'select public.request_model($1, $2, $3, $4, $5::jsonb) as r'
+  let f: S4Fixture
+  beforeAll(async () => {
+    f = await seedS4(db, 4)
+  })
+
+  /** n uploaded photos under {biz}/{request}/ (objects put as the database owner), as p_photos entries. */
+  async function upload(biz: string, request: string, n: number) {
+    const photos = []
+    for (let i = 0; i < n; i++) {
+      const path = `${biz}/${request}/${randomUUID()}.jpg`
+      await putObject(db, B, path)
+      photos.push({ storage_path: path, file_name: `photo-${i + 1}.jpg`, size_bytes: 1000 + i })
+    }
+    return photos
+  }
+  const send = (who: string, request: string, product: string, variant: string | null, photos: unknown[], note: string | null = null, aal: 'aal1' | 'aal2' = 'aal1') =>
+    h.call(who, SEND, [request, product, variant, note, JSON.stringify(photos)], aal)
+  const refuse = (who: string, request: string, product: string, variant: string | null, photos: unknown[], note: string | null = null) =>
+    h.probe(who, SEND, [request, product, variant, note, JSON.stringify(photos)])
+  const written = async () => ({
+    requests: (await db.query<{ n: number }>('select count(*)::int as n from public.model_requests where business_id = any($1)', [[f.bizA, f.bizB]])).rows[0]!.n,
+    photos: (await db.query<{ n: number }>('select count(*)::int as n from public.model_request_photos p join public.model_requests r on r.id = p.request_id where r.business_id = any($1)', [[f.bizA, f.bizB]])).rows[0]!.n,
+    audit: (await db.query<{ n: number }>(`select count(*)::int as n from public.audit_events where business_id = any($1) and event_type like 'model_request_%'`, [[f.bizA, f.bizB]])).rows[0]!.n,
+  })
+  const clear = async () => {
+    await db.query('delete from public.model_requests where business_id = any($1)', [[f.bizA, f.bizB]])
+    await db.query(`delete from public.audit_events where business_id = any($1) and event_type like 'model_request_%'`, [[f.bizA, f.bizB]])
+    await db.query('delete from storage.objects where bucket_id = $1', [B])
+  }
+
+  it('1 photo → model_request_photos_count; 11 → the same; a path in another business\'s folder → model_request_photo_missing; a path under another request id → the same; a path with no object → the same', async () => {
+    try {
+      const id = randomUUID()
+      await expect(refuse(f.ownerA, id, f.productP, null, await upload(f.bizA, id, 1))).rejects.toMatchObject({ message: 'model_request_photos_count', code: '22023' })
+      await expect(refuse(f.ownerA, id, f.productP, null, await upload(f.bizA, id, 11))).rejects.toMatchObject({ message: 'model_request_photos_count' })
+      const two = await upload(f.bizA, id, 2)
+      await expect(refuse(f.ownerA, id, f.productP, null, [two[0], two[0]])).rejects.toMatchObject({ message: 'model_request_photos_count' })
+      await expect(refuse(f.ownerA, id, f.productP, null, [two[0], ...(await upload(f.bizB, id, 1))])).rejects.toMatchObject({ message: 'model_request_photo_missing', code: '22023' })
+      await expect(refuse(f.ownerA, id, f.productP, null, [two[0], ...(await upload(f.bizA, randomUUID(), 1))])).rejects.toMatchObject({ message: 'model_request_photo_missing' })
+      const ghost = { storage_path: `${f.bizA}/${id}/${randomUUID()}.jpg`, file_name: 'ghost.jpg', size_bytes: 10 }
+      await expect(refuse(f.ownerA, id, f.productP, null, [two[0], ghost])).rejects.toMatchObject({ message: 'model_request_photo_missing' })
+      expect((await written()).requests).toBe(0)
+    } finally {
+      await clear()
+    }
+  })
+
+  it('a second open request for the same target → model_request_open; the same product with another option → allowed; after the first is cancelled → allowed', async () => {
+    try {
+      const first = randomUUID()
+      expect(await send(f.ownerA, first, f.productP, null, await upload(f.bizA, first, 2))).toEqual({ id: first, status: 'requested' })
+      const second = randomUUID()
+      await expect(refuse(f.ownerA, second, f.productP, null, await upload(f.bizA, second, 2))).rejects.toMatchObject({ message: 'model_request_open', code: '23505' })
+      const option = randomUUID()
+      expect(await send(f.ownerA, option, f.productP, f.variantV, await upload(f.bizA, option, 2))).toEqual({ id: option, status: 'requested' })
+      await h.call(f.ownerA, 'select public.cancel_model_request($1) as r', [first])
+      expect(await send(f.ownerA, second, f.productP, null, await upload(f.bizA, second, 2))).toEqual({ id: second, status: 'requested' })
+    } finally {
+      await clear()
+    }
+  })
+
+  it('a product with depth 0 → model_request_needs_dimensions; an option of another product → model_request_target_invalid; a 1001-character note → model_request_note_too_long; a request id already used → forbidden', async () => {
+    try {
+      const id = randomUUID()
+      const photos = await upload(f.bizA, id, 2)
+      await expect(refuse(f.ownerA, id, f.productQ, null, photos)).rejects.toMatchObject({ message: 'model_request_needs_dimensions', code: '22023' })
+      await expect(refuse(f.ownerA, id, f.productQ, f.variantV, photos)).rejects.toMatchObject({ message: 'model_request_target_invalid', code: '22023' })
+      await expect(refuse(f.ownerA, id, f.productP, null, photos, 'x'.repeat(1001))).rejects.toMatchObject({ message: 'model_request_note_too_long', code: '22023' })
+      // Review note (Task 1): the upload policy can't see another business's request, so the function checks the id.
+      const taken = randomUUID()
+      await insertRequest(db, { id: taken, business: f.bizB, product: f.productR, status: 'cancelled' })
+      await expect(refuse(f.ownerA, taken, f.productP, null, await upload(f.bizA, taken, 2))).rejects.toMatchObject({ message: 'forbidden', code: '42501' })
+      expect(await send(f.ownerA, id, f.productP, null, photos, 'x'.repeat(1000))).toEqual({ id, status: 'requested' })
+    } finally {
+      await clear()
+    }
+  })
+
+  it('a staff caller → forbidden; a member at aal1 with the business 2FA policy on → aal2_required', async () => {
+    try {
+      const id = randomUUID()
+      const photos = await upload(f.bizA, id, 2)
+      for (const staff of [f.owner, f.admin]) await expect(refuse(staff, id, f.productP, null, photos)).rejects.toMatchObject({ message: 'forbidden', code: '42501' })
+      await withTeam(MODEL_STAFF, async () => {
+        await expect(refuse(f.team, id, f.productP, null, photos)).rejects.toMatchObject({ message: 'forbidden' })
+      })
+      await expect(refuse(f.ownerB, id, f.productP, null, photos)).rejects.toMatchObject({ message: 'forbidden' })
+      await h.withPolicy(false, true, async () => {
+        await expect(refuse(f.ownerA, id, f.productP, null, photos)).rejects.toMatchObject({ message: 'aal2_required', code: '42501' })
+      })
+      expect(await written()).toEqual({ requests: 0, photos: 0, audit: 0 })
+    } finally {
+      await clear()
+    }
+  })
+
+  it('the request, its photo rows and one model_request_created audit row are written; nothing is written on any refusal', async () => {
+    try {
+      const bad = randomUUID()
+      await expect(refuse(f.ownerA, bad, f.productQ, null, await upload(f.bizA, bad, 2))).rejects.toThrow()
+      expect(await written()).toEqual({ requests: 0, photos: 0, audit: 0 })
+      const id = randomUUID()
+      const photos = await upload(f.bizA, id, 3)
+      photos[1]!.file_name = 'n'.repeat(300)
+      expect(await send(f.ownerA, id, f.productP, f.variantV, photos, '  Oak legs  ')).toEqual({ id, status: 'requested' })
+      expect((await db.query('select business_id, product_id, variant_id, status, note, requested_by, closed_at from public.model_requests where id = $1', [id])).rows)
+        .toEqual([{ business_id: f.bizA, product_id: f.productP, variant_id: f.variantV, status: 'requested', note: 'Oak legs', requested_by: f.ownerA, closed_at: null }])
+      expect((await db.query('select storage_path, char_length(file_name) as len, size_bytes::int as size, sort_order from public.model_request_photos where request_id = $1 order by sort_order', [id])).rows)
+        .toEqual(photos.map((p, i) => ({ storage_path: p.storage_path, len: i === 1 ? 255 : p.file_name.length, size: p.size_bytes, sort_order: i })))
+      expect((await db.query(`select actor_id, metadata from public.audit_events where event_type = 'model_request_created' and business_id = $1`, [f.bizA])).rows)
+        .toEqual([{ actor_id: f.ownerA, metadata: expect.objectContaining({ request_id: id, product_id: f.productP, variant_id: f.variantV }) }])
+    } finally {
+      await clear()
+    }
+  })
+
+  it('cancel when requested → cancelled with closed_at and the photo paths, and the member may then delete those objects; when in_progress → model_request_not_cancellable and nothing changes; another business\'s member → model_request_not_found', async () => {
+    const CANCEL = 'select public.cancel_model_request($1) as r'
+    try {
+      const id = randomUUID()
+      const photos = await upload(f.bizA, id, 2)
+      await send(f.ownerA, id, f.productP, null, photos)
+      await expect(h.probe(f.ownerB, CANCEL, [id])).rejects.toMatchObject({ message: 'model_request_not_found', code: 'P0002' })
+      await expect(h.probe(f.admin, CANCEL, [id])).rejects.toMatchObject({ message: 'model_request_not_found' })
+      await expect(h.probe(f.ownerA, CANCEL, [randomUUID()])).rejects.toMatchObject({ message: 'model_request_not_found' })
+      // Photos of a sent request can't be deleted by the member until it is cancelled.
+      const delOne = `delete from storage.objects where bucket_id = '${B}' and name = $1`
+      expect(await h.affected(f.ownerA, delOne, [photos[0]!.storage_path])).toBe(0)
+      await h.withPolicy(false, true, async () => {
+        await expect(h.probe(f.ownerA, CANCEL, [id])).rejects.toMatchObject({ message: 'aal2_required' })
+      })
+      expect(await h.call(f.ownerA, CANCEL, [id])).toEqual({ status: 'cancelled', photo_paths: photos.map((p) => p.storage_path) })
+      const row = (await db.query<{ status: string; closed: boolean }>('select status, closed_at is not null as closed from public.model_requests where id = $1', [id])).rows[0]
+      expect(row).toEqual({ status: 'cancelled', closed: true })
+      expect((await db.query(`select actor_id from public.audit_events where event_type = 'model_request_cancelled' and business_id = $1`, [f.bizA])).rows).toEqual([{ actor_id: f.ownerA }])
+      for (const p of photos) expect(await h.affected(f.ownerA, delOne, [p.storage_path])).toBe(1)
+      await expect(h.probe(f.ownerA, CANCEL, [id])).rejects.toMatchObject({ message: 'model_request_not_cancellable', code: 'P0001' })
+
+      const started = randomUUID()
+      await insertRequest(db, { id: started, business: f.bizA, product: f.productP, status: 'in_progress' })
+      const snapshot = async () => (await db.query('select status, closed_at, updated_at from public.model_requests where id = $1', [started])).rows
+      const before = await snapshot()
+      await expect(h.probe(f.ownerA, CANCEL, [started])).rejects.toMatchObject({ message: 'model_request_not_cancellable', code: 'P0001' })
+      expect(await snapshot()).toEqual(before)
+    } finally {
+      await clear()
+    }
+  })
+})
 // ---- end S4 Task 4 tests ----
 
 // ---- S4 Task 6 tests ----
