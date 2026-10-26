@@ -37,18 +37,24 @@ export function EmailStatusBadge({ status }: { status: EmailAttemptStatus }) {
   return <Badge tone={tone}>{label}</Badge>
 }
 
-/** Why an email was not sent or failed, in plain words. Unknown text is the provider's own (sanitized) message. */
+const EMAIL_REASON: Record<string, string> = {
+  demo_mode: 'Demo mode: no email is sent.',
+  email_not_configured: 'The email service is not configured on the server yet.',
+  test_sender_recipient_not_allowed: 'The Resend test sender can only email the Resend account owner until a domain is verified.',
+  invalid_recipient: 'The email address is not valid.',
+  admin_recipient_not_configured: 'No admin notification address (ADMIN_NOTIFICATION_EMAIL) is configured.',
+  no_recipient: 'The account has no email address.',
+}
+
+/** Why an email was not sent or failed, in plain words, for the email log. Unknown text is the provider's own (sanitized) message. */
 export function emailReason(error?: string): string | undefined {
   if (!error) return undefined
-  const known: Record<string, string> = {
-    demo_mode: 'Demo mode: no email is sent.',
-    email_not_configured: 'The email service is not configured on the server yet.',
-    test_sender_recipient_not_allowed: 'The Resend test sender can only email the Resend account owner until a domain is verified.',
-    invalid_recipient: 'The email address is not valid.',
-    admin_recipient_not_configured: 'No admin notification address (ADMIN_NOTIFICATION_EMAIL) is configured.',
-    no_recipient: 'The account has no email address.',
-  }
-  return known[error] ?? error
+  return knownEmailReason(error) ?? error
+}
+
+/** Fixed copy for a known reason code only; undefined for anything else. Toasts use this: raw provider text is never shown. */
+export function knownEmailReason(error?: string): string | undefined {
+  return error && Object.hasOwn(EMAIL_REASON, error) ? EMAIL_REASON[error] : undefined
 }
 
 export const EMAIL_KIND_LABEL: Record<string, string> = {

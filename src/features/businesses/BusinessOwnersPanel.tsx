@@ -16,7 +16,7 @@ import { usePreferences } from '@/lib/preferences'
 import { account, service } from '@/services'
 import type { ProvisionOutcome, ServiceError } from '@/services/catalogService'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
-import { emailReason } from '../applications/labels'
+import { knownEmailReason } from '../applications/labels'
 import { ActionCodeDialog } from '../settings/ActionCodeDialog'
 import { useNoticeToast } from '../team/useMemberActions'
 import { closureByBusiness } from './closure'
@@ -55,10 +55,10 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
 
   // The owner record exists either way; the toast says exactly what happened to the email.
   const report = (o: ProvisionOutcome, what: string) => {
-    const reason = emailReason(o.email.error)
+    const reason = knownEmailReason(o.email.error)
     if (o.email.status === 'accepted' || o.email.status === 'sent' || o.email.status === 'delivered')
       toast.success(what, 'Resend accepted the invitation email. Delivery is confirmed only when its status shows “Delivered”.')
-    else toast.error(`${what}, but the invitation email was not sent`, reason ?? 'Use “Resend invitation” to try again.')
+    else toast.error(`${what}, but the invitation email was not sent`, reason ?? 'The email service did not take it. Use “Resend invitation” to try again.')
   }
 
   const submit = async (e: FormEvent) => {

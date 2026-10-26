@@ -1232,7 +1232,8 @@ alter table public.email_log add constraint email_log_attempt_check check (attem
 
 -- {reservation_id, attempt}, or {error:'cooldown'|'too_many_invitations', retry_at}. Under a per-business advisory
 -- lock, so two parallel requests can't both pass the checks (one gets the reservation, the other the cooldown).
---   cooldown: a non-blocked attempt for the business (any recipient, still pending or sent) is under 60 s old;
+--   cooldown: any non-blocked attempt for the business (any recipient) is under 60 s old. Every non-blocked outcome
+--     (pending, accepted or failed) starts the cooldown;
 --   too_many_invitations: 10 non-blocked attempts for the business and this recipient in the last 24 h;
 --     retry_at is when the oldest of them leaves the window.
 -- Blocked attempts (nothing was sent) count for neither. Removing and re-inviting the owner doesn't reset anything.
@@ -1624,8 +1625,8 @@ begin
   if nullif(btrim(coalesce(p_ip, '')), '') is not null then
     v_meta := v_meta || jsonb_build_object('ip', left(btrim(p_ip), 64));
   end if;
-  -- audit_events allows 4096 bytes; answer instead of raising.
-  if pg_column_size(v_meta) > 4000 then
+  -- audit_events allows 4096 bytes; answer instead of raising. 3600 leaves room for what the snapshot trigger adds.
+  if pg_column_size(v_meta) > 3600 then
     return jsonb_build_object('error', 'invalid_request');
   end if;
   insert into public.audit_events (event_type, actor_id, business_id, metadata)

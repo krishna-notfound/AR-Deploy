@@ -7,7 +7,7 @@
 // the caller's own token. Only a reject that changes the status emails the applicant; approve, start review and reopen
 // send nothing (the owner invitation is the approval notice). An email failure never undoes the rejection.
 // Reopen (R-W2-2) moves an approved application whose business was deleted back to under_review.
-import { type ConfigResult, type EmailStatus, type LogEntry, sendAndLog } from '../_shared/email.ts'
+import { type ConfigResult, type EmailStatus, type LogEntry, SAFE_EMAIL_REASONS, sendAndLog } from '../_shared/email.ts'
 import { REASON_MAX_LENGTH, applicationDecisionEmail } from '../_shared/email-templates.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
@@ -99,10 +99,10 @@ async function sendDecision(
   a: { applicationId: string; applicant: { businessName: string; email: string; language: 'en' | 'pt' }; reason?: string; actorId: string },
 ): Promise<DecisionEmail> {
   const base = { kind: 'application_decision' as const, applicationId: a.applicationId, workflow: `application:${a.applicationId}:decision`, triggeredBy: a.actorId }
-  // The rejection is already committed, so nothing here may fail the request. A log row that can't be written is
-  // reported next to the real send outcome (the email may well have gone).
-  let logFailed = false
-  const log = async (e: LogEntry) => deps.log(e).catch(() => ((logFailed = true), ''))
+  // The rejection is already committed, so nothing here may fail the request. A log row that can't be written
+  // doesn't change the real send outcome (the email may well have gone). Only fixed reason codes reach the browser;
+  // provider text stays in email_log.
+  const log = async (e: LogEntry) => deps.log(e).catch(() => '')
   try {
     const email = applicationDecisionEmail(a.applicant.language, a.applicant.businessName, a.reason || undefined)
     if (!deps.config.ok) {
@@ -110,9 +110,8 @@ async function sendDecision(
       return { status: 'blocked', error: 'email_not_configured' }
     }
     const r = await sendAndLog({ config: deps.config.config, fetch: deps.fetch, log }, { ...email, ...base, to: a.applicant.email })
-    const error = r.error ?? (logFailed ? 'email_log_failed' : undefined)
-    return error ? { status: r.status, error } : { status: r.status }
+    return r.error && SAFE_EMAIL_REASONS.has(r.error) ? { status: r.status, error: r.error } : { status: r.status }
   } catch {
-    return { status: 'failed', error: 'unknown' }
+    return { status: 'failed' }
   }
 }

@@ -128,6 +128,20 @@ describe('BusinessOwnersPanel: owner state and invitations (S1.5 Task 17: R-W2-3
     expect(await screen.findByText('Ten invitations were sent to this owner in the last 24 hours. You can send the next one after 21/10/2026, 18:30.')).toBeInTheDocument()
   })
 
+  it('a failed invitation email never shows the provider text, only fixed copy', async () => {
+    vi.spyOn(service, 'getBusinessMembers').mockResolvedValue(ok([PENDING]))
+    vi.spyOn(service, 'getOwnerStates').mockResolvedValue(ok([STATE]))
+    vi.spyOn(service, 'resendOwnerInvitation').mockResolvedValue(ok({ owner: 'already_linked', email: { status: 'failed', error: 'Resend 500: internal provider detail', attempt: 2 } }))
+    renderPanel(await oak())
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Resend invitation' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Send a new invitation to rita@oak.example?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Resend invitation' }))
+    expect(await screen.findByText('New invitation created, but the invitation email was not sent')).toBeInTheDocument()
+    expect(screen.getByText('The email service did not take it. Use “Resend invitation” to try again.')).toBeInTheDocument()
+    expect(screen.queryByText(/internal provider detail/)).toBeNull()
+  })
+
   it('when the owner state fails to load, a pending owner shows no invitation date (never invitedAt)', async () => {
     vi.spyOn(service, 'getBusinessMembers').mockResolvedValue(ok([PENDING]))
     vi.spyOn(service, 'getOwnerStates').mockResolvedValue({ ok: false, error: { code: 'UNKNOWN', message: 'Network down' } })

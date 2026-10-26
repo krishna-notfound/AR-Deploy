@@ -54,6 +54,14 @@ const EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/
 
 export const isValidEmail = (to: string) => to.length <= 320 && EMAIL.test(to)
 
+/**
+ * The fixed reason codes a function may hand back to the browser for an email it did not send. Anything else
+ * (provider or network text) stays in email_log only: raw provider text never reaches the UI (CONSTRAINTS).
+ */
+export const SAFE_EMAIL_REASONS: ReadonlySet<string> = new Set([
+  'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'no_recipient', 'admin_recipient_not_configured', 'demo_mode',
+])
+
 /** True while sending from Resend's shared test domain (no verified domain yet). */
 export const usesTestSender = (from: string) => /@resend\.dev>?\s*$/i.test(from)
 

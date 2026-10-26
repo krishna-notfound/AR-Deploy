@@ -23,7 +23,7 @@ import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
 import { PossibleDuplicates } from '../applications/PossibleDuplicates'
-import { ApplicationStatusBadge, emailReason } from '../applications/labels'
+import { ApplicationStatusBadge, knownEmailReason } from '../applications/labels'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 
 const READINESS: Record<string, string> = {
@@ -110,7 +110,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const reportRejection = (r: ReviewedApplication) => {
     if (!r.decisionEmail) return toast.success('Application rejected')
     if (r.decisionEmail.status === 'accepted') return toast.success('Application rejected. The applicant was emailed.')
-    const why = (emailReason(r.decisionEmail.error) ?? 'the email service did not take it').replace(/\.$/, '')
+    const why = (knownEmailReason(r.decisionEmail.error) ?? 'the email service did not take it').replace(/\.$/, '')
     toast.error(`Application rejected, but the email was not sent: ${why}.`)
   }
 

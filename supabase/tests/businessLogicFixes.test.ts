@@ -2104,6 +2104,11 @@ describe('S1.5 Task 13: closure attribution and staff self-closure', () => {
     const requested = (await db.query<{ business_id: string | null; actor_id: string; name: string }>(
       `select business_id, actor_id, metadata->>'business_name' as name from public.audit_events where event_type = 'account_closure_requested' and actor_id = $1`, [BIZ_OWNER])).rows
     expect(requested).toEqual([{ business_id: BIZ, actor_id: BIZ_OWNER, name: 'T13 Casa' }])
+    // Final review: metadata over 3600 bytes is refused, so the snapshot trigger's additions stay under the 4096-byte check.
+    const big = JSON.stringify({ note: 'x'.repeat(3700) })
+    expect(await h.svc(`select public.service_log_account_event($1, 'account_signed_in', $2::jsonb, null, $3) as r`, [BIZ_OWNER, big, BIZ])).toEqual({ error: 'invalid_request' })
+    const fits = JSON.stringify({ note: 'x'.repeat(3500) })
+    expect(await h.svc(`select public.service_log_account_event($1, 'account_signed_in', $2::jsonb, '203.0.113.9', $3) as r`, [BIZ_OWNER, fits, BIZ])).toEqual({ ok: true })
     // The four-argument call still works (p_business_id defaults to null); only the service role may call it.
     expect(await h.svc(`select public.service_log_account_event($1, 'account_signed_in', '{}'::jsonb, null) as r`, [BIZ_OWNER])).toEqual({ ok: true })
     const grants = (await db.query<{ anon: boolean; auth: boolean; svc: boolean }>(

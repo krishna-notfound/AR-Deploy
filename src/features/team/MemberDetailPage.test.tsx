@@ -112,9 +112,11 @@ describe('Member detail (ADR-0029)', () => {
     expect(screen.getByRole('button', { name: 'Reactivate' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Remove' }))
     const dialog = await screen.findByRole('dialog', { name: 'Remove pedro.alves@sanctus.example from the team?' })
-    expect(within(dialog).getByText("Their access record and login are deleted. Past actions stay in the audit log as 'Deleted user (Admin)'. They can be invited again later.")).toBeInTheDocument()
+    // Final review: the dialog does not promise the login is deleted; the toast says what happened to it.
+    expect(within(dialog).getByText("Their access record is deleted. Their login is deleted too unless it still owns a business. Past actions stay in the audit log as 'Deleted user (Admin)'. They can be invited again later.")).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Remove member' }))
     expect(await screen.findByText('pedro.alves@sanctus.example was removed.')).toBeInTheDocument()
+    expect(screen.getByText('Their login was deleted too.')).toBeInTheDocument()
     expect(remove).toHaveBeenCalledWith('mem_pedro')
     // The member no longer exists: back to the team list, without them.
     await waitFor(() => expect(window.location.pathname).toBe('/admin/team'))

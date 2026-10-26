@@ -1,4 +1,4 @@
--- Rollback for the S1.5 migration supabase/migrations/<ts>_business_logic_fixes.sql
+-- Rollback for the S1.5 migration supabase/migrations/20261026041731_business_logic_fixes.sql
 -- (spec: docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md, §10.1). Run as the database owner, after
 -- deploying the Edge Functions and the app of the release before S1.5, and before any earlier rollback script.
 --
@@ -10,6 +10,8 @@
 -- `delete from public.product_analytics where product_id is null`. Every analytics row kept for a product deleted
 -- under S1.5 is deleted and cannot be recovered. The FK on audit_events.business_id is re-added NOT VALID, so audit
 -- rows that point at deleted businesses remain.
+-- Rolling back also drops email_provider_events.applied: provider events still pending (applied = false, their
+-- email_log row not yet known) lose that flag and are never applied.
 --
 -- Sections run newest task first. Each task inserts its section directly below the `begin;` line, in this format:
 --   -- =============================================================================

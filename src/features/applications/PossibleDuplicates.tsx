@@ -3,6 +3,7 @@
 import { Link } from 'react-router'
 import { useCan } from '@/auth/usePermission'
 import { PanelHeader } from '@/components/layout/PageHeader'
+import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { InlineNotice } from '@/components/ui/States'
 import type { ApplicationDuplicates, BusinessStatus, ID } from '@/domain/types'
@@ -31,7 +32,14 @@ export function PossibleDuplicates({ applicationId }: { applicationId: ID }) {
 
   if (dups.status === 'loading' && !dups.data) return <p className="text-ui-small text-ink-muted">Checking for possible duplicates…</p>
   if (!dups.data)
-    return <InlineNotice tone="neutral">Couldn't check for possible duplicates. You can still review this application.</InlineNotice>
+    return (
+      <InlineNotice tone="neutral">
+        <p>Couldn't check for possible duplicates. You can still review this application.</p>
+        <Button size="sm" className="mt-2" onClick={dups.refetch}>
+          Try again
+        </Button>
+      </InlineNotice>
+    )
   const { applications, businesses } = dups.data
   if (applications.length === 0 && businesses.length === 0) return null
 

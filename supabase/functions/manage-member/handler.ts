@@ -6,6 +6,7 @@
 // Deactivation also signs the member out on every device. The database already refuses their next request, so a
 // failed sign-out is reported but does not fail the action. Removal deletes the member's row in the database, then
 // their login (sessions ended, auth user deleted) when no business and no Owner row still uses it.
+import { type GateResult, gateReply } from '../_shared/gate.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
 
 /** What an admin_* function answers: { ok: true, ... } or { error }. */
@@ -13,6 +14,8 @@ type DbResult = { ok?: true; error?: string } & Record<string, unknown>
 
 export interface ManageDeps {
   userIdFromToken(token: string): Promise<string | null>
+  /** The 2FA gate with the caller's own token (spec §10.3): caller_mfa_satisfied(), then is_platform_admin(). Runs before any RPC. */
+  gate(token: string): Promise<GateResult>
   rpcAsCaller(token: string, fn: string, args: Record<string, unknown>): Promise<DbResult>
   signOutUser(userId: string): Promise<void>
   /** Service role: when the user has no business_members and no platform_admins row, ends their sessions and deletes the auth user. True when deleted. */
@@ -37,6 +40,8 @@ export async function handleManageMember(req: Request, deps: ManageDeps): Promis
 
   const token = bearerToken(req)
   if (!token || !(await deps.userIdFromToken(token))) return reply(401, { error: 'not_signed_in' })
+  const gate = await deps.gate(token)
+  if (gate !== 'ok') return gateReply(gate)
 
   const body = await readJsonObject(req, 2_000)
   const action = body?.action
