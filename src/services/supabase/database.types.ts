@@ -1,4 +1,4 @@
-// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-26 after migration 20261025180600
+// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-26 after migration 20261026041731
 // (Supabase type generator). Regenerate after any migration: npx supabase gen types typescript --project-id <ref>.
 export type Json =
   | string
@@ -110,13 +110,6 @@ export type Database = {
             columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "business_applications"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_events_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]
@@ -875,7 +868,10 @@ export type Database = {
       }
     }
     Functions: {
-      admin_application_duplicates: { Args: { p_application_id: string }; Returns: Json }
+      admin_application_duplicates: {
+        Args: { p_application_id: string }
+        Returns: Json
+      }
       admin_deactivate_member: { Args: { p_member: string }; Returns: Json }
       admin_get_member: { Args: { p_member: string }; Returns: Json }
       admin_invite_member: {
@@ -965,7 +961,7 @@ export type Database = {
           day: string
           embed_views: number
           model_interactions: number
-          product_id: string | null
+          product_id: string
           views: number
         }[]
       }
@@ -1029,6 +1025,10 @@ export type Database = {
         Args: { p_hashes: string[]; p_max?: number }
         Returns: boolean
       }
+      service_apply_provider_status: {
+        Args: { p_message_id: string; p_status: string }
+        Returns: boolean
+      }
       service_check_action_code: {
         Args: { p_code: string; p_purpose: string; p_user: string }
         Returns: Json
@@ -1062,6 +1062,10 @@ export type Database = {
       }
       service_has_recovery_codes: { Args: { p_user: string }; Returns: Json }
       service_inspect_invite: { Args: { p_token_hash: string }; Returns: Json }
+      service_latest_invite_note: {
+        Args: { p_member: string }
+        Returns: string
+      }
       service_link_owner: {
         Args: {
           p_actor: string
@@ -1071,7 +1075,6 @@ export type Database = {
         }
         Returns: string
       }
-      service_latest_invite_note: { Args: { p_member: string }; Returns: string }
       service_log_access_denied: {
         Args: { p_action: string; p_actor: string }
         Returns: undefined
@@ -1085,10 +1088,6 @@ export type Database = {
           p_user: string
         }
         Returns: Json
-      }
-      service_apply_provider_status: {
-        Args: { p_message_id: string; p_status: string }
-        Returns: boolean
       }
       service_record_email_event: {
         Args: {
@@ -1104,11 +1103,11 @@ export type Database = {
         Returns: undefined
       }
       service_request_closure: { Args: { p_user: string }; Returns: Json }
+      service_requires_2fa: { Args: { p_user: string }; Returns: Json }
       service_reserve_owner_invite: {
         Args: { p_actor: string; p_business: string; p_recipient: string }
         Returns: Json
       }
-      service_requires_2fa: { Args: { p_user: string }; Returns: Json }
       service_restore_closure: {
         Args: { p_actor: string; p_user: string }
         Returns: Json
