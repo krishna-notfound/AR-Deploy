@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BusinessApplication, Product } from '@/domain/types'
 import type { ProductInput, Result } from '../catalogService'
 import { isValidDb } from './db'
@@ -368,5 +368,89 @@ describe('closure rules (S1.5 Task 3, as the database: R-W1-2, R-W1-3)', () => {
     })
     expect(unwrap(await svc.getBusinessById('demo-business')).status).toBe('inactive')
     expect(unwrap(await svc.setBusinessStatus('demo-business', 'active')).status).toBe('active')
+  })
+})
+
+describe('owner invitations (S1.5 Task 17: the demo applies the reservation rules, R-W8-1 and R-W2-4)', () => {
+  const HOUR = 3600 * 1000
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString()
+  /** Adds earlier invitation attempts for a business (newest first, like the store). */
+  const seedAttempts = (businessId: string, rows: { recipient: string; at: string; outcome: 'accepted' | 'sent' | 'failed' | 'blocked' }[]) =>
+    store.update((d) => {
+      const list = (d.ownerInviteAttempts ??= [])
+      rows.forEach((r, i) => list.push({ businessId, recipient: r.recipient, attempt: 100 + i, outcome: r.outcome, createdAt: r.at }))
+      list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    })
+  const refusal = <T>(r: Result<T>) => {
+    if (r.ok) throw new Error('expected a refusal')
+    return r.error
+  }
+
+  it('provisionOwner for a business whose owner has the same email goes through resendOwnerInvitation: cooldown, already_accepted, and the 11th attempt in 24 h for the recipient is refused with retryAt', async () => {
+    const first = unwrap(await svc.provisionOwner({ businessId: 'biz_casa', email: 'Owner@Casa.test', language: 'en' }))
+    expect(first).toMatchObject({ owner: 'linked', email: { attempt: 1 } })
+    const resend = vi.spyOn(svc, 'resendOwnerInvitation')
+
+    // Inside 60 s: the cooldown, with the time it ends.
+    const cooled = refusal(await svc.provisionOwner({ businessId: 'biz_casa', email: 'owner@casa.test', language: 'pt' }))
+    expect(resend).toHaveBeenCalledWith('biz_casa', 'pt')
+    resend.mockRestore()
+    expect(cooled).toMatchObject({ code: 'RATE_LIMITED', reason: 'cooldown' })
+    const reserved = store.get().ownerInviteAttempts![0]!
+    expect(Date.parse(cooled.retryAt!) - Date.parse(reserved.createdAt)).toBe(60_000)
+
+    // Nine earlier invitations to this recipient in the last 24 h, plus the first one: the next one is refused.
+    store.update((d) => void (d.ownerInviteAttempts![0]!.createdAt = ago(2 * 60_000)))
+    seedAttempts('biz_casa', Array.from({ length: 9 }, (_, i) => ({ recipient: 'owner@casa.test', at: ago((20 - i) * HOUR), outcome: 'accepted' as const })))
+    const limited = refusal(await svc.provisionOwner({ businessId: 'biz_casa', email: 'owner@casa.test', language: 'en' }))
+    expect(limited).toMatchObject({ code: 'RATE_LIMITED', reason: 'too_many_invitations' })
+    expect(Date.parse(limited.retryAt!)).toBe(Date.parse(store.get().ownerInviteAttempts!.at(-1)!.createdAt) + 24 * HOUR) // the oldest of the ten, 20 h ago
+    expect(store.get().ownerInviteAttempts).toHaveLength(10)
+
+    // Once the owner accepted, there is nothing to resend.
+    store.update((d) => void (d.owners!.biz_casa!.acceptedAt = ago(HOUR)))
+    expect(refusal(await svc.provisionOwner({ businessId: 'biz_casa', email: 'owner@casa.test', language: 'en' }))).toMatchObject({ code: 'CONFLICT', reason: 'already_accepted' })
+  })
+
+  it("blocked demo attempts don't count", async () => {
+    store.update((d) => void ((d.owners ??= {}).biz_nord = { email: 'owner@nord.test', invitedAt: ago(HOUR) }))
+    seedAttempts('biz_nord', Array.from({ length: 10 }, (_, i) => ({ recipient: 'owner@nord.test', at: ago(i * 1000), outcome: 'blocked' as const })))
+    const sent = unwrap(await svc.resendOwnerInvitation('biz_nord', 'en'))
+    expect(sent.email.attempt).toBe(110) // continues after the highest attempt number
+    expect(store.get().ownerInviteAttempts![0]).toMatchObject({ businessId: 'biz_nord', recipient: 'owner@nord.test', attempt: 110, outcome: 'accepted' })
+    // The demo email itself stays honestly logged as not sent.
+    expect(unwrap(await svc.getEmailAttempts({ businessId: 'biz_nord' }))[0]).toMatchObject({ status: 'blocked', error: 'demo_mode', attempt: 110, workflow: 'invite:biz_nord' })
+  })
+
+  it('getOwnerStates mirrors the SQL states', async () => {
+    unwrap(await svc.provisionOwner({ businessId: 'biz_casa', email: 'owner@casa.test', language: 'en' }))
+    const invitedAt = store.get().ownerInviteAttempts![0]!.createdAt
+    const verdeAt = ago(30 * HOUR)
+    store.update((d) => {
+      d.owners!.biz_oak = { email: 'owner@oak.test', invitedAt: ago(48 * HOUR), acceptedAt: ago(47 * HOUR) }
+      // Invited before attempts were kept: only email rows.
+      d.owners!.biz_verde = { email: 'owner@verde.test', invitedAt: verdeAt }
+      d.emails!.push({ id: 'eml_v1', createdAt: verdeAt, updatedAt: verdeAt, kind: 'owner_invitation', recipient: 'owner@verde.test', subject: 'Invite', status: 'delivered', businessId: 'biz_verde', workflow: 'invite:biz_verde', attempt: 1 })
+    })
+    const states = async () => new Map(unwrap(await svc.getOwnerStates()).map((s) => [s.businessId, s]))
+    let byId = await states()
+    expect(byId.get('biz_nord')).toEqual({ businessId: 'biz_nord', state: 'needs_owner', lastInvitedAt: null, emailFailed: false })
+    expect(byId.get('biz_casa')).toEqual({ businessId: 'biz_casa', state: 'invite_pending', lastInvitedAt: invitedAt, emailFailed: false })
+    expect(byId.get('biz_verde')).toEqual({ businessId: 'biz_verde', state: 'invite_pending', lastInvitedAt: verdeAt, emailFailed: false })
+    expect(byId.get('biz_oak')).toMatchObject({ state: 'owner_active' })
+
+    // The newest attempt blocked, or its email bounced; with no attempt, the newest email decides.
+    store.update((d) => {
+      d.ownerInviteAttempts![0]!.outcome = 'blocked'
+      d.emails!.find((e) => e.id === 'eml_v1')!.status = 'bounced'
+    })
+    byId = await states()
+    expect(byId.get('biz_casa')!.emailFailed).toBe(true)
+    expect(byId.get('biz_verde')!.emailFailed).toBe(true)
+    store.update((d) => {
+      d.ownerInviteAttempts![0]!.outcome = 'accepted'
+      d.emails!.find((e) => e.workflow === 'invite:biz_casa' && e.attempt === 1)!.status = 'complained'
+    })
+    expect((await states()).get('biz_casa')!.emailFailed).toBe(true)
   })
 })

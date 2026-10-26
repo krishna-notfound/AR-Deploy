@@ -6,6 +6,15 @@ export type { DailyStat }
 
 export const SCHEMA_VERSION = 1
 
+export interface DemoInviteAttempt {
+  businessId: ID
+  /** Lower-case. */
+  recipient: string
+  attempt: number
+  outcome: 'accepted' | 'sent' | 'failed' | 'blocked'
+  createdAt: string
+}
+
 
 export interface Db {
   schemaVersion: typeof SCHEMA_VERSION
@@ -22,6 +31,8 @@ export interface Db {
   emails?: EmailAttempt[]
   /** Demo owners: there are no real accounts in demo mode, so only the invitation state is kept. */
   owners?: Record<ID, { email: string; invitedAt: string; acceptedAt?: string }>
+  /** Owner invitation attempts, newest first (as private.owner_invite_attempts, S1.5 R-W2-4). Kept when an owner is removed. */
+  ownerInviteAttempts?: DemoInviteAttempt[]
   /** Sample platform team (ADR-0029). Optional so demo data saved earlier stays valid. */
   team?: DemoTeam
 }

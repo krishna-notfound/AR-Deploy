@@ -1,6 +1,7 @@
 // Supabase Edge Function: owner invitations (ADR-0024). JWT verification stays on (supabase/config.toml) and the
 // handler re-checks the caller through the 2FA gate (R-W1-1): caller_mfa_satisfied() then platform_can('owners.manage'),
-// both with the caller's own token. Uses the service role for auth.admin.generateLink and the service_* functions.
+// both with the caller's own token. Uses the service role for auth.admin.generateLink, auth.admin.deleteUser (only for
+// an account this request created, R-W2-7) and the service_* functions (the invitation reservation, R-W2-4).
 // Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { callerRpc } from '../_shared/caller.ts'
@@ -74,15 +75,20 @@ Deno.serve((req) =>
       if (error) throw new Error(`link failed: ${error.message}`)
       return data as 'linked' | 'already_linked'
     },
-    async invitationAttempts(businessId) {
-      const { data, count, error } = await admin
-        .from('email_log')
-        .select('created_at', { count: 'exact' })
-        .eq('workflow', `invite:${businessId}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      if (error) throw new Error(`attempt lookup failed: ${error.message}`)
-      return { count: count ?? 0, lastAt: data?.[0]?.created_at ?? null }
+    async reserveInvite(businessId, recipient, actorId) {
+      const { data, error } = await admin.rpc('service_reserve_owner_invite', { p_business: businessId, p_recipient: recipient, p_actor: actorId })
+      if (error) throw new Error(`reservation failed: ${error.code ?? 'unknown'}`)
+      const r = data as { reservation_id?: string; attempt?: number; error?: 'cooldown' | 'too_many_invitations'; retry_at?: string }
+      if (r.error) return { error: r.error, retryAt: r.retry_at ?? '' }
+      return { reservationId: r.reservation_id!, attempt: r.attempt! }
+    },
+    async finishInvite(reservationId, outcome) {
+      const { error } = await admin.rpc('service_finish_owner_invite', { p_reservation: reservationId, p_outcome: outcome })
+      if (error) throw new Error(`reservation update failed: ${error.code ?? 'unknown'}`)
+    },
+    async deleteAuthUser(userId) {
+      const { error } = await admin.auth.admin.deleteUser(userId)
+      if (error) throw new Error(`user delete failed: ${error.status ?? 'unknown'}`)
     },
     async audit(e) {
       const { error } = await admin.from('audit_events').insert({

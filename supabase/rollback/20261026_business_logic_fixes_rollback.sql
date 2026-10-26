@@ -21,6 +21,82 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 17 rollback: owner invitations and onboarding: rolling limit with reservations, clean concurrent provisioning, acceptance on any sign-in, owner state on every business (R-W2-3, R-W2-4, R-W2-5, R-W2-7)
+-- =============================================================================
+
+drop function public.admin_list_owner_states();
+
+-- R-W2-3: record_sign_in as in 20261025163627_account_settings (no membership acceptance).
+create or replace function public.record_sign_in(p_user_agent text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_ua  text := nullif(left(btrim(regexp_replace(coalesce(p_user_agent, ''), '[[:cntrl:]]', '', 'g')), 200), '');
+begin
+  if v_uid is null then
+    raise exception 'not_signed_in' using errcode = '42501';
+  end if;
+  -- Serialise concurrent calls for the same user so two tabs cannot both record.
+  perform pg_advisory_xact_lock(hashtextextended('record_sign_in:' || v_uid::text, 0));
+  if exists (select 1 from public.audit_events
+             where actor_id = v_uid and event_type = 'account_signed_in' and created_at > now() - interval '60 seconds') then
+    return 'rate_limited';
+  end if;
+  insert into public.audit_events (event_type, actor_id, metadata)
+  values ('account_signed_in', v_uid, case when v_ua is null then '{}'::jsonb else jsonb_build_object('user_agent', v_ua) end);
+  return 'recorded';
+end;
+$$;
+
+-- R-W2-7: service_link_owner as in the Task 2 section (team-email check, no business row lock).
+create or replace function public.service_link_owner(p_business_id uuid, p_user_id uuid, p_actor uuid, p_application_id uuid default null)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_existing uuid;
+begin
+  if not exists (select 1 from public.businesses where id = p_business_id) then
+    raise exception 'business_not_found' using errcode = 'P0002';
+  end if;
+  if exists (
+    select 1 from auth.users u join public.platform_members m on m.email = lower(u.email::text)
+     where u.id = p_user_id
+  ) then
+    raise exception 'email_is_admin' using errcode = '23514';
+  end if;
+  select user_id into v_existing from public.business_members where business_id = p_business_id for update;
+  if v_existing is not null then
+    if v_existing = p_user_id then
+      return 'already_linked';
+    end if;
+    raise exception 'business_has_owner' using errcode = '23505';
+  end if;
+  insert into public.business_members (business_id, user_id, invited_at) values (p_business_id, p_user_id, now());
+  insert into public.audit_events (event_type, actor_id, application_id, business_id, metadata)
+  values ('owner_provisioned', p_actor, p_application_id, p_business_id, '{}'::jsonb);
+  return 'linked';
+end;
+$$;
+revoke execute on function public.service_link_owner(uuid, uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.service_link_owner(uuid, uuid, uuid, uuid) to service_role;
+
+-- R-W2-4: the earlier 1..100 attempt check, NOT VALID so email rows numbered above 100 are kept.
+alter table public.email_log drop constraint email_log_attempt_check;
+alter table public.email_log add constraint email_log_attempt_check check (attempt between 1 and 100) not valid;
+
+drop function public.service_finish_owner_invite(uuid, text);
+drop function public.service_reserve_owner_invite(uuid, text, uuid);
+drop table private.owner_invite_attempts;
+-- ---- end S1.5 Task 17 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 16 rollback: application review: possible duplicates, reopening after a deleted business (R-W2-2, R-W2-9)
 -- =============================================================================
 -- DATA LOSS: the business deletion dates (business_applications.business_deleted_at) are dropped and cannot be

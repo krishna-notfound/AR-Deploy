@@ -899,6 +899,7 @@ export type Database = {
       admin_list_closure_requests: { Args: never; Returns: Json }
       admin_list_member_invites: { Args: { p_member: string }; Returns: Json }
       admin_list_members: { Args: never; Returns: Json }
+      admin_list_owner_states: { Args: never; Returns: Json }
       admin_reactivate_member: { Args: { p_member: string }; Returns: Json }
       admin_remove_member: { Args: { p_member: string }; Returns: Json }
       admin_review_application: {
@@ -1055,6 +1056,10 @@ export type Database = {
         Returns: Json
       }
       service_end_sessions: { Args: { p_user: string }; Returns: undefined }
+      service_finish_owner_invite: {
+        Args: { p_outcome: string; p_reservation: string }
+        Returns: undefined
+      }
       service_has_recovery_codes: { Args: { p_user: string }; Returns: Json }
       service_inspect_invite: { Args: { p_token_hash: string }; Returns: Json }
       service_link_owner: {
@@ -1098,6 +1103,10 @@ export type Database = {
         Returns: undefined
       }
       service_request_closure: { Args: { p_user: string }; Returns: Json }
+      service_reserve_owner_invite: {
+        Args: { p_actor: string; p_business: string; p_recipient: string }
+        Returns: Json
+      }
       service_requires_2fa: { Args: { p_user: string }; Returns: Json }
       service_restore_closure: {
         Args: { p_actor: string; p_user: string }

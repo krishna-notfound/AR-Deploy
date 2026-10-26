@@ -1205,3 +1205,239 @@ $$;
 revoke execute on function public.admin_application_duplicates(uuid) from public, anon;
 grant execute on function public.admin_application_duplicates(uuid) to authenticated;
 -- ---- end S1.5 Task 16 ----
+
+-- =============================================================================
+-- S1.5 Task 17: owner invitations and onboarding: rolling limit with reservations, clean concurrent provisioning, acceptance on any sign-in, owner state on every business (R-W2-3, R-W2-4, R-W2-5, R-W2-7)
+-- =============================================================================
+
+-- R-W2-4: every owner invitation (provision or resend) reserves an attempt before provision-owner mints a code. The
+-- reservation is the cooldown and the rolling limit; its outcome is stored after the send. Rows go with the business.
+create table private.owner_invite_attempts (
+  id          uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  recipient   text not null check (recipient = lower(recipient) and char_length(recipient) between 3 and 320),
+  attempt     integer not null check (attempt between 1 and 100000),
+  actor       uuid references auth.users (id) on delete set null,
+  outcome     text check (outcome in ('accepted', 'sent', 'failed', 'blocked')),
+  created_at  timestamptz not null default now()
+);
+create index owner_invite_attempts_recipient_idx on private.owner_invite_attempts (business_id, recipient, created_at desc);
+alter table private.owner_invite_attempts enable row level security;
+revoke all on private.owner_invite_attempts from public, anon, authenticated;
+grant select, insert, update on private.owner_invite_attempts to service_role;
+
+-- The attempt number is the Idempotency-Key suffix and keeps growing per business; 100 is no longer a ceiling.
+alter table public.email_log drop constraint email_log_attempt_check;
+alter table public.email_log add constraint email_log_attempt_check check (attempt between 1 and 100000);
+
+-- {reservation_id, attempt}, or {error:'cooldown'|'too_many_invitations', retry_at}. Under a per-business advisory
+-- lock, so two parallel requests can't both pass the checks (one gets the reservation, the other the cooldown).
+--   cooldown: a non-blocked attempt for the business (any recipient, still pending or sent) is under 60 s old;
+--   too_many_invitations: 10 non-blocked attempts for the business and this recipient in the last 24 h;
+--     retry_at is when the oldest of them leaves the window.
+-- Blocked attempts (nothing was sent) count for neither. Removing and re-inviting the owner doesn't reset anything.
+create function public.service_reserve_owner_invite(p_business uuid, p_recipient text, p_actor uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_recipient text := lower(btrim(coalesce(p_recipient, '')));
+  v_last      timestamptz;
+  v_count     integer;
+  v_oldest    timestamptz;
+  v_attempt   integer;
+  v_id        uuid;
+begin
+  perform pg_advisory_xact_lock(hashtext('owner_invite:' || p_business::text));
+
+  select max(created_at) into v_last
+    from private.owner_invite_attempts
+   where business_id = p_business and outcome is distinct from 'blocked';
+  if v_last > now() - interval '60 seconds' then
+    return jsonb_build_object('error', 'cooldown', 'retry_at', v_last + interval '60 seconds');
+  end if;
+
+  select count(*) into v_count
+    from private.owner_invite_attempts
+   where business_id = p_business and recipient = v_recipient
+     and outcome is distinct from 'blocked' and created_at > now() - interval '24 hours';
+  if v_count >= 10 then
+    -- With exactly 10 this is the oldest counted attempt; the offset keeps it right if there were ever more.
+    select created_at into v_oldest
+      from private.owner_invite_attempts
+     where business_id = p_business and recipient = v_recipient
+       and outcome is distinct from 'blocked' and created_at > now() - interval '24 hours'
+     order by created_at
+    offset v_count - 10
+     limit 1;
+    return jsonb_build_object('error', 'too_many_invitations', 'retry_at', v_oldest + interval '24 hours');
+  end if;
+
+  -- Monotonic per business, continuing the invitations logged before this table existed.
+  v_attempt := 1 + greatest(
+    coalesce((select max(attempt) from private.owner_invite_attempts where business_id = p_business), 0),
+    coalesce((select max(attempt) from public.email_log where workflow = 'invite:' || p_business::text), 0));
+  insert into private.owner_invite_attempts (business_id, recipient, attempt, actor)
+  values (p_business, v_recipient, v_attempt, p_actor)
+  returning id into v_id;
+  return jsonb_build_object('reservation_id', v_id, 'attempt', v_attempt);
+end;
+$$;
+revoke execute on function public.service_reserve_owner_invite(uuid, text, uuid) from public, anon, authenticated;
+grant execute on function public.service_reserve_owner_invite(uuid, text, uuid) to service_role;
+
+-- Stores how the reserved attempt ended: the email status, or 'blocked' when nothing was sent (no code, link refused,
+-- email not configured).
+create function public.service_finish_owner_invite(p_reservation uuid, p_outcome text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_outcome is null or p_outcome not in ('accepted', 'sent', 'failed', 'blocked') then
+    raise exception 'invalid_outcome' using errcode = '22023';
+  end if;
+  update private.owner_invite_attempts set outcome = p_outcome where id = p_reservation;
+end;
+$$;
+revoke execute on function public.service_finish_owner_invite(uuid, text) from public, anon, authenticated;
+grant execute on function public.service_finish_owner_invite(uuid, text) to service_role;
+
+-- R-W2-7: the Task 2 body (team-email check kept), with the business row locked before the membership check, so two
+-- provisions for one business queue here; a unique violation that still slips through reads as business_has_owner.
+create or replace function public.service_link_owner(p_business_id uuid, p_user_id uuid, p_actor uuid, p_application_id uuid default null)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_business uuid;
+  v_existing uuid;
+begin
+  select id into v_business from public.businesses
+   where id = p_business_id
+     for update;
+  if v_business is null then
+    raise exception 'business_not_found' using errcode = 'P0002';
+  end if;
+  if exists (
+    select 1 from auth.users u join public.platform_members m on m.email = lower(u.email::text)
+     where u.id = p_user_id
+  ) then
+    raise exception 'email_is_admin' using errcode = '23514';
+  end if;
+  select user_id into v_existing from public.business_members where business_id = p_business_id for update;
+  if v_existing is not null then
+    if v_existing = p_user_id then
+      return 'already_linked';
+    end if;
+    raise exception 'business_has_owner' using errcode = '23505';
+  end if;
+  begin
+    insert into public.business_members (business_id, user_id, invited_at) values (p_business_id, p_user_id, now());
+  exception
+    when unique_violation then
+      raise exception 'business_has_owner' using errcode = '23505';
+  end;
+  insert into public.audit_events (event_type, actor_id, application_id, business_id, metadata)
+  values ('owner_provisioned', p_actor, p_application_id, p_business_id, '{}'::jsonb);
+  return 'linked';
+end;
+$$;
+revoke execute on function public.service_link_owner(uuid, uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.service_link_owner(uuid, uuid, uuid, uuid) to service_role;
+
+-- R-W2-3: any successful sign-in accepts the caller's pending owner memberships (an owner who never finished
+-- /accept-invite), one owner_onboarding_completed row each with {via:'sign_in'}. This runs before the 60-second rate
+-- limit and only touches pending rows, so it is idempotent. The rest is the 20261025163627 body.
+create or replace function public.record_sign_in(p_user_agent text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_ua  text := nullif(left(btrim(regexp_replace(coalesce(p_user_agent, ''), '[[:cntrl:]]', '', 'g')), 200), '');
+begin
+  if v_uid is null then
+    raise exception 'not_signed_in' using errcode = '42501';
+  end if;
+  -- Serialise concurrent calls for the same user so two tabs cannot both record.
+  perform pg_advisory_xact_lock(hashtextextended('record_sign_in:' || v_uid::text, 0));
+  with accepted as (
+    update public.business_members
+       set accepted_at = now()
+     where user_id = v_uid and accepted_at is null
+    returning business_id
+  )
+  insert into public.audit_events (event_type, actor_id, business_id, metadata)
+  select 'owner_onboarding_completed', v_uid, business_id, jsonb_build_object('via', 'sign_in') from accepted;
+  if exists (select 1 from public.audit_events
+             where actor_id = v_uid and event_type = 'account_signed_in' and created_at > now() - interval '60 seconds') then
+    return 'rate_limited';
+  end if;
+  insert into public.audit_events (event_type, actor_id, metadata)
+  values ('account_signed_in', v_uid, case when v_ua is null then '{}'::jsonb else jsonb_build_object('user_agent', v_ua) end);
+  return 'recorded';
+end;
+$$;
+
+-- R-W2-5: the owner state of every business, for the businesses list. last_invited_at is the newest reserved attempt,
+-- else the newest invite email (owners invited before the attempts table). email_failed: the newest attempt ended
+-- failed or blocked, or its email bounced or was a complaint; with no attempt, the newest invite email decides.
+create function public.admin_list_owner_states()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.platform_can('businesses.view') then
+    return jsonb_build_object('error', 'forbidden');
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'business_id', b.id,
+             'state', case when m.user_id is null then 'needs_owner'
+                           when m.accepted_at is null then 'invite_pending'
+                           else 'owner_active' end,
+             'last_invited_at', coalesce(a.created_at, l.created_at),
+             'email_failed', case
+                               -- A pending attempt (outcome null) has not failed.
+                               when a.id is not null then coalesce(a.outcome in ('failed', 'blocked'), false) or coalesce(ae.status in ('bounced', 'complained'), false)
+                               when l.status is not null then l.status in ('failed', 'blocked', 'bounced', 'complained')
+                               else false
+                             end)
+           order by b.created_at, b.id)
+      from public.businesses b
+      left join public.business_members m on m.business_id = b.id
+      left join lateral (
+        select x.id, x.attempt, x.outcome, x.created_at
+          from private.owner_invite_attempts x
+         where x.business_id = b.id
+         order by x.created_at desc, x.attempt desc
+         limit 1) a on true
+      left join lateral (
+        select e.status
+          from public.email_log e
+         where e.workflow = 'invite:' || b.id::text and e.attempt = a.attempt
+         order by e.created_at desc
+         limit 1) ae on a.id is not null
+      left join lateral (
+        select e.status, e.created_at
+          from public.email_log e
+         where e.workflow = 'invite:' || b.id::text
+         order by e.created_at desc
+         limit 1) l on true
+  ), '[]'::jsonb);
+end;
+$$;
+revoke execute on function public.admin_list_owner_states() from public, anon;
+grant execute on function public.admin_list_owner_states() to authenticated;
+-- ---- end S1.5 Task 17 ----

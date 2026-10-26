@@ -20,6 +20,7 @@ import type {
   LocalizedText,
   ModelAsset,
   ModelFormat,
+  OwnerState,
   Product,
   ProductImage,
   ProductModels,
@@ -514,8 +515,9 @@ const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string 
   business_has_owner: { code: 'CONFLICT', message: 'This business already has an owner. Remove them first to invite someone else.' },
   no_owner: { code: 'NOT_FOUND', message: 'This business has no invited owner yet.' },
   already_accepted: { code: 'CONFLICT', message: 'The owner has already accepted the invitation and can sign in.' },
+  // Owner invitations (R-W2-4): both carry retryAt, and the reason names which limit applied.
   cooldown: { code: 'RATE_LIMITED', message: 'Wait a minute between invitations.' },
-  too_many_attempts: { code: 'RATE_LIMITED', message: 'Too many invitations were sent for this business. Contact the owner directly.' },
+  too_many_invitations: { code: 'RATE_LIMITED', message: 'Ten invitations were sent to this owner in the last 24 hours.' },
   invite_link_failed: { code: 'UNKNOWN', message: 'Supabase could not create the invitation link. Check the Auth settings and try again.' },
   not_configured: { code: 'CONFIG', message: 'This feature is not configured on the server yet.' },
   duplicate_application: { code: 'CONFLICT', message: 'An application for this business from this email is already being reviewed.' },
@@ -554,8 +556,10 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     const { data, error } = await sb.functions.invoke(name, { body: body as Record<string, unknown> })
     if (!error) return ok(data as T)
     const res = (error as { context?: Response }).context
-    const payload = res && typeof res.json === 'function' ? ((await res.json().catch(() => ({}))) as { error?: string; message?: string; fields?: Record<string, string> }) : {}
+    const payload = res && typeof res.json === 'function' ? ((await res.json().catch(() => ({}))) as { error?: string; message?: string; fields?: Record<string, string>; retryAt?: string }) : {}
     const known = payload.error ? FUNCTION_ERRORS[payload.error] : undefined
+    // A refusal that can be retried later (owner invitations) keeps its reason and time.
+    if (known && typeof payload.retryAt === 'string') return { ok: false, error: { code: known.code, message: known.message, reason: payload.error, retryAt: payload.retryAt } }
     if (known) return fail(known.code, payload.message ?? known.message, payload.fields)
     return fail('UNKNOWN', 'The request could not be completed. Try again in a moment.')
   }
@@ -936,6 +940,14 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       guard(async () => changed(await invokeFunction<ProvisionOutcome>(PROVISION_OWNER_FUNCTION, { action: 'provision', businessId, email, language, applicationId }))),
     resendOwnerInvitation: (businessId, language) =>
       guard(async () => changed(await invokeFunction<ProvisionOutcome>(PROVISION_OWNER_FUNCTION, { action: 'resend', businessId, language }))),
+    getOwnerStates: () =>
+      guard(async () => {
+        const { data, error } = await sb.rpc('admin_list_owner_states')
+        if (error) return mapDbError(error)
+        if (!Array.isArray(data)) return fail('PERMISSION', "You don't have permission to do this.")
+        const rows = data as { business_id: string; state: OwnerState['state']; last_invited_at: string | null; email_failed: boolean }[]
+        return ok(rows.map((r) => ({ businessId: r.business_id, state: r.state, lastInvitedAt: r.last_invited_at, emailFailed: r.email_failed })))
+      }),
 
     // ---------------- business applications ----------------
     submitApplication: (input) => guard(() => invokeFunction<{ id: string; reference: string }>(SUBMIT_APPLICATION_FUNCTION, input)),

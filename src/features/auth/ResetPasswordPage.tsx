@@ -86,8 +86,15 @@ export default function ResetPasswordPage() {
     setPending(true)
     // Also signs out the account's other sessions (see AuthService.updatePassword).
     const res = await authService.updatePassword(password)
+    if (!res.ok) {
+      setPending(false)
+      return setError(authErrorText(t, res.error))
+    }
+    // R-W2-3: an invited owner who sets a password here has finished onboarding too. A failure changes nothing for
+    // them: their next sign-in accepts the membership (record_sign_in).
+    const me = await authService.getCurrentUser()
+    if (me.ok && me.data?.user?.role === 'business_admin') await authService.completeOwnerOnboarding()
     setPending(false)
-    if (!res.ok) return setError(authErrorText(t, res.error))
     toast.success(t('reset.updated'))
     navigate('/login', { replace: true })
   }
