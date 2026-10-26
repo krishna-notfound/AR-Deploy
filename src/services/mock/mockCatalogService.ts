@@ -12,7 +12,7 @@ import { CLOSURE_PENDING_ERROR, type CatalogService, PLATFORM_ACTOR_LABELS, PLAT
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { mockClosureOpen, noteMockClosureStatus, voidMockClosure } from './mockAccount'
-import { createMockTeam, demoPlatformRole } from './mockTeam'
+import { createMockTeam, demoPlatformRole, demoViewer } from './mockTeam'
 import { createSeed } from './seed'
 import { store } from './store'
 import { normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
@@ -182,6 +182,13 @@ function toCatalog(db: Db, b: Business): BusinessCatalog {
 
 const byUpdatedDesc = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt)
 
+/** R-W8-2: as the database's RLS, a non-active business is readable by a platform admin or its own business admin only. */
+function demoCanRead(b: Business): boolean {
+  if (b.status === 'active') return true
+  const v = demoViewer()
+  return v?.role === 'super_admin' || (v?.role === 'business_admin' && v.businessId === b.id)
+}
+
 export const mockCatalogService: CatalogService = {
   ...createMockTeam(run),
 
@@ -197,7 +204,7 @@ export const mockCatalogService: CatalogService = {
   getBusinessBySlug: (slug) =>
     run(() => {
       const b = store.get().businesses.find((x) => x.slug === slug)
-      return b ? ok(b) : fail('NOT_FOUND', 'Business not found.')
+      return b && demoCanRead(b) ? ok(b) : fail('NOT_FOUND', 'Business not found.')
     }),
 
   createBusiness: (data) =>
@@ -258,6 +265,7 @@ export const mockCatalogService: CatalogService = {
         d.businesses = d.businesses.filter((b) => b.id !== id)
         d.products = d.products.filter((p) => p.businessId !== id)
         if (d.owners) delete d.owners[id] // R-W8-2: the owner goes with the business
+        d.ownerInviteAttempts = d.ownerInviteAttempts?.filter((a) => a.businessId !== id) // as the cascade does
         d.dailyStats = d.dailyStats.filter((s) => s.businessId !== id)
         d.events = d.events.filter((e) => e.businessId !== id)
         // R-W2-2 / R-W8-2: the application that created it remembers the deletion, so it can be reopened.
@@ -274,7 +282,7 @@ export const mockCatalogService: CatalogService = {
     run(() => {
       const db = store.get()
       const b = db.businesses.find((x) => x.slug === slug)
-      return b ? ok(toCatalog(db, b)) : fail('NOT_FOUND', 'Catalog not found.')
+      return b && demoCanRead(b) ? ok(toCatalog(db, b)) : fail('NOT_FOUND', 'Catalog not found.')
     }),
 
   getCatalogs: () =>
@@ -310,7 +318,7 @@ export const mockCatalogService: CatalogService = {
     run(() => {
       const db = store.get()
       const business = db.businesses.find((b) => b.slug === businessSlug)
-      if (!business) return fail('NOT_FOUND', 'Catalog not found.')
+      if (!business || !demoCanRead(business)) return fail('NOT_FOUND', 'Catalog not found.')
       const product = db.products.find((p) => p.businessId === business.id && p.slug === productSlug)
       if (!product) return fail('NOT_FOUND', 'Product not found.')
       if (!opts?.allowDraft && (business.status !== 'active' || product.status !== 'published'))

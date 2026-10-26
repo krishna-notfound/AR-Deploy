@@ -13,7 +13,8 @@ import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { service } from '@/services'
-import { useServiceQuery } from '@/services/hooks'
+import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
+import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { initialPrice, primaryImage } from '@/lib/product'
 import { catalogLocalPath, productLocalPath, tenantCatalogPath, tenantProductPath } from '@/lib/urls'
 import { hasAny3d } from '@/features/ar/variantMedia'
@@ -21,10 +22,13 @@ import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { TAP_TARGET } from './tapTarget'
 
+/** Signed media URLs last MEDIA_URL_TTL_SECONDS; refetch on return to the tab once half of that has passed. */
+const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
+
 export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const params = useParams()
   const slug = tenantSlug ?? params.businessSlug ?? ''
-  const { t, localized } = useI18n()
+  const { t, lang, localized } = useI18n()
   const [search, setSearch] = useSearchParams()
   const q = search.get('q') ?? ''
   const cat = (CATEGORIES as readonly string[]).includes(search.get('category') ?? '') ? (search.get('category') as Category) : ''
@@ -47,6 +51,8 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
     () => (b && showCatalog ? service.getProducts({ businessId: b.id, status: 'published' }) : new Promise<never>(() => {})),
     [b?.id, showCatalog],
   )
+  // Pages left open must not show product photos whose signed URLs have expired.
+  useRefreshWhenStale(products.refetch, MEDIA_REFRESH_MS, products.data)
 
   useEffect(() => {
     if (b) document.title = b.name
@@ -59,7 +65,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
     setSearch(next, { replace: true })
   }
 
-  const all = useMemo(() => [...(products.data ?? [])].sort((a, b2) => a.name.en.localeCompare(b2.name.en)), [products.data])
+  const all = useMemo(() => [...(products.data ?? [])].sort((a, b2) => localized(a.name).localeCompare(localized(b2.name), lang)), [products.data, lang, localized])
   const categories = useMemo(() => CATEGORIES.filter((c) => all.some((p) => p.category === c)), [all])
   const term = q.trim().toLowerCase()
   const visible = all.filter((p) => (!cat || p.category === cat) && (!term || localized(p.name).toLowerCase().includes(term) || p.name.en.toLowerCase().includes(term)))

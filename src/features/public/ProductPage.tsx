@@ -17,7 +17,7 @@ import { cn } from '@/lib/cn'
 import { sceneViewerUnsupported } from '@/lib/files'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
-import { VARIANT_PARAM, needsPreview, withVariantParam } from '@/lib/urls'
+import { VARIANT_PARAM, catalogLocalPath, needsPreview, tenantCatalogPath, withVariantParam } from '@/lib/urls'
 import { isAndroid } from '@/lib/userAgent'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
@@ -68,7 +68,8 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   )
   // Pages left open (mobile tab restore) must not hand an expired model URL to Scene Viewer / Quick Look.
   useRefreshWhenStale(res.refetch, MEDIA_REFRESH_MS, res.data)
-  const catalogHref = tenantSlug ? '/' : `/catalog/${businessSlug}`
+  // R-W4-11: the way back keeps the owner preview.
+  const catalogHref = tenantSlug ? tenantCatalogPath({ preview: canPreview }) : catalogLocalPath({ slug: businessSlug }, { preview: canPreview })
   // A business admin may only preview their own unpublished products.
   const hiddenFromPublic = !!res.data && needsPreview(res.data.product, res.data.business)
   const ownerMismatch = canPreview && hiddenFromPublic && user?.role === 'business_admin' && res.data?.business.id !== user.businessId
@@ -80,8 +81,10 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
       </PublicShell>
     )
 
-  if (!res.data || ownerMismatch) {
-    const notFound = (res.status === 'error' && res.error.code === 'NOT_FOUND') || ownerMismatch
+  // R-W4-8: a refetch that says NOT_FOUND (renamed, unpublished, deleted) outranks the kept-stale product and its AR button.
+  const gone = res.status === 'error' && res.error.code === 'NOT_FOUND'
+  if (!res.data || ownerMismatch || gone) {
+    const notFound = gone || ownerMismatch
     return (
       <PublicShell>
         {notFound ? (
@@ -319,7 +322,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
               <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
                 {product.cta.url ? (
                   <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={textAction}>
-                    <LocalizedSpan text={product.cta.label} />
+                    {localized(product.cta.label).trim() ? <LocalizedSpan text={product.cta.label} /> : t('product.contactStore')}
                   </a>
                 ) : hasContact ? (
                   <button type="button" className={textAction} onClick={() => setContactOpen(true)}>
