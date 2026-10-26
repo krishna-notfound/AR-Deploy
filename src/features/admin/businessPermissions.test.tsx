@@ -26,7 +26,7 @@ afterEach(() => {
 /** Signed in as a Team member whose role holds exactly `permissions`. */
 function renderAs(permissions: Permission[], path: string, element: React.ReactElement) {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
-  vi.spyOn(service, 'getMyAccess').mockResolvedValue(ok({ role: 'team', permissions }))
+  vi.spyOn(service, 'getMyAccess').mockResolvedValue(ok({ role: 'team', permissions, status: 'active' }))
   const router = createMemoryRouter([{ path, element }], { initialEntries: [path] })
   return render(
     <AccountProvider>
