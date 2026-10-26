@@ -1,5 +1,6 @@
 import type { ModelAsset, Product, ProductImage, ProductModels, ProductVariant } from '@/domain/types'
 import { isStaleSessionAsset } from '@/lib/files'
+import { arProxyUrl } from '@/lib/urls'
 
 /** A model file the page can hand to the viewer (a blob: URL from an earlier page load cannot). */
 export const usableModel = (a?: ModelAsset): ModelAsset | undefined => (a && !isStaleSessionAsset(a) ? a : undefined)
@@ -45,6 +46,6 @@ export function hasAny3d(product: Pick<Product, 'models'> & { variants?: Product
 /**
  * The file the phone's own AR viewer opens (Scene Viewer `file=`, the Quick Look href): the stable public copy when
  * the product has one (published, Supabase mode: ar-models), else the URL the 3D view uses (demo sample URLs are
- * public already; a signed URL is the last resort).
+ * public already; a signed URL is the last resort). A public copy is opened through the site's own `/ar/` address.
  */
-export const arLaunchUrl = (a: ModelAsset): string => a.publicUrl || a.url
+export const arLaunchUrl = (a: ModelAsset): string => (a.publicUrl ? arProxyUrl(a.publicUrl) : a.url)

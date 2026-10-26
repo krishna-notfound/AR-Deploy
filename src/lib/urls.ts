@@ -156,6 +156,19 @@ export function settingsPath(scope: 'admin' | 'business', section: SettingsSecti
 
 /** Hash on the Scene Viewer fallback URL: Chrome opens it when the native viewer could not start (ADR-0021). */
 export const AR_FALLBACK_HASH = '#ar-unavailable'
+
+/**
+ * Phone AR files are served from the site's own domain: vercel.json rewrites `/ar/*` to this public folder. Some
+ * networks (several Indian ISPs, 2026) block supabase.co for apps such as Scene Viewer while the browser still gets
+ * through, so the phone's viewer never has to reach Supabase. Keep in step with the `/ar/:path*` rewrite.
+ */
+export const AR_PROXY_SOURCE = 'https://zggylkbgajamhriebdrg.supabase.co/storage/v1/object/public/ar-models/'
+export const AR_PROXY_PATH = '/ar/'
+
+/** The same-domain address of a public AR copy; any other URL (or a build without the rewrite) is returned as is. */
+export function arProxyUrl(url: string, enabled: boolean = import.meta.env.PROD): string {
+  return enabled && url.startsWith(AR_PROXY_SOURCE) ? `${AR_PROXY_PATH}${url.slice(AR_PROXY_SOURCE.length)}` : url
+}
 /** Android app that hosts Scene Viewer: the Google app, as model-viewer used on main (proven on the owner's phone). */
 export const SCENE_VIEWER_PACKAGE = 'com.google.android.googlequicksearchbox'
 

@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AR_FALLBACK_HASH, catalogLocalPath, needsPreview, quickLookHref, sceneViewerIntentUrl, settingsPath } from './urls'
+import { AR_FALLBACK_HASH, AR_PROXY_PATH, AR_PROXY_SOURCE, arProxyUrl, catalogLocalPath, needsPreview, quickLookHref, sceneViewerIntentUrl, settingsPath } from './urls'
 
 describe('needsPreview', () => {
   it('needsPreview is false only for a published product in an active business', () => {
@@ -90,5 +92,24 @@ describe('native AR launch URLs', () => {
     expect(quickLookHref(usdz, { trueToSize: true, pageUrl: PAGE })).toBe(`${usdz}#allowsContentScaling=0`)
     expect(quickLookHref(usdz, { trueToSize: false, pageUrl: PAGE })).toBe(usdz)
     expect(quickLookHref('/m/a.usdz', { trueToSize: false, pageUrl: PAGE })).toBe('https://sanctus.example/m/a.usdz')
+  })
+})
+
+describe('arProxyUrl (phone AR files from the site domain)', () => {
+  const pub = `${AR_PROXY_SOURCE}b1/p1/base/glb-m.glb`
+  it('maps a public ar-models copy to /ar/… when the rewrite is on, and leaves it alone otherwise', () => {
+    expect(arProxyUrl(pub, true)).toBe('/ar/b1/p1/base/glb-m.glb')
+    expect(arProxyUrl(pub, false)).toBe(pub)
+  })
+  it('never maps another URL (another project, a signed URL, a sample)', () => {
+    for (const u of ['https://other.supabase.co/storage/v1/object/public/ar-models/b1/x.glb', 'https://x.supabase.co/storage/v1/object/sign/product-media/a.glb?token=t', 'https://raw.githubusercontent.com/a.glb'])
+      expect(arProxyUrl(u, true)).toBe(u)
+  })
+  it('vercel.json rewrites /ar/ to the same folder, before the app fallback, which skips /ar/', () => {
+    const cfg = JSON.parse(readFileSync(join(process.cwd(), 'vercel.json'), 'utf8')) as { rewrites: { source: string; destination: string }[] }
+    expect(cfg.rewrites[0]).toEqual({ source: `${AR_PROXY_PATH}:path*`, destination: `${AR_PROXY_SOURCE}:path*` })
+    const spa = cfg.rewrites.find((r) => r.destination === '/index.html')!
+    expect(new RegExp(`^${spa.source}$`).test('/ar/b1/p1/base/glb-m.glb')).toBe(false)
+    expect(new RegExp(`^${spa.source}$`).test('/products/b/p')).toBe(true)
   })
 })
