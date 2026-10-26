@@ -401,4 +401,9 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'legal.agree.required': 'Para continuar, aceite os Termos e a Política de Privacidade.',
   'apply.err.terms_required': 'Para enviar a candidatura, aceite os Termos e a Política de Privacidade.',
   'common.close': 'Fechar',
+  // Redesign 2026-10-26 (product)
+  'product.backToCatalogue': 'Catálogo {name}',
+  'product.openOnPhone': 'Abrir no telemóvel',
+  'product.trueToSizeAr': 'Tamanho real em RA',
+  'product.category': 'Categoria',
 }

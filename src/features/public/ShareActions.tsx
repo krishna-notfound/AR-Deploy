@@ -1,31 +1,37 @@
 import { Copy, Share2 } from 'lucide-react'
-import { Button, type ButtonSize } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { copyText } from '@/lib/clipboard'
+import { cn } from '@/lib/cn'
 import { shareableCurrentUrl } from '@/lib/urls'
+import { TAP_TARGET } from './tapTarget'
 
-/** Copies the URL of the page the customer is on. */
-export function CopyLink({ size = 'md' }: { size?: ButtonSize }) {
+/** Copies the URL of the page the customer is on: a quiet pill (product page hand-off, in-app notice). */
+export function CopyLink({ size = 'md', className }: { size?: 'sm' | 'md'; className?: string }) {
   const { t } = useI18n()
   const toast = useToast()
   return (
-    <Button
-      size={size}
-      icon={<Copy className="size-4" aria-hidden />}
+    <button
+      type="button"
+      className={cn(
+        'inline-flex items-center justify-center gap-2 rounded-full bg-surface font-medium text-ink transition-colors hover:bg-canvas',
+        size === 'sm' ? 'h-10 px-4 text-[14px]' : 'h-12 px-5 text-[15px]',
+        className,
+      )}
       onClick={async () => {
         const ok = await copyText(shareableCurrentUrl())
         if (ok) toast.success(t('product.linkCopied'))
         else toast.error(t('product.copyFailed'))
       }}
     >
+      <Copy className="size-4" strokeWidth={1.5} aria-hidden />
       {t('ar.copyLink')}
-    </Button>
+    </button>
   )
 }
 
-/** Native share sheet where available; otherwise copies the link. */
-export function ShareButton({ title }: { title: string }) {
+/** Native share sheet where available; otherwise copies the link. A text button. */
+export function ShareButton({ title, className }: { title: string; className?: string }) {
   const { t } = useI18n()
   const toast = useToast()
   const onShare = async () => {
@@ -43,8 +49,9 @@ export function ShareButton({ title }: { title: string }) {
     else toast.error(t('product.copyFailed'))
   }
   return (
-    <Button variant="ghost" icon={<Share2 className="size-4" aria-hidden />} onClick={onShare}>
+    <button type="button" onClick={onShare} className={cn(TAP_TARGET, 'inline-flex items-center gap-2 text-[15px] font-medium text-ink transition-colors hover:text-accent-ink', className)}>
+      <Share2 className="size-4" strokeWidth={1.5} aria-hidden />
       {t('product.share')}
-    </Button>
+    </button>
   )
 }

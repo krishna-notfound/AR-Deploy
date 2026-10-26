@@ -1,9 +1,8 @@
-import { ArrowRight, Box, Eye, PauseCircle, SearchX, Store } from 'lucide-react'
+import { Box, Eye, PauseCircle, SearchX, Store } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { Button, ButtonLink } from '@/components/ui/Button'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -24,6 +23,13 @@ import { TAP_TARGET } from './tapTarget'
 
 /** Signed media URLs last MEDIA_URL_TTL_SECONDS; refetch on return to the tab once half of that has passed. */
 const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
+
+/** The obsidian pill of the public pages (primary action of the empty and no-results states). */
+const PILL_PRIMARY =
+  'inline-flex h-11 items-center justify-center rounded-full bg-ink px-6 text-[15px] font-medium text-canvas motion-safe:transition-transform motion-safe:duration-200 hover:opacity-90 active:scale-[0.97]'
+
+/** Grid of the catalogue: 2 columns on phones and tablets, 3 on desktop. A container, so the featured card can size its photo to the row. */
+const GRID = '@container grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-14 lg:grid-cols-3 lg:gap-y-16'
 
 export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const params = useParams()
@@ -69,6 +75,8 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const categories = useMemo(() => CATEGORIES.filter((c) => all.some((p) => p.category === c)), [all])
   const term = q.trim().toLowerCase()
   const visible = all.filter((p) => (!cat || p.category === cat) && (!term || localized(p.name).toLowerCase().includes(term) || p.name.en.toLowerCase().includes(term)))
+  // The first piece leads the grid (Stitch): only on the full, unfiltered list of at least 3.
+  const featureFirst = visible.length >= 3 && !term && !cat
 
   const productHref = (p: Product) => (tenantSlug ? tenantProductPath(p, { preview: isPreview }) : productLocalPath({ slug }, p, { preview: isPreview }))
   const catalogHref = tenantSlug ? tenantCatalogPath({ preview: isPreview }) : catalogLocalPath({ slug }, { preview: isPreview })
@@ -94,9 +102,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
             action={
               // On a business subdomain "/" is this missing catalogue, so the way out is only offered on the platform domain.
               tenantSlug ? undefined : (
-                <ButtonLink to="/" variant="primary">
+                <Link to="/" className={PILL_PRIMARY}>
                   {t('catalog.goHome')}
-                </ButtonLink>
+                </Link>
               )
             }
           />
@@ -116,38 +124,43 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   }
 
   return (
-    <PublicShell business={b} catalogHref={catalogHref}>
+    <PublicShell business={b} catalogHref={catalogHref} nameInHero>
       {isPreview && (
-        <div className="border-b border-warning/30 bg-warning-soft" role="status">
-          <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-10">
+        <div className="bg-warning-soft" role="status">
+          <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-5 py-2.5 text-[14px] font-medium text-warning sm:px-10">
             <Eye className="size-4 shrink-0" aria-hidden />
             {t('catalog.previewBanner')}
           </p>
         </div>
       )}
-      {/* Title block as the landing's section headers: eyebrow, serif name and count left, description right, hairline. */}
-      <section className="mx-auto max-w-[1320px] px-5 pt-12 pb-10 sm:px-10 sm:pt-20 sm:pb-12">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-end lg:gap-16">
-          <div className="flex min-w-0 items-start gap-5">
-            {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
-            <div className="min-w-0">
-              <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t('catalog.eyebrow')}</p>
-              <h1 className="mt-3 text-headline break-words">{b.name}</h1>
-              {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
-              {products.status === 'success' && (
-                <p className="mt-4 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
-              )}
-            </div>
-          </div>
-          {b.description && <p className="max-w-xl text-[15px] leading-7 text-ink-muted lg:justify-self-end">{b.description}</p>}
+      {/* Hero (Stitch): the business name as a monument, its description in full ink, the count at the far right. */}
+      <section className="mx-auto max-w-[1320px] px-5 pt-6 pb-8 sm:px-10 sm:pt-14 sm:pb-12">
+        <h1 className="font-display text-monument font-normal break-words text-ink">{b.name}</h1>
+        <div className="mt-5 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-end sm:justify-between sm:gap-12">
+          {b.description && <p className="max-w-2xl text-body-public text-ink sm:text-[19px] sm:leading-[1.6]">{b.description}</p>}
+          {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
+          {products.status === 'success' && (
+            <p className="shrink-0 text-[16px] leading-6 text-accent-ink tabular-nums sm:ml-auto sm:text-[17px]">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
+          )}
         </div>
       </section>
 
-      {/* Solid filter bar (no blur), hairline top and bottom. */}
-      <div className="sticky top-16 z-20 border-y border-line bg-canvas sm:top-20">
-        <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-8 sm:px-10">
+      {/* Filters: category pills and a pill search. Phones: search first, chips scroll sideways. */}
+      <div className="bg-canvas lg:sticky lg:top-16 lg:z-20">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-4 px-5 py-3 sm:flex-row sm:items-center sm:gap-8 sm:px-10">
+          <SearchInput
+            value={q}
+            onChange={(v) => setParam('q', v)}
+            label={t('catalog.searchLabel')}
+            placeholder={t('catalog.searchPlaceholder')}
+            className="sm:order-last sm:ml-auto sm:w-80 sm:shrink-0 [&_input]:h-12 [&_input]:rounded-full [&_input]:border-0 [&_input]:bg-subtle [&_input]:pl-11 [&_input]:text-[15px] [&_input]:text-ink sm:[&_input]:h-11 [&>svg]:left-4"
+          />
           {categories.length > 1 && (
-            <div role="group" aria-label={t('catalog.categories')} className="-mx-5 -my-1 flex min-w-0 gap-2 overflow-x-auto px-5 py-1 sm:mx-0 sm:px-0">
+            <div
+              role="group"
+              aria-label={t('catalog.categories')}
+              className="-mx-5 -my-1 flex min-w-0 gap-2.5 overflow-x-auto px-5 py-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
+            >
               {(['', ...categories] as const).map((c) => (
                 <button
                   key={c || 'all'}
@@ -156,8 +169,8 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   onClick={() => setParam('category', c)}
                   className={cn(
                     TAP_TARGET,
-                    'h-9 shrink-0 rounded-[2px] border px-4 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase transition-colors',
-                    cat === c ? 'border-obsidian bg-obsidian text-chalk' : 'border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink',
+                    'h-11 shrink-0 rounded-full px-5 text-[15px] leading-none font-medium motion-safe:transition-transform motion-safe:duration-150 active:scale-[0.96] sm:h-10',
+                    cat === c ? 'bg-ink text-canvas' : 'bg-subtle text-ink-body hover:text-ink',
                   )}
                 >
                   {c ? t(`category.${c}`) : t('catalog.allCategories')}
@@ -165,11 +178,10 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
               ))}
             </div>
           )}
-          <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('catalog.searchLabel')} placeholder={t('catalog.searchPlaceholder')} className="sm:ml-auto sm:w-72 sm:shrink-0" />
         </div>
       </div>
 
-      <section className="mx-auto max-w-[1320px] px-5 py-10 sm:px-10 sm:py-16" aria-live="polite">
+      <section className="mx-auto max-w-[1320px] px-5 pt-6 pb-10 sm:px-10 sm:pt-10 sm:pb-16" aria-live="polite">
         {products.status === 'loading' && !products.data ? (
           <CardSkeletons label={t('common.loading')} />
         ) : products.status === 'error' && !products.data ? (
@@ -181,15 +193,22 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
             icon={SearchX}
             title={t('catalog.noResultsTitle')}
             body={t('catalog.noResultsBody')}
-            action={<Button onClick={clearFilters}>{t('catalog.clearFilters')}</Button>}
+            action={
+              <button type="button" onClick={clearFilters} className={PILL_PRIMARY}>
+                {t('catalog.clearFilters')}
+              </button>
+            }
           />
         ) : (
-          <ul className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-            {visible.map((p) => (
-              <li key={p.id} className="min-w-0">
-                <ProductCard product={p} href={productHref(p)} />
-              </li>
-            ))}
+          <ul className={GRID}>
+            {visible.map((p, i) => {
+              const featured = featureFirst && i === 0
+              return (
+                <li key={p.id} className={cn('min-w-0', featured && 'col-span-2')}>
+                  <ProductCard product={p} href={productHref(p)} featured={featured} />
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
@@ -197,31 +216,54 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   )
 }
 
-/** A catalogue card in the landing's collection-card style: hairline frame, photo with a category chip, serif name. */
-function ProductCard({ product: p, href }: { product: Product; href: string }) {
+/** "W 80 × D 85 × H 75 cm" in the product's own unit, or '' when a measure is missing. */
+function useSizeLine(p: Product) {
+  const { t } = useI18n()
+  const { width: w, height: h, depth: d, unit } = p.dimensions
+  if (!(w > 0 && h > 0 && d > 0)) return ''
+  const n = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
+  return t('product.dimsLine', { w: n(w), d: n(d), h: n(h), unit })
+}
+
+/**
+ * A catalogue card (Stitch): a soft-cornered photo on a tone step with a "3D" pill, then the serif name and a
+ * price · size line, no box. The featured card spans two columns and matches its row's photo height on desktop.
+ */
+function ProductCard({ product: p, href, featured }: { product: Product; href: string; featured: boolean }) {
   const { t, lang, localized } = useI18n()
+  const size = useSizeLine(p)
   return (
-    <Link to={href} className="group flex h-full flex-col border border-line bg-surface p-3 transition-colors hover:border-line-strong focus-visible:outline-offset-4 sm:p-4">
-      <div className="relative overflow-hidden bg-subtle">
-        <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
-        <span className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate bg-surface px-2 py-1 text-xs leading-4 font-medium tracking-[0.08em] text-ink uppercase">
-          {t(`category.${p.category}`)}
-        </span>
+    <Link to={href} className="group block rounded-soft-sm focus-visible:outline-offset-4 sm:rounded-soft">
+      <div className="relative overflow-hidden rounded-soft-sm bg-subtle sm:rounded-soft">
+        <SmartImage
+          src={primaryImage(p)?.url}
+          alt={localized(p.name)}
+          className={cn(
+            'w-full motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-out motion-safe:group-hover:scale-[1.03]',
+            // Featured: landscape on its own row; beside two columns on desktop it takes their 4:5 photo height.
+            featured ? 'aspect-[4/3] lg:aspect-auto lg:h-[calc((100cqw-3rem)/3*1.25)]' : 'aspect-[4/5]',
+          )}
+        />
         {hasAny3d(p) && (
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 bg-surface px-2 py-1 text-xs leading-4 font-medium tracking-[0.08em] text-accent-ink uppercase">
-            <Box className="size-3" strokeWidth={1.5} aria-hidden />
+          <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full bg-canvas px-2.5 py-1 text-[12px] leading-4 font-medium text-ink sm:top-4 sm:right-4 sm:px-3 sm:text-[13px]">
+            <Box className="size-3.5" strokeWidth={1.5} aria-hidden />
             {t('catalog.has3d')}
           </span>
         )}
       </div>
-      <LocalizedSpan as="h2" text={p.name} className="mt-5 font-display text-[1.45rem] leading-snug font-normal text-ink" />
-      <LocalizedSpan as="p" text={p.shortDescription} className="mt-1.5 mb-5 line-clamp-2 text-[13px] leading-5 text-ink-muted" />
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-4">
-        <span className="text-[14px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(initialPrice(p), p.currency, lang)}</span>
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-[14px] leading-5 font-medium text-ink transition-colors group-hover:text-accent-ink">
-          {t('catalog.viewPiece')}
-          <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden />
-        </span>
+      <div className={cn('mt-3 sm:mt-4', featured && 'sm:flex sm:items-baseline sm:justify-between sm:gap-6')}>
+        <LocalizedSpan as="h2" text={p.name} className="font-display text-piece-card font-normal break-words text-ink" />
+        <p className={cn('mt-1 text-[14px] leading-5 text-ink-body tabular-nums sm:text-[15px]', featured && 'sm:mt-0 sm:shrink-0')}>
+          <span className="font-medium text-ink">{formatMoney(initialPrice(p), p.currency, lang)}</span>
+          {size && (
+            <>
+              <span className={cn('px-2 text-ink-faint', !featured && 'max-sm:hidden')} aria-hidden>
+                ·
+              </span>
+              <span className={cn(!featured && 'max-sm:mt-0.5 max-sm:block')}>{size}</span>
+            </>
+          )}
+        </p>
       </div>
     </Link>
   )
@@ -230,13 +272,12 @@ function ProductCard({ product: p, href }: { product: Product; href: string }) {
 /** Loading placeholders shaped like the cards. */
 function CardSkeletons({ label }: { label: string }) {
   return (
-    <div className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4" role="status" aria-label={label}>
-      {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} className="border border-line bg-surface p-3 sm:p-4">
-          <Skeleton className="aspect-[4/5] w-full" />
-          <Skeleton className="mt-5 h-5 w-2/3" />
-          <Skeleton className="mt-2 h-3.5 w-1/2" />
-          <Skeleton className="mt-6 h-3.5 w-1/4" />
+    <div className={GRID} role="status" aria-label={label}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i}>
+          <Skeleton className="aspect-[4/5] w-full rounded-soft-sm sm:rounded-soft" />
+          <Skeleton className="mt-4 h-6 w-2/3" />
+          <Skeleton className="mt-2 h-4 w-1/2" />
         </div>
       ))}
     </div>

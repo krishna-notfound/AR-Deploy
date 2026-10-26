@@ -152,12 +152,14 @@ describe('public catalogue clarity (D8)', () => {
     expect(document.body.textContent).not.toMatch(/\d{2} \/\//)
   })
 
-  it('"View piece" is sentence case, not uppercase', async () => {
+  it('card names and prices are sentence case, not uppercase', async () => {
     openApp('/catalog/nordhaus')
     await screen.findByText(/^\d+ products$/)
-    const label: HTMLElement | null = screen.getAllByText('View piece')[0] ?? null
-    for (let el = label; el && el.tagName !== 'A'; el = el.parentElement) {
-      expect(el.className).not.toMatch(/uppercase|text-label/)
+    const name = screen.getAllByRole('heading', { level: 2 })[0] ?? null
+    const card = name?.closest('a') ?? null
+    expect(card).not.toBeNull()
+    for (const el of [card!, ...Array.from(card!.querySelectorAll<HTMLElement>('*'))]) {
+      expect(el.getAttribute('class') ?? '').not.toMatch(/uppercase|text-label/)
     }
   })
 

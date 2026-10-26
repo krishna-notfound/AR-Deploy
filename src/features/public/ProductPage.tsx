@@ -1,10 +1,8 @@
-import { ArrowLeft, Box, CheckCircle2, Eye, Globe, HelpCircle, Images, Loader2, Mail, MapPin, PackageX, Phone, Smartphone } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Box, Check, Eye, Globe, HelpCircle, Loader2, Mail, MapPin, PackageX, Phone, Rotate3d } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { ButtonLink } from '@/components/ui/Button'
-import { SegmentedControl } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { ErrorState } from '@/components/ui/States'
@@ -96,9 +94,9 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
             title={t('product.notFoundTitle')}
             body={t('product.notFoundBody')}
             action={
-              <ButtonLink to={catalogHref} variant="brand">
+              <Link to={catalogHref} className="inline-flex h-12 items-center justify-center rounded-full bg-ink px-7 text-[16px] font-medium text-canvas transition-colors hover:bg-umber">
                 {t('product.viewCatalog')}
-              </ButtonLink>
+              </Link>
             }
           />
         ) : (
@@ -178,7 +176,6 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const modelUnsupported = isAndroid() && sceneViewerUnsupported(model.required ?? media.models.glb?.requiredExtensions).length > 0
   const availability = arAvailability(modelState, canAR, modelUnsupported)
   const additional = product.images.filter((i) => i.kind === 'additional')
-  const hasCta = modelState === 'loaded' || availability !== 'none'
 
   const open3d = () => {
     setMode('3d')
@@ -295,221 +292,215 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
   const { width: dw, height: dh, depth: dd } = product.dimensions
   const dimsLine = dw > 0 && dh > 0 && dd > 0 ? t('product.dimsLine', { w: fmtLen(dw), d: fmtLen(dd), h: fmtLen(dh), unit }) : ''
-  // Status labels, not controls: no border, so they never read as buttons that do nothing.
-  const stageChip = 'px-1 text-xs leading-4 font-medium tracking-[0.08em] text-ink-muted'
+  const priceText = formatMoney(price, product.currency, lang)
+  // The scale verdict beside the size (AR-09): "true to size" once measured; a mismatch is flagged where AR starts.
+  const verdict = modelState === 'loaded' && (scale.status === 'verified' || (scale.status === 'mismatch' && availability === 'available')) ? scale.status : null
+
+  // Phones: AR starts from a bar fixed to the bottom of the screen (reachable without scrolling, AR audit AR-05). The
+  // page keeps room for it under its last line.
+  const showArBar = modelState === 'loaded' && availability === 'available'
+  useEffect(() => {
+    if (!showArBar) return
+    document.body.classList.add(AR_BAR_SPACE)
+    return () => document.body.classList.remove(AR_BAR_SPACE)
+  }, [showArBar])
 
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
-  const primaryCta = 'inline-flex h-12 items-center justify-center gap-3 self-stretch rounded-[2px] bg-obsidian px-8 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-chalk transition-colors hover:bg-umber sm:self-start'
-  const textAction = cn(TAP_TARGET, 'inline-flex items-center border-b border-current pb-1 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink transition-colors hover:text-accent-ink')
+  const primaryCta =
+    'inline-flex h-12 items-center justify-center gap-2.5 rounded-full bg-ink px-7 text-[16px] font-medium text-canvas transition-[background-color,transform] hover:bg-umber motion-safe:duration-200 motion-safe:active:scale-[0.98] lg:h-14 lg:w-full'
+  const textAction = cn(TAP_TARGET, 'inline-flex items-center gap-2 text-[15px] font-medium text-ink transition-colors hover:text-accent-ink')
+  const material = localized(product.material)
+  const description = localized(product.description)
+  const shortDescription = localized(product.shortDescription)
 
   return (
     <PublicShell business={business} catalogHref={catalogHref}>
       {isPreview && (
-        <div className="border-b border-warning/30 bg-warning-soft">
-          <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-10">
+        <div className="bg-warning-soft">
+          <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-4 py-3 text-[14px] font-medium text-warning sm:px-10">
             <Eye className="size-4 shrink-0" aria-hidden />
             {business.status !== 'active' ? t('catalog.previewBanner') : t('product.draftPreview')}
           </p>
         </div>
       )}
 
-      <div className="mx-auto max-w-[1320px] px-5 pt-6 pb-20 sm:px-10 sm:pt-8">
-        <Link to={catalogHref} className={cn(TAP_TARGET, 'inline-flex items-center gap-2 py-1 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted hover:text-ink')}>
-          <ArrowLeft className="size-3.5" strokeWidth={1.5} aria-hidden />
-          {t('nav.backToCatalog', { name: business.name })}
+      <div className="mx-auto max-w-[1320px] px-4 pt-5 pb-16 sm:px-10 sm:pt-8 lg:pb-24">
+        <Link to={catalogHref} className={cn(TAP_TARGET, 'inline-flex items-center gap-2 text-[15px] text-ink-muted transition-colors hover:text-ink')}>
+          <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
+          {t('product.backToCatalogue', { name: business.name })}
         </Link>
 
-        {/* Phones: stage, then the AR call to action (reachable without scrolling, AR audit AR-05), then the text.
-            Desktop: the text column on the left with the call to action under the finish picker, the sticky stage on
-            the right. The last row takes any height the stage adds, so the left column never gains gaps. */}
-        <div className="mt-6 grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.7fr)] lg:grid-rows-[auto_auto_1fr] lg:gap-x-14">
-          {/* Stage + 3D/AR rail (reference: centre stage, round actions on the right). Shown first on phones. */}
-          <div ref={stageRef} className="scroll-mt-24 lg:sticky lg:top-28 lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-start">
-            <div className="flex flex-col gap-5 lg:flex-row lg:gap-6">
-              {/* Framed viewer card, as the landing's 3D section: a slim top bar of chips, the stage, a dimensions line. */}
-              <figure className="min-w-0 flex-1 border border-line bg-surface">
-                <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line px-3 py-2 sm:px-4">
-                  <p className="flex min-w-0 items-center gap-2.5 text-xs leading-4 font-medium tracking-[0.08em] uppercase">
-                    <span className={cn('size-1.5 shrink-0 rounded-full', mode === '3d' && modelState === 'loaded' ? 'bg-success' : 'bg-accent')} aria-hidden />
-                    <span className="shrink-0 text-ink">{mode === '3d' ? t('product.stage3d') : t('product.stagePhotos')}</span>
-                    <span className="hidden h-3 w-px shrink-0 bg-line sm:block" aria-hidden />
-                    <span className="hidden truncate text-ink-muted sm:block">{name}</span>
-                  </p>
-                  {(modelState === 'loaded' || availability === 'available') && (
-                    <p className="flex shrink-0 items-center gap-1.5">
-                      {modelState === 'loaded' && <span className={stageChip}>3D</span>}
-                      {availability === 'available' && <span className={stageChip}>AR</span>}
-                    </p>
+        {/* Phones: name and price, the stage, then the finish, the text and the quiet actions (AR in the bottom bar).
+            Desktop: the stage on the left (sticky), the name, price, finish and actions on the right. */}
+        <div className="mt-4 grid lg:mt-8 lg:grid-cols-[minmax(0,58fr)_minmax(0,42fr)] lg:grid-rows-[auto_1fr] lg:gap-x-16">
+          <header className="min-w-0 lg:col-start-2 lg:row-start-1">
+            <LocalizedSpan as="h1" text={product.name} className="line-clamp-2 font-display text-piece font-normal text-balance break-words text-ink" />
+            <div data-product-meta className="mt-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 text-[17px] leading-6 text-ink lg:mt-6 lg:block">
+              <p className="tabular-nums lg:text-[22px] lg:leading-7">{priceText}</p>
+              {(dimsLine || verdict) && (
+                <p className="contents text-ink lg:mt-3 lg:flex lg:flex-wrap lg:items-center lg:gap-x-2.5 lg:gap-y-1 lg:text-[16px] lg:text-ink-body">
+                  {dimsLine && (
+                    <>
+                      <span className="text-ink-faint lg:hidden" aria-hidden>
+                        ·
+                      </span>
+                      <span className="tabular-nums">{dimsLine}</span>
+                    </>
                   )}
-                </div>
-                <div className="p-2.5 sm:p-4">
-                <ProductMedia
-                  name={name}
-                  gallery={media.gallery}
-                  models={media.models}
-                  mode={mode}
-                  onModeChange={setMode}
-                  viewerRef={viewerRef}
-                  onArStatus={(s) => {
-                    if (s !== 'failed') return
-                    toast.error(arFailedMessage())
-                    // model-viewer turns AR off after a failed hand-off; follow it so the button goes away (AR-04).
-                    setCanAR(viewerRef.current?.canActivateAR() ?? false)
-                  }}
-                  onInteract={onModelInteract}
-                  onModelState={onModelState}
-                />
-                {media.fallback && has3d && variant && (
-                  <p className="mt-3 text-center text-xs text-ink-muted">{t('ar.variantFallback', { name: localized(variant.name) })}</p>
-                )}
-                </div>
-                {dimsLine && (
-                  <figcaption className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line px-3 py-3 sm:px-4">
-                    <span className="text-xs leading-4 font-medium tracking-[0.08em] text-ink-muted uppercase">{t('product.dimensions')}</span>
-                    <span className="text-[13px] text-ink-body tabular-nums">{dimsLine}</span>
-                  </figcaption>
-                )}
-              </figure>
-              {/* AR starts from the primary call to action only: one obvious AR entry point, as on main. */}
-              {has3d && (
-                <ul className="flex justify-center gap-10 lg:flex-col lg:justify-start lg:gap-7 lg:pt-14">
-                  <li>
-                    <RailAction
-                      mark={mode === '3d' ? <Images className="size-4" strokeWidth={1.4} aria-hidden /> : '3D'}
-                      label={mode === '3d' ? t('product.viewPhotos') : t('product.view3d')}
-                      pressed={mode === '3d'}
-                      onClick={() => (mode === '3d' ? setMode('photos') : open3d())}
-                    />
-                  </li>
-                </ul>
+                  {verdict && (
+                    <span className="inline-flex items-center gap-2.5 max-lg:basis-full">
+                      {dimsLine && (
+                        <span className="hidden text-ink-faint lg:inline" aria-hidden>
+                          ·
+                        </span>
+                      )}
+                      <ScaleBadge verified={verdict === 'verified'} separateUsdz={separateUsdz} />
+                    </span>
+                  )}
+                </p>
               )}
             </div>
+          </header>
+
+          <div ref={stageRef} className="mt-6 min-w-0 scroll-mt-24 lg:sticky lg:top-24 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:self-start">
+            <ProductMedia
+              name={name}
+              gallery={media.gallery}
+              models={media.models}
+              mode={mode}
+              onModeChange={setMode}
+              viewerRef={viewerRef}
+              onArStatus={(s) => {
+                if (s !== 'failed') return
+                toast.error(arFailedMessage())
+                // model-viewer turns AR off after a failed hand-off; follow it so the button goes away (AR-04).
+                setCanAR(viewerRef.current?.canActivateAR() ?? false)
+              }}
+              onInteract={onModelInteract}
+              onModelState={onModelState}
+              modeSwitch
+            />
+            {media.fallback && has3d && variant && <p className="mt-3 text-[14px] leading-5 text-ink-muted">{t('ar.variantFallback', { name: localized(variant.name) })}</p>}
           </div>
 
-          {hasCta && (
-            <div data-ar-cta className="mt-6 flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:mt-8">
+          <div className="mt-8 flex min-w-0 flex-col gap-8 lg:col-start-2 lg:row-start-2">
+            {shortDescription && <LocalizedSpan as="p" text={product.shortDescription} className="order-2 max-w-[38rem] text-body-public text-ink lg:order-1" />}
+            <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="order-1 lg:order-2" />
+
+            <div data-ar-cta className="order-3 flex flex-col gap-4">
               {/* Only for a model that loaded (AR-08). Where model-viewer can open AR, the primary action launches it
-                  ("View in my home", as on main); elsewhere it opens the 3D view and ArSection explains the phone hand-off. */}
+                  ("View in my home"; on phones in the bottom bar); elsewhere it opens the 3D view and ArSection explains
+                  the phone hand-off. */}
               {modelState === 'loaded' &&
                 (availability === 'available' ? (
-                  <button type="button" onClick={onActivate} disabled={launching} aria-busy={launching} className={cn(primaryCta, 'disabled:cursor-progress disabled:bg-umber')}>
-                    {launching ? t('ar.preparing') : t('ar.button')}
-                    {launching ? <Loader2 className="size-4 animate-spin" strokeWidth={1.4} aria-hidden /> : <Smartphone className="size-4" strokeWidth={1.4} aria-hidden />}
-                  </button>
+                  <div
+                    data-ar-bar
+                    className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-4 bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-10 lg:static lg:z-auto lg:block lg:bg-transparent lg:p-0"
+                  >
+                    <p className="min-w-0 truncate font-display text-[1.625rem] leading-none text-ink tabular-nums lg:hidden" aria-hidden>
+                      {priceText}
+                    </p>
+                    <button type="button" onClick={onActivate} disabled={launching} aria-busy={launching} className={cn(primaryCta, 'shrink-0 disabled:cursor-progress disabled:bg-umber')}>
+                      {launching ? <Loader2 className="size-5 animate-spin" strokeWidth={1.5} aria-hidden /> : <Box className="size-5" strokeWidth={1.5} aria-hidden />}
+                      {launching ? t('ar.preparing') : t('ar.button')}
+                    </button>
+                  </div>
                 ) : (
-                  <button type="button" onClick={open3d} className={primaryCta}>
+                  <button type="button" onClick={open3d} className={cn(primaryCta, 'w-full')}>
+                    <Rotate3d className="size-5" strokeWidth={1.5} aria-hidden />
                     {t('product.view3d')}
-                    <Box className="size-4" strokeWidth={1.4} aria-hidden />
                   </button>
                 ))}
-              {/* Where AR starts, the scale verdict too (AR-09): a model that does not match the listed size is flagged. */}
-              {availability === 'available' && scale.status !== 'unknown' && <ScaleBadge verified={scale.status === 'verified'} separateUsdz={separateUsdz} />}
-              <ArSection availability={availability} onShowTips={() => setTipsOpen('info')} />
+              <ArSection
+                availability={availability}
+                onShowTips={() => setTipsOpen('info')}
+                actions={
+                  <>
+                    {product.cta.url ? (
+                      <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={textAction}>
+                        {localized(product.cta.label).trim() ? <LocalizedSpan text={product.cta.label} /> : t('product.contactStore')}
+                      </a>
+                    ) : hasContact ? (
+                      <button type="button" className={textAction} onClick={() => setContactOpen(true)}>
+                        {t('product.contactStore')}
+                      </button>
+                    ) : null}
+                    <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
+                  </>
+                }
+              />
             </div>
-          )}
-
-          <div className="mt-10 min-w-0 lg:col-start-1 lg:row-start-1 lg:mt-0 lg:pt-2">
-            <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t(`category.${product.category}`)}</p>
-            <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
-            <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
-            <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
-
-            <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="mt-8 border-t border-line pt-6" />
           </div>
+        </div>
 
-          <div className="min-w-0 lg:col-start-1 lg:row-start-3">
-            {/* Desktop spacing as before: gap-5 under the call to action, mt-8 under the finish picker when there is none. */}
-            <div className={cn('mt-8', hasCta ? 'lg:mt-5' : 'lg:mt-8')}>
-              <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-                {product.cta.url ? (
-                  <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={textAction}>
-                    {localized(product.cta.label).trim() ? <LocalizedSpan text={product.cta.label} /> : t('product.contactStore')}
-                  </a>
-                ) : hasContact ? (
-                  <button type="button" className={textAction} onClick={() => setContactOpen(true)}>
-                    {t('product.contactStore')}
-                  </button>
-                ) : null}
-                <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
-              </div>
+        {/* Details: dimensions with the drawing on the left, the material and the long text on the right. */}
+        <div className="mt-12 grid gap-10 rounded-soft-sm bg-subtle p-5 sm:rounded-soft sm:p-8 lg:mt-20 lg:grid-cols-2 lg:gap-16 lg:p-12">
+          <section className="min-w-0" aria-labelledby="dims-h">
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="dims-h" className="text-[20px] leading-7 text-ink lg:text-[24px]">
+                {t('product.dimensions')}
+              </h2>
+              <UnitSwitch value={unit} onChange={setUnit} label={t('product.unitToggle')} />
             </div>
-
-            <section className="mt-10 border-t border-line pt-6" aria-labelledby="dims-h">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 id="dims-h" className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">
-                  {t('product.dimensions')}
-                </h2>
-                {/* Hit areas grown to 44px tall on the small control; its look is unchanged. */}
-                <span className="[&_button]:relative [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-2 [&_button]:before:content-['']">
-                  <SegmentedControl
-                    size="sm"
-                    label={t('product.unitToggle')}
-                    value={unit}
-                    onChange={setUnit}
-                    options={[
-                      { value: 'cm', label: 'cm' },
-                      { value: 'in', label: 'in' },
-                    ]}
-                  />
-                </span>
-              </div>
-              <div className="mt-4 grid items-center gap-4 sm:grid-cols-[1fr_auto]">
-                <DimensionDiagram dims={product.dimensions} unit={unit} />
-                <dl className="grid grid-cols-3 gap-3 text-sm sm:min-w-44 sm:grid-cols-1 sm:gap-0 sm:divide-y sm:divide-line">
-                  {(['width', 'height', 'depth'] as const).map((k) => (
-                    <div key={k} className="sm:flex sm:items-baseline sm:justify-between sm:gap-6 sm:py-2.5">
-                      <dt className="text-xs leading-4 font-medium tracking-[0.08em] text-ink-muted uppercase">{t(`product.${k}`)}</dt>
-                      <dd className="mt-1 text-[14px] text-ink tabular-nums sm:mt-0">
-                        {fmtLen(product.dimensions[k])} {unit}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-              {scale.status !== 'unknown' && modelState === 'loaded' && <ScaleNote verified={scale.status === 'verified'} separateUsdz={separateUsdz} measured={scale.measured} unit={unit} />}
-            </section>
-
-            {(localized(product.material) || product.weight) && (
-              <dl className="mt-8 divide-y divide-line border-y border-line">
-                {localized(product.material) && (
-                  <div className="flex items-baseline justify-between gap-6 py-4">
-                    <dt className="shrink-0 text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">{t('product.material')}</dt>
-                    <dd className="min-w-0 text-right text-[14px] text-ink-muted">
-                      <LocalizedSpan text={product.material} />
+            <div className="mt-5 rounded-soft-sm bg-surface p-5 sm:p-8">
+              <DimensionDiagram dims={product.dimensions} unit={unit} />
+              <dl className="mt-5 grid grid-cols-3 gap-3 text-center">
+                {(['width', 'depth', 'height'] as const).map((k) => (
+                  <div key={k}>
+                    <dt className="text-[14px] leading-5 text-ink-muted">{t(`product.${k}`)}</dt>
+                    <dd className="mt-1 text-[16px] leading-6 text-ink tabular-nums">
+                      {fmtLen(product.dimensions[k])} {unit}
                     </dd>
                   </div>
-                )}
-                {product.weight && (
-                  <div className="flex items-baseline justify-between gap-6 py-4">
-                    <dt className="shrink-0 text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">{t('product.weight')}</dt>
-                    <dd className="text-right text-[14px] text-ink-muted tabular-nums">
-                      {product.weight.value} {product.weight.unit}
-                    </dd>
-                  </div>
-                )}
+                ))}
               </dl>
-            )}
+            </div>
+            {scale.status !== 'unknown' && modelState === 'loaded' && <ScaleNote verified={scale.status === 'verified'} separateUsdz={separateUsdz} measured={scale.measured} unit={unit} />}
+          </section>
 
-            {localized(product.description) && (
-              <section className={cn('pt-6', localized(product.material) || product.weight ? 'mt-0' : 'mt-8 border-t border-line')} aria-labelledby="desc-h">
-                <h2 id="desc-h" className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">
-                  {t('product.description')}
+          <div className="flex min-w-0 flex-col gap-8">
+            {material && (
+              <section aria-labelledby="material-h">
+                <h2 id="material-h" className="text-[20px] leading-7 text-ink lg:text-[24px]">
+                  {t('product.material')}
                 </h2>
-                <LocalizedSpan as="p" text={product.description} className="mt-3 max-w-prose text-[15px] leading-7 whitespace-pre-line text-ink-muted" />
+                <LocalizedSpan as="p" text={product.material} className="mt-2 text-body-public text-ink" />
               </section>
             )}
+            {description && (
+              <section aria-labelledby="desc-h">
+                <h2 id="desc-h" className="text-[20px] leading-7 text-ink lg:text-[24px]">
+                  {t('product.description')}
+                </h2>
+                <LocalizedSpan as="p" text={product.description} className="mt-2 max-w-prose text-body-public whitespace-pre-line text-ink" />
+              </section>
+            )}
+            <dl className="flex flex-wrap gap-x-10 gap-y-4">
+              {product.weight && (
+                <div>
+                  <dt className="text-[14px] leading-5 text-ink-muted">{t('product.weight')}</dt>
+                  <dd className="mt-1 text-[16px] leading-6 text-ink tabular-nums">
+                    {product.weight.value} {product.weight.unit}
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-[14px] leading-5 text-ink-muted">{t('product.category')}</dt>
+                <dd className="mt-1 text-[16px] leading-6 text-ink">{t(`category.${product.category}`)}</dd>
+              </div>
+            </dl>
           </div>
         </div>
 
         {additional.length > 0 && (
-          <section className="mt-20 border-t border-line pt-8" aria-labelledby="more-h">
-            <h2 id="more-h" className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">
+          <section className="mt-12 lg:mt-20" aria-labelledby="more-h">
+            <h2 id="more-h" className="text-[20px] leading-7 text-ink lg:text-[24px]">
               {t('product.morePhotos')}
             </h2>
-            <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+            <ul className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
               {additional.map((img) => (
-                <li key={img.id} className="border border-line bg-surface p-2.5 sm:p-3">
-                  <SmartImage src={img.url} alt={img.alt || name} className="aspect-[4/3] w-full bg-subtle" />
+                <li key={img.id}>
+                  <SmartImage src={img.url} alt={img.alt || name} className="aspect-[4/3] w-full rounded-soft-sm bg-subtle sm:rounded-soft" />
                 </li>
               ))}
             </ul>
@@ -520,11 +511,11 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
       <ArTips open={tipsOpen !== null} onClose={() => setTipsOpen(null)} onStart={tipsOpen === 'before-ar' ? () => void startAR() : undefined} />
 
       <Modal open={contactOpen} onClose={() => setContactOpen(false)} title={business.name} size="sm" closeLabel={t('common.close')}>
-        <ul className="space-y-3 pb-2 text-sm">
+        <ul className="space-y-3 pb-2 text-[15px]">
           {business.contact.email && (
             <li className="flex items-center gap-3">
               <Mail className="size-4 text-ink-muted" aria-hidden />
-              <a className="min-w-0 break-all text-[var(--brand-accent)] underline" href={`mailto:${business.contact.email}?subject=${encodeURIComponent(name)}`}>
+              <a className="min-w-0 break-all text-accent-ink underline underline-offset-4" href={`mailto:${business.contact.email}?subject=${encodeURIComponent(name)}`}>
                 {business.contact.email}
               </a>
             </li>
@@ -532,7 +523,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           {business.contact.phone && (
             <li className="flex items-center gap-3">
               <Phone className="size-4 text-ink-muted" aria-hidden />
-              <a className="text-[var(--brand-accent)] underline" href={`tel:${business.contact.phone.replace(/\s/g, '')}`}>
+              <a className="text-accent-ink underline underline-offset-4" href={`tel:${business.contact.phone.replace(/\s/g, '')}`}>
                 {business.contact.phone}
               </a>
             </li>
@@ -540,7 +531,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           {business.contact.website && (
             <li className="flex items-center gap-3">
               <Globe className="size-4 text-ink-muted" aria-hidden />
-              <a className="min-w-0 break-all text-[var(--brand-accent)] underline" href={business.contact.website} target="_blank" rel="noopener noreferrer">
+              <a className="min-w-0 break-all text-accent-ink underline underline-offset-4" href={business.contact.website} target="_blank" rel="noopener noreferrer">
                 {business.contact.website.replace(/^https?:\/\//, '')}
               </a>
             </li>
@@ -557,6 +548,9 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   )
 }
 
+/** Room under the page for the phone's AR bar (body class while the bar shows; desktop has no bar). */
+const AR_BAR_SPACE = 'max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))]'
+
 /**
  * Copy for the scale note. Only the GLB is measured. Without a USDZ, iPhone Quick Look gets a file generated from
  * that GLB, so "true to size" holds for both AR viewers; an uploaded USDZ is never measured, so the claim is
@@ -568,6 +562,7 @@ export function scaleNoteKeys(verified: boolean, separateUsdz: boolean) {
   return { title: 'ar.scaleVerified', help: 'ar.scaleVerifiedHelp' } as const
 }
 
+/** The quiet scale line under the dimensions: the verdict and why. */
 function ScaleNote({ verified, separateUsdz, measured, unit }: { verified: boolean; separateUsdz: boolean; measured: MeasuredSize; unit: LengthUnit }) {
   const { t } = useI18n()
   const keys = scaleNoteKeys(verified, separateUsdz)
@@ -576,44 +571,52 @@ function ScaleNote({ verified, separateUsdz, measured, unit }: { verified: boole
     return Math.round(v)
   }
   const size = `${toUnit(measured.x)} × ${toUnit(measured.y)} × ${toUnit(measured.z)} ${unit}`
+  const Icon = verified ? Check : HelpCircle
   return (
-    <div className={cn('mt-5 flex items-start gap-2.5 border px-3.5 py-3 text-[13px]', verified ? 'border-success/20 bg-success-soft text-success' : 'border-line bg-subtle text-ink-muted')}>
-      {verified ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden /> : <HelpCircle className="mt-0.5 size-4 shrink-0" aria-hidden />}
-      <div>
-        <p className="font-medium">{t(keys.title)}</p>
-        <p className="mt-0.5 opacity-90">
-          {t(keys.help)} {!verified && t('ar.modelMeasures', { size })}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-/** The scale verdict beside the AR action (AR-09): the same labels as the scale note under the dimensions. */
-function ScaleBadge({ verified, separateUsdz }: { verified: boolean; separateUsdz: boolean }) {
-  const { t } = useI18n()
-  return (
-    <p className={cn('flex items-center gap-1.5 text-[13px] font-medium', verified ? 'text-success' : 'text-ink-muted')}>
-      {verified ? <CheckCircle2 className="size-4 shrink-0" aria-hidden /> : <HelpCircle className="size-4 shrink-0" aria-hidden />}
-      {t(scaleNoteKeys(verified, separateUsdz).title)}
+    <p className="mt-4 flex items-start gap-2 text-[14px] leading-5 text-ink-body">
+      <Icon className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={1.5} aria-hidden />
+      <span>
+        <span className="font-medium text-ink">{t(keys.title)}</span> {t(keys.help)} {!verified && t('ar.modelMeasures', { size })}
+      </span>
     </p>
   )
 }
 
-/** An action of the stage's rail ("3D · Visualizar em 3D"): a hairline square, as the Sanctus chips. */
-function RailAction({ mark, label, onClick, pressed }: { mark: ReactNode; label: string; onClick: () => void; pressed?: boolean }) {
+/**
+ * The scale verdict on the size line (AR-09). "True to size in AR" only when no separate, unmeasured USDZ is used for
+ * iPhone (COR-10); otherwise the same labels as the scale note.
+ */
+function ScaleBadge({ verified, separateUsdz }: { verified: boolean; separateUsdz: boolean }) {
+  const { t } = useI18n()
+  const label = verified && !separateUsdz ? t('product.trueToSizeAr') : t(scaleNoteKeys(verified, separateUsdz).title)
+  const Icon = verified ? Check : HelpCircle
   return (
-    <button type="button" onClick={onClick} className="group flex w-24 flex-col items-center gap-2.5 text-center">
-      <span
-        className={cn(
-          'grid size-12 place-items-center rounded-[2px] border text-xs font-medium tracking-[0.08em] transition-colors',
-          pressed ? 'border-obsidian bg-obsidian text-chalk' : 'border-line-strong bg-surface text-ink group-hover:border-obsidian group-hover:bg-obsidian group-hover:text-chalk',
-        )}
-        aria-hidden
-      >
-        {mark}
-      </span>
-      <span className="text-xs leading-4 font-medium tracking-[0.08em] text-ink-body uppercase">{label}</span>
-    </button>
+    <span className={cn('inline-flex items-center gap-1.5', verified ? 'text-ink' : 'text-ink-muted')}>
+      <Icon className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+      {label}
+    </span>
+  )
+}
+
+/** cm / in as a pill switch (radio group). */
+function UnitSwitch({ value, onChange, label }: { value: LengthUnit; onChange: (u: LengthUnit) => void; label: string }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-full bg-surface p-1">
+      {(['cm', 'in'] as const).map((u) => (
+        <button
+          key={u}
+          type="button"
+          role="radio"
+          aria-checked={value === u}
+          onClick={() => onChange(u)}
+          className={cn(
+            "relative inline-flex h-9 min-w-12 items-center justify-center rounded-full px-3.5 text-[14px] font-medium transition-colors before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] motion-safe:duration-200",
+            value === u ? 'bg-ink text-canvas' : 'text-ink-muted hover:text-ink',
+          )}
+        >
+          {u}
+        </button>
+      ))}
+    </div>
   )
 }

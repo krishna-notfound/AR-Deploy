@@ -192,10 +192,13 @@ describe('product page: the primary call to action opens AR where it can', () =>
     expect(arLabelled()).toHaveLength(0) // still checking: nothing offers AR yet
     loaded(el, false)
     expect(arLabelled()).toHaveLength(0)
+    // On a computer the phone hand-off sits behind "Open on your phone" (link and QR code).
+    fireEvent.click(screen.getByRole('button', { name: 'Open on your phone' }))
     expect(screen.getByText('View in your space on a phone')).toBeInTheDocument()
     const [primary] = screen.getAllByRole('button', { name: 'View in 3D' })
+    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(primary!)
-    expect(screen.getByText('Interactive 3D')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'true') // the stage shows the 3D model
     expect(el.activateAR).not.toHaveBeenCalled()
   })
 
@@ -218,25 +221,29 @@ describe('product page: AR audit quick wins', () => {
   const ANDROID_LINKEDIN = `${ANDROID_CHROME} [LinkedInApp]/4.1`
   const IPHONE_SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
   const asUserAgent = (ua: string) => vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua)
-  const cta = () => document.querySelector('[data-ar-cta]') as HTMLElement
+  /** The price and size line under the product name. */
+  const meta = () => document.querySelector('[data-product-meta]') as HTMLElement
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn()
   })
 
-  it('puts the AR action directly after the stage, before the title and the finish picker (AR-05)', async () => {
+  it('keeps the AR action reachable without scrolling on phones: a bar fixed to the bottom of the screen (AR-05)', async () => {
     openApp('/products/nordhaus/sheen-lounge-chair')
     const el = await viewerFor(/SheenChair\.glb$/)
     loaded(el, true)
     const button = arButton()!
-    const title = screen.getByRole('heading', { name: 'Sheen Lounge Chair', level: 1 })
+    const bar = button.closest('[data-ar-bar]') as HTMLElement
+    expect(bar.className).toMatch(/(^|\s)fixed(\s|$)/)
+    expect(bar.className).toMatch(/bottom-0/)
+    expect(bar.className).toMatch(/env\(safe-area-inset-bottom\)/)
+    // Desktop: the same single button sits in the right column, under the finish picker.
+    expect(bar.className).toMatch(/lg:static/)
     const firstSwatch = screen.getByRole('radio', { name: /Purple-Gold Damask/ })
-    const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(follows(el, button)).toBe(true)
-    expect(follows(button, title)).toBe(true)
-    expect(follows(button, firstSwatch)).toBe(true)
-    // Desktop keeps the old layout: the block is placed in the text column, under the finish picker.
-    expect(cta().className).toMatch(/lg:col-start-1/)
-    expect(cta().className).toMatch(/lg:row-start-2/)
+    expect(!!(firstSwatch.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    // The page keeps room under its last line for the bar while it shows.
+    expect(document.body.className).toMatch(/pb-\[calc/)
+    loaded(el, false)
+    expect(document.body.className).not.toMatch(/pb-\[calc/)
   })
 
   it('shows "Preparing AR…" from the tap until the hand-off settles, and ignores taps meanwhile (AR-06)', async () => {
@@ -335,13 +342,13 @@ describe('product page: AR audit quick wins', () => {
     }
   })
 
-  it('shows the scale label next to the AR action, and flags a model that does not match (AR-09)', async () => {
+  it('shows the scale label on the size line, and flags a model that does not match (AR-09)', async () => {
     openApp('/products/nordhaus/sheen-lounge-chair')
     const el = await viewerFor(/SheenChair\.glb$/)
     loaded(el, true)
-    expect(within(cta()).getByText('True-to-size model')).toBeInTheDocument()
+    expect(within(meta()).getByText('True to size in AR')).toBeInTheDocument()
     loaded(el, true, { x: 2, y: 2, z: 2 })
-    expect(within(cta()).getByText('AR scale unverified')).toBeInTheDocument()
-    expect(within(cta()).queryByText('True-to-size model')).toBeNull()
+    expect(within(meta()).getByText('AR scale unverified')).toBeInTheDocument()
+    expect(within(meta()).queryByText('True to size in AR')).toBeNull()
   })
 })

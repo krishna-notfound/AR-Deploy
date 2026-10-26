@@ -1,6 +1,5 @@
-import { Box, Info, Loader2, QrCode, Smartphone } from 'lucide-react'
-import { useState } from 'react'
-import { Button } from '@/components/ui/Button'
+import { Box, Info, Loader2, QrCode } from 'lucide-react'
+import { type ReactNode, useId, useState } from 'react'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { useQrCode } from '@/lib/useQrCode'
@@ -20,39 +19,18 @@ export function arAvailability(model: ModelState, canActivateAR: boolean, modelU
   return canActivateAR ? 'available' : 'unavailable'
 }
 
+const statusLine = 'flex items-start gap-2 text-[14px] leading-5 text-ink-muted'
+
 /**
- * AR status beside the product actions. The AR button itself ("View in my home") is the product page's primary action and
- * is shown only when model-viewer reports canActivateAR (a real capability check). Here: the check in progress,
- * AR tips, or how to use AR on a phone. Never fakes AR.
+ * The quiet controls under the product's primary action. The AR button itself ("View in my home") is the product page's
+ * primary action and is shown only when model-viewer reports canActivateAR (a real capability check). Here: the check
+ * in progress, AR tips, or how to use AR on a phone (a computer gets "Open on your phone" with the link and a QR code;
+ * a phone gets an honest line and the link). `actions` (contact, share) sit in the same row. Never fakes AR.
  */
-export function ArSection({ availability, onShowTips }: { availability: ArAvailability; onShowTips: () => void }) {
+export function ArSection({ availability, onShowTips, actions }: { availability: ArAvailability; onShowTips: () => void; actions?: ReactNode }) {
   const { t } = useI18n()
-  const [showQr, setShowQr] = useState(false)
-
-  if (availability === 'none') return null
-
-  if (availability === 'checking')
-    return (
-      <p className="flex items-center gap-2 text-[13px] text-ink-muted" role="status">
-        <Loader2 className="size-4 animate-spin" aria-hidden />
-        {t('ar.checking')}
-      </p>
-    )
-
-  if (availability === 'model-unsupported')
-    return (
-      <p className="flex items-start gap-2 text-[13px] text-ink-muted">
-        <Box className="mt-0.5 size-4 shrink-0" strokeWidth={1.4} aria-hidden />
-        {t('ar.modelUnsupported')}
-      </p>
-    )
-
-  if (availability === 'available')
-    return (
-      <button type="button" onClick={onShowTips} className={cn(TAP_TARGET, 'self-start text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted underline-offset-4 transition-colors hover:text-ink hover:underline')}>
-        {t('ar.tipsLink')}
-      </button>
-    )
+  const [open, setOpen] = useState(false)
+  const panelId = useId()
 
   // Honest hand-off copy (AR audit AR-07/08): a phone is never told to "open this page on your mobile device".
   const inApp = detectInAppBrowser()
@@ -61,6 +39,10 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
   // Already in Safari (iOS) / Chrome (Android): pointing to the same browser would be no help, so say it plainly.
   const inArBrowser = onPhone && browserName() === browser
   const phoneKind = inApp ? 'inApp' : !onPhone ? 'desktop' : inArBrowser ? 'device' : 'browser'
+  const handoff = availability === 'unavailable'
+  // The QR code hands the page from a computer to a phone; on a phone it is no help.
+  const desktopHandoff = handoff && !onPhone
+
   const title = { inApp: t('ar.inAppTitle', { browser }), desktop: t('ar.unsupportedTitle'), device: t('ar.deviceUnsupportedTitle'), browser: t('ar.phoneUnsupportedTitle') }[phoneKind]
   const body = {
     inApp: inApp ? t('ar.inAppBody', { app: IN_APP_NAME[inApp], browser }) : '',
@@ -68,27 +50,62 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
     device: t('ar.deviceUnsupportedBody'),
     browser: t('ar.phoneUnsupportedBody', { browser }),
   }[phoneKind]
+
   return (
-    <div className="border border-line bg-surface p-4 sm:p-5">
-      <div className="flex gap-3.5">
-        <span className="grid size-9 shrink-0 place-items-center rounded-[2px] border border-line">
-          <Smartphone className="size-4 text-accent-ink" strokeWidth={1.4} aria-hidden />
-        </span>
-        <div className="min-w-0">
-          <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">{title}</p>
-          <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{body}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <CopyLink size="sm" />
-            {/* The QR code hands the page from a computer to a phone; on a phone it is no help. */}
-            {!onPhone && (
-            <Button size="sm" variant="ghost" icon={<QrCode className="size-4" aria-hidden />} onClick={() => setShowQr((v) => !v)} aria-expanded={showQr}>
-              {showQr ? t('ar.hideQr') : t('ar.showQr')}
-            </Button>
-            )}
-          </div>
+    <div className="flex flex-col gap-4">
+      {(desktopHandoff || availability === 'available' || actions) && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {desktopHandoff && (
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-controls={panelId}
+              onClick={() => setOpen((v) => !v)}
+              className="inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full bg-surface px-6 text-[15px] font-medium text-ink transition-colors hover:bg-subtle"
+            >
+              <QrCode className="size-4" strokeWidth={1.5} aria-hidden />
+              {t('product.openOnPhone')}
+            </button>
+          )}
+          {availability === 'available' && (
+            <button type="button" onClick={onShowTips} className={cn(TAP_TARGET, 'text-[15px] font-medium text-ink-muted underline-offset-4 transition-colors hover:text-ink hover:underline')}>
+              {t('ar.tipsLink')}
+            </button>
+          )}
+          {actions}
         </div>
-      </div>
-      {showQr && !onPhone && <PageQr />}
+      )}
+
+      {availability === 'checking' && (
+        <p className={statusLine} role="status">
+          <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden />
+          {t('ar.checking')}
+        </p>
+      )}
+
+      {availability === 'model-unsupported' && (
+        <p className={statusLine}>
+          <Box className="mt-0.5 size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+          {t('ar.modelUnsupported')}
+        </p>
+      )}
+
+      {desktopHandoff && open && (
+        <div id={panelId} className="rounded-soft-sm bg-subtle p-5 sm:p-6">
+          <p className="text-[16px] leading-6 font-medium text-ink">{title}</p>
+          <p className="mt-1.5 text-[15px] leading-6 text-ink-body">{body}</p>
+          <PageQr />
+          <CopyLink size="sm" className="mt-4" />
+        </div>
+      )}
+
+      {handoff && !desktopHandoff && (
+        <div>
+          <p className="text-[15px] leading-6 font-medium text-ink">{title}</p>
+          <p className="mt-1 text-[15px] leading-6 text-ink-body">{body}</p>
+          <CopyLink size="sm" className="mt-3" />
+        </div>
+      )}
     </div>
   )
 }
@@ -99,10 +116,10 @@ function PageQr() {
   const url = shareableCurrentUrl()
   const qr = useQrCode(url, 360)
   return (
-    <div className="mt-4 flex items-center gap-4 border-t border-line pt-4">
-      {qr.url ? <img src={qr.url} alt={t('ar.qrHint')} className="size-28 shrink-0 border border-line bg-white p-1" /> : <div className="size-28 shrink-0 animate-shimmer bg-subtle" />}
-      <p className="flex items-start gap-1.5 text-xs leading-5 text-ink-muted">
-        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+    <div className="mt-4 flex items-center gap-4">
+      {qr.url ? <img src={qr.url} alt={t('ar.qrHint')} className="size-28 shrink-0 rounded-[12px] bg-white p-1.5" /> : <div className="size-28 shrink-0 animate-shimmer rounded-[12px] bg-surface" />}
+      <p className="flex items-start gap-1.5 text-[14px] leading-5 text-ink-muted">
+        <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
         {t('ar.qrHint')}
       </p>
     </div>

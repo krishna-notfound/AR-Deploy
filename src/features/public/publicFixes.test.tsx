@@ -77,7 +77,7 @@ describe('catalog link keeps the preview flag (R-W4-11)', { timeout: 20_000 }, (
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'business_admin', businessId: 'biz_nord' }))
     openApp('/products/nordhaus/oslo-bar-stool?preview=1') // a draft
     await screen.findByRole('heading', { name: 'Oslo Bar Stool', level: 1 }, { timeout: 10_000 })
-    const back = screen.getAllByRole('link').find((a) => a.getAttribute('href')?.startsWith('/catalog/nordhaus') && /back/i.test(a.textContent ?? ''))
+    const back = screen.getAllByRole('link').find((a) => a.getAttribute('href')?.startsWith('/catalog/nordhaus') && /catalogue/i.test(a.textContent ?? ''))
     expect(back).toHaveAttribute('href', '/catalog/nordhaus?preview=1')
   })
 })

@@ -400,6 +400,11 @@ export const en = {
   'legal.agree.newTab': '(opens in a new tab)',
   'legal.agree.required': 'Please agree to the Terms and the Privacy Policy to continue.',
   'apply.err.terms_required': 'Please agree to the Terms and the Privacy Policy to send your application.',
+  // Redesign 2026-10-26 (product)
+  'product.backToCatalogue': '{name} catalogue',
+  'product.openOnPhone': 'Open on your phone',
+  'product.trueToSizeAr': 'True to size in AR',
+  'product.category': 'Category',
 } as const
 
 export type TranslationKey = keyof typeof en

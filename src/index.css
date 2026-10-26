@@ -82,6 +82,24 @@
   --radius-control: 2px;
   --radius-card: 2px;
   --radius-stage: 2px;
+  /* Public catalog and product pages (ADR-0036, design/stitch/public): soft shapes. Photos, the 3D stage and
+     panels use rounded-soft (24px; rounded-soft-sm 18px on phones); buttons, chips, fields and switches are pills
+     (rounded-full). The dashboards keep the square references above. */
+  --radius-soft: 24px;
+  --radius-soft-sm: 18px;
+
+  /* Public pages type: the business name as a monument on its catalog, the piece's name on its page. */
+  --text-monument: clamp(3.5rem, 0.9rem + 9.6vw, 10rem);
+  --text-monument--line-height: 0.95;
+  --text-monument--letter-spacing: -0.03em;
+  --text-piece: clamp(2.75rem, 1.6rem + 3.4vw, 4.75rem);
+  --text-piece--line-height: 1;
+  --text-piece--letter-spacing: -0.02em;
+  --text-piece-card: clamp(1.375rem, 1.1rem + 0.7vw, 1.75rem);
+  --text-piece-card--line-height: 1.15;
+  --text-piece-card--letter-spacing: -0.01em;
+  --text-body-public: 1.0625rem;
+  --text-body-public--line-height: 1.6;
 
   /* Hairlines instead of elevation. Only floating layers (menus, dialogs, toasts) cast a shadow. */
   --shadow-card: 0 0 0 1px var(--color-line);
