@@ -697,7 +697,8 @@ describe('account-security', () => {
 describe('account-security: S1.5 Task 13 (R-W6-3, R-W7-6, R-W7-7, R-W7-9)', () => {
   it('notice.status accepted vs failed in the three responses', async () => {
     const { d, s } = deps()
-    const FAILED = { ok: true, notice: { status: 'failed', error: 'provider down' } }
+    // The provider's own text ('provider down') never reaches the app: only fixed reasons do.
+    const FAILED = { ok: true, notice: { status: 'failed' } }
     s.recovery[STAFF_2] = { salt: 'x', rows: [{ hash: 'h', used: false }] }
     expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code: await codeFor(d, s, OWNER, 'owner_reset_2fa') }))).toEqual(NOTICE_SENT)
     let code = await codeFor(d, s, OWNER, 'owner_reset_2fa')

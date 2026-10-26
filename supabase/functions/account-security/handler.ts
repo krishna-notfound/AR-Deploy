@@ -429,10 +429,15 @@ async function notify(ctx: Ctx, user: string, notice: SecurityNotice, knownEmail
   return sendQuietly(ctx, { ...securityNoticeEmail(notice, ctx.deps.appBaseUrl), to, kind: 'security_notice', workflow: `security_notice:${user}:${notice}`, triggeredBy: ctx.userId })
 }
 
+/** The fixed reasons a notice may carry to the app. Provider text never leaves this function (§10.2: no raw text). */
+const NOTICE_REASONS: ReadonlySet<string> = new Set([
+  'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'no_recipient', 'admin_recipient_not_configured', 'demo_mode',
+])
+
 async function sendQuietly(ctx: Ctx, email: SecurityEmail): Promise<NoticeOutcome> {
   try {
     const r = await ctx.deps.send(email)
-    return r.status === 'accepted' || !r.error ? { status: r.status } : { status: r.status, error: r.error }
+    return r.status !== 'accepted' && r.error && NOTICE_REASONS.has(r.error) ? { status: r.status, error: r.error } : { status: r.status }
   } catch (e) {
     console.error(`account-security: ${email.kind} email failed (${errorName(e)})`)
     return { status: 'failed' }

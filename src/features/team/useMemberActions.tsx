@@ -16,6 +16,10 @@ import { PERMISSION_LABEL, ROLE_LABEL } from './permissions'
  * "{done}. They were emailed." only when the email was accepted; otherwise
  * "{done}, but the notice email was not sent: {reason}." The action itself already happened either way.
  */
+const NOTICE_REASONS: ReadonlySet<string> = new Set([
+  'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'no_recipient', 'admin_recipient_not_configured', 'demo_mode',
+])
+
 export function useNoticeToast() {
   const toast = useToast()
   return useCallback(
@@ -24,7 +28,9 @@ export function useNoticeToast() {
         toast.success(`${done}. They were emailed.`, body)
         return
       }
-      const why = (emailReason(notice.error) ?? 'the email service did not take it').replace(/\.$/, '')
+      // Only a fixed reason is shown; any other text (a provider's own words) falls back to the generic sentence.
+      const known = notice.error && NOTICE_REASONS.has(notice.error) ? emailReason(notice.error) : undefined
+      const why = (known ?? 'the email service did not take it').replace(/\.$/, '')
       toast.error(`${done}, but the notice email was not sent: ${why}.`, body)
     },
     [toast],

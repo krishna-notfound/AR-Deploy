@@ -44,4 +44,10 @@ describe('notice toasts (R-W7-6)', () => {
     await toastFor('Their 2FA was reset', { status: 'blocked', error: 'no_recipient' })
     expect(await screen.findByText('Their 2FA was reset, but the notice email was not sent: The account has no email address.')).toBeInTheDocument()
   })
+
+  it('never shows raw provider text: an unknown reason falls back to the generic sentence', async () => {
+    await toastFor('Business restored', { status: 'failed', error: 'Resend 500: internal <b>oops</b> at api.resend.com' })
+    expect(await screen.findByText('Business restored, but the notice email was not sent: the email service did not take it.')).toBeInTheDocument()
+    expect(screen.queryByText(/Resend 500|oops|api\.resend\.com/)).toBeNull()
+  })
 })

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
+import { useOptionalAccount } from '@/auth/AccountProvider'
 import { type ActionPurpose, type Result, type ServiceError, account, isDemoMode } from '@/services'
 
 /** Seconds before another code can be sent (spec: resend cooldown 30 s). */
@@ -32,16 +33,17 @@ const SEND_ERRORS: Record<string, string> = {
  * hourly code limit. Kept in sessionStorage, so a new session tries again.
  */
 const BLOCKED_KEY = 'arfurn:action-code-email-blocked'
-const sendBlocked = () => {
+/** Keyed by the signed-in user, so another account on the same tab is not affected. */
+const sendBlocked = (uid: string) => {
   try {
-    return sessionStorage.getItem(BLOCKED_KEY) === '1'
+    return sessionStorage.getItem(`${BLOCKED_KEY}:${uid}`) === '1'
   } catch {
     return false
   }
 }
-const rememberBlocked = () => {
+const rememberBlocked = (uid: string) => {
   try {
-    sessionStorage.setItem(BLOCKED_KEY, '1')
+    sessionStorage.setItem(`${BLOCKED_KEY}:${uid}`, '1')
   } catch {
     // Storage unavailable: this dialog still disables Resend until it closes.
   }
@@ -73,7 +75,8 @@ export function ActionCodeDialog(props: ActionCodeDialogProps) {
 }
 
 function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destructive, onClose, onConfirm }: ActionCodeDialogProps) {
-  const [send, setSend] = useState<Send>(() => (sendBlocked() ? { status: 'blocked' } : { status: 'sending' }))
+  const uid = useOptionalAccount()?.user?.id ?? ''
+  const [send, setSend] = useState<Send>(() => (sendBlocked(uid) ? { status: 'blocked' } : { status: 'sending' }))
   // Resend waits until this time (ms); `now` ticks once a second while it is in the future.
   const [resendAt, setResendAt] = useState(0)
   const [now, setNow] = useState(() => Date.now())
@@ -95,7 +98,7 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
     const r = await account.sendActionCode(purpose)
     if (!live.current || id !== sendId.current) return
     if (!r.ok && r.error.reason === 'email_blocked') {
-      rememberBlocked()
+      rememberBlocked(uid)
       setSend({ status: 'blocked' })
     } else if (r.ok) {
       setSend({ status: 'sent', sentTo: r.data.sentTo })
@@ -106,19 +109,19 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
       // No cooldown after a failure: nothing was sent, so Resend is the next step straight away.
       setSend({ status: 'failed', message: sendMessage(r.error) })
     }
-  }, [purpose])
+  }, [purpose, uid])
 
   useEffect(() => {
     live.current = true
     // Once per opening, also under StrictMode's double effect: every send counts toward the hourly limit.
     if (!sentOnOpen.current) {
       sentOnOpen.current = true
-      if (!sendBlocked()) void sendCode()
+      if (!sendBlocked(uid)) void sendCode()
     }
     return () => {
       live.current = false
     }
-  }, [sendCode])
+  }, [sendCode, uid])
 
   const cooldown = Math.max(0, Math.ceil((resendAt - now) / 1000))
   useEffect(() => {
