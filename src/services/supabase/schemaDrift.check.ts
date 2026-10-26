@@ -2,6 +2,7 @@
 // A failure here means a migration renamed/dropped a column or the row types are out of date.
 import type { Database } from './database.types'
 import type { ApplicationRow, AuditRow, BusinessRow, DailyRow, EmailRow, ImageRow, ModelRow, ProductRow, VariantImageRow, VariantModelRow, VariantRow } from './supabaseCatalogService'
+import type { ModelRequestRow } from './modelRequestsRead'
 
 type T = Database['public']['Tables']
 type Missing<Hand, Gen> = Exclude<keyof Hand, keyof Gen>
@@ -19,4 +20,5 @@ export const schemaMatches: [
   Ok<Missing<ApplicationRow, T['business_applications']['Row']>>,
   Ok<Missing<AuditRow, T['audit_events']['Row']>>,
   Ok<Missing<EmailRow, T['email_log']['Row']>>,
-] = [true, true, true, true, true, true, true, true, true, true, true]
+  Ok<Missing<Omit<ModelRequestRow, 'products' | 'businesses' | 'product_variants' | 'model_request_photos'>, T['model_requests']['Row']>>,
+] = [true, true, true, true, true, true, true, true, true, true, true, true]

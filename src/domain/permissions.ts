@@ -34,6 +34,7 @@ export const PERMISSION_PREREQUISITES: Readonly<Record<Permission, readonly Perm
   'products.edit': ['products.view'],
   'products.publish': ['products.edit'],
   'products.delete': ['products.edit'],
+  'models.manage': ['businesses.view', 'products.view'],
   'analytics.view': [],
   'records.view': [],
   'access.view': [],

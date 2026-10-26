@@ -19,6 +19,17 @@ export const LOGO_RULES = {
   maxBytes: 2 * MB,
 }
 
+/**
+ * Photos sent with a 3D model request (S4 R-S4-5): originals, never downscaled (the modeller needs them). Under
+ * `minLongSide` px on the long side is a warning, not a refusal. No HEIC: iPhone Safari converts to JPEG.
+ */
+export const REQUEST_PHOTO_RULES = {
+  accept: ['image/jpeg', 'image/png', 'image/webp'],
+  extensions: ['.jpg', '.jpeg', '.png', '.webp'],
+  maxBytes: 10 * MB,
+  minLongSide: 1000,
+}
+
 export const MODEL_RULES: Record<ModelFormat, { extension: string; maxBytes: number }> = {
   glb: { extension: '.glb', maxBytes: 50 * MB },
   usdz: { extension: '.usdz', maxBytes: 50 * MB },

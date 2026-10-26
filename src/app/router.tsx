@@ -34,6 +34,8 @@ const AdminCatalogsPage = lazy(() => import('@/features/admin/AdminCatalogsPage'
 const ApplicationsPage = lazy(() => import('@/features/admin/ApplicationsPage'))
 const ApplicationDetailPage = lazy(() => import('@/features/admin/ApplicationDetailPage'))
 const AuditLogPage = lazy(() => import('@/features/admin/AuditLogPage'))
+const ModelRequestsPage = lazy(() => import('@/features/admin/ModelRequestsPage'))
+const ModelRequestDetailPage = lazy(() => import('@/features/admin/ModelRequestDetailPage'))
 const TeamPage = lazy(() => import('@/features/team/TeamPage'))
 const RolePermissionsPage = lazy(() => import('@/features/team/RolePermissionsPage'))
 const MemberDetailPage = lazy(() => import('@/features/team/MemberDetailPage'))
@@ -88,6 +90,8 @@ const adminRoutes: RouteObject = {
     { path: 'products', element: <RequirePermission need="products.view"><AdminProductsPage /></RequirePermission> },
     { path: 'products/new', element: <RequirePermission need="products.edit"><ProductEditorPage scope="admin" /></RequirePermission> },
     { path: 'products/:productId/edit', element: <RequirePermission need="products.edit"><ProductEditorPage scope="admin" /></RequirePermission> },
+    { path: 'model-requests', element: <RequirePermission need="models.manage"><ModelRequestsPage /></RequirePermission> },
+    { path: 'model-requests/:requestId', element: <RequirePermission need="models.manage"><ModelRequestDetailPage /></RequirePermission> },
     { path: 'analytics', element: <RequirePermission need="analytics.view"><AdminAnalyticsPage /></RequirePermission> },
     { path: 'catalogs', element: <RequirePermission need="products.view"><AdminCatalogsPage /></RequirePermission> },
     { path: 'team', element: <RequirePermission need="owner"><TeamPage /></RequirePermission> },

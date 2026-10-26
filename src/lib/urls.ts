@@ -125,11 +125,20 @@ export const applicationAdminPath = (id: string) => `/admin/applications/${id}`
 /** The applications list, optionally filtered by status (e.g. the overview's "awaiting review" link). */
 export const applicationsAdminPath = (status?: string) => `/admin/applications${status ? `?status=${encodeURIComponent(status)}` : ''}`
 export const businessAdminPath = (id: string) => `/admin/businesses/${id}`
+/** The staff 3D model request queue (S4 R-S4-10), optionally on a tab and for one business. */
+export function modelRequestsAdminPath(filter?: { status?: 'open' | 'delivered' | 'rejected' | 'cancelled' | 'all'; businessId?: string }): string {
+  const q = new URLSearchParams()
+  if (filter?.status) q.set('status', filter.status)
+  if (filter?.businessId) q.set('business', filter.businessId)
+  return `/admin/model-requests${q.toString() ? `?${q.toString()}` : ''}`
+}
+export const modelRequestAdminPath = (id: string) => `/admin/model-requests/${encodeURIComponent(id)}`
 /** The owner's product list, optionally filtered (the filters are the list's own URL parameters). */
-export function myProductsPath(filter?: { status?: 'draft' | 'published'; ar?: 'ready' | 'android-only' | 'android-blocked' | 'photos-only' }): string {
+export function myProductsPath(filter?: { status?: 'draft' | 'published'; ar?: 'ready' | 'android-only' | 'android-blocked' | 'photos-only'; model?: 'open' }): string {
   const q = new URLSearchParams()
   if (filter?.status) q.set('status', filter.status)
   if (filter?.ar) q.set('ar', filter.ar)
+  if (filter?.model) q.set('model', filter.model)
   return `/dashboard/products${q.toString() ? `?${q.toString()}` : ''}`
 }
 

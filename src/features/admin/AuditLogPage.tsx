@@ -117,7 +117,7 @@ export default function AuditLogPage() {
                     </time>
                     <div className="min-w-0 max-md:order-1 max-md:col-span-2">
                       <p className="text-[length:var(--text-ui-body)] leading-5 text-ink">
-                        <span className="font-medium">{sentenceCase(eventLabel(e.eventType))}</span>
+                        <span className="font-medium">{sentenceCase(eventLabel(e.eventType, e.metadata))}</span>
                         {e.toStatus && (
                           <span className="text-ink-muted">
                             {' '}

@@ -238,6 +238,7 @@ export type Database = {
       businesses: {
         Row: {
           accent_color: string
+          allow_own_models: boolean
           contact_address: string | null
           contact_email: string | null
           contact_phone: string | null
@@ -254,6 +255,7 @@ export type Database = {
         }
         Insert: {
           accent_color?: string
+          allow_own_models?: boolean
           contact_address?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -270,6 +272,7 @@ export type Database = {
         }
         Update: {
           accent_color?: string
+          allow_own_models?: boolean
           contact_address?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -352,6 +355,152 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "businesses"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_request_files: {
+        Row: {
+          created_at: string
+          file_name: string
+          format: string
+          request_id: string
+          required_extensions: string[] | null
+          size_bytes: number | null
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          format: string
+          request_id: string
+          required_extensions?: string[] | null
+          size_bytes?: number | null
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          format?: string
+          request_id?: string
+          required_extensions?: string[] | null
+          size_bytes?: number | null
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_request_files_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "model_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_request_photos: {
+        Row: {
+          file_name: string
+          request_id: string
+          size_bytes: number
+          sort_order: number
+          storage_path: string
+        }
+        Insert: {
+          file_name: string
+          request_id: string
+          size_bytes: number
+          sort_order?: number
+          storage_path: string
+        }
+        Update: {
+          file_name?: string
+          request_id?: string
+          size_bytes?: number
+          sort_order?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_request_photos_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "model_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_requests: {
+        Row: {
+          business_id: string
+          closed_at: string | null
+          created_at: string
+          delivered_at: string | null
+          handled_by: string | null
+          id: string
+          note: string | null
+          product_id: string
+          reason: string | null
+          requested_by: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          variant_id: string | null
+        }
+        Insert: {
+          business_id: string
+          closed_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          handled_by?: string | null
+          id: string
+          note?: string | null
+          product_id: string
+          reason?: string | null
+          requested_by?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          closed_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          handled_by?: string | null
+          id?: string
+          note?: string | null
+          product_id?: string
+          reason?: string | null
+          requested_by?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_requests_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_requests_product_id_business_id_fkey"
+            columns: ["product_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "model_requests_variant_id_product_id_fkey"
+            columns: ["variant_id", "product_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id", "product_id"]
           },
         ]
       }
@@ -712,6 +861,7 @@ export type Database = {
           height: number
           id: string
           material: Json
+          models_changed_at: string | null
           name: Json
           price: number
           published_at: string | null
@@ -736,6 +886,7 @@ export type Database = {
           height: number
           id?: string
           material?: Json
+          models_changed_at?: string | null
           name: Json
           price: number
           published_at?: string | null
@@ -760,6 +911,7 @@ export type Database = {
           height?: number
           id?: string
           material?: Json
+          models_changed_at?: string | null
           name?: Json
           price?: number
           published_at?: string | null
@@ -873,6 +1025,7 @@ export type Database = {
         Returns: Json
       }
       admin_deactivate_member: { Args: { p_member: string }; Returns: Json }
+      admin_deliver_model_request: { Args: { p_request: string }; Returns: Json }
       admin_get_member: { Args: { p_member: string }; Returns: Json }
       admin_invite_member: {
         Args: {
@@ -897,6 +1050,7 @@ export type Database = {
       admin_list_members: { Args: never; Returns: Json }
       admin_list_owner_states: { Args: never; Returns: Json }
       admin_reactivate_member: { Args: { p_member: string }; Returns: Json }
+      admin_reject_model_request: { Args: { p_reason: string; p_request: string }; Returns: Json }
       admin_remove_member: { Args: { p_member: string }; Returns: Json }
       admin_review_application: {
         Args: { p_action: string; p_application_id: string; p_reason?: string }
@@ -939,6 +1093,7 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_set_own_models: { Args: { p_allow: boolean; p_business: string }; Returns: Json }
       admin_set_role_permissions: {
         Args: {
           p_permissions: string[]
@@ -946,6 +1101,19 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_stage_model_file: {
+        Args: {
+          p_file_name: string
+          p_format: string
+          p_request: string
+          p_required_extensions: string[] | null
+          p_size_bytes: number
+          p_storage_path: string
+        }
+        Returns: Json
+      }
+      admin_start_model_request: { Args: { p_request: string }; Returns: Json }
+      admin_unstage_model_file: { Args: { p_format: string; p_request: string }; Returns: Json }
       admin_user_emails: {
         Args: { p_ids: string[] }
         Returns: {
@@ -967,7 +1135,9 @@ export type Database = {
       }
       caller_has_verified_factor: { Args: never; Returns: boolean }
       caller_mfa_satisfied: { Args: never; Returns: boolean }
+      can_write_own_models: { Args: { p_business: string }; Returns: boolean }
       cancel_account_closure: { Args: never; Returns: Json }
+      cancel_model_request: { Args: { p_request: string }; Returns: Json }
       complete_owner_onboarding: { Args: never; Returns: string }
       is_business_member: { Args: { bid: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
@@ -993,6 +1163,7 @@ export type Database = {
         }
       }
       log_account_event: { Args: { p_event: string }; Returns: undefined }
+      model_request_storage_paths: { Args: { p_request: string }; Returns: Json }
       my_platform_access: { Args: never; Returns: Json }
       my_recovery_codes_left: { Args: never; Returns: number }
       my_security_state: { Args: never; Returns: Json }
@@ -1008,6 +1179,16 @@ export type Database = {
         Returns: string
       }
       record_sign_in: { Args: { p_user_agent: string }; Returns: string }
+      request_model: {
+        Args: {
+          p_note: string | null
+          p_photos: Json
+          p_product: string
+          p_request_id: string
+          p_variant: string | null
+        }
+        Returns: Json
+      }
       save_product: {
         Args: {
           p_images: Json

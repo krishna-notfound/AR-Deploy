@@ -47,7 +47,7 @@ export function AuditTimeline({ applicationId, businessId, title = 'History', no
               <li key={e.id} className="relative">
                 <span className="absolute top-2 -left-[25px] size-2 rounded-full bg-ink" aria-hidden />
                 <p className="text-ui-body text-ink">
-                  <span className="font-medium">{eventLabel(e.eventType)}</span>
+                  <span className="font-medium">{eventLabel(e.eventType, e.metadata)}</span>
                   {e.toStatus && (
                     <span className="text-ink-muted">
                       {' '}

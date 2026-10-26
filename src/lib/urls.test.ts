@@ -32,3 +32,19 @@ describe('catalogLocalPath', () => {
     expect(catalogLocalPath({ slug: 'casa' }, { preview: true })).toBe('/catalog/casa?preview=1')
   })
 })
+
+describe('S4 Task 2: model request URLs', () => {
+  it("modelRequestsAdminPath({status:'open', businessId:'b1'}) = '/admin/model-requests?status=open&business=b1'", async () => {
+    const { modelRequestsAdminPath } = await import('./urls')
+    expect(modelRequestsAdminPath({ status: 'open', businessId: 'b1' })).toBe('/admin/model-requests?status=open&business=b1')
+    expect(modelRequestsAdminPath()).toBe('/admin/model-requests')
+  })
+  it("modelRequestAdminPath('r1') = '/admin/model-requests/r1'", async () => {
+    const { modelRequestAdminPath } = await import('./urls')
+    expect(modelRequestAdminPath('r1')).toBe('/admin/model-requests/r1')
+  })
+  it("myProductsPath({model:'open'}) = '/dashboard/products?model=open'", async () => {
+    const { myProductsPath } = await import('./urls')
+    expect(myProductsPath({ model: 'open' })).toBe('/dashboard/products?model=open')
+  })
+})

@@ -13,6 +13,10 @@ import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { mockClosureOpen, noteMockClosureStatus, voidMockClosure } from './mockAccount'
 import { createMockTeam, demoPlatformRole, demoViewer } from './mockTeam'
+import { createMockModelRequestsBusiness } from './mockModelRequestsBusiness'
+import { createMockModelRequestsRead } from './mockModelRequestsRead'
+import { clearSessionRequestMedia } from './mockModelRequestShared'
+import { createMockModelRequestsStaff } from './mockModelRequestsStaff'
 import { createSeed } from './seed'
 import { store } from './store'
 import { normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
@@ -191,6 +195,9 @@ function demoCanRead(b: Business): boolean {
 
 export const mockCatalogService: CatalogService = {
   ...createMockTeam(run),
+  ...createMockModelRequestsRead({ run, audit }),
+  ...createMockModelRequestsBusiness({ run, audit }),
+  ...createMockModelRequestsStaff({ run, audit }),
 
   // ---------------- businesses ----------------
   getBusinesses: () => run(() => ok([...store.get().businesses].sort(byUpdatedDesc))),
@@ -216,7 +223,7 @@ export const mockCatalogService: CatalogService = {
         return fail(code, 'Please fix the highlighted fields.', errors)
       }
       const ts = nowIso()
-      const business: Business = { ...data, name: data.name.trim(), id: newId('biz'), createdAt: ts, updatedAt: ts }
+      const business: Business = { ...data, name: data.name.trim(), allowOwnModels: false, id: newId('biz'), createdAt: ts, updatedAt: ts }
       store.update((d) => {
         d.businesses.push(business)
       })
@@ -679,6 +686,7 @@ export const mockCatalogService: CatalogService = {
             status: 'draft',
             branding: { accentColor: '#7A5C45' },
             defaultCurrency: 'EUR',
+            allowOwnModels: false,
             createdAt: ts,
             updatedAt: ts,
           }
@@ -794,6 +802,7 @@ export const mockCatalogService: CatalogService = {
     run(
       () => {
         store.replace(createSeed())
+        clearSessionRequestMedia()
         return ok(undefined)
       },
       { inject: false },
