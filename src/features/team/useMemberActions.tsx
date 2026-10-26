@@ -4,7 +4,7 @@ import { useCallback } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { InviteOutcome, MemberRole, PlatformMember } from '@/domain/types'
-import { emailReason } from '@/features/applications/labels'
+import { knownEmailReason } from '@/features/applications/labels'
 import { formatDate } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { type NoticeOutcome, service } from '@/services'
@@ -16,9 +16,6 @@ import { PERMISSION_LABEL, ROLE_LABEL } from './permissions'
  * "{done}. They were emailed." only when the email was accepted; otherwise
  * "{done}, but the notice email was not sent: {reason}." The action itself already happened either way.
  */
-const NOTICE_REASONS: ReadonlySet<string> = new Set([
-  'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'no_recipient', 'admin_recipient_not_configured', 'demo_mode',
-])
 
 export function useNoticeToast() {
   const toast = useToast()
@@ -29,7 +26,7 @@ export function useNoticeToast() {
         return
       }
       // Only a fixed reason is shown; any other text (a provider's own words) falls back to the generic sentence.
-      const known = notice.error && NOTICE_REASONS.has(notice.error) ? emailReason(notice.error) : undefined
+      const known = knownEmailReason(notice.error)
       const why = (known ?? 'the email service did not take it').replace(/\.$/, '')
       toast.error(`${done}, but the notice email was not sent: ${why}.`, body)
     },
@@ -58,7 +55,7 @@ export function useMemberActions() {
         return false
       }
       if (r.data.status === 'email_failed') {
-        toast.error('Invitation saved, but the email was not delivered', r.data.error ?? 'Try resending it.')
+        toast.error('Invitation saved, but the email was not delivered', knownEmailReason(r.data.error) ?? 'The email service did not take it. Try resending it.')
         return true
       }
       toast.success(`Invitation sent to ${email}`, `The link works once and expires on ${formatDate(r.data.expiresAt, 'en', prefs)}.`)
@@ -136,12 +133,19 @@ export function useMemberActions() {
     async (m: PlatformMember) => {
       const yes = await confirm({
         title: `Remove ${m.email} from the team?`,
-        body: `Their access record and login are deleted. Past actions stay in the audit log as 'Deleted user (${ROLE_LABEL[m.role]})'. They can be invited again later.`,
+        body: `Their access record is deleted. Their login is deleted too unless it still owns a business. Past actions stay in the audit log as 'Deleted user (${ROLE_LABEL[m.role]})'. They can be invited again later.`,
         confirmLabel: 'Remove member',
         destructive: true,
       })
       if (!yes) return false
-      return report(await service.removeMember(m.id), `${m.email} was removed.`)
+      // The toast says what happened to the login (manage-member keeps one that still owns a business, or that it could not delete).
+      const r = await service.removeMember(m.id)
+      const login = !m.userId
+        ? 'They never signed in, so there was no login to delete.'
+        : r.ok && r.data.loginDeleted
+          ? 'Their login was deleted too.'
+          : 'Their login was kept: it still owns a business, or it could not be deleted.'
+      return report(r, `${m.email} was removed.`, login)
     },
     [confirm, report],
   )

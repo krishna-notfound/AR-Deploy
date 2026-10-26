@@ -101,6 +101,20 @@ describe('invite-member (ADR-0030)', () => {
     expect(recorded[0]!.ok).toBe(false)
   })
 
+  // Final review: raw provider text never reaches the browser; only fixed reason codes do.
+  it('a provider failure answers without the provider text; a fixed code is passed through', async () => {
+    const raw = deps({ fetch: (async () => new Response(JSON.stringify({ message: 'Resend 500: internal provider detail' }), { status: 500 })) as never })
+    const res = await handleInviteMember(post({ action: 'invite', email: 'ana@studio.test', role: 'admin' }), raw.d)
+    const json = (await res.json()) as Record<string, unknown>
+    expect(json.status).toBe('email_failed')
+    expect(json.error).toBeUndefined()
+    expect(JSON.stringify(json)).not.toContain('internal provider detail')
+
+    const testSender = deps({ config: { ok: true, config: { ...CONFIG, from: 'Sanctus <onboarding@resend.dev>' } as never } })
+    const res2 = await handleInviteMember(post({ action: 'invite', email: 'ana@studio.test', role: 'admin' }), testSender.d)
+    expect(((await res2.json()) as Record<string, unknown>).error).toBe('test_sender_recipient_not_allowed')
+  })
+
   it('passes database refusals through', async () => {
     const { d } = deps({ inviteMember: async () => ({ error: 'already_member' }) })
     const res = await handleInviteMember(post({ action: 'invite', email: 'ana@studio.test', role: 'team' }), d)

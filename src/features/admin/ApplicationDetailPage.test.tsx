@@ -122,6 +122,18 @@ describe('ApplicationDetailPage', () => {
     const emails = await service.getEmailAttempts({ applicationId: id })
     expect(emails.ok && emails.data.filter((e) => e.kind === 'application_decision')).toHaveLength(1)
   })
+
+  it('a raw provider string is never shown: the toast falls back to the generic sentence', async () => {
+    const id = await submitApplication()
+    const app = (await service.getApplication(id)) as { ok: true; data: BusinessApplication }
+    vi.spyOn(service, 'reviewApplication').mockResolvedValue(ok({ ...app.data, status: 'rejected', decisionEmail: { status: 'failed', error: 'Resend 500: internal provider detail' } }))
+    renderPage(id)
+    const { user, dialog } = await openReject()
+    await user.type(within(dialog).getByRole('textbox'), 'Too small')
+    await user.click(within(dialog).getByRole('button', { name: 'Reject application' }))
+    expect(await screen.findByText('Application rejected, but the email was not sent: the email service did not take it.')).toBeInTheDocument()
+    expect(screen.queryByText(/internal provider detail/)).toBeNull()
+  })
 })
 
 /** Signed in as a Team member whose role holds exactly `permissions`. */

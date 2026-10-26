@@ -10,7 +10,8 @@ function deps(over: Partial<ManageDeps> = {}) {
   const signedOut: string[] = []
   const deleted: string[] = []
   const d: ManageDeps = {
-    userIdFromToken: async (t) => (t === 'owner-token' ? 'owner' : null),
+    userIdFromToken: async (t) => ({ 'owner-token': 'owner', 'aal1-token': 'owner', 'team-token': 'team' })[t] ?? null,
+    gate: async (t) => (t === 'owner-token' ? 'ok' : t === 'aal1-token' ? 'aal2_required' : 'forbidden'),
     rpcAsCaller: async (_token, fn, args) => {
       calls.push({ fn, args })
       if (fn === 'admin_remove_member') return { ok: true, user_id: USER }
@@ -30,6 +31,23 @@ const post = (body: unknown, token = 'owner-token') =>
   new Request('https://fn.test/manage-member', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(body) })
 
 describe('manage-member (ADR-0029)', () => {
+  // Spec §10.3: the 2FA gate runs first, before any RPC.
+  it('an Owner session at aal1 gets 403 aal2_required and no RPC runs', async () => {
+    const { d, calls } = deps()
+    const res = await handleManageMember(post({ action: 'deactivate', memberId: MEMBER }, 'aal1-token'), d)
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'aal2_required' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('a non-Owner gets 403 forbidden from the gate and no RPC runs', async () => {
+    const { d, calls } = deps()
+    const res = await handleManageMember(post({ action: 'remove', memberId: MEMBER }, 'team-token'), d)
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
+    expect(calls).toHaveLength(0)
+  })
+
   it('deactivates, then signs the member out everywhere', async () => {
     const { d, calls, signedOut } = deps()
     const res = await handleManageMember(post({ action: 'deactivate', memberId: MEMBER }), d)

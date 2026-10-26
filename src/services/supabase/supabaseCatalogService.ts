@@ -1024,8 +1024,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (!r.ok) return r
         listeners.forEach((l) => l())
         const { data, error } = await sb.from('business_applications').select('*').eq('id', id).maybeSingle<ApplicationRow>()
-        if (error || !data) return fail('UNKNOWN', 'The application was updated, but it could not be reloaded. Refresh the page.')
-        return ok(r.data.email ? { ...toApplication(data), decisionEmail: r.data.email } : toApplication(data))
+        const decision = r.data.email ? { decisionEmail: r.data.email } : {}
+        // The decision is applied either way: a failed re-read still reports it (the page refetches), never "not updated".
+        if (error || !data) {
+          const status = r.data.status as ApplicationStatus
+          return ok({ reloaded: false as const, id, status, ...(r.data.businessId ? { businessId: r.data.businessId } : {}), ...decision })
+        }
+        return ok({ ...toApplication(data), ...decision })
       }),
 
     getApplicationDuplicates: (id) =>

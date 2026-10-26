@@ -643,7 +643,7 @@ export const mockCatalogService: CatalogService = {
     }),
 
   reviewApplication: (id, action, reason) =>
-    run(() => {
+    run<ReviewedApplication>(() => {
       const db = store.get()
       const current = db.applications?.find((x) => x.id === id)
       if (!current) return fail('NOT_FOUND', 'Application not found.')
@@ -657,7 +657,7 @@ export const mockCatalogService: CatalogService = {
             ? { ok: false, error: REOPEN_NOT_ALLOWED_ERROR }
             : fail('CONFLICT', 'This application can no longer change to that status.')
       if (t.noop) return ok(current)
-      let next!: ReviewedApplication
+      let next!: Extract<ReviewedApplication, BusinessApplication>
       store.update((d) => {
         let businessId = current.businessId
         if (t.status === 'approved') {

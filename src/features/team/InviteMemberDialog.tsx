@@ -8,6 +8,7 @@ import { FormField, Input, Textarea } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
 import type { InviteOutcome, MemberRole, PlatformMember } from '@/domain/types'
+import { knownEmailReason } from '@/features/applications/labels'
 import { cn } from '@/lib/cn'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
@@ -195,7 +196,7 @@ export function InviteMemberDialog({
             </InlineNotice>
           ) : (
             <InlineNotice tone="warning">
-              <strong className="font-medium">Invitation saved, but the email wasn't delivered.</strong> {step.outcome.error ?? ''} You can try again
+              <strong className="font-medium">Invitation saved, but the email wasn't delivered.</strong> {knownEmailReason(step.outcome.error) ?? ''} You can try again
               now or later from the Invitations tab.
             </InlineNotice>
           )}

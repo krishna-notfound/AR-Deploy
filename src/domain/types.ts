@@ -285,7 +285,14 @@ export interface ApplicationDuplicates {
 }
 
 /** A reviewed application; a rejection also says what happened to the decision email (R-W2-1). Not proof of delivery. */
-export type ReviewedApplication = BusinessApplication & { decisionEmail?: { status: EmailAttemptStatus; error?: string } }
+type DecisionEmailOutcome = { status: EmailAttemptStatus; error?: string }
+/**
+ * A reviewed application, re-read after the change. `reloaded: false` when the decision was applied but the re-read
+ * failed: only the new status (and the decision email outcome) is known, and the page refetches.
+ */
+export type ReviewedApplication =
+  | (BusinessApplication & { reloaded?: true; decisionEmail?: DecisionEmailOutcome })
+  | { reloaded: false; id: ID; status: ApplicationStatus; businessId?: ID; decisionEmail?: DecisionEmailOutcome }
 
 export interface AuditEvent {
   id: ID

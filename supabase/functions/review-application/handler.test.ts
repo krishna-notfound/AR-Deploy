@@ -128,22 +128,40 @@ describe('review-application (R-W2-1)', () => {
     expect(logs).toHaveLength(1)
   })
 
-  it('an email failure keeps the rejection (200 ok:true, email.status failed)', async () => {
+  // Final review: raw provider text never reaches the browser; only fixed reason codes do.
+  it('an email failure keeps the rejection (200 ok:true, email.status failed) without the raw provider text', async () => {
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({ message: 'provider down' }), { status: 500 }))
     const { d, logs, status } = deps({ fetch: fetchFn as unknown as typeof fetch })
     const res = await handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'No' }), d)
     expect(res.status).toBe(200)
-    expect(await json(res)).toEqual({ ok: true, status: 'rejected', email: { status: 'failed', error: 'provider down' } })
+    expect(await json(res)).toEqual({ ok: true, status: 'rejected', email: { status: 'failed' } })
     expect(status[APP]).toBe('rejected')
     expect(logs[0]).toMatchObject({ kind: 'application_decision', status: 'failed' })
   })
 
-  it('an email_log failure after the rejection still answers ok, with the send outcome and the log failure', async () => {
+  it('an email_log failure after the rejection still answers ok, with the send outcome only', async () => {
     const { d, status } = deps({ log: async () => Promise.reject(new Error('insert failed')) })
     const res = await handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'No' }), d)
     expect(res.status).toBe(200)
-    expect(await json(res)).toEqual({ ok: true, status: 'rejected', email: { status: 'accepted', error: 'email_log_failed' } })
+    expect(await json(res)).toEqual({ ok: true, status: 'rejected', email: { status: 'accepted' } })
     expect(status[APP]).toBe('rejected')
+  })
+
+  it('a fixed config reason (test sender) is passed through', async () => {
+    const { d } = deps({ config: { ok: true, config: { ...CONFIG, from: 'Sanctus <onboarding@resend.dev>', testRecipients: ['owner@account.test'] } } })
+    const res = await handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'No' }), d)
+    expect(await json(res)).toEqual({ ok: true, status: 'rejected', email: { status: 'blocked', error: 'test_sender_recipient_not_allowed' } })
+  })
+
+  it('an unexpected throw while sending answers failed with no error text', async () => {
+    const fetchFn = vi.fn(async () => {
+      throw new Error('socket hang up: secret detail')
+    })
+    const { d } = deps({ fetch: fetchFn as unknown as typeof fetch, log: async () => { throw new Error('boom') } })
+    const res = await handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'No' }), d)
+    const body = (await json(res)) as { email: { status: string; error?: string } }
+    expect(body.email.error).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain('socket')
   })
 
   it('without email settings the rejection stands and the attempt is logged as blocked', async () => {

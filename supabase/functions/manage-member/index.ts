@@ -3,6 +3,8 @@
 // database checks the Owner; the service role is used only to sign a deactivated member out and to delete a removed
 // member's unused login.
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
+import { callerRpc } from '../_shared/caller.ts'
+import { gateCaller } from '../_shared/gate.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
 import { handleManageMember } from './handler.ts'
 
@@ -16,6 +18,8 @@ Deno.serve((req) =>
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)
     },
+    // 2FA first, then the platform Owner (R-W1-1, spec §10.3); the SQL functions check the Owner again.
+    gate: (token) => gateCaller(callerRpc(url, env('SUPABASE_ANON_KEY') ?? '', token), 'owner'),
     async rpcAsCaller(token, fn, args) {
       const caller = createClient(url, env('SUPABASE_ANON_KEY') ?? '', {
         auth: { persistSession: false, autoRefreshToken: false },

@@ -1,5 +1,6 @@
 // R-W2-9: the possible-duplicates warning on the application detail page.
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
@@ -59,6 +60,14 @@ describe('PossibleDuplicates (R-W2-9)', () => {
     renderPanel()
     expect(await screen.findByText("Couldn't check for possible duplicates. You can still review this application.")).toBeInTheDocument()
     expect(screen.queryByText('Network down.')).not.toBeInTheDocument()
+  })
+
+  it("the error state offers 'Try again', which re-checks", async () => {
+    const spy = vi.spyOn(service, 'getApplicationDuplicates').mockResolvedValueOnce(fail('UNKNOWN', 'Network down.')).mockResolvedValueOnce(ok(FOUND))
+    renderPanel()
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('Possible duplicates')).toBeInTheDocument()
+    expect(spy).toHaveBeenCalledTimes(2)
   })
 
   it("an application row reads 'Application {reference} · {businessName} · {status label} · same email' and links to applicationAdminPath(id)", async () => {

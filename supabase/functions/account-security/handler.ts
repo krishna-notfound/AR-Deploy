@@ -4,7 +4,7 @@
 // The caller comes from getUser() on their JWT, never from the body. Action codes and recovery codes exist in plain
 // text only inside this function and the email to the account holder: only salted SHA-256 hashes reach the database,
 // and neither is ever logged, audited or put in the email log (which stores the subject, kind and status only).
-import type { EmailStatus, LogEntry, OutgoingEmail, SendAndLogResult } from '../_shared/email.ts'
+import { type EmailStatus, type LogEntry, type OutgoingEmail, SAFE_EMAIL_REASONS, type SendAndLogResult } from '../_shared/email.ts'
 import { type RenderedEmail, type SecurityNotice, closureCancelledEmail, closureRequestEmail, securityCodeEmail, securityNoticeEmail, teamNoticeEmail } from '../_shared/email-templates.ts'
 import { UUID, bearerToken, clientIp, readJsonObject, reply, sha256Hex } from '../_shared/http.ts'
 
@@ -430,9 +430,7 @@ async function notify(ctx: Ctx, user: string, notice: SecurityNotice, knownEmail
 }
 
 /** The fixed reasons a notice may carry to the app. Provider text never leaves this function (§10.2: no raw text). */
-const NOTICE_REASONS: ReadonlySet<string> = new Set([
-  'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'no_recipient', 'admin_recipient_not_configured', 'demo_mode',
-])
+const NOTICE_REASONS = SAFE_EMAIL_REASONS
 
 async function sendQuietly(ctx: Ctx, email: SecurityEmail): Promise<NoticeOutcome> {
   try {
