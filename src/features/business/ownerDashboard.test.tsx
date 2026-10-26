@@ -108,15 +108,20 @@ describe('owner catalogue preview (DUX-02, ADR-0025)', () => {
     expect(link).toHaveAttribute('href', '/products/oak-ember/sunny-loveseat?preview=1')
   })
 
-  it('still answers "unavailable" to an anonymous visitor', async () => {
+  // R-W8-2: the demo follows the database's RLS, so a paused catalogue is not readable by outsiders at all. The page
+  // shows the not-found state (the separate "unavailable" page was dropped), and no preview or content leaks.
+  it('reads as not found to an anonymous visitor (R-W8-2)', async () => {
     openApp('/catalog/oak-ember?preview=1')
-    expect(await screen.findByRole('heading', { name: 'This catalog is currently unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Catalog not found' })).toBeInTheDocument()
     expect(screen.queryByText(/Preview\. Customers cannot see/)).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Oak & Ember Studio' })).toBeNull()
   })
 
-  it('still answers "unavailable" to the owner of another business', async () => {
+  it('reads as not found to the owner of another business (R-W8-2)', async () => {
     openApp('/catalog/oak-ember?preview=1', asOwner('biz_casa'))
-    expect(await screen.findByRole('heading', { name: 'This catalog is currently unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Catalog not found' })).toBeInTheDocument()
+    expect(screen.queryByText(/Preview\. Customers cannot see/)).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Oak & Ember Studio' })).toBeNull()
   })
 })
 
