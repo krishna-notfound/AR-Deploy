@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Input, Textarea } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
-import type { InviteOutcome, MemberRole } from '@/domain/types'
+import type { InviteOutcome, MemberRole, PlatformMember } from '@/domain/types'
 import { cn } from '@/lib/cn'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
@@ -21,7 +21,24 @@ const ORDER = PERMISSION_GROUPS.flatMap((g) => g.items)
 
 type Step = { kind: 'form' } | { kind: 'review' } | { kind: 'done'; outcome: InviteOutcome }
 
-export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean; onClose: () => void; onInvited?: (memberId: string) => void }) {
+/** R-W6-9: what to do when the email is already on the team, by that member's status in the loaded list. */
+const ALREADY_MEMBER: Partial<Record<PlatformMember['status'], string>> = {
+  invited: 'This person already has an invitation. Use Resend on their row.',
+  deactivated: 'This person was deactivated. Reactivate them, or remove them to start over.',
+}
+
+export function InviteMemberDialog({
+  open,
+  onClose,
+  onInvited,
+  members = [],
+}: {
+  open: boolean
+  onClose: () => void
+  onInvited?: (memberId: string) => void
+  /** The team list already loaded on the page, to explain an already_member refusal. */
+  members?: PlatformMember[]
+}) {
   const prefs = usePreferences()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<MemberRole>('team')
@@ -54,7 +71,8 @@ export function InviteMemberDialog({ open, onClose, onInvited }: { open: boolean
   const send = async () => {
     const r = await invite.mutate()
     if (!r.ok) {
-      setError(r.error.message)
+      const existing = r.error.reason === 'already_member' ? members.find((m) => m.email.toLowerCase() === clean) : undefined
+      setError((existing && ALREADY_MEMBER[existing.status]) ?? r.error.message)
       setStep({ kind: 'form' })
       return
     }

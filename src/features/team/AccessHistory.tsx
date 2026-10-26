@@ -33,9 +33,15 @@ export const ACTION_LABEL: Record<AccessAction, string> = {
 
 const roleName = (r?: string) => (r === 'owner' || r === 'admin' || r === 'team' ? ROLE_LABEL[r] : r)
 
-export function AccessHistory({ member }: { member?: string }) {
+/**
+ * The whole access history (with filters), or one member's: events about that member, and the access refusals of
+ * their login, matched on exact ids (R-W6-4).
+ */
+export function AccessHistory({ member }: { member?: { id: string; userId: string | null } }) {
   const [params, setParams] = useSearchParams()
-  const q = member ?? params.get('hq') ?? ''
+  const q = member ? '' : (params.get('hq') ?? '')
+  const memberId = member?.id
+  const userId = member?.userId ?? undefined
   const action = (Object.keys(ACTION_LABEL) as string[]).includes(params.get('action') ?? '') ? (params.get('action') as AccessAction) : undefined
   const outcome = params.get('outcome') === 'ok' || params.get('outcome') === 'denied' ? (params.get('outcome') as 'ok' | 'denied') : undefined
   const from = params.get('from') ?? ''
@@ -43,8 +49,8 @@ export function AccessHistory({ member }: { member?: string }) {
   const page = Math.max(1, Number(params.get('page') ?? 1) || 1)
 
   const events = useServiceQuery(
-    () => service.getAccessEvents({ q: q || undefined, action, outcome, from: from || undefined, to: to || undefined, page, pageSize: PAGE_SIZE }),
-    [q, action, outcome, from, to, page],
+    () => service.getAccessEvents({ q: q || undefined, memberId, userId, action, outcome, from: from || undefined, to: to || undefined, page, pageSize: PAGE_SIZE }),
+    [q, memberId, userId, action, outcome, from, to, page],
   )
 
   const set = (key: string, value: string) =>

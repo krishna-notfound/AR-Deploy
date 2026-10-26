@@ -4,6 +4,8 @@
 //   POST { action: "resend", memberId }                         → a new link for someone still invited (the old one stops working)
 // The link secret is 32 random bytes; only its SHA-256 is stored. The secret goes into the email only: it is never
 // returned, logged or put in the audit log. A provider failure is reported as email_failed, never as sent.
+// The email lists the role's permissions at send time; the note is stored on the invite, and a resend reuses the
+// newest invite's note (R-W6-5).
 import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
@@ -25,7 +27,12 @@ export interface InviteDeps {
   /** admin_invite_member, called with the caller's own token so the database re-checks the Owner. */
   inviteMember(token: string, email: string, role: MemberRole): Promise<DbResult<{ memberId: string }>>
   getMember(id: string): Promise<{ id: string; email: string; role: MemberRole; status: string } | null>
-  createInvite(memberId: string, tokenHash: string, expiresAt: string, actorId: string): Promise<DbResult<{ inviteId: string }>>
+  /** service_create_member_invite; the note (or null) is stored on the invite. */
+  createInvite(memberId: string, tokenHash: string, expiresAt: string, actorId: string, note: string | null): Promise<DbResult<{ inviteId: string }>>
+  /** The role's permission keys now (platform_role_permissions), for the email's bullets. */
+  rolePermissions(role: MemberRole): Promise<string[]>
+  /** The note of the member's newest invite, or null (service_latest_invite_note). */
+  latestNote(memberId: string): Promise<string | null>
   recordEmail(inviteId: string, ok: boolean, detail: string): Promise<void>
   inviterName(userId: string): Promise<string | null>
   logDenied(actorId: string, action: string): Promise<void>
@@ -73,6 +80,7 @@ export async function handleInviteMember(req: Request, deps: InviteDeps): Promis
   } else {
     if (typeof body.memberId !== 'string' || !UUID.test(body.memberId)) return reply(400, { error: 'invalid_request' })
     memberId = body.memberId
+    note = (await deps.latestNote(memberId)) ?? undefined
   }
 
   const member = await deps.getMember(memberId)
@@ -81,12 +89,15 @@ export async function handleInviteMember(req: Request, deps: InviteDeps): Promis
 
   const now = (deps.now ?? (() => new Date()))()
   const expiresAt = new Date(now.getTime() + INVITE_DAYS * 86_400_000).toISOString()
+  // Read before the invite is created, so a failed read leaves no unsent link behind.
+  const permissions = await deps.rolePermissions(member.role)
   const secret = newInviteSecret()
-  const invite = await deps.createInvite(member.id, await hashSecret(secret), expiresAt, actorId)
+  const invite = await deps.createInvite(member.id, await hashSecret(secret), expiresAt, actorId, note ?? null)
   if ('error' in invite) return reply(STATUS_FOR[invite.error] ?? 400, { error: invite.error })
 
   const email = renderEmail('team_invitation', 'en', {
     role: member.role,
+    permissions,
     note,
     expiresAt,
     inviterName: (await deps.inviterName(actorId)) ?? undefined,

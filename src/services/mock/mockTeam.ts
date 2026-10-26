@@ -7,7 +7,7 @@ import { newId } from '@/lib/id'
 import { PASSWORD_MIN } from '../accountService'
 import { type CatalogService, type Result, ok, teamFail } from '../catalogService'
 import type { Db } from './db'
-import { type DemoTeam, DEMO_OWNER_EMAIL, createDemoTeam } from './teamSeed'
+import { type DemoAccessEvent, type DemoTeam, DEMO_OWNER_EMAIL, createDemoTeam } from './teamSeed'
 // Circular with mockAccount (it reads demoPlatformRole): both use the other only inside functions, never at load.
 import { mockAccountService } from './mockAccount'
 import { store } from './store'
@@ -42,8 +42,12 @@ const effective = (i: MemberInvite) => (LIVE.has(i.status) && Date.parse(i.expir
 const nowIso = () => new Date().toISOString()
 const actor = () => (demoPlatformRole() === 'owner' ? DEMO_OWNER_EMAIL : `demo ${demoPlatformRole() ?? 'visitor'}`)
 
-function record(t: DemoTeam, e: { action: AccessAction; member?: string | null; fromRole?: string; toRole?: string; details: string; outcome?: 'ok' | 'denied' }) {
-  const event: AccessEvent = { id: newId('acc'), at: nowIso(), actor: actor(), member: e.member ?? null, action: e.action, outcome: e.outcome ?? 'ok', details: e.details }
+function record(t: DemoTeam, e: { action: AccessAction; member?: string | null; memberId?: string; fromRole?: string; toRole?: string; details: string; outcome?: 'ok' | 'denied' }) {
+  const event: DemoAccessEvent = { id: newId('acc'), at: nowIso(), actor: actor(), member: e.member ?? null, action: e.action, outcome: e.outcome ?? 'ok', details: e.details }
+  // The exact ids a member's history filters on (R-W6-4): the member the event is about, and who acted.
+  if (e.memberId) event.memberId = e.memberId
+  const role = demoPlatformRole()
+  if (role) event.actorId = DEMO_VIEWER[role]
   if (e.fromRole) event.fromRole = e.fromRole
   if (e.toRole) event.toRole = e.toRole
   t.events.unshift(event)
@@ -90,8 +94,22 @@ function issueInvite(t: DemoTeam, m: PlatformMember): InviteOutcome {
     createdBy: DEMO_OWNER_EMAIL, lastEmailAt: sentAt, lastEmailResult: 'demo: no email sent', acceptedAt: null, revokedAt: null,
   }
   ;(t.invites[m.id] ??= []).unshift(invite)
-  record(t, { action: 'invite_email_sent', member: m.email, toRole: m.role, details: 'Demo: recorded as sent, no email is sent' })
+  record(t, { action: 'invite_email_sent', member: m.email, memberId: m.id, toRole: m.role, details: 'Demo: recorded as sent, no email is sent' })
   return { memberId: m.id, status: 'sent', sentAt, expiresAt: invite.expiresAt }
+}
+
+/** Demo Reset 2FA (R-W6-6): whether this login's team member has 2FA to reset; null when they are not on the team. */
+export function demoMemberHas2fa(userId: string): boolean | null {
+  const m = team(store.get()).members.find((x) => x.userId === userId)
+  return m ? m.has2fa : null
+}
+
+/** After a demo Reset 2FA: the member has nothing left to reset. */
+export function clearDemoMember2fa(userId: string): void {
+  store.update((d) => {
+    const m = team(d).members.find((x) => x.userId === userId)
+    if (m) m.has2fa = false
+  })
 }
 
 export function createMockTeam(run: Run): TeamMethods {
@@ -150,10 +168,10 @@ export function createMockTeam(run: Run): TeamMethods {
           let m = tt.members.find((x) => x.email === clean)
           if (m) Object.assign(m, { role, status: 'invited', deactivatedAt: null, invitedBy: DEMO_OWNER_EMAIL })
           else {
-            m = { id: newId('mem'), userId: null, email: clean, fullName: null, role, status: 'invited', invitedBy: DEMO_OWNER_EMAIL, createdAt: nowIso(), activatedAt: null, deactivatedAt: null, lastSignInAt: null, invite: null }
+            m = { id: newId('mem'), userId: null, email: clean, fullName: null, role, status: 'invited', invitedBy: DEMO_OWNER_EMAIL, createdAt: nowIso(), activatedAt: null, deactivatedAt: null, lastSignInAt: null, invite: null, has2fa: false }
             tt.members.push(m)
           }
-          record(tt, { action: 'invite_created', member: clean, toRole: role, details: `Invited as ${role === 'admin' ? 'Admin' : 'Team'}` })
+          record(tt, { action: 'invite_created', member: clean, memberId: m.id, toRole: role, details: `Invited as ${role === 'admin' ? 'Admin' : 'Team'}` })
           outcome = issueInvite(tt, m)
         })
         return ok(outcome!)
@@ -182,7 +200,7 @@ export function createMockTeam(run: Run): TeamMethods {
         store.update((d) => {
           const tt = team(d)
           for (const i of tt.invites[id] ?? []) if (LIVE.has(i.status)) Object.assign(i, { status: 'revoked', revokedAt: nowIso() })
-          record(tt, { action: 'invite_revoked', member: m.email, details: 'Invitation revoked' })
+          record(tt, { action: 'invite_revoked', member: m.email, memberId: m.id, details: 'Invitation revoked' })
         })
         return ok(undefined)
       }),
@@ -196,7 +214,7 @@ export function createMockTeam(run: Run): TeamMethods {
         if (m.role === role) return ok(undefined)
         store.update((d) => {
           const mm = team(d).members.find((x) => x.id === id)!
-          record(team(d), { action: 'role_changed', member: mm.email, fromRole: mm.role, toRole: role, details: `Role changed to ${role === 'admin' ? 'Admin' : 'Team'}` })
+          record(team(d), { action: 'role_changed', member: mm.email, memberId: mm.id, fromRole: mm.role, toRole: role, details: `Role changed to ${role === 'admin' ? 'Admin' : 'Team'}` })
           mm.role = role
         })
         return ok(undefined)
@@ -214,7 +232,7 @@ export function createMockTeam(run: Run): TeamMethods {
           const mm = tt.members.find((x) => x.id === id)!
           for (const i of tt.invites[id] ?? []) if (LIVE.has(i.status)) Object.assign(i, { status: 'revoked', revokedAt: nowIso() })
           Object.assign(mm, { status: 'deactivated', deactivatedAt: nowIso() })
-          record(tt, { action: 'member_deactivated', member: mm.email, fromRole: mm.role, details: 'Deactivated and signed out' })
+          record(tt, { action: 'member_deactivated', member: mm.email, memberId: mm.id, fromRole: mm.role, details: 'Deactivated and signed out' })
         })
         return ok({})
       }),
@@ -228,7 +246,7 @@ export function createMockTeam(run: Run): TeamMethods {
         store.update((d) => {
           const mm = team(d).members.find((x) => x.id === id)!
           Object.assign(mm, { status: mm.userId ? 'active' : 'invited', deactivatedAt: null })
-          record(team(d), { action: 'member_reactivated', member: mm.email, toRole: mm.role, details: mm.userId ? 'Reactivated' : 'Reactivated; needs a new invitation' })
+          record(team(d), { action: 'member_reactivated', member: mm.email, memberId: mm.id, toRole: mm.role, details: mm.userId ? 'Reactivated' : 'Reactivated; needs a new invitation' })
         })
         return ok(undefined)
       }),
@@ -265,17 +283,22 @@ export function createMockTeam(run: Run): TeamMethods {
           return teamFail('forbidden')
         }
         const q = query.q?.trim().toLowerCase()
+        // One member's history: exact ids, as the Supabase query does (R-W6-4).
+        const scoped = query.memberId !== undefined || query.userId !== undefined
+        const mine = (e: DemoAccessEvent) =>
+          (!!query.memberId && e.memberId === query.memberId) || (!!query.userId && e.action === 'denied' && e.actorId === query.userId)
         const items = (store.get().team ?? createDemoTeam()).events.filter(
           (e) =>
             (!query.action || e.action === query.action) &&
             (!query.outcome || e.outcome === query.outcome) &&
             (!query.from || e.at.slice(0, 10) >= query.from) &&
             (!query.to || e.at.slice(0, 10) <= query.to) &&
+            (!scoped || mine(e)) &&
             (!q || [e.actor, e.member, e.details].some((v) => v?.toLowerCase().includes(q))),
         )
         const size = query.pageSize ?? 20
         const page = query.page ?? 1
-        return ok({ items: items.slice((page - 1) * size, page * size), total: items.length })
+        return ok({ items: items.slice((page - 1) * size, page * size).map(({ memberId: _m, actorId: _a, ...e }): AccessEvent => e), total: items.length })
       }),
 
     inspectInvite: (token) =>
@@ -312,7 +335,7 @@ export function createMockTeam(run: Run): TeamMethods {
           const ii = tt.invites[ref.memberId]!.find((i) => i.id === ref.inviteId)!
           Object.assign(mm, { status: 'active', userId: `usr_${mm.id}`, fullName: fullName.trim() || null, activatedAt: nowIso(), lastSignInAt: nowIso() })
           Object.assign(ii, { status: 'accepted', acceptedAt: nowIso() })
-          tt.events.unshift({ id: newId('acc'), at: nowIso(), actor: mm.email, member: mm.email, action: 'invite_accepted', outcome: 'ok', toRole: mm.role, details: `Joined as ${mm.role === 'admin' ? 'Admin' : 'Team'}` })
+          tt.events.unshift({ id: newId('acc'), at: nowIso(), actor: mm.email, member: mm.email, memberId: mm.id, actorId: `usr_${mm.id}`, action: 'invite_accepted', outcome: 'ok', toRole: mm.role, details: `Joined as ${mm.role === 'admin' ? 'Admin' : 'Team'}` })
         })
         return ok({ email: m.email })
       }),

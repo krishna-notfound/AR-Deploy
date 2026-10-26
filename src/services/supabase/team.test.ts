@@ -139,4 +139,39 @@ describe('Supabase team service', () => {
       error: { code: 'PERMISSION', reason: 'forbidden', message: "You don't have permission to do this." },
     })
   })
+
+  // R-W6-4: a member's history is matched on exact ids; there is no ilike search on email.
+  it('access history for one member filters on member_id, or access_denied by their login, with no ilike', async () => {
+    const calls: [string, ...unknown[]][] = []
+    const builder: Record<string, unknown> = {}
+    for (const m of ['select', 'like', 'order', 'range', 'eq', 'neq', 'gte', 'lte', 'ilike', 'or']) {
+      builder[m] = (...args: unknown[]) => (calls.push([m, ...args]), builder)
+    }
+    builder.then = (resolve: (v: unknown) => void) => resolve({ data: [], count: 0, error: null })
+    const sb = { from: vi.fn(() => builder), rpc: vi.fn() } as unknown as SupabaseClient
+    const team = createSupabaseTeam(sb)
+    const MEMBER = '00000000-0000-4000-8000-0000000000c1'
+    const USER = '00000000-0000-4000-8000-0000000000d1'
+
+    expect(await team.getAccessEvents({ memberId: MEMBER, userId: USER })).toEqual({ ok: true, data: { items: [], total: 0 } })
+    expect(calls).toContainEqual(['or', `metadata->>member_id.eq.${MEMBER},and(event_type.eq.access_denied,actor_id.eq.${USER})`])
+    expect(calls.some(([m]) => m === 'ilike')).toBe(false)
+
+    calls.length = 0
+    await team.getAccessEvents({ memberId: MEMBER }) // invited: no login yet
+    expect(calls).toContainEqual(['eq', 'metadata->>member_id', MEMBER])
+    expect(calls.some(([m]) => m === 'ilike' || m === 'or')).toBe(false)
+
+    // Anything that is not an id never reaches the filter string.
+    calls.length = 0
+    expect(await team.getAccessEvents({ memberId: 'x,or(id.neq.0)', userId: USER })).toEqual({ ok: true, data: { items: [], total: 0 } })
+    expect(calls).toEqual([])
+  })
+
+  it('passes has2fa through from admin_list_members (R-W6-6)', async () => {
+    const row = { id: 'm1', userId: null, email: 'ana@studio.test', fullName: null, role: 'team', status: 'invited', invitedBy: null, createdAt: 'a', activatedAt: null, deactivatedAt: null, lastSignInAt: null, invite: null, has2fa: false }
+    const { sb } = stub({ admin_list_members: { members: [row, { ...row, id: 'm2', has2fa: true }] } })
+    const r = await createSupabaseTeam(sb).listMembers()
+    expect(r.ok && r.data.map((m) => m.has2fa)).toEqual([false, true])
+  })
 })

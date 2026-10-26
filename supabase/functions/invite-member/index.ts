@@ -37,13 +37,24 @@ Deno.serve((req) =>
       if (error) throw new Error(`member lookup failed: ${error.message}`)
       return data
     },
-    async createInvite(memberId, tokenHash, expiresAt, actorId) {
+    async createInvite(memberId, tokenHash, expiresAt, actorId, note) {
       const { data, error } = await admin.rpc('service_create_member_invite', {
-        p_member: memberId, p_token_hash: tokenHash, p_expires_at: expiresAt, p_actor: actorId,
+        p_member: memberId, p_token_hash: tokenHash, p_expires_at: expiresAt, p_actor: actorId, p_note: note,
       })
       // The message could quote the hash; log only the code.
       if (error) throw new Error(`invite insert failed: ${error.code ?? 'unknown'}`)
       return data as { ok: true; inviteId: string } | { error: string }
+    },
+    async rolePermissions(role) {
+      const { data, error } = await admin.from('platform_role_permissions').select('permission').eq('role', role)
+      if (error) throw new Error(`role permissions lookup failed: ${error.code ?? 'unknown'}`)
+      return ((data ?? []) as { permission: string }[]).map((r) => r.permission)
+    },
+    async latestNote(memberId) {
+      const { data, error } = await admin.rpc('service_latest_invite_note', { p_member: memberId })
+      // The message could quote the note; log only the code.
+      if (error) throw new Error(`invite note lookup failed: ${error.code ?? 'unknown'}`)
+      return typeof data === 'string' ? data : null
     },
     async recordEmail(inviteId, ok, detail) {
       const { error } = await admin.rpc('service_record_invite_email', { p_invite: inviteId, p_ok: ok, p_detail: detail })

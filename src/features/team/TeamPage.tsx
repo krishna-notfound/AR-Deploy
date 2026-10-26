@@ -23,6 +23,10 @@ import { MembersTable } from './MembersTable'
 type Tab = 'members' | 'invitations' | 'history'
 const TABS: Tab[] = ['members', 'invitations', 'history']
 
+/** An invitation link that can still be used: sent or pending, and not past its expiry. */
+const liveLink = (m: PlatformMember) =>
+  !!m.invite && (m.invite.status === 'sent' || m.invite.status === 'pending') && Date.parse(m.invite.expiresAt) > Date.now()
+
 export default function TeamPage() {
   const [params, setParams] = useSearchParams()
   const tab = (TABS as string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'members'
@@ -33,7 +37,9 @@ export default function TeamPage() {
   const counts = useMemo(
     () => ({
       active: list.filter((m) => m.status === 'active').length,
-      pending: list.filter((m) => m.status === 'invited').length,
+      invited: list.filter((m) => m.status === 'invited').length,
+      // R-W6-9: only links that can still be used (sent or pending, not past their expiry).
+      pending: list.filter((m) => m.status === 'invited' && liveLink(m)).length,
       admins: list.filter((m) => m.role === 'admin' && m.status === 'active').length,
       team: list.filter((m) => m.role === 'team' && m.status === 'active').length,
     }),
@@ -90,7 +96,7 @@ export default function TeamPage() {
         onChange={(v) => setParam('tab', v === 'members' ? null : v)}
         tabs={[
           { value: 'members', label: 'Members', badge: members.data ? list.length : undefined },
-          { value: 'invitations', label: 'Invitations', badge: members.data ? counts.pending : undefined },
+          { value: 'invitations', label: 'Invitations', badge: members.data ? counts.invited : undefined },
           { value: 'history', label: (<span className="inline-flex items-center gap-1.5"><History className="size-3.5" aria-hidden />Access history</span>) },
         ]}
       />
@@ -110,7 +116,7 @@ export default function TeamPage() {
       </Card>
 
       <InvitationPanel member={inviteFor} onClose={() => setParam('invite', null)} />
-      <InviteMemberDialog open={params.get('new') === '1'} onClose={() => setParam('new', null)} onInvited={() => members.refetch()} />
+      <InviteMemberDialog open={params.get('new') === '1'} onClose={() => setParam('new', null)} onInvited={() => members.refetch()} members={list} />
     </>
   )
 }

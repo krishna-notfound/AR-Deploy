@@ -503,6 +503,25 @@ describe('account-security', () => {
     expect(s.sends.map((m) => m.to)).toEqual(['staff@sanctus.test'])
   })
 
+  // R-W6-6: Reset 2FA needs something to reset (a verified factor or unused recovery codes).
+  it('owner_reset_2fa on a member with no factor and no codes → 409 nothing_to_reset, no email, no event', async () => {
+    const { d, s } = deps()
+    const code = await codeFor(d, s, OWNER, 'owner_reset_2fa')
+    s.factors[STAFF] = [{ id: 'f-pending', type: 'totp', status: 'unverified', updatedAt: '2026-10-01T10:00:00Z' }]
+    s.recovery[STAFF] = { salt: 'x', rows: [{ hash: 'h', used: true }] }
+    s.sends.length = 0
+    s.events.length = 0
+    const r = await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code })
+    expect(r.status).toBe(409)
+    expect(await json(r)).toEqual({ ok: false, error: 'nothing_to_reset' })
+    expect(s.sends).toEqual([])
+    expect(s.events).toEqual([])
+    expect(s.deletedFactors).toEqual([])
+    // The code was not used up: once there is something to reset, the same code works.
+    s.recovery[STAFF] = { salt: 'x', rows: [{ hash: 'h', used: false }] }
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code }))).toEqual({ ok: true })
+  })
+
   it('complete_closure: Owner at aal2 with a code; deletes the business, then the user; logs with email removed', async () => {
     const { d, s } = deps()
     s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }

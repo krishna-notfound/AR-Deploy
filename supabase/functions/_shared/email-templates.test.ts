@@ -20,19 +20,34 @@ describe('invitation email with a code (ADR-0027)', () => {
 })
 
 describe('team invitation email (ADR-0030)', () => {
-  const data = { role: 'admin' as const, actionUrl: 'https://x.app/join#t=abc', expiresAt: '2026-11-01T12:00:00Z', note: '<b>hi</b>', inviterName: 'Owner' }
+  const data = {
+    role: 'admin' as const,
+    permissions: ['applications.approve', 'businesses.view'],
+    actionUrl: 'https://x.app/join#t=abc',
+    expiresAt: '2026-11-01T12:00:00Z',
+    note: '<b>hi</b>',
+    inviterName: 'Owner',
+  }
 
   it('names the role, lists what it can do, escapes the note and gives the expiry', () => {
     const e = renderEmail('team_invitation', 'en', data)
     expect(e.subject).toBe("You're invited to Sanctus")
     expect(e.html).toContain('as <strong>Admin</strong>')
-    expect(e.html).toContain('Review and approve business applications')
+    // R-W6-5: the role's permissions at send time, with the dashboard labels, in the dashboard order.
+    expect(e.text).toContain('As Admin you can:\n- View businesses\n- Approve applications')
     expect(e.html).toContain('&lt;b&gt;hi&lt;/b&gt;')
     expect(e.html).not.toContain('<b>hi</b>')
     expect(e.html).toContain('Accept invitation')
     expect(e.html).toContain('1 November 2026')
     expect(e.html).toContain('contact the platform owner')
     expect(e.text).toContain('https://x.app/join#t=abc')
+  })
+
+  it('a role with no permissions gets no list and no "you can"', () => {
+    const e = renderEmail('team_invitation', 'en', { ...data, permissions: [] })
+    expect(e.text).toContain('join the platform as Admin.\n')
+    expect(e.text).not.toContain('you can')
+    expect(e.html).not.toContain('<li')
   })
 
   it('refuses a note over 500 characters', () => {

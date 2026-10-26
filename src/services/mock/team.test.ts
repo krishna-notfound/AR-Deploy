@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Result } from '../catalogService'
+import { DEMO_CODE, mockAccountService, resetMockAccount } from './mockAccount'
 import { mockCatalogService as svc } from './mockCatalogService'
 import { createSeed } from './seed'
 import { store } from './store'
@@ -81,5 +82,61 @@ describe('team (demo service)', () => {
     expect(after.total).toBe(before + 2)
     expect(after.items[0]!.action).toBe('member_reactivated')
     expect(unwrap(await svc.getAccessEvents({ outcome: 'denied' })).items.every((e) => e.outcome === 'denied')).toBe(true)
+  })
+
+  // R-W6-4: a member's history is matched on exact ids, never an email search.
+  it("access history for delivered+a_b@resend.dev shows its events; an@x.pt doesn't show jan@x.pt's", async () => {
+    const plus = unwrap(await svc.inviteMember({ email: 'delivered+a_b@resend.dev', role: 'team' })).memberId
+    const an = unwrap(await svc.inviteMember({ email: 'an@x.pt', role: 'team' })).memberId
+    const jan = unwrap(await svc.inviteMember({ email: 'jan@x.pt', role: 'admin' })).memberId
+    unwrap(await svc.revokeMemberInvite(jan))
+    const history = async (memberId: string) => unwrap(await svc.getAccessEvents({ memberId })).items.map((e) => [e.member, e.action])
+    expect(await history(plus)).toEqual([
+      ['delivered+a_b@resend.dev', 'invite_email_sent'],
+      ['delivered+a_b@resend.dev', 'invite_created'],
+    ])
+    expect(await history(an)).toEqual([
+      ['an@x.pt', 'invite_email_sent'],
+      ['an@x.pt', 'invite_created'],
+    ])
+    expect((await history(jan)).map(([, a]) => a)).toEqual(['invite_revoked', 'invite_email_sent', 'invite_created'])
+  })
+
+  it("a member's history includes the access refusals of their login, and only theirs", async () => {
+    as('team') // João tries something only the Owner may do
+    expect((await svc.listMembers()).ok).toBe(false)
+    as('owner')
+    const members = unwrap(await svc.listMembers())
+    const joao = members.find((m) => m.email.startsWith('joao'))!
+    const items = unwrap(await svc.getAccessEvents({ memberId: joao.id, userId: joao.userId! })).items
+    expect(items.filter((e) => e.action === 'denied')).toHaveLength(2) // the seeded one and this one
+    expect(items.map((e) => e.action)).toContain('invite_accepted')
+    const ana = members.find((m) => m.email.startsWith('ana'))!
+    expect(unwrap(await svc.getAccessEvents({ memberId: ana.id, userId: ana.userId! })).items.some((e) => e.action === 'denied')).toBe(false)
+  })
+
+  it('lists has2fa per member (R-W6-6)', async () => {
+    const members = unwrap(await svc.listMembers())
+    expect(Object.fromEntries(members.map((m) => [m.email.split('@')[0], m.has2fa]))).toMatchObject({
+      'ana.ribeiro': true,
+      'joao.costa': true,
+      'marta.lopes': false,
+      'pedro.alves': false,
+    })
+  })
+
+  it('Reset 2FA: nothing_to_reset for a member without 2FA; after a reset, has2fa is false (R-W6-6)', async () => {
+    resetMockAccount()
+    const e = await mockAccountService.startTotpEnrollment() // the demo Owner at aal2
+    if (!e.ok) throw new Error('enrollment did not start')
+    unwrap(await mockAccountService.confirmTotpEnrollment(e.data.factorId, DEMO_CODE))
+    const members = unwrap(await svc.listMembers())
+    const pedro = members.find((m) => m.email.startsWith('pedro'))!
+    const r = await mockAccountService.ownerReset2fa(pedro.userId!, DEMO_CODE)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toMatchObject({ code: 'CONFLICT', reason: 'nothing_to_reset' })
+    const ana = members.find((m) => m.email.startsWith('ana'))!
+    unwrap(await mockAccountService.ownerReset2fa(ana.userId!, DEMO_CODE))
+    expect(unwrap(await svc.listMembers()).find((m) => m.id === ana.id)?.has2fa).toBe(false)
   })
 })

@@ -80,8 +80,9 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
     after(actions.changeRole(m, otherRole, from.filter((p) => !to.includes(p)), to.filter((p) => !from.includes(p))))
   }
   const live = m.invite && ['pending', 'sent', 'email_failed'].includes(m.invite.status)
-  // Owner support action (spec 8): only for someone with an account (an invited member has none yet), never the Owner.
-  const resetTarget = can('owner') && !isOwner ? m.userId : null
+  // Owner support action (spec 8): only for someone with an account (an invited member has none yet), never the Owner,
+  // and only when they have 2FA to reset (R-W6-6).
+  const resetTarget = can('owner') && !isOwner && m.has2fa ? m.userId : null
   const name = m.fullName ?? m.email
 
   return (
@@ -140,7 +141,10 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
           onClose={() => setResetting(false)}
           onConfirm={async (code) => {
             const r = await account.ownerReset2fa(resetTarget, code)
-            if (r.ok) toast.success('Their 2FA was reset. They were emailed.')
+            if (r.ok) {
+              toast.success('Their 2FA was reset. They were emailed.')
+              onChanged() // has2fa is now false: the button goes away
+            }
             return r
           }}
         />
@@ -233,7 +237,7 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
       <section aria-label="Access history" className="mt-6">
         <Card>
           <h2 className="border-b border-line px-4 py-4 text-ui-card font-semibold text-ink sm:px-6">Access history</h2>
-          <AccessHistory member={m.email} />
+          <AccessHistory member={{ id: m.id, userId: m.userId }} />
         </Card>
       </section>
     </>

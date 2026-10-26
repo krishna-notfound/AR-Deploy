@@ -6,7 +6,7 @@ import type { ClosureRequest, PlatformSettings, Profile, SecurityEvent, Security
 import { newId } from '@/lib/id'
 import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, PASSWORD_MAX, PASSWORD_MIN, accountFail } from '../accountService'
 import { type Result, ok } from '../catalogService'
-import { demoPlatformRole } from './mockTeam'
+import { clearDemoMember2fa, demoMemberHas2fa, demoPlatformRole } from './mockTeam'
 
 /** The only code the demo accepts, for action codes and the authenticator alike. */
 export const DEMO_CODE = '123456'
@@ -294,10 +294,14 @@ export const mockAccountService: AccountService = {
       return ok(state.platform)
     }),
 
-  ownerReset2fa: (_target, code) =>
+  ownerReset2fa: (target, code) =>
     run(() => {
       if (state.aal !== 'aal2') return accountFail('aal2_required')
-      return checkCode(code)
+      // As account-security (R-W6-6): a team member with no 2FA has nothing to reset, and the code is kept.
+      if (demoMemberHas2fa(target) === false) return accountFail('nothing_to_reset')
+      const r = checkCode(code)
+      if (r.ok) clearDemoMember2fa(target)
+      return r
     }),
 
   listClosureRequests: () => run(() => ok(state.closureRequests)),

@@ -25,12 +25,14 @@ export type ErrorCode =
   | 'not_signed_in' | 'invalid_request' | 'invalid_code' | 'code_expired' | 'too_many_attempts' | 'rate_limited'
   | 'aal2_required' | 'policy_requires_2fa' | 'owner_cannot_close' | 'already_requested' | 'not_allowed'
   | 'not_found' | 'email_failed' | 'unknown'
+  | 'nothing_to_reset'
 
 const STATUS: Record<ErrorCode, number> = {
   not_signed_in: 401,
   invalid_request: 400, invalid_code: 400, code_expired: 400, already_requested: 400, not_found: 400, email_failed: 400,
   aal2_required: 403, policy_requires_2fa: 403, owner_cannot_close: 403, not_allowed: 403,
   too_many_attempts: 429, rate_limited: 429,
+  nothing_to_reset: 409,
   unknown: 500,
 }
 
@@ -247,6 +249,8 @@ const ACTIONS: Record<string, Action> = {
     const kind = await classify(ctx, target)
     if (kind === 'owner') throw new Refusal('not_allowed')
     if (kind !== 'staff' && kind !== 'business') throw new Refusal('not_found')
+    // R-W6-6: nothing to reset (no verified factor, no unused recovery codes) → no email, no event, code kept.
+    if (!(await has2fa(ctx, target))) throw new Refusal('nothing_to_reset')
     await checkCode(ctx, 'owner_reset_2fa', ctx.body.code)
     await wipeSecondFactor(ctx, target)
     await logEvent(ctx, ctx.userId, 'account_2fa_reset_by_owner', { subject_id: target })
@@ -358,6 +362,12 @@ async function voidCodes(ctx: Ctx, purpose: string) {
   } catch (e) {
     console.error(`account-security: could not void an unsent code (${errorName(e)})`)
   }
+}
+
+/** A verified factor or unused recovery codes: the same rule as private.has_2fa (admin_list_members' has2fa). */
+async function has2fa(ctx: Ctx, user: string): Promise<boolean> {
+  if ((await ctx.deps.listFactors(user)).some((f) => f.status === 'verified')) return true
+  return Number((await sql(ctx, 'service_has_recovery_codes', { p_user: user })).count ?? 0) > 0
 }
 
 /** Deletes every MFA factor of the user and their recovery codes. */

@@ -2,7 +2,7 @@
 // ignore stylesheets) plus a text version. Every inserted value is escaped. PT wording follows the landing
 // copy (Brazilian Portuguese) until the client confirms the dialect (open decision C6).
 import type { EmailKind } from './email.ts'
-import { ROLE_SUMMARY, type MemberRole } from './team.ts'
+import { type MemberRole, permissionBullets } from './team.ts'
 
 export type EmailLang = 'en' | 'pt'
 
@@ -17,6 +17,8 @@ export interface TemplateData {
   applicantEmail?: string
   /** Team invitation (ADR-0030): the role offered, the inviter's optional note, and when the link expires (ISO). */
   role?: MemberRole
+  /** The role's permission keys at send time (platform_role_permissions), listed with the dashboard labels (R-W6-5). */
+  permissions?: string[]
   note?: string
   expiresAt?: string
   inviterName?: string
@@ -54,14 +56,16 @@ const longDate = (iso: string | undefined) =>
 // The platform console is English only, so the team invitation has one wording for both languages.
 const teamInvitation = (d: TemplateData): Copy => {
   const role = ROLE_NAME[d.role ?? 'team']
+  const list = permissionBullets(d.permissions ?? [])
+  const can = list.length ? ` As ${role} you can:` : ''
   return {
     subject: "You're invited to Sanctus",
     heading: "You're invited to Sanctus",
     body: `Hi,
 
-The Sanctus team has invited you to join the platform as ${role}. As ${role} you can:`,
-    bodyHtml: `Hi,</p><p style="margin:16px 0 0">The Sanctus team has invited you to join the platform as <strong>${esc(role)}</strong>. As ${esc(role)} you can:`,
-    list: ROLE_SUMMARY[d.role ?? 'team'],
+The Sanctus team has invited you to join the platform as ${role}.${can}`,
+    bodyHtml: `Hi,</p><p style="margin:16px 0 0">The Sanctus team has invited you to join the platform as <strong>${esc(role)}</strong>.${esc(can)}`,
+    list: list.length ? list : undefined,
     quote: d.note ? `${d.inviterName ? `${d.inviterName}: ` : ''}${d.note}` : undefined,
     cta: 'Accept invitation',
     note: `This link works once and expires on ${longDate(d.expiresAt)}. Not expecting this invitation? You can ignore this email, or contact the platform owner.`,

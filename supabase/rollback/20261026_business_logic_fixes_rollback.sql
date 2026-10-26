@@ -21,6 +21,87 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 10 rollback: invitation note, exact access history, 2FA reset only when set (R-W6-4, R-W6-5, R-W6-6, R-W6-9)
+-- =============================================================================
+
+-- R-W6-6: admin_list_members and admin_get_member as in 20261025070915_platform_team_roles (no has2fa).
+create or replace function public.admin_list_members()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.owner_or_deny('list_members') then
+    return jsonb_build_object('error', 'forbidden');
+  end if;
+  return jsonb_build_object('members',
+    coalesce((select jsonb_agg(x order by x->>'createdAt') from (
+      select jsonb_build_object('id', a.user_id, 'userId', a.user_id, 'email', u.email::text, 'fullName', null, 'role', 'owner',
+               'status', 'active', 'invitedBy', null, 'createdAt', a.created_at, 'activatedAt', a.created_at,
+               'deactivatedAt', null, 'lastSignInAt', u.last_sign_in_at, 'invite', null) as x
+        from public.platform_admins a join auth.users u on u.id = a.user_id
+      union all
+      select private.member_json(m) from public.platform_members m) s), '[]'::jsonb));
+end;
+$$;
+
+create or replace function public.admin_get_member(p_member uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member public.platform_members;
+begin
+  if not private.owner_or_deny('get_member') then
+    return jsonb_build_object('error', 'forbidden');
+  end if;
+  select * into v_member from public.platform_members where id = p_member;
+  if not found then
+    return jsonb_build_object('error', 'not_found');
+  end if;
+  return jsonb_build_object('member', private.member_json(v_member));
+end;
+$$;
+
+drop function private.has_2fa(uuid);
+
+-- R-W6-5: the four-argument service_create_member_invite as in 20261025070915_platform_team_roles. Dropping the note
+-- column deletes the stored invitation notes (they are not audit or email rows).
+drop function public.service_latest_invite_note(uuid);
+drop function public.service_create_member_invite(uuid, text, timestamptz, uuid, text);
+create function public.service_create_member_invite(p_member uuid, p_token_hash text, p_expires_at timestamptz, p_actor uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member public.platform_members;
+  v_id uuid;
+begin
+  select * into v_member from public.platform_members where id = p_member for update;
+  if not found or v_member.status <> 'invited' then
+    return jsonb_build_object('error', 'not_invited');
+  end if;
+  if (select count(*) from private.platform_invites where member_id = p_member and created_at > now() - interval '1 hour') >= 5 then
+    return jsonb_build_object('error', 'rate_limited');
+  end if;
+  update private.platform_invites set status = 'revoked', revoked_at = now(), revoked_by = p_actor
+   where member_id = p_member and status in ('pending', 'sent', 'email_failed');
+  insert into private.platform_invites (member_id, token_hash, expires_at, created_by)
+  values (p_member, p_token_hash, p_expires_at, p_actor) returning id into v_id;
+  return jsonb_build_object('ok', true, 'inviteId', v_id);
+end;
+$$;
+revoke execute on function public.service_create_member_invite(uuid, text, timestamptz, uuid) from public, anon, authenticated;
+grant execute on function public.service_create_member_invite(uuid, text, timestamptz, uuid) to service_role;
+alter table private.platform_invites drop column note;
+-- ---- end S1.5 Task 10 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 2 rollback: staff 2FA gate on Edge Functions, staff password length, owner email conflict (R-W1-1, R-W1-7, R-W1-8)
 -- =============================================================================
 
