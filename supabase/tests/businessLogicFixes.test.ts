@@ -2,12 +2,12 @@
 // S1.5 business-logic fixes (docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md): one describe per task,
 // on the shared PGlite harness. Each task seeds its own users and businesses with ids(task), so describes are
 // independent; a test that changes shared settings (role sets, the 2FA policy) restores them before it ends.
-import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { MIGRATIONS, ROLLBACK_SQL, S15_MIGRATION, freshDb, ids, makeHelpers, type Helpers } from './harness'
+import { createHash } from 'node:crypto'
 
 /**
  * Objects the S1.5 migration creates, which the rollback must drop: a table or view as `schema.name`, a function as
@@ -225,37 +225,6 @@ describe('S1.5 Task 2: staff 2FA gate, team email cannot own a business', () => 
   const BIZ_C = id(12)
   const link = (biz: string, user: string) =>
     h.svc(`select to_jsonb(public.service_link_owner($1, $2, $3, null)) as r`, [biz, user, ACTOR])
-describe('S1.5 Task 9: team membership lifecycle', () => {
-  GONE_AFTER_ROLLBACK.push('public.admin_remove_member(uuid)', 'private.sync_member_email()')
-  const id = ids(9)
-  const OWNER = id(1)
-  const ADMIN = id(2)
-  const DEACT = id(3)
-  const REM_OWNER = id(4)
-  const REM_INVITE = id(5)
-  const SYNC = id(6)
-  const CONFLICT = id(7)
-  const TAKEN = id(8)
-  const BROKEN = id(9)
-  const OFF = id(11)
-  const BIZ = id(10)
-  const M_DEACT = id(20)
-  const M_REM_OWNER = id(21)
-  const M_REM_INVITE = id(22)
-  const M_ADMIN = id(23)
-  const M_OFF = id(24)
-
-  type Answer = { ok?: boolean; user_id?: string; error?: string; memberId?: string }
-  const remove = (caller: string, member: string, aal: 'aal1' | 'aal2' = 'aal1') =>
-    h.call(caller, 'select public.admin_remove_member($1) as r', [member], aal) as Promise<Answer>
-  const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex')
-  const memberEmail = async (memberId: string) =>
-    (await db.query<{ email: string }>('select email from public.platform_members where id = $1', [memberId])).rows[0]?.email
-  const memberOf = async (userId: string) => (await db.query<{ id: string }>('select id from public.platform_members where user_id = $1', [userId])).rows[0]!.id
-  const emailEvents = async (memberId: string) =>
-    (await db.query<{ actor_id: string | null; metadata: Record<string, unknown> }>(
-      `select actor_id, metadata from public.audit_events where event_type = 'access_member_email_changed' and metadata->>'member_id' = $1 order by created_at`,
-      [memberId])).rows
 
   beforeAll(async () => {
     await db.exec(`
@@ -303,6 +272,22 @@ describe('S1.5 Task 9: team membership lifecycle', () => {
         `select pg_get_functiondef('public.service_link_owner(uuid, uuid, uuid, uuid)'::regprocedure) as d`)).rows[0]!.d.replace(/\r\n/g, '\n'),
       comment: (await target.query<{ c: string | null }>(
         `select obj_description('public.service_user_can(uuid, text)'::regprocedure, 'pg_proc') as c`)).rows[0]!.c,
+    })
+    const before = await freshDb((n) => n < S15_MIGRATION)
+    const rolled = await freshDb()
+    try {
+      const pre = await defs(before)
+      expect(pre.comment).toBeNull()
+      expect((await defs(rolled)).linkOwner).not.toEqual(pre.linkOwner)
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      expect(await defs(rolled)).toEqual(pre)
+    } finally {
+      await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
+})
+
 describe('S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)', () => {
   GONE_AFTER_ROLLBACK.push('private.permission_prerequisites()', 'private.with_prerequisites(text[])')
   // The TS map the SQL mirrors (imported here so this task's code stays inside its describe).
@@ -370,6 +355,122 @@ describe('S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)', (
       // One row per changed role (Admin already had every prerequisite), by the system.
       expect(rows).toEqual([{ actor_id: null, metadata: { role: 'team', added: ['products.edit', 'products.view'], removed: [], reason: 'prerequisites' } }])
       expect((await pre.query(preflightSql())).rows).toEqual([])
+    } finally {
+      await pre.close()
+    }
+  }, 60_000)
+
+  it('SQL closure equals withPrerequisites for every single permission', async () => {
+    const edges = (await db.query<{ permission: string; requires: string }>('select permission, requires from private.permission_prerequisites() order by 1, 2')).rows
+    const tsEdges = Object.entries(P.PERMISSION_PREREQUISITES).flatMap(([permission, reqs]) => reqs.map((requires) => ({ permission, requires })))
+    expect(edges).toEqual([...tsEdges].sort((a, b) => (a.permission < b.permission ? -1 : a.permission > b.permission ? 1 : a.requires < b.requires ? -1 : 1)))
+    await withRolePermissions({ team: [] }, async () => {
+      for (const p of P.ALL_PERMISSIONS) {
+        const closed = P.withPrerequisites([p])
+        const sql = (await db.query<{ r: string[] }>('select private.with_prerequisites(array[$1]) as r', [p])).rows[0]!.r
+        expect({ p, sql: [...sql].sort() }).toEqual({ p, sql: [...closed].sort() })
+        // The RPC answers the prerequisites it added, in the order of ALL_PERMISSIONS.
+        expect({ p, r: await save([p]) }).toEqual({ p, r: { ok: true, added: closed.filter((x) => x !== p) } })
+        expect({ p, stored: await stored('team') }).toEqual({ p, stored: [...closed].sort() })
+      }
+    })
+  })
+
+  it("a member whose role is {businesses.view, businesses.delete} saved through the RPC can delete storage objects in business-logos and product-media of that business; with only businesses.view they can't", async () => {
+    await db.exec(`
+      insert into storage.objects (bucket_id, name) values
+        ('business-logos', '${BIZ}/logo.png'), ('product-media', '${BIZ}/${id(20)}/photo.jpg'), ('product-media', '${BIZ}/${id(20)}/model.glb');
+    `)
+    const delLogos = `delete from storage.objects where bucket_id = 'business-logos' and name like $1`
+    const delMedia = `delete from storage.objects where bucket_id = 'product-media' and name like $1`
+    const delBiz = `delete from public.businesses where id = $1`
+    const prefix = [`${BIZ}/%`]
+    try {
+      await withRolePermissions({}, async () => {
+        expect(await save(['businesses.view', 'businesses.delete'])).toMatchObject({ ok: true })
+        expect(await h.affected(TEAM, delLogos, prefix)).toBe(1)
+        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
+        expect(await h.affected(TEAM, delBiz, [BIZ])).toBe(1)
+
+        expect(await save(['businesses.view'])).toEqual({ ok: true, added: [] })
+        expect(await h.affected(TEAM, delLogos, prefix)).toBe(0)
+        expect(await h.affected(TEAM, delMedia, prefix)).toBe(0)
+        expect(await h.affected(TEAM, delBiz, [BIZ])).toBe(0)
+      })
+      // Sets written straight to the table (not closed; deleting needs the read policies too, so the views stay):
+      // businesses.delete without any edit deletes logos and media, products.delete without products.edit media only.
+      await withRolePermissions({ team: ['businesses.view', 'products.view', 'businesses.delete'] }, async () => {
+        expect(await h.affected(TEAM, delLogos, prefix)).toBe(1)
+        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
+      })
+      await withRolePermissions({ team: ['businesses.view', 'products.view', 'products.delete'] }, async () => {
+        expect(await h.affected(TEAM, delLogos, prefix)).toBe(0)
+        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
+      })
+    } finally {
+      await db.query(`delete from storage.objects where name like $1`, prefix)
+    }
+  })
+
+  it('the rollback restores admin_set_role_permissions and the two storage delete policies, and keeps the role sets', async () => {
+    const definitions = async (target: PGlite) => ({
+      fn: (await target.query<{ d: string }>(`select pg_get_functiondef('public.admin_set_role_permissions(public.platform_role, text[])'::regprocedure) as d`)).rows[0]!.d.replace(/\r\n/g, '\n'),
+      policies: (await target.query(`select policyname, qual from pg_policies where tablename = 'objects'
+        and policyname in ('Platform members delete media', 'Platform members delete logos') order by 1`)).rows,
+    })
+    const before = await freshDb((n) => n < S15_MIGRATION)
+    const rolled = await freshDb()
+    try {
+      const pre = await definitions(before)
+      expect(pre.policies).toHaveLength(2)
+      expect(await definitions(rolled)).not.toEqual(pre)
+      await rolled.query(`insert into public.platform_role_permissions (role, permission) values ('team', 'businesses.status'), ('team', 'businesses.edit')`)
+      const sets = await stored('team', rolled)
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      expect(await definitions(rolled)).toEqual(pre)
+      expect(await stored('team', rolled)).toEqual(sets)
+    } finally {
+      await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
+})
+
+describe('S1.5 Task 9: team membership lifecycle', () => {
+  GONE_AFTER_ROLLBACK.push('public.admin_remove_member(uuid)', 'private.sync_member_email()')
+  const id = ids(9)
+  const OWNER = id(1)
+  const ADMIN = id(2)
+  const DEACT = id(3)
+  const REM_OWNER = id(4)
+  const REM_INVITE = id(5)
+  const SYNC = id(6)
+  const CONFLICT = id(7)
+  const TAKEN = id(8)
+  const BROKEN = id(9)
+  const OFF = id(11)
+  const BIZ = id(10)
+  const M_DEACT = id(20)
+  const M_REM_OWNER = id(21)
+  const M_REM_INVITE = id(22)
+  const M_ADMIN = id(23)
+  const M_OFF = id(24)
+
+  type Answer = { ok?: boolean; user_id?: string; error?: string; memberId?: string }
+  const remove = (caller: string, member: string, aal: 'aal1' | 'aal2' = 'aal1') =>
+    h.call(caller, 'select public.admin_remove_member($1) as r', [member], aal) as Promise<Answer>
+  const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex')
+  const memberEmail = async (memberId: string) =>
+    (await db.query<{ email: string }>('select email from public.platform_members where id = $1', [memberId])).rows[0]?.email
+  const memberOf = async (userId: string) => (await db.query<{ id: string }>('select id from public.platform_members where user_id = $1', [userId])).rows[0]!.id
+  const emailEvents = async (memberId: string) =>
+    (await db.query<{ actor_id: string | null; metadata: Record<string, unknown> }>(
+      `select actor_id, metadata from public.audit_events where event_type = 'access_member_email_changed' and metadata->>'member_id' = $1 order by created_at`,
+      [memberId])).rows
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
         ('${OWNER}', 't9-owner@test', now()), ('${ADMIN}', 't9-admin@test', now()), ('${DEACT}', 't9-deact@test', now()),
         ('${REM_OWNER}', 't9-rem-owner@test', now()), ('${REM_INVITE}', 't9-rem-invite@x.pt', now()),
         ('${SYNC}', 't9-sync@test', now()), ('${CONFLICT}', 't9-conflict@test', now()), ('${TAKEN}', 't9-taken@test', now()),
@@ -502,85 +603,19 @@ describe('S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)', (
     }
   }, 60_000)
 
-  it('SQL closure equals withPrerequisites for every single permission', async () => {
-    const edges = (await db.query<{ permission: string; requires: string }>('select permission, requires from private.permission_prerequisites() order by 1, 2')).rows
-    const tsEdges = Object.entries(P.PERMISSION_PREREQUISITES).flatMap(([permission, reqs]) => reqs.map((requires) => ({ permission, requires })))
-    expect(edges).toEqual([...tsEdges].sort((a, b) => (a.permission < b.permission ? -1 : a.permission > b.permission ? 1 : a.requires < b.requires ? -1 : 1)))
-    await withRolePermissions({ team: [] }, async () => {
-      for (const p of P.ALL_PERMISSIONS) {
-        const closed = P.withPrerequisites([p])
-        const sql = (await db.query<{ r: string[] }>('select private.with_prerequisites(array[$1]) as r', [p])).rows[0]!.r
-        expect({ p, sql: [...sql].sort() }).toEqual({ p, sql: [...closed].sort() })
-        // The RPC answers the prerequisites it added, in the order of ALL_PERMISSIONS.
-        expect({ p, r: await save([p]) }).toEqual({ p, r: { ok: true, added: closed.filter((x) => x !== p) } })
-        expect({ p, stored: await stored('team') }).toEqual({ p, stored: [...closed].sort() })
-      }
+  it('my_platform_access for a deactivated member → role null, status deactivated; the Owner still gets 15', async () => {
+    const access = (uid: string) => h.call(uid, 'select public.my_platform_access() as r') as Promise<Record<string, unknown> | null>
+    expect(await access(OFF)).toEqual({ role: null, permissions: [], status: 'deactivated' })
+    const owner = await access(OWNER)
+    expect(owner?.role).toBe('owner')
+    expect(owner?.permissions).toHaveLength(15)
+    expect((await access(ADMIN))?.role).toBe('admin')
+    expect(await access(id(98))).toBeNull() // no row at all
+    await withRolePermissions({ admin: [], team: [] }, async () => {
+      expect((await access(OWNER))?.permissions).toHaveLength(15)
+      expect(await access(OFF)).toEqual({ role: null, permissions: [], status: 'deactivated' })
     })
   })
-
-  it("a member whose role is {businesses.view, businesses.delete} saved through the RPC can delete storage objects in business-logos and product-media of that business; with only businesses.view they can't", async () => {
-    await db.exec(`
-      insert into storage.objects (bucket_id, name) values
-        ('business-logos', '${BIZ}/logo.png'), ('product-media', '${BIZ}/${id(20)}/photo.jpg'), ('product-media', '${BIZ}/${id(20)}/model.glb');
-    `)
-    const delLogos = `delete from storage.objects where bucket_id = 'business-logos' and name like $1`
-    const delMedia = `delete from storage.objects where bucket_id = 'product-media' and name like $1`
-    const delBiz = `delete from public.businesses where id = $1`
-    const prefix = [`${BIZ}/%`]
-    try {
-      await withRolePermissions({}, async () => {
-        expect(await save(['businesses.view', 'businesses.delete'])).toMatchObject({ ok: true })
-        expect(await h.affected(TEAM, delLogos, prefix)).toBe(1)
-        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
-        expect(await h.affected(TEAM, delBiz, [BIZ])).toBe(1)
-
-        expect(await save(['businesses.view'])).toEqual({ ok: true, added: [] })
-        expect(await h.affected(TEAM, delLogos, prefix)).toBe(0)
-        expect(await h.affected(TEAM, delMedia, prefix)).toBe(0)
-        expect(await h.affected(TEAM, delBiz, [BIZ])).toBe(0)
-      })
-      // Sets written straight to the table (not closed; deleting needs the read policies too, so the views stay):
-      // businesses.delete without any edit deletes logos and media, products.delete without products.edit media only.
-      await withRolePermissions({ team: ['businesses.view', 'products.view', 'businesses.delete'] }, async () => {
-        expect(await h.affected(TEAM, delLogos, prefix)).toBe(1)
-        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
-      })
-      await withRolePermissions({ team: ['businesses.view', 'products.view', 'products.delete'] }, async () => {
-        expect(await h.affected(TEAM, delLogos, prefix)).toBe(0)
-        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
-      })
-    } finally {
-      await db.query(`delete from storage.objects where name like $1`, prefix)
-    }
-  })
-
-  it('the rollback restores admin_set_role_permissions and the two storage delete policies, and keeps the role sets', async () => {
-    const definitions = async (target: PGlite) => ({
-      fn: (await target.query<{ d: string }>(`select pg_get_functiondef('public.admin_set_role_permissions(public.platform_role, text[])'::regprocedure) as d`)).rows[0]!.d.replace(/\r\n/g, '\n'),
-      policies: (await target.query(`select policyname, qual from pg_policies where tablename = 'objects'
-        and policyname in ('Platform members delete media', 'Platform members delete logos') order by 1`)).rows,
-    })
-    const before = await freshDb((n) => n < S15_MIGRATION)
-    const rolled = await freshDb()
-    try {
-      const pre = await defs(before)
-      expect(pre.comment).toBeNull()
-      expect((await defs(rolled)).linkOwner).not.toEqual(pre.linkOwner)
-      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
-      expect(await defs(rolled)).toEqual(pre)
-      const pre = await definitions(before)
-      expect(pre.policies).toHaveLength(2)
-      expect(await definitions(rolled)).not.toEqual(pre)
-      await rolled.query(`insert into public.platform_role_permissions (role, permission) values ('team', 'businesses.status'), ('team', 'businesses.edit')`)
-      const sets = await stored('team', rolled)
-      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
-      expect(await definitions(rolled)).toEqual(pre)
-      expect(await stored('team', rolled)).toEqual(sets)
-    } finally {
-      await before.close()
-      await rolled.close()
-    }
-  }, 120_000)
 })
 
 describe('S1.5 Task 12: email status integrity', () => {
@@ -734,18 +769,5 @@ describe('S1.5 Task 12: email status integrity', () => {
          from unnest(array['public.service_apply_provider_status(text, text)', 'public.service_record_email_event(text, text, text, text)']) as f`)
     expect(rows).toHaveLength(2)
     expect(rows).toEqual(rows.map((r) => ({ fn: r.fn, anon: false, authenticated: false, service: true })))
-  })
-  it('my_platform_access for a deactivated member → role null, status deactivated; the Owner still gets 15', async () => {
-    const access = (uid: string) => h.call(uid, 'select public.my_platform_access() as r') as Promise<Record<string, unknown> | null>
-    expect(await access(OFF)).toEqual({ role: null, permissions: [], status: 'deactivated' })
-    const owner = await access(OWNER)
-    expect(owner?.role).toBe('owner')
-    expect(owner?.permissions).toHaveLength(15)
-    expect((await access(ADMIN))?.role).toBe('admin')
-    expect(await access(id(98))).toBeNull() // no row at all
-    await withRolePermissions({ admin: [], team: [] }, async () => {
-      expect((await access(OWNER))?.permissions).toHaveLength(15)
-      expect(await access(OFF)).toEqual({ role: null, permissions: [], status: 'deactivated' })
-    })
   })
 })

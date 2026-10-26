@@ -72,15 +72,43 @@ grant execute on function public.service_record_email_event(text, text, text) to
 -- ---- end S1.5 Task 12 rollback ----
 
 -- =============================================================================
--- S1.5 Task 2 rollback: staff 2FA gate on Edge Functions, staff password length, owner email conflict (R-W1-1, R-W1-7, R-W1-8)
+-- S1.5 Task 9 rollback: team membership lifecycle: remove, email sync, deactivated access (R-W6-1, R-W6-2, R-W6-7)
 -- =============================================================================
 
--- R-W1-1: service_user_can had no comment before S1.5.
-comment on function public.service_user_can(uuid, text) is null;
+-- R-W6-7: back to Task 1's body (a deactivated member gets null again).
+create or replace function public.my_platform_access()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when exists (select 1 from public.platform_admins where user_id = (select auth.uid())) then
+      jsonb_build_object('role', 'owner', 'permissions', to_jsonb(array[
+        'access.view', 'analytics.view', 'applications.approve', 'applications.reject', 'applications.view',
+        'businesses.delete', 'businesses.edit', 'businesses.status', 'businesses.view', 'owners.manage',
+        'products.delete', 'products.edit', 'products.publish', 'products.view', 'records.view']))
+    else (
+      select jsonb_build_object('role', m.role::text, 'permissions',
+        (select coalesce(jsonb_agg(rp.permission order by rp.permission), '[]'::jsonb)
+           from public.platform_role_permissions rp where rp.role = m.role))
+      from public.platform_members m
+      where m.user_id = (select auth.uid()) and m.status = 'active')
+  end;
+$$;
+revoke execute on function public.my_platform_access() from public, anon;
+grant execute on function public.my_platform_access() to authenticated, service_role;
 
--- R-W1-8: service_link_owner as in 20261020091428_applications_and_owner_access (no team-email check).
-create or replace function public.service_link_owner(p_business_id uuid, p_user_id uuid, p_actor uuid, p_application_id uuid default null)
-returns text
+-- R-W6-2: member rows stop following the sign-in address. Addresses already synced (and their audit rows) stay.
+drop trigger if exists on_auth_user_email_sync_member on auth.users;
+drop function if exists private.sync_member_email();
+
+-- R-W6-1: removing members goes away; removed members stay removed and their access_member_removed rows stay.
+drop function if exists public.admin_remove_member(uuid);
+-- ---- end S1.5 Task 9 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 5 rollback: permission prerequisites and storage deletes (R-W3-3)
 -- =============================================================================
 
@@ -105,27 +133,6 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_existing uuid;
-begin
-  if not exists (select 1 from public.businesses where id = p_business_id) then
-    raise exception 'business_not_found' using errcode = 'P0002';
-  end if;
-  select user_id into v_existing from public.business_members where business_id = p_business_id for update;
-  if v_existing is not null then
-    if v_existing = p_user_id then
-      return 'already_linked';
-    end if;
-    raise exception 'business_has_owner' using errcode = '23505';
-  end if;
-  insert into public.business_members (business_id, user_id, invited_at) values (p_business_id, p_user_id, now());
-  insert into public.audit_events (event_type, actor_id, application_id, business_id, metadata)
-  values ('owner_provisioned', p_actor, p_application_id, p_business_id, '{}'::jsonb);
-  return 'linked';
-end;
-$$;
-revoke execute on function public.service_link_owner(uuid, uuid, uuid, uuid) from public, anon, authenticated;
-grant execute on function public.service_link_owner(uuid, uuid, uuid, uuid) to service_role;
--- ---- end S1.5 Task 2 rollback ----
   v_known constant text[] := array[
     'businesses.view', 'businesses.edit', 'businesses.status', 'businesses.delete', 'owners.manage',
     'applications.view', 'applications.approve', 'applications.reject',
@@ -162,41 +169,43 @@ grant execute on function public.admin_set_role_permissions(public.platform_role
 drop function private.with_prerequisites(text[]);
 drop function private.permission_prerequisites();
 -- ---- end S1.5 Task 5 rollback ----
--- S1.5 Task 9 rollback: team membership lifecycle: remove, email sync, deactivated access (R-W6-1, R-W6-2, R-W6-7)
+
+-- =============================================================================
+-- S1.5 Task 2 rollback: staff 2FA gate on Edge Functions, staff password length, owner email conflict (R-W1-1, R-W1-7, R-W1-8)
 -- =============================================================================
 
--- R-W6-7: back to Task 1's body (a deactivated member gets null again).
-create or replace function public.my_platform_access()
-returns jsonb
-language sql
-stable
+-- R-W1-1: service_user_can had no comment before S1.5.
+comment on function public.service_user_can(uuid, text) is null;
+
+-- R-W1-8: service_link_owner as in 20261020091428_applications_and_owner_access (no team-email check).
+create or replace function public.service_link_owner(p_business_id uuid, p_user_id uuid, p_actor uuid, p_application_id uuid default null)
+returns text
+language plpgsql
 security definer
 set search_path = ''
 as $$
-  select case
-    when exists (select 1 from public.platform_admins where user_id = (select auth.uid())) then
-      jsonb_build_object('role', 'owner', 'permissions', to_jsonb(array[
-        'access.view', 'analytics.view', 'applications.approve', 'applications.reject', 'applications.view',
-        'businesses.delete', 'businesses.edit', 'businesses.status', 'businesses.view', 'owners.manage',
-        'products.delete', 'products.edit', 'products.publish', 'products.view', 'records.view']))
-    else (
-      select jsonb_build_object('role', m.role::text, 'permissions',
-        (select coalesce(jsonb_agg(rp.permission order by rp.permission), '[]'::jsonb)
-           from public.platform_role_permissions rp where rp.role = m.role))
-      from public.platform_members m
-      where m.user_id = (select auth.uid()) and m.status = 'active')
-  end;
+declare
+  v_existing uuid;
+begin
+  if not exists (select 1 from public.businesses where id = p_business_id) then
+    raise exception 'business_not_found' using errcode = 'P0002';
+  end if;
+  select user_id into v_existing from public.business_members where business_id = p_business_id for update;
+  if v_existing is not null then
+    if v_existing = p_user_id then
+      return 'already_linked';
+    end if;
+    raise exception 'business_has_owner' using errcode = '23505';
+  end if;
+  insert into public.business_members (business_id, user_id, invited_at) values (p_business_id, p_user_id, now());
+  insert into public.audit_events (event_type, actor_id, application_id, business_id, metadata)
+  values ('owner_provisioned', p_actor, p_application_id, p_business_id, '{}'::jsonb);
+  return 'linked';
+end;
 $$;
-revoke execute on function public.my_platform_access() from public, anon;
-grant execute on function public.my_platform_access() to authenticated, service_role;
-
--- R-W6-2: member rows stop following the sign-in address. Addresses already synced (and their audit rows) stay.
-drop trigger if exists on_auth_user_email_sync_member on auth.users;
-drop function if exists private.sync_member_email();
-
--- R-W6-1: removing members goes away; removed members stay removed and their access_member_removed rows stay.
-drop function if exists public.admin_remove_member(uuid);
--- ---- end S1.5 Task 9 rollback ----
+revoke execute on function public.service_link_owner(uuid, uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.service_link_owner(uuid, uuid, uuid, uuid) to service_role;
+-- ---- end S1.5 Task 2 rollback ----
 
 -- =============================================================================
 -- S1.5 Task 1 rollback: security-activity privacy, profile visibility and Owner permissions; email kinds (R-W1-4, R-W1-5, R-W1-6, §10.4)
