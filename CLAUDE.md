@@ -34,7 +34,8 @@ It runs in **demo mode** by default (a mock service layer, no setup). A **Supaba
 5. Don't read `MASTER_PROMPT.md` in full. Grep for one section; see the README for how.
 
 ## Hard rules
-- Never build: a custom backend server, GLB→USDZ conversion, AI 3D, DNS or SSL setup, billing, or business-side team roles (platform Owner/Admin/Team roles: ADR-0029). Supabase (DB, Auth, Storage) is the only backend (ADR-0015).
+- Never build: a custom backend server, AI 3D, DNS or SSL setup, billing, or business-side team roles (platform Owner/Admin/Team roles: ADR-0029). Supabase (DB, Auth, Storage) is the only backend (ADR-0015).
+- GLB→USDZ only through the editor's "Build from GLB" (ADR-0039, in the browser, three.js USDZExporter).
 - Supabase rules:
   - Demo mode must keep working with no env vars.
   - Never fall back to demo data after a Supabase error.

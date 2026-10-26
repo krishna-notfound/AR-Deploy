@@ -1,4 +1,4 @@
-import { AlertTriangle, Box, CheckCircle2, CircleSlash, FileBox, Info, Link2, Loader2, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Box, CheckCircle2, CircleSlash, FileBox, Info, Link2, Loader2, Trash2, Upload, Wand2 } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { AssetStatusBadge, Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -53,7 +53,7 @@ export function ModelSection({
       {context === 'product' && (
         <InlineNotice tone="neutral" className="border border-line text-ink-body" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
           Upload the files your 3D artist delivered. <strong className="font-medium">GLB</strong> powers the 3D viewer and Android AR.{' '}
-          <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are made lighter before upload (smaller textures, fewer triangles; no compression, so Android AR still opens them); USDZ files are stored as uploaded. Nothing is converted.' : 'Files are stored as uploaded: they are not converted or compressed.'}
+          <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are made lighter before upload (smaller textures, fewer triangles; no compression, so Android AR still opens them); USDZ files are stored as uploaded, or built from the GLB with "Build from GLB".' : 'Files are stored as uploaded: they are not converted or compressed.'}
         </InlineNotice>
       )}
       {context === 'request' && (
@@ -64,7 +64,7 @@ export function ModelSection({
       {/* GLB and USDZ side by side, stacked on phones (BRIEF section 6). */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {(['glb', 'usdz'] as const).map((f) => (
-          <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange(f, a)} allowLink={context === 'product'} />
+          <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange(f, a)} allowLink={context === 'product'} buildFrom={f === 'usdz' ? models.glb : undefined} />
         ))}
       </div>
       {/* Keyed by the GLB: a replaced file never shows the previous file's measurement or readiness (AR-07). */}
@@ -79,23 +79,26 @@ function ModelSlot({
   onChange,
   businessId,
   allowLink,
+  buildFrom,
 }: {
   format: ModelFormat
   asset?: ModelAsset
   onChange: (a: ModelAsset | undefined) => void
   businessId?: string
   allowLink: boolean
+  /** The USDZ slot: the GLB an iPhone file can be built from (ADR-0039). */
+  buildFrom?: ModelAsset
 }) {
   const id = useId()
   const [error, setError] = useState<string | null>(null)
-  const [checking, setChecking] = useState<false | 'checking' | 'optimizing'>(false)
+  const [checking, setChecking] = useState<false | 'checking' | 'optimizing' | 'building'>(false)
   /** Result of the size optimization, and the untouched file so the admin can upload it instead. */
   const [optimizeNote, setOptimizeNote] = useState<{ text: string; original?: File } | null>(null)
   const [urlDraft, setUrlDraft] = useState('')
   const info = FORMAT_INFO[format]
   const stale = isStaleSessionAsset(asset)
 
-  const onFile = async (original: File, opts: { keepOriginal?: boolean } = {}) => {
+  const onFile = async (original: File, opts: { keepOriginal?: boolean; built?: boolean } = {}) => {
     if (checking) return
     setChecking('checking')
     const check = await validateModelFile(original, format)
@@ -115,7 +118,7 @@ function ModelSlot({
       )
     } else {
       // Large textures are accepted but flagged: they make AR slow on phones (AR audit AR-10).
-      const notes = [opts.keepOriginal ? 'Original file uploaded, not optimized.' : '', check.warning ?? ''].filter(Boolean)
+      const notes = [opts.keepOriginal ? 'Original file uploaded, not optimized.' : '', opts.built ? `Built from the GLB on ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. Check it on an iPhone before publishing.` : '', check.warning ?? ''].filter(Boolean)
       setOptimizeNote(notes.length ? { text: notes.join(' ') } : null)
     }
     const res = await service.uploadAsset({ kind: format, file, businessId })
@@ -126,6 +129,26 @@ function ModelSlot({
     const requiredExtensions = format === 'glb' ? await readRequiredExtensions(file) : undefined
     const { url, storagePath, status } = res.data
     onChange({ format, url, fileName: file.name, sizeBytes: file.size, status, ...(storagePath ? { storagePath } : {}), ...(requiredExtensions ? { requiredExtensions } : {}) })
+  }
+
+  // "Build from GLB" (owner 2026-10-27, ADR-0039): a real USDZ made in this browser from the stored GLB (already made
+  // lighter on upload), then uploaded exactly like a picked USDZ, with the same checks.
+  const canBuild = format === 'usdz' && !asset && !!buildFrom?.url && !isStaleSessionAsset(buildFrom)
+  const onBuild = async () => {
+    if (checking || !buildFrom) return
+    setChecking('building')
+    setError(null)
+    try {
+      const res = await fetch(buildFrom.url)
+      if (!res.ok) throw new Error(`GLB download failed (${res.status})`)
+      const { buildUsdzFromGlb, usdzNameFor } = await import('./usdzFromGlb')
+      const usdz = await buildUsdzFromGlb(await res.arrayBuffer())
+      setChecking(false)
+      await onFile(new File([usdz as BlobPart], usdzNameFor(buildFrom.fileName), { type: 'model/vnd.usdz+zip' }), { built: true })
+    } catch {
+      setChecking(false)
+      setError('We could not build the iPhone file from this GLB. Upload a USDZ made by your 3D artist instead.')
+    }
   }
 
   const onUrl = async () => {
@@ -174,6 +197,14 @@ function ModelSlot({
       ) : (
         <div className="mt-3 rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-5 text-center text-[13px] text-ink-muted">
           No {format.toUpperCase()} file yet.
+          {canBuild && (
+            <div className="mt-3 flex flex-col items-center gap-2">
+              <Button size="sm" disabled={!!checking} onClick={() => void onBuild()} icon={checking === 'building' ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Wand2 className="size-4" aria-hidden />}>
+                {checking === 'building' ? 'Building from GLB…' : 'Build from GLB'}
+              </Button>
+              <span className="max-w-xs text-[12px] leading-4">Makes the iPhone file from your GLB, at the same size. Or upload your own below.</span>
+            </div>
+          )}
         </div>
       )}
       {asset?.status === 'session-only' && !stale && (

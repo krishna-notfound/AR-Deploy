@@ -1,6 +1,7 @@
 # ADR-0019: Safe GLB optimization in the browser before upload (glTF-Transform)
 - **Status:** Accepted for implementation. Extended and switched on by default by ADR-0038 (owner, 2026-10-26: adds triangle reduction; `VITE_MODEL_OPTIMIZATION=off` now opts out).
 - **Date:** 2026-10-13
+- **Note:** "never converts formats" below is superseded in part by ADR-0039 (2026-10-27): the editor's "Build from GLB" makes a USDZ. The optimizer itself still converts nothing.
 - **Affects:** design/15-product-editor.md, audit/PRIORITIZED_ISSUES.md P1-01
 
 ## Context

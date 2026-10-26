@@ -45,3 +45,19 @@ test('GLB upload: oversized textures are reduced in the browser, with the origin
   await page.getByRole('button', { name: 'Upload the original instead' }).click()
   await expect(page.getByText('Original file uploaded, not optimized.')).toBeVisible({ timeout: 30_000 })
 })
+
+// Owner 2026-10-27 (ADR-0039): the USDZ section builds the iPhone file from the uploaded GLB, then stores it like a
+// picked USDZ (same checks). The file is named after the GLB and the note says where it came from.
+test('USDZ section: Build from GLB makes the iPhone file from the uploaded GLB', async ({ page }) => {
+  test.setTimeout(150_000)
+  const buffer = await glbWithLargeTexture()
+  await signInAsSuperAdmin(page)
+  await page.goto('/admin/products/prd_sheen_chair/edit')
+  const removeUsdz = page.getByRole('button', { name: 'Remove USDZ file' })
+  if (await removeUsdz.count()) await removeUsdz.click()
+  await page.locator('input[type="file"][accept=".glb"]').setInputFiles({ name: 'big-texture.glb', mimeType: 'model/gltf-binary', buffer })
+  await expect(page.getByText('Optimized for faster loading', { exact: false })).toBeVisible({ timeout: 90_000 })
+  await page.getByRole('button', { name: 'Build from GLB' }).click()
+  await expect(page.getByText('big-texture-from-glb.usdz')).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByText(/Built from the GLB on/)).toBeVisible()
+})

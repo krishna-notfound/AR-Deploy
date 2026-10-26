@@ -36,6 +36,7 @@ Use a product with a GLB **and** a USDZ whose scale shows "True-to-size model", 
 2. True size: measure as above. Quick Look allows pinch-scaling by default; note whether the initial size is correct.
 3. Product **without** USDZ (ADR-0038): "Preparing AR…" while the iPhone builds the file from the lightened GLB, then Quick Look opens at true size. Note how long it takes; tap twice quickly: only one Quick Look.
 4. Close Quick Look: back on the page, usable.
+5. Built from GLB (ADR-0039): in the editor, on a product with a GLB and no USDZ, click "Build from GLB" (desktop), save, then open the product on iPhone Safari. **Expected:** Quick Look opens immediately (no "Preparing AR…"), the piece is at true size (measure), and the materials look right (colours, metal/rough, no missing or black textures).
 
 ### Both platforms
 - **Model URL refresh:** open a product page, leave the tab in the background for 6 h+ (or overnight), return, then start AR. **Expected:** AR opens (the page fetched fresh 12 h signed URLs on return). Only meaningful for products whose files are stored in Supabase (the sample products use external URLs).

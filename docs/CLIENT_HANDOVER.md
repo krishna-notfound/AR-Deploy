@@ -125,7 +125,7 @@ Use **Add Product** in the business dashboard, or **All Products → New** in Su
 
 **3D models** (optional, but there's no AR without them)
 - **GLB file:** used for the 3D viewer on every device and for AR on Android. **Without a GLB there is no 3D viewer and no AR button**, even if a USDZ is uploaded.
-- **USDZ file:** used for AR on iPhone and iPad. Without it, iPhones try to convert the GLB themselves, which is slower and not guaranteed to work.
+- **USDZ file:** used for AR on iPhone and iPad. Without it, iPhones build one from the GLB each time a customer taps AR, which is slower and not guaranteed to work.
 - The largest file allowed is **30 MB for a GLB** and **40 MB for a USDZ**: larger files often fail to open in phone AR. For Android AR, Google recommends a GLB of **10 MB or less**. A GLB with textures above 2048 px is accepted with a warning, because large textures make AR slow on phones.
 - Files are checked to confirm they really are GLB or USDZ.
 
@@ -136,9 +136,11 @@ Use **Add Product** in the business dashboard, or **All Products → New** in Su
 - If not, they see **"AR scale unverified"**, and the editor suggests a likely cause, for example the wrong unit.
 - Only the GLB is measured. The USDZ must be exported at the same size.
 
-**Preparing the two files (the platform does not convert between them):**
+**Preparing the two files:**
 - Export the GLB from your 3D tool (e.g. Blender: File → Export → glTF 2.0, format "glTF Binary"), in metres, at real size, with the base of the furniture on the floor.
-- Make the USDZ from that same GLB, e.g. with Apple's free **Reality Converter** (macOS): open the GLB, check the size shown, export USDZ. Upload both to the same product.
+- Upload the GLB first. Then, in the **iPhone (USDZ)** section, click **Build from GLB**. The platform makes the iPhone file for you, in your browser, from the same GLB. It takes a few seconds and the section then says "Built from the GLB". Use a computer for this step.
+- Or make the USDZ yourself, e.g. with Apple's free **Reality Converter** (macOS): open the GLB, check the size shown, export USDZ, and upload it to the same product. An uploaded USDZ replaces a built one.
+- If you change the GLB later, click **Build from GLB** again so the iPhone file matches.
 - Keep the GLB under ~10 MB for Google Scene Viewer; very large files load slowly or fail.
 - After uploading, the editor's size check should say the model matches the entered dimensions. If it doesn't, fix the file or the numbers before publishing.
 

@@ -22,7 +22,7 @@ The editor is one page with section nav (sticky on desktop). Localized fields us
    - Info box: "GLB → web 3D viewer and Android AR (Scene Viewer). USDZ → iOS AR Quick Look."
    - Empty state with guidance when no model is uploaded.
    - `ModelPreview`: model-viewer without AR, plus the scale check from [09-3d-ar.md](09-3d-ar.md).
-   - **No** convert, compress, or AI buttons.
+   - **No** compress or AI buttons. One convert button only (ADR-0039): when a GLB is uploaded and no USDZ, the USDZ slot shows **"Build from GLB"**. It builds a real .usdz in the browser (three.js `USDZExporter`, Quick Look compatible, at most 50,000 triangles and 1024 px textures, metres kept) and sends it through the normal USDZ upload and validation. The slot then reads "Built from the GLB" with the date; the business can upload its own USDZ instead, or rebuild after changing the GLB.
 5. **Dimensions & specs**
    - W, H, D: required, > 0.
    - Unit: cm or in.

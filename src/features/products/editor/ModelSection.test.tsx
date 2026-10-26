@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelAsset } from '@/domain/types'
+import { service } from '@/services'
 import { ModelSection } from './ModelSection'
 
 const viewer = vi.hoisted(() => ({ outcome: 'load' as 'load' | 'error' }))
@@ -18,6 +19,61 @@ vi.mock('@/components/three/ModelViewer', () => ({
 
 const glb: ModelAsset = { format: 'glb', url: 'https://signed/m.glb', fileName: 'chair.glb', sizeBytes: 2048, status: 'valid', storagePath: 'b1/m.glb' }
 const dimensions = { width: 50, height: 90, depth: 50, unit: 'cm' as const }
+
+/** The smallest archive the USDZ upload check accepts: a stored model.usda first, then the end-of-archive record. */
+const tinyUsdz = vi.hoisted(() => () => {
+  const name = new TextEncoder().encode('model.usda')
+  const data = new TextEncoder().encode('#usda 1.0')
+  const out = new Uint8Array(30 + name.length + data.length + 22)
+  const v = new DataView(out.buffer)
+  v.setUint32(0, 0x04034b50, true)
+  v.setUint16(4, 20, true)
+  v.setUint16(26, name.length, true)
+  out.set(name, 30)
+  out.set(data, 30 + name.length)
+  v.setUint32(30 + name.length + data.length, 0x06054b50, true)
+  return out
+})
+const usdzBuild = vi.hoisted(() => ({ fn: vi.fn(async (_glb: ArrayBuffer) => tinyUsdz()) }))
+vi.mock('./usdzFromGlb', () => ({
+  buildUsdzFromGlb: (glb: ArrayBuffer) => usdzBuild.fn(glb),
+  usdzNameFor: (n: string) => n.replace(/\.glb$/i, '') + '-from-glb.usdz',
+}))
+
+describe('USDZ section: Build from GLB (owner 2026-10-27, ADR-0039)', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('with a GLB and no USDZ, builds the iPhone file from the GLB and uploads it like a picked USDZ', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([9, 9])))
+    vi.spyOn(service, 'uploadAsset').mockImplementation(async () => ({ ok: true, data: { url: 'https://signed/u.usdz', storagePath: 'b1/u.usdz', status: 'valid' } }) as never)
+    const onChange = vi.fn()
+    render(<ModelSection models={{ glb }} onChange={onChange} dimensions={dimensions} name="Chair" businessId="b1" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Build from GLB' }))
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('usdz', expect.objectContaining({ format: 'usdz', fileName: 'chair-from-glb.usdz', storagePath: 'b1/u.usdz' })))
+    expect(globalThis.fetch).toHaveBeenCalledWith(glb.url)
+    expect(usdzBuild.fn).toHaveBeenCalledTimes(1)
+    const upload = vi.mocked(service.uploadAsset).mock.calls[0]![0]
+    expect(upload).toMatchObject({ kind: 'usdz', businessId: 'b1' })
+    expect(upload.file.name).toBe('chair-from-glb.usdz')
+  })
+
+  it('offers no build without a GLB, or when a USDZ is already there', () => {
+    const usdz: ModelAsset = { format: 'usdz', url: 'https://signed/u.usdz', fileName: 'u.usdz', status: 'valid' }
+    const { rerender } = render(<ModelSection models={{}} onChange={() => {}} dimensions={dimensions} name="Chair" businessId="b1" />)
+    expect(screen.queryByRole('button', { name: 'Build from GLB' })).toBeNull()
+    rerender(<ModelSection models={{ glb, usdz }} onChange={() => {}} dimensions={dimensions} name="Chair" businessId="b1" />)
+    expect(screen.queryByRole('button', { name: 'Build from GLB' })).toBeNull()
+  })
+
+  it('a build that fails says so and keeps the upload controls', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([9, 9])))
+    usdzBuild.fn.mockRejectedValueOnce(new Error('bad glb'))
+    render(<ModelSection models={{ glb }} onChange={() => {}} dimensions={dimensions} name="Chair" businessId="b1" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Build from GLB' }))
+    expect(await screen.findByText(/could not build the iPhone file from this GLB/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Upload \.usdz file/)).toBeEnabled()
+  })
+})
 
 describe('S4 Task 6: ModelSection in a request', () => {
   it('context request hides the URL input and shows the scale check', async () => {

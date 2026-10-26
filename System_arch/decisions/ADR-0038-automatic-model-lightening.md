@@ -1,6 +1,7 @@
 # ADR-0038: Automatic model lightening is on by default, with triangle reduction
 - **Status:** Accepted (owner, 2026-10-26). Extends ADR-0019 and switches it on.
 - **Date:** 2026-10-26
+- **Note:** the "no GLB-to-USDZ conversion, ever" rule below is superseded by ADR-0039 (2026-10-27): the editor can build a USDZ from the GLB in the browser.
 - **Affects:** ADR-0019, design/15-product-editor.md, design/17-testing.md, docs/PRD.md (R-31, A-2), docs/CLIENT_HANDOVER.md, docs/TEST_PLAN.md
 
 ## Context
