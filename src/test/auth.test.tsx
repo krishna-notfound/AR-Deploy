@@ -185,16 +185,43 @@ describe('AcceptInvitePage (COR-15)', () => {
     const first = renderPage()
     await user.type(await screen.findByLabelText(/^Password/), 'a-long-password')
     await user.type(screen.getByLabelText(/^Repeat the password/), 'a-long-password')
+    await user.click(screen.getByRole('checkbox', { name: /^I agree to the Terms/ }))
     await user.click(screen.getByRole('button', { name: 'Save and continue' }))
     expect(await screen.findByText(/could not finish the setup/)).toBeInTheDocument()
     expect(auth.updatePassword).toHaveBeenCalledTimes(1)
 
     first.unmount() // the page asks the owner to reload
     renderPage()
-    await user.click(await screen.findByRole('button', { name: 'Continue' }))
+    await user.click(await screen.findByRole('checkbox', { name: /^I agree to the Terms/ }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByText('owner dashboard')).toBeInTheDocument()
     expect(screen.queryByLabelText(/^Password/)).not.toBeInTheDocument()
     expect(auth.updatePassword).toHaveBeenCalledTimes(1)
+  })
+
+  // S2 legal: the owner ticks "I agree to the Terms and the Privacy Policy" before the password is set.
+  it('does not set the password until the owner agrees to the Terms and the Privacy Policy', async () => {
+    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(pendingOwner)) })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await screen.findByLabelText(/^Password/), 'a-long-password')
+    await user.type(screen.getByLabelText(/^Repeat the password/), 'a-long-password')
+    const tick = screen.getByRole('checkbox', { name: /^I agree to the Terms/ })
+    // Both documents open in a new tab, so the form keeps what was typed.
+    expect(screen.getByRole('link', { name: /^Terms/ })).toHaveAttribute('href', '/terms')
+    expect(screen.getByRole('link', { name: /^Terms/ })).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('link', { name: /^Privacy Policy/ })).toHaveAttribute('href', '/privacy')
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByText('Please agree to the Terms and the Privacy Policy to continue.')).toBeInTheDocument()
+    expect(tick).toHaveAttribute('aria-invalid', 'true')
+    expect(auth.updatePassword).not.toHaveBeenCalled()
+    expect(auth.completeOwnerOnboarding).not.toHaveBeenCalled()
+
+    await user.click(tick)
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByText('owner dashboard')).toBeInTheDocument()
+    expect(auth.updatePassword).toHaveBeenCalledWith('a-long-password')
   })
 
   it('shows auth errors in the visitor language', async () => {
@@ -208,6 +235,7 @@ describe('AcceptInvitePage (COR-15)', () => {
     renderPage()
     await user.type(await screen.findByLabelText(/^Palavra-passe/), 'password1234')
     await user.type(screen.getByLabelText(/^Repita a palavra-passe/), 'password1234')
+    await user.click(screen.getByRole('checkbox', { name: /^Concordo com os Termos/ }))
     await user.click(screen.getByRole('button', { name: 'Guardar e continuar' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Escolha uma palavra-passe mais forte')
     expect(auth.completeOwnerOnboarding).not.toHaveBeenCalled()

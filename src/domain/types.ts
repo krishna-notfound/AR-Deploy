@@ -245,6 +245,8 @@ export interface ApplicationInput {
   modelReadiness: string
   notes?: string
   consent: boolean
+  /** The "I agree to the Terms and the Privacy Policy" tick; submit-application refuses the request without it. */
+  acceptedTerms?: boolean
   /** One per wizard session: retries and double clicks create one application. */
   submissionKey: string
 }

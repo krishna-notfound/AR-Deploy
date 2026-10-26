@@ -113,6 +113,9 @@ export const APPLY_PATH = '/apply'
 export const JOIN_PATH = '/join'
 /** Where owner invitation links land (the provision-owner Edge Function builds the absolute URL from APP_BASE_URL). */
 export const ACCEPT_INVITE_PATH = '/accept-invite'
+/** Public legal pages (EN/PT, text from docs/legal/drafts). Served on the platform domain and on business subdomains. */
+export const PRIVACY_PATH = '/privacy'
+export const TERMS_PATH = '/terms'
 
 export const applicationAdminPath = (id: string) => `/admin/applications/${id}`
 /** The applications list, optionally filtered by status (e.g. the overview's "awaiting review" link). */

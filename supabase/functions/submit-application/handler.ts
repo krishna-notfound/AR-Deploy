@@ -75,6 +75,9 @@ export async function handleSubmitApplication(req: Request, deps: SubmitDeps): P
   if (!body) return reply(400, { error: 'invalid_application' })
   // Honeypot field: people never see it, so a value means an automated submission.
   if (typeof body.hp === 'string' && body.hp.trim()) return reply(400, { error: 'invalid_application' })
+  // The wizard's "I agree to the Terms and the Privacy Policy" tick (S2 legal). Not stored yet: recording the
+  // accepted version and time is a later item (docs/legal/drafts/README.md, "What the app must do", 3).
+  if (body.acceptedTerms !== true) return reply(422, { error: 'invalid_request' })
 
   const v = validateApplication(body)
   if (!v.ok) return reply(400, { error: 'invalid_application', fields: v.errors })

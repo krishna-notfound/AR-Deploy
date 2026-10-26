@@ -8,6 +8,7 @@ import { useMaybeI18n } from '@/i18n/LanguageProvider'
 import { type Vars, translate } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
 import { APPLY_PATH } from '@/lib/urls'
+import { LegalLinks } from '../legal/LegalLinks'
 import { isDemoMode } from '@/services'
 import { LanguageSwitcher } from '../public/PublicShell'
 import { TAP_TARGET } from '../public/tapTarget'
@@ -245,7 +246,10 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-6 sm:px-10 lg:flex-row lg:items-start lg:justify-between lg:gap-12">
-          <p className="shrink-0 text-label text-ink-muted">{t('site.rights', { year: YEAR })}</p>
+          <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
+            <p className="text-label text-ink-muted">{t('site.rights', { year: YEAR })}</p>
+            <LegalLinks className="text-[13px] text-ink-muted" linkClassName={footerLink} />
+          </div>
           <p className="max-w-2xl text-xs leading-5 text-ink-muted lg:text-right">
             {t('site.credits')}
             {isDemoMode ? ` ${t('site.sampleData')}` : ''}

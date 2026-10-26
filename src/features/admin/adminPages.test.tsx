@@ -46,6 +46,7 @@ async function submitApplication() {
     modelReadiness: 'none',
     notes: '',
     consent: true,
+    acceptedTerms: true,
     submissionKey: crypto.randomUUID(),
   })
   expect(res.ok).toBe(true)
