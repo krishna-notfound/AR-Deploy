@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { signInAsSuperAdmin } from './helpers'
 
 // §19.8–19.11 Public catalog, product detail, 3D fallback, AR button, PT/EN
 test('catalog → product navigation with search and categories', async ({ page }) => {
@@ -161,4 +162,23 @@ test('the reset-password page renders without crashing', async ({ page }) => {
   await expect(page).toHaveURL(/\/demo/)
   await expect(page.getByText('Something went wrong')).toBeHidden()
   expect(errors).toEqual([])
+})
+
+// S1.5: a published product of a business that is not active yet is previewed through "Open product page", with the
+// catalog banner. A signed-out visitor sees no preview.
+test('Open product page on a product of an inactive business shows the preview banner; a visitor sees none', async ({ page, context, browser }) => {
+  await signInAsSuperAdmin(page)
+  await page.goto('/admin/products')
+  await page.getByRole('searchbox', { name: /Search/ }).fill('Walnut Writing Desk')
+  await page.getByRole('button', { name: 'Actions for Walnut Writing Desk' }).click()
+  const [popup] = await Promise.all([context.waitForEvent('page'), page.getByRole('menuitem', { name: 'Open product page' }).click()])
+  await expect(popup).toHaveURL(/\/products\/oak-ember\/walnut-writing-desk\?preview=1/)
+  await expect(popup.getByRole('heading', { level: 1, name: 'Walnut Writing Desk' })).toBeVisible()
+  await expect(popup.getByText('Preview. Customers cannot see this catalog until it is activated.')).toBeVisible()
+
+  const visitorContext = await browser.newContext({ baseURL: new URL(page.url()).origin })
+  const visitor = await visitorContext.newPage()
+  await visitor.goto('/products/oak-ember/walnut-writing-desk?preview=1')
+  await expect(visitor.getByText('Preview. Customers cannot see this catalog until it is activated.')).toHaveCount(0)
+  await visitorContext.close()
 })

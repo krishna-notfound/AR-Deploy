@@ -59,8 +59,8 @@ const ADMIN_ROUTES: Route[] = [
   { name: 'catalogs', path: '/admin/catalogs', ready: h1(/catalog/i), loaded: qr },
   { name: 'products list', path: '/admin/products', ready: h1('All products'), loaded: row('Products') },
   { name: 'analytics', path: '/admin/analytics', ready: h1('Analytics'), loaded: chart },
-  // Demo mode has no audit events (the server writes them), so this page is short: heading, search and empty state.
-  { name: 'audit log', path: '/admin/activity', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('heading', { name: 'No events yet' }).or(row('Events')(page)).first(), min: 5 },
+  // The demo audit log lists sample events (Task 14); the list is the unnamed <ul> under the "Events" heading. An empty state also counts as loaded.
+  { name: 'audit log', path: '/admin/activity', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('heading', { name: 'No events yet' }).or(page.locator('main ul > li').locator('visible=true')).first(), min: 5 },
   { name: 'settings: my account', path: '/admin/settings/account', ready: h1('My account'), loaded: card('Password'), min: 10 },
   { name: 'settings: profile', path: '/admin/settings/profile', ready: h1('Profile'), loaded: field('Name'), min: 8 },
   { name: 'settings: security and 2FA', path: '/admin/settings/security', ready: h1('Security & 2FA'), loaded: card('Two-step verification (2FA)'), min: 10 },

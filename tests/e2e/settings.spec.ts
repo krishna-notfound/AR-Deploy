@@ -223,3 +223,27 @@ test.describe('role visibility', () => {
     })
   }
 })
+
+// S1.5 R-W1-3: a business owner asks for closure (the catalog goes offline) and cancels it through the same
+// function path the Owner's Businesses list reads; the catalog returns to its previous status.
+test.describe('account closure', () => {
+  test('a business owner requests and cancels a closure', async ({ page }) => {
+    await signInAsBusiness(page, BUSINESS)
+    await page.goto('/dashboard/settings/account')
+    await expect(h1(page, 'My account')).toBeVisible()
+    await page.getByRole('button', { name: 'Request closure' }).click()
+    const ask = page.getByRole('dialog')
+    await expect(ask.getByText('Request closure?')).toBeVisible()
+    await ask.getByRole('button', { name: 'Continue' }).click()
+    const code = page.getByRole('dialog', { name: 'Confirm closure request' })
+    await code.getByLabel('6-digit code').fill(DEMO_CODE)
+    await code.getByRole('button', { name: 'Request closure' }).click()
+    await expect(page.getByText(/^Closure requested on .* · Your catalog is offline\.$/)).toBeVisible()
+
+    await page.getByRole('button', { name: 'Cancel request' }).click()
+    await expect(page.getByText('Closure request cancelled', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Your catalog is back to its previous status.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Request closure' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Cancel request' })).toHaveCount(0)
+  })
+})

@@ -84,3 +84,62 @@ test('an invitation link creates the account and opens the console', async ({ pa
   await expect(nav.getByRole('link', { name: /All Products/ })).toBeVisible()
   await expect(nav.getByRole('link', { name: /Team & Access/ })).toHaveCount(0)
 })
+
+// S1.5 R-W6-1: only a deactivated member can be removed, after a confirmation that says what is deleted.
+test('the Owner removes a deactivated member; an active one has no Remove', async ({ page }) => {
+  await signInAsSuperAdmin(page)
+  await page.goto('/admin/team/mem_joao')
+  await expect(page.getByRole('heading', { level: 1, name: 'João Costa' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Deactivate' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Remove', exact: true })).toHaveCount(0)
+
+  await page.goto('/admin/team/mem_pedro')
+  await expect(page.getByRole('heading', { level: 1, name: 'Pedro Alves' })).toBeVisible()
+  await page.getByRole('button', { name: 'Remove', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('Remove pedro.alves@sanctus.example from the team?')).toBeVisible()
+  await expect(dialog.getByText(/Deleted user \(Admin\)/)).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('heading', { level: 1, name: 'Pedro Alves' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Remove', exact: true }).click()
+  await confirmDialog(page, 'Remove member')
+  await expect(page.getByText('pedro.alves@sanctus.example was removed.').first()).toBeVisible()
+  await expect(page).toHaveURL(/\/admin\/team$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Team & Access' })).toBeVisible()
+  await expect(page.getByRole('table').getByText('pedro.alves@sanctus.example')).toHaveCount(0)
+})
+
+// S1.5 R-W3-3: a permission brings the ones it needs, ticked and locked while it is ticked.
+test('ticking a permission ticks and locks the ones it needs, and unticking it frees them', async ({ page }) => {
+  await signInAsSuperAdmin(page)
+  await page.goto('/admin/team/permissions')
+  const status = page.getByRole('checkbox', { name: 'Team: Activate or deactivate businesses' })
+  const edit = page.getByRole('checkbox', { name: 'Team: Create and edit businesses' })
+  const view = page.getByRole('checkbox', { name: 'Team: View businesses' })
+  await expect(edit).not.toBeChecked()
+  await expect(edit).toBeEnabled()
+  await expect(view).toBeChecked()
+  await expect(view).toBeEnabled()
+
+  await status.check()
+  await expect(edit).toBeChecked()
+  await expect(edit).toBeDisabled()
+  await expect(edit.locator('xpath=ancestor::label')).toHaveAttribute('title', 'Needed by Activate or deactivate businesses')
+  await expect(view).toBeChecked()
+  await expect(view).toBeDisabled()
+  await expect(page.locator('[aria-live="polite"]', { hasText: 'unsaved change' })).toContainText('2 unsaved changes')
+
+  await status.uncheck()
+  await expect(edit).not.toBeChecked()
+  await expect(edit).toBeEnabled()
+  await expect(view).toBeEnabled()
+
+  // Saving keeps the prerequisites with the permission.
+  await status.check()
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByText(/^(Permissions saved|Saved\. Also added: )/).first()).toBeVisible()
+  await expect(edit).toBeChecked()
+  await expect(edit).toBeDisabled()
+})
