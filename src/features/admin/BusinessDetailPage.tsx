@@ -22,6 +22,7 @@ import { CLOSURE_PENDING_ERROR, ok } from '@/services/catalogService'
 import { useNoticeToast } from '@/features/team/useMemberActions'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
+import { BusinessReadOnly } from '../businesses/BusinessReadOnly'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
 import { BusinessModelsCard } from '../businesses/BusinessModelsCard'
@@ -169,7 +170,7 @@ export default function BusinessDetailPage() {
       />
       {tab === 'details' && (
         <div className="space-y-6">
-          <BusinessForm business={b} mode="edit" />
+          {can('businesses.edit') ? <BusinessForm business={b} mode="edit" /> : <BusinessReadOnly business={b} />}
           <BusinessModelsCard business={b} onChanged={business.refetch} />
         </div>
       )}

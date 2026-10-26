@@ -4,6 +4,11 @@ import { formatFileSize } from './format'
 
 export const MB = 1024 * 1024
 
+/** "15 MB", "16.4 MB": megabytes without a trailing ".0", so limits read the same in hints and errors. */
+export function formatMb(bytes: number): string {
+  return `${Math.round((bytes / MB) * 10) / 10} MB`
+}
+
 export const IMAGE_RULES = {
   accept: ['image/jpeg', 'image/png', 'image/webp'],
   extensions: ['.jpg', '.jpeg', '.png', '.webp'],
@@ -30,12 +35,21 @@ export const REQUEST_PHOTO_RULES = {
   minLongSide: 1000,
 }
 
-export const MODEL_RULES: Record<ModelFormat, { extension: string; maxBytes: number }> = {
-  glb: { extension: '.glb', maxBytes: 50 * MB },
-  usdz: { extension: '.usdz', maxBytes: 50 * MB },
+/**
+ * Upload limits for AR (AR audit 2026-10-26, AR-10). Google Scene Viewer recommends GLBs of 10 MB or less and its
+ * validation can fail above 15 MB; a USDZ is opened by Quick Look on the phone, so it is held to a phone-sized limit
+ * too. Client-side only: the storage bucket keeps its own (larger) limit.
+ */
+export const MODEL_RULES: Record<ModelFormat, { extension: string; maxBytes: number; why: string }> = {
+  glb: { extension: '.glb', maxBytes: 15 * MB, why: 'Larger files often fail to open in Android AR (Google Scene Viewer). Reduce the textures (2048 px or less) or the polygon count and export again.' },
+  usdz: { extension: '.usdz', maxBytes: 25 * MB, why: 'Larger files are slow to open in iPhone AR (Quick Look). Reduce the textures (2048 px or less) and export again.' },
 }
 
-export type FileCheck = { ok: true } | { ok: false; message: string }
+/** Textures above this many pixels on a side slow AR down and can run phones out of memory (Scene Viewer guidance). */
+export const MAX_TEXTURE_PX = 2048
+
+/** `warning`: the file is accepted, but something will make AR slow (shown to the admin, never blocks the upload). */
+export type FileCheck = { ok: true; warning?: string } | { ok: false; message: string }
 
 function extOf(name: string): string {
   const i = name.lastIndexOf('.')
@@ -70,7 +84,7 @@ const ZIP_LOCAL = 0x04034b50
 const ZIP_END = 0x06054b50
 
 /** The GLB's JSON chunk, or a reason it is not a well-formed glTF 2.0 binary. Reads the header and JSON only. */
-async function readGlb(file: Blob): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; problem: string }> {
+async function readGlb(file: Blob): Promise<{ ok: true; json: Record<string, unknown>; binStart: number } | { ok: false; problem: string }> {
   if (file.size < 20) return { ok: false, problem: 'header check failed' }
   const head = new DataView((await readHeader(file, 20)).buffer)
   if (head.getUint32(0, true) !== GLB_MAGIC) return { ok: false, problem: 'header check failed' }
@@ -93,7 +107,39 @@ async function readGlb(file: Blob): Promise<{ ok: true; json: Record<string, unk
     const bin = new DataView((await readHeader(file.slice(next, next + 8), 8)).buffer)
     if (bin.getUint32(4, true) !== CHUNK_BIN || next + 8 + bin.getUint32(0, true) > file.size) return { ok: false, problem: 'its binary chunk is damaged' }
   }
-  return { ok: true, json }
+  return { ok: true, json, binStart: next + 8 }
+}
+
+/** Width and height from a PNG or JPEG header, or null for other formats (or a header that cannot be read). */
+function imageSize(b: Uint8Array): { w: number; h: number } | null {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength)
+  if (b.length >= 24 && v.getUint32(0) === 0x89504e47 && v.getUint32(12) === 0x49484452) return { w: v.getUint32(16), h: v.getUint32(20) }
+  if (b.length < 4 || v.getUint16(0) !== 0xffd8) return null
+  for (let i = 2; i + 9 < b.length; ) {
+    if (b[i] !== 0xff) return null
+    const marker = b[i + 1]!
+    // SOF0..SOF15, except DHT (C4), JPG (C8) and DAC (CC), carry the frame size.
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return { w: v.getUint16(i + 7), h: v.getUint16(i + 5) }
+    i += 2 + v.getUint16(i + 2)
+  }
+  return null
+}
+
+/** The largest embedded texture (PNG/JPEG in the BIN chunk), read from the image headers only. */
+async function largestTexture(file: Blob, json: Record<string, unknown>, binStart: number): Promise<{ w: number; h: number } | null> {
+  const images = Array.isArray(json.images) ? (json.images as { bufferView?: unknown }[]) : []
+  const views = Array.isArray(json.bufferViews) ? (json.bufferViews as { byteOffset?: unknown; byteLength?: unknown }[]) : []
+  let largest: { w: number; h: number } | null = null
+  for (const img of images.slice(0, 64)) {
+    const view = typeof img.bufferView === 'number' ? views[img.bufferView] : undefined
+    if (!view || typeof view.byteLength !== 'number') continue
+    const start = binStart + (typeof view.byteOffset === 'number' ? view.byteOffset : 0)
+    const length = Math.min(view.byteLength, 64 * 1024)
+    if (start + length > file.size) continue
+    const size = imageSize(await readHeader(file.slice(start, start + length), length))
+    if (size && (!largest || Math.max(size.w, size.h) > Math.max(largest.w, largest.h))) largest = size
+  }
+  return largest
 }
 
 /** USDZ = an uncompressed zip whose first file is the USD scene (Apple's USDZ rules). Reads two small slices. */
@@ -122,9 +168,13 @@ export async function validateModelFile(file: File, format: ModelFormat): Promis
   if (extOf(file.name) !== rule.extension)
     return { ok: false, message: `${file.name}: expected a ${rule.extension} file.` }
   if (file.size > rule.maxBytes)
-    return { ok: false, message: `${file.name} is ${formatFileSize(file.size)}. Maximum is ${formatFileSize(rule.maxBytes)}.` }
-  const problem = format === 'glb' ? await readGlb(file).then((r) => (r.ok ? null : r.problem)) : await usdzProblem(file)
+    return { ok: false, message: `${file.name} is ${formatMb(file.size)}. Maximum is ${formatMb(rule.maxBytes)}. ${rule.why}` }
+  const glb = format === 'glb' ? await readGlb(file) : null
+  const problem = glb ? (glb.ok ? null : glb.problem) : await usdzProblem(file)
   if (problem) return { ok: false, message: `${file.name} does not look like a valid ${format.toUpperCase()} file: ${problem}. Export it again.` }
+  const texture = glb?.ok ? await largestTexture(file, glb.json, glb.binStart).catch(() => null) : null
+  if (texture && Math.max(texture.w, texture.h) > MAX_TEXTURE_PX)
+    return { ok: true, warning: `${file.name} has a ${texture.w} × ${texture.h} px texture. Textures above ${MAX_TEXTURE_PX} px make AR slow and can fail on phones; export with textures of ${MAX_TEXTURE_PX} px or less.` }
   return { ok: true }
 }
 

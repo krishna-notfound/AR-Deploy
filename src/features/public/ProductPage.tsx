@@ -1,4 +1,4 @@
-import { ArrowLeft, Box, CheckCircle2, Eye, Globe, HelpCircle, Images, Mail, MapPin, PackageX, Phone, Smartphone } from 'lucide-react'
+import { ArrowLeft, Box, CheckCircle2, Eye, Globe, HelpCircle, Images, Loader2, Mail, MapPin, PackageX, Phone, Smartphone } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
@@ -18,7 +18,7 @@ import { sceneViewerUnsupported } from '@/lib/files'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
 import { VARIANT_PARAM, catalogLocalPath, needsPreview, tenantCatalogPath, withVariantParam } from '@/lib/urls'
-import { isAndroid } from '@/lib/userAgent'
+import { arBrowserName, detectInAppBrowser, isAndroid } from '@/lib/userAgent'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
@@ -32,8 +32,10 @@ import { ShareButton } from './ShareActions'
 import { TAP_TARGET } from './tapTarget'
 import { VariantPicker } from './VariantPicker'
 
-/** Ignore AR taps this soon after a launch (double taps, impatient re-taps while the native viewer opens). */
+/** Ignore AR taps this soon after a launch settles (double taps, impatient re-taps while the native viewer opens). */
 export const AR_RELAUNCH_MS = 2000
+/** Clear "Preparing AR…" if the native hand-off never settles (the page may never hear back from the viewer). */
+export const AR_PENDING_MAX_MS = 20_000
 /** Signed media URLs last MEDIA_URL_TTL_SECONDS; refetch on return to the tab once half of that has passed. */
 const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
 
@@ -132,6 +134,8 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const name = localized(product.name)
   const has3d = modelState === 'loading' || modelState === 'loaded'
   const setCanAR = (value: boolean) => setModel((m) => (m.key === modelKey ? { ...m, canAR: value } : m))
+  // In an in-app browser the hand-off fails because of the app, not the phone: say which browser to use (AR-08).
+  const arFailedMessage = () => (detectInAppBrowser() ? t('ar.inAppTitle', { browser: arBrowserName() }) : t('ar.failed'))
 
   const selectVariant = (id: string) => {
     setVariantId(id)
@@ -173,32 +177,48 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const modelUnsupported = isAndroid() && sceneViewerUnsupported(model.required ?? media.models.glb?.requiredExtensions).length > 0
   const availability = arAvailability(modelState, canAR, modelUnsupported)
   const additional = product.images.filter((i) => i.kind === 'additional')
+  const hasCta = modelState === 'loaded' || availability !== 'none'
 
   const open3d = () => {
     setMode('3d')
     stageRef.current?.scrollIntoView({ block: 'nearest' })
   }
 
-  // One launch attempt (and one 'ar_activation' event) per tap; taps within AR_RELAUNCH_MS of a launch are ignored.
+  // One launch attempt (and one 'ar_activation' event) per tap. Taps are ignored while a launch is pending (iPhone
+  // builds the USDZ first, which can take seconds) and for AR_RELAUNCH_MS after it settles (AR audit AR-06).
   // The event means "visitor tried to open AR", never "the piece was placed".
   const lastLaunch = useRef(-Infinity)
+  const launchingRef = useRef(false)
+  const [launching, setLaunching] = useState(false)
   const startAR = async () => {
     setTipsOpen(null)
     // The viewer can lose AR after a failed hand-off (e.g. the Google app is missing): no dead button, no event (AR-04).
     if (!viewerRef.current?.canActivateAR()) {
       setCanAR(false)
-      toast.error(t('ar.failed'))
+      toast.error(arFailedMessage())
       return
     }
     const now = performance.now()
-    if (now - lastLaunch.current < AR_RELAUNCH_MS) return
+    if (launchingRef.current || now - lastLaunch.current < AR_RELAUNCH_MS) return
+    launchingRef.current = true
+    setLaunching(true)
     lastLaunch.current = now
     setMode('3d') // if AR cannot start, the visitor is left on the 3D model rather than a photo
     if (!isPreview) void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
+    const done = () => {
+      clearTimeout(safety)
+      if (!launchingRef.current) return
+      launchingRef.current = false
+      setLaunching(false)
+      lastLaunch.current = performance.now()
+    }
+    const safety = setTimeout(done, AR_PENDING_MAX_MS)
     try {
       await viewerRef.current?.activateAR()
     } catch {
-      toast.error(t('ar.failed'))
+      toast.error(arFailedMessage())
+    } finally {
+      done()
     }
   }
 
@@ -218,6 +238,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const stageChip = 'px-1 text-xs leading-4 font-medium tracking-[0.08em] text-ink-muted'
 
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
+  const primaryCta = 'inline-flex h-12 items-center justify-center gap-3 self-stretch rounded-[2px] bg-obsidian px-8 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-chalk transition-colors hover:bg-umber sm:self-start'
   const textAction = cn(TAP_TARGET, 'inline-flex items-center border-b border-current pb-1 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink transition-colors hover:text-accent-ink')
 
   return (
@@ -237,9 +258,12 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           {t('nav.backToCatalog', { name: business.name })}
         </Link>
 
-        <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.7fr)] lg:gap-14">
+        {/* Phones: stage, then the AR call to action (reachable without scrolling, AR audit AR-05), then the text.
+            Desktop: the text column on the left with the call to action under the finish picker, the sticky stage on
+            the right. The last row takes any height the stage adds, so the left column never gains gaps. */}
+        <div className="mt-6 grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.7fr)] lg:grid-rows-[auto_auto_1fr] lg:gap-x-14">
           {/* Stage + 3D/AR rail (reference: centre stage, round actions on the right). Shown first on phones. */}
-          <div ref={stageRef} className="scroll-mt-24 lg:sticky lg:top-28 lg:order-2 lg:self-start">
+          <div ref={stageRef} className="scroll-mt-24 lg:sticky lg:top-28 lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-start">
             <div className="flex flex-col gap-5 lg:flex-row lg:gap-6">
               {/* Framed viewer card, as the landing's 3D section: a slim top bar of chips, the stage, a dimensions line. */}
               <figure className="min-w-0 flex-1 border border-line bg-surface">
@@ -267,7 +291,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                   viewerRef={viewerRef}
                   onArStatus={(s) => {
                     if (s !== 'failed') return
-                    toast.error(t('ar.failed'))
+                    toast.error(arFailedMessage())
                     // model-viewer turns AR off after a failed hand-off; follow it so the button goes away (AR-04).
                     setCanAR(viewerRef.current?.canActivateAR() ?? false)
                   }}
@@ -301,24 +325,40 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             </div>
           </div>
 
-          <div className="min-w-0 lg:order-1 lg:pt-2">
+          {hasCta && (
+            <div data-ar-cta className="mt-6 flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:mt-8">
+              {/* Only for a model that loaded (AR-08). Where model-viewer can open AR, the primary action launches it
+                  ("View in my home", as on main); elsewhere it opens the 3D view and ArSection explains the phone hand-off. */}
+              {modelState === 'loaded' &&
+                (availability === 'available' ? (
+                  <button type="button" onClick={onActivate} disabled={launching} aria-busy={launching} className={cn(primaryCta, 'disabled:cursor-progress disabled:bg-umber')}>
+                    {launching ? t('ar.preparing') : t('ar.button')}
+                    {launching ? <Loader2 className="size-4 animate-spin" strokeWidth={1.4} aria-hidden /> : <Smartphone className="size-4" strokeWidth={1.4} aria-hidden />}
+                  </button>
+                ) : (
+                  <button type="button" onClick={open3d} className={primaryCta}>
+                    {t('product.view3d')}
+                    <Box className="size-4" strokeWidth={1.4} aria-hidden />
+                  </button>
+                ))}
+              {/* Where AR starts, the scale verdict too (AR-09): a model that does not match the listed size is flagged. */}
+              {availability === 'available' && scale.status !== 'unknown' && <ScaleBadge verified={scale.status === 'verified'} separateUsdz={separateUsdz} />}
+              <ArSection availability={availability} onShowTips={() => setTipsOpen('info')} />
+            </div>
+          )}
+
+          <div className="mt-10 min-w-0 lg:col-start-1 lg:row-start-1 lg:mt-0 lg:pt-2">
             <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t(`category.${product.category}`)}</p>
             <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
             <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
             <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
 
             <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="mt-8 border-t border-line pt-6" />
+          </div>
 
-            <div className="mt-8 flex flex-col gap-5">
-              {/* Only for a model that loaded (AR-08). Where model-viewer can open AR, the primary action launches it
-                  ("View in my home", as on main); elsewhere it opens the 3D view and ArSection explains the phone hand-off. */}
-              {modelState === 'loaded' && (
-                <button type="button" onClick={availability === 'available' ? onActivate : open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch rounded-[2px] bg-obsidian px-8 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-chalk transition-colors hover:bg-umber sm:self-start">
-                  {availability === 'available' ? t('ar.button') : t('product.view3d')}
-                  {availability === 'available' ? <Smartphone className="size-4" strokeWidth={1.4} aria-hidden /> : <Box className="size-4" strokeWidth={1.4} aria-hidden />}
-                </button>
-              )}
-              <ArSection availability={availability} onShowTips={() => setTipsOpen('info')} />
+          <div className="min-w-0 lg:col-start-1 lg:row-start-3">
+            {/* Desktop spacing as before: gap-5 under the call to action, mt-8 under the finish picker when there is none. */}
+            <div className={cn('mt-8', hasCta ? 'lg:mt-5' : 'lg:mt-8')}>
               <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
                 {product.cta.url ? (
                   <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={textAction}>
@@ -485,6 +525,17 @@ function ScaleNote({ verified, separateUsdz, measured, unit }: { verified: boole
         </p>
       </div>
     </div>
+  )
+}
+
+/** The scale verdict beside the AR action (AR-09): the same labels as the scale note under the dimensions. */
+function ScaleBadge({ verified, separateUsdz }: { verified: boolean; separateUsdz: boolean }) {
+  const { t } = useI18n()
+  return (
+    <p className={cn('flex items-center gap-1.5 text-[13px] font-medium', verified ? 'text-success' : 'text-ink-muted')}>
+      {verified ? <CheckCircle2 className="size-4 shrink-0" aria-hidden /> : <HelpCircle className="size-4 shrink-0" aria-hidden />}
+      {t(scaleNoteKeys(verified, separateUsdz).title)}
+    </p>
   )
 }
 

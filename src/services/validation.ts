@@ -11,16 +11,26 @@ export const MAX_VARIANT_IMAGES = 20
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/** Longest value (after trimming) each business field accepts; the form's maxLength uses the same numbers. */
+export const BUSINESS_LIMITS = { name: 80, slug: 63, description: 1000, email: 320, phone: 50, address: 500 } as const
+
+const tooLong = (n: number) => `Use ${n} characters or fewer.`
+
 export function validateBusiness(data: BusinessInput, others: Business[]): FieldErrors {
   const e: FieldErrors = {}
   const name = data.name.trim()
   if (!name) e.name = 'Business name is required.'
-  else if (name.length > 80) e.name = 'Use 80 characters or fewer.'
+  else if (name.length > BUSINESS_LIMITS.name) e.name = tooLong(BUSINESS_LIMITS.name)
   if (!data.slug) e.slug = 'Catalog address is required.'
+  else if (data.slug.length > BUSINESS_LIMITS.slug) e.slug = tooLong(BUSINESS_LIMITS.slug)
   else if (!isValidSlug(data.slug)) e.slug = 'Use lowercase letters, numbers and single hyphens only.'
   else if (RESERVED_SUBDOMAINS.has(data.slug)) e.slug = 'This catalog address is reserved by the platform. Choose another.'
   else if (others.some((b) => b.slug === data.slug)) e.slug = 'This catalog address is already used by another business.'
-  if (data.contact.email && !EMAIL.test(data.contact.email)) e['contact.email'] = 'Enter a valid email address.'
+  if ((data.description ?? '').trim().length > BUSINESS_LIMITS.description) e.description = tooLong(BUSINESS_LIMITS.description)
+  if ((data.contact.email ?? '').trim().length > BUSINESS_LIMITS.email) e['contact.email'] = tooLong(BUSINESS_LIMITS.email)
+  else if (data.contact.email && !EMAIL.test(data.contact.email)) e['contact.email'] = 'Enter a valid email address.'
+  if ((data.contact.phone ?? '').trim().length > BUSINESS_LIMITS.phone) e['contact.phone'] = tooLong(BUSINESS_LIMITS.phone)
+  if ((data.contact.address ?? '').trim().length > BUSINESS_LIMITS.address) e['contact.address'] = tooLong(BUSINESS_LIMITS.address)
   if (data.contact.website && !isHttpUrl(data.contact.website)) e['contact.website'] = 'Enter a full URL starting with https://'
   if (!/^#[0-9a-fA-F]{6}$/.test(data.branding.accentColor)) e['branding.accentColor'] = 'Use a hex colour such as #7A5C45.'
   return e

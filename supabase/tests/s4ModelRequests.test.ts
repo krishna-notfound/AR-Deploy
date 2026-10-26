@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MIGRATIONS, S4_MIGRATION, S4_ROLLBACK_SQL, freshDb, ids, makeHelpers, type Helpers } from './harness'
+import { MIGRATIONS, S4_MIGRATION, S4_ROLLBACK_SQL, UP_TO_S4, freshDb, ids, makeHelpers, type Helpers } from './harness'
 
 type ModelRequestStatus = 'requested' | 'in_progress' | 'delivered' | 'rejected' | 'cancelled'
 
@@ -164,6 +164,16 @@ describe('S4 Task 1: permission, switch, tables, bucket', () => {
     }
   })
 
+  it('the S4 migration also applies on a database that already has S2 (the live order: S2 shipped first)', async () => {
+    const live = await freshDb((n) => n !== S4_MIGRATION)
+    try {
+      await live.exec(readFileSync(join(MIGRATIONS, S4_MIGRATION), 'utf8'))
+      expect((await live.query<{ o: string | null }>(`select to_regclass('public.model_requests')::text as o`)).rows[0]!.o).toBe('model_requests')
+    } finally {
+      await live.close()
+    }
+  }, 120_000)
+
   it("the Owner's my_platform_access().permissions has length 16 after Admin and Team sets are both {}", async () => {
     const saved = (await db.query<{ role: string; permission: string }>('select role::text, permission from public.platform_role_permissions')).rows
     try {
@@ -175,6 +185,17 @@ describe('S4 Task 1: permission, switch, tables, bucket', () => {
       expect(await h.call(f.admin, 'select public.my_platform_access() as r')).toEqual({ role: 'admin', permissions: [] })
     } finally {
       for (const r of saved) await db.query('insert into public.platform_role_permissions (role, permission) values ($1::public.platform_role, $2)', [r.role, r.permission])
+    }
+  })
+
+  it('private.permission_prerequisites() on the full schema equals PERMISSION_PREREQUISITES, models.manage included (the S1.5 suite checks the keys before S4)', async () => {
+    const P = await import('@/domain/permissions')
+    const edges = (await db.query<{ permission: string; requires: string }>('select permission, requires from private.permission_prerequisites() order by 1, 2')).rows
+    const tsEdges = Object.entries(P.PERMISSION_PREREQUISITES).flatMap(([permission, reqs]) => reqs.map((requires) => ({ permission, requires })))
+    expect(edges).toEqual([...tsEdges].sort((a, b) => (a.permission < b.permission ? -1 : a.permission > b.permission ? 1 : a.requires < b.requires ? -1 : 1)))
+    for (const p of P.ALL_PERMISSIONS) {
+      const sql = (await db.query<{ r: string[] }>('select private.with_prerequisites(array[$1]) as r', [p])).rows[0]!.r
+      expect({ p, sql: [...sql].sort() }).toEqual({ p, sql: [...P.withPrerequisites([p])].sort() })
     }
   })
 
@@ -499,7 +520,7 @@ describe('S4 rollback', () => {
 
   it('apply → rollback → re-apply succeeds; every GONE_AFTER_ROLLBACK name is gone; policies, my_platform_access, admin_set_role_permissions, permission_prerequisites and save_product equal a database before S4', async () => {
     const before = await freshDb((n) => n < S4_MIGRATION)
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S4)
     try {
       const pre = await definitions(before)
       expect(GONE_AFTER_ROLLBACK.length).toBeGreaterThan(0)
@@ -525,7 +546,7 @@ describe('S4 rollback', () => {
   }, 120_000)
 
   it('fix round 1: a refused bucket delete (hosted storage.protect_delete) is only a notice; the rest of the rollback commits', async () => {
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S4)
     try {
       // Hosted Storage refuses direct deletes from its tables (storage.protect_delete); stand in with a trigger.
       await rolled.exec(`
@@ -541,7 +562,7 @@ describe('S4 rollback', () => {
   }, 60_000)
 
   it('rollback raises model_request_photos_not_empty while the bucket has objects', async () => {
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S4)
     try {
       await putObject(rolled, 'model-request-photos', `${ids(1)(10)}/${ids(1)(50)}/${ids(1)(51)}.jpg`)
       await expect(rolled.exec(readFileSync(S4_ROLLBACK_SQL, 'utf8'))).rejects.toThrow(/model_request_photos_not_empty/)
@@ -1189,7 +1210,7 @@ describe('S4 Task 7: email kind', () => {
   })
 
   it('rollback restores the 12-kind check when no model_request_update row exists', async () => {
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S4)
     try {
       await rolled.exec(readFileSync(S4_ROLLBACK_SQL, 'utf8'))
       await expect(insert(rolled, 'model_request_update')).rejects.toThrow(/email_log_kind_check/)
@@ -1200,7 +1221,7 @@ describe('S4 Task 7: email kind', () => {
   }, 60_000)
 
   it('rollback keeps the wider check when a model_request_update row exists', async () => {
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S4)
     try {
       await insert(rolled, 'model_request_update')
       await rolled.exec(readFileSync(S4_ROLLBACK_SQL, 'utf8'))

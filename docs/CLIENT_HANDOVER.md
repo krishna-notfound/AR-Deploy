@@ -126,7 +126,7 @@ Use **Add Product** in the business dashboard, or **All Products → New** in Su
 **3D models** (optional, but there's no AR without them)
 - **GLB file:** used for the 3D viewer on every device and for AR on Android. **Without a GLB there is no 3D viewer and no AR button**, even if a USDZ is uploaded.
 - **USDZ file:** used for AR on iPhone and iPad. Without it, iPhones try to convert the GLB themselves, which is slower and not guaranteed to work.
-- The largest file allowed is **50 MB**. For Android AR, Google recommends a GLB of **10 MB or less**. Larger files load slowly on mobile data.
+- The largest file allowed is **15 MB for a GLB** and **25 MB for a USDZ**: larger files often fail to open in phone AR. For Android AR, Google recommends a GLB of **10 MB or less**. A GLB with textures above 2048 px is accepted with a warning, because large textures make AR slow on phones.
 - Files are checked to confirm they really are GLB or USDZ.
 
 **AR readiness panel.** After you upload a model, this panel shows what customers will get: 3D viewer, Android AR, iPhone/iPad AR, true size, and a file-size warning.

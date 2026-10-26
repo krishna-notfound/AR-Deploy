@@ -5,8 +5,10 @@ import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
 import type { Product } from '@/domain/types'
 import { catalogPublicUrl, productPublicUrl } from '@/lib/urls'
-import { service } from '@/services'
+import { account, service } from '@/services'
 import { ok } from '@/services/catalogService'
+import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
+import { OWNER_CLOSURE_LINE } from '../businesses/closure'
 import { productArReadiness } from '../products/productReadiness'
 
 // The QR library draws on a canvas jsdom does not have; record what each code would encode instead.
@@ -108,15 +110,20 @@ describe('owner catalogue preview (DUX-02, ADR-0025)', () => {
     expect(link).toHaveAttribute('href', '/products/oak-ember/sunny-loveseat?preview=1')
   })
 
-  it('still answers "unavailable" to an anonymous visitor', async () => {
+  // R-W8-2: the demo follows the database's RLS, so a paused catalogue is not readable by outsiders at all. The page
+  // shows the not-found state (the separate "unavailable" page was dropped), and no preview or content leaks.
+  it('reads as not found to an anonymous visitor (R-W8-2)', async () => {
     openApp('/catalog/oak-ember?preview=1')
-    expect(await screen.findByRole('heading', { name: 'This catalog is currently unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Catalog not found' })).toBeInTheDocument()
     expect(screen.queryByText(/Preview\. Customers cannot see/)).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Oak & Ember Studio' })).toBeNull()
   })
 
-  it('still answers "unavailable" to the owner of another business', async () => {
+  it('reads as not found to the owner of another business (R-W8-2)', async () => {
     openApp('/catalog/oak-ember?preview=1', asOwner('biz_casa'))
-    expect(await screen.findByRole('heading', { name: 'This catalog is currently unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Catalog not found' })).toBeInTheDocument()
+    expect(screen.queryByText(/Preview\. Customers cannot see/)).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Oak & Ember Studio' })).toBeNull()
   })
 })
 
@@ -279,5 +286,28 @@ describe('business Overview: Changes by the platform team (R-W7-2)', () => {
     expect(await within(card).findByText('Catalog for Casa Lisboa Interiors was paused')).toBeInTheDocument()
     expect(within(card).getAllByRole('listitem')).toHaveLength(1)
     expect(within(card).queryByText(/Nordhaus/)).toBeNull()
+  })
+})
+
+describe("S2 Task 2: the owner's closure line follows the real status (R-W3-6)", () => {
+  afterEach(() => resetMockAccount())
+  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  it("the closure line reads 'Closure requested on {date} · ' + OWNER_CLOSURE_LINE[status]; the shell notice names the closure", { timeout: 20_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(asOwner('biz_casa')))
+    expect((await account.requestClosure(DEMO_CODE)).ok).toBe(true)
+    openApp('/dashboard', asOwner('biz_casa'))
+    const line = await screen.findByText(new RegExp(`^Closure requested on .+ · ${escape(OWNER_CLOSURE_LINE.inactive)}$`), {}, { timeout: 15_000 })
+    expect(line).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'My account' })).toHaveAttribute('href', '/dashboard/settings/account')
+    expect(screen.queryByText('Your catalog is paused.')).toBeNull()
+  })
+
+  it("a draft status reads 'Your catalog is not public yet.'", { timeout: 20_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(asOwner('biz_casa')))
+    expect((await account.requestClosure(DEMO_CODE)).ok).toBe(true)
+    await service.setBusinessStatus('biz_casa', 'draft')
+    openApp('/dashboard', asOwner('biz_casa'))
+    expect(await screen.findByText(/^Closure requested on .+ · Your catalog is not public yet\.$/, {}, { timeout: 15_000 })).toBeInTheDocument()
   })
 })

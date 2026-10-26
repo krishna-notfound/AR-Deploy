@@ -12,9 +12,11 @@ import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { type Business, type BusinessStatus, CURRENCIES, type Currency } from '@/domain/types'
 import { slugInput, slugify } from '@/lib/slug'
+import { BUSINESS_SLUG_MAX } from '@/lib/slug'
 import { PUBLIC_URLS_ARE_LIVE, PUBLIC_URL_MODE, ROOT_DOMAIN, catalogPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import type { BusinessInput } from '@/services/catalogService'
+import { BUSINESS_LIMITS, validateBusiness } from '@/services/validation'
 import { BusinessIdentityPreview } from './BusinessIdentityPreview'
 
 export type BusinessFormMode = 'create' | 'edit' | 'owner'
@@ -47,7 +49,8 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
   const toast = useToast()
   const confirm = useConfirm()
   // Creating a live business needs businesses.status (R-W3-3; the database refuses it too); otherwise only a draft.
-  const canCreateActive = useCan()('businesses.status')
+  const can = useCan()
+  const canCreateActive = can('businesses.status')
   const [data, setData] = useState<BusinessInput>(() => toInput(business))
   const [snapshot, setSnapshot] = useState(() => JSON.stringify(toInput(business)))
   const [slugTouched, setSlugTouched] = useState(mode !== 'create')
@@ -78,6 +81,14 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
       name: data.name.trim(),
       contact: Object.fromEntries(Object.entries(data.contact).map(([k, v]) => [k, v?.trim() || undefined])) as BusinessInput['contact'],
       status: intent === 'draft' ? 'draft' : intent === 'create' ? 'active' : data.status,
+    }
+    // Field limits are checked here too, so an over-long value (pasted, or stored before a limit) gets its field error
+    // without a service call (R-W3-7). The slug conflict check stays with the service.
+    const local = validateBusiness(payload, [])
+    if (Object.keys(local).length) {
+      setErrors(local)
+      toast.error(business ? 'Could not save changes' : 'Could not create business', 'Please fix the highlighted fields.')
+      return
     }
     const patch = business ? changedBusinessFields(payload, JSON.parse(snapshot) as BusinessInput, mode === 'owner' ? OWNER_FIELDS : undefined) : null
     if (business && patch?.slug !== undefined && patch.slug !== business.slug) {
@@ -140,7 +151,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
             <FormField label="Business name" required error={errors.name}>
               <Input
                 value={data.name}
-                maxLength={80}
+                maxLength={BUSINESS_LIMITS.name}
                 autoComplete="organization"
                 onChange={(e) => {
                   const name = e.target.value
@@ -151,8 +162,8 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
             <FormField label="Logo">
               <LogoUpload value={data.logoUrl} onChange={(logoUrl) => set({ logoUrl })} name={data.name} businessId={business?.id} />
             </FormField>
-            <FormField label="Description" hint="Shown at the top of the public catalog.">
-              <Textarea value={data.description} maxLength={400} rows={3} onChange={(e) => set({ description: e.target.value })} />
+            <FormField label="Description" hint="Shown at the top of the public catalog." error={errors.description}>
+              <Textarea value={data.description} maxLength={BUSINESS_LIMITS.description} rows={3} onChange={(e) => set({ description: e.target.value })} />
             </FormField>
           </div>
         </Card>
@@ -161,16 +172,16 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
           <CardHeader title="Contact" description="Shown to customers when a product has no call-to-action link." />
           <div className="grid gap-5 px-6 pb-6 sm:grid-cols-2">
             <FormField label="Email" optional error={errors['contact.email']}>
-              <Input type="email" autoComplete="email" value={data.contact.email ?? ''} onChange={(e) => setContact({ email: e.target.value })} />
+              <Input type="email" autoComplete="email" maxLength={BUSINESS_LIMITS.email} value={data.contact.email ?? ''} onChange={(e) => setContact({ email: e.target.value })} />
             </FormField>
-            <FormField label="Phone" optional>
-              <Input type="tel" autoComplete="tel" value={data.contact.phone ?? ''} onChange={(e) => setContact({ phone: e.target.value })} />
+            <FormField label="Phone" optional error={errors['contact.phone']}>
+              <Input type="tel" autoComplete="tel" maxLength={BUSINESS_LIMITS.phone} value={data.contact.phone ?? ''} onChange={(e) => setContact({ phone: e.target.value })} />
             </FormField>
             <FormField label="Website" optional error={errors['contact.website']}>
               <Input type="url" placeholder="https://" value={data.contact.website ?? ''} onChange={(e) => setContact({ website: e.target.value })} />
             </FormField>
-            <FormField label="Address" optional>
-              <Input autoComplete="street-address" value={data.contact.address ?? ''} onChange={(e) => setContact({ address: e.target.value })} />
+            <FormField label="Address" optional error={errors['contact.address']}>
+              <Input autoComplete="street-address" maxLength={BUSINESS_LIMITS.address} value={data.contact.address ?? ''} onChange={(e) => setContact({ address: e.target.value })} />
             </FormField>
           </div>
         </Card>
@@ -205,15 +216,16 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                   <InputAddon side={PUBLIC_URL_MODE === 'path' ? 'left' : 'right'} addon={PUBLIC_URL_MODE === 'path' ? '/catalog/' : `.${ROOT_DOMAIN}`}>
                     <Input
                       value={data.slug}
+                      maxLength={BUSINESS_SLUG_MAX}
                       onChange={(e) => {
                         setSlugTouched(true)
-                        set({ slug: slugInput(e.target.value) })
+                        set({ slug: slugInput(e.target.value, BUSINESS_SLUG_MAX) })
                       }}
                     />
                   </InputAddon>
                 </FormField>
                 <div className="grid gap-5 sm:grid-cols-2">
-                  {mode === 'edit' && (
+                  {mode === 'edit' && can('businesses.status') && (
                     <FormField label="Catalog status" hint="Inactive catalogs are hidden from customers.">
                       <Select value={data.status} onChange={(e) => set({ status: e.target.value as BusinessStatus })}>
                         <option value="active">Active</option>

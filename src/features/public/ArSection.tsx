@@ -8,6 +8,7 @@ import { CopyLink } from './ShareActions'
 import type { ModelState } from './ProductMedia'
 import { TAP_TARGET } from './tapTarget'
 import { shareableCurrentUrl } from '@/lib/urls'
+import { IN_APP_NAME, arBrowserName, browserName, detectInAppBrowser, isAndroid, isIOS } from '@/lib/userAgent'
 
 /** 'model-unsupported': this phone's AR viewer cannot open this model (Android + a GLB Scene Viewer does not support). */
 export type ArAvailability = 'none' | 'checking' | 'available' | 'unavailable' | 'model-unsupported'
@@ -53,6 +54,20 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
       </button>
     )
 
+  // Honest hand-off copy (AR audit AR-07/08): a phone is never told to "open this page on your mobile device".
+  const inApp = detectInAppBrowser()
+  const onPhone = isIOS() || isAndroid()
+  const browser = arBrowserName()
+  // Already in Safari (iOS) / Chrome (Android): pointing to the same browser would be no help, so say it plainly.
+  const inArBrowser = onPhone && browserName() === browser
+  const phoneKind = inApp ? 'inApp' : !onPhone ? 'desktop' : inArBrowser ? 'device' : 'browser'
+  const title = { inApp: t('ar.inAppTitle', { browser }), desktop: t('ar.unsupportedTitle'), device: t('ar.deviceUnsupportedTitle'), browser: t('ar.phoneUnsupportedTitle') }[phoneKind]
+  const body = {
+    inApp: inApp ? t('ar.inAppBody', { app: IN_APP_NAME[inApp], browser }) : '',
+    desktop: t('ar.unsupportedBody'),
+    device: t('ar.deviceUnsupportedBody'),
+    browser: t('ar.phoneUnsupportedBody', { browser }),
+  }[phoneKind]
   return (
     <div className="border border-line bg-surface p-4 sm:p-5">
       <div className="flex gap-3.5">
@@ -60,17 +75,20 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
           <Smartphone className="size-4 text-accent-ink" strokeWidth={1.4} aria-hidden />
         </span>
         <div className="min-w-0">
-          <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">{t('ar.unsupportedTitle')}</p>
-          <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t('ar.unsupportedBody')}</p>
+          <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">{title}</p>
+          <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{body}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <CopyLink size="sm" />
+            {/* The QR code hands the page from a computer to a phone; on a phone it is no help. */}
+            {!onPhone && (
             <Button size="sm" variant="ghost" icon={<QrCode className="size-4" aria-hidden />} onClick={() => setShowQr((v) => !v)} aria-expanded={showQr}>
               {showQr ? t('ar.hideQr') : t('ar.showQr')}
             </Button>
+            )}
           </div>
         </div>
       </div>
-      {showQr && <PageQr />}
+      {showQr && !onPhone && <PageQr />}
     </div>
   )
 }

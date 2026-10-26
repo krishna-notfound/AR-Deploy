@@ -14,6 +14,16 @@ export const ROLLBACK_SQL = join(__dirname, '..', 'rollback', '20261026_business
 export const S4_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_s4_model_requests.sql'))!
 /** Path of the S4 rollback script. */
 export const S4_ROLLBACK_SQL = join(__dirname, '..', 'rollback', '20261026_s4_model_requests_rollback.sql')
+export const S2_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_s2_business_logic.sql'))!
+export const S2_ROLLBACK_SQL = join(__dirname, '..', 'rollback', '20261026_s2_business_logic_rollback.sql')
+/** Migrations up to and including S1.5: the S1.5 suite and its rollback checks run without S2. */
+export const UP_TO_S15 = (n: string) => n <= S15_MIGRATION
+/** Migrations up to and including S4: the S4 rollback checks run on the database S4 left, without the later S2. */
+export const UP_TO_S4 = (n: string) => n <= S4_MIGRATION
+/** Permission keys added after S1.5 (S4: models.manage). The S1.5 suite, run on UP_TO_S15, leaves them out. */
+export const LATER_PERMISSIONS = ['models.manage'] as const
+/** Migrations before S2 (S1.5 and S4): the database S2 is applied to and rolled back to. */
+export const BEFORE_S2 = (n: string) => n < S2_MIGRATION
 
 /** The parts of Supabase the migrations rely on: API roles, auth (users, uid/jwt from test settings, MFA), storage. */
 export const SUPABASE_STUBS = `
