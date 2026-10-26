@@ -16,12 +16,15 @@ export type TransitionResult =
   | { ok: true; status: ApplicationStatus; noop: boolean }
   | { ok: false; reason: 'invalid_transition' | 'reason_required' | 'reopen_not_allowed' }
 
-/** Reopen (R-W2-2): only an approved application whose business was deleted, back to under_review. */
-function canReopen(status: ApplicationStatus, businessId?: ID | null): boolean {
+/**
+ * Reopen (R-W2-2): only an approved application whose business was deleted, back to under_review. Callers pass the
+ * application's businessId (null or undefined when it has none), so a missing link is never assumed.
+ */
+function canReopen(status: ApplicationStatus, businessId: ID | null | undefined): boolean {
   return status === 'approved' && !businessId
 }
 
-export function applyReview(current: ApplicationStatus, action: ReviewAction, reason?: string, opts: { businessId?: ID | null } = {}): TransitionResult {
+export function applyReview(current: ApplicationStatus, action: ReviewAction, reason: string | undefined, opts: { businessId: ID | null | undefined }): TransitionResult {
   if (action === 'reopen') return canReopen(current, opts.businessId) ? { ok: true, status: 'under_review', noop: false } : { ok: false, reason: 'reopen_not_allowed' }
   const next = TARGET[action]
   if (next === current) return { ok: true, status: current, noop: true }
@@ -31,7 +34,7 @@ export function applyReview(current: ApplicationStatus, action: ReviewAction, re
 }
 
 /** Actions an admin can take from a status (drives which buttons are shown); reopen only for approved with no business. */
-export function availableActions(status: ApplicationStatus, opts: { businessId?: ID | null } = {}): ReviewAction[] {
+export function availableActions(status: ApplicationStatus, opts: { businessId: ID | null | undefined }): ReviewAction[] {
   const actions: ReviewAction[] = (Object.keys(TARGET) as (keyof typeof TARGET)[]).filter((a) => ALLOWED[status].includes(TARGET[a]))
   return canReopen(status, opts.businessId) ? [...actions, 'reopen'] : actions
 }

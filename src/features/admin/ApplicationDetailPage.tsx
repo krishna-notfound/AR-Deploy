@@ -96,6 +96,11 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const [includeReason, setIncludeReason] = useState(false)
   const includeHintId = useId()
   const actions = availableActions(app.status, { businessId: app.businessId ?? null })
+  const canStartReview = actions.includes('start_review') && can('applications.approve')
+  const canReject = actions.includes('reject') && can('applications.reject')
+  const canReopen = actions.includes('reopen') && can('applications.approve')
+  const canApprove = actions.includes('approve') && can('applications.approve')
+  const showActions = canStartReview || canReject || canReopen || canApprove
   // R-W2-2: approved, but the business it created was deleted (L1 has no date).
   const businessDeleted = app.status === 'approved' && !app.businessId
 
@@ -148,14 +153,19 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
             </span>
           </>
         }
-        actions={
+      />
+
+      {/* R-W2-9: the possible duplicates come before the review actions, in reading order at every width. */}
+      <div className="mb-6 space-y-4 empty:hidden">
+        <PossibleDuplicates applicationId={app.id} />
+        {showActions && (
           <div className="flex flex-wrap gap-2">
-            {actions.includes('start_review') && can('applications.approve') && (
+            {canStartReview && (
               <Button icon={<Eye className="size-4" aria-hidden />} loading={review.pending} onClick={() => void run('start_review')}>
                 {app.status === 'rejected' ? 'Reopen review' : 'Start review'}
               </Button>
             )}
-            {actions.includes('reject') && can('applications.reject') && (
+            {canReject && (
               <Button
                 variant="secondary"
                 className="border-danger! text-danger! hover:bg-danger-soft!"
@@ -168,23 +178,22 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
                 Reject
               </Button>
             )}
-            {actions.includes('reopen') && can('applications.approve') && (
+            {canReopen && (
               <Button icon={<RotateCcw className="size-4" aria-hidden />} loading={review.pending} onClick={() => void run('reopen')}>
                 Reopen for review
               </Button>
             )}
-            {actions.includes('approve') && can('applications.approve') && (
+            {canApprove && (
               <Button variant="primary" icon={<Check className="size-4" aria-hidden />} loading={review.pending} onClick={() => void approve()}>
                 Approve
               </Button>
             )}
           </div>
-        }
-      />
+        )}
+      </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
-          <PossibleDuplicates applicationId={app.id} />
           {needsOwner && (
             <InlineNotice tone="info">
               <div className="flex flex-wrap items-center justify-between gap-3">
