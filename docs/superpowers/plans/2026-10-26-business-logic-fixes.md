@@ -11,7 +11,7 @@
 
 **Tech stack:** React 19, React Router 8, Tailwind 4, TypeScript 6, Vitest + Testing Library, PGlite (`@electric-sql/pglite`), Playwright, Supabase (supabase-js 2.117.3, Deno Edge Functions), Resend.
 
-**Spec:** `docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md`. Read it before your task; `§` and `R-Wn-k` references below point into it. Evidence with file:line is in `docs/audits/2026-10-26-business-logic/*.md`, and the binding rulings are in `RULINGS.md`. **The owner slimmed S1.5 on 2026-10-26.** Only the requirements in the coverage table are built here. Everything in "Moved out of S1.5" (end of this plan) is out of scope: it gets no code, no test and no SQL in this plan.
+**Spec:** `docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md`. Read it before your task; `§` and `R-Wn-k` references below point into it. Evidence with file:line is in `docs/audits/2026-10-26-business-logic/*.md`, and the binding rulings are in `RULINGS.md`. **The owner slimmed S1.5 on 2026-10-26.** Only the requirements in the coverage table are built here. Everything in "Moved out of S1.5" (end of this plan) is out of scope: it gets no code, no test and no SQL in this plan. **The owner cancelled S3 (the application form builder) on 2026-10-26**, so the findings once moved to S3 are back here as Tasks 16–18 (R-W1-9 was already kept in Task 2).
 
 ## Global Constraints
 
@@ -277,7 +277,7 @@ Closes **R-W2-1** (APP-01 = MAIL-01).
 - Consumes: `gateCaller(…, 'staff')` from Task 2. The per-action permission stays in SQL.
 - Produces (function): `POST {applicationId, action:'start_review'|'approve'|'reject', reason?, includeReason?}` → `{ok:true, status, businessId?, email?:{status, error?}}`.
   - Errors: 403 `aal2_required`/`forbidden`; 422 `reason_required`/`invalid_transition`; 404 `application_not_found`; 400 `invalid_request`.
-  - `reopen` is moved to S3, so it returns 400 `invalid_request`.
+  - `reopen` is not part of Task 4: it returns 400 `invalid_request` until Task 16 adds it.
 - Produces (deps):
   ```ts
   export interface ReviewDeps {
@@ -763,6 +763,11 @@ Closes **R-W8-3** (ANA-08), **R-W8-4** (ANA-09), **R-W8-5** (TEAM-19), **R-W8-6*
 
 Closes the §13.2 documentation and the §14 Playwright journeys for the kept scope. It also writes down TEAM-20 as it is (§12), and records the owner's slim.
 
+**Runs last, after Tasks 16–18 are merged, and covers them too:**
+- e2e: `applications.spec.ts` adds reopen after a business delete and the "Possible duplicates" panel on a seeded re-application; `business-crud.spec.ts` adds the owner-state column and its filter.
+- Docs: design/24 (reopen, the rolling invitation limit and reservations, possible duplicates, the attempt-based submission limit and the daily hash, replay completion); design/19 (`owner_invite_attempts`, `application_attempts` and the new functions); SECURITY_REVIEW (the submission limit counts attempts; the submitter hash is daily).
+- Runbook: deploy `submit-application` with the other functions, and add the read-only pre-flight query for the `email_log.attempt` maxima per `invite:<business>` workflow (R-W2-4).
+
 **Files:**
 - Modify (e2e, demo mode):
   - `tests/e2e/applications.spec.ts`: reject with and without the reason (toast, and the reason shown only when ticked);
@@ -779,7 +784,7 @@ Closes the §13.2 documentation and the §14 Playwright journeys for the kept sc
   - `docs/PRD.md` (the R-28/R-30 analytics labels);
   - `docs/CLIENT_HANDOVER.md` (the TEAM-20 sentence and owner notices);
   - `docs/PRODUCTION_READINESS.md`, `System_arch/Task.md` and `System_arch/HANDOFF.md`;
-  - `System_arch/tasks/P12-team-roles-and-addons.md` (the S1.5 line in the P13 section; the moved R-IDs added to the S2, S3 and S4 lines);
+  - `System_arch/tasks/P12-team-roles-and-addons.md` (the S1.5 line in the P13 section; the moved R-IDs added to the S2 and S4 lines; S3 stays marked cancelled);
   - the spec's status line: "Slimmed by the owner on 2026-10-26; see the plan's 'Moved out of S1.5'".
 
 **Interfaces:**
@@ -806,6 +811,235 @@ Closes the §13.2 documentation and the §14 Playwright journeys for the kept sc
 - [ ] **Step 5: Run the full gates.** `npm run typecheck && npm run lint && npm test && npm run build` all pass.
 - [ ] **Step 6: Tick and commit.** Tick S1.5 in the task file with a note, and update the phase row in `Task.md`. Commit with the message "S1.5 Task 15: e2e journeys, ADR-0033, runbook, security and client docs".
 
+
+### Tasks 16–18: the application findings back from S3
+
+The owner cancelled S3 (the application form builder) on 2026-10-26: "keep form as it is … I don't want a form builder now". Its findings come back into S1.5 as three tasks. They are split so that a reviewer can accept or reject each one on its own, and so that no task reads a table or a function another of the three creates:
+- **Task 16** is the reviewer's application page and its SQL (`admin_review_application`, duplicates).
+- **Task 17** is the owner invitation and onboarding path (`provision-owner`, the reservations, the owner states that read them, and the demo `provisionOwner`).
+- **Task 18** is the public submission function (`submit-application`).
+
+**Order and base for all three:**
+- They start only after **Task 2** (merged: `_shared/gate.ts`, the provision-owner gate and `isTeamEmail`, and the Task 2 `service_link_owner` body) and **Task 4** (`review-application`, `reviewApplication(...)`, the confirmation template line) are merged into `feature/sanctus-brand-design-system`. Cut each branch from that merge.
+- The three can be built in parallel with each other and with the other waves. They follow `PARALLEL.md`: only append their own migration section, insert their own rollback section below the header, and put all PGlite code in their own `describe`.
+- The harness allows `ids(task)` only for tasks 1 to 15. Each of the three changes that bound to `task > 18` (and its error text to "1 to 18"). It is the same one-line edit in all three, so the merges agree.
+- They run before Task 15, which writes the e2e journeys, the docs and the runbook for them (see the Task 15 note).
+
+### Task 16: Application review: possible duplicates, reopening after a deleted business, the approval result by permission
+
+Closes **R-W2-2** (APP-03 = BIZ-07, L1), **R-W2-6** (APP-07), **R-W2-8** (APP-12) and **R-W2-9** (APP-04). It also builds the two mock bullets of R-W8-2 that reopening needs: a mock business delete clears `application.businessId` and sets `businessDeletedAt`.
+
+**Files:**
+- Migration: append the Task 16 section:
+  - `business_applications.business_deleted_at timestamptz` (no backfill; L1 has no date);
+  - `private.mark_application_business_deleted()` and its `BEFORE DELETE` trigger on `public.businesses` (sets `business_deleted_at = now()` where `business_id = old.id`);
+  - `admin_review_application(uuid, text, text)` redefined with `create or replace`. Start from the **live** body: the `20261020091428` body with the check that `20261025070915` widened through `widen_admin_check`. Write the check out explicitly: `public.is_platform_admin() or public.platform_can(case p_action when 'reject' then 'applications.reject' else 'applications.approve' end)`. Add the action `reopen`: `approved → under_review` only when `business_id is null`, otherwise `reopen_not_allowed` (22023); it writes `application_status_changed` with `from_status 'approved'`, `to_status 'under_review'` and metadata `{action:'reopen'}`. The other transitions are unchanged. Same signature and grants;
+  - `private.normalize_business_name(text) → text` (`immutable`; execute revoked from public, anon and authenticated);
+  - `admin_application_duplicates(p_application_id uuid) → jsonb` (security definer, `grant execute … to authenticated`);
+  - and the rollback section: restore the previous `admin_review_application` body, then drop the trigger, both functions and the column. The header line says the deletion dates are lost.
+- Modify:
+  - `supabase/functions/review-application/{handler,index,handler.test}.ts`: `reopen` is accepted and passed to SQL; `reopen_not_allowed` → 422. The Task 4 assertion "reopen → 400 invalid_request" is replaced (the commit body names R-W2-2);
+  - `src/domain/types.ts`: `ReviewAction` gains `'reopen'`; `BusinessApplication.businessDeletedAt?: string`; new `ApplicationDuplicates`;
+  - `src/services/applicationRules.ts`: `applyReview` and `availableActions` know `reopen`; new `normalizeBusinessName`;
+  - `src/services/catalogService.ts`: `getApplicationDuplicates`;
+  - `src/services/supabase/supabaseCatalogService.ts`: map `business_deleted_at`; `getApplicationDuplicates` through the RPC; `DB_RULES.reopen_not_allowed` (§10.2 copy);
+  - `src/services/supabase/database.types.ts` (the column and the RPC, by hand);
+  - `src/services/mock/mockCatalogService.ts`: `reopen`, `getApplicationDuplicates`, and `deleteBusiness` clearing `businessId` and setting `businessDeletedAt` on the application;
+  - `src/features/admin/ApplicationDetailPage.tsx` and `ApplicationDetailPage.test.tsx` (the test file comes from Task 4);
+  - `src/features/businesses/useBusinessActions.ts` (the delete dialog line only);
+  - `docs/PRD.md` (X-01, R-W2-8).
+- Create:
+  - `src/features/applications/PossibleDuplicates.tsx` and `PossibleDuplicates.test.tsx`. The panel is its own component, so the edits to `ApplicationDetailPage.tsx` stay small next to Task 11's gating edits;
+  - `src/services/applicationRules.test.ts`.
+
+**Interfaces:**
+- Consumes:
+  - from Task 4: `reviewApplication(id, action, reason?, opts?)`, the `review-application` function and its `ReviewDeps.reviewAsCaller`. Only the action union is widened to `'start_review' | 'approve' | 'reject' | 'reopen'`;
+  - from Task 2: `gateCaller(…, 'staff')` (unchanged);
+  - `usePermission` for `applications.approve`, `owners.manage` and `businesses.view`.
+- Produces (SQL):
+  - `admin_application_duplicates(uuid) → jsonb` = `{applications:[{id, reference, business_name, status, created_at, match:'email'|'name'|'both'}], businesses:[{id, name, status, match:'owner_email'|'name'|'both'}]}`, or `{error:'forbidden'}` / `{error:'not_found'}`;
+  - error key `reopen_not_allowed` (22023).
+- Produces (TS):
+  ```ts
+  export interface ApplicationDuplicates {
+    applications: { id: ID; reference: string; businessName: string; status: ApplicationStatus; createdAt: string; match: 'email' | 'name' | 'both' }[]
+    businesses: { id: ID; name: string; status: BusinessStatus; match: 'owner_email' | 'name' | 'both' }[]
+  }
+  getApplicationDuplicates(id: ID): Promise<Result<ApplicationDuplicates>>
+  export function normalizeBusinessName(name: string): string        // the SQL rule, for the mock
+  export function availableActions(status: ApplicationStatus, opts?: { businessId?: ID | null }): ReviewAction[]  // 'reopen' only for approved with no business
+  ```
+
+- [ ] **Step 1: Write the failing PGlite tests** (`describe('S1.5 Task 16: application review')`; `GONE_AFTER_ROLLBACK.push('public.admin_application_duplicates(uuid)', 'private.normalize_business_name(text)', 'private.mark_application_business_deleted()')`):
+  - "deleting the business of an approved application sets business_deleted_at and nulls business_id";
+  - "reopen moves approved → under_review when business_id is null and writes application_status_changed with metadata action reopen; approving again creates a new draft business";
+  - "reopen while the business exists, or from submitted/under_review/rejected, raises reopen_not_allowed";
+  - "reopen needs applications.approve: a Team member with only applications.reject gets the permission error";
+  - "normalize_business_name: 'Casa, Lda.', 'casa lda' and 'Cása' give 'casa'; 'Lda' gives ''";
+  - "admin_application_duplicates lists an approved application with the same email (match email), a business 'Casa' for 'Casa, Lda.' (match name) and a business whose owner's auth email is the applicant email (match owner_email); never the application itself, a rejected one or the business it created; at most 10 of each";
+  - "an empty normalized name matches no application and no business";
+  - "a member without applications.view gets {error:'forbidden'}; anon cannot execute it".
+- [ ] **Step 2: Write the failing handler, rules and component tests:**
+  - review-application: "reopen → 200 {ok:true, status:'under_review'} and no email"; "reopen_not_allowed from SQL → 422 {error:'reopen_not_allowed'}".
+  - `applicationRules.test.ts`: "availableActions('approved', {businessId:null}) includes reopen; with a business it does not"; "normalizeBusinessName matches the SQL cases above".
+  - `PossibleDuplicates.test.tsx`:
+    - "shows 'Checking for possible duplicates…' while loading";
+    - "renders nothing when both lists are empty";
+    - "shows 'Couldn't check for possible duplicates. You can still review this application.' on an error";
+    - "an application row reads 'Application {reference} · {businessName} · {status label} · same email' and links to applicationAdminPath(id)";
+    - "a business row links to businessAdminPath(id) only with businesses.view; without it the name is plain text".
+  - `ApplicationDetailPage.test.tsx`:
+    - "an approved application with businessDeletedAt shows 'Business deleted on {date}'; with no business and no date it shows 'The business created from this application was deleted.'";
+    - "Reopen for review shows only with applications.approve and only for that state; it calls reviewApplication(id, 'reopen')";
+    - "Approve stays enabled while the duplicates panel is shown";
+    - approval result (R-W2-6), three permission sets: "with owners.manage and businesses.view: today's toast and 'Go to owner invitation'"; "without owners.manage: 'Approved. A draft business was created. Someone with 'Invite and remove business owners' must invite the owner.'"; "without businesses.view: the business card and owner panel are replaced by 'A draft business was created. Your role can't open businesses.' and there is no 'Business not found'".
+  - `useBusinessActions` (through the businesses page test that already opens the delete dialog): "the delete dialog adds 'The owner's sign-in stays, but they lose access. The application that created it shows as 'Business deleted'.'".
+  - Mock (`src/services/mock/service.test.ts`): "deleting a business clears businessId and sets businessDeletedAt on its application; reopen then works"; "getApplicationDuplicates follows the SQL rule".
+- [ ] **Step 3: Run them and confirm they fail.** `npx vitest run supabase/tests/businessLogicFixes.test.ts -t "Task 16" supabase/functions/review-application src/services/applicationRules.test.ts src/services/mock/service.test.ts src/features/applications src/features/admin/ApplicationDetailPage src/features/admin/adminPages.test.tsx`
+- [ ] **Step 4: Write the SQL section and its rollback section.** Read the live `admin_review_application` with `pg_get_functiondef` on a fresh PGlite at `n < S15_MIGRATION` and start from that text. Accents go through `translate()`; no extension.
+- [ ] **Step 5: Implement the function change, the services (Supabase and mock), the rules and the types.**
+- [ ] **Step 6: Implement the UI** (the panel, the deleted-business state, Reopen, the approval result by permission, the delete dialog line) and the PRD X-01 line: "Superseded by ADR-0024 (apply → approve → admin-provisioned owner)".
+- [ ] **Step 7: Run the tests again** (same command; expected PASS), then `npm run typecheck`, `npm run lint` and the Edge Function type check. Check `/admin/applications/:id` at 1440 and 390 px in the demo.
+- [ ] **Step 8: Commit.** Message "S1.5 Task 16: possible duplicates, reopen after a deleted business, approval result by permission". The body names R-W2-2 for the changed Task 4 assertion.
+
+### Task 17: Owner invitations and onboarding: rolling limit with reservations, clean concurrent provisioning, acceptance on any sign-in, owner state on every business
+
+Closes **R-W2-3** (APP-02), **R-W2-4** (APP-05 = MAIL-06, MAIL-15), **R-W2-5** (APP-06 = L5, L2), **R-W2-7** (APP-08) and **R-W8-1** (APP-13).
+
+**Files:**
+- Migration: append the Task 17 section:
+  - `private.owner_invite_attempts` (§10.1: RLS on, revoke all from public, anon and authenticated, `grant select, insert, update to service_role`, index `(business_id, recipient, created_at desc)`);
+  - `service_reserve_owner_invite(p_business uuid, p_recipient text, p_actor uuid) → jsonb` and `service_finish_owner_invite(p_reservation uuid, p_outcome text) → void` (service_role only);
+  - `email_log.attempt` check widened from `1..100` to `1..100000`;
+  - `service_link_owner` redefined **from the Task 2 section's body** (keep its `email_is_admin` check): `select … from public.businesses where id = p_business_id for update` before the membership check, and `unique_violation` caught and raised as `business_has_owner`;
+  - `record_sign_in(text)` redefined from the `20261025163627` body: first set `accepted_at = now()` on the caller's `business_members` rows where `accepted_at is null`, writing `owner_onboarding_completed` with metadata `{via:'sign_in'}` per accepted row, **before** the 60-second rate-limit check (idempotent);
+  - `admin_list_owner_states() → jsonb` (security definer, `grant execute … to authenticated`);
+  - and the rollback section: restore `service_link_owner` to the Task 2 body and `record_sign_in` to the S1 body, re-add the `1..100` attempt check as `not valid` (so no email row changes), and drop the new table and functions.
+- Modify:
+  - `supabase/functions/provision-owner/{handler,index,handler.test}.ts`;
+  - `src/services/catalogService.ts`: `ServiceError.retryAt?: string`, `getOwnerStates`;
+  - `src/domain/types.ts`: `OwnerState`;
+  - `src/services/supabase/supabaseCatalogService.ts`: `getOwnerStates`; the `cooldown` and `too_many_invitations` refusals carry `retryAt`; `too_many_attempts` is replaced by `too_many_invitations`;
+  - `src/services/supabase/database.types.ts` (the RPC, by hand);
+  - `src/services/mock/mockCatalogService.ts` and `src/services/mock/service.test.ts`;
+  - `src/features/auth/ResetPasswordPage.tsx`;
+  - `src/features/businesses/BusinessOwnersPanel.tsx`;
+  - `src/features/admin/BusinessesListPage.tsx` and `adminPages.test.tsx` (or the list's own test file, if a wave-A task created one).
+- Create: `src/features/auth/ResetPasswordPage.test.tsx`, `src/features/businesses/BusinessOwnersPanel.test.tsx` (if it doesn't exist after wave A; otherwise extend it).
+
+**Interfaces:**
+- Consumes (Task 2, merged): `ProvisionDeps.gate`, `ProvisionDeps.isTeamEmail`, the `email_is_admin` link result, and the Task 2 `service_link_owner` body.
+- Produces (SQL):
+  - `service_reserve_owner_invite` → `{reservation_id, attempt}`, or `{error:'cooldown', retry_at}` (a non-blocked attempt for the business is under 60 s old), or `{error:'too_many_invitations', retry_at}` (10 or more non-blocked attempts for the business and `lower(recipient)` in the last 24 h; `retry_at` = the oldest counted attempt + 24 h). Taken under `pg_advisory_xact_lock(hashtext('owner_invite:' || p_business))`. `attempt` = 1 + the greater of `max(attempt)` in the table for the business and `max(email_log.attempt)` for `workflow = 'invite:' || p_business`;
+  - `service_finish_owner_invite` stores `accepted`, `sent`, `failed` or `blocked` (anything else raises `invalid_outcome`);
+  - `admin_list_owner_states()` → `[{business_id, state:'needs_owner'|'invite_pending'|'owner_active', last_invited_at, email_failed}]`, gated on `platform_can('businesses.view')` (else `{error:'forbidden'}`). `last_invited_at` is the newest attempt's `created_at`, falling back to the newest `email_log` row for `invite:<business>` (owners invited before this migration, the L5 businesses). `email_failed` is true when the newest attempt's outcome is `failed` or `blocked`, or its `email_log` row (same business and attempt) is `bounced` or `complained`; with no attempt row, the newest `email_log` row decides.
+- Produces (deps, `provision-owner/handler.ts`):
+  ```ts
+  // replaces invitationAttempts(businessId)
+  reserveInvite(businessId: string, recipient: string, actorId: string): Promise<{ reservationId: string; attempt: number } | { error: 'cooldown' | 'too_many_invitations'; retryAt: string }>
+  finishInvite(reservationId: string, outcome: 'accepted' | 'sent' | 'failed' | 'blocked'): Promise<void>
+  /** Deletes an auth user that this same request created (R-W2-7). */
+  deleteAuthUser(userId: string): Promise<void>
+  ```
+  - Provision: gate → input → business → owner (`business_has_owner` for a different email; the same email goes to `resend`) → `isTeamEmail` → `accountByEmail` checks → **`reserveInvite`** (429 `{error, retryAt}`) → `createCode` (on failure: `finishInvite(…,'blocked')`, 502) → `linkOwner` (on `business_has_owner`/`email_is_admin`: `finishInvite(…,'blocked')`, and `deleteAuthUser` when `accountByEmail` found no account at the start, then 409) → send with Idempotency-Key `invite:<business>:<attempt>` → `finishInvite` with the email status (`accepted`/`sent`/`failed`/`blocked`).
+  - Resend: `already_accepted` → `reserveInvite` (429) → `createCode` → send → `finishInvite`. `too_many_attempts` no longer exists.
+- Produces (TS):
+  ```ts
+  export interface OwnerState { businessId: ID; state: 'needs_owner' | 'invite_pending' | 'owner_active'; lastInvitedAt: string | null; emailFailed: boolean }
+  getOwnerStates(): Promise<Result<OwnerState[]>>
+  ```
+
+- [ ] **Step 1: Write the failing PGlite tests** (`describe('S1.5 Task 17: owner invitations and onboarding')`; `GONE_AFTER_ROLLBACK.push('private.owner_invite_attempts', 'public.service_reserve_owner_invite(uuid,text,uuid)', 'public.service_finish_owner_invite(uuid,text)', 'public.admin_list_owner_states()')`):
+  - "a second reservation for the business inside 60 s → cooldown with retry_at; a blocked first attempt causes no cooldown";
+  - "the 11th non-blocked attempt in 24 h for the same business and recipient → too_many_invitations with retry_at = oldest counted + 24 h; blocked attempts don't count; 'Rita@X.pt' and 'rita@x.pt' count together";
+  - "remove the owner and re-invite the same email: the count continues";
+  - "attempt numbers continue from max(email_log.attempt) for invite:<business>";
+  - "two connections reserving at once: exactly one gets a reservation, the other cooldown";
+  - "email_log accepts attempt 101";
+  - "two connections linking different users to the same business: one links, the other raises business_has_owner" (the row lock; `email_is_admin` from Task 2 still raised);
+  - "record_sign_in as an owner whose membership is pending sets accepted_at and writes owner_onboarding_completed {via:'sign_in'}; a second call inside 60 s changes nothing and writes no second row";
+  - "admin_list_owner_states: a business with no owner → needs_owner; a pending owner → invite_pending with last_invited_at from the newest attempt (or the newest invite email_log row when there is no attempt); a bounced newest invite → email_failed true; an accepted owner → owner_active; without businesses.view → {error:'forbidden'}";
+  - "anon cannot select from private.owner_invite_attempts".
+- [ ] **Step 2: Write the failing handler tests** (provision-owner):
+  - "the 11th attempt → 429 {error:'too_many_invitations', retryAt}; no generateCode";
+  - "cooldown → 429 {error:'cooldown', retryAt}; no generateCode";
+  - "provision reserves before generateCode and finishes with the email status; the Idempotency-Key is invite:<business>:<reserved attempt>";
+  - "a failed code finishes the reservation as blocked";
+  - "a link refused with business_has_owner after this request created the account → 409, finishInvite blocked and deleteAuthUser(userId) called; for an account that existed before, deleteAuthUser is not called";
+  - replace the assertion "resends with a cooldown and an attempt limit, appending to the history" with the reservation version (the commit body names R-W2-4).
+- [ ] **Step 3: Write the failing client tests:**
+  - `ResetPasswordPage.test.tsx`: "after a successful password set, a business_admin calls completeOwnerOnboarding once; platform staff don't".
+  - `BusinessOwnersPanel.test.tsx`:
+    - "a pending owner shows 'Last invitation sent {date}' from the owner state, not invitedAt";
+    - "an accepted owner shows 'Owner active', hides Resend and offers Reset 2FA";
+    - "too_many_invitations shows 'Ten invitations were sent to this owner in the last 24 hours. You can send the next one after {time}.' with retryAt in the date-format preference".
+  - BusinessesListPage: "the owner column shows 'Needs owner', 'Invite pending', 'Invite pending · email not sent' and 'Owner active'; the filter narrows the rows"; "while the states load the column shows a placeholder; on an error the list still renders, with 'Couldn't load owner states.' above it and no owner filter".
+  - Mock (`service.test.ts`, R-W8-1 and the R-W2-4 parity):
+    - "provisionOwner for a business whose owner has the same email goes through resendOwnerInvitation: cooldown, already_accepted, and the 11th attempt in 24 h for the recipient is refused with retryAt";
+    - "blocked demo attempts don't count";
+    - "getOwnerStates mirrors the SQL states".
+- [ ] **Step 4: Run them and confirm they fail.** `npx vitest run supabase/tests/businessLogicFixes.test.ts -t "Task 17" supabase/functions/provision-owner src/services/mock/service.test.ts src/features/auth src/features/businesses src/features/admin/adminPages.test.tsx`
+- [ ] **Step 5: Write the SQL section and its rollback section.** Copy `service_link_owner` from the Task 2 section, not from `20261020091428`.
+- [ ] **Step 6: Implement provision-owner** (handler and `index.ts` wiring through the service role: `service_reserve_owner_invite`, `service_finish_owner_invite`, `auth.admin.deleteUser`). Never log the code or the recipient.
+- [ ] **Step 7: Implement the services (Supabase and mock), `ResetPasswordPage`, the Owner card and the businesses list column and filter.** The mock `provisionOwner` existing-owner path calls `resendOwnerInvitation`; the mock resend applies the 60-s cooldown, the rolling 10-per-24-h limit per recipient without blocked attempts, and `already_accepted`. The demo has no invited-owner sign-in, so `record_sign_in` has no mock twin.
+- [ ] **Step 8: Run the tests again** (same command; expected PASS), then `npm run typecheck`, `npm run lint` and the Edge Function type check. Check `/admin/businesses` and a business detail page at 1440 and 390 px in the demo.
+- [ ] **Step 9: Commit.** Message "S1.5 Task 17: rolling owner-invitation limit with reservations, clean concurrent provisioning, acceptance on any sign-in, owner state on every business". The body names R-W2-4 for the changed resend assertion.
+
+### Task 18: Application submission: rate limit first, daily hash, nothing lost after the insert
+
+Closes **R-W2-10** (APP-11) and **R-W2-11** (APP-09 = MAIL-14).
+
+**Files:**
+- Migration: append the Task 18 section:
+  - `private.application_attempts` (§10.1: RLS on, revoke all from public, anon and authenticated, `grant select, insert, delete to service_role`, indexes `(submitter_hash, created_at)` and `(created_at)`);
+  - `service_application_attempt(p_hashes text[], p_max int default 5) → boolean` (service_role only; the R-W2-10 rule);
+  - and the rollback section (drops both).
+- Modify: `supabase/functions/submit-application/{handler,index,handler.test}.ts`. The existing assertion "stores the raw IP nowhere: only a salted hash" is updated for the dated hash (the commit body names R-W2-10).
+- No client change: the wizard copy (`apply.rateLimited`, `apply.duplicate`) and the mock stay as they are (the demo has no client IP).
+
+**Interfaces:**
+- Consumes: the `application_confirmation` template as Task 4 left it (the replay sends it; no template is edited here).
+- Produces (deps, `submit-application/handler.ts`):
+  ```ts
+  export async function submitterHash(ip: string, salt: string, day: string): Promise<string>   // sha256Hex(`application|${day}|${ip}|${salt}`), day = UTC YYYY-MM-DD
+  export interface StoredApplication { id: string; reference: string; applicantEmail: string; businessName: string; language: 'en' | 'pt'; createdAt: string }
+  findByKey(submissionKey: string): Promise<StoredApplication | null>
+  insert(app: NormalizedApplication, submitterHash: string): Promise<StoredApplication | 'duplicate_key'>
+  /** service_application_attempt: true when the attempt is allowed (and recorded). Replaces countRecent. */
+  allowAttempt(hashes: string[]): Promise<boolean>
+  hasSubmittedAudit(applicationId: string): Promise<boolean>
+  loggedWorkflows(applicationId: string): Promise<Set<string>>
+  ```
+  - Order: validate → `findByKey` (replay; R-W2-11) → `allowAttempt([today, yesterday when now − 1 h is on the previous UTC day])` (429 `rate_limited`) → `findOpenDuplicate` (409) → `insert` (today's hash) → audit in try/catch → emails.
+  - Replay: older than 30 s → the missing audit row (try/catch) and every workflow with no `email_log` row, rendered from the stored row; 30 s or newer → the stored row only. The `duplicate_key` path sends nothing.
+  - `sendApplicationEmails(deps, stored, skip: Set<string>)` takes the stored row (address, business name, language) and skips the logged workflows.
+
+- [ ] **Step 1: Write the failing PGlite tests** (`describe('S1.5 Task 18: application submission')`; `GONE_AFTER_ROLLBACK.push('private.application_attempts', 'public.service_application_attempt(text[],integer)')`):
+  - "five calls are allowed, the sixth in the hour returns false and records nothing";
+  - "attempts under either of two hashes count together";
+  - "attempts older than 2 hours are deleted by the next call";
+  - "two connections at count 4: exactly one is allowed";
+  - "anon and authenticated cannot select from private.application_attempts".
+- [ ] **Step 2: Write the failing handler tests:**
+  - R-W2-10:
+    - "five attempts answered 409 duplicate_application, then a sixth → 429 rate_limited, and findOpenDuplicate is not called for the sixth";
+    - "the same IP hashes differently on 2026-10-26 and 2026-10-27";
+    - "at 00:20 UTC allowAttempt receives today's and yesterday's hash; at 12:00 only today's";
+    - "a key replay after five attempts → 200 with the stored row, and allowAttempt is not called".
+  - R-W2-11:
+    - "audit throws → 200, the confirmation and the admin alert are both sent, and console.error has no email address";
+    - "a replay 5 minutes after the insert with no email_log rows sends the confirmation (stored language) and the admin alert once each, and writes the missing application_submitted";
+    - "a replay with the confirmation logged sends only the admin alert";
+    - "a replay 10 seconds after the insert sends nothing";
+    - "a replay whose body has another email sends to the stored address";
+    - "the duplicate_key path sends nothing".
+- [ ] **Step 3: Run them and confirm they fail.** `npx vitest run supabase/tests/businessLogicFixes.test.ts -t "Task 18" supabase/functions/submit-application`
+- [ ] **Step 4: Write the SQL section and its rollback section.**
+- [ ] **Step 5: Implement the handler and `index.ts`** (`allowAttempt` → `rpc('service_application_attempt', {p_hashes, p_max: MAX_SUBMISSIONS_PER_HOUR})`; `loggedWorkflows` reads `email_log.workflow` by `application_id`; `hasSubmittedAudit` reads `audit_events`). The submitter hash and the error logs never contain the IP or an email address.
+- [ ] **Step 6: Run the tests again** (same command; expected PASS), then `npm run typecheck`, `npm run lint` and the Edge Function type check. No route changes, so no viewport check.
+- [ ] **Step 7: Commit.** Message "S1.5 Task 18: application rate limit before the duplicate check, daily hash, emails completed on retry". The body names R-W2-10 for the changed hash assertion.
+
 ---
 
 ## Coverage (kept scope)
@@ -820,7 +1054,18 @@ Closes the §13.2 documentation and the §14 Playwright journeys for the kept sc
 | R-W1-6 | TEAM-18 | 1 |
 | R-W1-7 | TEAM-09 | 2 |
 | R-W1-8 | TEAM-11 | 2 |
+| R-W1-9 | APP-10 | 2 (controller ruling at pre-flight) |
 | R-W2-1 | APP-01 = MAIL-01 | 4 |
+| R-W2-2 | APP-03 = BIZ-07, L1 | 16 |
+| R-W2-3 | APP-02 | 17 |
+| R-W2-4 | APP-05 = MAIL-06, MAIL-15 | 17 |
+| R-W2-5 | APP-06 = L5, L2 | 17 |
+| R-W2-6 | APP-07 | 16 |
+| R-W2-7 | APP-08 | 17 |
+| R-W2-8 | APP-12 | 16 |
+| R-W2-9 | APP-04 | 16 |
+| R-W2-10 | APP-11 | 18 |
+| R-W2-11 | APP-09 = MAIL-14 | 18 |
 | R-W3-3 | TEAM-02 = PROD-04, TEAM-03, BIZ-06 (storage part) | 5 |
 | R-W3-6 (BIZ-02 derived-copy part) | BIZ-02 | 3 |
 | R-W3-8 | PUB-06 = BIZ-11 | 6 |
@@ -851,7 +1096,9 @@ Closes the §13.2 documentation and the §14 Playwright journeys for the kept sc
 | R-W7-7 | MAIL-05 | 13 |
 | R-W7-8 | MAIL-07 | 11 |
 | R-W7-9 | MAIL-16 | 13 |
+| R-W8-1 | APP-13 | 17 |
 | R-W8-2 (closure bullets) | BIZ-10 (part) | 14 |
+| R-W8-2 (application-link bullets: delete clears `businessId`, sets `businessDeletedAt`) | BIZ-10 (part) | 16 |
 | R-W8-3 | ANA-08 | 14 |
 | R-W8-4 | ANA-09 | 14 |
 | R-W8-5 | TEAM-19 | 14 |
@@ -859,28 +1106,31 @@ Closes the §13.2 documentation and the §14 Playwright journeys for the kept sc
 | §12 documented as is | TEAM-20 | 15 |
 | §13.2 docs, §14 e2e | — | 15 |
 
-Kept: 42 whole requirements plus 2 partial ones (R-W3-6, R-W8-2). Still deferred as in the spec §1.3: PROD-13, ANA-05, TEAM-20 (documented, Task 15), and the PUB-09/PUB-04 parts.
+Kept: 54 whole requirements plus 2 partial ones (R-W3-6, R-W8-2). 42 were kept at the slim; R-W1-9 was kept by the controller in Task 2; the other 11 came back when S3 was cancelled (Tasks 16–18). Still deferred as in the spec §1.3: PROD-13, ANA-05, TEAM-20 (documented, Task 15), and the PUB-09/PUB-04 parts.
 
 ## Moved out of S1.5 (owner decision, 2026-10-26; no tasks here)
 
+S3 was cancelled by the owner on 2026-10-26, so every row that pointed to S3 is back in S1.5 (the task is named in the Target column). The S2 and S4 rows stay out.
+
 | R-ID | Findings | Target |
 |---|---|---|
-| R-W1-9 | APP-10 (accept-invite with a session) | S3 |
-| R-W2-2 | APP-03 = BIZ-07, L1 (reopen a deleted-business application; business delete dialog line) | S3 |
-| R-W2-3 | APP-02 (acceptance on any sign-in) | S3 |
-| R-W2-4 | APP-05 = MAIL-06, MAIL-15 (invitation limit and reservations) | S3 |
-| R-W2-5 | APP-06 = L5, L2 (owner-state column) | S3 |
-| R-W2-6 | APP-07 (approval result by permission) | S3 |
-| R-W2-7 | APP-08 (concurrent provisioning, orphan login) | S3 |
-| R-W2-8 | APP-12 (PRD X-01) | S3 |
-| R-W8-1 | APP-13 (demo provisionOwner) | S3 |
+| R-W1-9 | APP-10 (accept-invite with a session) | back in S1.5, Task 2 |
+| R-W2-2 | APP-03 = BIZ-07, L1 (reopen a deleted-business application; business delete dialog line) | back in S1.5, Task 16 |
+| R-W2-3 | APP-02 (acceptance on any sign-in) | back in S1.5, Task 17 |
+| R-W2-4 | APP-05 = MAIL-06, MAIL-15 (invitation limit and reservations) | back in S1.5, Task 17 |
+| R-W2-5 | APP-06 = L5, L2 (owner-state column) | back in S1.5, Task 17 |
+| R-W2-6 | APP-07 (approval result by permission) | back in S1.5, Task 16 |
+| R-W2-7 | APP-08 (concurrent provisioning, orphan login) | back in S1.5, Task 17 |
+| R-W2-8 | APP-12 (PRD X-01) | back in S1.5, Task 16 |
+| R-W8-1 | APP-13 (demo provisionOwner) | back in S1.5, Task 17 |
+| R-W2-9, R-W2-10, R-W2-11 | APP-04, APP-11, APP-09 = MAIL-14 (were folded into S3 in the spec) | back in S1.5, Tasks 16 and 18 |
 | R-W3-1 | BIZ-04 (business slug history and redirect) | S2 |
 | R-W3-2 | PUB-03 = PROD-06 (product slug history and redirect) | S2 (its published-slug confirmation: S4) |
 | R-W3-4 | BIZ-06 (logo move, partial sweep reporting) | S2 |
 | R-W3-5 | BIZ-05 (read-only BusinessForm) | S2 |
 | R-W3-6 (BIZ-08 part) | BIZ-08 (owner's own-closure notice wording) | S2 |
 | R-W3-7 | BIZ-09 (field limits) | S2 |
-| R-W8-2 (non-closure bullets) | BIZ-10 (delete clears owners and application link; signed-out visibility) | S2 |
+| R-W8-2 (non-closure bullets) | BIZ-10 (delete clears owners; signed-out visibility). The application-link bullets are built in Task 16. | S2 |
 | R-W4-8 | PUB-04 (the built part: not-found replaces a stale page) | S2 |
 | R-W4-9 | PUB-05 | S2 |
 | R-W4-10 | PUB-07 | S2 |
@@ -895,4 +1145,4 @@ Kept: 42 whole requirements plus 2 partial ones (R-W3-6, R-W8-2). Still deferred
 | R-W4-7 | PROD-09 | S4 |
 | R-W4-14 | PROD-05 (docs) | S4 |
 
-Pre-flight items that belonged to moved work (slug reservation from `business_slug_changed`, and the `email_log.attempt` maxima) are left out of the Task 15 runbook.
+The pre-flight item that belonged to moved work (slug reservation from `business_slug_changed`) is left out of the Task 15 runbook. The `email_log.attempt` maxima are back with Task 17, and Task 15 writes that query.

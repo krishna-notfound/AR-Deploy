@@ -100,3 +100,5 @@ These findings sit in code that the upcoming projects rebuild, so they are fixed
 - **S2** (platform site controls, Business → Catalog & public page): PUB-02 = BIZ-03 (unavailable-catalog page, ruling 9); MAIL-02 part 2 (the Email log page; the "Email failed" status on team invitations stays in S1.5); MAIL-19 (admin inbox notice); PUB-09 per-page title and description (the `noindex` header stays in S1.5).
 - **S3** (application form builder): APP-04 (duplicate warning, ruling 3), APP-11 (rate limit before the duplicate check), APP-09 = MAIL-14 (emails lost when an application save half-fails).
 - **S4** (3D model requests): PROD-03 (unsaved uploads, ruling 14), ANA-03 (AR readiness per finish), PROD-12 (demo upload rules).
+
+S3 cancelled by the owner on 2026-10-26; its findings are built in S1.5 Tasks 16–18.

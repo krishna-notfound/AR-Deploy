@@ -1,6 +1,6 @@
 # S1.5: Business-logic fixes
 
-**Status:** design for owner review (2026-10-26). It is based on the 2026-10-26 business-logic audit (`docs/audits/2026-10-26-business-logic/`: APP, BIZ, PROD, PUB, ANA, TEAM, MAIL and LIVE) and its binding `RULINGS.md`. The owner's later decision moves some findings into S2, S3 and S4 (see §1.4). Where a ruling and a fix sketch differ, the ruling wins. Where the owner's decision and a ruling differ, the owner's decision wins.
+**Status:** design for owner review (2026-10-26). It is based on the 2026-10-26 business-logic audit (`docs/audits/2026-10-26-business-logic/`: APP, BIZ, PROD, PUB, ANA, TEAM, MAIL and LIVE) and its binding `RULINGS.md`. The owner's later decision moves some findings into S2 and S4 (see §1.4). S3 (the application form builder) was cancelled by the owner on 2026-10-26 ("keep form as it is … I don't want a form builder now"), so the application findings once folded into it are specified here again (R-W2-9 to R-W2-11). Where a ruling and a fix sketch differ, the ruling wins. Where the owner's decision and a ruling differ, the owner's decision wins.
 **Source:** the owner asked for every audit fix to be built.
 **Working rules:**
 - Build on a branch cut from `feature/sanctus-brand-design-system`. S1 is not on `main` yet: commit `9691fab` is not an ancestor of `main`.
@@ -19,7 +19,7 @@
 Make each platform rule hold in the database and the Edge Functions, not only in the UI. Make each screen and email say what is really true. Order of work: security and High findings first, then data integrity, then honesty and consistency, then demo parity.
 
 ### 1.2 Scope
-Every audit finding that is not deferred (§1.3) or folded (§1.4): 71 requirements in 8 workstreams (§2–§9). The coverage table is in §15.
+Every audit finding that is not deferred (§1.3) or folded (§1.4): 74 requirements in 8 workstreams (§2–§9). The coverage table is in §15.
 
 ### 1.3 Non-goals (deferred, not built; RULINGS "Deferred")
 - **PROD-13:** categories are furniture-only while applications accept other industries. Client decision C10.
@@ -29,22 +29,21 @@ Every audit finding that is not deferred (§1.3) or folded (§1.4): 71 requireme
 - **PUB-04 (part):** signed media URLs stay valid for up to 12 h in pages that are already open. Accepted and documented. The "not-found replaces the stale page" half is built (R-W4-8).
 - No background sweeps, no scheduler, no server-side HTML. The slug redirects (R-W3-1/2) happen in the browser.
 
-### 1.4 Folded into S2/S3/S4 (owner decision; not specified here)
+### 1.4 Folded into S2/S4 (owner decision; not specified here)
+**S3 cancelled (owner, 2026-10-26):** "keep form as it is … I don't want a form builder now". APP-04, APP-11 and APP-09 = MAIL-14, which were folded into S3, are back in S1.5 as R-W2-9, R-W2-10 and R-W2-11 (§3). The application form itself stays as it is.
+
 | ID | Problem (one line) | Target |
 |---|---|---|
 | PUB-02 = BIZ-03 | A paused or draft catalog shows "Catalog not found" instead of "unavailable" (ruling 9, `public_catalog_state`). | S2 (Catalog & public page) |
 | MAIL-02 (part 2) | There is no plain Email log page for `records.view`. The "Email failed" state on team invitations stays here (R-W7-3). | S2 (platform site controls) |
 | MAIL-19 | Switching off "New business applications" doesn't stop alerts when your address is the admin inbox. | S2 |
 | PUB-09 (part) | Pages don't set their own title and description in the browser. The `X-Robots-Tag: noindex` header stays here (R-W4-12). | S2 |
-| APP-04 | No warning about duplicate applications or businesses (ruling 3). | S3 (form builder) |
-| APP-11 | The duplicate check runs before the rate limit, and the "daily" hash is permanent. | S3 |
-| APP-09 = MAIL-14 | An audit failure after insert means the emails are never sent, even on retry. | S3 |
 | PROD-03 | Unsaved editor uploads stay in Storage (ruling 14). | S4 (3D model requests) |
 | ANA-03 | Overview readiness takes the best finish and hides finishes with no USDZ. | S4 |
 | PROD-12 | Demo uploads skip the "choose the business first" and storage-path rules. | S4 |
 
 ### 1.5 Duplicate map (RULINGS; each group is built once, under the first ID)
-- **Applications:** APP-01 = MAIL-01, APP-05 = MAIL-06 (+ MAIL-15 in the same requirement), APP-03 = BIZ-07 (+ LIVE L1), APP-06 = LIVE L5 (+ L2).
+- **Applications:** APP-01 = MAIL-01, APP-05 = MAIL-06 (+ MAIL-15 in the same requirement), APP-03 = BIZ-07 (+ LIVE L1), APP-06 = LIVE L5 (+ L2), APP-09 = MAIL-14.
 - **Public pages and businesses:** PUB-01 = PROD-01 (+ L3), PUB-03 = PROD-06, with BIZ-04 as the business-slug twin (R-W3-1 and R-W3-2 share one mechanism). PUB-06 = BIZ-11.
 - **Closure, team and email:** BIZ-02 = TEAM-07, TEAM-08 = MAIL-10, TEAM-05 = MAIL-03 (ruling 22), TEAM-14 = MAIL-17.
 - **Permissions and numbers:** ANA-01 = TEAM-10, TEAM-02 = PROD-04 (+ TEAM-03 and the storage part of BIZ-06), ANA-06 = BIZ-12.
@@ -219,10 +218,70 @@ Every audit finding that is not deferred (§1.3) or folded (§1.4): 71 requireme
 - **Rule:** `service_link_owner` locks the business row (`select … from businesses where id = … for update`) before the membership check. It catches `unique_violation` and raises `business_has_owner`.
 - When provision-owner created the auth user in this same request and linking then fails, it deletes that user.
 - **Acceptance:** two parallel provisions with different emails give one 200 and one 409 `business_has_owner`. The second email has no auth user afterwards.
+  - With R-W2-4 in place, a second provision inside 60 s usually stops earlier, at the reservation (429 `cooldown`), before any auth user exists. The handler test fakes the reservation as granted to reach the link race; the PGlite test races `service_link_owner` on two connections (§16).
 
 **R-W2-8 (APP-12, ruling 32).**
 - **Layer:** docs.
 - **Rule:** `docs/PRD.md` X-01 is marked "Superseded by ADR-0024 (apply → approve → admin-provisioned owner)".
+
+**R-W2-9 (APP-04, ruling 3). The reviewer is warned about possible duplicates before deciding.**
+- **Layer:** migration (`private.normalize_business_name(text)`, `admin_application_duplicates(uuid)`), service (supabase and mock), UI.
+- **Rule:**
+  - `private.normalize_business_name(text) → text` is `immutable`. It lower-cases and trims, folds the Portuguese accents with `translate()` (á à â ã ä é è ê ë í ì î ï ó ò ô õ ö ú ù û ü ç ñ → plain letters; no `unaccent` extension), drops one trailing legal-form word (`lda`, `limitada`, `unipessoal`, `sa`, `ltd`, `limited`, `llc`, `inc`), then removes every character that is not `a-z` or `0-9`. An empty result never matches anything.
+  - `admin_application_duplicates(p_application_id uuid) → jsonb` is security definer, gated on `is_platform_admin() or platform_can('applications.view')` (otherwise `{error:'forbidden'}`; an unknown id gives `{error:'not_found'}`). It returns `{applications:[…], businesses:[…]}`, at most 10 of each, newest first:
+    - `applications`: other applications (never the one asked about) with status `submitted`, `under_review` or `approved`, whose `lower(applicant_email)` equals this one's or whose normalized business name equals this one's. Each item is `{id, reference, business_name, status, created_at, match:'email'|'name'|'both'}`.
+    - `businesses`: businesses (never the one this application created) whose normalized name equals this one's, or whose owner's (`business_members` role `owner`) `auth.users.email` equals `lower(applicant_email)`. Each item is `{id, name, status, match:'owner_email'|'name'|'both'}`. The owner's email itself is never returned.
+  - The warning never blocks a review action. The existing 409 `duplicate_application` at submission is unchanged.
+  - The mock implements the same rule, with the same normalization in `src/services/applicationRules.ts` (`normalizeBusinessName`).
+- **Acceptance:**
+  - "Casa, Lda.", "casa lda" and "Cása" normalize to `casa`; "Lda" alone normalizes to `''` and matches nothing.
+  - An application from an email with an earlier approved application lists it with `match:'email'`; "Casa, Lda." against an existing business "Casa" lists the business with `match:'name'`; a business whose owner's login email is the applicant email lists `match:'owner_email'`.
+  - Rejected applications and the application itself are never listed.
+  - A caller without `applications.view` gets `{error:'forbidden'}`; anon can't execute the function.
+  - The detail page shows the panel above the review actions, and Approve still works with the panel shown.
+- **UI (English, §11.1):**
+  - The panel "Possible duplicates" shows on the application detail page only when there is at least one match.
+  - Application rows link to `applicationAdminPath(id)`. Business rows link to `businessAdminPath(id)` only for a caller with `businesses.view`; otherwise the name is plain text.
+  - While loading: "Checking for possible duplicates…". On an error: "Couldn't check for possible duplicates. You can still review this application." Neither blocks the review actions.
+
+**R-W2-10 (APP-11). The rate limit comes before the duplicate lookup, counts every attempt, and the submitter hash is daily.**
+- **Layer:** migration (`private.application_attempts`, `service_application_attempt`) and submit-application.
+- **Decision (audit evidence):** the column comment (`20261020091428:44`, "Salted daily hash of the submitter's IP, used only for rate limiting") states the privacy intent, so the hash gets the UTC date; the comment is kept and becomes true. Moving the check alone would not stop the probe, because the limit counted stored rows and a 409 probe stores none; so the limit counts attempts.
+- **Rule:**
+  - The handler order is: validate → key replay (R-W2-11) → rate limit → duplicate lookup → insert. A key replay is never rate-limited (it is the retry of an attempt that already counted).
+  - `submitterHash(ip, salt, day)` = `sha256Hex('application|' + day + '|' + ip + '|' + salt)`, where `day` is the UTC date `YYYY-MM-DD`. The stored `submitter_hash` is today's hash.
+  - `private.application_attempts (id bigint identity, submitter_hash text not null, created_at timestamptz default now())`, indexed on `(submitter_hash, created_at)` and on `created_at`. RLS on; revoke all from public, anon and authenticated; grants to `service_role` only.
+  - `service_application_attempt(p_hashes text[], p_max int default 5) → boolean` (service_role only). Under `pg_advisory_xact_lock(hashtext('application_attempt:' || p_hashes[1]))` it deletes attempts older than 2 hours, counts the attempts of the last hour whose hash is in `p_hashes`, returns false when the count is `p_max` or more, and otherwise inserts `p_hashes[1]` and returns true.
+  - The handler passes today's hash and, when the hour before `now` started on the previous UTC day, that day's hash as well, so the hourly window holds across midnight.
+  - A refused attempt (429) is not recorded. A duplicate refusal (409) is recorded, because the attempt passed the limit first.
+  - The demo has no client IP, so the mock has no rate limit (unchanged).
+- **Acceptance (handler and PGlite):**
+  - Five attempts that each get 409 `duplicate_application`, then a sixth from the same IP in the hour → 429 `rate_limited`, and the duplicate lookup is not called for the sixth.
+  - The same IP gives different hashes on two UTC dates.
+  - Five attempts at 23:40–23:59 UTC, then one at 00:20 UTC → 429.
+  - A key replay after five attempts → 200 with the stored row.
+  - `service_application_attempt` deletes rows older than 2 hours; two parallel calls at count 4 let exactly one through.
+- **Copy:** none new. The wizard keeps `apply.rateLimited` and `apply.duplicate` (EN/PT).
+
+**R-W2-11 (APP-09 = MAIL-14). An audit failure after the insert is not fatal, and a key replay sends the emails that are missing.**
+- **Layer:** submit-application.
+- **Rule:**
+  - The `application_submitted` audit write is in a try/catch: a failure is logged (no personal data) and the emails are still sent. The response is 200 with the stored row.
+  - `findByKey` returns the stored row's `id`, `reference`, `applicant_email`, `business_name`, `language` and `created_at`.
+  - On a key replay (`findByKey` hit), when the row's `created_at` is more than 30 seconds before `now`:
+    - if the application has no `application_submitted` audit row, the handler writes it (non-fatal);
+    - it builds the same workflow list as the first attempt (applicant confirmation, admin inbox, opted-in staff) and sends each workflow that has no `email_log` row for this `application_id`. The Idempotency-Key stays the workflow, so Resend never delivers one twice;
+    - every email uses the stored row (address, business name, language), never the replayed body.
+  - A replay within 30 seconds (a double click while the first request is still sending) returns the stored row and sends nothing.
+  - The `duplicate_key` path (a concurrent retry) returns the stored row and sends nothing, as today.
+  - A `failed` or `blocked` `email_log` row counts as present: a replay never retries a failed send.
+- **Acceptance (handler):**
+  - The audit throws → 200, both emails are sent, and the error log has no email address.
+  - A replay 5 minutes later with no `email_log` rows → the confirmation (in the stored language) and the admin alert are sent once each, and the missing audit row is written.
+  - A replay with the confirmation already logged → only the admin alert is sent.
+  - A replay 10 seconds after the insert → 200 and nothing sent.
+  - The replayed body carries a different email address → the stored address is used.
+- **Copy:** none new. Replayed emails use the existing `application_confirmation` (EN/PT, with the §11.2 line) and `admin_notification` (EN) templates.
 
 ## 4. W3 Business lifecycle and addresses
 
@@ -633,6 +692,7 @@ Rollback: `supabase/rollback/20261026_business_logic_fixes_rollback.sql`. It:
 |---|---|---|
 | `public.business_slug_history` | `slug text pk` (same format check as `businesses.slug`), `business_id uuid null → businesses on delete set null`, `retired_at timestamptz default now()` | RLS on; revoke all from public/anon/authenticated; `grant select to authenticated`. Policy: `is_platform_admin() or platform_can('businesses.view') or is_business_member(business_id)`. No API writes (definer triggers). |
 | `public.product_slug_history` | `business_id → businesses on delete cascade`, `slug text`, `product_id → products on delete cascade`, `retired_at`; `pk (business_id, slug)` | Same pattern. Policy: `is_platform_admin() or platform_can('products.view') or is_business_member(business_id)`. |
+| `private.application_attempts` | `id bigint identity`, `submitter_hash text not null`, `created_at timestamptz default now()`; indexes `(submitter_hash, created_at)` and `(created_at)` | RLS on; revoke all from public/anon/authenticated; `grant select, insert, delete to service_role`. R-W2-10. |
 | `private.owner_invite_attempts` | `id`, `business_id → businesses on delete cascade`, `recipient text check (= lower)`, `attempt int`, `actor uuid → auth.users on delete set null`, `outcome text null check in ('accepted','sent','failed','blocked')`, `created_at`; index `(business_id, recipient, created_at desc)` | RLS on; revoke all from public/anon/authenticated; `grant select, insert, update to service_role`. |
 
 **Columns and constraints**
@@ -658,6 +718,9 @@ Rollback: `supabase/rollback/20261026_business_logic_fixes_rollback.sql`. It:
 | `public_slug_redirect(p_business_slug text, p_product_slug text default null) → jsonb` | anon, authenticated | `{business_slug, product_slug?}` for a retired slug of an active business (and a published product), else null. It returns nothing about non-active businesses. |
 | `analytics_daily(p_tz, p_days, p_business) → table` (security **invoker**) | authenticated | R-W5-2 |
 | `admin_list_owner_states() → jsonb` | authenticated | R-W2-5 |
+| `admin_application_duplicates(p_application_id uuid) → jsonb` | authenticated | R-W2-9 |
+| `service_application_attempt(p_hashes text[], p_max int default 5) → boolean` | service_role | R-W2-10 |
+| `private.normalize_business_name(text) → text` (`immutable`, not definer) | none (execute revoked from public, anon, authenticated; called by definer functions) | R-W2-9 |
 | `admin_remove_member(p_member uuid) → jsonb` | authenticated | R-W6-1 |
 | `service_reserve_owner_invite(uuid, text, uuid)`, `service_finish_owner_invite(uuid, text)` | service_role | R-W2-4 |
 | `service_apply_provider_status(text, text) → boolean` | service_role | R-W7-5 |
@@ -714,6 +777,7 @@ All of them:
 | `account-security` | true | `notice` in responses; `email_blocked`; `nothing_to_reset`; `cancel_closure`; staff self-closure `team_notice` |
 | `accept-member-invite` | false (unchanged) | password 12–72 |
 | `track-event` | false (unchanged) | accepts `embed_view` |
+| `submit-application` | false (unchanged) | rate limit before the duplicate lookup through `service_application_attempt`, dated submitter hash (R-W2-10); non-fatal audit and replay completion (R-W2-11). Same input and output. |
 | `resend-webhook` | false (unchanged) | forwards `email.suppressed` |
 
 `supabase/config.toml` gets `[functions.review-application]` and `[functions.notify-business-owner]` with `verify_jwt = true`.
@@ -734,6 +798,11 @@ All of them:
 - Reject toast:
   - "Application rejected. The applicant was emailed."
   - or "Application rejected, but the email was not sent: {reason}."
+- Possible duplicates (R-W2-9):
+  - Panel title: "Possible duplicates". Intro: "Check these before you decide. This is only a warning; every action stays available."
+  - Application row: "Application {reference} · {businessName} · {status label} · {match}", where {match} is "same email", "same business name" or "same email and business name".
+  - Business row: "Business {name} · {status label} · {match}", where {match} is "its owner uses this email", "same business name" or "same business name, and its owner uses this email".
+  - Loading: "Checking for possible duplicates…". Error: "Couldn't check for possible duplicates. You can still review this application."
 
 **Businesses and closure**
 - Closure badge: "Closure requested on {date}".
@@ -806,7 +875,7 @@ Every notice ends with: "You can see this change under 'Changes by the platform 
 3. Run `npm run db:types`.
 
 **Edge Functions and frontend**
-4. Deploy the functions: the new `review-application` and `notify-business-owner`, then `provision-owner`, `invite-member`, `manage-member`, `send-test-email`, `account-security`, `accept-member-invite`, `track-event` and `resend-webhook`. No new secrets.
+4. Deploy the functions: the new `review-application` and `notify-business-owner`, then `submit-application`, `provision-owner`, `invite-member`, `manage-member`, `send-test-email`, `account-security`, `accept-member-invite`, `track-event` and `resend-webhook`. No new secrets.
 5. Subscribe the Resend webhook to `email.suppressed`.
 6. Release the frontend to the Preview, then to `sanctus.warpkit.online`. Push to `main` only when the owner asks.
 
@@ -857,7 +926,9 @@ Every notice ends with: "You can see this change under 'Changes by the platform 
     - `reopen` transitions and `business_deleted_at`;
     - `service_link_owner` lock, `email_is_admin` and `business_has_owner`;
     - reservation cooldown, the 24-hour limit and blocked exclusion, plus parallel reserve (two connections);
-    - `record_sign_in` accepts memberships.
+    - `record_sign_in` accepts memberships;
+    - `normalize_business_name` cases and `admin_application_duplicates` matches, exclusions and gate (R-W2-9);
+    - `service_application_attempt`: the limit, the two-hash window, the 2-hour clean-up and a parallel call at count 4 (R-W2-10).
   - **Products:** `save_product` with a stale `expected_updated_at`, and `product_not_found`.
   - **Analytics:** `analytics_daily` time-zone buckets and RLS; `embed_view` accepted and counted; product delete keeps the analytics rows; `business_product_counts` with more than 1000 products.
   - **Audit and email:** product audit events and the cascade skip; the snapshot trigger fields; owners can read only their business's whitelisted events; webhook ranks, suppressed and the pending-event apply; the team-invite `email_failed` update; `service_apply_provider_status`.
@@ -868,6 +939,7 @@ Every notice ends with: "You can see this change under 'Changes by the platform 
   - `review-application`: each action, the email with and without the reason, EN/PT, email failure keeps the rejection, `aal2_required`.
   - `notify-business-owner`: only the caller's recent staff rows, dedupe, language choice.
   - `provision-owner`: `aal2_required`, `cooldown`/`too_many_invitations` with `retryAt`, orphan delete, `email_is_admin` before account creation.
+  - `submit-application`: the rate limit before the duplicate lookup, the dated hash and the midnight window (R-W2-10); the non-fatal audit, the replay completion, the 30-second guard and the stored address (R-W2-11).
   - `invite-member`: gated resend, permission-built bullets, note kept on resend.
   - `manage-member remove`, `send-test-email` (gated and rank-safe), `account-security` (`notice`, `email_blocked`, `nothing_to_reset`, `cancel_closure`, `team_notice`), `accept-member-invite` length 12, `track-event` `embed_view`, `email-templates` for the 3 new kinds in EN/PT.
 - **Service and component tests:**
@@ -890,7 +962,7 @@ Every notice ends with: "You can see this change under 'Changes by the platform 
     - the deactivated login message.
   - Every component test covers loading, empty and error states.
 - **Playwright (demo, 1440 and 390):**
-  - extend `applications.spec` (reject with and without the reason, reopen after a business delete);
+  - extend `applications.spec` (reject with and without the reason, reopen after a business delete, the "Possible duplicates" panel on a seeded re-application);
   - `business-crud.spec` (slug change → old URL redirects; owner-state column; delete toast);
   - `product-crud.spec` (published slug confirm; option removal confirm; stale-save message via two contexts);
   - `public.spec` (lower-case redirect; product redirect keeps `?variant`; draft-business preview banner);
@@ -919,21 +991,21 @@ Every notice ends with: "You can see this change under 'Changes by the platform 
     - Remove a deactivated QA member, then invite the email as an owner.
 
 ## 15. Coverage
-"folded" = moved to S2/S3/S4 (§1.4); "deferred" = RULINGS deferred (§1.3); "explained" = no change needed.
+"folded" = moved to S2/S4 (§1.4; S3 was cancelled and its findings are back in W2); "deferred" = RULINGS deferred (§1.3); "explained" = no change needed.
 
 | ID | WS | Req | | ID | WS | Req | | ID | WS | Req |
 |---|---|---|---|---|---|---|---|---|---|---|
 | APP-01 | W2 | R-W2-1 | | PROD-01 | = PUB-01 | R-W4-1 | | TEAM-01 | W1 | R-W1-1 |
 | APP-02 | W2 | R-W2-3 | | PROD-02 | W4 | R-W4-2 | | TEAM-02 | W3 | R-W3-3 |
 | APP-03 | W2 | R-W2-2 | | PROD-03 | folded S4 | — | | TEAM-03 | = TEAM-02 | R-W3-3 |
-| APP-04 | folded S3 | — | | PROD-04 | = TEAM-02 | R-W3-3 | | TEAM-04 | W6 | R-W6-1 |
+| APP-04 | W2 | R-W2-9 | | PROD-04 | = TEAM-02 | R-W3-3 | | TEAM-04 | W6 | R-W6-1 |
 | APP-05 | W2 | R-W2-4 | | PROD-05 | W4 | R-W4-14 | | TEAM-05 | W6 | R-W6-2 |
 | APP-06 | W2 | R-W2-5 | | PROD-06 | = PUB-03 | R-W3-2 | | TEAM-06 | W6 | R-W6-4 |
 | APP-07 | W2 | R-W2-6 | | PROD-07 | W4 | R-W4-4 | | TEAM-07 | = BIZ-02 | R-W1-3 |
 | APP-08 | W2 | R-W2-7 | | PROD-08 | W4 | R-W4-3 | | TEAM-08 | W6 | R-W6-3 |
-| APP-09 | folded S3 | — | | PROD-09 | W4 | R-W4-7 | | TEAM-09 | W1 | R-W1-7 |
+| APP-09 | W2 | R-W2-11 | | PROD-09 | W4 | R-W4-7 | | TEAM-09 | W1 | R-W1-7 |
 | APP-10 | W1 | R-W1-9 | | PROD-10 | W4 | R-W4-5 | | TEAM-10 | = ANA-01 | R-W5-1 |
-| APP-11 | folded S3 | — | | PROD-11 | W4 | R-W4-6 | | TEAM-11 | W1 | R-W1-8 |
+| APP-11 | W2 | R-W2-10 | | PROD-11 | W4 | R-W4-6 | | TEAM-11 | W1 | R-W1-8 |
 | APP-12 | W2 | R-W2-8 | | PROD-12 | folded S4 | — | | TEAM-12 | W6 | R-W6-8 |
 | APP-13 | W8 | R-W8-1 | | PROD-13 | deferred | — | | TEAM-13 | W6 | R-W6-9 |
 | BIZ-01 | W1 | R-W1-2 | | PUB-01 | W4 | R-W4-1 | | TEAM-14 | W6 | R-W6-5 |
@@ -956,7 +1028,7 @@ Every notice ends with: "You can see this change under 'Changes by the platform 
 | | | | | ANA-08 | W8 | R-W8-3 | | MAIL-11 | W7 | R-W7-2 |
 | | | | | ANA-09 | W8 | R-W8-4 | | MAIL-12 | W7 | R-W7-4 |
 | | | | | ANA-10 | W5 | R-W5-5 | | MAIL-13 | W7 | R-W7-5 |
-| | | | | ANA-11 | W5 | R-W5-4 | | MAIL-14 | = APP-09, folded S3 | — |
+| | | | | ANA-11 | W5 | R-W5-4 | | MAIL-14 | = APP-09 | R-W2-11 |
 | | | | | ANA-12 | W5 | R-W5-8 | | MAIL-15 | W2 | R-W2-4 |
 | | | | | | | | | MAIL-16 | W7 | R-W7-9 |
 | | | | | | | | | MAIL-17 | = TEAM-14 | R-W6-5 |
@@ -969,3 +1041,7 @@ Every notice ends with: "You can see this change under 'Changes by the platform 
 - **Ruling 17's "capped wording"** is read as a "per view" ratio, never a percentage, so a value above 1 can't read as more than 100%.
 - **MAIL-05 fix sketch** ("don't count blocked attempts"): not taken. S1 counts voided codes on purpose (`20261025163627:591`). Returning `email_blocked` and disabling Resend removes the useless retries instead.
 - **MAIL-08 fix sketch:** the audit `business_id` FK is dropped (history keeps the id), and the actor is a role label only (no email or name). This matches the hashed-email rule of rulings 21 and 28.
+- **Ruling 3 (APP-04)** names approved and under-review applications. `submitted` ones are matched too: they are open as well, and the audit's concurrent case (two submissions with different keys) is two `submitted` rows.
+- **APP-11 fix sketch** ("rate-limit before the duplicate lookup"): taken, and the limit now counts attempts (`private.application_attempts`), because a 409 probe stores no application row and would otherwise never reach the limit. The hash takes the UTC date (the column comment's intent), and the hourly window checks both dates around midnight.
+- **APP-09 / MAIL-14 fix sketches** ("audit non-fatal" or "send what is missing on replay"): both are taken. A replay within 30 seconds of the insert sends nothing, so a double click can't race the first request's sends.
+- **R-W2-7 with R-W2-4:** the reservation runs before `generateLink`, so a second provision for the same business inside 60 s gets 429 `cooldown` and creates no account. The row lock and the orphan delete in R-W2-7 cover a second provision after the cooldown (or after a `blocked` first attempt) that races the link.
