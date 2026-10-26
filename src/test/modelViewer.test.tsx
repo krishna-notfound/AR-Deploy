@@ -25,7 +25,7 @@ describe('ModelViewer', () => {
     const { container } = render(<ModelViewer src="https://x.test/a.glb" iosSrc="https://x.test/a.usdz" alt="Chair" ar />)
     await waitFor(() => expect(container.querySelector('model-viewer')).not.toBeNull())
     const el = container.querySelector('model-viewer')!
-    expect(el.getAttribute('ar-modes')).toBe('scene-viewer quick-look')
+    expect(el.getAttribute('ar-modes')).toBe('webxr scene-viewer quick-look')
     expect(el.getAttribute('ar-scale')).toBe('fixed')
     expect(el.getAttribute('ios-src')).toBe('https://x.test/a.usdz')
   })

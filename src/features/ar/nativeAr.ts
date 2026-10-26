@@ -1,14 +1,19 @@
-// Direct launch of the phone's own AR viewer (ADR-0021, owner 2026-10-26): Google Scene Viewer on Android, Apple AR
-// Quick Look on iPhone/iPad. No WebXR. Everything else keeps model-viewer's activateAR() (in-app browsers, desktop,
+// Launch of the phone's AR (ADR-0035, owner 2026-10-26, amends ADR-0021): Android opens AR inside Chrome first
+// (model-viewer's activateAR() with ar-modes "webxr scene-viewer quick-look", the flow the owner tested and that worked
+// on their phones; Google Scene Viewer showed a black screen there even for Google's own sample). Apple AR Quick Look
+// on iPhone/iPad with an uploaded USDZ. Everything else keeps model-viewer's activateAR() (in-app browsers, desktop,
 // and iPhones without an uploaded USDZ, where model-viewer builds one on the phone).
 import { detectInAppBrowser, isAndroid, isIOS } from '@/lib/userAgent'
 
 export type NativeArRoute = 'scene-viewer' | 'quick-look' | 'model-viewer'
 
-export function nativeArRoute(hasUsdz: boolean, ua: string = navigator.userAgent): NativeArRoute {
+/** Android: AR inside Chrome first (model-viewer WebXR), Scene Viewer only as model-viewer's fallback (ADR-0035). */
+export const ANDROID_WEBXR_FIRST = true
+
+export function nativeArRoute(hasUsdz: boolean, ua: string = navigator.userAgent, androidWebXrFirst: boolean = ANDROID_WEBXR_FIRST): NativeArRoute {
   // In-app browsers swallow intents and have no rel="ar": keep model-viewer and its honest failure messages.
   if (detectInAppBrowser(ua)) return 'model-viewer'
-  if (isAndroid(ua)) return 'scene-viewer'
+  if (isAndroid(ua)) return androidWebXrFirst ? 'model-viewer' : 'scene-viewer'
   if (isIOS(ua) && hasUsdz) return 'quick-look'
   return 'model-viewer'
 }

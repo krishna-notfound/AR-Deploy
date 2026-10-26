@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
-import { nativeAr } from '@/features/ar/nativeAr'
+import { nativeAr, nativeArRoute } from '@/features/ar/nativeAr'
 import { service } from '@/services'
 import { AR_TIPS_KEY } from './ArTips'
 
@@ -38,7 +38,6 @@ function loaded(el: FakeViewer, canActivateAR: boolean, size = { x: 0.828, y: 0.
 const arButton = () => screen.queryByRole('button', { name: 'View in my home' })
 const asUserAgent = (ua: string) => vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua)
 const arEvents = (record: { mock: { calls: unknown[][] } }) => record.mock.calls.filter(([e]) => (e as { type: string }).type === 'ar_activation')
-const intentParams = (intent: string) => new URLSearchParams(intent.slice(intent.indexOf('?') + 1, intent.indexOf('#Intent')))
 const mockNavigate = () => vi.spyOn(nativeAr, 'navigate').mockImplementation(() => {})
 function captureClicks() {
   const clicked: HTMLAnchorElement[] = []
@@ -76,8 +75,8 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
 })
 
-describe('product page: direct native AR launch on Android (Scene Viewer)', () => {
-  it('opens the Scene Viewer intent with the exact GLB, the title and the fallback, once per tap', { timeout: 20_000 }, async () => {
+describe('product page: AR on Android opens inside Chrome first (model-viewer WebXR, ADR-0035)', () => {
+  it('the tap calls model-viewer activateAR once (no Scene Viewer intent from the page), one event', { timeout: 20_000 }, async () => {
     asUserAgent(ANDROID_CHROME)
     const navigate = mockNavigate()
     const record = vi.spyOn(service, 'recordEvent')
@@ -85,74 +84,47 @@ describe('product page: direct native AR launch on Android (Scene Viewer)', () =
     const el = await viewerFor(/SheenChair\.glb$/)
     loaded(el, true)
     fireEvent.click(arButton()!)
-    fireEvent.click(screen.getByRole('button', { name: /Preparing AR/ })) // impatient second tap: ignored
-    expect(navigate).toHaveBeenCalledTimes(1)
-    const intent = navigate.mock.calls[0]![0]
-    expect(intent).toMatch(/^intent:\/\/arvr\.google\.com\/scene-viewer\/1\.2\?file=/)
-    expect(intent).toContain('#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=')
-    const q = intentParams(intent)
-    expect(q.get('file')).toBe(el.getAttribute('src')) // exactly the model the 3D view shows
-    expect(q.get('title')).toBe('Sheen Lounge Chair')
-    expect(q.get('mode')).toBe('ar_preferred')
-    expect(q.get('resizable')).toBe('false') // verified true to size
-    expect(decodeURIComponent(intent.split('S.browser_fallback_url=')[1]!)).toContain('/products/nordhaus/sheen-lounge-chair#ar-unavailable;end;')
-    expect(el.activateAR).not.toHaveBeenCalled()
+    await waitFor(() => expect(el.activateAR).toHaveBeenCalledTimes(1))
+    expect(navigate).not.toHaveBeenCalled()
     expect(arEvents(record)).toHaveLength(1)
-    // Back from Scene Viewer: the page is visible again and the button is ready.
-    act(() => {
-      document.dispatchEvent(new Event('visibilitychange'))
-    })
     expect(await screen.findByRole('button', { name: 'View in my home' })).toBeEnabled()
   })
 
-  it('a model that is not verified true to size opens resizable', async () => {
-    asUserAgent(ANDROID_CHROME)
-    const navigate = mockNavigate()
-    openApp('/products/nordhaus/sheen-lounge-chair')
-    loaded(await viewerFor(/SheenChair\.glb$/), true, { x: 2, y: 2, z: 2 })
-    fireEvent.click(arButton()!)
-    expect(navigate).toHaveBeenCalledTimes(1)
-    expect(intentParams(navigate.mock.calls[0]![0]).has('resizable')).toBe(false)
-  })
-
-  it('goes through the AR tips first, then launches from "Start AR" (one event)', async () => {
+  it('goes through the AR tips first, then starts AR from "Start AR" (one event)', async () => {
     localStorage.removeItem(AR_TIPS_KEY)
     asUserAgent(ANDROID_CHROME)
-    const navigate = mockNavigate()
     const record = vi.spyOn(service, 'recordEvent')
     openApp('/products/nordhaus/sheen-lounge-chair')
-    loaded(await viewerFor(/SheenChair\.glb$/), true)
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
     fireEvent.click(arButton()!)
-    expect(navigate).not.toHaveBeenCalled()
+    expect(el.activateAR).not.toHaveBeenCalled()
     fireEvent.click(await screen.findByRole('button', { name: 'Start AR' }))
-    expect(navigate).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(el.activateAR).toHaveBeenCalledTimes(1))
     expect(arEvents(record)).toHaveLength(1)
   })
 
-  it("a selected finish opens that finish's own GLB", async () => {
+  it("a selected finish starts AR on that finish's own model (the 3D view shows it)", async () => {
     asUserAgent(ANDROID_CHROME)
-    const navigate = mockNavigate()
     openApp('/products/nordhaus/sheen-lounge-chair')
     loaded(await viewerFor(/SheenChair\.glb$/), true)
     fireEvent.click(screen.getByRole('radio', { name: /Purple-Gold Damask/ }))
-    loaded(await viewerFor(/ChairDamaskPurplegold\.glb$/), true)
+    const el = await viewerFor(/ChairDamaskPurplegold\.glb$/)
+    loaded(el, true)
     fireEvent.click(arButton()!)
-    expect(intentParams(navigate.mock.calls[0]![0]).get('file')).toMatch(/ChairDamaskPurplegold\.glb$/)
+    await waitFor(() => expect(el.activateAR).toHaveBeenCalledTimes(1))
   })
+})
 
-  it('back on the page through the fallback URL: says AR could not start and clears the marker', async () => {
-    asUserAgent(ANDROID_CHROME)
-    mockNavigate()
-    openApp('/products/nordhaus/sheen-lounge-chair')
-    loaded(await viewerFor(/SheenChair\.glb$/), true)
-    fireEvent.click(arButton()!)
-    act(() => {
-      window.history.pushState(null, '', `${window.location.pathname}#ar-unavailable`)
-      window.dispatchEvent(new HashChangeEvent('hashchange'))
-    })
-    expect((await screen.findAllByText(/AR could not start/)).length).toBeGreaterThan(0)
-    expect(window.location.hash).toBe('')
-    expect(screen.queryByRole('button', { name: /Preparing AR/ })).toBeNull()
+describe('nativeArRoute', () => {
+  it('Android: model-viewer (WebXR first) by default; the direct Scene Viewer route only when WebXR first is off', () => {
+    expect(nativeArRoute(false, ANDROID_CHROME)).toBe('model-viewer')
+    expect(nativeArRoute(true, ANDROID_CHROME)).toBe('model-viewer')
+    expect(nativeArRoute(false, ANDROID_CHROME, false)).toBe('scene-viewer')
+  })
+  it('iPhone: Quick Look with a USDZ, model-viewer without', () => {
+    expect(nativeArRoute(true, IPHONE_SAFARI)).toBe('quick-look')
+    expect(nativeArRoute(false, IPHONE_SAFARI)).toBe('model-viewer')
   })
 })
 
@@ -232,19 +204,6 @@ describe('product page: native AR opens the public copy (ar-models) when the mod
     return res.ok ? res.data.variants[0]!.id : ''
   }
 
-  it('Android: the Scene Viewer file= is the public URL; the 3D view keeps its own URL', async () => {
-    asUserAgent(ANDROID_CHROME)
-    withPublicCopies()
-    const navigate = mockNavigate()
-    openApp('/products/nordhaus/sheen-lounge-chair')
-    const el = await viewerFor(/SheenChair\.glb$/)
-    loaded(el, true)
-    fireEvent.click(arButton()!)
-    expect(navigate).toHaveBeenCalledTimes(1)
-    expect(intentParams(navigate.mock.calls[0]![0]).get('file')).toBe(`${PUBLIC}${await firstFinish()}.glb`)
-    expect(el.getAttribute('src')).toMatch(/SheenChair\.glb$/)
-  })
-
   it('iPhone: the Quick Look href is the public USDZ URL', async () => {
     asUserAgent(IPHONE_SAFARI)
     withPublicCopies()
@@ -256,13 +215,4 @@ describe('product page: native AR opens the public copy (ar-models) when the mod
     expect(arLinks()[0]!.getAttribute('href')).toBe(`${PUBLIC}${await firstFinish()}.usdz#allowsContentScaling=0`)
   })
 
-  it('without a public copy (demo sample URLs): file= falls back to the model URL', async () => {
-    asUserAgent(ANDROID_CHROME)
-    const navigate = mockNavigate()
-    openApp('/products/nordhaus/sheen-lounge-chair')
-    const el = await viewerFor(/SheenChair\.glb$/)
-    loaded(el, true)
-    fireEvent.click(arButton()!)
-    expect(intentParams(navigate.mock.calls[0]![0]).get('file')).toBe(el.getAttribute('src'))
-  })
 })

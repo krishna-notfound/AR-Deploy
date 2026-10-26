@@ -137,7 +137,7 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       auto-rotate-delay={autoRotate ? '0' : undefined}
       rotation-per-second={autoRotate ? '14deg' : undefined}
       // Native viewers only (owner decision 2026-10-13): Scene Viewer on Android, Quick Look on iOS.
-      ar-modes="scene-viewer quick-look"
+      ar-modes="webxr scene-viewer quick-look"
       ar-scale="fixed"
       ar-placement="floor"
       loading="eager"
