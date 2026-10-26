@@ -172,7 +172,7 @@ describe('My products when the business has none', () => {
 describe('analytics labels (DUX-07)', () => {
   it('says "attempts", never "activations", and shows "No 3D" (not a number or a dash) for products without a 3D model', async () => {
     openApp('/dashboard/analytics', asOwner('biz_casa'))
-    expect(await screen.findByText('AR launch attempts per product page view')).toBeInTheDocument()
+    expect(await screen.findByText('Over page and embed views, last 30 days')).toBeInTheDocument()
     const table = await screen.findByRole('table', { name: 'Product performance' })
     const row = (await within(table).findByRole('link', { name: 'Atlantic Round Dining Table' })).closest('tr') as HTMLElement
     expect(within(row).getAllByText('No 3D')).toHaveLength(2)

@@ -36,6 +36,13 @@ describe('track-event handler', () => {
     expect(calls[0]).toMatchObject({ productId: P, businessId: B })
   })
 
+  it('accepts embed_view', async () => {
+    const { d, calls } = deps()
+    expect((await handleTrackEvent(post({ productId: P, businessId: B, type: 'embed_view' }), d)).status).toBe(204)
+    expect(calls.map((c) => c.eventType)).toEqual(['embed_view'])
+    expect((await handleTrackEvent(post({ productId: P, businessId: B, type: 'embed_click' }), d)).status).toBe(400)
+  })
+
   it('never passes the raw IP on: only a 64-char hex digest', async () => {
     const { d, calls } = deps()
     await handleTrackEvent(post({ productId: P, businessId: B, type: 'view' }), d)

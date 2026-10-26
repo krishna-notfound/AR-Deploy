@@ -11,26 +11,29 @@ import { StatGroup } from '@/components/ui/StatGroup'
 import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { Business, Product } from '@/domain/types'
-import { formatDate, formatNumber, formatPercent } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { myProductsPath } from '@/lib/urls'
 import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useCancelClosure } from '../settings/useCancelClosure'
 import { SetupProgressCard } from '../settings/OnboardingChecklist'
 import { ActivityList } from '../shared/ActivityList'
-import { MostViewedList } from '../analytics/MostViewedList'
+import { MostViewedList, formatArRate, mostViewed } from '../analytics/MostViewedList'
 import { hasArModel, productArReadiness } from '../products/productReadiness'
 
 export default function BusinessOverviewPage() {
   const business = useCurrentBusiness()
-  const summary = useServiceQuery(() => service.getBusinessAnalytics(business.id), [business.id])
+  const prefs = usePreferences()
+  const timeZone = prefs?.timezone
+  const summary = useServiceQuery(() => service.getBusinessAnalytics(business.id, { timeZone }), [business.id, timeZone])
   const products = useServiceQuery(() => service.getProductsByBusiness(business.id), [business.id])
   const activity = useServiceQuery(() => service.getRecentActivity({ businessId: business.id, limit: 6 }), [business.id])
   const s = summary.data
   const isPublic = business.status === 'active'
   const nothingPublished = !!products.data && !products.data.some((p) => p.status === 'published')
   const productMap = new Map((products.data ?? []).map((p) => [p.id, p]))
-  const top = (s?.byProduct ?? []).filter((r) => productMap.has(r.productId) && r.views > 0).slice(0, 5)
+  const top = mostViewed(s?.byProduct ?? [], productMap)
   const withModel = products.data?.filter(hasArModel).length
   const productsFailed = products.status === 'error' && !products.data
 
@@ -65,7 +68,7 @@ export default function BusinessOverviewPage() {
               {
                 label: 'AR launch attempts',
                 value: formatNumber(s?.totals.arActivations ?? 0),
-                hint: s && s.totals.views ? `Last 30 days · ${formatPercent(s.totals.arActivations / s.totals.views)} of views` : 'Last 30 days',
+                hint: s && s.totals.views + s.totals.embedViews ? `Last 30 days · ${formatArRate(s.totals.arActivations / (s.totals.views + s.totals.embedViews))}` : 'Last 30 days',
               },
             ]}
             footer={
@@ -82,7 +85,7 @@ export default function BusinessOverviewPage() {
             <Card className={productsFailed ? 'lg:col-span-12' : 'lg:col-span-7'}>
               <PanelHeader
                 title="Views and AR launch attempts"
-                description="Last 30 days"
+                description="Page and embed views, last 30 days"
                 actions={
                   <Link to="/dashboard/analytics" className={panelLinkClass}>
                     Open analytics <ArrowRight className="size-3.5" aria-hidden />
@@ -91,17 +94,17 @@ export default function BusinessOverviewPage() {
               />
               <CardBody>
                 {/* With nothing published there is nothing to visit: flat lines would read as "no one is looking" (DUX-04). */}
-                {nothingPublished && !s?.totals.views ? (
+                {nothingPublished && !s?.totals.views && !s?.totals.embedViews ? (
                   <EmptyState icon={BarChart3} title="No published products yet" body="Views and AR launch attempts appear once customers can see your products." />
                 ) : s ? (
-                  <ActivityTrend data={s.series} compact />
+                  <ActivityTrend data={s.series} compact prefs={prefs} />
                 ) : (
                   <Skeleton className="h-32 w-full" />
                 )}
               </CardBody>
             </Card>
             <Card className="lg:col-span-7">
-              <PanelHeader title="Most viewed products" description="Product page views, last 30 days" />
+              <PanelHeader title="Most viewed products" description="Page and embed views, last 30 days" />
               <CardBody>
                 {productsFailed ? (
                   <ErrorState message="Your products could not be loaded." onRetry={products.refetch} />

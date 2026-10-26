@@ -461,23 +461,30 @@ export type Database = {
           created_at: string
           event_type: string
           id: string
-          product_id: string
+          product_id: string | null
         }
         Insert: {
           business_id: string
           created_at?: string
           event_type: string
           id?: string
-          product_id: string
+          product_id?: string | null
         }
         Update: {
           business_id?: string
           created_at?: string
           event_type?: string
           id?: string
-          product_id?: string
+          product_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "product_analytics_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_analytics_product_id_business_id_fkey"
             columns: ["product_id", "business_id"]
@@ -819,16 +826,41 @@ export type Database = {
       }
     }
     Views: {
+      business_product_counts: {
+        Row: {
+          business_id: string | null
+          drafts: number | null
+          published: number | null
+          total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_analytics_daily: {
         Row: {
           ar_activations: number | null
           business_id: string | null
           day: string | null
+          embed_views: number | null
           model_interactions: number | null
           product_id: string | null
           views: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "product_analytics_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_analytics_product_id_business_id_fkey"
             columns: ["product_id", "business_id"]
@@ -917,6 +949,18 @@ export type Database = {
         Returns: {
           email: string
           id: string
+        }[]
+      }
+      analytics_daily: {
+        Args: { p_business?: string; p_days?: number; p_tz: string }
+        Returns: {
+          ar_activations: number
+          business_id: string
+          day: string
+          embed_views: number
+          model_interactions: number
+          product_id: string | null
+          views: number
         }[]
       }
       caller_has_verified_factor: { Args: never; Returns: boolean }

@@ -10,12 +10,13 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { StatGroup } from '@/components/ui/StatGroup'
 import { SkeletonRows, Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
-import { formatNumber, formatPercent } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ActivityList } from '../shared/ActivityList'
 import { applicationsAdminPath } from '@/lib/urls'
-import { MostViewedList } from '../analytics/MostViewedList'
+import { MostViewedList, formatArRate, mostViewed } from '../analytics/MostViewedList'
 import { hasArModel } from '../products/productReadiness'
 import { useBusinesses } from '../products/useCatalogData'
 import { SetupProgressCard } from '../settings/OnboardingChecklist'
@@ -23,14 +24,16 @@ import { SetupProgressCard } from '../settings/OnboardingChecklist'
 export default function AdminOverviewPage() {
   const can = useCan()
   const navigate = useNavigate()
-  const summary = useServiceQuery(() => service.getAnalytics(), [])
+  const prefs = usePreferences()
+  const timeZone = prefs?.timezone
+  const summary = useServiceQuery(() => service.getAnalytics({ timeZone }), [timeZone])
   const products = useServiceQuery(() => service.getProducts(), [])
   const { list: businesses, map: bizMap, query: bizQuery } = useBusinesses()
   const activity = useServiceQuery(() => service.getRecentActivity({ limit: 6 }), [])
   const s = summary.data
 
   const productMap = new Map((products.data ?? []).map((p) => [p.id, p]))
-  const top = (s?.byProduct ?? []).filter((r) => productMap.has(r.productId)).slice(0, 5)
+  const top = mostViewed(s?.byProduct ?? [], productMap)
   const activeBusinesses = businesses.filter((b) => b.status === 'active').length
   const withModel = products.data?.filter(hasArModel).length
 
@@ -84,7 +87,7 @@ export default function AdminOverviewPage() {
               {
                 label: 'AR launch attempts',
                 value: formatNumber(s?.totals.arActivations ?? 0),
-                hint: s && s.totals.views ? `Last 30 days · ${formatPercent(s.totals.arActivations / s.totals.views)} of views` : 'Last 30 days',
+                hint: s && s.totals.views + s.totals.embedViews ? `Last 30 days · ${formatArRate(s.totals.arActivations / (s.totals.views + s.totals.embedViews))}` : 'Last 30 days',
               },
             ]}
             footer={
@@ -98,15 +101,15 @@ export default function AdminOverviewPage() {
 
           <Card>
             <PanelHeader
-              title="Product views and AR launch attempts"
-              description="All businesses, last 30 days"
+              title="Views and AR launch attempts"
+              description="Page and embed views, all businesses, last 30 days"
               actions={
                 <Link to="/admin/analytics" className={panelLinkClass}>
                   Open analytics <ArrowRight className="size-3.5" aria-hidden />
                 </Link>
               }
             />
-            <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact emptyBody="Views and AR opens will appear here once people visit published catalogs." /> : <Skeleton className="h-32 w-full" />}</CardBody>
+            <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact prefs={prefs} emptyBody="Views and AR opens will appear here once people visit published catalogs." /> : <Skeleton className="h-32 w-full" />}</CardBody>
           </Card>
 
           {/* Grid items default to min-width: auto, so a long product name would widen the card past a phone screen. */}
@@ -114,7 +117,7 @@ export default function AdminOverviewPage() {
             <Card className="lg:col-span-7">
               <PanelHeader
                 title="Most viewed products"
-                description="Product page views, last 30 days"
+                description="Page and embed views, last 30 days"
                 actions={
                   <Link to="/admin/analytics" className={panelLinkClass}>
                     Full ranking <ArrowRight className="size-3.5" aria-hidden />

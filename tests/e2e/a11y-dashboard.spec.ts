@@ -37,7 +37,7 @@ const card = (title: string | RegExp) => (page: Page) => page.locator('main').ge
 
 const showTable = async (page: Page) => {
   await page.getByRole('button', { name: 'Show as table' }).first().click()
-  await expect(page.getByRole('table', { name: /Daily product views/ })).toBeVisible()
+  await expect(page.getByRole('table', { name: /Daily page and embed views/ })).toBeVisible()
 }
 
 const ADMIN_ROUTES: Route[] = [

@@ -88,13 +88,13 @@ function EmbedProductView({ business, product, tenant }: { business: Business; p
     setSearch((prev) => withVariantParam(prev, id), { replace: true, preventScrollReset: true })
   }
 
-  // The same analytics as the public product page: one view per load, one 3D interaction. Never 'ar_activation':
-  // the AR link only opens the product page, where a real launch is recorded.
+  // One embed_view per load (the product page records its own 'view', so each surface counts once, R-W5-3) and one
+  // 3D interaction. Never 'ar_activation': the AR link only opens the product page, where a real launch is recorded.
   const recorded = useRef(false)
   useEffect(() => {
     if (recorded.current) return
     recorded.current = true
-    void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'view' })
+    void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'embed_view' })
   }, [product.id, product.businessId])
   const interacted = useRef(false)
   const onModelInteract = () => {

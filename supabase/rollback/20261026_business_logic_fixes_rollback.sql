@@ -21,6 +21,109 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 7 rollback: analytics data: embed views, deleted products, exact counts, local days (R-W5-2, R-W5-3, R-W5-4, R-W5-6)
+-- =============================================================================
+
+drop function public.analytics_daily(text, integer, uuid);
+drop view public.business_product_counts;
+
+-- R-W5-3: record_event_limited as in 20261024065538 (no embed_view). create or replace keeps the grants.
+create or replace function public.record_event_limited(
+  p_visitor_key text,
+  p_product_id  uuid,
+  p_business_id uuid,
+  p_event_type  text
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_limit  constant integer := 30; -- events per visitor key per minute
+  v_window timestamptz := date_trunc('minute', now());
+  v_hits   integer;
+begin
+  if p_visitor_key is null or p_visitor_key !~ '^[0-9a-f]{64}$' then
+    return 'invalid';
+  end if;
+
+  insert into private.analytics_hits as h (visitor_key, window_start)
+  values (p_visitor_key, v_window)
+  on conflict (visitor_key, window_start) do update set hits = h.hits + 1
+  returning h.hits into v_hits;
+
+  -- Opportunistic cleanup keeps the table to roughly the last hour.
+  if random() < 0.02 then
+    delete from private.analytics_hits where window_start < now() - interval '1 hour';
+  end if;
+
+  if v_hits > v_limit then
+    return 'rate_limited';
+  end if;
+
+  if p_event_type is null or p_event_type not in ('view', 'ar_activation', 'model_interaction')
+     or not exists (
+       select 1 from public.products p
+       join public.businesses b on b.id = p.business_id
+       where p.id = p_product_id
+         and p.business_id = p_business_id
+         and p.status = 'published'
+         and b.status = 'active'
+     ) then
+    return 'invalid';
+  end if;
+
+  -- The viewer and AR button only exist when the product (or one of its variants) has a model.
+  if p_event_type in ('ar_activation', 'model_interaction')
+     and not exists (select 1 from public.product_models m where m.product_id = p_product_id)
+     and not exists (select 1 from public.product_variant_models vm where vm.product_id = p_product_id) then
+    return 'invalid';
+  end if;
+
+  insert into public.product_analytics (business_id, product_id, event_type)
+  values (p_business_id, p_product_id, p_event_type);
+  return 'recorded';
+end;
+$$;
+revoke execute on function public.record_event_limited(text, uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.record_event_limited(text, uuid, uuid, text) to service_role;
+
+-- R-W5-3: a view cannot drop a column through create or replace; recreate it as in 20261012200810 with its grants.
+drop view public.product_analytics_daily;
+create view public.product_analytics_daily
+with (security_invoker = true) as
+select
+  business_id,
+  product_id,
+  (created_at at time zone 'utc')::date as day,
+  count(*) filter (where event_type = 'view') as views,
+  count(*) filter (where event_type = 'ar_activation') as ar_activations,
+  count(*) filter (where event_type = 'model_interaction') as model_interactions
+from public.product_analytics
+group by business_id, product_id, (created_at at time zone 'utc')::date;
+revoke all on public.product_analytics_daily from public, anon, authenticated;
+grant select on public.product_analytics_daily to authenticated;
+grant all on public.product_analytics_daily to service_role;
+
+-- R-W5-4: back to the cascade FK. DATA LOSS (see the header): rows of deleted products are deleted first.
+delete from public.product_analytics where product_id is null;
+alter table public.product_analytics
+  drop constraint product_analytics_business_id_fkey,
+  drop constraint product_analytics_product_id_business_id_fkey,
+  add constraint product_analytics_product_id_business_id_fkey
+    foreign key (product_id, business_id) references public.products (id, business_id) on delete cascade;
+alter table public.product_analytics alter column product_id set not null;
+
+-- R-W5-3: before S1.5 an embed load was recorded as a view, so embed_view rows become view rows (kept, not split).
+update public.product_analytics set event_type = 'view' where event_type = 'embed_view';
+alter table public.product_analytics
+  drop constraint product_analytics_event_type_check,
+  add constraint product_analytics_event_type_check
+    check (event_type in ('view', 'ar_activation', 'model_interaction'));
+-- ---- end S1.5 Task 7 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 18 rollback: application submission: rate limit first, daily hash (R-W2-10, R-W2-11)
 -- =============================================================================
 

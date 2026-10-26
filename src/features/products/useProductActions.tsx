@@ -54,7 +54,7 @@ export function useProductActions(scope: EditorScope) {
     async remove(p: Product, opts?: { after?: string }) {
       const ok = await confirm({
         title: `Delete “${p.name.en}”?`,
-        body: 'This permanently removes the product, its images and its analytics. This cannot be undone.',
+        body: "This permanently removes the product and its images. This cannot be undone. Its past views stay in your totals as 'Deleted product'.",
         confirmLabel: 'Delete product',
         destructive: true,
       })

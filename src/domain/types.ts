@@ -120,12 +120,16 @@ export interface Product {
   updatedAt: ISODate
 }
 
-/** model_interaction = the visitor rotated/zoomed the 3D model (recorded once per page view). */
-export type AnalyticsEventType = 'view' | 'ar_activation' | 'model_interaction'
+/**
+ * model_interaction = the visitor rotated/zoomed the 3D model (recorded once per page view). embed_view = the product
+ * was loaded in an embed on another site; view = the product page itself.
+ */
+export type AnalyticsEventType = 'view' | 'embed_view' | 'ar_activation' | 'model_interaction'
 
 export interface AnalyticsEvent {
   id: ID
-  productId: ID
+  /** Null once the product was deleted: its history stays in the business totals as "Deleted product". */
+  productId: ID | null
   businessId: ID
   type: AnalyticsEventType
   at: ISODate
@@ -134,7 +138,9 @@ export interface AnalyticsEvent {
 }
 
 export interface DailyPoint {
+  /** A local date (YYYY-MM-DD) in the time zone the summary was made for. */
   date: string
+  /** Product page and embed views. */
   views: number
   arActivations: number
 }
@@ -142,9 +148,12 @@ export interface DailyPoint {
 export interface ProductAnalytics {
   productId: ID
   businessId: ID
+  /** Product page views. */
   views: number
+  embedViews: number
   arActivations: number
   modelInteractions: number
+  /** AR launches per view: arActivations / (views + embedViews), 0 without views. Never a percentage. */
   arRate: number
 }
 
@@ -162,12 +171,15 @@ export interface AnalyticsSummary {
     published: number
     drafts: number
     views: number
+    embedViews: number
     arActivations: number
     modelInteractions: number
   }
   series: DailyPoint[]
   byProduct: ProductAnalytics[]
   byBusiness: BusinessAnalytics[]
+  /** Events of products that were deleted (counted in the totals and the series), or null when there are none. */
+  deletedProducts: { views: number; embedViews: number; arActivations: number; modelInteractions: number } | null
   /** True for demo data (seeded + recorded in this browser); false for a real backend. */
   isSample: boolean
 }

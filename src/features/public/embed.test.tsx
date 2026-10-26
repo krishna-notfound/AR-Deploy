@@ -32,7 +32,7 @@ afterEach(() => {
 })
 
 describe('embed page (ADR-0026)', { timeout: 20_000 }, () => {
-  it('renders a published product without the public page chrome, and records a view', { timeout: 20_000 }, async () => {
+  it('renders a published product without the public page chrome, and records an embed view (R-W5-3)', { timeout: 20_000 }, async () => {
     const record = vi.spyOn(service, 'recordEvent')
     openApp('/embed/products/casa-lisboa/glam-velvet-sofa')
     expect(await screen.findByRole('heading', { name: 'Glam Velvet Sofa', level: 1 }, { timeout: 10_000 })).toBeInTheDocument()
@@ -40,7 +40,8 @@ describe('embed page (ADR-0026)', { timeout: 20_000 }, () => {
     expect(screen.queryByRole('radiogroup', { name: 'Language' })).toBeNull() // no PublicShell header
     await waitFor(() => expect(document.querySelector('model-viewer')).not.toBeNull())
     expect(document.querySelector('model-viewer')).not.toHaveAttribute('ar')
-    await waitFor(() => expect(record).toHaveBeenCalledWith(expect.objectContaining({ type: 'view' })))
+    await waitFor(() => expect(record).toHaveBeenCalledWith(expect.objectContaining({ type: 'embed_view' })))
+    expect(record).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'view' }))
   })
 
   it('opens the full product page in a new tab for AR, on the chosen finish, and records no AR launch', { timeout: 20_000 }, async () => {
