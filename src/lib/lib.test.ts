@@ -16,6 +16,10 @@ describe('slug', () => {
     expect(slugInput('modern-sofa')).toBe('modern-sofa')
     expect(slugInput('Sofá Grande')).toBe('sof-grande')
   })
+  it("slugInput('a'.repeat(70), 63) has length 63; slugInput without max is unchanged (S2 Task 2)", () => {
+    expect(slugInput('a'.repeat(70), 63)).toHaveLength(63)
+    expect(slugInput('a'.repeat(70))).toHaveLength(70)
+  })
   it('slugifies accents and punctuation', () => {
     expect(slugify('Sofá Glam — Veludo!')).toBe('sofa-glam-veludo')
     expect(isValidSlug('modern-sofa')).toBe(true)

@@ -11,14 +11,18 @@ export function slugify(input: string): string {
     .replace(/-+$/g, '')
 }
 
-/** While typing: lowercase, invalid characters become '-', but a trailing '-' is kept so "modern-" can become "modern-sofa". Validated on save. */
-export function slugInput(input: string): string {
-  return input.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-{2,}/g, '-')
+/** While typing: lowercase, invalid characters become '-', but a trailing '-' is kept so "modern-" can become "modern-sofa". Validated on save. Cut to `max` when given. */
+export function slugInput(input: string, max?: number): string {
+  const s = input.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-{2,}/g, '-')
+  return max === undefined ? s : s.slice(0, max)
 }
 
 export function isValidSlug(slug: string): boolean {
   return SLUG_PATTERN.test(slug)
 }
+
+/** Business catalog addresses are DNS labels: at most 63 characters (BUSINESS_LIMITS.slug). */
+export const BUSINESS_SLUG_MAX = 63
 
 /** Database check: product slugs are at most 70 characters. */
 export const PRODUCT_SLUG_MAX = 70

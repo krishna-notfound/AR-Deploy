@@ -7,6 +7,7 @@ import { SIGN_IN_PATH } from '@/auth/RequireRole'
 import { account, service } from '@/services'
 import { accountFail } from '@/services/accountService'
 import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
+import { OWNER_CLOSURE_LINE } from '@/features/businesses/closure'
 
 type As = { role: 'super_admin'; platformRole?: 'owner' | 'admin' | 'team' } | { role: 'business_admin'; businessId: string }
 
@@ -266,5 +267,28 @@ describe('My account section', () => {
     expect(await screen.findByText("Couldn't cancel the closure request")).toBeInTheDocument()
     expect(screen.getByText(/Closure requested on .* · Your catalog is offline\./)).toBeInTheDocument()
     expect(cancel).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe("S2 Task 2: the closure line in My account follows the real status (R-W3-6)", () => {
+  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  it("the closure line reads 'Closure requested on {date} · ' + OWNER_CLOSURE_LINE[status]", { timeout: 30_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(BUSINESS))
+    expect((await account.requestClosure(DEMO_CODE)).ok).toBe(true)
+    open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    const closing = card('Close your account')
+    expect(await within(closing).findByText(new RegExp(`^Closure requested on .+ · ${escape(OWNER_CLOSURE_LINE.inactive)}$`))).toBeInTheDocument()
+  })
+
+  it("a draft status reads 'Your catalog is not public yet.'", { timeout: 30_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(BUSINESS))
+    expect((await account.requestClosure(DEMO_CODE)).ok).toBe(true)
+    await service.setBusinessStatus('biz_casa', 'draft')
+    open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    const closing = card('Close your account')
+    expect(await within(closing).findByText(/^Closure requested on .+ · Your catalog is not public yet\.$/)).toBeInTheDocument()
   })
 })

@@ -1,10 +1,13 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+import type { Permission } from '@/domain/types'
 import { service } from '@/services'
+import { ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from './BusinessForm'
 
@@ -92,5 +95,67 @@ describe('BusinessForm (edit)', () => {
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
     expect(Object.keys(update.mock.calls[0]![1])).toEqual(['contact'])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('S2 Task 2: field limits and the status select (R-W3-5, R-W3-7)', () => {
+  function renderEditAs(permissions: Permission[]) {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    vi.spyOn(service, 'getMyAccess').mockResolvedValue(ok({ role: 'team', permissions, status: 'active' }))
+    const router = createMemoryRouter([{ path: '/admin/businesses/biz_nord', element: <EditRoute /> }], { initialEntries: ['/admin/businesses/biz_nord'] })
+    render(
+      <AccountProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <RouterProvider router={router} />
+          </ConfirmProvider>
+        </ToastProvider>
+      </AccountProvider>,
+    )
+  }
+
+  it('inputs carry maxLength name 80, slug 63, description 1000, email 320, phone 50, address 500', async () => {
+    renderEdit()
+    expect(await screen.findByLabelText(/^Business name/)).toHaveAttribute('maxLength', '80')
+    expect(screen.getByLabelText(/Catalog address/)).toHaveAttribute('maxLength', '63')
+    expect(screen.getByLabelText('Description')).toHaveAttribute('maxLength', '1000')
+    expect(screen.getByLabelText(/^Email/)).toHaveAttribute('maxLength', '320')
+    expect(screen.getByLabelText(/^Phone/)).toHaveAttribute('maxLength', '50')
+    expect(screen.getByLabelText(/^Address/)).toHaveAttribute('maxLength', '500')
+  })
+
+  it("a 501-character address shows 'Use 500 characters or fewer.' and makes no service call", async () => {
+    const user = userEvent.setup()
+    const update = vi.spyOn(service, 'updateBusiness')
+    renderEdit()
+    // maxLength stops typing past the limit; a pasted or stored value can still be longer.
+    fireEvent.change(await screen.findByLabelText(/^Address/), { target: { value: 'a'.repeat(501) } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Use 500 characters or fewer.')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Address/)).toHaveAttribute('aria-invalid', 'true')
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('the status select shows only with businesses.status', async () => {
+    renderEditAs(['businesses.view', 'businesses.edit'])
+    await screen.findByLabelText(/^Business name/)
+    expect(screen.queryByLabelText('Catalog status')).toBeNull()
+    cleanup()
+    renderEditAs(['businesses.view', 'businesses.edit', 'businesses.status'])
+    expect(await screen.findByLabelText('Catalog status')).toBeInTheDocument()
+  })
+
+  it('a stored 1200-character description gets the description field error on save, not only a toast', async () => {
+    const user = userEvent.setup()
+    const stored = await service.getBusinessById('biz_nord')
+    if (!stored.ok) throw new Error('seed missing')
+    vi.spyOn(service, 'getBusinessById').mockResolvedValue(ok({ ...stored.data, description: 'd'.repeat(1200) }))
+    const update = vi.spyOn(service, 'updateBusiness')
+    renderEdit()
+    await user.type(await screen.findByLabelText(/^Phone/), '1')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Use 1000 characters or fewer.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Description')).toHaveAttribute('aria-invalid', 'true')
+    expect(update).not.toHaveBeenCalled()
   })
 })

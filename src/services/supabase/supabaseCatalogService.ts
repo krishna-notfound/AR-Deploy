@@ -199,6 +199,11 @@ export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictFiel
   }
 }
 
+/** A storage refusal by RLS (R-W3-6): HTTP 403, or Postgres's "new row violates row-level security policy". */
+export function isStorageForbidden(e: { statusCode?: string | number; message?: string }): boolean {
+  return String(e.statusCode ?? '') === '403' || /row-level security/i.test(e.message ?? '')
+}
+
 const toBusiness = (r: BusinessRow): Business => ({
   id: r.id,
   name: r.name,
@@ -1124,7 +1129,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const contentType = UPLOAD_CONTENT_TYPE[kind] ?? file.type
         const body = file.type === contentType ? file : new File([file], file.name, { type: contentType })
         const { error } = await sb.storage.from(bucket).upload(path, body, { contentType, upsert: false })
-        if (error) return fail('STORAGE', `Upload failed: ${error.message}`)
+        if (error) return isStorageForbidden(error) ? teamFail('forbidden') : fail('STORAGE', `Upload failed: ${error.message}`)
         if (bucket === LOGO_BUCKET) return ok({ url: sb.storage.from(bucket).getPublicUrl(path).data.publicUrl, status: 'valid' as const })
         const signed = await sb.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL_SECONDS)
         if (signed.error) return fail('STORAGE', `Uploaded, but a preview link could not be created: ${signed.error.message}`)
