@@ -1163,7 +1163,7 @@ export type Database = {
         }
       }
       log_account_event: { Args: { p_event: string }; Returns: undefined }
-      model_request_storage_paths: { Args: { p_request: string }; Returns: Json }
+      model_request_storage_paths: { Args: { p_product: string }; Returns: Json }
       my_platform_access: { Args: never; Returns: Json }
       my_recovery_codes_left: { Args: never; Returns: number }
       my_security_state: { Args: never; Returns: Json }

@@ -15,7 +15,7 @@ import { mockClosureOpen, noteMockClosureStatus, voidMockClosure } from './mockA
 import { createMockTeam, demoPlatformRole, demoViewer } from './mockTeam'
 import { createMockModelRequestsBusiness } from './mockModelRequestsBusiness'
 import { createMockModelRequestsRead } from './mockModelRequestsRead'
-import { clearSessionRequestMedia } from './mockModelRequestShared'
+import { clearSessionRequestMedia, sessionRequestMedia } from './mockModelRequestShared'
 import { createMockModelRequestsStaff } from './mockModelRequestsStaff'
 import { createSeed } from './seed'
 import { store } from './store'
@@ -133,6 +133,26 @@ async function simulateLatency(): Promise<void> {
 const EVENTS_PER_MINUTE = 30
 const clone = <T>(v: T): T => structuredClone(v)
 const nowIso = () => new Date().toISOString()
+
+/** S4 R-S4-18: drops the requests `gone` selects (their photo and staged rows go with them, as the cascade does) and revokes their session photo and staged-file URLs. */
+function dropModelRequests(d: Db, gone: (r: NonNullable<Db['modelRequests']>[number]) => boolean): void {
+  const dropped = (d.modelRequests ?? []).filter(gone)
+  if (!dropped.length) return
+  d.modelRequests = (d.modelRequests ?? []).filter((r) => !gone(r))
+  const revoke = (url: string) => {
+    try {
+      if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+    } catch {
+      // best effort
+    }
+  }
+  for (const r of dropped) {
+    for (const url of sessionRequestMedia.photos.get(r.id) ?? []) revoke(url)
+    for (const f of Object.values(sessionRequestMedia.staged.get(r.id) ?? {})) if (f) revoke(f.url)
+    sessionRequestMedia.photos.delete(r.id)
+    sessionRequestMedia.staged.delete(r.id)
+  }
+}
 
 /** Wraps every call: latency, optional failure injection, catch-all. */
 async function run<T>(fn: () => Result<T>, opts: { inject?: boolean } = {}): Promise<Result<T>> {
@@ -271,6 +291,7 @@ export const mockCatalogService: CatalogService = {
       store.update((d) => {
         d.businesses = d.businesses.filter((b) => b.id !== id)
         d.products = d.products.filter((p) => p.businessId !== id)
+        dropModelRequests(d, (r) => r.businessId === id) // R-S4-18: their photos and staged files go too
         if (d.owners) delete d.owners[id] // R-W8-2: the owner goes with the business
         d.ownerInviteAttempts = d.ownerInviteAttempts?.filter((a) => a.businessId !== id) // as the cascade does
         d.dailyStats = d.dailyStats.filter((s) => s.businessId !== id)
@@ -379,6 +400,9 @@ export const mockCatalogService: CatalogService = {
       }
       store.update((d) => {
         d.products = d.products.map((p) => (p.id === id ? next : p))
+        // R-S4-18: an option removed in this save takes its requests, photos and staged files with it.
+        const kept = new Set(next.variants.map((v) => v.id))
+        dropModelRequests(d, (r) => r.productId === id && !!r.variantId && !kept.has(r.variantId))
         if (next.slug !== current.slug) auditProduct(d, 'product_slug_changed', next, { metadata: { from: current.slug, to: next.slug } })
       })
       return ok(next)
@@ -418,6 +442,7 @@ export const mockCatalogService: CatalogService = {
       if (!current) return fail('NOT_FOUND', 'Product not found.')
       store.update((d) => {
         d.products = d.products.filter((p) => p.id !== id)
+        dropModelRequests(d, (r) => r.productId === id) // R-S4-18
         // Its history stays in the business totals as "Deleted product" (R-W5-4).
         d.dailyStats = d.dailyStats.map((s) => (s.productId === id ? { ...s, productId: null } : s))
         d.events = d.events.map((e) => (e.productId === id ? { ...e, productId: null } : e))

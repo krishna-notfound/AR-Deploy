@@ -15,6 +15,9 @@ const OWNER_PURPOSES: ReadonlySet<string> = new Set(['owner_reset_2fa', 'complet
 
 /** Recovery-code alphabet: 31 characters (no I, L, O, 0 or 1, so a code read aloud or handwritten is unambiguous).
  * 10 characters give about 49.5 bits per code. */
+/** The buckets whose folder named after the business is removed when its closure completes (R-S4-18 adds the request photos). */
+export const SWEEP_BUCKETS = ['product-media', 'business-logos', 'model-request-photos'] as const
+
 export const RECOVERY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 export const RECOVERY_CODES_PER_SET = 8
 const RECOVERY_LENGTH = 10
@@ -69,7 +72,7 @@ export interface AccountSecurityDeps {
   deleteUser(userId: string): Promise<void>
   /** Deletes the business row; related rows cascade (a closure request keeps its row, with business_id set null). */
   deleteBusiness(businessId: string): Promise<void>
-  /** Removes the business's product-media and business-logos folders. Throws when it could not remove everything. */
+  /** Removes the business's folder in every SWEEP_BUCKETS bucket. Throws when it could not remove everything. */
   sweepBusinessStorage(businessId: string): Promise<void>
   userEmail(userId: string): Promise<string | null>
   /** sendAndLog: sends through Resend and writes one email_log row. */

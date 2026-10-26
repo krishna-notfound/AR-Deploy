@@ -7,15 +7,12 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { callerRpc } from '../_shared/caller.ts'
 import { type LogEntry, logRow, readEmailConfig, sendAndLog } from '../_shared/email.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
-import { aalFromJwt, handleAccountSecurity } from './handler.ts'
+import { SWEEP_BUCKETS, aalFromJwt, handleAccountSecurity } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
 const url = env('SUPABASE_URL') ?? ''
 const admin = createClient(url, serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
 const config = readEmailConfig(env)
-
-const MEDIA_BUCKET = 'product-media'
-const LOGO_BUCKET = 'business-logos'
 
 async function log(e: LogEntry): Promise<string> {
   const { data, error } = await admin.from('email_log').insert(logRow(e)).select('id').single()
@@ -71,7 +68,7 @@ Deno.serve((req) =>
       if (error) throw new Error(`business delete failed: ${error.code ?? 'unknown'}`)
     },
     async sweepBusinessStorage(businessId) {
-      const results = await Promise.allSettled([removeFolder(MEDIA_BUCKET, businessId), removeFolder(LOGO_BUCKET, businessId)])
+      const results = await Promise.allSettled(SWEEP_BUCKETS.map((bucket) => removeFolder(bucket, businessId)))
       if (results.some((r) => r.status === 'rejected')) throw new Error('storage sweep incomplete')
     },
     async userEmail(userId) {

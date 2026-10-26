@@ -563,6 +563,81 @@ describe('S4 rollback', () => {
 // ---- end S4 Task 7 tests ----
 
 // ---- S4 Task 8 tests ----
+describe('S4 Task 8: clean-up paths', () => {
+  GONE_AFTER_ROLLBACK.push('public.model_request_storage_paths(uuid)')
+  let f: S4Fixture
+  const id8 = ids(8)
+  const reqCancelled = id8(50)
+  const reqOpenV = id8(51)
+  const reqPlain = id8(52)
+  const reqOther = id8(53)
+  const photo = (biz: string, req: string, n: number) => `${biz}/${req}/${id8(60 + n)}.jpg`
+  const count = async (table: string, where: string, params: unknown[]) =>
+    Number((await db.query<{ n: string }>(`select count(*)::text as n from public.${table} where ${where}`, params)).rows[0]!.n)
+
+  beforeAll(async () => {
+    f = await seedS4(db, 8)
+    // P: a delivered request for the product itself, and an open one for option V; R (business B): one request.
+    await insertRequest(db, { id: reqPlain, business: f.bizA, product: f.productP, status: 'delivered', photos: [photo(f.bizA, reqPlain, 1), photo(f.bizA, reqPlain, 2)] })
+    await insertRequest(db, { id: reqOpenV, business: f.bizA, product: f.productP, variant: f.variantV, status: 'in_progress', photos: [photo(f.bizA, reqOpenV, 3), photo(f.bizA, reqOpenV, 4)] })
+    await insertRequest(db, { id: reqCancelled, business: f.bizA, product: f.productQ, status: 'cancelled', photos: [photo(f.bizA, reqCancelled, 5)] })
+    await insertRequest(db, { id: reqOther, business: f.bizB, product: f.productR, status: 'requested', photos: [photo(f.bizB, reqOther, 6), photo(f.bizB, reqOther, 7)] })
+    await db.query(
+      `insert into public.model_request_files (request_id, format, storage_path, file_name, size_bytes) values ($1, 'glb', $2, 'staged.glb', 10)`,
+      [reqOpenV, `${f.bizA}/${id8(70)}.glb`])
+  })
+
+  const paths = (user: string, product: string) => h.call(user, 'select public.model_request_storage_paths($1) as r', [product])
+
+  it('the owner and a products.delete staff member get the photo and staged paths; another business owner and Team without products.delete get forbidden', async () => {
+    const expected = [
+      { bucket: 'model-request-photos', path: photo(f.bizA, reqPlain, 1), variant_id: null },
+      { bucket: 'model-request-photos', path: photo(f.bizA, reqPlain, 2), variant_id: null },
+      { bucket: 'model-request-photos', path: photo(f.bizA, reqOpenV, 3), variant_id: f.variantV },
+      { bucket: 'model-request-photos', path: photo(f.bizA, reqOpenV, 4), variant_id: f.variantV },
+      { bucket: 'product-media', path: `${f.bizA}/${id8(70)}.glb`, variant_id: f.variantV },
+    ].sort((a, b) => (a.bucket + a.path < b.bucket + b.path ? -1 : 1))
+    expect(await paths(f.ownerA, f.productP)).toEqual(expected)
+    expect(await paths(f.admin, f.productP)).toEqual(expected)
+    expect(await paths(f.owner, f.productP)).toEqual(expected)
+    // A product without requests gives an empty list, never null.
+    expect(await paths(f.ownerB, f.productR)).toHaveLength(2)
+    expect(await paths(f.ownerA, f.productQ)).toEqual([{ bucket: 'model-request-photos', path: photo(f.bizA, reqCancelled, 5), variant_id: null }])
+    await expect(h.probe(f.ownerB, 'select public.model_request_storage_paths($1)', [f.productP])).rejects.toMatchObject({ message: 'forbidden', code: '42501' })
+    await expect(h.probe(f.ownerA, 'select public.model_request_storage_paths($1)', [f.productR])).rejects.toMatchObject({ message: 'forbidden' })
+    await withTeam(TEAM_DEFAULTS, async () => {
+      await expect(h.probe(f.team, 'select public.model_request_storage_paths($1)', [f.productP])).rejects.toMatchObject({ message: 'forbidden', code: '42501' })
+    })
+    await withTeam([...TEAM_DEFAULTS, 'products.delete'], async () => {
+      expect(await paths(f.team, f.productP)).toEqual(expected)
+    })
+    await expect(h.probe(f.ownerA, 'select public.model_request_storage_paths($1)', [f.free(99)])).rejects.toMatchObject({ message: 'forbidden' })
+  })
+
+  it('refuses at aal1 when the 2FA policy is on, and anon cannot call it', async () => {
+    await h.withPolicy(false, true, async () => {
+      await expect(h.probe(f.ownerA, 'select public.model_request_storage_paths($1)', [f.productP], 'aal1')).rejects.toMatchObject({ message: 'aal2_required', code: '42501' })
+    })
+    await expect(h.probe('', 'select public.model_request_storage_paths($1)', [f.productP], null, 'anon')).rejects.toBeDefined()
+  })
+
+  it('deleting an option cascades only that option requests, photo rows and staged rows', async () => {
+    await db.query('delete from public.product_variants where id = $1', [f.variantV])
+    expect(await count('model_requests', 'id = $1', [reqOpenV])).toBe(0)
+    expect(await count('model_request_photos', 'request_id = $1', [reqOpenV])).toBe(0)
+    expect(await count('model_request_files', 'request_id = $1', [reqOpenV])).toBe(0)
+    expect(await count('model_requests', 'id = $1', [reqPlain])).toBe(1)
+    expect(await count('model_request_photos', 'request_id = $1', [reqPlain])).toBe(2)
+  })
+
+  it('deleting the product cascades its requests, photo rows and staged rows, and leaves other products alone', async () => {
+    await db.query('delete from public.products where id = $1', [f.productP])
+    expect(await count('model_requests', 'product_id = $1', [f.productP])).toBe(0)
+    expect(await count('model_request_photos', 'request_id = $1', [reqPlain])).toBe(0)
+    expect(await count('model_requests', 'id = any($1::uuid[])', [[reqCancelled, reqOther]])).toBe(2)
+    expect(await count('model_request_photos', 'request_id = any($1::uuid[])', [[reqCancelled, reqOther]])).toBe(3)
+  })
+})
 // ---- end S4 Task 8 tests ----
 
 // Fixture helpers for the later tasks' describes (referenced here so the linter sees them used before those exist).

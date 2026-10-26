@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { type EmailConfig, type LogEntry, sendAndLog } from '../_shared/email'
 import { sha256Hex } from '../_shared/http'
-import { type AccountSecurityDeps, type Factor, aalFromJwt, handleAccountSecurity } from './handler'
+import { type AccountSecurityDeps, type Factor, SWEEP_BUCKETS, aalFromJwt, handleAccountSecurity } from './handler'
 
 const OWNER = '00000000-0000-4000-8000-000000000001'
 const STAFF = '00000000-0000-4000-8000-000000000002'
@@ -610,6 +610,10 @@ describe('account-security', () => {
     expect(s.deletedUsers).toEqual([BIZ_OWNER])
     expect(s.events.at(-1)!.metadata.user_delete_failed).toBeUndefined()
     expect(s.sends.map((m) => m.to)).toEqual(['owner@sanctus.test', 'maria@studio.pt'])
+  })
+
+  it('SWEEP_BUCKETS lists product-media, business-logos and model-request-photos', () => {
+    expect([...SWEEP_BUCKETS]).toEqual(['product-media', 'business-logos', 'model-request-photos'])
   })
 
   it('complete_closure: a failed storage sweep is noted and the closure still completes', async () => {
