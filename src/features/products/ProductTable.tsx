@@ -7,10 +7,12 @@ import { Badge, ProductStatusBadge, type Tone } from '@/components/ui/Badge'
 import { type Column, DataTable } from '@/components/ui/DataTable'
 import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { Thumb } from '@/components/ui/SmartImage'
+import type { ProductRequestState } from '@/domain/modelRequests'
 import type { Business, Product, ProductAnalytics } from '@/domain/types'
 import { formatDate, formatMoney, formatNumber } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { primaryImage } from '@/lib/product'
+import { MODEL_REQUEST_BADGE_LABEL, type ModelRequestBadge, modelRequestBadge } from '../modelRequests/badge'
 import { AR_READINESS_HINT, AR_READINESS_LABEL, type ProductArReadiness, hasArModel, productArReadiness } from './productReadiness'
 import { EmbedCodeDialog } from './EmbedCodeDialog'
 import { ProductQrDialog } from './ProductQrDialog'
@@ -29,6 +31,14 @@ export function ArReadinessPill({ product }: { product: Product }) {
   )
 }
 
+const requestTone: Record<ModelRequestBadge, Tone> = { requested: 'accent', in_progress: 'warning', rejected: 'danger' }
+
+/** The product's 3D request badge (R-S4-9); nothing when there is none to show. */
+function RequestBadge({ product, state }: { product: Product; state: ProductRequestState | undefined }) {
+  const badge = modelRequestBadge(state, productArReadiness(product) === 'photos-only')
+  return badge ? <Badge tone={requestTone[badge]}>{MODEL_REQUEST_BADGE_LABEL[badge]}</Badge> : null
+}
+
 /** Stored AR launch attempts, or "No 3D" when the product has no 3D model and none were ever recorded (DUX-07). */
 export function arAttemptsText(p: Product, attempts: number | undefined): string {
   return !attempts && !hasArModel(p) ? 'No 3D' : formatNumber(attempts ?? 0)
@@ -42,6 +52,7 @@ export function ProductTable({
   products,
   businesses,
   stats,
+  requestStates,
   scope,
   showBusiness = scope === 'admin',
   loading,
@@ -52,6 +63,8 @@ export function ProductTable({
   products: Product[]
   businesses: Map<string, Business>
   stats: Map<string, ProductAnalytics>
+  /** Each product's 3D request state (business scope only; the admin list passes none and shows no badges). */
+  requestStates?: Record<string, ProductRequestState>
   scope: EditorScope
   /** Show the business column and sub-line; off when the table is already limited to one business. */
   showBusiness?: boolean
@@ -98,6 +111,7 @@ export function ProductTable({
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[length:var(--text-ui-small)] leading-[1.15] text-ink-muted">
           <span className="capitalize">{p.category}</span>
           <ArReadinessPill product={p} />
+          <RequestBadge product={p} state={requestStates?.[p.id]} />
         </span>
       </div>
     </div>
@@ -172,8 +186,9 @@ export function ProductTable({
                 <span>{formatNumber(stats.get(p.id)?.views ?? 0)} views</span>
                 {hasArModel(p) || stats.get(p.id)?.arActivations ? <span>{formatNumber(stats.get(p.id)?.arActivations ?? 0)} AR attempts</span> : null}
               </div>
-              <div className="mt-1.5">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <ArReadinessPill product={p} />
+                <RequestBadge product={p} state={requestStates?.[p.id]} />
               </div>
             </div>
             <DropdownMenu label={`Actions for ${p.name.en}`} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menuItems(p)} />

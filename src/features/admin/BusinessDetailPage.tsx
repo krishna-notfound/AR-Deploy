@@ -24,6 +24,7 @@ import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
+import { BusinessModelsCard } from '../businesses/BusinessModelsCard'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 import { closureByBusiness } from '../businesses/closure'
 import { useBusinessActions } from '../businesses/useBusinessActions'
@@ -166,7 +167,12 @@ export default function BusinessDetailPage() {
           { value: 'qr', label: 'Catalog & QR' },
         ]}
       />
-      {tab === 'details' && <BusinessForm business={b} mode="edit" />}
+      {tab === 'details' && (
+        <div className="space-y-6">
+          <BusinessForm business={b} mode="edit" />
+          <BusinessModelsCard business={b} onChanged={business.refetch} />
+        </div>
+      )}
       {tab === 'products' && (
         <Card>
           <div className="flex items-center justify-between gap-3 border-b border-line p-4">
