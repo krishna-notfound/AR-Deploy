@@ -8,7 +8,7 @@ import { DashboardContext } from '@/components/layout/dashboardContext'
 import { Monogram } from '../applications/Monogram'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import { account, service } from '@/services'
-import { ok } from '@/services/catalogService'
+import { fail, ok } from '@/services/catalogService'
 import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
 import AdminOverviewPage from './AdminOverviewPage'
 import ApplicationsPage from './ApplicationsPage'
@@ -188,7 +188,9 @@ describe('BusinessesListPage: closure requests (Owner only)', () => {
       expect(screen.queryByRole('region', { name: 'Requests without a business' })).toBeNull()
       unmount()
     }
-    expect(list).not.toHaveBeenCalled()
+    // R-W1-3: the requests are loaded for everyone with businesses.view (for the read-only badge); the filter and
+    // the orphan requests stay the Owner's.
+    expect(list).toHaveBeenCalled()
   })
 
   it('lists a closure request whose business is gone, and completes it with the action code', async () => {
@@ -213,5 +215,82 @@ describe('BusinessesListPage: closure requests (Owner only)', () => {
     expect(complete).toHaveBeenCalledWith('demo-closing-owner', DEMO_CODE)
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Requests without a business' })).toBeNull())
     expect(screen.getByRole('button', { name: 'Closure requested 0' })).toBeInTheDocument()
+  })
+})
+
+describe('BusinessesListPage: an open closure is visible and blocks activation (R-W1-3)', () => {
+  const CLOSURE_PENDING = 'This business has an open closure request. Only the platform Owner can restore it or complete it.'
+  const OAK_REQUEST = { userId: 'usr_oak', email: 'owner@oak.example', businessId: 'biz_oak', businessName: 'Oak & Ember Studio', requestedAt: '2026-10-20T10:00:00.000Z' }
+
+  /** The menu items of one business row (the desktop table; the mobile list repeats them). */
+  async function menuItemsFor(user: ReturnType<typeof userEvent.setup>, name: string) {
+    await user.click((await screen.findAllByRole('button', { name: `Actions for ${name}` }))[0]!)
+    const items = screen.getAllByRole('menuitem').map((m) => m.textContent?.trim())
+    await user.keyboard('{Escape}')
+    return items
+  }
+
+  it("'Closure requested on {date}' badge for a businesses.view user", async () => {
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([OAK_REQUEST]))
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    const badges = await screen.findAllByText(/^Closure requested on .*2026/)
+    expect(badges.length).toBeGreaterThan(0)
+    // Only on the business that asked.
+    for (const b of badges) expect(b.closest('tr, li')?.textContent).toContain('Oak & Ember Studio')
+  })
+
+  it('Activate is hidden while a request is open, with the closure_pending copy as its tooltip', async () => {
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([OAK_REQUEST]))
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    const badge = (await screen.findAllByText(/^Closure requested on /))[0]!
+    expect(badge.closest('[title]')).toHaveAttribute('title', CLOSURE_PENDING)
+    expect(await menuItemsFor(user, 'Oak & Ember Studio')).not.toContain('Activate catalog')
+    // A business without a request keeps its status action.
+    expect(await menuItemsFor(user, 'Nordhaus Living')).toContain('Deactivate catalog')
+  })
+
+  it('offers Activate for an inactive business only once the closure list has loaded without a request for it', async () => {
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([]))
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    await waitFor(async () => expect(await menuItemsFor(user, 'Oak & Ember Studio')).toContain('Activate catalog'))
+    expect(screen.queryByText(/^Closure requested on /)).toBeNull()
+  })
+
+  it('a request opened after the page loaded: Activate is refused with the closure_pending copy', async () => {
+    // The page's list is stale (no request), and the service refuses as the database does (closure_pending).
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([]))
+    vi.spyOn(service, 'setBusinessStatus').mockResolvedValue({ ok: false, error: { code: 'CONFLICT', message: CLOSURE_PENDING, reason: 'closure_pending' } })
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    await waitFor(async () => expect(await menuItemsFor(user, 'Oak & Ember Studio')).toContain('Activate catalog'))
+    await user.click((await screen.findAllByRole('button', { name: 'Actions for Oak & Ember Studio' }))[0]!)
+    await user.click(screen.getByRole('menuitem', { name: 'Activate catalog' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Activate catalog' }))
+    expect(await screen.findByText('Catalog not activated')).toBeInTheDocument()
+    expect(screen.getByText(CLOSURE_PENDING)).toBeInTheDocument()
+  })
+
+  it('while the closure list loads, Activate is not offered', async () => {
+    vi.spyOn(account, 'listClosureRequests').mockReturnValue(new Promise(() => {}))
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    expect((await screen.findAllByText('Oak & Ember Studio')).length).toBeGreaterThan(0)
+    expect(await menuItemsFor(user, 'Oak & Ember Studio')).not.toContain('Activate catalog')
+  })
+
+  it('a failed closure list shows an error with retry, and Activate comes back once it loads', async () => {
+    const list = vi.spyOn(account, 'listClosureRequests').mockResolvedValue(fail('UNKNOWN', 'Network down.'))
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    expect(await screen.findByText('Could not load the closure requests. Network down.')).toBeInTheDocument()
+    expect(await menuItemsFor(user, 'Oak & Ember Studio')).not.toContain('Activate catalog')
+    list.mockResolvedValue(ok([]))
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.queryByText(/Could not load the closure requests/)).toBeNull())
+    expect(await menuItemsFor(user, 'Oak & Ember Studio')).toContain('Activate catalog')
   })
 })

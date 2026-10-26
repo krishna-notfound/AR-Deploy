@@ -31,7 +31,7 @@ import { localDayBounds } from '@/lib/format'
 import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, isoDay, summarize } from '../analytics'
-import { type BusinessInput, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok, teamFail } from '../catalogService'
+import { type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok, teamFail } from '../catalogService'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
@@ -159,6 +159,7 @@ const ACCOUNT_RULES: Record<string, ServiceError> = {
   platform_admin_only: { code: 'PERMISSION', message: 'Only platform admins can do this.' },
   application_not_found: { code: 'NOT_FOUND', message: 'Application not found.' },
   business_not_found: { code: 'NOT_FOUND', message: 'This business no longer exists.' },
+  closure_pending: CLOSURE_PENDING_ERROR,
 }
 
 /**

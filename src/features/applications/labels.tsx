@@ -67,6 +67,7 @@ const EVENT_LABEL: Record<string, string> = {
   business_deleted: 'Business deleted',
   owner_provisioned: 'Owner provisioned',
   owner_removed: 'Owner removed',
+  account_closure_voided: 'Closure request cancelled: owner removed',
   owner_onboarding_completed: 'Owner completed onboarding',
   invitation_requested: 'Invitation requested',
   invitation_resent: 'Invitation resent',

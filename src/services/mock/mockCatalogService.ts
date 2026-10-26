@@ -8,9 +8,10 @@ import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
 import { MAX_INVITATION_ATTEMPTS, RESEND_COOLDOWN_SECONDS, applyReview } from '../applicationRules'
-import { type CatalogService, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
+import { CLOSURE_PENDING_ERROR, type CatalogService, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
 import { summarize } from '../analytics'
 import type { Db } from './db'
+import { mockClosureOpen, voidMockClosure } from './mockAccount'
 import { createMockTeam } from './mockTeam'
 import { createSeed } from './seed'
 import { store } from './store'
@@ -134,6 +135,8 @@ export const mockCatalogService: CatalogService = {
       const next: Business = { ...current, ...data, contact: { ...current.contact, ...data.contact }, id, updatedAt: nowIso() }
       const errors = validateBusiness(next, db.businesses.filter((b) => b.id !== id))
       if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
+      // The form's status field meets the same database guard as setBusinessStatus (R-W1-3).
+      if (next.status === 'active' && current.status !== 'active' && mockClosureOpen(id)) return { ok: false, error: CLOSURE_PENDING_ERROR }
       store.update((d) => {
         d.businesses = d.businesses.map((b) => (b.id === id ? next : b))
         logActivity(d, 'business_updated', `Business “${next.name}” was updated`, { businessId: id })
@@ -145,6 +148,8 @@ export const mockCatalogService: CatalogService = {
     run(() => {
       const current = store.get().businesses.find((b) => b.id === id)
       if (!current) return fail('NOT_FOUND', 'Business not found.')
+      // As the database guard (R-W1-3): no activation while the owner's closure request is open, the Owner included.
+      if (status === 'active' && current.status !== 'active' && mockClosureOpen(id)) return { ok: false, error: CLOSURE_PENDING_ERROR }
       const next: Business = { ...current, status, updatedAt: nowIso() }
       store.update((d) => {
         d.businesses = d.businesses.map((b) => (b.id === id ? next : b))
@@ -378,6 +383,9 @@ export const mockCatalogService: CatalogService = {
       store.update((d) => {
         delete d.owners![businessId]
         audit(d, { eventType: 'owner_removed', actorId: DEMO_ADMIN.id, businessId })
+        // As the database trigger (R-W1-2): the owner's closure request ends with their membership; the status stays.
+        for (const subject of voidMockClosure(businessId))
+          audit(d, { eventType: 'account_closure_voided', actorId: DEMO_ADMIN.id, businessId, metadata: { subject_id: subject, business_id: businessId, reason: 'owner_removed' } })
       })
       return ok(undefined)
     }),
