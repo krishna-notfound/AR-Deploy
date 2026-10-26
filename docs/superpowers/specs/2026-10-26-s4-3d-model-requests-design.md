@@ -512,3 +512,12 @@ The runbook tests apply → rollback → re-apply on PGlite.
 3. **Publishing before the model arrives:** a product can be published photo-only while its request is open, and the public page says nothing about a coming model.
 4. **Cancelling:** the business can cancel only until the team starts work. After that, it asks the team, who decline with a reason.
 5. **Limits and keeping photos:** 25 open requests per business, 10 MB per photo, and request photos kept until the product is deleted (so the team can revise a model). Cancelled requests' photos are deleted.
+
+## Owner decisions (2026-10-26)
+
+These override the defaults above where they differ.
+
+1. **Own upload default:** off for new businesses; on for existing businesses that already have any 3D file. Switchable per business.
+2. **Who handles requests:** the new permission `models.manage` ("Handle 3D model requests"). Admin gets it in the backfill; Team does not by default.
+3. **Publishing before the model:** a product may be published photo-only while its request is open; nothing about the request appears publicly.
+4. **Cancelling and limits:** the business can cancel only while the request is still "Requested". **There is no limit on open requests per business** (the 25-open rule in R-S4-6 is removed). The 10 MB per photo, 2–10 photos and JPG/PNG/WebP rules stay. Request photos are kept until the product is deleted, and deleted when a request is cancelled.
