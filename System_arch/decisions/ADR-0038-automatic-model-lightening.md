@@ -12,7 +12,7 @@ The owner answered client question A-2 with "yes, turn it on". ADR-0019 only dow
 - **New step, triangle reduction:** a model above 100,000 triangles is welded and simplified toward 100,000 triangles with the meshoptimizer simplifier (quadric-error edge collapse). The surface never moves more than 0.1% of the model's size (error 0.001). Textures above 2048 px are downscaled as before.
 - **Still no compression extensions:** no Draco, KTX2, meshopt, WebP or quantization, so Android AR (Scene Viewer) and WebXR can still open the file.
 - **Checks:** the result is re-read. The bounding box (true size) must stay within 0.5% of the original, with no new extensions and no new materials. Otherwise the original is kept.
-- **USDZ:** untouched. No GLB-to-USDZ conversion, ever.
+- **USDZ:** untouched. No GLB-to-USDZ conversion, ever. For iPhone (owner 2026-10-26): a product without a USDZ lets the iPhone build one from the lightened GLB when the visitor taps AR (model-viewer's own Quick Look path), with textures capped at 2048 px (`ar-usdz-max-texture-size`); a second tap never starts a second build; the editor advises removing an uploaded USDZ above 10 MB.
 - **Dependency:** `meshoptimizer` 1.2.0 (MIT), pinned exactly. It is the same library `@gltf-transform/cli` 4.5.1 uses for simplification. It loads only inside the worker chunk.
 
 ## Consequences

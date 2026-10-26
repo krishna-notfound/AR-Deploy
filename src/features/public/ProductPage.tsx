@@ -197,6 +197,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   /** Ends the pending launch ("Preparing AR…"); set by each launch. */
   const settleLaunch = useRef<() => void>(() => {})
   const [launching, setLaunching] = useState(false)
+  const activateInFlight = useRef(false)
   const startAR = async () => {
     setTipsOpen(null)
     // The viewer can lose AR after a failed hand-off (e.g. the Google app is missing): no dead button, no event (AR-04).
@@ -206,7 +207,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
       return
     }
     const now = performance.now()
-    if (launchingRef.current || now - lastLaunch.current < AR_RELAUNCH_MS) return
+    if (launchingRef.current || activateInFlight.current || now - lastLaunch.current < AR_RELAUNCH_MS) return
     launchingRef.current = true
     setLaunching(true)
     lastLaunch.current = now
@@ -258,11 +259,15 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
       }
       return
     }
+    // model-viewer may be building the iPhone file from the GLB, which can outlast the safety timeout: no second
+    // build until this one settles (AR audit 2026-10-26, M3).
+    activateInFlight.current = true
     try {
       await viewerRef.current?.activateAR()
     } catch {
       toast.error(arFailedMessage())
     } finally {
+      activateInFlight.current = false
       done()
     }
   }

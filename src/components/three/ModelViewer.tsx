@@ -161,6 +161,8 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       ar-modes="webxr scene-viewer quick-look"
       ar-scale="fixed"
       ar-placement="floor"
+      // An iPhone with no uploaded USDZ builds one from this GLB; keep its textures phone-sized (ADR-0038).
+      ar-usdz-max-texture-size="2048"
       loading="eager"
       reveal="auto"
       className={className}

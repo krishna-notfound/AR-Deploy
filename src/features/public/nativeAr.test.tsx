@@ -192,6 +192,30 @@ describe('product page: direct native AR launch on iPhone (Quick Look)', () => {
     await act(async () => settle())
     expect(await screen.findByRole('button', { name: 'View in my home' })).toBeEnabled()
   })
+
+  // AR audit 2026-10-26 (M3): building the iPhone file from a heavy GLB can take longer than the 20 s safety timeout;
+  // a second tap then started a second build at the same time (memory on the phone).
+  it('without a USDZ: a tap while the iPhone file is still being built starts no second build, even after 20 s', async () => {
+    asUserAgent(IPHONE_SAFARI)
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    let settle: () => void = () => {}
+    el.activateAR = vi.fn(() => new Promise<void>((r) => (settle = r)))
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      fireEvent.click(arButton()!)
+      await act(async () => {
+        vi.advanceTimersByTime(25_000)
+      })
+      const button = await screen.findByRole('button', { name: /View in my home|Preparing AR/ })
+      fireEvent.click(button)
+      expect(el.activateAR).toHaveBeenCalledTimes(1)
+      await act(async () => settle())
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('product page: native AR opens the public copy (ar-models) when the model has one', () => {

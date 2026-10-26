@@ -8,7 +8,7 @@ export const LARGE_MODEL_BYTES = 10 * MB
 
 export type ReadinessLevel = 'ready' | 'warning' | 'missing'
 export interface ReadinessItem {
-  key: 'viewer' | 'android' | 'ios' | 'scale' | 'size'
+  key: 'viewer' | 'android' | 'ios' | 'scale' | 'size' | 'usdzSize'
   level: ReadinessLevel
   label: string
   detail: string
@@ -86,6 +86,13 @@ export function arReadiness({
             : 'Not checked yet: needs a loaded model and width, height and depth.',
     },
   ]
+  if (hasUsdz && usdz?.sizeBytes && usdz.sizeBytes > LARGE_MODEL_BYTES)
+    items.push({
+      key: 'usdzSize',
+      level: 'warning',
+      label: 'iPhone file size',
+      detail: `${formatFileSize(usdz.sizeBytes)}: slow to open on iPhone. Remove it, and iPhones build a light one from the GLB (made lighter on upload); or upload a USDZ under ${formatFileSize(LARGE_MODEL_BYTES)}.`,
+    })
   if (hasGlb && glb?.sizeBytes && glb.sizeBytes > LARGE_MODEL_BYTES)
     items.push({ key: 'size', level: 'warning', label: 'File size', detail: `${formatFileSize(glb.sizeBytes)}: slow on mobile data. Google recommends ${formatFileSize(LARGE_MODEL_BYTES)} or less for Android AR.` })
   return items

@@ -28,6 +28,8 @@ describe('ModelViewer', () => {
     expect(el.getAttribute('ar-modes')).toBe('webxr scene-viewer quick-look')
     expect(el.getAttribute('ar-scale')).toBe('fixed')
     expect(el.getAttribute('ios-src')).toBe('https://x.test/a.usdz')
+    // The iPhone file model-viewer builds from the GLB (no USDZ uploaded) keeps textures within 2048 px (ADR-0038).
+    expect(el.getAttribute('ar-usdz-max-texture-size')).toBe('2048')
   })
 
   // AR audit 2026-10-26: model-viewer settles WebXR support asynchronously (navigator.xr.isSessionSupported). A model

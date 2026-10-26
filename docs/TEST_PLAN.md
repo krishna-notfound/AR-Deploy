@@ -34,7 +34,7 @@ Use a product with a GLB **and** a USDZ whose scale shows "True-to-size model", 
 ### iPhone / iPad (Safari)
 1. Product page loads the 3D model; tap "View in my home" → tips → "Start AR". **Expected:** Apple Quick Look opens with the USDZ.
 2. True size: measure as above. Quick Look allows pinch-scaling by default; note whether the initial size is correct.
-3. Product **without** USDZ: note what happens (model-viewer may convert the GLB; slow or failing is a finding, not a pass).
+3. Product **without** USDZ (ADR-0038): "Preparing AR…" while the iPhone builds the file from the lightened GLB, then Quick Look opens at true size. Note how long it takes; tap twice quickly: only one Quick Look.
 4. Close Quick Look: back on the page, usable.
 
 ### Both platforms

@@ -71,6 +71,17 @@ describe('arReadiness', () => {
   })
 })
 
+describe('arReadiness: iPhone file size (ADR-0038)', () => {
+  it('advises removing a heavy USDZ, since iPhones build a light one from the optimized GLB', () => {
+    const items = arReadiness({ glb, usdz: { ...usdz, sizeBytes: 12.2 * MB }, preview: 'loaded', scale: verified })
+    const item = items.find((i) => i.key === 'usdzSize')
+    expect(item?.level).toBe('warning')
+    expect(item?.detail).toMatch(/12\.2 MB/)
+    expect(item?.detail).toMatch(/Remove it/)
+    expect(arReadiness({ glb, usdz: { ...usdz, sizeBytes: 3 * MB }, preview: 'loaded', scale: verified }).some((i) => i.key === 'usdzSize')).toBe(false)
+  })
+})
+
 describe('sceneViewerWarning', () => {
   // Owner 2026-10-26: guidance, not an alarm. Say what to upload instead (a lighter model Google ARCore opens), in plain
   // words, without raw glTF extension names.
