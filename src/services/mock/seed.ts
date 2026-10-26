@@ -644,6 +644,8 @@ export function createSeed(now: number = Date.now()): Db {
     ),
     audit: seedActivity(businesses, products),
     team: createDemoTeam(now),
+    // The sample owner behind the demo's open closure request (mockAccount.ts): Oak & Ember asked to close.
+    owners: { biz_oak: { email: 'closing@demo.example', invitedAt: daysAgo(30, now), acceptedAt: daysAgo(29, now) } },
   }
 }
 

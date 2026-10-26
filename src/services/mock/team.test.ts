@@ -67,7 +67,7 @@ describe('team (demo service)', () => {
     const owner = unwrap(await svc.listMembers()).find((m) => m.role === 'owner')!
     const r = await svc.setMemberRole(owner.id, 'team')
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.error.reason).toBe('owner_protected')
+    if (!r.ok) expect(r.error.reason).toBe('self') // the Owner is the signed-in demo person (R-W8-5)
   })
 
   it('accepts the demo invitation once', async () => {
@@ -186,5 +186,48 @@ describe('team (demo service)', () => {
     expect(await members('  An@X.pt ')).toEqual(['an@x.pt'])
     expect(await members('jan@x.pt')).toEqual(['jan@x.pt'])
     expect(await members('x.pt')).toEqual([])
+  })
+})
+
+describe('team (demo service): the database rules (S1.5 R-W8-5)', () => {
+  it('checks real owner memberships: an owner email is refused, a business contact address is not', async () => {
+    unwrap(await svc.provisionOwner({ businessId: 'biz_casa', email: 'Owner@Casa.test', language: 'en' }))
+    const refused = await svc.inviteMember({ email: 'owner@casa.test', role: 'team' })
+    expect(!refused.ok && refused.error.reason).toBe('business_owner')
+    // hello@casalisboa.example is only a contact address on the business, not an owner membership.
+    expect(unwrap(await svc.inviteMember({ email: 'hello@casalisboa.example', role: 'team' })).status).toBe('sent')
+  })
+
+  it('the 6th resend in an hour is rate_limited', async () => {
+    const marta = unwrap(await svc.listMembers()).find((m) => m.email.startsWith('marta'))!
+    for (let i = 0; i < 5; i++) unwrap(await svc.resendMemberInvite(marta.id))
+    const sixth = await svc.resendMemberInvite(marta.id)
+    expect(!sixth.ok && sixth.error.reason).toBe('rate_limited')
+    expect(!sixth.ok && sixth.error.code).toBe('RATE_LIMITED')
+  })
+
+  it("self refusal: the signed-in person can't change, deactivate or remove their own row", async () => {
+    const owner = unwrap(await svc.listMembers()).find((m) => m.role === 'owner')!
+    for (const r of [await svc.setMemberRole(owner.id, 'team'), await svc.deactivateMember(owner.id), await svc.removeMember(owner.id)]) {
+      expect(!r.ok && r.error.reason).toBe('self')
+    }
+  })
+
+  it('a removed demo Admin has no platform access (as my_platform_access)', async () => {
+    const ana = unwrap(await svc.listMembers()).find((m) => m.email.startsWith('ana.'))!
+    unwrap(await svc.deactivateMember(ana.id))
+    unwrap(await svc.removeMember(ana.id))
+    as('admin')
+    expect(unwrap(await svc.getMyAccess())).toBeNull()
+  })
+
+  it('access history filtered as R-W6-4: one member by exact id, a denied actor by exact user id', async () => {
+    const marta = unwrap(await svc.listMembers()).find((m) => m.email.startsWith('marta'))!
+    const mine = unwrap(await svc.getAccessEvents({ memberId: marta.id })).items
+    expect(mine.length).toBeGreaterThan(0)
+    expect(mine.every((e) => e.member?.startsWith('marta'))).toBe(true)
+    const denied = unwrap(await svc.getAccessEvents({ userId: 'usr_mem_joao' })).items
+    expect(denied.map((e) => e.action)).toEqual(['denied'])
+    expect(unwrap(await svc.getAccessEvents({ memberId: 'nobody' })).items).toEqual([])
   })
 })

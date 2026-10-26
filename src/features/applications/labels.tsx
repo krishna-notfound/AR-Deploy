@@ -56,7 +56,12 @@ export const EMAIL_KIND_LABEL: Record<string, string> = {
   invitation_resend: 'Invitation resent',
   application_confirmation: 'Application confirmation',
   application_decision: 'Application decision',
-  business_notice: 'Notice to the business owner',
+  business_notice: 'Business notice',
+  team_invitation: 'Team invitation',
+  security_code: 'Security code',
+  security_notice: 'Security notice',
+  closure_request: 'Closure request',
+  team_notice: 'Team notice',
   admin_notification: 'Admin notification',
   test: 'Test email',
 }

@@ -196,7 +196,8 @@ describe('BusinessesListPage: closure requests (Owner only)', () => {
   })
 
   it('lists a closure request whose business is gone, and completes it with the action code', async () => {
-    // The demo request names a business that is not on the platform (as after a partly finished closure).
+    // The request names a business that is not on the platform (as after a partly finished closure).
+    await service.deleteBusiness('biz_oak')
     const e = await account.startTotpEnrollment()
     if (!e.ok) throw new Error('enrollment did not start')
     await account.confirmTotpEnrollment(e.data.factorId, DEMO_CODE)
@@ -215,7 +216,7 @@ describe('BusinessesListPage: closure requests (Owner only)', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Complete closure' }))
     // S1.5 R-W7-6: demo mode sends no email, and the toast says so.
     expect(await screen.findByText('Closure completed, but the notice email was not sent: Demo mode: no email is sent.')).toBeInTheDocument()
-    expect(complete).toHaveBeenCalledWith('demo-closing-owner', DEMO_CODE)
+    expect(complete).toHaveBeenCalledWith('demo-owner-biz_oak', DEMO_CODE)
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Requests without a business' })).toBeNull())
     expect(screen.getByRole('button', { name: 'Closure requested 0' })).toBeInTheDocument()
   })

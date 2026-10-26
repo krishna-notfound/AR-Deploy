@@ -98,3 +98,20 @@ describe('demo service (R-W5-4)', () => {
     expect(after.data.byProduct.some((p) => p.productId === top.productId)).toBe(false)
   })
 })
+
+describe('summarize: rows outside the series (S1.5 R-W8-3)', () => {
+  it("summarize skips rows whose day isn't in the series", () => {
+    const s = summarize(
+      base({
+        dailyStats: [stat('p1', 'b1', '2026-10-26', 5), stat('p1', 'b1', '2026-01-01', 900), stat(null, 'b1', '2026-01-01', 700)],
+        events: [{ productId: 'p1', businessId: 'b1', type: 'view', at: '2025-01-01T10:00:00Z' }],
+      }),
+      'b1',
+      NOW,
+      false,
+    )
+    expect(s.totals.views).toBe(5)
+    expect(s.deletedProducts).toBeNull()
+    expect(s.byProduct.find((p) => p.productId === 'p1')?.views).toBe(5)
+  })
+})

@@ -60,6 +60,12 @@ function denied(what: string): boolean {
   return true
 }
 
+/** Whether this row is the demo person signed in: the database refuses to change your own access (`self`). */
+const isSelf = (m: PlatformMember) => {
+  const role = demoPlatformRole()
+  return !!role && !!m.userId && m.userId === DEMO_VIEWER[role]
+}
+
 function withInvite(t: DemoTeam, m: PlatformMember): PlatformMember {
   const latest = t.invites[m.id]?.[0]
   return { ...m, invite: latest ? { status: effective(latest), expiresAt: latest.expiresAt } : null }
@@ -139,6 +145,8 @@ export function createMockTeam(run: Run): TeamMethods {
         const t = store.get().team ?? createDemoTeam()
         // The demo Admin and Team are sample members: deactivated on Team & Access, they are told so (S1.5 R-W6-7).
         const me = t.members.find((m) => m.userId === DEMO_VIEWER[role])
+        // A removed Admin or Team has no member row, so no access (as my_platform_access).
+        if (role !== 'owner' && !me) return ok<PlatformAccess | null>(null)
         if (role !== 'owner' && me?.status === 'deactivated') return ok<PlatformAccess | null>({ role: null, permissions: [], status: 'deactivated' })
         return ok<PlatformAccess | null>({ role, permissions: role === 'owner' ? [...ALL_PERMISSIONS] : [...t.rolePermissions[role]], status: 'active' })
       }),
@@ -182,7 +190,8 @@ export function createMockTeam(run: Run): TeamMethods {
         const existing = t.members.find((m) => m.email === clean)
         if (existing?.role === 'owner') return teamFail('owner_protected')
         if (existing && !(existing.status === 'deactivated' && !existing.userId)) return teamFail('already_member')
-        if (db.businesses.some((b) => b.contact.email?.toLowerCase() === clean)) return teamFail('business_owner')
+        // A real owner membership (business_members), not a business's contact address.
+        if (Object.values(db.owners ?? {}).some((o) => o.email.toLowerCase() === clean)) return teamFail('business_owner')
         let outcome: InviteOutcome | undefined
         store.update((d) => {
           const tt = team(d)
@@ -204,6 +213,9 @@ export function createMockTeam(run: Run): TeamMethods {
         const m = team(store.get()).members.find((x) => x.id === id)
         if (!m) return teamFail('not_found')
         if (m.status !== 'invited') return teamFail('not_invited')
+        // As service_create_member_invite: at most 5 invitations per member in an hour.
+        const hourAgo = Date.now() - 3_600_000
+        if ((team(store.get()).invites[id] ?? []).filter((i) => Date.parse(i.createdAt) > hourAgo).length >= 5) return teamFail('rate_limited')
         let outcome: InviteOutcome | undefined
         store.update((d) => {
           outcome = issueInvite(team(d), team(d).members.find((x) => x.id === id)!)
@@ -231,6 +243,7 @@ export function createMockTeam(run: Run): TeamMethods {
         if (denied('change a role')) return teamFail('forbidden')
         const m = team(store.get()).members.find((x) => x.id === id)
         if (!m) return teamFail('not_found')
+        if (isSelf(m)) return teamFail('self')
         if (m.role === 'owner') return teamFail('owner_protected')
         if (m.role === role) return ok(undefined)
         store.update((d) => {
@@ -246,6 +259,7 @@ export function createMockTeam(run: Run): TeamMethods {
         if (denied('deactivate a member')) return teamFail('forbidden')
         const m = team(store.get()).members.find((x) => x.id === id)
         if (!m) return teamFail('not_found')
+        if (isSelf(m)) return teamFail('self')
         if (m.role === 'owner') return teamFail('owner_protected')
         if (m.status === 'deactivated') return ok({})
         store.update((d) => {
@@ -277,6 +291,7 @@ export function createMockTeam(run: Run): TeamMethods {
         if (denied('remove a member')) return teamFail('forbidden')
         const m = team(store.get()).members.find((x) => x.id === id)
         if (!m) return teamFail('not_found')
+        if (isSelf(m)) return teamFail('self')
         if (m.role === 'owner') return teamFail('owner_protected')
         if (m.status !== 'deactivated') return teamFail('not_deactivated')
         store.update((d) => {

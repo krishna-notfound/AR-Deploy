@@ -210,13 +210,14 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
     await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
     await user.click(within(dialog).getByRole('button', { name: 'Complete closure' }))
     expect(await screen.findByRole('heading', { name: 'Businesses list' })).toBeInTheDocument()
-    expect(complete).toHaveBeenCalledWith('demo-closing-owner', DEMO_CODE)
+    expect(complete).toHaveBeenCalledWith('demo-owner-biz_oak', DEMO_CODE)
     // S1.5 R-W7-6: demo mode sends no email, and the toast says so.
     expect(screen.getByText('Closure completed, but the notice email was not sent: Demo mode: no email is sent.')).toBeInTheDocument()
     cleanup()
 
     // Restore: confirmed, then the banner is gone.
     resetMockAccount()
+    await service.resetDemoData() // Complete deleted the business
     await ownerAtAal2()
     renderAt('biz_oak')
     const banner2 = await screen.findByRole('region', { name: 'Closure requested' })
@@ -253,7 +254,7 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
     renderAt('biz_oak')
     const banner = await screen.findByRole('region', { name: 'Closure requested' })
     // Handled elsewhere (another tab) after this page loaded.
-    expect((await account.restoreClosure('demo-closing-owner')).ok).toBe(true)
+    expect((await account.restoreClosure('demo-owner-biz_oak')).ok).toBe(true)
     await user.click(within(banner).getByRole('button', { name: 'Restore' }))
     await user.click(within(await screen.findByRole('dialog', { name: 'Restore Oak & Ember Studio?' })).getByRole('button', { name: 'Restore' }))
     expect(await screen.findByText('This closure was already handled.')).toBeInTheDocument()
@@ -270,7 +271,7 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
     await user.click(within(banner).getByRole('button', { name: 'Complete closure' }))
     const dialog = await screen.findByRole('dialog', { name: 'Complete closure of Oak & Ember Studio?' })
     await within(dialog).findByText(/We emailed a 6-digit code/)
-    expect((await account.restoreClosure('demo-closing-owner')).ok).toBe(true)
+    expect((await account.restoreClosure('demo-owner-biz_oak')).ok).toBe(true)
     await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
     await user.click(within(dialog).getByRole('button', { name: 'Complete closure' }))
     expect(await screen.findByText('This closure was already handled.')).toBeInTheDocument()

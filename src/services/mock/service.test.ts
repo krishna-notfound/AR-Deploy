@@ -336,39 +336,35 @@ describe('business applications and owner access (demo, ADR-0024)', () => {
 })
 
 describe('closure rules (S1.5 Task 3, as the database: R-W1-2, R-W1-3)', () => {
-  // The demo's one closure request names 'demo-business'; give it a business and an owner here.
+  // The demo's one closure request names the seeded, inactive Oak & Ember and its sample owner (R-W8-2).
   beforeEach(() => {
     resetMockAccount()
-    store.update((d) => {
-      const oak = d.businesses.find((b) => b.id === 'biz_oak')!
-      d.businesses.push({ ...oak, id: 'demo-business', slug: 'demo-closing', name: 'Demo closing business', status: 'inactive' })
-      ;(d.owners ??= {})['demo-business'] = { email: 'closing@demo.example', invitedAt: '2026-10-01T10:00:00.000Z', acceptedAt: '2026-10-02T10:00:00.000Z' }
-    })
+    store.replace(createSeed())
   })
 
   it("setBusinessStatus(…, 'active') refuses with closure_pending while a request is open; draft is allowed", async () => {
-    const r = await svc.setBusinessStatus('demo-business', 'active')
+    const r = await svc.setBusinessStatus('biz_oak', 'active')
     expect(r.ok === false && r.error).toEqual({
       code: 'CONFLICT',
       message: 'This business has an open closure request. Only the platform Owner can restore it or complete it.',
       reason: 'closure_pending',
     })
-    expect(unwrap(await svc.setBusinessStatus('demo-business', 'draft')).status).toBe('draft')
+    expect(unwrap(await svc.setBusinessStatus('biz_oak', 'draft')).status).toBe('draft')
     // The edit form's status field too.
-    const viaForm = await svc.updateBusiness('demo-business', { status: 'active' })
+    const viaForm = await svc.updateBusiness('biz_oak', { status: 'active' })
     expect(viaForm.ok === false && viaForm.error.reason).toBe('closure_pending')
   })
 
   it('removeBusinessMember voids the request (account_closure_voided), keeps the status, and activation works again', async () => {
-    unwrap(await svc.removeBusinessMember('demo-business', 'demo-owner-demo-business'))
+    unwrap(await svc.removeBusinessMember('biz_oak', 'demo-owner-biz_oak'))
     expect(unwrap(await mockAccountService.listClosureRequests())).toEqual([])
     const audit = store.get().audit ?? []
     expect(audit.find((e) => e.eventType === 'account_closure_voided')).toMatchObject({
-      businessId: 'demo-business',
-      metadata: { subject_id: 'demo-closing-owner', business_id: 'demo-business', reason: 'owner_removed' },
+      businessId: 'biz_oak',
+      metadata: { subject_id: 'demo-owner-biz_oak', business_id: 'biz_oak', reason: 'owner_removed' },
     })
-    expect(unwrap(await svc.getBusinessById('demo-business')).status).toBe('inactive')
-    expect(unwrap(await svc.setBusinessStatus('demo-business', 'active')).status).toBe('active')
+    expect(unwrap(await svc.getBusinessById('biz_oak')).status).toBe('inactive')
+    expect(unwrap(await svc.setBusinessStatus('biz_oak', 'active')).status).toBe('active')
   })
 })
 
@@ -499,5 +495,93 @@ describe('history and owner notices (S1.5 Task 11: R-W7-1, R-W7-2)', () => {
     expect(rows.map((e) => e.eventType)).toEqual(expect.arrayContaining(['business_deleted', 'business_status_changed']))
     for (const e of rows) expect(e).toMatchObject({ businessName: name, businessDeleted: true })
     expect(rows.filter((e) => e.eventType.startsWith('business_') && e.eventType !== 'business_created').map((e) => e.actorLabel)).toEqual(['Owner', 'Owner'])
+  })
+})
+
+describe('closure demo parity (S1.5 Task 14, R-W8-2)', () => {
+  beforeEach(() => {
+    resetMockAccount()
+    store.replace(createSeed())
+  })
+  const aal2 = async () => {
+    const e = unwrap(await mockAccountService.startTotpEnrollment())
+    unwrap(await mockAccountService.confirmTotpEnrollment(e.factorId, '123456'))
+  }
+
+  it("the seed request's business exists and its owner is the one the owner list shows", async () => {
+    const [req] = unwrap(await mockAccountService.listClosureRequests())
+    expect(unwrap(await svc.getBusinessById(req!.businessId!)).name).toBe(req!.businessName)
+    expect(unwrap(await svc.getBusinessMembers(req!.businessId!)).map((m) => m.userId)).toEqual([req!.userId])
+  })
+
+  it('a business account request sets inactive and remembers the status; cancel restores it', async () => {
+    localStorage.setItem('arfurn:account', JSON.stringify({ role: 'business_admin', businessId: 'biz_nord' }))
+    unwrap(await mockAccountService.requestClosure('123456'))
+    expect(unwrap(await svc.getBusinessById('biz_nord')).status).toBe('inactive')
+    unwrap(await mockAccountService.cancelClosure())
+    expect(unwrap(await svc.getBusinessById('biz_nord')).status).toBe('active')
+    // A draft chosen while the request is open is the one to restore.
+    unwrap(await mockAccountService.requestClosure('123456'))
+    unwrap(await svc.setBusinessStatus('biz_nord', 'draft'))
+    unwrap(await mockAccountService.cancelClosure())
+    expect(unwrap(await svc.getBusinessById('biz_nord')).status).toBe('draft')
+  })
+
+  it('Restore puts the status back; Complete deletes the business, its owner and its products', async () => {
+    await aal2()
+    const [req] = unwrap(await mockAccountService.listClosureRequests())
+    unwrap(await mockAccountService.restoreClosure(req!.userId))
+    expect(unwrap(await svc.getBusinessById('biz_oak')).status).toBe('inactive')
+
+    resetMockAccount()
+    await aal2()
+    unwrap(await mockAccountService.completeClosure(req!.userId, '123456'))
+    const gone = await svc.getBusinessById('biz_oak')
+    expect(!gone.ok && gone.error.code).toBe('NOT_FOUND')
+    expect(store.get().products.some((p) => p.businessId === 'biz_oak')).toBe(false)
+    expect(store.get().owners?.biz_oak).toBeUndefined()
+    expect(unwrap(await mockAccountService.listClosureRequests())).toEqual([])
+  })
+
+  it('the mock leaves platform_security_policy_changed out of Security activity', async () => {
+    await aal2()
+    unwrap(await mockAccountService.updatePlatformSettings({ require2faStaff: true }))
+    const types = unwrap(await mockAccountService.listSecurityEvents()).map((e) => e.type)
+    expect(types).not.toContain('platform_security_policy_changed')
+  })
+})
+
+describe('record event parity (S1.5 Task 14, R-W8-4)', () => {
+  const event = (productId: string, type: 'view' | 'ar_activation' | 'model_interaction' = 'view', businessId = 'biz_casa') =>
+    svc.recordEvent({ productId, businessId, type })
+
+  it('refuses an unpublished product, an inactive business, an AR event with no model (VALIDATION), and the 31st event in a minute (RATE_LIMITED)', async () => {
+    const products = store.get().products
+    const draft = products.find((p) => p.businessId === 'biz_casa' && p.status === 'draft')!
+    const noModel = products.find((p) => p.businessId === 'biz_casa' && p.status === 'published' && !p.models.glb && !p.models.usdz && p.variants.every((v) => !v.models?.glb))
+    const inactive = products.find((p) => p.businessId === 'biz_oak')!
+    const live = products.find((p) => p.businessId === 'biz_casa' && p.status === 'published' && p.models.glb)!
+    for (const r of [await event(draft.id), await event(inactive.id, 'view', 'biz_oak'), await event(live.id, 'view', 'biz_nord')]) {
+      expect(!r.ok && r.error.code).toBe('VALIDATION')
+    }
+    if (noModel) {
+      const ar = await event(noModel.id, 'ar_activation')
+      expect(!ar.ok && ar.error.code).toBe('VALIDATION')
+      expect((await event(noModel.id, 'view')).ok).toBe(true)
+    }
+    store.update((d) => void (d.events = []))
+    for (let i = 0; i < 30; i++) unwrap(await event(live.id, 'ar_activation'))
+    const thirty1 = await event(live.id)
+    expect(!thirty1.ok && thirty1.error.code).toBe('RATE_LIMITED')
+  })
+})
+
+describe('mock invitation email (S1.5 Task 14, R-W8-6)', () => {
+  it("the mock resend subject is 'New invitation code'", async () => {
+    unwrap(await svc.provisionOwner({ businessId: 'biz_casa', email: 'owner@casa.test', language: 'en' }))
+    store.update((d) => void (d.ownerInviteAttempts = []))
+    unwrap(await svc.resendOwnerInvitation('biz_casa', 'en'))
+    const mail = (store.get().emails ?? []).find((e) => e.kind === 'invitation_resend')
+    expect(mail?.subject).toMatch(/^New invitation code/)
   })
 })
