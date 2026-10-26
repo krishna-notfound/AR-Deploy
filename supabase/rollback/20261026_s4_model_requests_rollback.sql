@@ -23,6 +23,7 @@ begin;
 -- =============================================================================
 -- S4 Task 8 rollback: Clean-up with the product, the option, the business and the closure (R-S4-18)
 -- =============================================================================
+drop function public.model_request_storage_paths(uuid);
 -- ---- end S4 Task 8 rollback ----
 
 -- =============================================================================

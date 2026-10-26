@@ -4,6 +4,7 @@ import type { ProductInput, Result } from '../catalogService'
 import { isValidDb } from './db'
 import { mockCatalogService as svc } from './mockCatalogService'
 import { createSeed } from './seed'
+import { sessionRequestMedia } from './mockModelRequestShared'
 import { DB_KEY, store } from './store'
 import { mockAccountService, resetMockAccount } from './mockAccount'
 
@@ -586,5 +587,59 @@ describe('mock invitation email (S1.5 Task 14, R-W8-6)', () => {
     unwrap(await svc.resendOwnerInvitation('biz_casa', 'en'))
     const mail = (store.get().emails ?? []).find((e) => e.kind === 'invitation_resend')
     expect(mail?.subject).toMatch(/^New invitation code/)
+  })
+})
+
+describe('S4 Task 8: request files are cleaned up (R-S4-18)', () => {
+  const request = (id: string, productId: string, businessId: string, variantId?: string) => ({
+    id, businessId, productId, ...(variantId ? { variantId } : {}), status: 'requested' as const,
+    createdAt: '2026-10-26T10:00:00.000Z', updatedAt: '2026-10-26T10:00:00.000Z', photos: [],
+  })
+  const seedSession = (id: string) => {
+    sessionRequestMedia.photos.set(id, [`blob:photo-${id}`])
+    sessionRequestMedia.staged.set(id, { glb: { url: `blob:glb-${id}`, fileName: 'm.glb', sizeBytes: 1 } } as never)
+  }
+
+  it('deleting a product or business removes its requests and revokes their session photo URLs', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    try {
+      const mine = unwrap(await svc.getProductsByBusiness('biz_casa'))
+      const other = unwrap(await svc.getProductsByBusiness('biz_nord'))[0]!
+      store.update((d) => {
+        d.modelRequests = [request('r_prod', mine[0]!.id, 'biz_casa'), request('r_prod2', mine[1]!.id, 'biz_casa'), request('r_other', other.id, 'biz_nord')]
+      })
+      for (const id of ['r_prod', 'r_prod2', 'r_other']) seedSession(id)
+      unwrap(await svc.deleteProduct(mine[0]!.id))
+      expect(store.get().modelRequests!.map((r) => r.id)).toEqual(['r_prod2', 'r_other'])
+      expect(revoke).toHaveBeenCalledWith('blob:photo-r_prod')
+      expect(revoke).toHaveBeenCalledWith('blob:glb-r_prod')
+      expect(sessionRequestMedia.photos.has('r_prod')).toBe(false)
+      unwrap(await svc.deleteBusiness('biz_casa'))
+      expect(store.get().modelRequests!.map((r) => r.id)).toEqual(['r_other'])
+      expect(revoke).toHaveBeenCalledWith('blob:photo-r_prod2')
+      expect(sessionRequestMedia.photos.has('r_other')).toBe(true)
+      expect(revoke).not.toHaveBeenCalledWith('blob:photo-r_other')
+    } finally {
+      revoke.mockRestore()
+    }
+  })
+
+  it('saving a product without an option removes only the requests of that option', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    try {
+      const p = unwrap(await svc.getProductsByBusiness('biz_casa')).find((x) => x.variants.length >= 2)!
+      const [gone, kept] = p.variants
+      store.update((d) => {
+        d.modelRequests = [request('r_gone', p.id, 'biz_casa', gone!.id), request('r_kept', p.id, 'biz_casa', kept!.id), request('r_whole', p.id, 'biz_casa')]
+      })
+      for (const id of ['r_gone', 'r_kept', 'r_whole']) seedSession(id)
+      unwrap(await svc.updateProduct(p.id, { variants: p.variants.filter((v) => v.id !== gone!.id) }))
+      expect(store.get().modelRequests!.map((r) => r.id)).toEqual(['r_kept', 'r_whole'])
+      expect(revoke).toHaveBeenCalledWith('blob:photo-r_gone')
+      expect(revoke).not.toHaveBeenCalledWith('blob:photo-r_kept')
+      expect(revoke).not.toHaveBeenCalledWith('blob:photo-r_whole')
+    } finally {
+      revoke.mockRestore()
+    }
   })
 })

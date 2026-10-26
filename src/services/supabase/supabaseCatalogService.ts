@@ -41,6 +41,7 @@ import { type AuditEntry, type BusinessInput, CLOSURE_PENDING_ERROR, type Catalo
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
+const REQUEST_PHOTO_BUCKET = 'model-request-photos'
 export const LOGO_BUCKET = 'business-logos'
 export const TRACK_EVENT_FUNCTION = 'track-event'
 export const NOTIFY_OWNER_FUNCTION = 'notify-business-owner'
@@ -681,10 +682,11 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
    * Empties `folder`. Lists every page of 1000 first (removing while listing would shift the offsets), then removes
    * each page. A page that cannot be listed counts as one failed file: the real number is unknown, never zero.
    */
-  async function removeFolder(bucket: string, folder: string): Promise<{ removed: number; failed: number; handled: Set<string> }> {
+  async function removeFolder(bucket: string, folder: string): Promise<{ removed: number; failed: number; handled: Set<string>; subfolders: string[] }> {
     const PAGE = 1000
     const pages: string[][] = []
     const handled = new Set<string>()
+    const subfolders: string[] = []
     let failed = 0
     for (let offset = 0; ; offset += PAGE) {
       const { data, error } = await sb.storage.from(bucket).list(folder, { limit: PAGE, offset })
@@ -693,6 +695,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         break
       }
       const files = data.filter((f) => f.id).map((f) => `${folder}/${f.name}`)
+      subfolders.push(...data.filter((f) => !f.id).map((f) => `${folder}/${f.name}`))
       if (files.length) pages.push(files)
       for (const f of files) handled.add(f)
       if (data.length < PAGE) break
@@ -703,7 +706,52 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       if (error) failed += files.length
       else removed += files.length
     }
-    return { removed, failed, handled }
+    return { removed, failed, handled, subfolders }
+  }
+
+  /** Empties `folder` and each request subfolder one level below it (request photos: {business}/{request}/{file}). */
+  async function removeFolderWithSubfolders(bucket: string, folder: string): Promise<{ removed: number; failed: number }> {
+    const top = await removeFolder(bucket, folder)
+    let removed = top.removed
+    let failed = top.failed
+    for (const sub of top.subfolders) {
+      const inner = await removeFolder(bucket, sub)
+      removed += inner.removed
+      failed += inner.failed
+    }
+    return { removed, failed }
+  }
+
+  /**
+   * R-S4-18: the request photos and staged model files of a product, from model_request_storage_paths. Read before the
+   * rows go (the cascade removes the request rows that name them). null when they could not be read.
+   */
+  async function requestFilePaths(productId: ID): Promise<{ bucket: string; path: string; variantId: string | null }[] | null> {
+    const { data, error } = await sb.rpc('model_request_storage_paths', { p_product: productId })
+    if (error) return null
+    if (!Array.isArray(data)) return []
+    return data.flatMap((row) => {
+      const r = row as { bucket?: unknown; path?: unknown; variant_id?: unknown }
+      return typeof r.bucket === 'string' && typeof r.path === 'string' ? [{ bucket: r.bucket, path: r.path, variantId: typeof r.variant_id === 'string' ? r.variant_id : null }] : []
+    })
+  }
+
+  /**
+   * Removes exactly the paths given (never a folder): photos from model-request-photos, staged files from product-media
+   * unless another row still references them. Best effort; the counts are exact.
+   */
+  async function removeRequestFiles(files: { bucket: string; path: string }[]): Promise<{ removed: number; failed: number }> {
+    const photos = [...new Set(files.filter((f) => f.bucket === REQUEST_PHOTO_BUCKET).map((f) => f.path))]
+    const staged = files.filter((f) => f.bucket === MEDIA_BUCKET).map((f) => f.path)
+    let removed = 0
+    let failed = 0
+    if (photos.length) {
+      const { error } = await sb.storage.from(REQUEST_PHOTO_BUCKET).remove(photos)
+      if (error) failed += photos.length
+      else removed += photos.length
+    }
+    const media = await removeUnreferencedMedia(staged)
+    return { removed: removed + media.removed, failed: failed + media.failed }
   }
 
   async function saveProduct(id: ID | null, input: ProductInput): Promise<Result<Product>> {
@@ -878,8 +926,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (error) return mapDbError(error)
         if (!data.length) return refusedOrMissing('businesses', { id }, 'Business not found.')
         // Rows cascade in the database; files live in Storage and are removed here (folder = business id).
-        const [media, logos] = await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id)])
-        const sweep: StorageSweep = { removedFiles: media.removed + logos.removed, failedFiles: media.failed + logos.failed }
+        const [media, logos, photos] = await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id), removeFolderWithSubfolders(REQUEST_PHOTO_BUCKET, id)])
+        const sweep: StorageSweep = { removedFiles: media.removed + logos.removed + photos.removed, failedFiles: media.failed + logos.failed + photos.failed }
         const logo = current.ok ? ownedLogoPath(current.data.logoUrl, id) : null
         // The folder sweep already counted a logo it listed; only a logo it could not list is removed (and counted) here.
         if (logo && !logos.handled.has(logo)) {
@@ -940,8 +988,21 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           const pubErrors = validateForPublish(next)
           if (Object.keys(pubErrors).length) return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
         }
+        // R-S4-18: an option this save drops takes its requests with it (cascade), so read their files first.
+        const droppingOptions = current.data.variants.some((v) => !next.variants.some((n) => n.id === v.id))
+        const requestFiles = droppingOptions ? await requestFilePaths(id) : null
+        // The Result<Product> cannot carry a sweep, so photos that cannot be located are named in the console, never dropped silently.
+        if (droppingOptions && !requestFiles) console.warn('updateProduct: the request files of a removed option could not be read, so they were not removed.')
         const saved = await saveProduct(id, next)
-        if (saved.ok) await removeUnreferencedMedia(mediaPaths(current.data))
+        if (saved.ok) {
+          await removeUnreferencedMedia(mediaPaths(current.data))
+          const kept = new Set(saved.data.variants.map((v) => v.id))
+          const dropped = requestFiles?.filter((f) => f.variantId && !kept.has(f.variantId)) ?? []
+          if (dropped.length) {
+            const swept = await removeRequestFiles(dropped)
+            if (swept.failed) console.warn(`updateProduct: ${swept.failed} request file(s) of a removed option could not be removed.`)
+          }
+        }
         return changed(saved)
       }),
     duplicateProduct: (id) =>
@@ -958,6 +1019,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     deleteProduct: (id) =>
       guard(async () => {
         const current = await productById(id)
+        const requestFiles = await requestFilePaths(id) // R-S4-18: read before the rows cascade away
         const { data, error } = await sb.from('products').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
         if (!data.length) return refusedOrMissing('products', { id }, 'Product not found.')
@@ -966,6 +1028,12 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           notifyOwner(current.data.businessId)
           const media = await removeUnreferencedMedia(mediaPaths(current.data))
           sweep = { removedFiles: media.removed, failedFiles: media.failed }
+        }
+        // Unreadable paths are reported as one failed file (the real number is unknown, never zero).
+        if (!requestFiles) sweep.failedFiles += 1
+        else if (requestFiles.length) {
+          const files = await removeRequestFiles(requestFiles)
+          sweep = { removedFiles: sweep.removedFiles + files.removed, failedFiles: sweep.failedFiles + files.failed }
         }
         return changed(ok(sweep))
       }),

@@ -502,4 +502,44 @@ alter table public.email_log add constraint email_log_kind_check
 -- =============================================================================
 -- S4 Task 8: Clean-up with the product, the option, the business and the closure (R-S4-18)
 -- =============================================================================
+-- model_request_storage_paths: the request photo paths and staged model paths of a product, read before its row
+-- delete so the service can remove the files after it. Photos live in model-request-photos, staged files in
+-- product-media; variant_id is the request's option (null for a product-level request).
+create function public.model_request_storage_paths(p_product uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_business uuid;
+begin
+  if not public.caller_mfa_satisfied() then
+    raise exception 'aal2_required' using errcode = '42501';
+  end if;
+  select business_id into v_business from public.products where id = p_product;
+  if not (public.is_business_member(v_business) or public.platform_can('products.delete')) then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  return coalesce((
+    select jsonb_agg(x.item order by x.bucket, x.path)
+      from (
+        select 'model-request-photos' as bucket, ph.storage_path as path,
+               jsonb_build_object('bucket', 'model-request-photos', 'path', ph.storage_path, 'variant_id', r.variant_id) as item
+          from public.model_request_photos ph
+          join public.model_requests r on r.id = ph.request_id
+         where r.product_id = p_product
+        union all
+        select 'product-media', f.storage_path,
+               jsonb_build_object('bucket', 'product-media', 'path', f.storage_path, 'variant_id', r.variant_id)
+          from public.model_request_files f
+          join public.model_requests r on r.id = f.request_id
+         where r.product_id = p_product
+      ) x
+  ), '[]'::jsonb);
+end;
+$$;
+revoke execute on function public.model_request_storage_paths(uuid) from public, anon;
+grant execute on function public.model_request_storage_paths(uuid) to authenticated, service_role;
 -- ---- end S4 Task 8 ----
