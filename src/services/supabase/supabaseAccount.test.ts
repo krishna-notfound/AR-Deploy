@@ -511,7 +511,6 @@ describe('Supabase account service', () => {
       rpc: {
         list_my_security_events: { data: [{ id: 'e1', event_type: 'account_signed_in', created_at: '2026-10-25T09:00:00Z', metadata: { user_agent: 'Firefox', ip: '1.2.3.4' } }, { id: 'e2', event_type: 'account_password_changed', created_at: '2026-10-24T09:00:00Z', metadata: {} }, { id: 'e3', event_type: 'account_deleted', created_at: '2026-10-23T09:00:00Z', metadata: { delete_failed: true } }] },
         admin_list_closure_requests: { data: [{ user_id: 'u2', email: 'b@x.pt', business_id: 'b2', business_name: 'Casa', requested_at: '2026-10-20T00:00:00Z' }] },
-        cancel_account_closure: { data: { error: 'not_found' } },
         record_sign_in: { data: 'rate_limited' },
       },
     })
@@ -525,8 +524,12 @@ describe('Supabase account service', () => {
       ],
     })
     expect(await a.listClosureRequests()).toEqual({ ok: true, data: [{ userId: 'u2', email: 'b@x.pt', businessId: 'b2', businessName: 'Casa', requestedAt: '2026-10-20T00:00:00Z' }] })
-    const c = await a.cancelClosure()
+    // S1.5 R-W7-9: cancelling goes through account-security (cancel_closure), not the RPC.
+    const cancelled = fake({ invoke: { data: { ok: false, error: 'not_found' } } })
+    const c = await account(cancelled).cancelClosure()
     expect(!c.ok && c.error.reason).toBe('not_found')
+    expect(cancelled.invoke).toHaveBeenCalledWith('account-security', { body: { action: 'cancel_closure' } })
+    expect(cancelled.rpc).not.toHaveBeenCalledWith('cancel_account_closure', undefined)
 
     // Without businesses.view the function answers {"error":"forbidden"} (an object, not an array).
     const refused = fake({ rpc: { admin_list_closure_requests: { data: { error: 'forbidden' } } } })

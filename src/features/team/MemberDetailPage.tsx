@@ -14,14 +14,13 @@ import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { MemberRole, PlatformMember } from '@/domain/types'
 import { formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
-import { useToast } from '@/components/ui/ToastProvider'
 import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ActionCodeDialog } from '../settings/ActionCodeDialog'
 import { AccessHistory } from './AccessHistory'
 import { PERMISSION_GROUPS, ROLE_LABEL } from './permissions'
 import { InviteStatusBadge, MemberStatusBadge, RoleBadge } from './teamLabels'
-import { useMemberActions } from './useMemberActions'
+import { useMemberActions, useNoticeToast } from './useMemberActions'
 
 export default function MemberDetailPage() {
   const { memberId = '' } = useParams()
@@ -68,7 +67,7 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
   const actions = useMemberActions()
   const navigate = useNavigate()
   const can = useCan()
-  const toast = useToast()
+  const noticeToast = useNoticeToast()
   const [resetting, setResetting] = useState(false)
   const invites = useServiceQuery(() => (m.role === 'owner' ? Promise.resolve({ ok: true as const, data: [] }) : service.listMemberInvites(m.id)), [m.id, m.role])
   const isOwner = m.role === 'owner'
@@ -152,7 +151,7 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
           onConfirm={async (code) => {
             const r = await account.ownerReset2fa(resetTarget, code)
             if (r.ok) {
-              toast.success('Their 2FA was reset. They were emailed.')
+              noticeToast('Their 2FA was reset', r.data.notice)
               onChanged() // has2fa is now false: the button goes away
             }
             return r

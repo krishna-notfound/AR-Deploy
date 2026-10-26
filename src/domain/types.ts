@@ -389,7 +389,7 @@ export type RolePermissions = Record<MemberRole, Permission[]>
 export type AccessAction =
   | 'invite_created' | 'invite_email_sent' | 'invite_email_failed' | 'invite_accepted' | 'invite_revoked' | 'invite_expired_attempt'
   | 'role_changed' | 'permissions_changed' | 'member_deactivated' | 'member_reactivated' | 'denied'
-  | 'member_removed' | 'member_email_changed'
+  | 'member_removed' | 'member_email_changed' | 'member_closed'
 export interface AccessEvent {
   id: ID
   at: ISODate

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
+import { useOptionalAccount } from '@/auth/AccountProvider'
 import { type ActionPurpose, type Result, type ServiceError, account, isDemoMode } from '@/services'
 
 /** Seconds before another code can be sent (spec: resend cooldown 30 s). */
@@ -19,9 +20,33 @@ const CODE_ERRORS: Record<string, string> = {
   too_many_attempts: 'Too many wrong attempts. Send a new code and try again.',
   rate_limited: 'Too many codes were requested. Wait a few minutes and try again.',
 }
+const EMAIL_BLOCKED = "Email can't be sent to this address yet. Contact the Sanctus team."
 const SEND_ERRORS: Record<string, string> = {
   email_failed: "We couldn't send the code. Try again.",
+  email_blocked: EMAIL_BLOCKED,
   rate_limited: CODE_ERRORS.rate_limited as string,
+}
+
+/**
+ * R-W7-7: once the server says this address can't be emailed (a blocked send), no further code is asked for in this
+ * browser session: a retry can't succeed until the platform side changes. Every request would also count toward the
+ * hourly code limit. Kept in sessionStorage, so a new session tries again.
+ */
+const BLOCKED_KEY = 'arfurn:action-code-email-blocked'
+/** Keyed by the signed-in user, so another account on the same tab is not affected. */
+const sendBlocked = (uid: string) => {
+  try {
+    return sessionStorage.getItem(`${BLOCKED_KEY}:${uid}`) === '1'
+  } catch {
+    return false
+  }
+}
+const rememberBlocked = (uid: string) => {
+  try {
+    sessionStorage.setItem(`${BLOCKED_KEY}:${uid}`, '1')
+  } catch {
+    // Storage unavailable: this dialog still disables Resend until it closes.
+  }
 }
 /** After these the code in hand is no longer usable: clear the field so the next step is a new code. */
 const CODE_SPENT = new Set(['code_expired', 'too_many_attempts'])
@@ -29,7 +54,7 @@ const CODE_SPENT = new Set(['code_expired', 'too_many_attempts'])
 const codeMessage = (e: ServiceError) => (e.reason && Object.hasOwn(CODE_ERRORS, e.reason) ? (CODE_ERRORS[e.reason] as string) : e.message)
 const sendMessage = (e: ServiceError) => (e.reason && Object.hasOwn(SEND_ERRORS, e.reason) ? (SEND_ERRORS[e.reason] as string) : e.message)
 
-type Send = { status: 'sending' } | { status: 'sent'; sentTo: string } | { status: 'failed'; message: string }
+type Send = { status: 'sending' } | { status: 'sent'; sentTo: string } | { status: 'failed'; message: string } | { status: 'blocked' }
 
 export interface ActionCodeDialogProps {
   open: boolean
@@ -50,7 +75,8 @@ export function ActionCodeDialog(props: ActionCodeDialogProps) {
 }
 
 function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destructive, onClose, onConfirm }: ActionCodeDialogProps) {
-  const [send, setSend] = useState<Send>({ status: 'sending' })
+  const uid = useOptionalAccount()?.user?.id ?? ''
+  const [send, setSend] = useState<Send>(() => (sendBlocked(uid) ? { status: 'blocked' } : { status: 'sending' }))
   // Resend waits until this time (ms); `now` ticks once a second while it is in the future.
   const [resendAt, setResendAt] = useState(0)
   const [now, setNow] = useState(() => Date.now())
@@ -71,7 +97,10 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
     setSend({ status: 'sending' })
     const r = await account.sendActionCode(purpose)
     if (!live.current || id !== sendId.current) return
-    if (r.ok) {
+    if (!r.ok && r.error.reason === 'email_blocked') {
+      rememberBlocked(uid)
+      setSend({ status: 'blocked' })
+    } else if (r.ok) {
       setSend({ status: 'sent', sentTo: r.data.sentTo })
       const t = Date.now()
       setNow(t)
@@ -80,19 +109,19 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
       // No cooldown after a failure: nothing was sent, so Resend is the next step straight away.
       setSend({ status: 'failed', message: sendMessage(r.error) })
     }
-  }, [purpose])
+  }, [purpose, uid])
 
   useEffect(() => {
     live.current = true
     // Once per opening, also under StrictMode's double effect: every send counts toward the hourly limit.
     if (!sentOnOpen.current) {
       sentOnOpen.current = true
-      void sendCode()
+      if (!sendBlocked(uid)) void sendCode()
     }
     return () => {
       live.current = false
     }
-  }, [sendCode])
+  }, [sendCode, uid])
 
   const cooldown = Math.max(0, Math.ceil((resendAt - now) / 1000))
   useEffect(() => {
@@ -139,7 +168,7 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
   useEffect(() => {
     if (sent && !pending) codeField.current?.querySelector('input')?.focus()
   }, [sent, pending])
-  const canResend = send.status !== 'sending' && cooldown <= 0 && !pending
+  const canResend = send.status !== 'sending' && send.status !== 'blocked' && cooldown <= 0 && !pending
 
   return (
     <Modal
@@ -172,6 +201,7 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
           {send.status === 'failed' && (
             <InlineNotice tone="warning">{send.message}</InlineNotice>
           )}
+          {send.status === 'blocked' && <InlineNotice tone="warning">{EMAIL_BLOCKED}</InlineNotice>}
         </div>
         {isDemoMode && (
           <InlineNotice tone="neutral">Demo: no email is sent. Use the code 123456.</InlineNotice>

@@ -46,6 +46,7 @@ export function emailReason(error?: string): string | undefined {
     test_sender_recipient_not_allowed: 'The Resend test sender can only email the Resend account owner until a domain is verified.',
     invalid_recipient: 'The email address is not valid.',
     admin_recipient_not_configured: 'No admin notification address (ADMIN_NOTIFICATION_EMAIL) is configured.',
+    no_recipient: 'The account has no email address.',
   }
   return known[error] ?? error
 }

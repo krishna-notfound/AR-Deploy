@@ -19,6 +19,7 @@ import { usePreferences } from '@/lib/preferences'
 import { catalogLocalPath } from '@/lib/urls'
 import { account, service } from '@/services'
 import { CLOSURE_PENDING_ERROR, ok } from '@/services/catalogService'
+import { useNoticeToast } from '@/features/team/useMemberActions'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
 import { AuditTimeline } from '../applications/AuditTimeline'
@@ -249,6 +250,7 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
   const prefs = usePreferences()
   const confirm = useConfirm()
   const toast = useToast()
+  const noticeToast = useNoticeToast()
   const navigate = useNavigate()
   const titleId = useId()
   const [completing, setCompleting] = useState(false)
@@ -272,7 +274,7 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
     const r = await account.restoreClosure(request.userId)
     setRestoring(false)
     if (r.ok) {
-      toast.success('Business restored', 'The catalog is back at its previous status and the owner was emailed.')
+      noticeToast('Business restored', r.data.notice, 'The catalog is back at its previous status.')
       onRestored()
     } else if (r.error.reason === 'not_found') alreadyHandled()
     else toast.error('Could not restore the business', r.error.message)
@@ -309,7 +311,7 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
         onConfirm={async (code) => {
           const r = await account.completeClosure(request.userId, code)
           if (r.ok) {
-            toast.success('Closure completed', `${business.name} and its owner's account were deleted.`)
+            noticeToast('Closure completed', r.data.notice, `${business.name} and its owner's account were deleted.`)
             navigate('/admin/businesses')
           } else if (r.error.reason === 'not_found') {
             // Nothing left to complete: close the dialog (an ok answer closes it) and show the current state.

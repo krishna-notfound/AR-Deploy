@@ -211,7 +211,8 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
     await user.click(within(dialog).getByRole('button', { name: 'Complete closure' }))
     expect(await screen.findByRole('heading', { name: 'Businesses list' })).toBeInTheDocument()
     expect(complete).toHaveBeenCalledWith('demo-closing-owner', DEMO_CODE)
-    expect(screen.getByText('Closure completed')).toBeInTheDocument()
+    // S1.5 R-W7-6: demo mode sends no email, and the toast says so.
+    expect(screen.getByText('Closure completed, but the notice email was not sent: Demo mode: no email is sent.')).toBeInTheDocument()
     cleanup()
 
     // Restore: confirmed, then the banner is gone.
@@ -223,7 +224,7 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
     const confirm = await screen.findByRole('dialog', { name: 'Restore Oak & Ember Studio?' })
     await user.click(within(confirm).getByRole('button', { name: 'Restore' }))
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Closure requested' })).toBeNull())
-    expect(screen.getByText('Business restored')).toBeInTheDocument()
+    expect(screen.getByText('Business restored, but the notice email was not sent: Demo mode: no email is sent.')).toBeInTheDocument()
     const left = await account.listClosureRequests()
     expect(left.ok && left.data).toEqual([])
   })
@@ -286,10 +287,11 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
     expect(screen.queryByRole('region', { name: 'Closure requested' })).toBeNull()
   })
 
-  it("Reset 2FA on the business owner panel opens the action-code dialog and toasts 'Their 2FA was reset. They were emailed.'", { timeout: 20_000 }, async () => {
+  // S1.5 R-W7-6: "They were emailed." only when the notice email was accepted.
+  it("Reset 2FA on the business owner panel opens the action-code dialog and toasts 'Their 2FA was reset. They were emailed.' when the email was accepted", { timeout: 20_000 }, async () => {
     await ownerAtAal2()
     vi.spyOn(service, 'getBusinessMembers').mockResolvedValue(ok([ACCEPTED_OWNER]))
-    const reset = vi.spyOn(account, 'ownerReset2fa')
+    const reset = vi.spyOn(account, 'ownerReset2fa').mockResolvedValue(ok({ notice: { status: 'accepted' as const } }))
     const user = userEvent.setup()
     renderAt('biz_nord', 'owners')
     await user.click(await screen.findByRole('button', { name: 'Reset 2FA for rita@nord.example' }))

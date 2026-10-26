@@ -2055,3 +2055,74 @@ describe('S1.5 Task 11: history that survives deletion, owner notices', () => {
     }
   }, 120_000)
 })
+
+describe('S1.5 Task 13: closure attribution and staff self-closure', () => {
+  GONE_AFTER_ROLLBACK.push('public.service_log_account_event(uuid, text, jsonb, text, uuid)')
+  const id = ids(13)
+  const P_OWNER = id(1)
+  const ADMIN = id(2)
+  const BIZ_OWNER = id(3)
+  const BIZ = id(10)
+  let adminMember = ''
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ('${P_OWNER}', 't13-owner@test', now()), ('${ADMIN}', 't13-admin@test', now()), ('${BIZ_OWNER}', 't13-biz@test', now());
+      insert into public.platform_admins (user_id) values ('${P_OWNER}');
+      insert into public.platform_members (user_id, email, role, status) values ('${ADMIN}', 't13-admin@test', 'admin', 'active');
+      insert into public.businesses (id, name, slug, status) values ('${BIZ}', 'T13 Casa', 't13-casa', 'active');
+      insert into public.business_members (business_id, user_id) values ('${BIZ}', '${BIZ_OWNER}');
+    `)
+    adminMember = (await db.query<{ id: string }>('select id from public.platform_members where user_id = $1', [ADMIN])).rows[0]!.id
+  })
+
+  it('staff self-closure writes access_member_closed before the user is deleted', async () => {
+    expect(await h.svc('select public.service_request_closure($1) as r', [ADMIN])).toEqual({ ok: true, kind: 'staff', role: 'admin' })
+    const closed = async () =>
+      (await db.query<{ actor_id: string | null; metadata: Record<string, unknown> }>(
+        `select actor_id, metadata from public.audit_events where event_type = 'access_member_closed' and metadata->>'member_id' = $1`, [adminMember])).rows
+    const hash = createHash('sha256').update('t13-admin@test').digest('hex')
+    expect(await closed()).toEqual([{ actor_id: ADMIN, metadata: { member_id: adminMember, email_sha256: hash, role: 'admin', reason: 'self_closure', actor_label: 'Admin' } }])
+    expect(JSON.stringify(await closed())).not.toContain('t13-admin@test')
+    // A retry after a failed user delete writes no second row.
+    expect(await h.svc('select public.service_request_closure($1) as r', [ADMIN])).toEqual({ ok: true, kind: 'staff', role: 'admin' })
+    expect(await closed()).toHaveLength(1)
+    // The Edge Function then deletes the account: the row stays, with its label.
+    await db.query('delete from auth.users where id = $1', [ADMIN])
+    expect(await closed()).toEqual([{ actor_id: null, metadata: expect.objectContaining({ role: 'admin', reason: 'self_closure', actor_label: 'Admin' }) }])
+  })
+
+  it("account_closure_requested stores business_id, and the closure's status change is attributed to the requester via app.actor_id", async () => {
+    expect(await h.svc('select public.service_request_closure($1) as r', [BIZ_OWNER])).toEqual({ ok: true, kind: 'business', business_id: BIZ })
+    const change = (await db.query<{ actor_id: string | null; to_status: string; label: string }>(
+      `select actor_id, to_status, metadata->>'actor_label' as label from public.audit_events
+        where event_type = 'business_status_changed' and business_id = $1`, [BIZ])).rows
+    expect(change).toEqual([{ actor_id: BIZ_OWNER, to_status: 'inactive', label: 'Business owner' }])
+
+    expect(await h.svc(`select public.service_log_account_event($1, 'account_closure_requested', '{}'::jsonb, null, $2) as r`, [BIZ_OWNER, BIZ])).toEqual({ ok: true })
+    const requested = (await db.query<{ business_id: string | null; actor_id: string; name: string }>(
+      `select business_id, actor_id, metadata->>'business_name' as name from public.audit_events where event_type = 'account_closure_requested' and actor_id = $1`, [BIZ_OWNER])).rows
+    expect(requested).toEqual([{ business_id: BIZ, actor_id: BIZ_OWNER, name: 'T13 Casa' }])
+    // The four-argument call still works (p_business_id defaults to null); only the service role may call it.
+    expect(await h.svc(`select public.service_log_account_event($1, 'account_signed_in', '{}'::jsonb, null) as r`, [BIZ_OWNER])).toEqual({ ok: true })
+    const grants = (await db.query<{ anon: boolean; auth: boolean; svc: boolean }>(
+      `select has_function_privilege('anon', 'public.service_log_account_event(uuid, text, jsonb, text, uuid)', 'execute') as anon,
+              has_function_privilege('authenticated', 'public.service_log_account_event(uuid, text, jsonb, text, uuid)', 'execute') as auth,
+              has_function_privilege('service_role', 'public.service_log_account_event(uuid, text, jsonb, text, uuid)', 'execute') as svc`)).rows[0]
+    expect(grants).toEqual({ anon: false, auth: false, svc: true })
+    expect((await db.query(`select to_regprocedure('public.service_log_account_event(uuid, text, jsonb, text)')::text as o`)).rows[0]).toEqual({ o: null })
+
+    // app.actor_id is transaction-local: a later service-role change in its own transaction has no actor.
+    await h.as('', (tx) => tx.query(`update public.businesses set status = 'draft' where id = $1`, [BIZ]), 'service_role', null)
+    const later = (await db.query<{ actor_id: string | null }>(
+      `select actor_id from public.audit_events where event_type = 'business_status_changed' and business_id = $1 and to_status = 'draft'`, [BIZ])).rows
+    expect(later).toEqual([{ actor_id: null }])
+    // A signed-in caller is still recorded as themselves.
+    await db.query(`delete from public.account_closure_requests where user_id = $1`, [BIZ_OWNER])
+    await h.as(P_OWNER, (tx) => tx.query(`update public.businesses set status = 'active' where id = $1`, [BIZ]))
+    const owner = (await db.query<{ actor_id: string | null }>(
+      `select actor_id from public.audit_events where event_type = 'business_status_changed' and business_id = $1 and to_status = 'active'`, [BIZ])).rows
+    expect(owner).toEqual([{ actor_id: P_OWNER }])
+  })
+})

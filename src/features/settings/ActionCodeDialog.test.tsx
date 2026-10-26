@@ -189,4 +189,24 @@ describe('ActionCodeDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1)
     await act(async () => finish(ok(undefined)))
   })
+
+  // R-W7-7. Last in the file: the blocked state lasts for the browser session (sessionStorage), cleared at the end.
+  it("email_blocked shows 'Email can't be sent to this address yet. Contact the Sanctus team.' and disables Resend for the session", async () => {
+    const BLOCKED = "Email can't be sent to this address yet. Contact the Sanctus team."
+    const send = vi.spyOn(account, 'sendActionCode').mockResolvedValue(accountFail('email_blocked'))
+    try {
+      const first = renderDialog()
+      expect(await screen.findByText(BLOCKED)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Resend code' })).toBeDisabled()
+      expect(confirmButton()).toBeDisabled()
+      first.view.unmount()
+      // Opened again in the same session: no new code is asked for, and Resend stays off.
+      renderDialog()
+      expect(await screen.findByText(BLOCKED)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Resend code' })).toBeDisabled()
+      expect(send).toHaveBeenCalledTimes(1)
+    } finally {
+      sessionStorage.clear()
+    }
+  })
 })

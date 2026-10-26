@@ -4,11 +4,38 @@ import { useCallback } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { InviteOutcome, MemberRole, PlatformMember } from '@/domain/types'
+import { emailReason } from '@/features/applications/labels'
 import { formatDate } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
-import { service } from '@/services'
+import { type NoticeOutcome, service } from '@/services'
 import type { Result } from '@/services/catalogService'
 import { PERMISSION_LABEL, ROLE_LABEL } from './permissions'
+
+/**
+ * R-W7-6: the toast after an Owner action that emails the account holder (reset 2FA, restore or complete a closure).
+ * "{done}. They were emailed." only when the email was accepted; otherwise
+ * "{done}, but the notice email was not sent: {reason}." The action itself already happened either way.
+ */
+const NOTICE_REASONS: ReadonlySet<string> = new Set([
+  'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'no_recipient', 'admin_recipient_not_configured', 'demo_mode',
+])
+
+export function useNoticeToast() {
+  const toast = useToast()
+  return useCallback(
+    (done: string, notice: NoticeOutcome, body?: string) => {
+      if (notice.status === 'accepted') {
+        toast.success(`${done}. They were emailed.`, body)
+        return
+      }
+      // Only a fixed reason is shown; any other text (a provider's own words) falls back to the generic sentence.
+      const known = notice.error && NOTICE_REASONS.has(notice.error) ? emailReason(notice.error) : undefined
+      const why = (known ?? 'the email service did not take it').replace(/\.$/, '')
+      toast.error(`${done}, but the notice email was not sent: ${why}.`, body)
+    },
+    [toast],
+  )
+}
 
 export function useMemberActions() {
   const confirm = useConfirm()

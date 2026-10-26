@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { applicationDecisionEmail, businessNoticeEmail, renderEmail } from './email-templates'
+import { applicationDecisionEmail, businessNoticeEmail, closureCancelledEmail, renderEmail, teamNoticeEmail } from './email-templates'
 
 describe('invitation email with a code (ADR-0027)', () => {
   it('shows the code in the HTML and text, in both languages, with a plain page link', () => {
@@ -120,5 +120,26 @@ describe('business_notice (R-W7-2, §11.2)', () => {
     const e = businessNoticeEmail('en', 'product_deleted', { businessName: 'Casa', productName: '<b>Sofa</b>' })
     expect(e.html).not.toContain('<b>Sofa</b>')
     expect(e.html).toContain('&lt;b&gt;Sofa&lt;/b&gt;')
+  })
+})
+
+describe('S1.5 Task 13: staff emails (§11.3)', () => {
+  it('teamNoticeEmail: "{email} left the Sanctus team", with the role, the date and the audit-log note', () => {
+    const e = teamNoticeEmail('ana@sanctus.test', 'team', '25 October 2026')
+    expect(e.subject).toBe('ana@sanctus.test left the Sanctus team')
+    expect(e.text).toContain(
+      "ana@sanctus.test (Team) deleted their Sanctus account on 25 October 2026. Their access ended and their sessions were signed out. Their past actions show as 'Deleted user (Team)' in the audit log.",
+    )
+    expect(e.html).not.toContain('href=')
+    expect(teamNoticeEmail('<x>@a.test', 'admin', '1 May 2026').html).toContain('&lt;x&gt;@a.test')
+  })
+
+  it('closureCancelledEmail: "Closure request cancelled: {businessName}" and the status it is back to', () => {
+    const e = closureCancelledEmail('Casa & Co', 'active')
+    expect(e.subject).toBe('Closure request cancelled: Casa & Co')
+    expect(e.text).toContain('The owner of Casa & Co cancelled their account-closure request. The catalog is back to live.')
+    expect(e.html).toContain('Casa &amp; Co')
+    expect(closureCancelledEmail('Casa', 'draft').text).toContain('The catalog is back to draft.')
+    expect(closureCancelledEmail('Casa', 'inactive').text).toContain('The catalog is back to paused.')
   })
 })

@@ -1595,3 +1595,146 @@ revoke all on function private.audit_business_change() from public, anon, authen
 -- dashboard reads it. R-W7-8 is UI only.
 
 -- ---- end S1.5 Task 11 ----
+
+-- =============================================================================
+-- S1.5 Task 13: account-security notices, blocked codes, closure attribution, staff self-closure (R-W6-3, R-W7-6, R-W7-7, R-W7-9)
+-- =============================================================================
+
+-- R-W7-9: account_closure_requested (and any account event about a business) stores business_id, so it filters by the
+-- business and the snapshot trigger adds its name. Dropped and recreated with the extra argument (the default keeps
+-- four-argument calls working); the grants of 20261025163627_account_settings are restated. Body otherwise unchanged.
+drop function public.service_log_account_event(uuid, text, jsonb, text);
+create function public.service_log_account_event(p_user uuid, p_event text, p_metadata jsonb, p_ip text, p_business_id uuid default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_meta jsonb := coalesce(p_metadata, '{}'::jsonb);
+begin
+  if p_event is null or p_event not in (
+       'account_signed_in', 'account_password_changed', 'account_email_change_requested', 'account_2fa_enabled',
+       'account_2fa_disabled', 'account_recovery_used', 'account_recovery_regenerated', 'account_2fa_reset_by_owner',
+       'account_closure_requested', 'account_closure_cancelled', 'account_closure_completed', 'account_closure_restored',
+       'account_deleted', 'platform_security_policy_changed')
+     or jsonb_typeof(v_meta) <> 'object' then
+    return jsonb_build_object('error', 'invalid_request');
+  end if;
+  if nullif(btrim(coalesce(p_ip, '')), '') is not null then
+    v_meta := v_meta || jsonb_build_object('ip', left(btrim(p_ip), 64));
+  end if;
+  -- audit_events allows 4096 bytes; answer instead of raising.
+  if pg_column_size(v_meta) > 4000 then
+    return jsonb_build_object('error', 'invalid_request');
+  end if;
+  insert into public.audit_events (event_type, actor_id, business_id, metadata)
+  values (p_event, (select u.id from auth.users u where u.id = p_user), p_business_id, v_meta);
+  return jsonb_build_object('ok', true);
+end;
+$$;
+revoke execute on function public.service_log_account_event(uuid, text, jsonb, text, uuid) from public, anon, authenticated;
+grant execute on function public.service_log_account_event(uuid, text, jsonb, text, uuid) to service_role;
+
+-- R-W6-3: a staff self-closure writes access_member_closed (in the member's history, with the address hashed) while
+-- the user still exists, so the actor label is computed; a retry after a failed user delete writes no second row.
+-- R-W7-9: the business's move to inactive runs with the service role (auth.uid() is null), so app.actor_id names the
+-- requester for audit_business_change. Body otherwise as in 20261025163627_account_settings.
+create or replace function public.service_request_closure(p_user uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member public.platform_members;
+  v_biz    public.businesses;
+begin
+  if p_user is null then
+    return jsonb_build_object('error', 'not_allowed');
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('closure:' || p_user::text, 0));
+  if exists (select 1 from public.platform_admins where user_id = p_user) then
+    return jsonb_build_object('error', 'owner_cannot_close');
+  end if;
+  if exists (select 1 from public.account_closure_requests where user_id = p_user) then
+    return jsonb_build_object('error', 'already_requested');
+  end if;
+
+  select * into v_member from public.platform_members where user_id = p_user for update;
+  if found then
+    -- Idempotent, so a retry after a failed user deletion works.
+    update public.platform_members set status = 'deactivated', deactivated_at = coalesce(deactivated_at, now())
+     where id = v_member.id and status <> 'deactivated';
+    update private.platform_invites set status = 'revoked', revoked_at = now()
+     where member_id = v_member.id and status in ('pending', 'sent', 'email_failed');
+    perform public.service_end_sessions(p_user);
+    if not exists (select 1 from public.audit_events
+                    where event_type = 'access_member_closed' and metadata->>'member_id' = v_member.id::text) then
+      insert into public.audit_events (event_type, actor_id, metadata)
+      values ('access_member_closed', (select u.id from auth.users u where u.id = p_user),
+              jsonb_build_object('member_id', v_member.id,
+                                 'email_sha256', encode(sha256(convert_to(lower(btrim(v_member.email)), 'UTF8')), 'hex'),
+                                 'role', v_member.role::text, 'reason', 'self_closure'));
+    end if;
+    -- The role lets account-security name it in the Owners' team notice.
+    return jsonb_build_object('ok', true, 'kind', 'staff', 'role', v_member.role::text);
+  end if;
+
+  select b.* into v_biz from public.businesses b
+    join public.business_members m on m.business_id = b.id
+   where m.user_id = p_user
+   order by m.created_at, b.id
+   limit 1
+   for update of b;
+  if not found then
+    return jsonb_build_object('error', 'not_allowed');
+  end if;
+  insert into public.account_closure_requests (user_id, business_id, previous_business_status)
+  values (p_user, v_biz.id, v_biz.status);
+  perform set_config('app.account_closure', 'on', true);
+  perform set_config('app.actor_id', p_user::text, true);
+  update public.businesses set status = 'inactive' where id = v_biz.id and status <> 'inactive';
+  perform set_config('app.actor_id', '', true);
+  return jsonb_build_object('ok', true, 'kind', 'business', 'business_id', v_biz.id);
+end;
+$$;
+revoke execute on function public.service_request_closure(uuid) from public, anon, authenticated;
+grant execute on function public.service_request_closure(uuid) to service_role;
+
+-- R-W7-9: a change made with the service role on someone's behalf names them through app.actor_id (transaction-local,
+-- set only by security definer functions such as service_request_closure). A signed-in caller always wins; an id that
+-- is not a user records no actor. Body otherwise as in S1.5 Task 11.
+create or replace function private.audit_business_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_on_behalf text := nullif(current_setting('app.actor_id', true), '');
+begin
+  if v_actor is null and v_on_behalf ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    select u.id into v_actor from auth.users u where u.id = v_on_behalf::uuid;
+  end if;
+  if tg_op = 'UPDATE' then
+    if new.status is distinct from old.status then
+      insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status)
+      values ('business_status_changed', v_actor, new.id, old.status, new.status);
+    end if;
+    if new.slug is distinct from old.slug then
+      insert into public.audit_events (event_type, actor_id, business_id, metadata)
+      values ('business_slug_changed', v_actor, new.id, jsonb_build_object('from', old.slug, 'to', new.slug));
+    end if;
+  elsif tg_op = 'DELETE' then
+    insert into public.audit_events (event_type, actor_id, business_id, metadata)
+    values ('business_deleted', v_actor, old.id,
+            jsonb_build_object('business_id', old.id, 'name', old.name, 'business_name', old.name));
+  end if;
+  return null;
+end;
+$$;
+revoke all on function private.audit_business_change() from public, anon, authenticated;
+
+-- ---- end S1.5 Task 13 ----

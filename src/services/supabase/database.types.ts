@@ -1078,6 +1078,7 @@ export type Database = {
       }
       service_log_account_event: {
         Args: {
+          p_business_id?: string
           p_event: string
           p_ip: string
           p_metadata: Json

@@ -153,7 +153,8 @@ describe('Member detail: Reset 2FA (Owner only)', () => {
     await account.confirmTotpEnrollment(e.data.factorId, DEMO_CODE)
   }
 
-  it("Reset 2FA on a member opens the action-code dialog and toasts 'Their 2FA was reset. They were emailed.'", { timeout: 20_000 }, async () => {
+  // S1.5 R-W7-6: the toast says whether the notice was emailed; demo mode sends no email, so it says it was not.
+  it("Reset 2FA on a member opens the action-code dialog and toasts that the notice email was not sent in demo mode", { timeout: 20_000 }, async () => {
     await ownerAtAal2()
     const reset = vi.spyOn(account, 'ownerReset2fa')
     const user = userEvent.setup()
@@ -165,7 +166,7 @@ describe('Member detail: Reset 2FA (Owner only)', () => {
     await within(dialog).findByText(/We emailed a 6-digit code/)
     await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
     await user.click(within(dialog).getByRole('button', { name: 'Reset 2FA' }))
-    expect(await screen.findByText('Their 2FA was reset. They were emailed.')).toBeInTheDocument()
+    expect(await screen.findByText('Their 2FA was reset, but the notice email was not sent: Demo mode: no email is sent.')).toBeInTheDocument()
     expect(reset).toHaveBeenCalledWith('usr_mem_ana', DEMO_CODE)
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
@@ -181,7 +182,7 @@ describe('Member detail: Reset 2FA (Owner only)', () => {
     await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
     await user.click(within(dialog).getByRole('button', { name: 'Reset 2FA' }))
     expect(await within(dialog).findByText(/This needs 2FA/)).toBeInTheDocument()
-    expect(screen.queryByText('Their 2FA was reset. They were emailed.')).toBeNull()
+    expect(screen.queryByText(/Their 2FA was reset/)).toBeNull()
   })
 
   it('none of these appear for Admin or Team', { timeout: 20_000 }, async () => {
@@ -249,3 +250,17 @@ describe('Email failed invitations (R-W7-3)', () => {
     expect((await within(history).findAllByText('Email failed')).length).toBeGreaterThan(0)
   })
 })
+
+describe('S1.5 Task 13: staff self-closure in Access history (R-W6-3)', () => {
+  it("Access history: 'Admin closed their own account'", { timeout: 20_000 }, async () => {
+    // The demo Admin (Ana) closes their own account.
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
+    expect(await account.requestClosure(DEMO_CODE)).toEqual({ ok: true, data: { kind: 'staff' } })
+    // The Owner opens Ana's page.
+    open('/admin/team/mem_ana')
+    await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
+    expect(await screen.findByText('Admin closed their own account')).toBeInTheDocument()
+    expect(screen.getAllByText('Account closed').length).toBeGreaterThan(0)
+  })
+})
+

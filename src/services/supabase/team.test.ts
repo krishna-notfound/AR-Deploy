@@ -229,4 +229,19 @@ describe('Supabase team service', () => {
     expect(calls.some(([m]) => m === 'ilike')).toBe(false)
     expect(await members('x.pt')).toEqual([])
   })
+
+  it("S1.5 Task 13: access_member_closed reads as member_closed, '{Role} closed their own account'", async () => {
+    const builder: Record<string, unknown> = {}
+    for (const m of ['select', 'like', 'order', 'range', 'eq', 'neq', 'gte', 'lte', 'or']) builder[m] = () => builder
+    builder.then = (resolve: (v: unknown) => void) =>
+      resolve({
+        data: [{ id: 'e1', created_at: '2026-10-26T10:00:00Z', event_type: 'access_member_closed', actor_id: null, from_status: null, to_status: null, metadata: { member_id: 'm1', role: 'admin', reason: 'self_closure', email_sha256: 'ab', actor_label: 'Admin' } }],
+        count: 1,
+        error: null,
+      })
+    const sb = { from: vi.fn(() => builder), rpc: vi.fn() } as unknown as SupabaseClient
+    const r = await createSupabaseTeam(sb).getAccessEvents({ action: 'member_closed' })
+    expect(r.ok && r.data.items).toEqual([{ id: 'e1', at: '2026-10-26T10:00:00Z', actor: null, member: null, action: 'member_closed', outcome: 'ok', details: 'Admin closed their own account' }])
+  })
 })
+

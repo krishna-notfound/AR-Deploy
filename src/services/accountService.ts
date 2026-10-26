@@ -1,7 +1,7 @@
 // Account settings, security and 2FA (S1, spec sections 7 and 8). The UI imports `account` from services/index.ts.
 // Supabase: services/supabase/supabaseAccount.ts (Auth, the profiles and platform_settings tables, database
 // functions and the account-security Edge Function). Demo: services/mock/mockAccount.ts, an in-memory test harness.
-import type { ActionPurpose, ClosureRequest, ID, PlatformSettings, Profile, SecurityEvent, SecurityState, TotpEnrollment } from '@/domain/types'
+import type { ActionPurpose, ClosureRequest, EmailAttemptStatus, ID, PlatformSettings, Profile, SecurityEvent, SecurityState, TotpEnrollment } from '@/domain/types'
 import type { Result, ServiceErrorCode } from './catalogService'
 
 export type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, SettingsSection, TotpEnrollment } from '@/domain/types'
@@ -11,6 +11,12 @@ export interface AssuranceLevels {
   currentLevel: 'aal1' | 'aal2'
   /** aal2 when the account has a verified factor: the sign-in needs the code step while currentLevel is aal1. */
   nextLevel: 'aal1' | 'aal2'
+}
+
+/** What happened to the notice email an Owner action sends the account holder (R-W7-6). */
+export interface NoticeOutcome {
+  status: EmailAttemptStatus
+  error?: string
 }
 
 export type ProfilePatch = Partial<Pick<Profile, 'displayName' | 'timezone' | 'dateFormat' | 'clock' | 'notifyNewApplications'>>
@@ -43,14 +49,15 @@ export interface AccountService {
   redeemRecoveryCode(code: string): Promise<Result<void>>
   disable2fa(code: string): Promise<Result<void>>
   requestClosure(code: string): Promise<Result<{ kind: 'business' | 'staff' }>>
+  /** Through the account-security function, which cancels as the caller and alerts the admin inbox (R-W7-9). */
   cancelClosure(): Promise<Result<void>>
   getPlatformSettings(): Promise<Result<PlatformSettings>>
   /** Reason: aal2_required when the Owner is signed in without 2FA. */
   updatePlatformSettings(patch: Partial<Pick<PlatformSettings, 'require2faStaff' | 'require2faBusiness'>>): Promise<Result<PlatformSettings>>
-  ownerReset2fa(targetUserId: ID, code: string): Promise<Result<void>>
+  ownerReset2fa(targetUserId: ID, code: string): Promise<Result<{ notice: NoticeOutcome }>>
   listClosureRequests(): Promise<Result<ClosureRequest[]>>
-  completeClosure(targetUserId: ID, code: string): Promise<Result<void>>
-  restoreClosure(targetUserId: ID): Promise<Result<void>>
+  completeClosure(targetUserId: ID, code: string): Promise<Result<{ notice: NoticeOutcome }>>
+  restoreClosure(targetUserId: ID): Promise<Result<{ notice: NoticeOutcome }>>
 }
 
 /**
@@ -72,6 +79,7 @@ export const ACCOUNT_ERRORS: Record<string, { code: ServiceErrorCode; message: s
   not_allowed: { code: 'PERMISSION', message: "You don't have permission to do this." },
   not_found: { code: 'NOT_FOUND', message: 'That account or request no longer exists.' },
   email_failed: { code: 'UNKNOWN', message: "We couldn't send the email. Try again." },
+  email_blocked: { code: 'CONFIG', message: "Email can't be sent to this address yet. Contact the Sanctus team." },
   nothing_to_reset: { code: 'CONFLICT', message: "They don't have 2FA set up, so there is nothing to reset." },
   unknown: { code: 'UNKNOWN', message: 'Something went wrong. Try again.' },
   // Supabase Auth and client-side checks

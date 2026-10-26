@@ -20,6 +20,7 @@ import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
 import { account, isDemoMode, service } from '@/services'
 import { CLOSURE_PENDING_ERROR, ok } from '@/services/catalogService'
+import { useNoticeToast } from '@/features/team/useMemberActions'
 import { useServiceQuery } from '@/services/hooks'
 import { closureByBusiness } from '../businesses/closure'
 import { useBusinessActions } from '../businesses/useBusinessActions'
@@ -312,6 +313,7 @@ const ALREADY_HANDLED = 'This closure was already handled.'
 function OrphanRequests({ requests, onChanged }: { requests: ClosureRequest[]; onChanged: () => void }) {
   const prefs = usePreferences()
   const toast = useToast()
+  const noticeToast = useNoticeToast()
   const titleId = useId()
   const [target, setTarget] = useState<ClosureRequest | null>(null)
 
@@ -348,7 +350,7 @@ function OrphanRequests({ requests, onChanged }: { requests: ClosureRequest[]; o
           if (!target) return { ok: true as const, data: undefined }
           const r = await account.completeClosure(target.userId, code)
           if (r.ok) {
-            toast.success('Closure completed', `The account for ${target.email} was deleted.`)
+            noticeToast('Closure completed', r.data.notice, `The account for ${target.email} was deleted.`)
             onChanged()
           } else if (r.error.reason === 'not_found') {
             // Nothing left to complete: close the dialog (an ok answer closes it) and show the current list.

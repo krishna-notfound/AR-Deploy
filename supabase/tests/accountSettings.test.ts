@@ -310,7 +310,8 @@ const SERVICE_FUNCTIONS = [
   'service_create_action_code(uuid, text, text, text)', 'service_check_action_code(uuid, text, text)',
   'service_void_action_codes(uuid, text)', 'service_set_recovery_codes(uuid, text[], text)',
   'service_use_recovery_code(uuid, text)', 'service_clear_recovery_codes(uuid)', 'service_has_recovery_codes(uuid)',
-  'service_log_account_event(uuid, text, jsonb, text)', 'service_requires_2fa(uuid)', 'service_request_closure(uuid)',
+  // S1.5 R-W7-9: service_log_account_event gained p_business_id (uuid, default null).
+  'service_log_account_event(uuid, text, jsonb, text, uuid)', 'service_requires_2fa(uuid)', 'service_request_closure(uuid)',
   'service_restore_closure(uuid, uuid)', 'service_closure_target(uuid)', 'service_classify_user(uuid)',
 ]
 
@@ -423,7 +424,8 @@ describe('account settings: codes and closure (Task 2)', () => {
       .toEqual({ business_id: BIZ_C, previous_business_status: 'active' })
     expect(await req(CLOSE_BIZ_U)).toEqual({ error: 'already_requested' })
 
-    expect(await req(CLOSE_STAFF_U)).toEqual({ ok: true, kind: 'staff' })
+    // S1.5 R-W6-3: the staff answer names the role, for the Owners' team notice.
+    expect(await req(CLOSE_STAFF_U)).toEqual({ ok: true, kind: 'staff', role: 'team' })
     expect((await db.query('select status from public.platform_members where user_id = $1', [CLOSE_STAFF_U])).rows[0]).toEqual({ status: 'deactivated' })
     expect((await db.query<{ user_id: string }>('select user_id from auth.sessions')).rows.map((r) => r.user_id)).toEqual([TEAM_U])
 
