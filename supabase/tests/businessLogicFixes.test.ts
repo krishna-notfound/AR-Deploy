@@ -135,16 +135,16 @@ describe('S1.5 Task 1: scaffold and privacy', () => {
     })
   })
 
-  it("after Admin and Team permission sets are both {}, the Owner's my_platform_access().permissions has length 15", async () => {
+  it("after Admin and Team permission sets are both {}, the Owner's my_platform_access().permissions has length 16 (15 + S4 models.manage, R-S4-1)", async () => {
     const access = (uid: string) => h.call(uid, 'select public.my_platform_access() as r') as Promise<{ role: string; permissions: string[] } | null>
     await withRolePermissions({ admin: [], team: [] }, async () => {
       const owner = await access(OWNER)
       expect(owner?.role).toBe('owner')
-      expect(owner?.permissions).toHaveLength(15)
-      expect(new Set(owner?.permissions).size).toBe(15)
+      expect(owner?.permissions).toHaveLength(16)
+      expect(new Set(owner?.permissions).size).toBe(16)
       expect(await access(ADMIN)).toEqual({ role: 'admin', permissions: [] })
     })
-    // The same 15 keys the role-permission table allows.
+    // The same 16 keys the role-permission table allows.
     const allowed = (await db.query<{ d: string }>(
       `select pg_get_constraintdef(oid) as d from pg_constraint where conrelid = 'public.platform_role_permissions'::regclass and contype = 'c'`)).rows[0]!.d
     for (const p of (await access(OWNER))!.permissions) expect(allowed).toContain(`'${p}'`)
@@ -201,7 +201,8 @@ describe('S1.5 rollback', () => {
       // Re-apply: the migration runs cleanly on the rolled-back database.
       await rolled.exec(readFileSync(join(MIGRATIONS, S15_MIGRATION), 'utf8'))
       const again = await definitions(rolled)
-      const applied = await freshDb()
+      // The database as S1.5 left it (later migrations, such as S4's, redefine some of these again).
+      const applied = await freshDb((n) => n <= S15_MIGRATION)
       try {
         expect(again).toEqual(await definitions(applied))
       } finally {
@@ -603,16 +604,16 @@ describe('S1.5 Task 9: team membership lifecycle', () => {
     }
   }, 60_000)
 
-  it('my_platform_access for a deactivated member → role null, status deactivated; the Owner still gets 15', async () => {
+  it('my_platform_access for a deactivated member → role null, status deactivated; the Owner still gets 16 (R-S4-1)', async () => {
     const access = (uid: string) => h.call(uid, 'select public.my_platform_access() as r') as Promise<Record<string, unknown> | null>
     expect(await access(OFF)).toEqual({ role: null, permissions: [], status: 'deactivated' })
     const owner = await access(OWNER)
     expect(owner?.role).toBe('owner')
-    expect(owner?.permissions).toHaveLength(15)
+    expect(owner?.permissions).toHaveLength(16)
     expect((await access(ADMIN))?.role).toBe('admin')
     expect(await access(id(98))).toBeNull() // no row at all
     await withRolePermissions({ admin: [], team: [] }, async () => {
-      expect((await access(OWNER))?.permissions).toHaveLength(15)
+      expect((await access(OWNER))?.permissions).toHaveLength(16)
       expect(await access(OFF)).toEqual({ role: null, permissions: [], status: 'deactivated' })
     })
   })

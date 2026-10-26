@@ -18,12 +18,16 @@ describe('permission prerequisites (R-W3-3)', () => {
     expect(withPrerequisites(ALL_PERMISSIONS)).toEqual(ALL_PERMISSIONS)
   })
 
-  it('has the §4 map: an entry for each of the 15 keys, every prerequisite a known key', () => {
+  it('has the §4 map: an entry for each of the 16 keys, every prerequisite a known key', () => {
     expect(Object.keys(PERMISSION_PREREQUISITES).sort()).toEqual([...ALL_PERMISSIONS].sort())
     expect(PERMISSION_PREREQUISITES['businesses.status']).toEqual(['businesses.edit'])
     expect(PERMISSION_PREREQUISITES['owners.manage']).toEqual(['businesses.view'])
     expect(PERMISSION_PREREQUISITES['applications.approve']).toEqual(['applications.view'])
     expect(PERMISSION_PREREQUISITES['applications.reject']).toEqual(['applications.view'])
+    // R-S4-1: handling 3D requests shows product and business names.
+    expect(PERMISSION_PREREQUISITES['models.manage']).toEqual(['businesses.view', 'products.view'])
+    expect(ALL_PERMISSIONS).toHaveLength(16)
+    expect(ALL_PERMISSIONS.indexOf('models.manage')).toBe(ALL_PERMISSIONS.indexOf('products.delete') + 1)
     for (const reqs of Object.values(PERMISSION_PREREQUISITES)) for (const r of reqs) expect(ALL_PERMISSIONS).toContain(r)
   })
 })

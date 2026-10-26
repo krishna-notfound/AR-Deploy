@@ -9,6 +9,8 @@ export interface DemoTeam {
   events: DemoAccessEvent[]
   /** Demo link tokens → member id (real links only store a hash; this is demo data). */
   tokens: Record<string, { memberId: string; inviteId: string }>
+  /** S4 R-S4-1: the Admin set has had its one-time models.manage backfill (absent in demo data saved before S4). */
+  modelsManageBackfilled?: boolean
 }
 
 /** A recorded access event plus the exact ids a member's history filters on (R-W6-4), as the database stores them. */
@@ -68,5 +70,6 @@ export function createDemoTeam(now: number = Date.now()): DemoTeam {
       ev('acc_1', -39, { memberId: 'mem_ana', actorId: 'usr_mem_ana', actor: 'ana.ribeiro@sanctus.example', member: 'ana.ribeiro@sanctus.example', action: 'invite_accepted', toRole: 'admin', details: 'Joined as Admin' }),
     ],
     tokens: { [DEMO_INVITE_TOKEN]: { memberId: 'mem_marta', inviteId: 'inv_marta' } },
+    modelsManageBackfilled: true,
   }
 }

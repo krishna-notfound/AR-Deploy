@@ -90,7 +90,8 @@ beforeAll(async () => {
     insert into auth.users values ('${ADMIN}', 'admin@test', now()), ('${OWNER}', 'owner@test', now()), ('${STRANGER}', 'stranger@test', null),
       ('${OTHER_OWNER}', 'other@test', now());
     insert into public.platform_admins (user_id) values ('${ADMIN}');
-    insert into public.businesses (id, name, slug, status) values ('${BIZ}', 'Biz', 'biz', 'active');
+    -- S4 R-S4-3: this owner uploads its own 3D files, so its switch is on.
+    insert into public.businesses (id, name, slug, status, allow_own_models) values ('${BIZ}', 'Biz', 'biz', 'active', true);
     insert into public.businesses (id, name, slug, status) values ('${OTHER_BIZ}', 'Other', 'other', 'active');
     insert into public.business_members (business_id, user_id) values ('${BIZ}', '${OWNER}'), ('${OTHER_BIZ}', '${OTHER_OWNER}');
   `)
@@ -559,7 +560,7 @@ describe('security hardening (20261024065538_security_hardening)', () => {
   beforeAll(async () => {
     await db.exec(`
       insert into auth.users values ('${HOWNER}', 'hardening-owner@test', now());
-      insert into public.businesses (id, name, slug, status, logo_url) values ('${HB}', 'Hardened', 'hardened', 'active', 'https://cdn.test/logo.png');
+      insert into public.businesses (id, name, slug, status, logo_url, allow_own_models) values ('${HB}', 'Hardened', 'hardened', 'active', 'https://cdn.test/logo.png', true);
       insert into public.business_members (business_id, user_id) values ('${HB}', '${HOWNER}');
     `)
   })

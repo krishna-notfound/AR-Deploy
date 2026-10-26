@@ -5,7 +5,7 @@ import type { Permission, RolePermissions } from './types'
 export const ALL_PERMISSIONS: Permission[] = [
   'businesses.view', 'businesses.edit', 'businesses.status', 'businesses.delete', 'owners.manage',
   'applications.view', 'applications.approve', 'applications.reject',
-  'products.view', 'products.edit', 'products.publish', 'products.delete',
+  'products.view', 'products.edit', 'products.publish', 'products.delete', 'models.manage',
   'analytics.view', 'records.view', 'access.view',
 ]
 
