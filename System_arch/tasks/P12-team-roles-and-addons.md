@@ -116,9 +116,10 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
     - one shared closure-complete dialog for business and orphan requests, and the Change role trigger sizing;
     - on phones the section list has no main column, so the security notice shows only inside a section;
     - spec §6 and `design/19` wording for opt-in 2FA still to update.
-- **S2:** Platform site controls (applications open/closed, email settings, maintenance mode, site info and SEO, legal links, new-business defaults, data export) plus Business → Catalog & public page.
-- **S3:** an application form builder: the Owner edits the fields, and the values are stored in the database.
-- **S4:** 3D model requests (A3): a per-business "allow own 3D upload" setting, separate catalog and request photos (2–10), admin upload, notification to the business, and the 3D part hidden until the model is ready.
+- **S1.5 Business-logic fixes:** audit of 2026-10-26 (`docs/audits/2026-10-26-business-logic/`, 99 findings, 4 High). About 70 are fixed in S1.5; the rest are folded into S2–S4 below (`RULINGS.md`).
+- **S2:** Platform site controls (applications open/closed, email settings, maintenance mode, site info and SEO, legal links, new-business defaults, data export) plus Business → Catalog & public page. **Also fixes** audit findings PUB-02/BIZ-03, MAIL-02 (Email log page), MAIL-19, PUB-09.
+- **S3:** an application form builder: the Owner edits the fields, and the values are stored in the database. **Also fixes** audit findings APP-04, APP-11, APP-09/MAIL-14.
+- **S4:** 3D model requests (A3): a per-business "allow own 3D upload" setting, separate catalog and request photos (2–10), admin upload, notification to the business, and the 3D part hidden until the model is ready. **Also fixes** audit findings PROD-03, ANA-03, PROD-12.
 
 ## Log
 
