@@ -341,6 +341,9 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
       dimension_unit: p.dimensions.unit,
       weight_value: p.weight?.value ?? null,
       weight_unit: p.weight?.unit ?? null,
+      // S4 R-S4-3/R-S4-17: leave every model row alone (own uploads off), and the models_changed_at the editor loaded.
+      keep_models: p.keepModels === true,
+      expected_models_changed_at: p.modelsChangedAt ?? null,
     },
     p_images: normalizeImages(p.images).map((img, i) => ({ ...stored(img), alt: img.alt ?? null, is_primary: img.isPrimary, kind: img.kind, sort_order: i })),
     p_models: modelList(p.models).map((m) => ({ ...stored(m), format: m.format, file_name: m.fileName, size_bytes: m.sizeBytes ?? null, required_extensions: m.requiredExtensions ?? null })),
@@ -364,6 +367,9 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
 }
 
 const modelList = (m: ProductModels | undefined): ModelAsset[] => [m?.glb, m?.usdz].filter((x): x is ModelAsset => !!x)
+
+/** The product with no 3D files on it or its options (a photo-only duplicate, S4 R-S4-3). */
+const withoutModels = (p: Product): Product => ({ ...p, models: {}, variants: p.variants.map(({ models: _models, ...v }) => v) })
 
 /** Storage paths a product points at: its images and models and every variant's photos and models. */
 export function mediaPaths(p: Pick<Product, 'images' | 'models' | 'variants'>): string[] {
@@ -1013,8 +1019,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (siblings.error) return mapDbError(siblings.error)
         const slug = uniqueSlug(`${src.data.slug}-copy`, siblings.data.map((s) => s.slug), PRODUCT_SLUG_MAX)
         const name = { en: `${src.data.name.en} (copy)`, ...(src.data.name.pt ? { pt: `${src.data.name.pt} (cópia)` } : {}) }
+        // S4 R-S4-3 (Review Focus 1): a business that may not write its own 3D files gets a photo-only copy; the
+        // original keeps its files.
+        const own = await sb.rpc('can_write_own_models', { p_business: src.data.businessId })
+        if (own.error) return mapDbError(own.error)
+        const from = own.data === true ? src.data : withoutModels(src.data)
         // Copies reference the same stored files; nothing is re-uploaded.
-        return changed(await saveProduct(null, { ...src.data, slug, name }))
+        return changed(await saveProduct(null, { ...from, slug, name }))
       }),
     deleteProduct: (id) =>
       guard(async () => {

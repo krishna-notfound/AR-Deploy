@@ -552,6 +552,185 @@ describe('S4 rollback', () => {
 })
 
 // ---- S4 Task 3 tests ----
+describe('S4 Task 3: save and storage with the switch', () => {
+  // save_product and two storage policies are redefinitions (the rollback describe compares them with a database
+  // before S4). The stamp trigger function is new: save_product runs as the caller, who has no grant on
+  // models_changed_at.
+  GONE_AFTER_ROLLBACK.push('private.stamp_models_changed()')
+  let f: S4Fixture
+  const OLD = '2026-01-01T00:00:00+00:00'
+  beforeAll(async () => {
+    f = await seedS4(db, 3)
+    // P (switch off) has a product GLB and option V a GLB; R (switch on) has a product GLB. Seeded as the database owner.
+    await db.exec(`
+      insert into public.product_models (product_id, format, storage_path, file_name, created_at) values
+        ('${f.productP}', 'glb', '${f.bizA}/${f.free(60)}.glb', 'p.glb', '${OLD}'),
+        ('${f.productR}', 'glb', '${f.bizB}/${f.free(61)}.glb', 'r.glb', '${OLD}');
+      insert into public.product_variant_models (variant_id, product_id, format, storage_path, file_name, created_at) values
+        ('${f.variantV}', '${f.productP}', 'glb', '${f.bizA}/${f.free(62)}.glb', 'v.glb', '${OLD}');`)
+  })
+
+  type Tx = Parameters<Parameters<Helpers['as']>[1]>[0]
+  const ROLL = new Error('rollback')
+  /** Runs `fn` in one transaction as `uid`, returns its value and rolls everything back. */
+  async function inTx<T>(uid: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+    let out: T | undefined
+    try {
+      await h.as(uid, async (tx) => {
+        out = await fn(tx)
+        throw ROLL
+      })
+    } catch (e) {
+      if (e !== ROLL) throw e
+    }
+    return out as T
+  }
+  const model = (format: 'glb' | 'usdz', path: string, file = `m.${format}`) => ({ format, storage_path: path, file_name: file, size_bytes: 1000 })
+  const productP = (extra: Record<string, unknown> = {}) => ({
+    id: f.productP, business_id: f.bizA, slug: 'p', name: { en: 'Sofa P renamed' }, category: 'sofa', price: 100000,
+    currency: 'EUR', width: 200, height: 80, depth: 90, dimension_unit: 'cm', ...extra,
+  })
+  const productR = (extra: Record<string, unknown> = {}) => ({
+    id: f.productR, business_id: f.bizB, slug: 'r', name: { en: 'Table R renamed' }, category: 'table', price: 50000,
+    currency: 'EUR', width: 160, height: 75, depth: 90, dimension_unit: 'cm', ...extra,
+  })
+  const storedP = () => [model('glb', `${f.bizA}/${f.free(60)}.glb`, 'p.glb')]
+  const storedR = () => [model('glb', `${f.bizB}/${f.free(61)}.glb`, 'r.glb')]
+  const optionV = (models = [model('glb', `${f.bizA}/${f.free(62)}.glb`, 'v.glb')]) => ({ id: f.variantV, name: { en: 'Oak' }, images: [], models })
+  const SAVE = `select public.save_product($1::jsonb, '[]'::jsonb, $2::jsonb, $3::jsonb) as r`
+  const args = (p: unknown, models: unknown, variants: unknown) => [JSON.stringify(p), JSON.stringify(models), JSON.stringify(variants)]
+  const state = async (tx: Tx, product: string) => ({
+    name: (await tx.query<{ n: string }>(`select name ->> 'en' as n from public.products where id = $1`, [product])).rows[0]!.n,
+    changedAt: (await tx.query<{ t: string | null }>(`select models_changed_at::text as t from public.products where id = $1`, [product])).rows[0]!.t,
+    models: (await tx.query(`select format, storage_path, created_at = '${OLD}'::timestamptz as old from public.product_models where product_id = $1 order by format`, [product])).rows,
+    variantModels: (await tx.query(`select variant_id, format, created_at = '${OLD}'::timestamptz as old from public.product_variant_models where product_id = $1 order by 1, 2`, [product])).rows,
+    options: (await tx.query(`select id from public.product_variants where product_id = $1`, [product])).rows.length,
+  })
+  const committed = async (product: string) => {
+    let s: Awaited<ReturnType<typeof state>> | undefined
+    await db.transaction(async (tx) => {
+      s = await state(tx, product)
+    })
+    return s!
+  }
+
+  it('switch off, owner: an extra usdz row → own_models_not_allowed and nothing written; unchanged models → saved; keep_models with a changed name → saved and model rows untouched; deleting an option with a GLB → allowed', async () => {
+    const before = await committed(f.productP)
+    const extra = [...storedP(), model('usdz', `${f.bizA}/${f.free(63)}.usdz`)]
+    await expect(h.call(f.ownerA, SAVE, args(productP(), extra, [optionV()]))).rejects.toMatchObject({ message: 'own_models_not_allowed', code: '42501' })
+    expect(await committed(f.productP)).toEqual(before)
+    // A changed option model, and removing the product GLB, are changes too.
+    await expect(h.call(f.ownerA, SAVE, args(productP(), storedP(), [optionV([model('glb', `${f.bizA}/${f.free(64)}.glb`)])])))
+      .rejects.toMatchObject({ message: 'own_models_not_allowed' })
+    await expect(h.call(f.ownerA, SAVE, args(productP(), [], [optionV()]))).rejects.toMatchObject({ message: 'own_models_not_allowed' })
+    expect(await committed(f.productP)).toEqual(before)
+
+    const unchanged = await inTx(f.ownerA, async (tx) => {
+      await tx.query(SAVE, args(productP(), storedP(), [optionV()]))
+      return state(tx, f.productP)
+    })
+    expect(unchanged).toEqual({ ...before, name: 'Sofa P renamed' })
+
+    const kept = await inTx(f.ownerA, async (tx) => {
+      await tx.query(SAVE, args(productP({ keep_models: true }), [], [optionV([])]))
+      return state(tx, f.productP)
+    })
+    expect(kept).toEqual({ ...before, name: 'Sofa P renamed' })
+
+    const dropped = await inTx(f.ownerA, async (tx) => {
+      await tx.query(SAVE, args(productP({ keep_models: true }), [], []))
+      return state(tx, f.productP)
+    })
+    expect(dropped).toMatchObject({ options: 0, variantModels: [], models: before.models })
+  })
+
+  it('switch on, owner, and Admin (products.edit) with the switch off: a changed model set is saved and models_changed_at is set', async () => {
+    const usdz = model('usdz', `${f.bizB}/${f.free(65)}.usdz`)
+    const onB = await inTx(f.ownerB, async (tx) => {
+      await tx.query(SAVE, args(productR({ expected_models_changed_at: null }), [...storedR(), usdz], []))
+      return state(tx, f.productR)
+    })
+    expect(onB.models).toEqual([
+      { format: 'glb', storage_path: `${f.bizB}/${f.free(61)}.glb`, old: false },
+      { format: 'usdz', storage_path: usdz.storage_path, old: false },
+    ])
+    expect(onB.changedAt).not.toBeNull()
+
+    const byAdmin = await inTx(f.admin, async (tx) => {
+      await tx.query(SAVE, args(productP({ expected_models_changed_at: null }), [], [optionV([model('glb', `${f.bizA}/${f.free(66)}.glb`)])]))
+      return state(tx, f.productP)
+    })
+    expect(byAdmin.models).toEqual([])
+    expect(byAdmin.variantModels).toEqual([{ variant_id: f.variantV, format: 'glb', old: false }])
+    expect(byAdmin.changedAt).not.toBeNull()
+  })
+
+  it('unchanged models leave models_changed_at as it was; an old client that resends unchanged models (no keep_models, no expected_models_changed_at) saves fine', async () => {
+    for (const p of [productP({ expected_models_changed_at: null }), productP()]) {
+      const s = await inTx(f.ownerA, async (tx) => {
+        await tx.query(SAVE, args(p, storedP(), [optionV()]))
+        return state(tx, f.productP)
+      })
+      expect(s).toMatchObject({ name: 'Sofa P renamed', changedAt: null })
+      expect(s.models).toEqual([{ format: 'glb', storage_path: `${f.bizA}/${f.free(60)}.glb`, old: true }])
+      expect(s.variantModels).toEqual([{ variant_id: f.variantV, format: 'glb', old: true }])
+    }
+  })
+
+  it('expected_models_changed_at older than the stored value (or null) and a changed set → models_changed_elsewhere, nothing written; with keep_models or unchanged models → saved', async () => {
+    await db.query(`update public.products set models_changed_at = '2026-03-03 00:00:00+00' where id = $1`, [f.productR])
+    try {
+      const before = await committed(f.productR)
+      const changed = [...storedR(), model('usdz', `${f.bizB}/${f.free(67)}.usdz`)]
+      for (const expected of ['2026-03-02T00:00:00Z', null]) {
+        await expect(h.call(f.ownerB, SAVE, args(productR({ expected_models_changed_at: expected }), changed, [])))
+          .rejects.toMatchObject({ message: 'models_changed_elsewhere', code: 'P0001' })
+      }
+      expect(await committed(f.productR)).toEqual(before)
+      // The value the editor loaded: saved, and the stamp moves.
+      const fresh = await inTx(f.ownerB, async (tx) => {
+        await tx.query(SAVE, args(productR({ expected_models_changed_at: '2026-03-03T00:00:00Z' }), changed, []))
+        return state(tx, f.productR)
+      })
+      expect(fresh.models).toHaveLength(2)
+      expect(fresh.changedAt).not.toBe(before.changedAt)
+      const stale = '2026-03-02T00:00:00Z'
+      for (const [p, models] of [[productR({ expected_models_changed_at: stale, keep_models: true }), []], [productR({ expected_models_changed_at: stale }), storedR()]] as const) {
+        const s = await inTx(f.ownerB, async (tx) => {
+          await tx.query(SAVE, args(p, models, []))
+          return state(tx, f.productR)
+        })
+        expect(s).toEqual({ ...before, name: 'Table R renamed' })
+      }
+    } finally {
+      await db.query(`update public.products set models_changed_at = null where id = $1`, [f.productR])
+    }
+  })
+
+  it('storage, switch off: an owner insert of {business}/{uuid}.glb and .usdz is refused, .png allowed; switch on: all allowed; a first folder that is not a uuid is refused without an error', async () => {
+    const insert = (name: string) => `insert into storage.objects (bucket_id, name) values ('product-media', '${name}')`
+    for (const ext of ['glb', 'usdz', 'GLB']) {
+      await expect(h.probe(f.ownerA, insert(`${f.bizA}/${f.free(70)}.${ext}`))).rejects.toThrow(/row-level security/)
+    }
+    expect(await h.affected(f.ownerA, insert(`${f.bizA}/${f.free(70)}.png`))).toBe(1)
+    for (const ext of ['glb', 'usdz', 'png']) {
+      expect(await h.affected(f.ownerB, insert(`${f.bizB}/${f.free(71)}.${ext}`))).toBe(1)
+      expect(await h.affected(f.admin, insert(`${f.bizA}/${f.free(72)}.${ext}`))).toBe(1)
+    }
+    await expect(h.probe(f.ownerA, insert(`not-a-uuid/${f.free(73)}.glb`))).rejects.toThrow(/row-level security/)
+    await expect(h.probe(f.ownerA, insert(`not-a-uuid/${f.free(73)}.png`))).rejects.toThrow(/row-level security/)
+    // Update: renaming an image to a .glb is refused with the switch off, allowed with it on.
+    await putObject(db, 'product-media', `${f.bizA}/${f.free(74)}.png`)
+    await putObject(db, 'product-media', `${f.bizB}/${f.free(75)}.png`)
+    try {
+      await expect(h.probe(f.ownerA, `update storage.objects set name = '${f.bizA}/${f.free(74)}.glb' where name = '${f.bizA}/${f.free(74)}.png'`))
+        .rejects.toThrow(/row-level security/)
+      expect(await h.affected(f.ownerB, `update storage.objects set name = '${f.bizB}/${f.free(75)}.glb' where name = '${f.bizB}/${f.free(75)}.png'`)).toBe(1)
+    } finally {
+      await db.query(`delete from storage.objects where name in ($1, $2)`, [`${f.bizA}/${f.free(74)}.png`, `${f.bizB}/${f.free(75)}.png`])
+    }
+  })
+})
 // ---- end S4 Task 3 tests ----
 
 // ---- S4 Task 4 tests ----

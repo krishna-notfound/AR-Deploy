@@ -265,9 +265,11 @@ describe('variant media (20261020143507_variant_media)', () => {
     const stored = await db.query<{ required_extensions: string[] }>('select required_extensions from public.product_variant_models where variant_id = $1', [first!.id])
     expect(stored.rows[0]!.required_extensions).toEqual(['KHR_texture_transform', 'EXT_texture_webp'])
 
-    // Saving again with the stored id keeps the variant (and so any link to it) and replaces its media.
+    // Saving again with the stored id keeps the variant (and so any link to it) and replaces its media. The editor
+    // sends the models_changed_at it loaded (S4 R-S4-17), here the one the first save stamped.
     const second = img(BIZ, 'webp')
-    await save({ variants: [variant({ id: first!.id, name: { en: 'Oak (renamed)' }, images: [photo(path), photo(second)] })] }, id)
+    const loaded = (await db.query<{ t: string }>('select models_changed_at::text as t from public.products where id = $1', [id])).rows[0]!.t
+    await save({ modelsChangedAt: loaded, variants: [variant({ id: first!.id, name: { en: 'Oak (renamed)' }, images: [photo(path), photo(second)] })] }, id)
     const after = await variantsOf(id)
     expect(after).toEqual([{ id: first!.id, en: 'Oak (renamed)' }])
     expect(await countMedia(id, OWNER, 'authenticated')).toEqual({ i: 2, m: 0 })
