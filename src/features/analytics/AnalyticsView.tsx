@@ -2,7 +2,7 @@ import { BarChart3 } from 'lucide-react'
 import { useId, useMemo } from 'react'
 import { Link } from 'react-router'
 import { ActivityTrend } from '@/components/charts/ActivityTrend'
-import { SERIES } from '@/components/charts/Charts'
+import { SERIES, dayLabel } from '@/components/charts/Charts'
 import { PanelHeader } from '@/components/layout/PageHeader'
 import { SampleDataTag } from '@/components/ui/Badge'
 import { Card, CardBody } from '@/components/ui/Card'
@@ -13,14 +13,19 @@ import { StatGroup } from '@/components/ui/StatGroup'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { Skeleton } from '@/components/ui/Skeleton'
 import type { Business, Product, ProductAnalytics } from '@/domain/types'
-import { formatNumber, formatPercent } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
+import { EMBED_VIEWS_SINCE } from '@/services/analytics'
 import { useServiceQuery } from '@/services/hooks'
 import { primaryImage } from '@/lib/product'
-import { MostViewedList, arAttempts } from './MostViewedList'
+import { MostViewedList, allViews, arAttempts, formatArRate, mostViewed } from './MostViewedList'
 
 /** A figure that does not exist (yet): a grey dash at hint size, not a word in the 28px value slot (BRIEF section 4). */
 const MISSING = <span className="text-ui-small font-normal text-ink-muted">—</span>
+
+/** Row key of the one "Deleted product" row: the history of products that were deleted (R-W5-4). */
+const DELETED = 'deleted-products'
 
 /**
  * Shared analytics: product views and AR launch attempts only (design/16).
@@ -38,7 +43,13 @@ export function AnalyticsView({
   editBase: string
 }) {
   const selectId = useId()
-  const summary = useServiceQuery(() => (businessId ? service.getBusinessAnalytics(businessId) : service.getAnalytics()), [businessId])
+  const prefs = usePreferences()
+  // Days are the person's local days (R-W5-2); without preferences the service uses this device's zone.
+  const timeZone = prefs?.timezone
+  const summary = useServiceQuery(
+    () => (businessId ? service.getBusinessAnalytics(businessId, { timeZone }) : service.getAnalytics({ timeZone })),
+    [businessId, timeZone],
+  )
   const products = useServiceQuery(() => service.getProducts(businessId ? { businessId } : {}), [businessId])
   const productMap = useMemo(() => new Map<string, Product>((products.data ?? []).map((p) => [p.id, p])), [products.data])
   const bizMap = useMemo(() => new Map<string, Business>((businesses ?? []).map((b) => [b.id, b])), [businesses])
@@ -50,9 +61,16 @@ export function AnalyticsView({
   if (summary.status === 'error' && !s) return <ErrorState message={summary.error.message} onRetry={summary.refetch} />
   if (products.status === 'error' && !products.data) return <ErrorState message={products.error.message} onRetry={products.refetch} />
 
-  const rows = (s?.byProduct ?? []).filter((r) => productMap.has(r.productId))
-  const top = rows.slice(0, 5)
+  const gone = s?.deletedProducts
+  const rows: ProductAnalytics[] = [
+    ...(s?.byProduct ?? []).filter((r) => productMap.has(r.productId)),
+    ...(gone ? [{ productId: DELETED, businessId: businessId ?? '', ...gone, arRate: allViews(gone) ? gone.arActivations / allViews(gone) : 0 }] : []),
+  ]
+  const top = mostViewed(s?.byProduct ?? [], productMap)
   const showBusinessCol = !!businesses && !businessId
+  const totalViews = s ? s.totals.views + s.totals.embedViews : 0
+  // Rows from before embed_view existed can't be split: say so while the window still reaches back before it.
+  const embedNote = s && s.series.length > 0 && s.series[0]!.date < EMBED_VIEWS_SINCE ? `Embed loads before ${dayLabel(EMBED_VIEWS_SINCE, prefs)} are counted as page views.` : null
 
   const columns: Column<ProductAnalytics>[] = [
     {
@@ -60,6 +78,7 @@ export function AnalyticsView({
       header: 'Product',
       sortValue: (r) => productMap.get(r.productId)?.name.en ?? '',
       cell: (r) => {
+        if (r.productId === DELETED) return <span className="text-ink-muted">Deleted product</span>
         const p = productMap.get(r.productId)
         return (
           <div className="flex items-center gap-3">
@@ -74,7 +93,8 @@ export function AnalyticsView({
     ...(showBusinessCol
       ? [{ key: 'business', header: 'Business', sortValue: (r: ProductAnalytics) => bizMap.get(r.businessId)?.name ?? '', className: 'max-w-[240px]', cell: (r: ProductAnalytics) => <span className="block truncate text-ink-muted" title={bizMap.get(r.businessId)?.name}>{bizMap.get(r.businessId)?.name}</span> } satisfies Column<ProductAnalytics>]
       : []),
-    { key: 'views', header: 'Views', align: 'right', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
+    { key: 'views', header: 'Product page views', align: 'right', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
+    { key: 'embedViews', header: 'Embed views', align: 'right', sortValue: (r) => r.embedViews, cell: (r) => formatNumber(r.embedViews) },
     {
       key: 'ar',
       header: 'AR launch attempts',
@@ -89,8 +109,9 @@ export function AnalyticsView({
       key: 'rate',
       header: 'AR rate',
       align: 'right',
+      className: 'whitespace-nowrap',
       sortValue: (r) => (arAttempts(productMap.get(r.productId), r) === null ? -1 : r.arRate),
-      cell: (r) => (arAttempts(productMap.get(r.productId), r) === null ? <span className="text-ink-faint">No 3D</span> : r.views ? formatPercent(r.arRate) : 'No views'),
+      cell: (r) => (arAttempts(productMap.get(r.productId), r) === null ? <span className="text-ink-faint">No 3D</span> : allViews(r) ? formatArRate(r.arRate) : 'No views'),
     },
   ]
 
@@ -122,34 +143,49 @@ export function AnalyticsView({
         loading={loading}
         stats={[
           { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+          { label: 'Embed views', value: formatNumber(s?.totals.embedViews ?? 0), hint: 'Product embeds on other websites' },
           { label: 'AR launch attempts', value: formatNumber(s?.totals.arActivations ?? 0), hint: 'Last 30 days' },
           // The seeded sample data has no 3D interactions: "0" next to thousands of views would read as broken tracking.
           s?.isSample && !s.totals.modelInteractions
             ? { label: '3D interactions', value: MISSING, hint: 'Not recorded in the sample data' }
             : { label: '3D interactions', value: formatNumber(s?.totals.modelInteractions ?? 0), hint: 'Times a visitor turned or zoomed a 3D model' },
-          s && !s.totals.views
+          s && !totalViews
             ? { label: 'AR launch rate', value: MISSING, hint: 'No views yet' }
-            : { label: 'AR launch rate', value: s ? formatPercent(s.totals.arActivations / s.totals.views) : formatPercent(0), hint: 'AR launch attempts per product page view' },
+            : {
+                label: 'AR launch rate',
+                value: (
+                  <>
+                    {(s ? s.totals.arActivations / totalViews : 0).toFixed(2)}
+                    <span className="mt-0.5 block text-ui-small font-normal tracking-normal text-ink-muted"> AR launches per view</span>
+                  </>
+                ),
+                hint: 'Over page and embed views, last 30 days',
+              },
           { label: 'Published products', value: formatNumber(s?.totals.published ?? 0), hint: 'Current' },
         ]}
         footer={
-          s?.isSample && !onBusinessChange ? (
-            <span className="flex flex-wrap items-center gap-2">
-              <SampleDataTag /> Includes seeded sample data. Not live production analytics.
+          (s?.isSample && !onBusinessChange) || embedNote ? (
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {s?.isSample && !onBusinessChange && (
+                <>
+                  <SampleDataTag /> Includes seeded sample data. Not live production analytics.
+                </>
+              )}
+              {embedNote && <span>{embedNote}</span>}
             </span>
           ) : undefined
         }
       />
 
       <Card>
-        <PanelHeader title="Views and AR launch attempts" description="Daily totals, last 30 days" actions={!onBusinessChange && s?.isSample ? <SampleDataTag /> : undefined} />
-        <CardBody className="sm:px-6 sm:pb-6">{loading || !s ? <Skeleton className="h-40 w-full" /> : <ActivityTrend data={s.series} {...(businessId ? {} : { emptyBody: 'Views and AR opens will appear here once people visit published catalogs.' })} />}</CardBody>
+        <PanelHeader title="Views and AR launch attempts" description="Daily totals of page and embed views, last 30 days" actions={!onBusinessChange && s?.isSample ? <SampleDataTag /> : undefined} />
+        <CardBody className="sm:px-6 sm:pb-6">{loading || !s ? <Skeleton className="h-40 w-full" /> : <ActivityTrend data={s.series} prefs={prefs} {...(businessId ? {} : { emptyBody: 'Views and AR opens will appear here once people visit published catalogs.' })} />}</CardBody>
       </Card>
 
       <div className={showBusinessCol ? 'grid gap-6 lg:grid-cols-2 [&>*]:min-w-0' : ''}>
         {showBusinessCol && (
           <Card>
-            <PanelHeader title="Views by business" description="Product page views, last 30 days" />
+            <PanelHeader title="Views by business" description="Page and embed views, last 30 days" />
             <CardBody className="sm:px-6">
               {loading || !s ? (
                 <Skeleton className="h-40 w-full" />
@@ -160,7 +196,7 @@ export function AnalyticsView({
           </Card>
         )}
         <Card>
-          <PanelHeader title="Most viewed products" description="Product page views, last 30 days" />
+          <PanelHeader title="Most viewed products" description="Page and embed views, last 30 days" />
           <CardBody className="sm:px-6">
             {loading || productsLoading ? (
               <Skeleton className="h-40 w-full" />
@@ -185,6 +221,13 @@ export function AnalyticsView({
           initialSort={{ key: 'views', dir: 'desc' }}
           empty={<EmptyState icon={BarChart3} title="No products to report on" body="Add and publish products to start collecting views." />}
           mobileRow={(r) => {
+            if (r.productId === DELETED)
+              return (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-ui-body text-ink-muted">Deleted product</span>
+                  <span className="shrink-0 text-ui-body font-medium tabular-nums">{formatNumber(allViews(r))} views</span>
+                </div>
+              )
             const p = productMap.get(r.productId)
             const attempts = arAttempts(p, r)
             return (
@@ -195,10 +238,10 @@ export function AnalyticsView({
                     <Link to={`${editBase}/${r.productId}/edit`} className="min-w-0 text-ui-body font-medium hover:underline">
                       {p?.name.en}
                     </Link>
-                    <span className="shrink-0 text-ui-body font-medium tabular-nums">{formatNumber(r.views)} views</span>
+                    <span className="shrink-0 text-ui-body font-medium tabular-nums">{formatNumber(allViews(r))} views</span>
                   </div>
                   <p className="text-ui-body text-ink-muted tabular-nums">
-                    {attempts === null ? 'No 3D model' : `${formatNumber(attempts)} AR launch attempts · ${r.views ? formatPercent(r.arRate) : 'No views'}`}
+                    {attempts === null ? 'No 3D model' : `${formatNumber(attempts)} AR launch attempts · ${allViews(r) ? formatArRate(r.arRate) : 'No views'}`}
                   </p>
                 </div>
               </div>

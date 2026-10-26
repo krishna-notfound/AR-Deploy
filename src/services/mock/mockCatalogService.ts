@@ -9,7 +9,7 @@ import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
 import { MAX_INVITATION_ATTEMPTS, RESEND_COOLDOWN_SECONDS, applyReview } from '../applicationRules'
 import { type CatalogService, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
-import { summarize } from '../analytics'
+import { deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { createMockTeam } from './mockTeam'
 import { createSeed } from './seed'
@@ -162,8 +162,8 @@ export const mockCatalogService: CatalogService = {
         const productIds = new Set(d.products.filter((p) => p.businessId === id).map((p) => p.id))
         d.businesses = d.businesses.filter((b) => b.id !== id)
         d.products = d.products.filter((p) => p.businessId !== id)
-        d.dailyStats = d.dailyStats.filter((s) => !productIds.has(s.productId))
-        d.events = d.events.filter((e) => !productIds.has(e.productId))
+        d.dailyStats = d.dailyStats.filter((s) => s.businessId !== id)
+        d.events = d.events.filter((e) => e.businessId !== id)
         logActivity(d, 'business_deleted', `Business “${current.name}” and its ${productIds.size} products were deleted`, {})
       })
       return ok(undefined)
@@ -302,8 +302,9 @@ export const mockCatalogService: CatalogService = {
       if (!current) return fail('NOT_FOUND', 'Product not found.')
       store.update((d) => {
         d.products = d.products.filter((p) => p.id !== id)
-        d.dailyStats = d.dailyStats.filter((s) => s.productId !== id)
-        d.events = d.events.filter((e) => e.productId !== id)
+        // Its history stays in the business totals as "Deleted product" (R-W5-4).
+        d.dailyStats = d.dailyStats.map((s) => (s.productId === id ? { ...s, productId: null } : s))
+        d.events = d.events.map((e) => (e.productId === id ? { ...e, productId: null } : e))
         logActivity(d, 'product_deleted', `Product “${current.name.en}” was deleted`, { businessId: current.businessId })
       })
       return ok(undefined)
@@ -337,12 +338,12 @@ export const mockCatalogService: CatalogService = {
     }),
 
   // ---------------- analytics ----------------
-  getAnalytics: () => run(() => ok(summarize(store.get()))),
+  getAnalytics: (opts) => run(() => ok(summarize(store.get(), undefined, new Date(), true, opts?.timeZone ?? deviceTimeZone()))),
 
-  getBusinessAnalytics: (businessId) =>
+  getBusinessAnalytics: (businessId, opts) =>
     run(() => {
       if (!store.get().businesses.some((b) => b.id === businessId)) return fail('NOT_FOUND', 'Business not found.')
-      return ok(summarize(store.get(), businessId))
+      return ok(summarize(store.get(), businessId, new Date(), true, opts?.timeZone ?? deviceTimeZone()))
     }),
 
   recordEvent: ({ productId, type }) =>

@@ -673,7 +673,7 @@ function seedDailyStats(products: Product[], now: number): DailyStat[] {
         const trend = 1 + (29 - day) * 0.012
         const views = Math.round(popularity * weekendBoost * trend * (0.6 + rand() * 0.8))
         const arActivations = Math.round(views * arPropensity * (0.7 + rand() * 0.6))
-        out.push({ productId: p.id, businessId: p.businessId, date: isoDay(date), views, arActivations })
+        out.push({ productId: p.id, businessId: p.businessId, date: isoDay(date), views, embedViews: 0, arActivations })
       }
     })
   return out

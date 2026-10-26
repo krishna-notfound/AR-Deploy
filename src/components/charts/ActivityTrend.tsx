@@ -1,7 +1,7 @@
 import { Table2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import type { DailyPoint } from '@/domain/types'
-import { formatNumber } from '@/lib/format'
+import { type DatePrefs, formatNumber } from '@/lib/format'
 import { Button } from '../ui/Button'
 import { EmptyState } from '../ui/States'
 import { CombinedTrendChart, SERIES, type SeriesKey, SeriesTable, TrendChart } from './Charts'
@@ -16,9 +16,12 @@ export function ActivityTrend({
   data,
   compact,
   emptyBody = 'Views and AR opens will appear here once people visit your catalog.',
+  prefs,
 }: {
   data: DailyPoint[]
   compact?: boolean
+  /** The person's date settings (`usePreferences()`): the axis, tooltip and table show days in their format. */
+  prefs?: DatePrefs
   /** The zero-activity body; the default speaks to one business, platform pages pass their own. */
   emptyBody?: string
 }) {
@@ -74,7 +77,7 @@ export function ActivityTrend({
           )}
           <div className="ml-auto">{tableToggle}</div>
         </div>
-        {showTable ? <SeriesTable data={data} /> : <CombinedTrendChart data={data} show={show} height={220} />}
+        {showTable ? <SeriesTable data={data} prefs={prefs} /> : <CombinedTrendChart data={data} show={show} height={220} prefs={prefs} />}
       </div>
     )
   }
@@ -82,7 +85,7 @@ export function ActivityTrend({
   return (
     <div>
       {showTable ? (
-        <SeriesTable data={data} />
+        <SeriesTable data={data} prefs={prefs} />
       ) : (
         <div className="grid gap-8 lg:grid-cols-2">
           {KEYS.map((k) => (
@@ -92,7 +95,7 @@ export function ActivityTrend({
                 <span className="font-medium text-ink">{SERIES[k].label}</span>
                 <span className="text-ink-muted tabular-nums">{formatNumber(k === 'views' ? views : ar)} in 30 days</span>
               </div>
-              <TrendChart data={data} series={k} height={160} />
+              <TrendChart data={data} series={k} height={160} prefs={prefs} />
             </div>
           ))}
         </div>

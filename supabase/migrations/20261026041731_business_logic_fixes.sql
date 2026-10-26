@@ -94,3 +94,152 @@ alter table public.email_log add constraint email_log_kind_check
                   'security_code', 'security_notice', 'closure_request',
                   'application_decision', 'business_notice', 'team_notice'));
 -- ---- end S1.5 Task 1 ----
+
+-- =============================================================================
+-- S1.5 Task 7: analytics data: embed views, deleted products, exact counts, local days (R-W5-2, R-W5-3, R-W5-4, R-W5-6)
+-- =============================================================================
+
+-- R-W5-3: an embed load is its own event, so the product page and the embed each count once.
+alter table public.product_analytics
+  drop constraint product_analytics_event_type_check,
+  add constraint product_analytics_event_type_check
+    check (event_type in ('view', 'embed_view', 'ar_activation', 'model_interaction'));
+
+-- R-W5-4: a product's history outlives the product (product_id becomes null and the row stays in the business
+-- totals as "Deleted product"); deleting the business still deletes every analytics row it owns.
+alter table public.product_analytics alter column product_id drop not null;
+alter table public.product_analytics
+  drop constraint product_analytics_product_id_business_id_fkey,
+  add constraint product_analytics_product_id_business_id_fkey
+    foreign key (product_id, business_id) references public.products (id, business_id) on delete set null (product_id),
+  add constraint product_analytics_business_id_fkey
+    foreign key (business_id) references public.businesses (id) on delete cascade;
+
+-- R-W5-3: the same view with embed_views appended as its last column (create or replace keeps the grants).
+create or replace view public.product_analytics_daily
+with (security_invoker = true) as
+select
+  business_id,
+  product_id,
+  (created_at at time zone 'utc')::date as day,
+  count(*) filter (where event_type = 'view') as views,
+  count(*) filter (where event_type = 'ar_activation') as ar_activations,
+  count(*) filter (where event_type = 'model_interaction') as model_interactions,
+  count(*) filter (where event_type = 'embed_view') as embed_views
+from public.product_analytics
+group by business_id, product_id, (created_at at time zone 'utc')::date;
+
+-- R-W5-3: same body as 20261024065538 (OWN-04) plus embed_view, which needs no 3D model.
+create or replace function public.record_event_limited(
+  p_visitor_key text,
+  p_product_id  uuid,
+  p_business_id uuid,
+  p_event_type  text
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_limit  constant integer := 30; -- events per visitor key per minute
+  v_window timestamptz := date_trunc('minute', now());
+  v_hits   integer;
+begin
+  if p_visitor_key is null or p_visitor_key !~ '^[0-9a-f]{64}$' then
+    return 'invalid';
+  end if;
+
+  insert into private.analytics_hits as h (visitor_key, window_start)
+  values (p_visitor_key, v_window)
+  on conflict (visitor_key, window_start) do update set hits = h.hits + 1
+  returning h.hits into v_hits;
+
+  -- Opportunistic cleanup keeps the table to roughly the last hour.
+  if random() < 0.02 then
+    delete from private.analytics_hits where window_start < now() - interval '1 hour';
+  end if;
+
+  if v_hits > v_limit then
+    return 'rate_limited';
+  end if;
+
+  if p_event_type is null or p_event_type not in ('view', 'embed_view', 'ar_activation', 'model_interaction')
+     or not exists (
+       select 1 from public.products p
+       join public.businesses b on b.id = p.business_id
+       where p.id = p_product_id
+         and p.business_id = p_business_id
+         and p.status = 'published'
+         and b.status = 'active'
+     ) then
+    return 'invalid';
+  end if;
+
+  -- The viewer and AR button only exist when the product (or one of its variants) has a model.
+  if p_event_type in ('ar_activation', 'model_interaction')
+     and not exists (select 1 from public.product_models m where m.product_id = p_product_id)
+     and not exists (select 1 from public.product_variant_models vm where vm.product_id = p_product_id) then
+    return 'invalid';
+  end if;
+
+  insert into public.product_analytics (business_id, product_id, event_type)
+  values (p_business_id, p_product_id, p_event_type);
+  return 'recorded';
+end;
+$$;
+revoke execute on function public.record_event_limited(text, uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.record_event_limited(text, uuid, uuid, text) to service_role;
+
+-- R-W5-6: exact product counts per business in one row each (the API caps a plain products read at 1000 rows).
+-- security_invoker: a caller counts only the products RLS lets them read.
+create view public.business_product_counts
+with (security_invoker = true) as
+select
+  business_id,
+  count(*)::integer as total,
+  (count(*) filter (where status = 'published'))::integer as published,
+  (count(*) filter (where status = 'draft'))::integer as drafts
+from public.products
+group by business_id;
+revoke all on public.business_product_counts from public, anon, authenticated;
+grant select on public.business_product_counts to authenticated, service_role;
+
+-- R-W5-2: daily totals by the caller's local day. Security invoker, so the product_analytics RLS policies decide
+-- which rows count. The window is the last p_days local dates, today included; its start is local midnight, so a
+-- day that is 23 or 25 hours long (DST) is bucketed whole.
+create function public.analytics_daily(p_tz text, p_days integer default 30, p_business uuid default null)
+returns table (business_id uuid, product_id uuid, day date, views bigint, embed_views bigint, ar_activations bigint,
+               model_interactions bigint)
+language plpgsql
+stable
+security invoker
+set search_path = ''
+as $$
+declare
+  v_today date;
+begin
+  if p_tz is null or not exists (select 1 from pg_catalog.pg_timezone_names z where z.name = p_tz) then
+    raise exception 'invalid_timezone' using errcode = '22023';
+  end if;
+  if p_days is null or p_days < 1 or p_days > 366 then
+    raise exception 'invalid_request' using errcode = '22023';
+  end if;
+  v_today := (now() at time zone p_tz)::date;
+  return query
+    select a.business_id, a.product_id, (a.created_at at time zone p_tz)::date,
+           count(*) filter (where a.event_type = 'view'),
+           count(*) filter (where a.event_type = 'embed_view'),
+           count(*) filter (where a.event_type = 'ar_activation'),
+           count(*) filter (where a.event_type = 'model_interaction')
+      from public.product_analytics a
+     where a.created_at >= ((v_today - (p_days - 1))::timestamp at time zone p_tz)
+       and a.created_at < ((v_today + 1)::timestamp at time zone p_tz)
+       and (p_business is null or a.business_id = p_business)
+     group by a.business_id, a.product_id, (a.created_at at time zone p_tz)::date
+     order by 3, 1, 2;
+end;
+$$;
+revoke execute on function public.analytics_daily(text, integer, uuid) from public, anon;
+grant execute on function public.analytics_daily(text, integer, uuid) to authenticated, service_role;
+-- ---- end S1.5 Task 7 ----

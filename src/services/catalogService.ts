@@ -160,8 +160,9 @@ export interface CatalogService {
   unpublishProduct(id: ID): Promise<Result<Product>>
 
   // analytics & activity
-  getAnalytics(): Promise<Result<AnalyticsSummary>>
-  getBusinessAnalytics(businessId: ID): Promise<Result<AnalyticsSummary>>
+  /** The last 30 local days in `timeZone` (pass `usePreferences()?.timezone`; default: this device's zone). */
+  getAnalytics(opts?: { timeZone?: string }): Promise<Result<AnalyticsSummary>>
+  getBusinessAnalytics(businessId: ID, opts?: { timeZone?: string }): Promise<Result<AnalyticsSummary>>
   recordEvent(e: { productId: ID; businessId: ID; type: AnalyticsEventType }): Promise<Result<void>>
   getRecentActivity(opts?: { businessId?: ID; limit?: number }): Promise<Result<ActivityItem[]>>
 
