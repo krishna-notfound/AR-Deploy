@@ -4,6 +4,7 @@ import type { ProductInput, Result } from '../catalogService'
 import { isValidDb } from './db'
 import { mockCatalogService as svc } from './mockCatalogService'
 import { createSeed } from './seed'
+import { sessionRequestMedia } from './mockModelRequestShared'
 import { DB_KEY, store } from './store'
 import { mockAccountService, resetMockAccount } from './mockAccount'
 
@@ -586,5 +587,121 @@ describe('mock invitation email (S1.5 Task 14, R-W8-6)', () => {
     unwrap(await svc.resendOwnerInvitation('biz_casa', 'en'))
     const mail = (store.get().emails ?? []).find((e) => e.kind === 'invitation_resend')
     expect(mail?.subject).toMatch(/^New invitation code/)
+  })
+})
+
+describe('S4 Task 8: request files are cleaned up (R-S4-18)', () => {
+  const request = (id: string, productId: string, businessId: string, variantId?: string) => ({
+    id, businessId, productId, ...(variantId ? { variantId } : {}), status: 'requested' as const,
+    createdAt: '2026-10-26T10:00:00.000Z', updatedAt: '2026-10-26T10:00:00.000Z', photos: [],
+  })
+  const seedSession = (id: string) => {
+    sessionRequestMedia.photos.set(id, [`blob:photo-${id}`])
+    sessionRequestMedia.staged.set(id, { glb: { url: `blob:glb-${id}`, fileName: 'm.glb', sizeBytes: 1 } } as never)
+  }
+
+  it('deleting a product or business removes its requests and revokes their session photo URLs', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    try {
+      const mine = unwrap(await svc.getProductsByBusiness('biz_casa'))
+      const other = unwrap(await svc.getProductsByBusiness('biz_nord'))[0]!
+      store.update((d) => {
+        d.modelRequests = [request('r_prod', mine[0]!.id, 'biz_casa'), request('r_prod2', mine[1]!.id, 'biz_casa'), request('r_other', other.id, 'biz_nord')]
+      })
+      for (const id of ['r_prod', 'r_prod2', 'r_other']) seedSession(id)
+      unwrap(await svc.deleteProduct(mine[0]!.id))
+      expect(store.get().modelRequests!.map((r) => r.id)).toEqual(['r_prod2', 'r_other'])
+      expect(revoke).toHaveBeenCalledWith('blob:photo-r_prod')
+      expect(revoke).toHaveBeenCalledWith('blob:glb-r_prod')
+      expect(sessionRequestMedia.photos.has('r_prod')).toBe(false)
+      unwrap(await svc.deleteBusiness('biz_casa'))
+      expect(store.get().modelRequests!.map((r) => r.id)).toEqual(['r_other'])
+      expect(revoke).toHaveBeenCalledWith('blob:photo-r_prod2')
+      expect(sessionRequestMedia.photos.has('r_other')).toBe(true)
+      expect(revoke).not.toHaveBeenCalledWith('blob:photo-r_other')
+    } finally {
+      revoke.mockRestore()
+    }
+  })
+
+  it('saving a product without an option removes only the requests of that option', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    try {
+      const p = unwrap(await svc.getProductsByBusiness('biz_casa')).find((x) => x.variants.length >= 2)!
+      const [gone, kept] = p.variants
+      store.update((d) => {
+        d.modelRequests = [request('r_gone', p.id, 'biz_casa', gone!.id), request('r_kept', p.id, 'biz_casa', kept!.id), request('r_whole', p.id, 'biz_casa')]
+      })
+      for (const id of ['r_gone', 'r_kept', 'r_whole']) seedSession(id)
+      unwrap(await svc.updateProduct(p.id, { variants: p.variants.filter((v) => v.id !== gone!.id) }))
+      expect(store.get().modelRequests!.map((r) => r.id)).toEqual(['r_kept', 'r_whole'])
+      expect(revoke).toHaveBeenCalledWith('blob:photo-r_gone')
+      expect(revoke).not.toHaveBeenCalledWith('blob:photo-r_kept')
+      expect(revoke).not.toHaveBeenCalledWith('blob:photo-r_whole')
+    } finally {
+      revoke.mockRestore()
+    }
+  })
+})
+
+describe('S4 Task 3: own 3D uploads and stale model saves (demo, R-S4-3, R-S4-17, R-S4-19)', () => {
+  const asOwner = (businessId: string) => localStorage.setItem('arfurn:account', JSON.stringify({ role: 'business_admin', businessId }))
+  const asAdmin = () => localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
+  const usdz = { format: 'usdz' as const, url: 'blob:demo-usdz', fileName: 'x.usdz', status: 'session-only' as const }
+  const file = (name: string) => new File(['x'], name)
+
+  it('mock: an owner of a switch-off business saving a changed model set → own_models_not_allowed; unchanged or keepModels → saved', async () => {
+    asOwner('biz_casa')
+    const src = unwrap(await svc.getProductById('prd_glam_sofa'))
+    const refused = await svc.updateProduct(src.id, { models: { ...src.models, usdz } })
+    expect(refused).toMatchObject({
+      ok: false,
+      error: { code: 'PERMISSION', reason: 'own_models_not_allowed', message: '3D files for this business are made by the Sanctus team. Request a 3D model instead.' },
+    })
+    expect(unwrap(await svc.getProductById(src.id)).models).toEqual(src.models)
+    const renamed = unwrap(await svc.updateProduct(src.id, { name: { en: 'Renamed' }, models: src.models, modelsChangedAt: src.modelsChangedAt }))
+    expect(renamed.models).toEqual(src.models)
+    const kept = unwrap(await svc.updateProduct(src.id, { name: { en: 'Kept' }, models: {}, keepModels: true }))
+    expect(kept.models).toEqual(src.models)
+    expect(kept).not.toHaveProperty('keepModels')
+    expect(kept.modelsChangedAt).toBe(src.modelsChangedAt)
+  })
+
+  it('mock: uploadAsset glb/usdz → own_models_not_allowed for a switch-off owner; an image is not refused; a switch-on owner and staff may upload 3D', async () => {
+    asOwner('biz_casa')
+    for (const kind of ['glb', 'usdz'] as const)
+      expect(await svc.uploadAsset({ kind, file: file(`m.${kind}`), businessId: 'biz_casa' })).toMatchObject({ ok: false, error: { reason: 'own_models_not_allowed' } })
+    const img = await svc.uploadAsset({ kind: 'image', file: new File(['x'], 'p.png', { type: 'image/png' }), businessId: 'biz_casa' })
+    expect(img.ok ? undefined : img.error.reason).not.toBe('own_models_not_allowed')
+    asOwner('biz_nord')
+    expect((await svc.uploadAsset({ kind: 'glb', file: file('m.glb'), businessId: 'biz_nord' })).ok).toBe(true)
+    asAdmin()
+    expect((await svc.uploadAsset({ kind: 'glb', file: file('m.glb'), businessId: 'biz_casa' })).ok).toBe(true)
+  })
+
+  it('mock: a switch-on owner and Admin may change models, which stamps modelsChangedAt; models_changed_elsewhere when the stored modelsChangedAt is newer', async () => {
+    asOwner('biz_nord')
+    const src = unwrap(await svc.getProductById('prd_sheen_chair'))
+    const saved = unwrap(await svc.updateProduct(src.id, { models: { ...src.models, usdz }, modelsChangedAt: src.modelsChangedAt }))
+    expect(saved.models.usdz?.url).toBe('blob:demo-usdz')
+    expect(saved.modelsChangedAt).toBeDefined()
+    // An editor that loaded the product before that change (an older value, or none) is refused for a model change only.
+    for (const stale of [undefined, '2000-01-01T00:00:00.000Z']) {
+      expect(await svc.updateProduct(src.id, { models: {}, modelsChangedAt: stale })).toMatchObject({ ok: false, error: { code: 'CONFLICT', reason: 'models_changed_elsewhere' } })
+      expect(unwrap(await svc.updateProduct(src.id, { name: { en: 'Text only' }, models: saved.models, modelsChangedAt: stale })).models).toEqual(saved.models)
+    }
+    asAdmin()
+    const casa = unwrap(await svc.getProductById('prd_glam_sofa'))
+    expect(unwrap(await svc.updateProduct(casa.id, { models: {}, modelsChangedAt: casa.modelsChangedAt })).modelsChangedAt).toBeDefined()
+  })
+
+  it('Review Focus 1: duplicateProduct for a switch-off business copies no 3D rows and the original keeps its GLB', async () => {
+    asOwner('biz_casa')
+    const copy = unwrap(await svc.duplicateProduct('prd_glam_sofa'))
+    expect(copy.models).toEqual({})
+    expect(copy.variants.every((v) => !v.models)).toBe(true)
+    expect(unwrap(await svc.getProductById('prd_glam_sofa')).models.glb).toBeDefined()
+    asOwner('biz_nord')
+    expect(unwrap(await svc.duplicateProduct('prd_sheen_chair')).models.glb).toBeDefined()
   })
 })

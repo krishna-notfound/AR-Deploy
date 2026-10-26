@@ -19,7 +19,7 @@ import { DropdownMenu } from '../ui/Menu'
 import { useFocusTrap } from '../ui/Modal'
 import { BrandMark, Wordmark } from '../ui/BrandMark'
 import { InlineNotice } from '../ui/States'
-import { DashboardContext, type DashboardContextValue, useDashboard, usePendingApplications } from './dashboardContext'
+import { DashboardContext, type DashboardContextValue, useDashboard, usePendingApplications, useRequestedModelRequests } from './dashboardContext'
 import { FullPageSpinner } from './FullPageSpinner'
 import { BreadcrumbSlotContext, type BreadcrumbSlot } from './PageHeader'
 import type { NavItem } from './nav'
@@ -196,13 +196,14 @@ function Brand({ collapsed, variant }: { collapsed?: boolean; variant: Variant }
 }
 
 function NavBadge({ kind, collapsed }: { kind: NonNullable<NavItem['badge']>; collapsed?: boolean }) {
-  const q = usePendingApplications(kind === 'pendingApplications')
-  const n = q.data?.total ?? 0
+  const applications = usePendingApplications(kind === 'pendingApplications')
+  const requests = useRequestedModelRequests(kind === 'requestedModelRequests')
+  const n = (kind === 'pendingApplications' ? applications.data?.total : requests.data) ?? 0
   if (!n) return null
   const text = n > 99 ? '99+' : formatNumber(n)
   return (
     <>
-      <span className="sr-only">, {formatNumber(n)} awaiting review</span>
+      <span className="sr-only">, {formatNumber(n)} {kind === 'pendingApplications' ? 'awaiting review' : 'waiting to start'}</span>
       <span
         aria-hidden
         className={cn(

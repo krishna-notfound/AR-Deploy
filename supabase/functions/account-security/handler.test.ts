@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { type EmailConfig, type LogEntry, sendAndLog } from '../_shared/email'
 import { sha256Hex } from '../_shared/http'
-import { type AccountSecurityDeps, type Factor, aalFromJwt, handleAccountSecurity } from './handler'
+import { type AccountSecurityDeps, type Factor, SWEEP_BUCKETS, aalFromJwt, handleAccountSecurity, removeBusinessFolder } from './handler'
 
 const OWNER = '00000000-0000-4000-8000-000000000001'
 const STAFF = '00000000-0000-4000-8000-000000000002'
@@ -610,6 +610,49 @@ describe('account-security', () => {
     expect(s.deletedUsers).toEqual([BIZ_OWNER])
     expect(s.events.at(-1)!.metadata.user_delete_failed).toBeUndefined()
     expect(s.sends.map((m) => m.to)).toEqual(['owner@sanctus.test', 'maria@studio.pt'])
+  })
+
+  it('SWEEP_BUCKETS lists product-media, business-logos and model-request-photos', () => {
+    expect([...SWEEP_BUCKETS]).toEqual(['product-media', 'business-logos', 'model-request-photos'])
+  })
+
+  describe('removeBusinessFolder (R-S4-18)', () => {
+    type Entry = { name: string; id: string | null }
+    const storage = (tree: Record<string, Entry[]>, failRemove: string[] = []) => {
+      const removed: string[] = []
+      return {
+        removed,
+        list: async (bucket: string, folder: string, offset: number) => (offset === 0 ? (tree[`${bucket}/${folder}`] ?? []) : []),
+        remove: async (bucket: string, paths: string[]) => {
+          if (failRemove.includes(bucket)) throw new Error('remove failed')
+          removed.push(...paths.map((p) => `${bucket}:${p}`))
+        },
+      }
+    }
+    const tree = {
+      'model-request-photos/b1': [{ name: 'r1', id: null }, { name: 'r2', id: null }],
+      'model-request-photos/b1/r1': [{ name: 'a.jpg', id: 'x' }, { name: 'b.jpg', id: 'y' }],
+      'model-request-photos/b1/r2': [{ name: 'c.jpg', id: 'z' }],
+      'product-media/b1': [{ name: 'm.glb', id: 'g' }, { name: 'sub', id: null }],
+      'product-media/b1/sub': [{ name: 'never.glb', id: 'n' }],
+    }
+
+    it('descends one level for model-request-photos and removes the request subfolders files', async () => {
+      const s = storage(tree)
+      await removeBusinessFolder(s, 'model-request-photos', 'b1')
+      expect(s.removed.sort()).toEqual(['model-request-photos:b1/r1/a.jpg', 'model-request-photos:b1/r1/b.jpg', 'model-request-photos:b1/r2/c.jpg'])
+    })
+
+    it('does not descend in the other buckets, and never leaves the business folder', async () => {
+      const s = storage(tree)
+      await removeBusinessFolder(s, 'product-media', 'b1')
+      expect(s.removed).toEqual(['product-media:b1/m.glb'])
+    })
+
+    it('throws when a subfolder files cannot be removed, after trying every subfolder', async () => {
+      const s = storage(tree, ['model-request-photos'])
+      await expect(removeBusinessFolder(s, 'model-request-photos', 'b1')).rejects.toThrow()
+    })
   })
 
   it('complete_closure: a failed storage sweep is noted and the closure still completes', async () => {

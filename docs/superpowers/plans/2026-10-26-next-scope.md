@@ -44,6 +44,8 @@ Owner's words (2026-10-26): "i dont need mantainance part just make privacy poli
 
 **Dropped / later**: none of the other S4 ideas.
 
+**Status (2026-10-26):** built on `s4/integration` (ADR-0034, spec `docs/superpowers/specs/2026-10-26-s4-3d-model-requests-design.md`). All nine tasks are merged, with demo e2e journeys at desktop and mobile. Not yet applied to `zggylkbgajamhriebdrg`: the owner's go-ahead, the pre-flight and the live checks are next (`docs/OPERATIONS_RUNBOOK.md`, "S4 3D model requests"). Owner decision: no limit on open requests per business.
+
 ## AR: audit and fix
 
 - The AR button was fixed (see above). Still to audit, with real devices:

@@ -28,10 +28,10 @@ afterEach(() => {
 })
 
 describe('Role permissions (ADR-0029)', () => {
-  it('lists the 15 permissions in three groups for Admin and Team; the Owner has everything', { timeout: 20_000 }, async () => {
+  it('lists the 16 permissions in three groups for Admin and Team; the Owner has everything', { timeout: 20_000 }, async () => {
     open()
     await screen.findByRole('heading', { level: 1, name: 'Role permissions' })
-    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     for (const g of ['Businesses & applications', 'Products & catalogues', 'Insight & records']) expect(screen.getByRole('heading', { name: g })).toBeInTheDocument()
     expect(box('Team', 'View businesses')).toBeChecked()
     expect(box('Team', 'Publish and unpublish')).not.toBeChecked()
@@ -41,7 +41,7 @@ describe('Role permissions (ADR-0029)', () => {
   it('shows the save bar only while there are unsaved changes', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open()
-    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
     expect(screen.queryByText('All changes saved')).toBeNull()
     await user.click(box('Team', 'Publish and unpublish'))
@@ -54,7 +54,7 @@ describe('Role permissions (ADR-0029)', () => {
   it('keeps one always-mounted polite live region that holds the full status text, even when the bar is hidden', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open()
-    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     const region = document.querySelector('[aria-live="polite"][data-save-status]') as HTMLElement
     expect(region).not.toBeNull()
     expect(region).toHaveTextContent('')
@@ -70,7 +70,7 @@ describe('Role permissions (ADR-0029)', () => {
     const user = userEvent.setup()
     vi.spyOn(service, 'setRolePermissions').mockResolvedValue(fail('UNKNOWN', 'Network down.'))
     open()
-    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     await user.click(box('Team', 'Publish and unpublish'))
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     expect(await screen.findByText('Permissions not saved')).toBeInTheDocument()
@@ -82,7 +82,7 @@ describe('Role permissions (ADR-0029)', () => {
   it('moves focus to the page heading when a successful save removes the bar', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open()
-    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     await user.click(box('Team', 'Publish and unpublish'))
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull())
@@ -94,7 +94,7 @@ describe('Role permissions (ADR-0029)', () => {
   it('counts unsaved changes, and Cancel puts them back', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open()
-    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     await user.click(box('Team', 'Publish and unpublish'))
     expect(screen.getAllByText('1 unsaved change').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -113,7 +113,7 @@ describe('Role permissions (ADR-0029)', () => {
       return r
     })
     open()
-    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     await user.click(box('Team', 'Create and edit products'))
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     const dialog = await screen.findByRole('dialog')
@@ -143,7 +143,7 @@ describe('Role permissions (ADR-0029)', () => {
   it('asks before leaving with unsaved changes', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open()
-    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     await user.click(box('Admin', 'Delete businesses'))
     await user.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: /Overview/ }))
     expect(await screen.findByRole('dialog', { name: 'Leave without saving?' })).toBeInTheDocument()
@@ -155,19 +155,22 @@ describe('Role permissions (ADR-0029)', () => {
       localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
       expect((await service.setRolePermissions('team', perms)).ok).toBe(true)
       open()
-      await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+      await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
     }
 
     it("shows 'Includes: {labels}' under each permission", async () => {
       open()
-      await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
-      // The 9 permissions that need others, once each.
-      expect(screen.getAllByText(/^Includes: /)).toHaveLength(9)
+      await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(32))
+      // The 10 permissions that need others, once each.
+      expect(screen.getAllByText(/^Includes: /)).toHaveLength(10)
       // Publish and Delete products both need editing (and so viewing).
       expect(screen.getAllByText('Includes: View products and catalogues, Create and edit products')).toHaveLength(2)
       expect(screen.getByText('Includes: View businesses, Create and edit businesses, View products and catalogues, Create and edit products, Delete products')).toBeInTheDocument()
       // Approve and Reject both need View applications.
       expect(screen.getAllByText('Includes: View applications')).toHaveLength(2)
+      // R-S4-1: Handle 3D model requests needs both views.
+      const models = screen.getByText('Handle 3D model requests').closest('li')!
+      expect(within(models).getByText('Includes: View businesses, View products and catalogues')).toBeInTheDocument()
     })
 
     it('ticking products.publish ticks and locks products.edit and products.view', async () => {

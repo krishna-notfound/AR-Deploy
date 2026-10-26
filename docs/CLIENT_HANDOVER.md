@@ -148,6 +148,43 @@ Use **Add Product** in the business dashboard, or **All Products → New** in Su
 - **Publish** needs: an English name, a price above zero, at least one gallery photo, and width, height and depth above zero. A published product is visible only while its business is **Active**.
 - In the product list you can also **Unpublish** (the product goes back to draft), **Duplicate** (the copy is a draft named "(copy)" and uses the same files), **Copy URL** and **Delete** (you'll be asked to confirm).
 
+### Requesting a 3D model from the Sanctus team
+
+Most businesses do not make their own 3D files. Instead you ask the Sanctus team to make the model from photos of the product, and you are emailed when it is ready. There is no charge per request and no limit on how many you send.
+
+**How to request one (business owner)**
+1. Open the product in your dashboard, fill in its width, height and depth (the model is made to that size) and **save it**. A new product must be saved as a draft first.
+2. In the **3D models** section, find **Request a 3D model**. If your business is allowed to upload its own files, choose **Request from Sanctus (recommended)** first.
+3. Add **2 to 10 photos** (JPG, PNG or WebP, up to 10 MB each): the front, the back, both sides, an angle, and close-ups of the material, in even light and without people. Only the Sanctus team sees these photos. They are separate from your catalog photos and never appear in your catalog.
+4. For a colour or option that needs its own model, pick it under **Model for**. Add a note if it helps (for example "the legs are oak and the cushion is removable"), then press **Send request**.
+
+**What you see afterwards**
+- **Requested:** the Sanctus team has not started. You can press **Cancel request** until work starts (the photos are then deleted).
+- **In progress:** work has started. To stop it, contact the Sanctus team.
+- **Ready:** the model is attached to the product, and you are emailed. If the product is published, customers see the 3D view and AR straight away. If you had the editor open, press **Reload** to see it.
+- **Declined:** the team could not make the model from the photos. The reason is shown and emailed. Press **Send a new request** with better photos.
+- The product list shows **3D requested**, **3D in progress** or **3D declined** next to each product, and you can filter for products with open requests.
+- Until the model is ready the product shows its photos only, and customers see nothing about a request. You can publish the product meanwhile.
+
+**How staff deliver a model (platform team with "Handle 3D model requests")**
+1. Open **3D requests** in the admin menu. The number beside it is how many requests are waiting. Tabs: Open, Delivered, Declined, Cancelled, All.
+2. Open a request. Look at the photos (select one to enlarge it, use the arrow keys to move, **Download original** to save it), the size, material and the business's note.
+3. Press **Start work**, make the model elsewhere, then upload the **GLB** and, for iPhones, the **USDZ** under **Model files**. The same checks as in the product editor apply (format, size, the size check against the entered dimensions). The files stay with the request until you deliver.
+4. Press **Deliver model**. The files **replace** the product's current 3D files (or the option's), the product gets them at once, and the business owner is emailed. Without a USDZ, iPhone AR depends on the phone converting the GLB; the dialog warns about this.
+5. To refuse, press **Decline** and write a reason. It is sent to the business, so make it useful (for example "the photos are too dark; please send new ones in daylight").
+6. If the email cannot be sent, the screen says so; the delivery or decline still stands.
+
+**Who may upload their own 3D files**
+- On each business's page in the admin, the **3D models** card has the switch **Can upload its own 3D files**. Only the platform team changes it; businesses cannot.
+- **Off** (the default for new businesses): the business can request models but cannot add, replace or remove 3D files itself. Its product editor shows the current files as "managed by the Sanctus team". Photos, text and prices stay editable.
+- **On:** the business can upload its own GLB and USDZ files as before, and can still request models.
+- Businesses that already had 3D files when this was introduced were switched **on**, so nothing they use was taken away. Turning the switch off later keeps their existing files; from then on only the Sanctus team changes them.
+
+**Good to know**
+- Delivering replaces the whole set of files. If a business had its own USDZ and you deliver only a GLB, the old USDZ is removed.
+- Request photos are kept after a request ends so the team can revise a model, and are deleted if the request is cancelled or the product, business or account is removed.
+- In demo mode, photos and files are kept only until the page is reloaded, and no email is sent.
+
 ---
 
 ## 5. Model compression

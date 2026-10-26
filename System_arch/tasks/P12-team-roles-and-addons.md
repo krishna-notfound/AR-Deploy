@@ -30,6 +30,8 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
   - whether a product can be published before its model arrives;
   - **no Meshy API integration** (still out of scope unless the owner decides otherwise).
 
+- **Status (2026-10-26): built as S4 on `s4/integration`, not yet applied to the client project.** ADR-0034, spec `docs/superpowers/specs/2026-10-26-s4-3d-model-requests-design.md`, migration `20261026120000_s4_model_requests`, function `review-model-request`. The owner chose no limit on open requests. The questions above are answered: photos 2 to 10 and a note; no cost; email to the business owner (EN or PT); a product can be published photo-only while its request is open. Demo e2e journeys: `tests/e2e/model-requests*.spec.ts`. Release: `docs/OPERATIONS_RUNBOOK.md` ("S4 3D model requests"). Live checks and the real-device AR check are still to do.
+
 ### A2 QR code and direct AR link for every product: second
 
 - **Ask:** every product has a QR code and a direct link that opens straight to "View in AR".

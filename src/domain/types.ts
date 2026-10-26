@@ -35,6 +35,8 @@ export interface Business {
   /** Applied to public pages only. */
   branding: { accentColor: string }
   defaultCurrency: Currency
+  /** Whether the business may add, replace or remove its own GLB/USDZ files; only the platform changes it (S4 R-S4-2). */
+  allowOwnModels: boolean
   createdAt: ISODate
   updatedAt: ISODate
 }
@@ -121,6 +123,8 @@ export interface Product {
   cta: { label: LocalizedText; url?: string }
   status: ProductStatus
   publishedAt?: ISODate
+  /** When the product's or an option's 3D files last changed (S4 R-S4-17); unset until the first change. */
+  modelsChangedAt?: ISODate
   createdAt: ISODate
   updatedAt: ISODate
 }
@@ -348,7 +352,7 @@ export interface OwnerState {
 export type Permission =
   | 'businesses.view' | 'businesses.edit' | 'businesses.status' | 'businesses.delete' | 'owners.manage'
   | 'applications.view' | 'applications.approve' | 'applications.reject'
-  | 'products.view' | 'products.edit' | 'products.publish' | 'products.delete'
+  | 'products.view' | 'products.edit' | 'products.publish' | 'products.delete' | 'models.manage'
   | 'analytics.view' | 'records.view' | 'access.view'
 export type PlatformRole = 'owner' | 'admin' | 'team'
 export type MemberRole = Exclude<PlatformRole, 'owner'>

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -211,7 +211,8 @@ describe('editor: a link with no label (R-W4-13)', { timeout: 30_000 }, () => {
     await user.type(await screen.findByRole('textbox', { name: /^Product name/ }, { timeout: 10_000 }), 'Link test')
     await user.clear(screen.getByRole('textbox', { name: /^Button label/ }))
     await user.type(screen.getByLabelText(/^Button link/), 'https://shop.example/x')
-    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+    // The publish bar's Save draft (S4's 3D model request panel has its own for a new product).
+    await user.click(within(screen.getByRole('region', { name: 'Save and publish' })).getByRole('button', { name: 'Save draft' }))
     await waitFor(() => expect(screen.getAllByText('Add a button label, or remove the link.').length).toBeGreaterThan(0))
   })
 })

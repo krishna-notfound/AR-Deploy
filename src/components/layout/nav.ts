@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Box,
   Building2,
   ClipboardList,
   History,
@@ -21,7 +22,7 @@ export interface NavItem {
   /** Match only the exact path (for index routes). */
   end?: boolean
   /** A live count shown next to the label (real data only). */
-  badge?: 'pendingApplications'
+  badge?: 'pendingApplications' | 'requestedModelRequests'
   /** Platform permission(s) needed to see this place; any one is enough (ADR-0029). Omitted: everyone. */
   requires?: Need | Need[]
   /** Opens a full-screen view (the settings hub) whose close button returns to the page it was opened from. */
@@ -33,6 +34,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/applications', label: 'Applications', icon: ClipboardList, badge: 'pendingApplications', requires: 'applications.view' },
   { to: '/admin/businesses', label: 'Businesses', icon: Building2, requires: 'businesses.view' },
   { to: '/admin/products', label: 'All Products', icon: Package, requires: 'products.view' },
+  { to: '/admin/model-requests', label: '3D requests', icon: Box, badge: 'requestedModelRequests', requires: 'models.manage' },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, requires: 'analytics.view' },
   { to: '/admin/catalogs', label: 'Catalogs & QR Codes', icon: QrCode, requires: 'products.view' },
   { to: '/admin/team', label: 'Team & Access', icon: Users, requires: 'owner' },

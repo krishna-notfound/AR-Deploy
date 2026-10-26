@@ -1,6 +1,6 @@
 # S4: 3D model requests
 
-**Status:** Design for owner review (2026-10-26). No code yet.
+**Status:** Built on `s4/integration` (2026-10-26), decisions in ADR-0034; not yet applied to the client project (runbook: "S4 3D model requests"). Owner decisions at the end of this file override the defaults above them.
 **Source:** the owner's re-plan of 2026-10-26 (`docs/superpowers/plans/2026-10-26-next-scope.md`, §S4: "Request a 3D model, Admin uploads + notify, Allow own upload switch"). The owner's earlier words are in `System_arch/tasks/P12-team-roles-and-addons.md` (A3, and P13 "3D models (this is A3)"):
 > "allow client to upload there own 3d model if this allow it will for for per business default business can request 3d model and cn only wait for 3dmodel should be made vide admin side when 3dmodel down and upload from admin side client get notification that 3dmodel is done can it can be show on catelog side left 3d model part will be hidden only business see upload multiple photo there are should be 2 section first which is show to use in without 3d mode second section will be apply for 3model with upload aleast 2-3page can and can so up as my client can do last 10 this should be a different section business side so admin have full control over 3d models"
 

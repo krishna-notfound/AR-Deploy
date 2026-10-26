@@ -7,6 +7,7 @@ import { callerRpc } from '../_shared/caller.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
 import { gateCaller } from '../_shared/gate.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
+import { ownerRecipient } from '../_shared/owner.ts'
 import { STAFF_LABELS, handleNotifyBusinessOwner } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
@@ -39,20 +40,7 @@ Deno.serve((req) =>
       if (error) throw new Error(`audit lookup failed: ${error.code ?? 'unknown'}`)
       return ((data ?? []) as AuditRow[]).map((r) => ({ id: r.id, eventType: r.event_type, metadata: { ...(r.metadata ?? {}), to_status: r.to_status } }))
     },
-    async recipient(businessId) {
-      const [biz, member, app] = await Promise.all([
-        admin.from('businesses').select('name').eq('id', businessId).maybeSingle(),
-        admin.from('business_members').select('user_id').eq('business_id', businessId).limit(1).maybeSingle(),
-        admin.from('business_applications').select('language').eq('business_id', businessId).limit(1).maybeSingle(),
-      ])
-      for (const r of [biz, member, app]) if (r.error) throw new Error(`recipient lookup failed: ${r.error.code ?? 'unknown'}`)
-      if (!biz.data || !member.data) return null
-      const u = await admin.auth.admin.getUserById(member.data.user_id)
-      if (u.error) throw new Error(`recipient lookup failed: ${u.error.code ?? 'unknown'}`)
-      const email = u.data.user?.email ?? ''
-      if (!email) return null
-      return { email, language: app.data?.language === 'pt' ? 'pt' : 'en', businessName: biz.data.name }
-    },
+    recipient: (businessId) => ownerRecipient(admin, businessId),
     async alreadySent(workflow) {
       const { count, error } = await admin.from('email_log').select('id', { count: 'exact', head: true }).eq('workflow', workflow)
       if (error) throw new Error(`email_log lookup failed: ${error.code ?? 'unknown'}`)

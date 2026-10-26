@@ -446,6 +446,10 @@ verify_jwt = true
 [functions.notify-business-owner]
 verify_jwt = true
 
+# S4 (R-S4-15): 3D model requests. Staff with models.manage, 2FA-gated in the handler; emails the business owner.
+[functions.review-model-request]
+verify_jwt = true
+
 # Platform team (ADR-0029, ADR-0030). invite-member and manage-member need a signed-in caller; accept-member-invite is
 # public (the link secret is the credential) and checks the JWT itself for "accept".
 [functions.invite-member]
