@@ -140,4 +140,17 @@ describe('send-test-email handler', () => {
     expect(status).toEqual({ providerMessageId: 'abc12345-msg', lastEvent: 'delivered', status: 'delivered' })
     expect(updates).toEqual([['abc12345-msg', 'delivered']])
   })
+  it('never writes a lower-ranked status: opened, clicked, scheduled, queued and unknown events write nothing', async () => {
+    const { d, updates } = deps()
+    for (const last_event of ['opened', 'clicked', 'scheduled', 'queued', 'something_new']) {
+      d.fetch = vi.fn(async () => new Response(JSON.stringify({ last_event }), { status: 200 })) as unknown as typeof fetch
+      const res = await handleTestEmail(post({ action: 'status', providerMessageId: 'abc12345-msg' }), d)
+      expect(res.status).toBe(200)
+    }
+    expect(updates).toEqual([])
+    // A delayed event is evidence, and goes to the rank rule (which decides whether it is written).
+    d.fetch = vi.fn(async () => new Response(JSON.stringify({ last_event: 'delivery_delayed' }), { status: 200 })) as unknown as typeof fetch
+    await handleTestEmail(post({ action: 'status', providerMessageId: 'abc12345-msg' }), d)
+    expect(updates).toEqual([['abc12345-msg', 'delayed']])
+  })
 })

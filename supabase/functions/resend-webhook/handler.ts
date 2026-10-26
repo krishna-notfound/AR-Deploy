@@ -1,6 +1,7 @@
 // Request handling for the resend-webhook Edge Function (design/23-email.md). Resend signs every delivery with
 // svix headers; unsigned, stale or tampered requests are refused. Each svix-id is processed once
-// (service_record_email_event), so redeliveries are harmless, and an email_log status only ever moves forward.
+// (service_record_email_event), so redeliveries are harmless, and an email_log status only ever moves forward
+// by the rank rule; an event that arrives before its log row is kept and applied when the row appears (R-W7-4).
 import { readJsonObject, reply } from '../_shared/http.ts'
 
 export const TOLERANCE_SECONDS = 300
@@ -9,8 +10,8 @@ export interface WebhookDeps {
   /** RESEND_WEBHOOK_SECRET, "whsec_<base64>". */
   secret: string
   now?: () => Date
-  /** Returns false when this svix id was already processed. */
-  record(svixId: string, providerMessageId: string, eventType: string): Promise<boolean>
+  /** Returns false when this svix id was already processed. `error` is the reason an event brings (R-W7-4). */
+  record(svixId: string, providerMessageId: string, eventType: string, error?: string): Promise<boolean>
 }
 
 const fromBase64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
@@ -60,6 +61,8 @@ export async function handleResendWebhook(req: Request, deps: WebhookDeps): Prom
   const messageId = typeof data?.email_id === 'string' ? data.email_id : ''
   // Signed but not an email event we track (e.g. contact events): acknowledge so Resend stops retrying.
   if (!type.startsWith('email.') || !/^[\w-]{8,100}$/.test(messageId)) return reply(200, { processed: false, reason: 'ignored' })
-  const fresh = await deps.record(req.headers.get('svix-id')!, messageId, type.slice(0, 60))
+  // A suppressed address is a bounce whose reason is "suppressed" (R-W7-4).
+  const svixId = req.headers.get('svix-id')!
+  const fresh = await (type === 'email.suppressed' ? deps.record(svixId, messageId, 'email.bounced', 'suppressed') : deps.record(svixId, messageId, type.slice(0, 60)))
   return reply(200, { processed: fresh, ...(fresh ? {} : { reason: 'duplicate' }) })
 }

@@ -1024,8 +1024,13 @@ export type Database = {
         }
         Returns: Json
       }
+      service_apply_provider_status: {
+        Args: { p_message_id: string; p_status: string }
+        Returns: boolean
+      }
       service_record_email_event: {
         Args: {
+          p_error?: string
           p_event_type: string
           p_provider_message_id: string
           p_svix_id: string

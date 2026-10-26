@@ -18,14 +18,14 @@ async function signed(body: unknown, { id = 'msg_svix_1', ts = TS, secret = SECR
 
 function deps(over: Partial<WebhookDeps> = {}) {
   const seen = new Set<string>()
-  const recorded: [string, string, string][] = []
+  const recorded: [string, string, string, string?][] = []
   const d: WebhookDeps = {
     secret: SECRET,
     now: () => NOW,
-    record: async (svix, msg, type) => {
+    record: async (svix, msg, type, error) => {
       if (seen.has(svix)) return false
       seen.add(svix)
-      recorded.push([svix, msg, type])
+      recorded.push(error === undefined ? [svix, msg, type] : [svix, msg, type, error])
       return true
     },
     ...over,
@@ -44,6 +44,13 @@ describe('resend-webhook', () => {
     const again = await handleResendWebhook(await signed(EVENT), d)
     expect(await again.json()).toEqual({ processed: false, reason: 'duplicate' })
     expect(recorded).toEqual([['msg_svix_1', '4ef9a417-02e9-4d39-ad75-9611e0fcc33c', 'email.delivered']])
+  })
+
+  it('email.suppressed → bounced, error suppressed', async () => {
+    const { d, recorded } = deps()
+    const res = await handleResendWebhook(await signed({ ...EVENT, type: 'email.suppressed' }), d)
+    expect(await res.json()).toEqual({ processed: true })
+    expect(recorded).toEqual([['msg_svix_1', '4ef9a417-02e9-4d39-ad75-9611e0fcc33c', 'email.bounced', 'suppressed']])
   })
 
   it('refuses unsigned, tampered, wrongly keyed and stale requests', async () => {

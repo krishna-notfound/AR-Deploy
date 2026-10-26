@@ -10,8 +10,8 @@ const admin = createClient(env('SUPABASE_URL') ?? '', serviceKeyFrom(env), { aut
 Deno.serve((req) =>
   handleResendWebhook(req, {
     secret: env('RESEND_WEBHOOK_SECRET') ?? '',
-    async record(svixId, providerMessageId, eventType) {
-      const { data, error } = await admin.rpc('service_record_email_event', { p_svix_id: svixId, p_provider_message_id: providerMessageId, p_event_type: eventType })
+    async record(svixId, providerMessageId, eventType, reason) {
+      const { data, error } = await admin.rpc('service_record_email_event', { p_svix_id: svixId, p_provider_message_id: providerMessageId, p_event_type: eventType, p_error: reason ?? null })
       if (error) throw new Error(`record failed: ${error.message}`)
       return data === true
     },

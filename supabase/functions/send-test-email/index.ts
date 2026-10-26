@@ -49,8 +49,9 @@ Deno.serve((req) =>
       return data.id as string
     },
     async updateStatus(providerMessageId, status) {
-      const { error } = await admin.from('email_log').update({ status, updated_at: new Date().toISOString() }).eq('provider_message_id', providerMessageId)
-      if (error) throw new Error(`email_log update failed: ${error.message}`)
+      // Never a direct update: the function applies the rank rule, so a lower-ranked status is never written (R-W7-5).
+      const { error } = await admin.rpc('service_apply_provider_status', { p_message_id: providerMessageId, p_status: status })
+      if (error) throw new Error(`status update failed: ${error.message}`)
     },
   }).catch((e) => {
     // A gate RPC or database failure: 500 unknown, as in the other functions (no token or secret in the log line).

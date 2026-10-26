@@ -15,8 +15,12 @@ export interface TestEmailDeps {
   /** The 2FA gate with the caller's own token (R-W1-1): caller_mfa_satisfied(), then is_platform_admin(). */
   gate(token: string): Promise<GateResult>
   log(entry: LogEntry): Promise<string>
+  /** Applies provider evidence through service_apply_provider_status: only the rank rule decides if it is written. */
   updateStatus(providerMessageId: string, status: EmailStatus): Promise<void>
 }
+
+/** Resend last_event values that are delivery evidence. opened, clicked, scheduled and unknown ones write nothing (R-W7-5). */
+const EVIDENCE_EVENTS = new Set(['sent', 'delivered', 'delivery_delayed', 'bounced', 'complained', 'failed', 'canceled'])
 
 export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -53,7 +57,7 @@ export async function handleTestEmail(req: Request, deps: TestEmailDeps): Promis
     if (!/^[\w-]{8,100}$/.test(id)) return reply(400, { error: 'invalid_provider_message_id' })
     const r = await fetchProviderStatus(deps.fetch, config, id)
     if (!r.ok) return reply(502, { error: 'provider_lookup_failed', detail: r.error })
-    await deps.updateStatus(id, r.status)
+    if (EVIDENCE_EVENTS.has(r.lastEvent)) await deps.updateStatus(id, r.status)
     return reply(200, { providerMessageId: id, lastEvent: r.lastEvent, status: r.status })
   }
 
