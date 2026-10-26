@@ -1,7 +1,5 @@
-// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-25 after migration 20261025070915
+// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-26 after migration 20261025180600
 // (Supabase type generator). Regenerate after any migration: npx supabase gen types typescript --project-id <ref>.
-// S1 (account settings): profiles, platform_settings, account_closure_requests and their functions are hand-added from
-// the spec until the account_settings migration is applied and this file is regenerated (Task 14).
 export type Json =
   | string
   | number
@@ -62,7 +60,15 @@ export type Database = {
           requested_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "account_closure_requests_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_events: {
         Row: {
@@ -772,7 +778,6 @@ export type Database = {
           },
         ]
       }
-    }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -812,6 +817,7 @@ export type Database = {
         }
         Relationships: []
       }
+    }
     Views: {
       product_analytics_daily: {
         Row: {
@@ -912,6 +918,8 @@ export type Database = {
           id: string
         }[]
       }
+      caller_has_verified_factor: { Args: never; Returns: boolean }
+      caller_mfa_satisfied: { Args: never; Returns: boolean }
       cancel_account_closure: { Args: never; Returns: Json }
       complete_owner_onboarding: { Args: never; Returns: string }
       is_business_member: { Args: { bid: string }; Returns: boolean }
@@ -1046,6 +1054,10 @@ export type Database = {
         Returns: boolean
       }
       service_user_id_by_email: { Args: { p_email: string }; Returns: string }
+      service_void_action_codes: {
+        Args: { p_purpose: string; p_user: string }
+        Returns: Json
+      }
     }
     Enums: {
       invite_status:
