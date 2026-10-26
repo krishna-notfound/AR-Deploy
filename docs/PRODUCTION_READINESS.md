@@ -185,6 +185,7 @@ Local infrastructure: Docker is not installed, so `supabase start` (local Supaba
 
 | Date | Phase | Change |
 |---|---|---|
+| 2026-10-26 | S1.5 | Business-logic fixes built on the branch (ADR-0033, migration `20261026041731`, 18 tasks). **Not applied** to `zggylkbgajamhriebdrg`: release needs the owner's go-ahead and the read-only pre-flight (role sets that will be widened, Postgres 15 or later, team email drift, invitation attempt maxima). Release order, live checks and rollback (loses analytics rows kept for deleted products): `docs/OPERATIONS_RUNBOOK.md` and `docs/TEST_PLAN.md`. Gate items before launch: set `EMBED_VIEWS_SINCE` to the apply date, subscribe the Resend webhook to `email.suppressed`, run the two-connection live checks |
 | 2026-10-13 | review pass | Onboarding display name, public i18n, variant/slug validation, analytics states; decisions recorded (no directory, admin approval kept, no date ranges)
 | 2026-10-13 | live A–D | Migrations applied to `pmnjchhrgvajtjpadpqo`, live suite 15/15, QA cleanup verified, sample data identified, release checklist, test plan
 | 2026-10-13 | C/D | AR native-only (ADR-0021), SEC-04/06/08/10 fixed, SEC-05 shown not exploitable, owner registration + claim links (ADR-0022, migration not applied), stale docs corrected, staging runbook. Local commits only

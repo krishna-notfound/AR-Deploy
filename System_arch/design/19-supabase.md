@@ -172,6 +172,47 @@ npm run db:types   # npx supabase gen types typescript --project-id <ref> > src/
 ## How the access helpers enforce 2FA (S1, migrations 20261025163627 and 20261025180600)
 `is_platform_admin()`, `is_platform_member()` and `platform_can()` (staff) and `is_business_member()` (business owners) are true only when the 2FA rule holds: **`aal2 OR (policy off AND no verified factor)`**. The policy is `platform_settings.require_2fa_staff` / `require_2fa_business`. The factor check is `public.caller_has_verified_factor()` (security definer: it reads `auth.mfa_factors` for `auth.uid()` only). The definer helpers call `private.mfa_satisfied(scope)`. The two invoker helpers carry the same rule inline, because the API roles have no usage on schema `private`. Every RLS policy and admin function that uses the helpers, including the `business-logos` and `product-media` storage policies, therefore refuses an aal1 session when the policy is on or the user has a verified factor. Not gated: the own `profiles` row, `platform_settings`, `my_security_state()`, `record_sign_in()`, the Auth MFA APIs, public catalog reads and `service_*` functions.
 
+## S1.5 additions (ADR-0033, migration `20261026041731_business_logic_fixes.sql`)
+Rollback: `supabase/rollback/20261026_business_logic_fixes_rollback.sql`. Release: `docs/OPERATIONS_RUNBOOK.md` ("Business-logic fixes (S1.5)"). Needs Postgres 15 or later.
+
+**Tables (RLS on, nothing for anon or authenticated, `service_role` only)**
+| Table | Purpose |
+|---|---|
+| `private.owner_invite_attempts` | Reservations for owner invitations: `business_id`, lower-case `recipient`, `attempt`, `actor`, `outcome` (`accepted`, `sent`, `failed`, `blocked`), `created_at`. Select, insert and update for `service_role`. |
+| `private.application_attempts` | Attempts to submit an application: `submitter_hash` (daily), `created_at`. Select, insert and delete for `service_role`. Rows older than 2 hours are removed on each call. |
+
+**Columns and constraints**
+- `business_applications.business_deleted_at` (set by a trigger when the linked business is deleted).
+- `private.platform_invites.note` (up to 500 characters).
+- `private.email_provider_events.applied` and `error`.
+- `email_log.attempt` between 1 and 100000; `email_log_kind_check` adds `application_decision`, `business_notice`, `team_notice`.
+- `product_analytics.product_id` is nullable with `on delete set null (product_id)` (Postgres 15); a new foreign key on `business_id` cascades; the event check adds `embed_view`.
+- `audit_events.business_id` is no longer a foreign key.
+
+**Views and functions**
+- `product_analytics_daily` appends `embed_views`. `public.business_product_counts` (security invoker) gives exact product counts per business.
+- `analytics_daily(p_tz, p_days, p_business)` (security invoker) buckets days in the viewer's time zone; an unknown zone raises `invalid_timezone`.
+- `admin_remove_member`, `service_create_member_invite`, `service_latest_invite_note`, `private.has_2fa`, `admin_list_owner_states`, `admin_application_duplicates`, `service_reserve_owner_invite`, `service_finish_owner_invite`, `service_application_attempt`, `service_apply_provider_status`, `private.permission_prerequisites`, `private.with_prerequisites`, `private.normalize_business_name`, and `public.platform_can_read_profile(uuid)` (the last is not in the spec; it lets the profiles policy decide per row with the gated `platform_can`).
+- Redefined: `record_sign_in` (accepts a pending owner), `my_platform_access` (Owner always has all 15 permissions; a deactivated member gets `status: 'deactivated'`), `admin_set_role_permissions` (stores prerequisites, answers `{ok, added}`), `admin_list_members` and `admin_get_member` (`has2fa`), `service_link_owner`, `service_closure_target`, `private.undo_closure`, `service_record_email_event`, `record_event_limited` and `private.audit_business_change` (sets `business_id` on `business_deleted`). Task 13 also redefines `service_request_closure` and recreates `service_log_account_event` with `p_business_id`.
+- Triggers (execute revoked from public, anon, authenticated): `void_closure_on_owner_removed`, `guard_activate_during_closure` (`closure_pending`), `mark_application_business_deleted`, `audit_product_change`, `snapshot_audit_event`, `apply_pending_email_events`, `sync_member_email` (on `auth.users`, never raises).
+
+**Policies**
+- `audit_events`: "Platform members read audit events" excludes `account_%` for everyone but the Owner. New: "Platform members read catalogue activity" (product events) and "Business owners read platform changes to their business" (a fixed list of event types for their own business).
+- `profiles`: "Platform members read profiles" is replaced (own row, the Owner, staff profiles for `access.view` or `records.view`, owner profiles for `businesses.view`).
+- `storage.objects`: "Platform members delete media" needs `products.edit`, `products.delete` or `businesses.delete`; "Platform members delete logos" needs `businesses.edit` or `businesses.delete`.
+
+**Permission prerequisites** (`private.permission_prerequisites()`, mirrored by `PERMISSION_PREREQUISITES` in `src/domain/permissions.ts`): `businesses.edit` ← `businesses.view`; `businesses.status` ← `businesses.edit`; `businesses.delete` ← `businesses.edit` and `products.delete`; `owners.manage` ← `businesses.view`; `applications.approve` and `applications.reject` ← `applications.view`; `products.edit` ← `products.view`; `products.publish` and `products.delete` ← `products.edit`. The closure is transitive and stored.
+
+**Access map additions**
+| Service method | Supabase call | Protected by |
+|---|---|---|
+| review an application | `functions.invoke('review-application')` → `admin_review_application` | 2FA gate, then the permission for the action; sends the rejection email. |
+| possible duplicates | `rpc('admin_application_duplicates')` | `applications.view` or the Owner. |
+| owner state per business | `rpc('admin_list_owner_states')` | `businesses.view`. |
+| remove a team member | `functions.invoke('manage-member', {action:'remove'})` → `admin_remove_member` | Owner (SQL `owner_or_deny`). |
+| analytics by day | `rpc('analytics_daily')` and `business_product_counts` | security invoker: RLS decides what is counted. |
+| owner notices | `functions.invoke('notify-business-owner')` | 2FA gate, staff only; deduped by `email_log.workflow`. |
+
 ## Pre-deployment review (2026-10-12)
 Fixed in the migration files (none had been applied anywhere):
 

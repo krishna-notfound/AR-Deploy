@@ -31,10 +31,10 @@ The public pages pick English or Portuguese from the visitor's phone or browser 
 **There is no public sign-up.** Businesses apply, and the Sanctus team decides:
 
 1. **A business applies** at `/apply` ("Apply as a business" in the header and footer). The form has five short steps in English or Portuguese. Applying creates no account. The applicant gets a reference and a confirmation email.
-2. **Review it** in **Applications**. Search by business, applicant, email or reference, and filter by status or date. Open an application to read the answers, then **Start review**, **Approve** or **Reject** (a rejection needs a reason, which is kept in the history). A rejected application can be reopened.
+2. **Review it** in **Applications**. Search by business, applicant, email or reference, and filter by status or date. Open an application to read the answers, then **Start review**, **Approve** or **Reject** (a rejection needs a reason, which is kept in the history; you choose whether the applicant sees it in their email). A rejected application can be reopened, and so can an approved one whose business was deleted.
 3. **Approving creates the business as a draft.** Customers can't see it until you set it to **Active** on the business page.
 4. **Invite the owner.** On the approved application (or the business's **Owner & history** tab), check the email (it's prefilled with the applicant's) and click **Invite owner**. Each business has exactly **one** owner. The owner receives a link to set their password. The link is never shown to you, so nobody can copy it.
-5. **Resend invitation** if the owner lost the email or the link expired (wait a minute between attempts; at most 10). Every attempt and its email outcome is listed under **Emails**.
+5. **Resend invitation** if the owner lost the email or the link expired (wait a minute between attempts; at most 10 per owner in 24 hours). Every attempt and its email outcome is listed under **Emails**.
 
 The **Audit log** shows who did what and when (approvals, rejections, invitations, owner removals, status changes). Entries can't be edited or deleted.
 
@@ -43,6 +43,20 @@ An email shows **Accepted by Resend** when the provider took it. It shows **Deli
 To remove an owner, use the remove (bin) icon next to their email on the **Owner & history** tab.
 
 ---
+
+### Team roles, owner notices and what to expect (after the business-logic update)
+
+- **Rejection emails.** When you reject an application, the applicant is emailed in their language (English or Portuguese). The reason you typed is kept in the history. It goes into the email **only if you tick "Include the reason in the email"**. If the email can't be sent, the screen says so, and the rejection still stands.
+- **Possible duplicates.** If an application has the same email or a very similar business name as another application or an existing business, a **Possible duplicates** panel appears above the review buttons. It is a warning only: you can still approve or reject.
+- **Reopening.** If you delete a business that came from an approved application, the application says the business was deleted, and **Reopen** puts it back under review so a new draft can be created.
+- **Owner invitations.** Wait one minute between invitations. At most **10 invitations per owner in any 24 hours** can be sent for one business, and removing and re-inviting the same person counts in the same limit. The screen tells you when you can send the next one.
+- **Owner column.** The Businesses list shows **Needs owner**, **Invite pending** (or **Invite pending · email not sent**) or **Owner active** for every business, and you can filter by it. An owner is "active" as soon as they sign in successfully, even if they never opened the invitation page.
+- **Roles.** Some permissions need others to work, so ticking one also ticks what it needs, and those stay locked until you untick the permission that needs them. For example, "Publish and unpublish" needs "Create and edit products", which needs "View products and catalogues". The platform Owner always keeps every permission.
+- **Team members who are removed or deactivated.** Removing a team member ends their access, and the same email can then be invited again, even as a business owner. A deactivated person who signs in is told their access was deactivated.
+- **Product changes by the team.** Team members with "Create and edit products" change published products directly; there is no review step. Remove that permission if Team should only prepare drafts.
+- **Business owners are told about changes.** When the platform team pauses or reactivates a business, or unpublishes or deletes one of its products, the owner gets an email (in the language of their application, otherwise English) and sees the change under **Changes by the platform team** on their dashboard. The email is sent when the change is made; if the browser is closed at that moment, the email may not go, but the list on the dashboard always has the change.
+- **History keeps working after a deletion.** Entries for a deleted business still show its name with "(deleted)", and entries by a deleted person show "Deleted user" with their role.
+- **Open closure requests.** While an owner's closure request is open, a business can't be set to Active from the list or the page. The platform Owner restores or completes the request. Removing the owner cancels it.
 
 ### Your account and security
 
@@ -175,12 +189,13 @@ A tool that shrinks GLB files before upload is built, but it is **switched OFF**
 
 Reports cover the **last 30 days**, per business and per product. Super Admin can filter by business. Owners see only their own business.
 
-- **Views:** how many times a product page was loaded.
+- **Page views:** how many times a product page was loaded on the catalog.
+- **Embed views:** how many times a product was loaded through the embed on another website. Embed loads before the day the update went live were counted as page views and can't be separated; the page says so.
 - **AR launch attempts** (the summary card says "AR button activations"): taps on "View in my home". Repeat taps within 2 seconds count once. **This is not proof that AR opened or that furniture was placed**, only that the customer tried.
 - **3D interactions:** visitors who turned or zoomed a model (counted once per page visit).
 - **AR rate:** AR launch attempts divided by views.
 
-Your own previews are not counted. To protect against spam, each visitor can send a limited number of events per minute, and visitors are identified only by a scrambled code, never their IP address.
+Products you deleted keep their numbers and appear as one **Deleted products** row, so the totals still match. Days follow the time zone in your profile settings. Your own previews are not counted. To protect against spam, each visitor can send a limited number of events per minute, and visitors are identified only by a scrambled code, never their IP address.
 
 ---
 

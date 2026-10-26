@@ -63,9 +63,9 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 
 | ID | Requirement | Src | Status | Evidence | Gap / risk | Acceptance | Client approval |
 |---|---|---|---|---|---|---|---|
-| R-28 | Product page views | C | VERIFIED (live) | `ProductPage.tsx` once per load → `track-event`; live rows; Live API suite 15/15 on 2026-10-13 | Rate-limit key may be spoofable (SEC-03); seeded sample analytics mixed in | Counts reconcile with stored events | N |
+| R-28 | Product page views (catalog) and embed views (S1.5: the views series counts page and embed loads and is labelled "Page and embed views"; embed loads are stored as `embed_view`) | C | VERIFIED (live) | `ProductPage.tsx` once per load → `track-event`; live rows; Live API suite 15/15 on 2026-10-13 | Rate-limit key may be spoofable (SEC-03); seeded sample analytics mixed in; embed loads before the S1.5 release (`EMBED_VIEWS_SINCE`) were stored as page views and cannot be split, and the analytics page says so | Counts reconcile with stored events | N |
 | R-29 | AR activation **attempts** | C | IMPLEMENTED_NOT_VERIFIED | Branch: one `ar_activation` event per launch attempt, taps within 2 s ignored (`ProductPage.tsx` `AR_RELAUNCH_MS`); e2e checks one Scene Viewer intent per double tap | The event means "tried to open AR", not success or placement. Dashboard label still says "AR activations" (UI_BACKLOG row 11) | Metric labelled "AR launch attempts"; counts reconcile on staging | N |
-| R-30 | Per-product and per-business totals | C | IMPLEMENTED_NOT_VERIFIED | `product_analytics_daily` view; `AnalyticsView.tsx` | 30-day window only | Totals match raw event counts | N |
+| R-30 | Per-product and per-business totals | C | IMPLEMENTED_NOT_VERIFIED | `product_analytics_daily` view; `AnalyticsView.tsx` | 30-day window only (days follow the viewer's time zone, S1.5). Events of deleted products stay in the totals as one "Deleted products" row, and the product count comes from `business_product_counts` | Totals match raw event counts | N |
 
 ## Assets, delivery, ownership
 

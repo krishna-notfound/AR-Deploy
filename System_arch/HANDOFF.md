@@ -1,5 +1,13 @@
 # Handoff: read this first in a new session (updated 2026-10-20)
 
+## Business-logic fixes, S1.5 (2026-10-26, same branch, NOT yet applied to `zggylkbgajamhriebdrg`)
+- Fixes from the 2026-10-26 audit (ADR-0033): permission prerequisites, 2FA before permission on the Edge Functions, history that survives a deleted business, embed views and deleted-product analytics, team removal and email sync, email status integrity, and the application and owner-invitation fixes that came back when S3 was cancelled. Spec `docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md`, plan `docs/superpowers/plans/2026-10-26-business-logic-fixes.md`.
+- One migration `supabase/migrations/20261026041731_business_logic_fixes.sql` and one rollback `supabase/rollback/20261026_business_logic_fixes_rollback.sql`. New functions: `review-application` and `notify-business-owner` (`verify_jwt = true`).
+- **Before applying:** the owner's go-ahead, then the read-only pre-flight in `docs/OPERATIONS_RUNBOOK.md` ("Business-logic fixes (S1.5)"). It shows the role sets the backfill will widen, checks Postgres is 15 or later, and lists team rows whose email differs from the login. Set `EMBED_VIEWS_SINCE` (`src/services/analytics.ts`) to the apply date, and subscribe the Resend webhook to `email.suppressed`.
+- Order: migration, `db:types`, functions, frontend to the Preview, production only when the owner asks. Never `config push`. Live checks: `docs/TEST_PLAN.md` ("S1.5 live checks"), including the two-connection ones the test database cannot prove.
+- Rollback loses the analytics rows kept for deleted products (the script header and the runbook say so).
+- Still to land when this was written: Task 13 (account-security notices, closure attribution), Task 14 (demo parity) and the Task 15 Playwright journeys. Address history and redirects, the stale product save and the Email log page moved to S2 and S4 (`System_arch/tasks/P12-team-roles-and-addons.md`).
+
 ## Account settings and 2FA, S1 (2026-10-26)
 - Settings hub at `/admin/settings/:section` and `/dashboard/settings/:section`, authenticator 2FA with recovery codes, emailed codes for risky actions, the Owner's 2FA policy and closure requests (ADR-0032).
 - **2FA is enforced in the database access helpers**, not only in the app (`SecurityGate` is UX).

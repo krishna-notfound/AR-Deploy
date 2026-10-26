@@ -70,3 +70,40 @@ Status: applied to `zggylkbgajamhriebdrg` on 2026-10-26 and checked live (31 of 
 - **The client IP from `X-Forwarded-For` is client-controlled.** The function stores it with security events as a log aid only. No decision, limit or lockout depends on it (the limits are per user).
 - **A lost authenticator plus lost recovery codes for the Owner** is recovered from the SQL editor (runbook). Anyone with database access can do this, which is by design.
 - **Closure flag hardening (minor):** the `app.account_closure` setting is not cleared right after the closure's own update.
+## S1.5: Business-logic fixes (ADR-0033)
+
+Status: built on the branch; to be applied to `zggylkbgajamhriebdrg` after the pre-flight in `docs/OPERATIONS_RUNBOOK.md` ("Business-logic fixes (S1.5)"). Migration `20261026041731_business_logic_fixes`. Source: the 2026-10-26 audit (`docs/audits/2026-10-26-business-logic/`) and `docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md`.
+
+### What is enforced, and where
+
+| Control | Enforced by |
+|---|---|
+| 2FA before permission on Edge Functions (R-W1-1) | `_shared/gate.ts` builds a caller client from the caller's token, checks `caller_mfa_satisfied()`, then the gated helper (`platform_can('owners.manage')` or `is_platform_admin()`). It covers `provision-owner`, `invite-member`, `send-test-email`, `review-application` and `notify-business-owner`. An `aal1` caller gets 403 `aal2_required` before anything is created or sent. `service_user_can` is no longer used for caller checks (it is not 2FA-aware). `manage-member` is not wrapped by the gate: its permission checks run in SQL through the gated helpers, so the rule still applies. |
+| Other people's security activity (R-W1-4) | The audit read policy for platform members excludes `account_%` events. Only the Owner reads other people's sign-ins, 2FA changes and closure steps. The Audit log hides sign-ins unless the Owner ticks "Show sign-ins". |
+| Profile visibility (R-W1-5) | A row is readable by its owner, the platform Owner, staff with `access.view` or `records.view` (staff profiles), and staff with `businesses.view` (business owners' profiles). It uses `public.platform_can_read_profile(uuid)`, a definer function that is not in the spec's function list. It exposes one fact: whether a given user id is staff or an owner. Only callers who can already list those people can use it that way. |
+| Owner permissions (R-W1-6) | `my_platform_access()` returns all 15 permissions for the Owner, whatever the Admin and Team sets hold. The Owner test stays ungated (`exists platform_admins`), so an Owner at `aal1` can still reach 2FA setup. It reports a role only, and every data path stays gated. |
+| Permission prerequisites (R-W3-3) | `private.permission_prerequisites()` and `admin_set_role_permissions` store a role set with everything it needs. The storage delete policies follow the permission that deletes the row. The one-off backfill can widen an existing role; the runbook pre-flight shows it first and each change is audited. |
+| Staff passwords, invitations (R-W1-7 to R-W1-9) | Staff passwords are 12 to 72 characters. An email with any platform-team row cannot be invited as a business owner (`email_is_admin`). `/accept-invite` never sets the password of whoever is signed in. |
+| Closure integrity (R-W1-2, R-W1-3) | A closure request belongs to the owner's membership: removing the owner voids it. A trigger refuses `status = 'active'` while a request is open (`closure_pending`), even for the Owner; only cancel or restore (which set `app.account_closure`) bring the business back. |
+| History survives deletion (R-W7-1) | `audit_events.business_id` is no longer a foreign key. A `BEFORE INSERT` trigger stores the business name and the actor's role label (never an email or name) in the metadata. Business owners can read a fixed list of platform changes to their own business. |
+| Submission limit (R-W2-10) | `submit-application` counts **attempts**, not stored rows (`private.application_attempts`, 5 per submitter per hour, checked before the duplicate lookup), so a probe that only gets 409 is limited too. The submitter hash includes the UTC date, so it changes daily and cannot link a person across days. A key replay is never rate limited. |
+| Owner-invitation limit (R-W2-4) | `private.owner_invite_attempts`: 60 s between sends and 10 per business and recipient in a rolling 24 h, reserved under an advisory lock before the code is made. Removing and re-inviting the same address counts in the same window. |
+| Email status integrity (R-W7-3 to R-W7-5) | Provider events apply by rank (a late `delivered` never replaces `bounced`); `email.suppressed` maps to `bounced`; an event that arrives before its log row is stored and applied later. |
+| Analytics | Deleted products keep their events (`product_id` set to null) and show as "Deleted products". Deleting a business still removes its events. Embed loads are recorded as `embed_view`. |
+
+### Documented as is (TEAM-20)
+
+Team members with "Create and edit products" change published products directly; there is no review step. Remove that permission if Team should only prepare drafts.
+
+### Accepted risks and open items
+
+- **The backfill can widen access.** The pre-flight lists the roles and the permissions they would gain. The owner approves or narrows the sets first.
+- **The Owner cannot Activate a closing business directly** (by design). Restore stays available.
+- **Owner notices are best effort.** The dashboard calls `notify-business-owner` after the change, so a closed tab means no email. The "Changes by the platform team" list is the durable record.
+- **Review function ordering.** `review-application` loads the application with the service role before it checks the per-action permission, so a staff member without approve or reject can tell a missing application (404) from a forbidden one (403). They can already see the application list with `applications.view`. Minor.
+- **Midnight race on the submission limit.** The advisory lock is per hash, so two requests at the UTC date change can admit one extra attempt. Replays are not limited by age. Both are minor.
+- **Concurrent invitations.** The "account created by this request" test in `provision-owner` can misfire in a narrow same-email race. Accepted as specified. Real two-connection races are checked in the live checks (`docs/TEST_PLAN.md`), because the test database runs sequentially.
+- **The `auth.users` email-sync trigger** runs inside Supabase Auth's update. It never raises, and a test asserts that an exception inside it does not block an email change.
+- **Rolling back the analytics foreign key** deletes the rows kept for deleted products (stated in the rollback script header and the runbook).
+- **Embed views before the release** were stored as page views and cannot be split. The analytics page says so.
+- **Moved out of this release:** address history and redirects (BIZ-04, PUB-03), the not-found window (PUB-04), the stale-product-save check and the Email log page. They are tracked in S2 and S4.

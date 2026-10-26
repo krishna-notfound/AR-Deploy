@@ -170,6 +170,92 @@ What stays: audit rows, the wider audit `event_type` check, the email-log kinds,
 
 Never run `supabase config push` from this repo. It would push the local development Auth settings (`supabase/config.toml`) over the hosted project's Auth, including the settings above. Change Auth only in the dashboard.
 
+## Business-logic fixes (S1.5)
+
+The audit fixes of 2026-10-26 (ADR-0033): permission prerequisites, 2FA before permission on the Edge Functions, history that survives a deleted business, embed views and deleted-product analytics, team removal, email status integrity, and the application and owner-invitation fixes. Deploy only with the owner's explicit go-ahead, and only to the client project `zggylkbgajamhriebdrg`. Never touch `pmnjchhrgvajtjpadpqo`.
+
+One migration (`supabase/migrations/20261026041731_business_logic_fixes.sql`) and one rollback script (`supabase/rollback/20261026_business_logic_fixes_rollback.sql`). The Task 13 section (closure attribution, notices) may still be landing; the lines below mark what depends on it.
+
+### Release order
+
+1. **Go-ahead.** The owner approves the release for `zggylkbgajamhriebdrg`. Confirm a recent backup exists (Supabase → Database → Backups), because the rollback loses some analytics rows.
+2. **Read-only pre-flight.** Run the four statements below in the SQL editor (every one is a `select`). **Show the owner the results before anything is applied.**
+   1. **Postgres version.** The migration uses `on delete set null (product_id)`, which needs Postgres 15 or later. Expect `true`. If it is `false`, stop: the migration would fail.
+      ```sql
+      select current_setting('server_version') as version,
+             current_setting('server_version_num')::int >= 150000 as ok_for_set_null_columns;
+      ```
+   2. **Role sets that will be widened** (R-W3-3). The migration adds the permissions a role's set needs (for example `products.edit` for a role that has `products.publish`). **This widens access.** An empty result means nothing changes. If a role would gain something the owner does not want, narrow the set first in Platform team → Roles. The change is audited (`access_permissions_changed`, reason `prerequisites`). The statement carries its own copy of the map, because the function does not exist yet.
+      ```sql
+      with recursive prereq (permission, requires) as (
+        values ('businesses.edit', 'businesses.view'), ('businesses.status', 'businesses.edit'),
+               ('businesses.delete', 'businesses.edit'), ('businesses.delete', 'products.delete'),
+               ('owners.manage', 'businesses.view'), ('applications.approve', 'applications.view'),
+               ('applications.reject', 'applications.view'), ('products.edit', 'products.view'),
+               ('products.publish', 'products.edit'), ('products.delete', 'products.edit')),
+      closed (role, permission) as (
+        select role, permission from public.platform_role_permissions
+        union
+        select c.role, p.requires from closed c join prereq p on p.permission = c.permission)
+      select role::text as role, array_agg(permission order by permission) as will_add
+        from (select role, permission from closed
+              except select role, permission from public.platform_role_permissions) missing
+       group by role order by role;
+      ```
+   3. **Team rows whose email differs from the login's** (R-W6-2). The migration syncs them and writes `access_member_email_changed`. A row whose new address another member already holds is left alone and recorded with `conflict: true`; the owner resolves those by hand.
+      ```sql
+      select m.id, m.role, m.status, m.email as team_email, lower(u.email) as login_email
+        from public.platform_members m join auth.users u on u.id = m.user_id
+       where u.email is not null and m.email <> lower(u.email)
+       order by m.id;
+      ```
+   4. **Invitation attempt numbers** (R-W2-4). The new reservation continues from the highest attempt already logged per business (`invite:<business id>`), and the attempt limit on `email_log.attempt` is widened to 1..100000. This is informational: a business near the old ceiling of 100 would otherwise have been stuck.
+      ```sql
+      select workflow, max(attempt) as max_attempt, count(*) as emails
+        from public.email_log
+       where workflow like 'invite:%'
+       group by workflow
+       order by max_attempt desc;
+      ```
+3. **Set `EMBED_VIEWS_SINCE`** in `src/services/analytics.ts` to the apply date (`YYYY-MM-DD`, the day the migration is pushed). The analytics page tells people that embed loads before that day are counted as page views. The value in the repo is a placeholder. It ships with the frontend (step 7), so if the migration slips a day, change it first.
+4. **Apply the migration.** `npx supabase db push --linked`. **Never `supabase config push`** (see "Never `config push`" above). If it fails, read the error before retrying: check `supabase_migrations.schema_migrations` to see whether it was recorded.
+5. **Regenerate the types.** `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+6. **Deploy the Edge Functions**, straight after the migration, in this order. No new secrets: they use the existing email set (`RESEND_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL`, `EMAIL_TEST_RECIPIENTS`, `ADMIN_NOTIFICATION_EMAIL`) and the keys Supabase provides.
+   ```
+   npx supabase functions deploy review-application notify-business-owner --project-ref zggylkbgajamhriebdrg
+   npx supabase functions deploy provision-owner invite-member manage-member accept-member-invite send-test-email account-security track-event resend-webhook submit-application --project-ref zggylkbgajamhriebdrg
+   ```
+   - `review-application` and `notify-business-owner` are new, and both are `verify_jwt = true` in `supabase/config.toml`.
+   - `provision-owner`, `invite-member`, `manage-member`, `send-test-email` and `account-security` keep `verify_jwt = true`; `accept-member-invite`, `track-event`, `resend-webhook` and `submit-application` keep `false`. The settings come from `config.toml`.
+   - `account-security` carries the Task 13 changes (notices, `email_blocked`, `cancel_closure`, staff self-closure notice).
+   - `submit-application` is deployed with the others: it needs `private.application_attempts` and `service_application_attempt` from the migration.
+7. **Subscribe the Resend webhook to `email.suppressed`** (Resend dashboard → Webhooks → the existing endpoint → add the event). Without it a suppressed address stays at `sent` or `failed` instead of `bounced`.
+8. **Release the frontend** to the Preview first, then to `sanctus.warpkit.online` only when the owner asks (push to `main`). Release it after the functions: the new dashboard calls `review-application` for every review decision.
+9. **Check after deploy.** Run the live checks in `docs/TEST_PLAN.md` ("S1.5 live checks"). Include the two-connection checks, because the test database runs sequentially and cannot prove them.
+
+### Mixed versions
+
+- **Migration before frontend, always.** The new role editor assumes every stored role set already holds its prerequisites. Before the backfill it would open with unsaved changes.
+- **Old frontend against the new database** works:
+  - `save_product` without `expected_updated_at` skips the check;
+  - a direct `admin_review_application` call still works, but it sends no email (rejection emails come from `review-application`);
+  - the embed sends `view`, so embeds count as page views until the new frontend ships;
+  - Activate on a business with an open closure gets the generic error, not the explanation.
+- **Old functions against the new database** keep working, but only the new ones add the new rules: the 2FA gate, the invitation reservation and the attempt-based submission limit. Deploy all of them (step 6) before telling the team the release is done.
+- **New frontend against old functions** shows buttons that fail: the review page needs `review-application`, the owner card needs the new `provision-owner`, and owner notices need `notify-business-owner`. Deploy the functions first.
+
+### Rollback
+
+Order matters. The script assumes the previous functions and frontend are back, because the S1.5 versions call objects the script drops.
+
+1. **Frontend.** Vercel → Deployments → the previous production deployment → **Instant Rollback**.
+2. **Functions.** Redeploy the previous versions of the functions in step 6 from the commit before the S1.5 merge. Delete `review-application` and `notify-business-owner` from Edge Functions afterwards.
+3. **Database.** In the SQL editor, as the database owner, run `supabase/rollback/20261026_business_logic_fixes_rollback.sql`, **before** any earlier rollback script (the platform-team-roles and account-settings ones, if wanted, come after it).
+4. **What it does.** It restores the earlier function bodies, policies and constraints; drops the S1.5 tables, triggers, views and functions; and re-adds the foreign key on `audit_events.business_id` as `NOT VALID`.
+5. **What it keeps.** Every audit and email row. Constraints that S1.5 widened (email kinds, audit types) are re-added `NOT VALID`, so rows written under S1.5 stay.
+6. **Data loss warning.** Restoring the analytics cascade (`product_analytics.product_id` back to `on delete cascade`) first runs `delete from public.product_analytics where product_id is null`. **Every analytics row kept for a product deleted under S1.5 is deleted and cannot be recovered.** Count them first: `select count(*) from public.product_analytics where product_id is null;`. The role-set prerequisites the backfill added are not removed (narrow the sets by hand if needed), and `embed_view` rows become `view` rows (kept, no longer split).
+7. Regenerate the types: `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+
 ## Rollback
 
 | What | How | Data effect |
@@ -177,6 +263,7 @@ Never run `supabase config push` from this repo. It would push the local develop
 | App | Vercel → Deployments → previous production deployment → **Instant Rollback** (or revert the merge commit on `main`) | none |
 | Migrations `20261013093006` + `20261013144121` | Run `supabase/rollback/20261013_publish_rules_and_claims_rollback.sql` in the SQL editor (tested in PGlite) | drops claim links; keeps businesses, products and owner links |
 | Migrations `20261025163627` + `20261025180600` (account settings, 2FA) | Run `supabase/rollback/20261025_account_settings_optin_2fa_rollback.sql` first, then `supabase/rollback/20261025_account_settings_rollback.sql` (see "Account settings and 2FA (S1)") | drops profiles, the 2FA policy, codes and closure requests; keeps audit rows, TOTP factors and the avatars bucket if it has files |
+| Migration `20261026041731` (business-logic fixes, S1.5) | Redeploy the previous frontend and functions, then run `supabase/rollback/20261026_business_logic_fixes_rollback.sql` (see "Business-logic fixes (S1.5)") | drops the S1.5 tables, triggers and functions; keeps audit and email rows; **deletes analytics rows kept for deleted products** |
 | Earlier migrations | `supabase/rollback/20261012_p8_rollback.sql` | **destructive** (drops all tables): backup first |
 | Data | Supabase → Database → Backups (daily on paid plans; on Free take a manual dump: `npx supabase db dump --data-only -f backup.sql`) | — |
 
