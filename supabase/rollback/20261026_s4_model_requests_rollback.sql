@@ -61,7 +61,26 @@ $$;
 drop policy "Members add request photos" on storage.objects;
 drop policy "Members and model staff read request photos" on storage.objects;
 drop policy "Members and clean-up staff delete request photos" on storage.objects;
-delete from storage.buckets where id = 'model-request-photos';
+-- The bucket, only when empty. Hosted Storage blocks direct deletes from its tables unless storage.allow_delete_query
+-- is on (ignored where the setting does not exist, e.g. PGlite). If the delete is still refused, the refusal is only
+-- a notice (the rest of this rollback commits): delete the empty bucket in the dashboard then
+-- (Storage > model-request-photos > Delete bucket).
+do $$
+begin
+  perform set_config('storage.allow_delete_query', 'true', true);
+exception when others then
+  null;
+end;
+$$;
+do $$
+begin
+  delete from storage.buckets b
+   where b.id = 'model-request-photos'
+     and not exists (select 1 from storage.objects o where o.bucket_id = b.id);
+exception when others then
+  raise notice 'model-request-photos bucket not deleted (%): delete it in the dashboard (Storage > model-request-photos > Delete bucket)', sqlerrm;
+end;
+$$;
 
 -- Audit reads back to S1.5 Task 8.
 drop policy "Model staff read request events" on public.audit_events;

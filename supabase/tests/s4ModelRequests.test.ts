@@ -241,6 +241,24 @@ describe('S4 Task 1: permission, switch, tables, bucket', () => {
     }
   })
 
+  it('fix round 1: an Admin inserting a business with allow_own_models = true gets own_models_admin_only; with the default it is created off', async () => {
+    const insert = (on: boolean) => `insert into public.businesses (id, name, slug, status, allow_own_models) values ('${f.free(95)}', 'New Co', 's4-t1-new', 'draft', ${on})`
+    await expect(h.probe(f.admin, insert(true))).rejects.toMatchObject({ message: 'own_models_admin_only', code: '42501' })
+    expect(await h.affected(f.admin, insert(false))).toBe(1)
+  })
+
+  it('fix round 1: an owner with the switch on moving a model row from their product to a product of a switch-off business gets own_models_not_allowed', async () => {
+    const path = glbPath(f.bizB, 96)
+    await db.query(insertModel(f.productR, path))
+    try {
+      await expect(h.probe(f.ownerB, 'update public.product_models set product_id = $1 where product_id = $2', [f.productP, f.productR]))
+        .rejects.toMatchObject({ message: 'own_models_not_allowed', code: '42501' })
+      expect((await db.query('select 1 from public.product_models where product_id = $1', [f.productR])).rows).toHaveLength(1)
+    } finally {
+      await db.query('delete from public.product_models where product_id = $1', [f.productR])
+    }
+  })
+
   it('model_requests rows: owner reads own business only; other owner, Team without the key and anon read 0; Team with the key reads all; no role can insert, update or delete through the API; the same for photos; staged files only with the key', async () => {
     const rA = f.free(80)
     const rB = f.free(81)
@@ -504,6 +522,22 @@ describe('S4 rollback', () => {
       await rolled.close()
     }
   }, 120_000)
+
+  it('fix round 1: a refused bucket delete (hosted storage.protect_delete) is only a notice; the rest of the rollback commits', async () => {
+    const rolled = await freshDb()
+    try {
+      // Hosted Storage refuses direct deletes from its tables (storage.protect_delete); stand in with a trigger.
+      await rolled.exec(`
+        create function storage.refuse_delete() returns trigger language plpgsql as $$
+        begin raise exception 'Direct deletion from storage tables is not allowed'; end; $$;
+        create trigger refuse_delete before delete on storage.buckets for each row execute function storage.refuse_delete();`)
+      await rolled.exec(readFileSync(S4_ROLLBACK_SQL, 'utf8'))
+      expect((await rolled.query(`select to_regclass('public.model_requests') as t`)).rows[0]).toEqual({ t: null })
+      expect((await rolled.query(`select 1 from storage.buckets where id = 'model-request-photos'`)).rows).toHaveLength(1)
+    } finally {
+      await rolled.close()
+    }
+  }, 60_000)
 
   it('rollback raises model_request_photos_not_empty while the bucket has objects', async () => {
     const rolled = await freshDb()
