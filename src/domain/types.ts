@@ -343,7 +343,7 @@ export interface OwnerState {
 export type Permission =
   | 'businesses.view' | 'businesses.edit' | 'businesses.status' | 'businesses.delete' | 'owners.manage'
   | 'applications.view' | 'applications.approve' | 'applications.reject'
-  | 'products.view' | 'products.edit' | 'products.publish' | 'products.delete'
+  | 'products.view' | 'products.edit' | 'products.publish' | 'products.delete' | 'models.manage'
   | 'analytics.view' | 'records.view' | 'access.view'
 export type PlatformRole = 'owner' | 'admin' | 'team'
 export type MemberRole = Exclude<PlatformRole, 'owner'>

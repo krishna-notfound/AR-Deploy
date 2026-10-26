@@ -10,6 +10,10 @@ export const MIGRATIONS = join(__dirname, '..', 'migrations')
 export const S15_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_business_logic_fixes.sql'))!
 /** Path of the S1.5 rollback script. */
 export const ROLLBACK_SQL = join(__dirname, '..', 'rollback', '20261026_business_logic_fixes_rollback.sql')
+/** File name of the one S4 migration (`<ts>_s4_model_requests.sql`). */
+export const S4_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_s4_model_requests.sql'))!
+/** Path of the S4 rollback script. */
+export const S4_ROLLBACK_SQL = join(__dirname, '..', 'rollback', '20261026_s4_model_requests_rollback.sql')
 
 /** The parts of Supabase the migrations rely on: API roles, auth (users, uid/jwt from test settings, MFA), storage. */
 export const SUPABASE_STUBS = `
