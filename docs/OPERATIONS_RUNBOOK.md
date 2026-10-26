@@ -256,6 +256,74 @@ Order matters. The script assumes the previous functions and frontend are back, 
 6. **Data loss warning.** Restoring the analytics cascade (`product_analytics.product_id` back to `on delete cascade`) first runs `delete from public.product_analytics where product_id is null`. **Every analytics row kept for a product deleted under S1.5 is deleted and cannot be recovered.** Count them first: `select count(*) from public.product_analytics where product_id is null;`. The role-set prerequisites the backfill added are not removed (narrow the sets by hand if needed), and `embed_view` rows become `view` rows (kept, no longer split).
 7. Regenerate the types: `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
 
+## S4 3D model requests
+
+The 3D model request feature of 2026-10-26 (ADR-0034): the `models.manage` permission, the per-business own-upload switch, the request tables, the private `model-request-photos` bucket, the staff queue, and the `review-model-request` Edge Function. Deploy only with the owner's explicit go-ahead, and only to the client project `zggylkbgajamhriebdrg`. Never touch `pmnjchhrgvajtjpadpqo`.
+
+One migration (`supabase/migrations/20261026120000_s4_model_requests.sql`, dated after the S2 migration, which is already live) and one rollback script (`supabase/rollback/20261026_s4_model_requests_rollback.sql`).
+
+### Release order
+
+1. **Go-ahead.** The owner approves the release for `zggylkbgajamhriebdrg`. Confirm a recent backup exists (Supabase → Database → Backups).
+2. **Read-only pre-flight.** Run these statements in the SQL editor (every one is a `select`; the same text is in the migration's `PRE-FLIGHT (S4)` comment). **Show the owner the results before anything is applied.**
+   1. **Postgres version.** Expect `true`. The S1.5 migration already needed 15 or later, so this should hold; a `false` means stop.
+      ```sql
+      select current_setting('server_version') as version,
+             current_setting('server_version_num')::int >= 150000 as ok;
+      ```
+   2. **Which businesses get the own-upload switch ON and OFF.** A business that already has any product or option 3D file starts ON (`starts_on = true`) so it keeps what it uses; every other business starts OFF and must request models. The owner can turn any business off afterwards (Business → 3D models).
+      ```sql
+      select b.id, b.name, b.slug,
+             exists (select 1 from public.products p
+                      where p.business_id = b.id
+                        and (exists (select 1 from public.product_models pm where pm.product_id = p.id)
+                             or exists (select 1 from public.product_variant_models vm where vm.product_id = p.id))) as starts_on
+        from public.businesses b order by starts_on desc, b.name;
+      ```
+   3. **The stored Admin and Team role sets.** **The backfill widens Admin:** it gains `models.manage` (and `products.view` and `businesses.view` if missing), with one audit row (`access_permissions_changed`, reason `model_requests_backfill`). Team is not changed. If the owner does not want Admin to handle requests, narrow the set in Platform team → Roles after the release.
+      ```sql
+      select role::text, array_agg(permission order by permission) as permissions
+        from public.platform_role_permissions group by role order by role;
+      ```
+   4. **No `model-request-photos` bucket yet** (or only a private one). Expect no rows. A public bucket with this name stops the migration.
+      ```sql
+      select id, public from storage.buckets where id = 'model-request-photos';
+      ```
+3. **Apply the migration.** `npx supabase db push --linked`. **Never `supabase config push`** (see "Never `config push`"). If it fails, read the error before retrying: check `supabase_migrations.schema_migrations` to see whether it was recorded.
+4. **Regenerate the types.** `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+5. **Deploy the Edge Functions**, straight after the migration. No new secrets: they use the existing email set and the keys Supabase provides.
+   ```
+   npx supabase functions deploy review-model-request account-security --project-ref zggylkbgajamhriebdrg
+   ```
+   - `review-model-request` is new and is `verify_jwt = true` in `supabase/config.toml`. The email kind `model_request_update` is new, so `email_log` must already hold the wider kind check from the migration.
+   - `account-security` changes only its closure sweep, which now also removes the business's `model-request-photos` folder.
+6. **Live smoke checks right after applying** (before the owner is told it is done; use QA accounts and a QA business, see `docs/TEST_PLAN.md`, "S4 live checks"):
+   - One real request with photos: the definer functions read `storage.objects` on hosted Supabase, and only a real upload proves that works there.
+   - Stage a GLB and USDZ, deliver, then decline a second request.
+   - A direct `PATCH` of `allow_own_models` as a business owner is refused (42501).
+   - A `.glb` upload by a business whose switch is off is refused by Storage.
+7. **Release the frontend** to the Preview first, then to `sanctus.warpkit.online` only when the owner asks (push to `main`). **Keep the gap between the migration and the frontend short, and do not edit roles in the Roles page during it:** the old role editor does not know `models.manage` and would drop it from any role it saves.
+8. **Check after deploy.** Run "S4 live checks" in `docs/TEST_PLAN.md`, including the real-device AR checks of a delivered model.
+
+### Mixed versions
+
+- **Migration before frontend, always.** The new dashboards read columns and functions the old database does not have.
+- **Old frontend against the new database** works for products: it resends unchanged models, which `save_product` ignores, so a business with the switch off still saves. An old frontend that adds a model for a business with the switch off gets the generic error, which is the intended rule. It never sends `expected_models_changed_at`, so the stale-save check is skipped for it. It has no request screens, and its role editor would drop `models.manage` (see step 7).
+- **New frontend against old functions** shows Deliver and Decline buttons that fail until `review-model-request` is deployed. Deploy the functions first.
+
+### Rollback
+
+Order matters: **S4 first, then S2, then S1.5.**
+
+1. **Frontend.** Vercel → Deployments → the previous production deployment → **Instant Rollback**.
+2. **Delete the new function first.** `npx supabase functions delete review-model-request --project-ref zggylkbgajamhriebdrg`, **before** the S4 rollback SQL. There is no earlier version of it, and it would answer 500 once the SQL functions it calls are gone. Redeploy the previous `account-security` from the commit before the S4 merge.
+3. **Export the request photos.** They are customer data. Download every object in the `model-request-photos` bucket (Storage API or dashboard; keep the `{business}/{request}/` folder names) and give the export to the owner.
+4. **Empty the bucket** through the Storage API (dashboard: select all objects, Delete). The rollback script **refuses to run while objects remain** (`model_request_photos_not_empty`).
+5. **Database.** In the SQL editor, as the database owner, run `supabase/rollback/20261026_s4_model_requests_rollback.sql`. It restores the earlier `save_product`, `my_platform_access`, `permission_prerequisites`, the permission check constraint (removing `models.manage` from role sets first, with an audit row) and the recreated storage policies, and drops the three request tables, the triggers, functions, the two new columns and the new storage policies.
+6. **What stays.** Delivered models (ordinary product model rows), all audit rows, and every `email_log` row. The email kind check keeps the wider list while any `model_request_update` row exists. Staged files in `product-media` stay as unreferenced files.
+7. **The bucket itself.** On hosted Supabase, deleting from the Storage tables directly can be refused. The script then only raises a notice and the rest still commits: delete the empty `model-request-photos` bucket in the dashboard (Storage → `model-request-photos` → Delete bucket).
+8. Then, if wanted, the S2 rollback (`20261026_s2_business_logic_rollback.sql`), and after it the S1.5 one (see "Business-logic fixes (S1.5)"). Regenerate the types: `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+
 ## Rollback
 
 | What | How | Data effect |
@@ -264,6 +332,7 @@ Order matters. The script assumes the previous functions and frontend are back, 
 | Migrations `20261013093006` + `20261013144121` | Run `supabase/rollback/20261013_publish_rules_and_claims_rollback.sql` in the SQL editor (tested in PGlite) | drops claim links; keeps businesses, products and owner links |
 | Migrations `20261025163627` + `20261025180600` (account settings, 2FA) | Run `supabase/rollback/20261025_account_settings_optin_2fa_rollback.sql` first, then `supabase/rollback/20261025_account_settings_rollback.sql` (see "Account settings and 2FA (S1)") | drops profiles, the 2FA policy, codes and closure requests; keeps audit rows, TOTP factors and the avatars bucket if it has files |
 | Migration `20261026041731` (business-logic fixes, S1.5) | Redeploy the previous frontend and functions, then run `supabase/rollback/20261026_business_logic_fixes_rollback.sql` (see "Business-logic fixes (S1.5)") | drops the S1.5 tables, triggers and functions; keeps audit and email rows; **deletes analytics rows kept for deleted products** |
+| Migration `20261026120000` (3D model requests, S4) | Delete `review-model-request`, export and empty the `model-request-photos` bucket, then run `supabase/rollback/20261026_s4_model_requests_rollback.sql` **before** the S2 and S1.5 scripts (see "S4 3D model requests") | drops the request tables, columns and policies; keeps delivered models, audit and email rows; **request photos must be exported first** |
 | Earlier migrations | `supabase/rollback/20261012_p8_rollback.sql` | **destructive** (drops all tables): backup first |
 | Data | Supabase → Database → Backups (daily on paid plans; on Free take a manual dump: `npx supabase db dump --data-only -f backup.sql`) | — |
 
