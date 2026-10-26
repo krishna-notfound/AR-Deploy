@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { NormalizedApplication } from '../_shared/application'
 import type { EmailConfig, LogEntry } from '../_shared/email'
+import { renderEmail } from '../_shared/email-templates'
 import { MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, type SubmitDeps, handleSubmitApplication, submitterHash } from './handler'
 
 const CONFIG: EmailConfig = {
@@ -37,30 +38,65 @@ function deps(over: Partial<SubmitDeps> = {}) {
   const logs: LogEntry[] = []
   const audits: { eventType: string; applicationId: string }[] = []
   const sends: { to: string; subject: string }[] = []
+  /** Recorded attempts (service_application_attempt): the first hash of each allowed call. */
+  const attempts: string[] = []
+  const clock = { at: new Date('2026-10-26T12:00:00Z') }
   const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
     const b = JSON.parse(String(init?.body)) as { to: string[]; subject: string }
     sends.push({ to: b.to[0]!, subject: b.subject })
     return new Response(JSON.stringify({ id: `msg-${sends.length}-abcdef` }), { status: 200 })
   })
+  const stored = (r: (typeof rows)[number]): StoredApplication => ({
+    id: r.id,
+    reference: r.reference,
+    applicantEmail: r.applicantEmail,
+    businessName: r.businessName,
+    language: r.language,
+    createdAt: r.createdAt,
+  })
   const d: SubmitDeps = {
     config: { ok: true, config: CONFIG },
     fetch: fetchFn as unknown as typeof fetch,
     salt: 'salt',
-    findByKey: async (k) => rows.find((r) => r.key === k) ?? null,
+    now: () => clock.at,
+    findByKey: async (k) => {
+      const r = rows.find((x) => x.key === k)
+      return r ? stored(r) : null
+    },
     findOpenDuplicate: async (email, name) => rows.find((r) => r.app.applicantEmail === email && r.app.businessName.toLowerCase() === name.toLowerCase()) ?? null,
-    countRecent: async (h) => rows.filter((r) => r.hash === h).length,
+    // The R-W2-10 rule: refused at MAX attempts in the hour under any of the hashes; otherwise the first hash is recorded.
+    allowAttempt: async (hashes) => {
+      if (attempts.filter((h) => hashes.includes(h)).length >= MAX_SUBMISSIONS_PER_HOUR) return false
+      attempts.push(hashes[0]!)
+      return true
+    },
     insert: async (app, hash) => {
-      const row = { id: `app-${rows.length + 1}`, reference: `REF${rows.length + 1}`, key: app.submissionKey, hash, app }
+      const row = {
+        id: `app-${rows.length + 1}`,
+        reference: `REF${rows.length + 1}`,
+        applicantEmail: app.applicantEmail,
+        businessName: app.businessName,
+        language: app.language,
+        createdAt: clock.at.toISOString(),
+        key: app.submissionKey,
+        hash,
+        app,
+      }
       rows.push(row)
-      return { id: row.id, reference: row.reference }
+      return stored(row)
     },
     audit: async (e) => void audits.push(e),
+    hasSubmittedAudit: async (id) => audits.some((a) => a.applicationId === id && a.eventType === 'application_submitted'),
+    loggedWorkflows: async (id) => new Set(logs.filter((l) => l.applicationId === id).map((l) => l.workflow ?? '')),
     log: async (e) => (logs.push(e), `log-${logs.length}`),
     staffAlertRecipients: async () => [],
     ...over,
   }
-  return { d, rows, logs, audits, sends, fetchFn }
+  return { d, rows, logs, audits, sends, fetchFn, attempts, clock }
 }
+
+const STORED_9: StoredApplication = { id: 'app-9', reference: 'REF9', applicantEmail: 'ana@studio.test', businessName: 'Atelier Cão', language: 'pt', createdAt: '2026-10-26T11:00:00.000Z' }
+const key = (i: number) => `${i}f1c1b1e-3c55-4a1c-9d47-0a3c1e2b9f10`.slice(-36)
 
 const post = (body: unknown, ip = '203.0.113.9') =>
   new Request('https://fn.test/submit-application', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ip }, body: JSON.stringify(body) })
@@ -80,10 +116,11 @@ describe('submit-application', () => {
     ])
   })
 
-  it('stores the raw IP nowhere: only a salted hash', async () => {
+  it('stores the raw IP nowhere: only a salted hash of the UTC day', async () => {
     const { d, rows } = deps()
     await handleSubmitApplication(post(VALID), d)
-    expect(rows[0]!.hash).toBe(await submitterHash('203.0.113.9', 'salt'))
+    // R-W2-10: the stored hash is today's (UTC) hash.
+    expect(rows[0]!.hash).toBe(await submitterHash('203.0.113.9', 'salt', '2026-10-26'))
     expect(rows[0]!.hash).not.toContain('203.0.113.9')
   })
 
@@ -116,11 +153,10 @@ describe('submit-application', () => {
   })
 
   it('handles a concurrent duplicate insert by returning the stored row', async () => {
-    const stored = { id: 'app-9', reference: 'REF9' }
     let calls = 0
-    const { d } = deps({ findByKey: async () => (calls++ ? stored : null), insert: async () => 'duplicate_key' })
+    const { d } = deps({ findByKey: async () => (calls++ ? STORED_9 : null), insert: async () => 'duplicate_key' })
     const res = await handleSubmitApplication(post(VALID), d)
-    expect(await res.json()).toEqual(stored)
+    expect(await res.json()).toEqual({ id: 'app-9', reference: 'REF9' })
   })
 
   it('refuses a second open application for the same business and email', async () => {
@@ -133,7 +169,6 @@ describe('submit-application', () => {
 
   it(`rate-limits after ${MAX_SUBMISSIONS_PER_HOUR} submissions per hour from one connection`, async () => {
     const { d } = deps()
-    const key = (i: number) => `${i}f1c1b1e-3c55-4a1c-9d47-0a3c1e2b9f10`.slice(-36)
     for (let i = 0; i < MAX_SUBMISSIONS_PER_HOUR; i++) {
       const r = await handleSubmitApplication(post({ ...VALID, businessName: `Studio ${i}`, submissionKey: key(i) }), d)
       expect(r.status).toBe(200)
@@ -199,5 +234,146 @@ describe('submit-application', () => {
   it('fails closed without a salt', async () => {
     const { d } = deps({ salt: '' })
     expect((await handleSubmitApplication(post(VALID), d)).status).toBe(500)
+  })
+})
+
+describe('submit-application: rate limit first, daily hash (R-W2-10)', () => {
+  it('five attempts answered 409 duplicate_application, then a sixth → 429 rate_limited, and findOpenDuplicate is not called for the sixth', async () => {
+    const { d, rows } = deps()
+    const app = { applicantEmail: 'ana@studio.test', businessName: 'Atelier Cão' } as NormalizedApplication
+    rows.push({ ...STORED_9, id: 'app-0', reference: 'REF0', key: 'seeded', hash: 'seeded', app })
+    const findOpenDuplicate = vi.fn(d.findOpenDuplicate)
+    d.findOpenDuplicate = findOpenDuplicate
+    for (let i = 0; i < 5; i++) {
+      const r = await handleSubmitApplication(post({ ...VALID, submissionKey: key(i) }), d)
+      expect(r.status).toBe(409)
+      expect(await r.json()).toEqual({ error: 'duplicate_application' })
+    }
+    expect(findOpenDuplicate).toHaveBeenCalledTimes(5)
+    const sixth = await handleSubmitApplication(post({ ...VALID, submissionKey: key(6) }), d)
+    expect(sixth.status).toBe(429)
+    expect(await sixth.json()).toEqual({ error: 'rate_limited' })
+    expect(findOpenDuplicate).toHaveBeenCalledTimes(5)
+  })
+
+  it('the same IP hashes differently on 2026-10-26 and 2026-10-27', async () => {
+    const a = await submitterHash('203.0.113.9', 'salt', '2026-10-26')
+    const b = await submitterHash('203.0.113.9', 'salt', '2026-10-27')
+    expect(a).toMatch(/^[0-9a-f]{64}$/)
+    expect(b).toMatch(/^[0-9a-f]{64}$/)
+    expect(a).not.toBe(b)
+  })
+
+  it("at 00:20 UTC allowAttempt receives today's and yesterday's hash; at 12:00 only today's", async () => {
+    const { d, clock } = deps()
+    const allowAttempt = vi.fn(async (_hashes: string[]) => true)
+    d.allowAttempt = allowAttempt
+    clock.at = new Date('2026-10-27T00:20:00Z')
+    await handleSubmitApplication(post({ ...VALID, submissionKey: key(1) }), d)
+    expect(allowAttempt).toHaveBeenLastCalledWith([await submitterHash('203.0.113.9', 'salt', '2026-10-27'), await submitterHash('203.0.113.9', 'salt', '2026-10-26')])
+    clock.at = new Date('2026-10-27T12:00:00Z')
+    await handleSubmitApplication(post({ ...VALID, businessName: 'Noon Studio', submissionKey: key(2) }), d)
+    expect(allowAttempt).toHaveBeenLastCalledWith([await submitterHash('203.0.113.9', 'salt', '2026-10-27')])
+  })
+
+  it('five attempts at 23:40–23:56 UTC, then one at 00:20 UTC → 429', async () => {
+    const { d, clock } = deps()
+    for (let i = 0; i < 5; i++) {
+      clock.at = new Date(Date.UTC(2026, 9, 26, 23, 40 + i * 4))
+      expect((await handleSubmitApplication(post({ ...VALID, businessName: `Late ${i}`, submissionKey: key(i) }), d)).status).toBe(200)
+    }
+    clock.at = new Date('2026-10-27T00:20:00Z')
+    expect((await handleSubmitApplication(post({ ...VALID, businessName: 'After midnight', submissionKey: key(7) }), d)).status).toBe(429)
+  })
+
+  it('a key replay after five attempts → 200 with the stored row, and allowAttempt is not called', async () => {
+    const { d } = deps()
+    const allowAttempt = vi.fn(d.allowAttempt)
+    d.allowAttempt = allowAttempt
+    expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
+    for (let i = 1; i < 5; i++) expect((await handleSubmitApplication(post({ ...VALID, submissionKey: key(i) }), d)).status).toBe(409)
+    expect(allowAttempt).toHaveBeenCalledTimes(5)
+    const replay = await handleSubmitApplication(post(VALID), d)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toEqual({ id: 'app-1', reference: 'REF1' })
+    expect(allowAttempt).toHaveBeenCalledTimes(5)
+  })
+})
+
+describe('submit-application: nothing lost after the insert (R-W2-11)', () => {
+  const FIVE_MIN = 5 * 60_000
+  /** VALID stored as app-1 with no audit or email rows, as if the first request died right after the insert. */
+  function storedWithoutFollowUp() {
+    const t = deps()
+    const app = { applicantEmail: 'ana@studio.test', businessName: 'Atelier Cão' } as NormalizedApplication
+    t.rows.push({ ...STORED_9, id: 'app-1', reference: 'REF1', createdAt: t.clock.at.toISOString(), key: VALID.submissionKey, hash: 'h', app })
+    return t
+  }
+
+  it('audit throws → 200, the confirmation and the admin alert are both sent, and console.error has no email address', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { d, sends } = deps({ audit: async () => Promise.reject(new Error('audit insert failed: ana@studio.test')) })
+    const res = await handleSubmitApplication(post(VALID), d)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: 'app-1', reference: 'REF1' })
+    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test'])
+    expect(spy).toHaveBeenCalled()
+    for (const args of spy.mock.calls) expect(args.map(String).join(' ')).not.toMatch(/@|203\.0\.113\.9/)
+    spy.mockRestore()
+  })
+
+  it('a replay 5 minutes after the insert with no email_log rows sends the confirmation (stored language) and the admin alert once each, and writes the missing application_submitted', async () => {
+    const { d, sends, audits, clock } = storedWithoutFollowUp()
+    clock.at = new Date(clock.at.getTime() + FIVE_MIN)
+    const res = await handleSubmitApplication(post({ ...VALID, language: 'en' }), d)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: 'app-1', reference: 'REF1' })
+    expect(sends).toEqual([
+      { to: 'ana@studio.test', subject: renderEmail('application_confirmation', 'pt', { businessName: 'Atelier Cão' }).subject },
+      { to: 'team@account.test', subject: renderEmail('admin_notification', 'en', { businessName: 'Atelier Cão' }).subject },
+    ])
+    expect(audits).toEqual([{ eventType: 'application_submitted', applicationId: 'app-1', toStatus: 'submitted' }])
+    // Another replay finds both workflows logged and the audit row written: nothing more.
+    expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
+    expect(sends).toHaveLength(2)
+    expect(audits).toHaveLength(1)
+  })
+
+  it('a replay with the confirmation logged sends only the admin alert', async () => {
+    const { d, sends, logs, clock } = storedWithoutFollowUp()
+    // A failed row counts as present: a replay never retries a failed send.
+    logs.push({ kind: 'application_confirmation', recipient: 'ana@studio.test', subject: 'S', status: 'failed', applicationId: 'app-1', workflow: 'application:app-1:application_confirmation' })
+    clock.at = new Date(clock.at.getTime() + FIVE_MIN)
+    expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
+    expect(sends.map((s) => s.to)).toEqual(['team@account.test'])
+  })
+
+  it('a replay 10 seconds after the insert sends nothing', async () => {
+    const { d, sends, audits, clock } = storedWithoutFollowUp()
+    clock.at = new Date(clock.at.getTime() + 10_000)
+    const res = await handleSubmitApplication(post(VALID), d)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: 'app-1', reference: 'REF1' })
+    expect(sends).toHaveLength(0)
+    expect(audits).toHaveLength(0)
+  })
+
+  it('a replay whose body has another email sends to the stored address', async () => {
+    const { d, sends, clock } = storedWithoutFollowUp()
+    clock.at = new Date(clock.at.getTime() + FIVE_MIN)
+    expect((await handleSubmitApplication(post({ ...VALID, applicantEmail: 'someone.else@studio.test', businessName: 'Other Co' }), d)).status).toBe(200)
+    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test'])
+    expect(sends.some((s) => s.subject.includes('Other Co'))).toBe(false)
+  })
+
+  it('the duplicate_key path sends nothing', async () => {
+    let calls = 0
+    const { d, sends, audits, logs } = deps({ findByKey: async () => (calls++ ? STORED_9 : null), insert: async () => 'duplicate_key' })
+    const res = await handleSubmitApplication(post(VALID), d)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: 'app-9', reference: 'REF9' })
+    expect(sends).toHaveLength(0)
+    expect(audits).toHaveLength(0)
+    expect(logs).toHaveLength(0)
   })
 })

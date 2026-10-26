@@ -21,6 +21,15 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 18 rollback: application submission: rate limit first, daily hash (R-W2-10, R-W2-11)
+-- =============================================================================
+
+-- The earlier submit-application counts stored rows by submitter_hash; deploy it before running this.
+drop function if exists public.service_application_attempt(text[], int);
+drop table if exists private.application_attempts;
+-- ---- end S1.5 Task 18 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 2 rollback: staff 2FA gate on Edge Functions, staff password length, owner email conflict (R-W1-1, R-W1-7, R-W1-8)
 -- =============================================================================
 

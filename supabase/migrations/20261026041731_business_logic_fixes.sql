@@ -281,3 +281,58 @@ create policy "Platform members delete logos" on storage.objects
   using (bucket_id = 'business-logos'
          and ((select public.platform_can('businesses.edit')) or (select public.platform_can('businesses.delete'))));
 -- ---- end S1.5 Task 5 ----
+
+-- =============================================================================
+-- S1.5 Task 18: application submission: rate limit first, daily hash (R-W2-10, R-W2-11)
+-- =============================================================================
+
+-- R-W2-10: every submission attempt that passes the limit is recorded here, whatever its outcome (stored, 409
+-- duplicate), so a probe that stores nothing is still limited. submitter_hash is the salted daily (UTC) hash of the
+-- submitter's IP computed by submit-application; raw IPs are never stored. Rows older than 2 hours are deleted by
+-- the next call of service_application_attempt.
+create table private.application_attempts (
+  id             bigint generated always as identity primary key,
+  submitter_hash text        not null,
+  created_at     timestamptz not null default now()
+);
+create index application_attempts_hash_created_idx on private.application_attempts (submitter_hash, created_at);
+create index application_attempts_created_idx on private.application_attempts (created_at);
+alter table private.application_attempts enable row level security;
+revoke all on private.application_attempts from public, anon, authenticated;
+grant select, insert, delete on private.application_attempts to service_role;
+
+-- true when the attempt is allowed, and then it is recorded under p_hashes[1] (today's hash). The attempts of the
+-- last hour under any of p_hashes count together (today's and, just after midnight UTC, yesterday's), so the hourly
+-- window holds across midnight. A refused attempt is not recorded. The advisory lock serializes concurrent calls
+-- for the same submitter, so two calls at p_max - 1 let exactly one through.
+create function public.service_application_attempt(p_hashes text[], p_max int default 5)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  if p_hashes is null or cardinality(p_hashes) = 0 or p_hashes[1] is null or p_max is null then
+    raise exception 'invalid_attempt' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('application_attempt:' || p_hashes[1]));
+
+  delete from private.application_attempts where created_at < now() - interval '2 hours';
+
+  select count(*) into v_count
+    from private.application_attempts
+   where submitter_hash = any (p_hashes)
+     and created_at > now() - interval '1 hour';
+  if v_count >= p_max then
+    return false;
+  end if;
+
+  insert into private.application_attempts (submitter_hash) values (p_hashes[1]);
+  return true;
+end;
+$$;
+revoke execute on function public.service_application_attempt(text[], int) from public, anon, authenticated;
+grant execute on function public.service_application_attempt(text[], int) to service_role;
+-- ---- end S1.5 Task 18 ----

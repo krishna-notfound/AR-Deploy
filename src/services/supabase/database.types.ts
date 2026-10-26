@@ -974,6 +974,10 @@ export type Database = {
         Args: { p_full_name?: string; p_token_hash: string; p_user: string }
         Returns: string
       }
+      service_application_attempt: {
+        Args: { p_hashes: string[]; p_max?: number }
+        Returns: boolean
+      }
       service_check_action_code: {
         Args: { p_code: string; p_purpose: string; p_user: string }
         Returns: Json
