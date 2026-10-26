@@ -480,6 +480,131 @@ create policy "Business owners read platform changes to their business" on publi
 -- =============================================================================
 -- S4 Task 4: The business request: send, cancel, and the request panel (R-S4-6, R-S4-7, R-S4-8)
 -- =============================================================================
+
+-- R-S4-6: a business member sends a request in one call. The photos were uploaded first (upload on send) under
+-- {business}/{p_request_id}/{uuid}.{ext}; this checks every rule in order, then writes the request, its photo rows and
+-- one model_request_created row. There is no open-request limit (owner decision 2026-10-26).
+create function public.request_model(p_request_id uuid, p_product uuid, p_variant uuid, p_note text, p_photos jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_business uuid;
+  v_width    numeric;
+  v_height   numeric;
+  v_depth    numeric;
+  v_count    integer;
+  v_note     text := nullif(btrim(coalesce(p_note, '')), '');
+  v_photo    record;
+  v_path     text;
+  v_size     bigint;
+  v_shape    text;
+begin
+  select p.business_id, p.width, p.height, p.depth into v_business, v_width, v_height, v_depth
+    from public.products p where p.id = p_product;
+  -- 1. member of the product's business (an unknown product has no business: forbidden).
+  perform private.require_business_member(v_business);
+  -- The storage insert policy checks "request id unused" under the caller's RLS, which can't see another business's
+  -- requests; check it here as definer, so photos can never join a request that already exists.
+  if p_request_id is null or exists (select 1 from public.model_requests r where r.id = p_request_id) then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  -- 2. the option, when given, belongs to the product.
+  if p_variant is not null
+     and not exists (select 1 from public.product_variants v where v.id = p_variant and v.product_id = p_product) then
+    raise exception 'model_request_target_invalid' using errcode = '22023';
+  end if;
+  -- 3. the model is made to the product's size.
+  if not (coalesce(v_width, 0) > 0 and coalesce(v_height, 0) > 0 and coalesce(v_depth, 0) > 0) then
+    raise exception 'model_request_needs_dimensions' using errcode = '22023';
+  end if;
+  -- 4. one open request per target (the partial unique index backs this against a parallel call, below).
+  if exists (select 1 from public.model_requests r
+              where r.product_id = p_product and r.variant_id is not distinct from p_variant
+                and r.status in ('requested', 'in_progress')) then
+    raise exception 'model_request_open' using errcode = '23505';
+  end if;
+  -- 5. 2 to 10 distinct photos.
+  if p_photos is null or jsonb_typeof(p_photos) <> 'array' then
+    raise exception 'model_request_photos_count' using errcode = '22023';
+  end if;
+  v_count := jsonb_array_length(p_photos);
+  if v_count not between 2 and 10
+     or (select count(distinct e ->> 'storage_path') from jsonb_array_elements(p_photos) e) <> v_count then
+    raise exception 'model_request_photos_count' using errcode = '22023';
+  end if;
+  -- 6. each photo is in this business's folder for this request id, and its object was uploaded.
+  v_shape := '^' || v_business::text || '/' || p_request_id::text
+             || '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp)$';
+  for v_photo in select e from jsonb_array_elements(p_photos) e loop
+    v_path := case when jsonb_typeof(v_photo.e) = 'object' then v_photo.e ->> 'storage_path' end;
+    v_size := case when jsonb_typeof(v_photo.e -> 'size_bytes') = 'number' then (v_photo.e ->> 'size_bytes')::numeric::bigint end;
+    if v_path is null or v_path !~ v_shape or v_size is null or v_size not between 1 and 10485760
+       or not exists (select 1 from storage.objects o where o.bucket_id = 'model-request-photos' and o.name = v_path) then
+      raise exception 'model_request_photo_missing' using errcode = '22023';
+    end if;
+  end loop;
+  -- 7. the note.
+  if char_length(v_note) > 1000 then
+    raise exception 'model_request_note_too_long' using errcode = '22023';
+  end if;
+
+  begin
+    insert into public.model_requests (id, business_id, product_id, variant_id, note, requested_by)
+    values (p_request_id, v_business, p_product, p_variant, v_note, (select auth.uid()));
+  exception when unique_violation then
+    -- A parallel call sent the same target first (model_requests_one_open_idx).
+    raise exception 'model_request_open' using errcode = '23505';
+  end;
+  insert into public.model_request_photos (request_id, storage_path, file_name, size_bytes, sort_order)
+  select p_request_id, e ->> 'storage_path',
+         coalesce(nullif(left(btrim(coalesce(e ->> 'file_name', '')), 255), ''), split_part(e ->> 'storage_path', '/', 3)),
+         (e ->> 'size_bytes')::numeric::bigint, (n - 1)::integer
+    from jsonb_array_elements(p_photos) with ordinality as t(e, n);
+  insert into public.audit_events (event_type, actor_id, business_id, metadata)
+  values ('model_request_created', (select auth.uid()), v_business,
+          jsonb_build_object('request_id', p_request_id, 'product_id', p_product, 'variant_id', p_variant));
+  return jsonb_build_object('id', p_request_id, 'status', 'requested');
+end;
+$$;
+revoke execute on function public.request_model(uuid, uuid, uuid, text, jsonb) from public, anon;
+grant execute on function public.request_model(uuid, uuid, uuid, text, jsonb) to authenticated;
+
+-- R-S4-8: a business member cancels a request while it is still "Requested". It returns the photo paths; the client
+-- then deletes those objects (the delete policy allows it once the request is cancelled). A request the caller is
+-- not a member for reads as not found.
+create function public.cancel_model_request(p_request uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_req   public.model_requests%rowtype;
+  v_paths text[];
+begin
+  select * into v_req from public.model_requests r where r.id = p_request for update;
+  if not found or not exists (select 1 from public.business_members m
+                               where m.business_id = v_req.business_id and m.user_id = (select auth.uid())) then
+    raise exception 'model_request_not_found' using errcode = 'P0002';
+  end if;
+  perform private.require_business_member(v_req.business_id);
+  if v_req.status <> 'requested' then
+    raise exception 'model_request_not_cancellable' using errcode = 'P0001';
+  end if;
+  update public.model_requests set status = 'cancelled', closed_at = now() where id = p_request;
+  select coalesce(array_agg(p.storage_path order by p.sort_order), '{}') into v_paths
+    from public.model_request_photos p where p.request_id = p_request;
+  insert into public.audit_events (event_type, actor_id, business_id, metadata)
+  values ('model_request_cancelled', (select auth.uid()), v_req.business_id,
+          jsonb_build_object('request_id', p_request, 'product_id', v_req.product_id, 'variant_id', v_req.variant_id));
+  return jsonb_build_object('status', 'cancelled', 'photo_paths', to_jsonb(v_paths));
+end;
+$$;
+revoke execute on function public.cancel_model_request(uuid) from public, anon;
+grant execute on function public.cancel_model_request(uuid) to authenticated;
 -- ---- end S4 Task 4 ----
 
 -- =============================================================================
