@@ -5,7 +5,7 @@ import type { TranslationKey } from './en'
 export const pt: Partial<Record<TranslationKey, string>> = {
   'nav.backToCatalog': 'Voltar a {name}',
   'nav.language': 'Idioma',
-  'nav.poweredBy': 'Catálogo com tecnologia Sanctus (demonstração)',
+  'nav.poweredBy': 'Catálogo com tecnologia Sanctus',
 
   'catalog.searchPlaceholder': 'Pesquisar neste catálogo',
   'catalog.searchLabel': 'Pesquisar produtos',

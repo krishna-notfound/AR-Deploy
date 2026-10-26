@@ -250,10 +250,12 @@ export function SiteFooter() {
             <p className="text-label text-ink-muted">{t('site.rights', { year: YEAR })}</p>
             <LegalLinks className="text-[13px] text-ink-muted" linkClassName={footerLink} />
           </div>
-          <p className="max-w-2xl text-xs leading-5 text-ink-muted lg:text-right">
-            {t('site.credits')}
-            {isDemoMode ? ` ${t('site.sampleData')}` : ''}
-          </p>
+          {/* The sample catalogues and their credits exist only in demo mode (owner 2026-10-26: nothing demo on the live site). */}
+          {isDemoMode && (
+            <p className="max-w-2xl text-xs leading-5 text-ink-muted lg:text-right">
+              {t('site.credits')} {t('site.sampleData')}
+            </p>
+          )}
         </div>
       </div>
     </footer>

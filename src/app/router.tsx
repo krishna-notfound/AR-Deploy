@@ -1,7 +1,8 @@
 import { RequirePermission } from '@/auth/usePermission'
 import { JOIN_PATH, PRIVACY_PATH, TERMS_PATH } from '@/lib/urls'
 import { lazy, Suspense } from 'react'
-import { Outlet, type RouteObject, createBrowserRouter } from 'react-router'
+import { Navigate, Outlet, type RouteObject, createBrowserRouter, useLocation } from 'react-router'
+import { isDemoMode } from '@/services'
 import { RequireRole } from '@/auth/RequireRole'
 import { SecurityGate } from '@/auth/SecurityGate'
 import { DashboardShell } from '@/components/layout/DashboardShell'
@@ -60,6 +61,12 @@ function PublicLayout() {
       </Suspense>
     </LanguageProvider>
   )
+}
+
+/** /demo on the live site: the sign-in page, keeping ?next= and the rest of the query. */
+function ToLogin() {
+  const { search } = useLocation()
+  return <Navigate to={`/login${search}`} replace />
 }
 
 function Standalone() {
@@ -156,7 +163,8 @@ function pathModeRoutes(): RouteObject[] {
         {
           element: <Standalone />,
           children: [
-            { path: '/demo', element: <DemoEntryPage /> },
+            // The demo account picker exists only in demo mode; on the live site /demo goes to the sign-in page.
+            { path: '/demo', element: isDemoMode ? <DemoEntryPage /> : <ToLogin /> },
             { path: '/login', element: <LoginPage /> },
             { path: JOIN_PATH, element: <JoinPage /> },
             ...settingsRoutes,

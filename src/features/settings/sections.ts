@@ -4,6 +4,7 @@ import { type ComponentType, type LazyExoticComponent, createContext, lazy, useC
 import { useOptionalAccount } from '@/auth/AccountProvider'
 import type { Need } from '@/auth/usePermission'
 import type { SettingsSection } from '@/domain/types'
+import { isDemoMode } from '@/services'
 
 export type { SettingsSection } from '@/domain/types'
 
@@ -37,7 +38,8 @@ export const SECTIONS: SettingsSectionDef[] = [
   { id: 'preferences', label: 'Preferences', group: 'Your account', visible: everyone, element: lazy(() => import('./sections/PreferencesSection')) },
   { id: 'activity', label: 'Security activity', group: 'Your account', visible: everyone, element: lazy(() => import('./sections/ActivitySection')) },
   { id: 'business', label: 'Business profile', group: 'Your business', visible: businessOnly, element: lazy(() => import('./sections/BusinessSection')) },
-  { id: 'platform', label: 'General', group: 'Platform', visible: ownerOnly, element: lazy(() => import('./sections/PlatformSection')) },
+  // Demo data tools and sample credits only: the live site has no General section (owner 2026-10-26).
+  { id: 'platform', label: 'General', group: 'Platform', visible: (c) => isDemoMode && ownerOnly(c), element: lazy(() => import('./sections/PlatformSection')) },
   { id: 'security-policy', label: 'Security policy', group: 'Platform', visible: ownerOnly, element: lazy(() => import('./sections/SecurityPolicySection')) },
 ]
 

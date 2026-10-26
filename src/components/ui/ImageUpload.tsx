@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn'
 import { IMAGE_RULES, validateImageFile } from '@/lib/files'
 import { formatFileSize } from '@/lib/format'
 import { newId } from '@/lib/id'
-import { service } from '@/services'
+import { isDemoMode, service } from '@/services'
 import { IconButton } from './Button'
 import { SmartImage } from './SmartImage'
 
@@ -128,7 +128,7 @@ export function ImageUpload({
         </label>
       </div>
       <p className="mt-2 text-xs text-ink-muted">
-        JPG, PNG or WebP, up to {formatFileSize(IMAGE_RULES.maxBytes)} each. Large photos are resized for this demo.
+        JPG, PNG or WebP, up to {formatFileSize(IMAGE_RULES.maxBytes)} each.{isDemoMode && ' Large photos are resized for this demo.'}
         {allowPrimary && ' The primary image is used as the catalog thumbnail and 3D poster.'}
       </p>
       {errors.length > 0 && (

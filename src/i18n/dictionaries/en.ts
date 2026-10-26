@@ -3,7 +3,7 @@
 export const en = {
   'nav.backToCatalog': 'Back to {name}',
   'nav.language': 'Language',
-  'nav.poweredBy': 'Catalogue powered by Sanctus (demo)',
+  'nav.poweredBy': 'Catalogue powered by Sanctus',
 
   'catalog.searchPlaceholder': 'Search this catalog',
   'catalog.searchLabel': 'Search products',
