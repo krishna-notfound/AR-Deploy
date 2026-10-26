@@ -890,8 +890,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const { data, error } = await q.limit(opts.limit ?? 10).returns<AuditRow[]>()
         if (error) return mapDbError(error)
         const events = (data ?? []).map(toAuditEvent)
-        // Catalog status rows carry the business id only: name the businesses from their rows.
-        const unnamed = [...new Set(events.filter((e) => e.eventType === 'business_status_changed' && e.businessId && !e.metadata.business_name).map((e) => e.businessId!))]
+        // Catalog status and business_created rows carry the business id only: name the businesses from their rows.
+        const unnamed = [...new Set(events.filter((e) => (e.eventType === 'business_status_changed' || e.eventType === 'business_created') && e.businessId && !e.metadata.business_name).map((e) => e.businessId!))]
         const names = new Map<ID, string>()
         if (unnamed.length) {
           const b = await sb.from('businesses').select('id, name').in('id', unnamed).returns<{ id: string; name: string }[]>()

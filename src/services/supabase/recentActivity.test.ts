@@ -79,6 +79,17 @@ describe('getRecentActivity from audit events (R-W5-5)', () => {
     expect(r.data.map((a) => a.message)).toEqual(['Draft lamp was added'])
   })
 
+  it('names a business_created row from its business, as the demo does', async () => {
+    const { sb, calls } = stub({
+      audit_events: { data: [row('1', 'business_created', { metadata: { source: 'application' } })] },
+      businesses: { data: [{ id: 'b1', name: 'Atelier Norte' }] },
+    })
+    const r = await createSupabaseCatalogService(sb).getRecentActivity()
+    if (!r.ok) throw new Error(r.error.message)
+    expect(r.data.map((a) => a.message)).toEqual(['Atelier Norte was created'])
+    expect(calls.businesses).toContainEqual(['in', 'id', ['b1']])
+  })
+
   it('an error is returned as an error, with no fallback data', async () => {
     const { sb } = stub({ audit_events: { error: { code: '42501', message: 'permission denied' } } })
     const r = await createSupabaseCatalogService(sb).getRecentActivity()

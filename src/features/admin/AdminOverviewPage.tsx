@@ -17,7 +17,7 @@ import { ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
 import { ActivityList } from '../shared/ActivityList'
 import { applicationsAdminPath } from '@/lib/urls'
-import { MostViewedList, formatArRate, mostViewed } from '../analytics/MostViewedList'
+import { MostViewedList, allViews, formatArRate, mostViewed } from '../analytics/MostViewedList'
 import { hasArModel } from '../products/productReadiness'
 import { useBusinesses } from '../products/useCatalogData'
 import { SetupProgressCard } from '../settings/OnboardingChecklist'
@@ -34,13 +34,17 @@ export default function AdminOverviewPage() {
   const canBusinesses = can('businesses.view')
   const needsSummary = canAnalytics || canProducts || canBusinesses
   const summary = useServiceQuery(() => (needsSummary ? service.getAnalytics({ timeZone }) : Promise.resolve(ok(null))), [timeZone, needsSummary])
-  const products = useServiceQuery(() => (canProducts ? service.getProducts() : Promise.resolve(ok(null))), [canProducts])
+  // Most viewed names products too: with analytics.view alone, RLS still returns the published ones.
+  const needsProducts = canProducts || canAnalytics
+  const products = useServiceQuery(() => (needsProducts ? service.getProducts() : Promise.resolve(ok(null))), [needsProducts])
   const { list: businesses, map: bizMap, query: bizQuery } = useBusinesses()
   const activity = useServiceQuery(() => service.getRecentActivity({ limit: 6 }), [])
   const s = summary.data
 
   const productMap = new Map((products.data ?? []).map((p) => [p.id, p]))
   const top = mostViewed(s?.byProduct ?? [], productMap)
+  // Viewed products this person can't read (no products.view): say why they are missing instead of "no activity".
+  const unnamedViews = !canProducts && (s?.byProduct ?? []).some((r) => allViews(r) > 0 && !productMap.has(r.productId))
   const activeBusinesses = businesses.filter((b) => b.status === 'active').length
   const withModel = products.data?.filter(hasArModel).length
   const stats: Stat[] = [
@@ -163,10 +167,13 @@ export default function AdminOverviewPage() {
                     <ErrorState message={products.error.message} onRetry={products.refetch} />
                   ) : !s || products.status === 'loading' ? (
                     <SkeletonRows rows={4} />
-                  ) : top.length === 0 ? (
+                  ) : top.length === 0 && !unnamedViews ? (
                     <EmptyState title="No product activity yet" />
                   ) : (
-                    <MostViewedList rows={top} products={productMap} businesses={bizMap} editBase={can('products.edit') ? '/admin/products' : undefined} />
+                    <>
+                      {top.length > 0 && <MostViewedList rows={top} products={productMap} businesses={bizMap} editBase={can('products.edit') ? '/admin/products' : undefined} />}
+                      {unnamedViews && <p className="py-3 text-[length:var(--text-ui-small)] text-ink-muted">Product names need the 'View products' permission.</p>}
+                    </>
                   )}
                 </CardBody>
               </Card>

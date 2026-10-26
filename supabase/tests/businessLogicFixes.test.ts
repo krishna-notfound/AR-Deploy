@@ -1418,4 +1418,24 @@ describe('S1.5 Task 8: catalogue activity from audit events', () => {
       expect(await read(OWNER_A)).toEqual([])
     })
   })
+
+  it('the rollback removes the products_audit trigger and both audit_events policies, and keeps the product_* rows', async () => {
+    const rolled = await freshDb()
+    try {
+      const objects = async () => ({
+        trigger: (await rolled.query(`select 1 from pg_trigger where tgname = 'products_audit' and tgrelid = 'public.products'::regclass`)).rows.length,
+        policies: (await rolled.query<{ policyname: string }>(
+          `select policyname from pg_policies where tablename = 'audit_events'
+              and policyname in ('Platform members read catalogue activity', 'Business owners read platform changes to their business') order by 1`)).rows.map((r) => r.policyname),
+      })
+      expect(await objects()).toEqual({ trigger: 1, policies: ['Business owners read platform changes to their business', 'Platform members read catalogue activity'] })
+      await rolled.exec(`insert into public.businesses (id, name, slug, status) values ('${id(30)}', 'T8 R', 't8-r', 'active');
+        ${product(id(31), id(30), 'r', 'T8 R sofa')}`)
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      expect(await objects()).toEqual({ trigger: 0, policies: [] })
+      expect((await rolled.query(`select 1 from public.audit_events where event_type = 'product_created' and metadata->>'product_id' = $1`, [id(31)])).rows).toHaveLength(1)
+    } finally {
+      await rolled.close()
+    }
+  }, 120_000)
 })

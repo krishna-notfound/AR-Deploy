@@ -398,6 +398,20 @@ describe('AdminOverviewPage follows permissions (R-W5-1)', () => {
     expect(figures().queryByText('Published')).toBeNull()
     expect(figures().queryByText('Drafts')).toBeNull()
     expect(figures().getByText('Product page views')).toBeInTheDocument()
+    // Most viewed still names the products the database lets this role read (published ones), without edit links.
+    const card = (await screen.findByRole('heading', { name: 'Most viewed products' })).closest('.shadow-\\[var\\(--shadow-card\\)\\]') as HTMLElement
+    await waitFor(() => expect(within(card).getAllByRole('listitem').length).toBeGreaterThan(0))
+    expect(within(card).queryByText('No product activity yet')).toBeNull()
+    expect(within(card).queryAllByRole('link').filter((a) => /\/edit$/.test(a.getAttribute('href') ?? ''))).toHaveLength(0)
+  })
+
+  it("analytics.view without products.view: viewed products it can't name are explained, not called 'no activity'", async () => {
+    // As under RLS with no readable product: the analytics rows are there, the names are not.
+    vi.spyOn(service, 'getProducts').mockResolvedValue(ok([]))
+    await overviewAs(['analytics.view', 'businesses.view'])
+    const card = (await screen.findByRole('heading', { name: 'Most viewed products' })).closest('.shadow-\\[var\\(--shadow-card\\)\\]') as HTMLElement
+    expect(await within(card).findByText("Product names need the 'View products' permission.")).toBeInTheDocument()
+    expect(within(card).queryByText('No product activity yet')).toBeNull()
   })
 
   it("Team without applications.view never sees 'No applications awaiting review'", async () => {
