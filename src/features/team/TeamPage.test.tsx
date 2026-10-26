@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
 import { service } from '@/services'
+import type { PlatformMember } from '@/domain/types'
 import { fail } from '@/services/catalogService'
 
 function open(url: string) {
@@ -101,6 +102,35 @@ describe('Team & Access page (ADR-0029)', () => {
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Revoke invitation' }))
     await waitFor(() => expect(within(rowFor('marta.lopes@sanctus.example')).getByText('Revoked')).toBeInTheDocument())
+    // R-W6-9: the toast says how to send a new link.
+    expect(await screen.findByText('Invitation revoked. Use Resend to send them a new link.')).toBeInTheDocument()
+  })
+
+  it("'Pending invitations' counts only sent or pending, unexpired invites", { timeout: 20_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' })) // the demo team is staff-only
+    const real = await service.listMembers()
+    if (!real.ok) throw new Error('demo team did not load')
+    const marta = real.data.find((m) => m.email.startsWith('marta'))!
+    const later = new Date(Date.now() + 86_400_000).toISOString()
+    const earlier = new Date(Date.now() - 86_400_000).toISOString()
+    const invited = (n: number, invite: PlatformMember['invite']): PlatformMember => ({ ...marta, id: `inv_${n}`, email: `invited${n}@studio.test`, invite })
+    vi.spyOn(service, 'listMembers').mockResolvedValue({
+      ok: true,
+      data: [
+        ...real.data.filter((m) => m.status !== 'invited'),
+        invited(1, { status: 'sent', expiresAt: later }),
+        invited(2, { status: 'pending', expiresAt: later }),
+        invited(3, { status: 'sent', expiresAt: earlier }), // expired, not yet marked
+        invited(4, { status: 'expired', expiresAt: earlier }),
+        invited(5, { status: 'email_failed', expiresAt: later }),
+        invited(6, { status: 'revoked', expiresAt: later }),
+        invited(7, null),
+      ],
+    })
+    open('/admin/team')
+    await screen.findByRole('heading', { level: 1, name: 'Team & Access' })
+    const stat = (label: string) => screen.getByText(label, { selector: 'dt' }).parentElement!.parentElement as HTMLElement
+    await waitFor(() => expect(within(stat('Pending invitations')).getByText('2')).toBeInTheDocument())
   })
 
   it('lists access history and filters refused attempts', { timeout: 20_000 }, async () => {

@@ -13,7 +13,7 @@ function deps(over: Partial<InviteDeps> = {}) {
   const bodies: string[] = []
   const audits: unknown[] = []
   const denied: string[] = []
-  const created: { hash: string; expiresAt: string }[] = []
+  const created: { hash: string; expiresAt: string; note: string | null }[] = []
   const recorded: { ok: boolean; detail: string }[] = []
   const d: InviteDeps = {
     config: { ok: true, config: CONFIG as never },
@@ -27,7 +27,9 @@ function deps(over: Partial<InviteDeps> = {}) {
     gate: async (t) => (t === 'owner-token' ? 'ok' : t === 'owner-aal1-token' ? 'aal2_required' : 'forbidden'),
     inviteMember: async () => ({ ok: true, memberId: MEMBER }),
     getMember: async () => ({ id: MEMBER, email: 'ana@studio.test', role: 'team', status: 'invited' }),
-    createInvite: async (_m, hash, expiresAt) => (created.push({ hash, expiresAt }), { ok: true, inviteId: 'inv_1' }),
+    createInvite: async (_m, hash, expiresAt, _a, note) => (created.push({ hash, expiresAt, note }), { ok: true, inviteId: 'inv_1' }),
+    rolePermissions: async (role) => (role === 'admin' ? ['businesses.view', 'applications.view', 'products.view', 'products.edit', 'products.publish'] : ['products.view', 'products.edit']),
+    latestNote: async () => null,
     recordEmail: async (_i, ok, detail) => void recorded.push({ ok, detail }),
     inviterName: async () => 'Platform Owner',
     logDenied: async (_a, action) => void denied.push(action),
@@ -121,5 +123,47 @@ describe('invite-member (ADR-0030)', () => {
     const res = await handleInviteMember(post({ action: 'resend', memberId: MEMBER }), limited.d)
     expect(res.status).toBe(429)
     expect(limited.bodies).toHaveLength(0)
+  })
+
+  const asAdmin: InviteDeps['getMember'] = async () => ({ id: MEMBER, email: 'ana@studio.test', role: 'admin', status: 'invited' })
+
+  // R-W6-5: the bullets come from the role's permissions at send time, with the dashboard labels.
+  it("lists the role's permissions at send time, in the dashboard wording", async () => {
+    const { d, bodies } = deps({ getMember: asAdmin })
+    await handleInviteMember(post({ action: 'invite', email: 'ana@studio.test', role: 'admin' }), d)
+    const text = (JSON.parse(bodies[0]!) as { text: string }).text
+    expect(text).toContain('- View businesses')
+    expect(text).toContain('- Publish and unpublish')
+  })
+
+  it("with products.publish removed from Admin, the email bullets don't mention publishing", async () => {
+    const rolePermissions = vi.fn<InviteDeps['rolePermissions']>(async () => ['businesses.view', 'products.view', 'products.edit'])
+    const { d, bodies } = deps({ rolePermissions, getMember: asAdmin })
+    await handleInviteMember(post({ action: 'invite', email: 'ana@studio.test', role: 'admin' }), d)
+    expect(rolePermissions).toHaveBeenCalledWith('admin')
+    const { text, html } = JSON.parse(bodies[0]!) as { text: string; html: string }
+    expect(text).toContain('- Create and edit products')
+    expect(text).not.toMatch(/publish/i)
+    expect(html).not.toMatch(/publish/i)
+  })
+
+  it('stores the note with the invite', async () => {
+    const { d, created, bodies } = deps()
+    await handleInviteMember(post({ action: 'invite', email: 'ana@studio.test', role: 'team', note: '  Welcome aboard  ' }), d)
+    expect(created[0]!.note).toBe('Welcome aboard')
+    expect(bodies[0]).toContain('Welcome aboard')
+    const none = deps()
+    await handleInviteMember(post({ action: 'invite', email: 'ana@studio.test', role: 'team' }), none.d)
+    expect(none.created[0]!.note).toBeNull()
+  })
+
+  it('resend reuses the latest note', async () => {
+    const latestNote = vi.fn<InviteDeps['latestNote']>(async () => 'See you Monday')
+    const { d, created, bodies } = deps({ latestNote })
+    const res = await handleInviteMember(post({ action: 'resend', memberId: MEMBER }), d)
+    expect(res.status).toBe(200)
+    expect(latestNote).toHaveBeenCalledWith(MEMBER)
+    expect(created[0]!.note).toBe('See you Monday')
+    expect((JSON.parse(bodies[0]!) as { text: string }).text).toContain('See you Monday')
   })
 })

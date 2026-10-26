@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import { service } from '@/services'
+import type { PlatformMember } from '@/domain/types'
 import { teamFail } from '@/services/catalogService'
 import { InviteMemberDialog } from './InviteMemberDialog'
 
@@ -90,6 +91,38 @@ describe('Invite member dialog (ADR-0030)', () => {
     await user.click(await d.findByRole('button', { name: 'Send invitation' }))
     expect(await d.findByText('This email already has platform access.')).toBeInTheDocument()
     expect(d.getByLabelText(/Email address/)).toBeInTheDocument()
+  })
+
+  // R-W6-9: already_member says what to do, from the existing member's status in the loaded list.
+  it('maps already_member by the existing member’s status', async () => {
+    const existing = (status: PlatformMember['status']): PlatformMember => ({
+      id: 'm1', userId: status === 'invited' ? null : 'u1', email: 'taken@studio.test', fullName: null, role: 'team', status, invitedBy: null,
+      createdAt: '2026-10-01T00:00:00Z', activatedAt: null, deactivatedAt: null, lastSignInAt: null, invite: null, has2fa: false,
+    })
+    vi.spyOn(service, 'inviteMember').mockResolvedValue(teamFail('already_member'))
+    const cases: [PlatformMember['status'], string][] = [
+      ['invited', 'This person already has an invitation. Use Resend on their row.'],
+      ['deactivated', 'This person was deactivated. Reactivate them, or remove them to start over.'],
+      ['active', 'This email already has platform access.'],
+    ]
+    for (const [status, message] of cases) {
+      const user = userEvent.setup()
+      const { unmount } = render(
+        <MemoryRouter>
+          <ToastProvider>
+            <ConfirmProvider>
+              <InviteMemberDialog open onClose={vi.fn()} members={[existing(status)]} />
+            </ConfirmProvider>
+          </ToastProvider>
+        </MemoryRouter>,
+      )
+      const d = within(screen.getByRole('dialog'))
+      await user.type(d.getByLabelText(/Email address/), 'Taken@Studio.test')
+      await user.click(d.getByRole('button', { name: 'Review invitation' }))
+      await user.click(await d.findByRole('button', { name: 'Send invitation' }))
+      expect(await d.findByText(message)).toBeInTheDocument()
+      unmount()
+    }
   })
 
   it('disables Send while the invitation is going out', async () => {

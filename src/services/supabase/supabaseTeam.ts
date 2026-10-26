@@ -45,6 +45,8 @@ const ACTION_OF: Record<string, AccessAction> = {
 }
 const TYPE_OF = Object.fromEntries(Object.entries(ACTION_OF).map(([k, v]) => [v, k])) as Record<AccessAction, string>
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const ROLE = (r: unknown) => (r === 'admin' ? 'Admin' : r === 'team' ? 'Team' : String(r ?? ''))
 
 function details(action: AccessAction, m: Record<string, unknown>, to?: string | null): string {
@@ -211,6 +213,10 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
 
     async getAccessEvents(query = {}) {
       try {
+        // One member's history (R-W6-4): exact ids only. Anything that is not an id matches nothing, and never
+        // reaches the PostgREST filter string.
+        const scoped = query.memberId !== undefined || query.userId !== undefined
+        if (scoped && ![query.memberId, query.userId].every((x) => x === undefined || UUID.test(x))) return ok({ items: [], total: 0 })
         const size = query.pageSize ?? 20
         const page = query.page ?? 1
         let q = sb
@@ -224,7 +230,11 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
         if (query.outcome === 'ok') q = q.neq('event_type', 'access_denied')
         if (query.from) q = q.gte('created_at', `${query.from}T00:00:00`)
         if (query.to) q = q.lte('created_at', `${query.to}T23:59:59.999`)
-        if (query.q?.trim()) q = q.ilike('metadata->>email', `%${query.q.trim().replace(/[%_]/g, '')}%`)
+        if (query.memberId && query.userId) q = q.or(`metadata->>member_id.eq.${query.memberId},and(event_type.eq.access_denied,actor_id.eq.${query.userId})`)
+        else if (query.memberId) q = q.eq('metadata->>member_id', query.memberId)
+        else if (query.userId) q = q.eq('event_type', 'access_denied').eq('actor_id', query.userId)
+        // The member-email filter is an exact address, never a pattern (R-W6-4): 'an@x.pt' must not find 'jan@x.pt'.
+        if (query.q?.trim()) q = q.eq('metadata->>email', query.q.trim().toLowerCase())
         const { data, count, error } = await q
         if (error) return teamFail(error.code === '42501' ? 'forbidden' : 'unknown')
         type Row = { id: string; created_at: string; event_type: string; actor_id: string | null; from_status: string | null; to_status: string | null; metadata: Record<string, unknown> }

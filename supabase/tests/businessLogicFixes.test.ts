@@ -1180,3 +1180,133 @@ describe('S1.5 Task 7: analytics data', () => {
     await expect(h.probe('', 'select * from public.business_product_counts', [], null, 'anon')).rejects.toThrow(/permission denied/)
   })
 })
+
+describe('S1.5 Task 10: invitation note, exact access history, 2FA reset only when set', () => {
+  GONE_AFTER_ROLLBACK.push(
+    'public.service_create_member_invite(uuid, text, timestamptz, uuid, text)',
+    'public.service_latest_invite_note(uuid)',
+    'private.has_2fa(uuid)',
+  )
+  const id = ids(10)
+  const OWNER = id(1)
+  const FACTOR = id(2) // a verified authenticator
+  const CODES = id(3) // recovery codes left, no factor
+  const NOTHING = id(4) // no factor, no codes
+  const HALF = id(5) // an unverified factor and only used codes
+  const LATE = id(7) // holds an expired link
+  const HASH = (n: number) => String(n).repeat(64).slice(0, 64)
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ('${OWNER}', 't10-owner@test', now()), ('${FACTOR}', 't10-factor@test', now()), ('${CODES}', 't10-codes@test', now()),
+        ('${NOTHING}', 't10-nothing@test', now()), ('${HALF}', 't10-half@test', now()), ('${LATE}', 't10-late@test', now());
+      insert into public.platform_admins (user_id) values ('${OWNER}');
+      insert into public.platform_members (user_id, email, role, status) values
+        ('${FACTOR}', 't10-factor@test', 'admin', 'active'), ('${CODES}', 't10-codes@test', 'team', 'active'),
+        ('${NOTHING}', 't10-nothing@test', 'team', 'active'), ('${HALF}', 't10-half@test', 'team', 'active'),
+        (null, 't10-invited@test', 'team', 'invited'), (null, 't10-late@test', 'team', 'invited');
+      insert into auth.mfa_factors (user_id, status, factor_type) values
+        ('${OWNER}', 'verified', 'totp'), ('${FACTOR}', 'verified', 'totp'), ('${HALF}', 'unverified', 'totp');
+      insert into private.recovery_codes (user_id, code_hash, salt, used_at) values
+        ('${CODES}', '${HASH(1)}', 's', null), ('${HALF}', '${HASH(2)}', 's', now());
+    `)
+  })
+
+  const memberId = async (email: string) =>
+    (await db.query<{ id: string }>('select id from public.platform_members where email = $1', [email])).rows[0]!.id
+
+  it('note > 500 refused', async () => {
+    const m = await memberId('t10-invited@test')
+    const create = (n: number, note: string | null) =>
+      h.svc(`select public.service_create_member_invite($1, $2, now() + interval '7 days', $3, $4) as r`, [m, HASH(n), OWNER, note])
+    await expect(create(3, 'x'.repeat(501))).rejects.toThrow(/platform_invites_note_check/)
+    expect(await create(4, 'x'.repeat(500))).toMatchObject({ ok: true })
+    expect(await create(5, null)).toMatchObject({ ok: true })
+    await expect(db.query(`update private.platform_invites set note = $1 where member_id = $2`, ['y'.repeat(501), m])).rejects.toThrow(/platform_invites_note_check/)
+  })
+
+  it('stores the note on the invite, and the latest note is what a resend reuses', async () => {
+    const m = await memberId('t10-invited@test')
+    await h.svc(`select public.service_create_member_invite($1, $2, now() + interval '7 days', $3, 'Welcome, Ana') as r`, [m, HASH(6), OWNER])
+    expect(await h.svc(`select to_jsonb(public.service_latest_invite_note($1)) as r`, [m])).toBe('Welcome, Ana')
+    // Four-argument calls (the Edge Function of the earlier release) still work and store no note.
+    await h.svc(
+      `select public.service_create_member_invite(p_member => $1, p_token_hash => $2, p_expires_at => now() + interval '7 days', p_actor => $3) as r`,
+      [m, HASH(7), OWNER])
+    expect(await h.svc(`select to_jsonb(public.service_latest_invite_note($1)) as r`, [m])).toBeNull()
+    // Service role only.
+    for (const fn of ['public.service_latest_invite_note(uuid)', 'public.service_create_member_invite(uuid, text, timestamptz, uuid, text)']) {
+      const g = (await db.query<{ a: boolean; u: boolean; s: boolean }>(
+        `select has_function_privilege('anon', $1::regprocedure, 'execute') as a, has_function_privilege('authenticated', $1::regprocedure, 'execute') as u,
+                has_function_privilege('service_role', $1::regprocedure, 'execute') as s`, [fn])).rows[0]
+      expect({ fn, ...g }).toEqual({ fn, a: false, u: false, s: true })
+    }
+    expect((await db.query(`select to_regprocedure('public.service_create_member_invite(uuid, text, timestamptz, uuid)')::text as o`)).rows[0]).toEqual({ o: null })
+  })
+
+  it('an expired-invite attempt carries member_id', async () => {
+    const m = await memberId('t10-late@test')
+    await db.query(
+      `insert into private.platform_invites (member_id, token_hash, status, expires_at, created_by) values ($1, $2, 'sent', now() - interval '1 day', $3)`,
+      [m, HASH(8), OWNER])
+    expect(await h.svc(`select to_jsonb(public.service_accept_invite($1, $2)) as r`, [HASH(8), LATE])).toBe('invite_expired')
+    const { rows } = await db.query<{ metadata: Record<string, unknown> }>(
+      `select metadata from public.audit_events where event_type = 'access_invite_expired_attempt' and actor_id = $1`, [LATE])
+    expect(rows).toEqual([{ metadata: { member_id: m } }])
+  })
+
+  it('has_2fa true for a verified factor or recovery codes, else false', async () => {
+    const list = (await h.call(OWNER, 'select public.admin_list_members() as r', [], 'aal2')) as { members: { email: string; has2fa: boolean }[] }
+    const byEmail = Object.fromEntries(list.members.filter((x) => x.email.startsWith('t10-')).map((x) => [x.email, x.has2fa]))
+    expect(byEmail).toEqual({
+      't10-owner@test': true,
+      't10-factor@test': true,
+      't10-codes@test': true,
+      't10-nothing@test': false,
+      't10-half@test': false,
+      't10-invited@test': false,
+      't10-late@test': false,
+    })
+    const one = async (email: string) =>
+      ((await h.call(OWNER, 'select public.admin_get_member($1) as r', [await memberId(email)], 'aal2')) as { member: { has2fa: boolean } }).member.has2fa
+    expect(await one('t10-factor@test')).toBe(true)
+    expect(await one('t10-codes@test')).toBe(true)
+    expect(await one('t10-nothing@test')).toBe(false)
+    expect(await one('t10-half@test')).toBe(false)
+    // private.has_2fa is not callable from the API roles.
+    for (const role of ['anon', 'authenticated', 'service_role']) {
+      expect((await db.query<{ x: boolean }>(`select has_function_privilege($1, 'private.has_2fa(uuid)', 'execute') as x`, [role])).rows[0]!.x).toBe(false)
+    }
+  })
+
+  it('rollback restores the four-argument invite function, admin_list_members and admin_get_member, and drops the note column', async () => {
+    const defs = async (target: PGlite) => {
+      // The body keeps the source file's line endings (CRLF in a Windows checkout); compare the text only.
+      const def = async (fn: string) =>
+        (await target.query<{ d: string }>(`select pg_get_functiondef($1::regprocedure) as d`, [fn])).rows[0]!.d.replace(/\r\n/g, '\n')
+      return {
+        invite: await def('public.service_create_member_invite(uuid, text, timestamptz, uuid)'),
+        list: await def('public.admin_list_members()'),
+        get: await def('public.admin_get_member(uuid)'),
+        note: (await target.query(
+          `select 1 from information_schema.columns where table_schema = 'private' and table_name = 'platform_invites' and column_name = 'note'`)).rows.length,
+      }
+    }
+    const before = await freshDb((n) => n < S15_MIGRATION)
+    const rolled = await freshDb()
+    try {
+      const pre = await defs(before)
+      expect(pre.note).toBe(0)
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      expect(await defs(rolled)).toEqual(pre)
+      const g = (await rolled.query<{ u: boolean; s: boolean }>(
+        `select has_function_privilege('authenticated', 'public.service_create_member_invite(uuid, text, timestamptz, uuid)', 'execute') as u,
+                has_function_privilege('service_role', 'public.service_create_member_invite(uuid, text, timestamptz, uuid)', 'execute') as s`)).rows[0]
+      expect(g).toEqual({ u: false, s: true })
+    } finally {
+      await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
+})

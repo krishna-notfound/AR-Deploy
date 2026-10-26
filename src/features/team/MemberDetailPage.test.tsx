@@ -38,6 +38,15 @@ describe('Member detail (ADR-0029)', () => {
     expect(await screen.findByText('Invited as Team')).toBeInTheDocument() // this member's access events
   })
 
+  // R-W6-4: the member's Access history is matched on their ids, not an email search.
+  it("asks for this member's access history by id and login", { timeout: 20_000 }, async () => {
+    const spy = vi.spyOn(service, 'getAccessEvents')
+    open('/admin/team/mem_joao')
+    expect(await screen.findByText('Tried to open Team & Access')).toBeInTheDocument() // João's own refusal
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ memberId: 'mem_joao', userId: 'usr_mem_joao', q: undefined }))
+    expect(screen.queryByText('Joined as Admin')).toBeNull() // Ana's event
+  })
+
   it('shows the header avatar as a 48px Inter square with the initials when there is no photo', { timeout: 20_000 }, async () => {
     open('/admin/team/mem_ana')
     await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
@@ -191,6 +200,22 @@ describe('Member detail: Reset 2FA (Owner only)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
     const trigger = screen.getByRole('button', { name: 'Change role' })
     for (const c of ['h-10!', 'max-sm:h-11!', 'pointer-coarse:h-11!', 'w-auto!']) expect(trigger.className).toContain(c)
+  })
+
+  // R-W6-6: Reset 2FA only when has2fa (a verified authenticator or unused recovery codes).
+  it('Reset 2FA only when has2fa', { timeout: 20_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' })) // the demo team is staff-only
+    const real = await service.listMembers()
+    if (!real.ok) throw new Error('demo team did not load')
+    vi.spyOn(service, 'listMembers').mockResolvedValue({ ok: true, data: real.data.map((m) => (m.id === 'mem_ana' ? { ...m, has2fa: false } : m)) })
+    const { unmount } = open('/admin/team/mem_ana')
+    await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
+    expect(screen.getByRole('button', { name: 'Deactivate' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reset 2FA' })).toBeNull()
+    unmount()
+    open('/admin/team/mem_joao') // has2fa: true
+    await screen.findByRole('heading', { level: 1, name: 'João Costa' })
+    expect(screen.getByRole('button', { name: 'Reset 2FA' })).toBeInTheDocument()
   })
 
   it('is not offered for an invited member with no account yet, nor for the Owner', { timeout: 20_000 }, async () => {

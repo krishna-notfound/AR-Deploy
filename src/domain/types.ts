@@ -333,6 +333,8 @@ export interface PlatformMember {
   deactivatedAt: ISODate | null
   lastSignInAt: ISODate | null
   invite: { status: InviteStatus; expiresAt: ISODate } | null
+  /** They have 2FA the Owner could reset: a verified authenticator or unused recovery codes (R-W6-6). */
+  has2fa: boolean
   /** Their profile photo (public URL), or null for initials. Absent when the source does not know it. */
   avatarUrl?: string | null
 }
@@ -372,6 +374,12 @@ export interface AccessEvent {
 }
 export interface AccessQuery {
   q?: string
+  /**
+   * One member's history (R-W6-4): events whose metadata names this member, plus access refusals by `userId` (their
+   * login, when they have one). Exact ids, never an email search.
+   */
+  memberId?: ID
+  userId?: ID
   action?: AccessAction
   outcome?: 'ok' | 'denied'
   from?: string

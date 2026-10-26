@@ -72,6 +72,7 @@ export const ACCOUNT_ERRORS: Record<string, { code: ServiceErrorCode; message: s
   not_allowed: { code: 'PERMISSION', message: "You don't have permission to do this." },
   not_found: { code: 'NOT_FOUND', message: 'That account or request no longer exists.' },
   email_failed: { code: 'UNKNOWN', message: "We couldn't send the email. Try again." },
+  nothing_to_reset: { code: 'CONFLICT', message: "They don't have 2FA set up, so there is nothing to reset." },
   unknown: { code: 'UNKNOWN', message: 'Something went wrong. Try again.' },
   // Supabase Auth and client-side checks
   current_password_mismatch: { code: 'VALIDATION', message: 'Your current password is incorrect.' },

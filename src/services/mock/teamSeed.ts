@@ -6,10 +6,13 @@ export interface DemoTeam {
   members: PlatformMember[]
   invites: Record<string, MemberInvite[]>
   rolePermissions: RolePermissions
-  events: AccessEvent[]
+  events: DemoAccessEvent[]
   /** Demo link tokens → member id (real links only store a hash; this is demo data). */
   tokens: Record<string, { memberId: string; inviteId: string }>
 }
+
+/** A recorded access event plus the exact ids a member's history filters on (R-W6-4), as the database stores them. */
+export type DemoAccessEvent = AccessEvent & { memberId?: string; actorId?: string }
 
 export const DEMO_OWNER_EMAIL = 'admin@platform.example'
 export const DEMO_INVITE_TOKEN = 'demo-invite-token'
@@ -25,6 +28,7 @@ export function createDemoTeam(now: number = Date.now()): DemoTeam {
     deactivatedAt: null,
     lastSignInAt: null,
     invite: null,
+    has2fa: false,
     ...m,
   })
   const martaInvite: MemberInvite = {
@@ -39,13 +43,13 @@ export function createDemoTeam(now: number = Date.now()): DemoTeam {
     revokedAt: null,
   }
   const members: PlatformMember[] = [
-    member({ id: 'usr_platform', userId: 'usr_platform', email: DEMO_OWNER_EMAIL, fullName: 'Platform Admin', role: 'owner', status: 'active', invitedBy: null, createdAt: at(-120), activatedAt: at(-120), lastSignInAt: at(0) }),
-    member({ id: 'mem_ana', email: 'ana.ribeiro@sanctus.example', fullName: 'Ana Ribeiro', role: 'admin', status: 'active', lastSignInAt: at(-1) }),
-    member({ id: 'mem_joao', email: 'joao.costa@sanctus.example', fullName: 'João Costa', role: 'team', status: 'active', createdAt: at(-20), activatedAt: at(-19), lastSignInAt: at(-3) }),
+    member({ id: 'usr_platform', userId: 'usr_platform', email: DEMO_OWNER_EMAIL, fullName: 'Platform Admin', role: 'owner', status: 'active', invitedBy: null, createdAt: at(-120), activatedAt: at(-120), lastSignInAt: at(0), has2fa: true }),
+    member({ id: 'mem_ana', email: 'ana.ribeiro@sanctus.example', fullName: 'Ana Ribeiro', role: 'admin', status: 'active', lastSignInAt: at(-1), has2fa: true }),
+    member({ id: 'mem_joao', email: 'joao.costa@sanctus.example', fullName: 'João Costa', role: 'team', status: 'active', createdAt: at(-20), activatedAt: at(-19), lastSignInAt: at(-3), has2fa: true }),
     member({ id: 'mem_marta', email: 'marta.lopes@sanctus.example', role: 'team', status: 'invited', createdAt: at(-1), invite: { status: 'sent', expiresAt: martaInvite.expiresAt } }),
     member({ id: 'mem_pedro', email: 'pedro.alves@sanctus.example', fullName: 'Pedro Alves', role: 'admin', status: 'deactivated', deactivatedAt: at(-5), lastSignInAt: at(-9) }),
   ]
-  const ev = (id: string, days: number, e: Omit<AccessEvent, 'id' | 'at' | 'outcome'> & { outcome?: AccessEvent['outcome'] }): AccessEvent => ({ id, at: at(days), outcome: 'ok', ...e })
+  const ev = (id: string, days: number, e: Omit<DemoAccessEvent, 'id' | 'at' | 'outcome'> & { outcome?: AccessEvent['outcome'] }): DemoAccessEvent => ({ id, at: at(days), outcome: 'ok', ...e })
   return {
     members,
     invites: {
@@ -56,12 +60,12 @@ export function createDemoTeam(now: number = Date.now()): DemoTeam {
     },
     rolePermissions: { admin: [...DEFAULT_ROLE_PERMISSIONS.admin], team: [...DEFAULT_ROLE_PERMISSIONS.team] },
     events: [
-      ev('acc_6', -1, { actor: DEMO_OWNER_EMAIL, member: 'marta.lopes@sanctus.example', action: 'invite_email_sent', toRole: 'team', details: 'Invitation email accepted by the provider' }),
-      ev('acc_5', -1, { actor: DEMO_OWNER_EMAIL, member: 'marta.lopes@sanctus.example', action: 'invite_created', toRole: 'team', details: 'Invited as Team' }),
-      ev('acc_4', -2, { actor: 'joao.costa@sanctus.example', member: null, action: 'denied', outcome: 'denied', details: 'Tried to open Team & Access' }),
-      ev('acc_3', -5, { actor: DEMO_OWNER_EMAIL, member: 'pedro.alves@sanctus.example', action: 'member_deactivated', fromRole: 'admin', details: 'Deactivated' }),
-      ev('acc_2', -19, { actor: 'joao.costa@sanctus.example', member: 'joao.costa@sanctus.example', action: 'invite_accepted', toRole: 'team', details: 'Joined as Team' }),
-      ev('acc_1', -39, { actor: 'ana.ribeiro@sanctus.example', member: 'ana.ribeiro@sanctus.example', action: 'invite_accepted', toRole: 'admin', details: 'Joined as Admin' }),
+      ev('acc_6', -1, { memberId: 'mem_marta', actor: DEMO_OWNER_EMAIL, member: 'marta.lopes@sanctus.example', action: 'invite_email_sent', toRole: 'team', details: 'Invitation email accepted by the provider' }),
+      ev('acc_5', -1, { memberId: 'mem_marta', actor: DEMO_OWNER_EMAIL, member: 'marta.lopes@sanctus.example', action: 'invite_created', toRole: 'team', details: 'Invited as Team' }),
+      ev('acc_4', -2, { actorId: 'usr_mem_joao', actor: 'joao.costa@sanctus.example', member: null, action: 'denied', outcome: 'denied', details: 'Tried to open Team & Access' }),
+      ev('acc_3', -5, { memberId: 'mem_pedro', actor: DEMO_OWNER_EMAIL, member: 'pedro.alves@sanctus.example', action: 'member_deactivated', fromRole: 'admin', details: 'Deactivated' }),
+      ev('acc_2', -19, { memberId: 'mem_joao', actorId: 'usr_mem_joao', actor: 'joao.costa@sanctus.example', member: 'joao.costa@sanctus.example', action: 'invite_accepted', toRole: 'team', details: 'Joined as Team' }),
+      ev('acc_1', -39, { memberId: 'mem_ana', actorId: 'usr_mem_ana', actor: 'ana.ribeiro@sanctus.example', member: 'ana.ribeiro@sanctus.example', action: 'invite_accepted', toRole: 'admin', details: 'Joined as Admin' }),
     ],
     tokens: { [DEMO_INVITE_TOKEN]: { memberId: 'mem_marta', inviteId: 'inv_marta' } },
   }

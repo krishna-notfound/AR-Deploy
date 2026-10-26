@@ -12,16 +12,31 @@ export const PERMISSIONS = [
 
 export type MemberRole = 'admin' | 'team'
 
-/** Plain bullets for the invitation email: what the role is for, not the exact permission list. */
-export const ROLE_SUMMARY: Record<MemberRole, string[]> = {
-  admin: [
-    'Review and approve business applications',
-    'Manage businesses and their owners',
-    'Create, publish and manage products',
-    'View analytics and records',
-  ],
-  team: ['View businesses and applications', 'Create and edit products', 'View analytics'],
+/**
+ * The dashboard label of each permission, mirrored from src/features/team/permissions.ts (team.test.ts checks they are
+ * equal). The invitation email lists the role's permissions at send time with these labels (R-W6-5).
+ */
+export const PERMISSION_LABELS: Record<string, string> = {
+  'businesses.view': 'View businesses',
+  'businesses.edit': 'Create and edit businesses',
+  'businesses.status': 'Activate or deactivate businesses',
+  'businesses.delete': 'Delete businesses',
+  'owners.manage': 'Invite and remove business owners',
+  'applications.view': 'View applications',
+  'applications.approve': 'Approve applications',
+  'applications.reject': 'Reject applications',
+  'products.view': 'View products and catalogues',
+  'products.edit': 'Create and edit products',
+  'products.publish': 'Publish and unpublish',
+  'products.delete': 'Delete products',
+  'analytics.view': 'View analytics',
+  'records.view': 'View the audit log and email log',
+  'access.view': 'View access history',
 }
+
+/** The labels of a role's permissions, in the dashboard order; unknown keys are left out. */
+export const permissionBullets = (permissions: readonly string[]): string[] =>
+  PERMISSIONS.filter((p) => permissions.includes(p)).map((p) => PERMISSION_LABELS[p]!)
 
 /**
  * Staff passwords (R-W1-7): at least 12 characters, as for every account (src/services PASSWORD_MIN), and at most 72

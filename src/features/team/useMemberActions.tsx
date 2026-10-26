@@ -62,7 +62,7 @@ export function useMemberActions() {
         destructive: true,
       })
       if (!yes) return false
-      return report(await service.revokeMemberInvite(m.id), 'Invitation revoked')
+      return report(await service.revokeMemberInvite(m.id), 'Invitation revoked. Use Resend to send them a new link.')
     },
     [confirm, report],
   )

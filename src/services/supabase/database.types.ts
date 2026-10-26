@@ -1044,6 +1044,7 @@ export type Database = {
           p_actor: string
           p_expires_at: string
           p_member: string
+          p_note?: string
           p_token_hash: string
         }
         Returns: Json
@@ -1060,6 +1061,7 @@ export type Database = {
         }
         Returns: string
       }
+      service_latest_invite_note: { Args: { p_member: string }; Returns: string }
       service_log_access_denied: {
         Args: { p_action: string; p_actor: string }
         Returns: undefined
