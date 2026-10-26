@@ -1,6 +1,13 @@
-# Handoff: read this first in a new session (updated 2026-10-20)
+# Handoff: read this first in a new session (updated 2026-10-27)
 
-## Business-logic fixes, S1.5 (2026-10-26, same branch, NOT yet applied to `zggylkbgajamhriebdrg`)
+## Live state (checked 2026-10-27; re-check before relying on it, see CLAUDE.md "Facts and live state")
+- **Site:** `sanctus.warpkit.online` is built from `feature/sanctus-brand-design-system` (Vercel Preview). `main` (last commit 2026-10-14) is not live. Before merging to `main`: Production env vars must point at `zggylkbgajamhriebdrg`, and the domain must be switched to `main` in Vercel (not checkable from here).
+- **Supabase `zggylkbgajamhriebdrg`:** all 18 migrations applied; 13 Edge Functions active. 10 were deployed on 2026-10-26 07:52 UTC, before `_shared/team.ts` gained `models.manage` (only effect: team invitation emails omit that permission line); redeploy only with the owner's go-ahead.
+- **Not checkable from here:** Auth Site URL and redirect URLs. The only record is a 2026-10-20 QA note that the Site URL was the default `http://localhost:3000/`; it may have been fixed. Ask the owner before stating it either way. Same for the `APP_BASE_URL` secret's value (it is set) and Vercel env vars.
+- **Live test content:** catalog `idk` (products `idkidk` Astronaut, `chair` 17.5 MB Tripo chair). Remove before handover, with the owner's OK.
+
+
+## Business-logic fixes, S1.5 (2026-10-26, same branch; migration `20261026041731` applied to `zggylkbgajamhriebdrg`, checked 2026-10-27)
 - Fixes from the 2026-10-26 audit (ADR-0033): permission prerequisites, 2FA before permission on the Edge Functions, history that survives a deleted business, embed views and deleted-product analytics, team removal and email sync, email status integrity, and the application and owner-invitation fixes that came back when S3 was cancelled. Spec `docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md`, plan `docs/superpowers/plans/2026-10-26-business-logic-fixes.md`.
 - One migration `supabase/migrations/20261026041731_business_logic_fixes.sql` and one rollback `supabase/rollback/20261026_business_logic_fixes_rollback.sql`. New functions: `review-application` and `notify-business-owner` (`verify_jwt = true`).
 - **Before applying:** the owner's go-ahead, then the read-only pre-flight in `docs/OPERATIONS_RUNBOOK.md` ("Business-logic fixes (S1.5)"). It shows the role sets the backfill will widen, checks Postgres is 15 or later, and lists team rows whose email differs from the login. Set `EMBED_VIEWS_SINCE` (`src/services/analytics.ts`) to the apply date, and subscribe the Resend webhook to `email.suppressed`.
