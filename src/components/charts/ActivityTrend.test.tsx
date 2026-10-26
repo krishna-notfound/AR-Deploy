@@ -13,9 +13,9 @@ describe('ActivityTrend', () => {
     const user = userEvent.setup()
     render(<ActivityTrend data={data} compact />)
     expect(screen.getAllByRole('img')).toHaveLength(1)
-    expect(screen.getByRole('img')).toHaveAccessibleName('Product views and AR launch attempts, last 30 days')
+    expect(screen.getByRole('img')).toHaveAccessibleName('Page and embed views and AR launch attempts, last 30 days')
 
-    const views = screen.getByRole('button', { name: 'Product views' })
+    const views = screen.getByRole('button', { name: 'Page and embed views' })
     const ar = screen.getByRole('button', { name: 'AR launch attempts' })
     expect(views).toHaveAttribute('aria-pressed', 'true')
     expect(ar).toHaveAttribute('aria-pressed', 'true')
@@ -47,7 +47,7 @@ describe('ActivityTrend', () => {
   it('full size (analytics): two small multiples, as before', () => {
     render(<ActivityTrend data={data} />)
     expect(screen.getAllByRole('img')).toHaveLength(2)
-    expect(screen.queryByRole('button', { name: 'Product views' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Page and embed views' })).toBeNull()
   })
 
   it('the table header is sentence case with no letter-spacing', async () => {

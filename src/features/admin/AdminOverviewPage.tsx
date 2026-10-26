@@ -101,8 +101,8 @@ export default function AdminOverviewPage() {
 
           <Card>
             <PanelHeader
-              title="Product views and AR launch attempts"
-              description="All businesses, last 30 days"
+              title="Views and AR launch attempts"
+              description="Page and embed views, all businesses, last 30 days"
               actions={
                 <Link to="/admin/analytics" className={panelLinkClass}>
                   Open analytics <ArrowRight className="size-3.5" aria-hidden />

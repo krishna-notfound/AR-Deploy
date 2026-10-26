@@ -85,7 +85,7 @@ export default function BusinessOverviewPage() {
             <Card className={productsFailed ? 'lg:col-span-12' : 'lg:col-span-7'}>
               <PanelHeader
                 title="Views and AR launch attempts"
-                description="Last 30 days"
+                description="Page and embed views, last 30 days"
                 actions={
                   <Link to="/dashboard/analytics" className={panelLinkClass}>
                     Open analytics <ArrowRight className="size-3.5" aria-hidden />
@@ -94,7 +94,7 @@ export default function BusinessOverviewPage() {
               />
               <CardBody>
                 {/* With nothing published there is nothing to visit: flat lines would read as "no one is looking" (DUX-04). */}
-                {nothingPublished && !s?.totals.views ? (
+                {nothingPublished && !s?.totals.views && !s?.totals.embedViews ? (
                   <EmptyState icon={BarChart3} title="No published products yet" body="Views and AR launch attempts appear once customers can see your products." />
                 ) : s ? (
                   <ActivityTrend data={s.series} compact prefs={prefs} />

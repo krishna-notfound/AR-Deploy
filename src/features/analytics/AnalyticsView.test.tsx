@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { TrendTooltip, dayLabel } from '@/components/charts/Charts'
+import { SERIES, TrendTooltip, dayLabel } from '@/components/charts/Charts'
 import type { AnalyticsSummary, Product, ProductAnalytics } from '@/domain/types'
 import { type DatePrefs, formatDate } from '@/lib/format'
 import { service } from '@/services'
@@ -146,14 +146,29 @@ describe('AnalyticsView (S1.5 Task 7)', () => {
     renderView(Promise.resolve({ ok: true, data: summaryOf() }))
     // The table view of the chart: local dates in the person's format, never shifted by their zone (São Paulo is UTC-3).
     await user.click(await screen.findByRole('button', { name: 'Show as table' }))
-    const days = within(screen.getByRole('table', { name: 'Daily product views and AR launch attempts' })).getAllByRole('row').slice(1).map((r) => r.firstElementChild?.textContent)
+    const days = within(screen.getByRole('table', { name: 'Daily page and embed views and AR launch attempts' })).getAllByRole('row').slice(1).map((r) => r.firstElementChild?.textContent)
     expect(days).toEqual(['2026-10-26', '2026-10-25'])
     // The axis ticks and the tooltip format through the same function.
     expect(dayLabel('2026-10-25', { timezone: 'Pacific/Auckland', dateFormat: 'dd/MM/yyyy', clock: '24h' })).toBe(formatDate('2026-10-25', 'en', { timezone: 'UTC', dateFormat: 'dd/MM/yyyy', clock: '24h' }))
-    render(<TrendTooltip active payload={[{ value: 3 }]} label="2026-10-25" seriesLabel="Product views" prefs={{ timezone: 'America/Sao_Paulo', dateFormat: 'dd/MM/yyyy', clock: '24h' }} />)
+    render(<TrendTooltip active payload={[{ value: 3 }]} label="2026-10-25" seriesLabel="Page and embed views" prefs={{ timezone: 'America/Sao_Paulo', dateFormat: 'dd/MM/yyyy', clock: '24h' }} />)
     expect(screen.getByText('25/10/2026')).toBeInTheDocument()
     // Without preferences (signed out, still loading): the short default.
     expect(dayLabel('2026-10-25')).toBe('Oct 25')
+  })
+
+  it("names the chart's views series 'Page and embed views' (it counts both), unlike the page-only stat", async () => {
+    const user = userEvent.setup()
+    renderView(Promise.resolve({ ok: true, data: summaryOf() }))
+    // Series 60 + 50 = 110 (page + embed), while the "Product page views" stat reads 90.
+    const legend = (await screen.findByText('Page and embed views', { selector: 'span' })).parentElement!
+    expect(legend).toHaveTextContent('Page and embed views110 in 30 days')
+    expect(screen.getByRole('img', { name: 'Page and embed views, last 30 days' })).toBeInTheDocument()
+    expect(screen.queryByText(/Product views/)).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Show as table' }))
+    const table = screen.getByRole('table', { name: 'Daily page and embed views and AR launch attempts' })
+    expect(within(table).getByRole('columnheader', { name: 'Page and embed views' })).toBeInTheDocument()
+    render(<TrendTooltip active payload={[{ value: 3 }]} label="2026-10-25" seriesLabel={SERIES.views.label} />)
+    expect(screen.getByText('3 page and embed views')).toBeInTheDocument()
   })
 
   it('shows loading, empty and error states', async () => {

@@ -8,7 +8,8 @@ import type { DailyPoint } from '@/domain/types'
 import { type DatePrefs, formatCompact, formatDate, formatNumber } from '@/lib/format'
 
 export const SERIES = {
-  views: { color: '#1D1C1A', label: 'Product views' },
+  // The views series counts product page views plus embed views (R-W5-3): its label says so.
+  views: { color: '#1D1C1A', label: 'Page and embed views' },
   ar: { color: '#8A765C', label: 'AR launch attempts' },
 } as const
 
@@ -174,14 +175,14 @@ export function SeriesTable({ data, prefs }: { data: DailyPoint[]; prefs?: DateP
   return (
     <div className="max-h-64 overflow-auto rounded-[var(--radius-control)] border border-line">
       <table className="w-full text-[length:var(--text-ui-small)]">
-        <caption className="sr-only">Daily product views and AR launch attempts</caption>
+        <caption className="sr-only">Daily page and embed views and AR launch attempts</caption>
         <thead className="sticky top-0 bg-surface">
           <tr className="text-left text-ink-muted">
             <th scope="col" className="px-3 py-2 font-medium">
               Date
             </th>
             <th scope="col" className="px-3 py-2 text-right font-medium">
-              Views
+              {SERIES.views.label}
             </th>
             <th scope="col" className="px-3 py-2 text-right font-medium">
               AR launch attempts
