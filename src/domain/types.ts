@@ -288,6 +288,18 @@ export interface EmailAttempt {
   attempt: number
 }
 
+/**
+ * A business's owner, for the businesses list (S1.5 R-W2-5). `lastInvitedAt`: the newest invitation attempt (or the
+ * newest invitation email for owners invited before attempts were kept). `emailFailed`: that invitation was not sent,
+ * failed, bounced or was marked as spam.
+ */
+export interface OwnerState {
+  businessId: ID
+  state: 'needs_owner' | 'invite_pending' | 'owner_active'
+  lastInvitedAt: string | null
+  emailFailed: boolean
+}
+
 // ---------------------------------------------------------------------------
 // Platform team roles (ADR-0029, ADR-0030)
 // ---------------------------------------------------------------------------

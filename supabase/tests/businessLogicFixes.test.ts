@@ -918,3 +918,312 @@ describe('S1.5 Task 3: closure integrity', () => {
     }
   }, 120_000)
 })
+
+describe('S1.5 Task 17: owner invitations and onboarding', () => {
+  GONE_AFTER_ROLLBACK.push(
+    'private.owner_invite_attempts',
+    'public.service_reserve_owner_invite(uuid,text,uuid)',
+    'public.service_finish_owner_invite(uuid,text)',
+    'public.admin_list_owner_states()',
+  )
+
+  const id = ids(17)
+  const OWNER = id(1) // the platform Owner (actor)
+  const TEAM = id(2) // an active Team member
+  const U_A = id(3)
+  const U_B = id(4)
+  const U_C = id(5)
+  const PENDING = id(6) // an owner who never finished /accept-invite
+  const LIMITED = id(7) // a pending owner who signed in less than 60 s ago
+  const STAFF_EMAIL_USER = id(8) // an account whose email has a platform_members row
+  const ACTIVE = id(9)
+  const P_STATE = id(30)
+  const L5_STATE = id(31)
+  const BOUNCED_STATE = id(32)
+  const BLOCKED_STATE = id(33)
+  const BIZ = (n: number) => id(10 + n) // 10..25
+  const NEEDS = BIZ(10)
+  const PENDING_BIZ = BIZ(11)
+  const L5_BIZ = BIZ(12)
+  const BOUNCED_BIZ = BIZ(13)
+  const ACTIVE_BIZ = BIZ(14)
+  const BLOCKED_BIZ = BIZ(15)
+
+  type J = Record<string, unknown>
+  type Reserved = { reservation_id: string; attempt: number } | { error: string; retry_at: string }
+
+  beforeAll(async () => {
+    const users = [OWNER, TEAM, U_A, U_B, U_C, PENDING, LIMITED, STAFF_EMAIL_USER, ACTIVE, P_STATE, L5_STATE, BOUNCED_STATE, BLOCKED_STATE]
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ${users.map((u, i) => `('${u}', '${u === STAFF_EMAIL_USER ? 'T17-Staff@Test' : `t17-u${i}@test`}', now())`).join(', ')};
+      insert into public.platform_admins (user_id) values ('${OWNER}');
+      insert into public.platform_members (user_id, email, role, status) values
+        ('${TEAM}', 't17-u1@test', 'team', 'active'), (null, 't17-staff@test', 'team', 'invited');
+      insert into public.businesses (id, name, slug, status) values
+        ${Array.from({ length: 16 }, (_, n) => `('${BIZ(n)}', 'Task Seventeen ${n}', 't17-${n}', 'draft')`).join(', ')};
+    `)
+  })
+
+  const reserve = (biz: string, recipient: string) =>
+    h.svc(`select public.service_reserve_owner_invite($1, $2, $3) as r`, [biz, recipient, OWNER]) as unknown as Promise<Reserved>
+  const finish = (reservation: string, outcome: string) =>
+    h.as('', (tx) => tx.query('select public.service_finish_owner_invite($1, $2)', [reservation, outcome]), 'service_role', null)
+  const granted = (r: Reserved) => {
+    if (!('reservation_id' in r)) throw new Error(`expected a reservation, got ${JSON.stringify(r)}`)
+    return r
+  }
+  /** Moves every attempt of `biz` back by `seconds` (as the database owner), so the next reservation is past the cooldown. */
+  const age = (biz: string, seconds: number) =>
+    db.query(`update private.owner_invite_attempts set created_at = created_at - make_interval(secs => $2) where business_id = $1`, [biz, seconds])
+  const attempts = async (biz: string) =>
+    (await db.query<{ id: string; recipient: string; attempt: number; outcome: string | null; created_at: Date }>(
+      'select id, recipient, attempt, outcome, created_at from private.owner_invite_attempts where business_id = $1 order by created_at', [biz])).rows
+  const link = (biz: string, user: string) => h.svc(`select to_jsonb(public.service_link_owner($1, $2, $3, null)) as r`, [biz, user, OWNER])
+  const fnDef = async (sig: string) => (await db.query<{ d: string }>(`select pg_get_functiondef($1::regprocedure) as d`, [sig])).rows[0]!.d
+  const states = async (uid: string) => (await h.call(uid, 'select public.admin_list_owner_states() as r')) as unknown
+
+  it('a second reservation for the business inside 60 s → cooldown with retry_at; a blocked first attempt causes no cooldown', async () => {
+    const first = granted(await reserve(BIZ(0), 'Owner@Shop.test'))
+    expect(first.attempt).toBe(1)
+    const second = await reserve(BIZ(0), 'owner@shop.test')
+    expect(second).toMatchObject({ error: 'cooldown' })
+    const [row] = await attempts(BIZ(0))
+    expect(row).toMatchObject({ recipient: 'owner@shop.test', attempt: 1, outcome: null })
+    expect(Date.parse((second as { retry_at: string }).retry_at) - row!.created_at.getTime()).toBe(60_000)
+    // Another recipient for the same business waits too: the cooldown is per business.
+    expect(await reserve(BIZ(0), 'other@shop.test')).toMatchObject({ error: 'cooldown' })
+
+    // A blocked attempt (nothing was sent) starts no cooldown.
+    const blocked = granted(await reserve(BIZ(1), 'owner@shop.test'))
+    await finish(blocked.reservation_id, 'blocked')
+    expect(granted(await reserve(BIZ(1), 'owner@shop.test')).attempt).toBe(2)
+    expect((await attempts(BIZ(1))).map((a) => a.outcome)).toEqual(['blocked', null])
+
+    // Only the four outcomes are stored.
+    await expect(finish(blocked.reservation_id, 'delivered')).rejects.toMatchObject({ message: 'invalid_outcome' })
+    for (const outcome of ['accepted', 'sent', 'failed']) await finish(blocked.reservation_id, outcome)
+    expect((await attempts(BIZ(1)))[0]!.outcome).toBe('failed')
+  })
+
+  it("the 11th non-blocked attempt in 24 h for the same business and recipient → too_many_invitations with retry_at = oldest counted + 24 h; blocked attempts don't count; 'Rita@X.pt' and 'rita@x.pt' count together", async () => {
+    const biz = BIZ(2)
+    // 9 sent attempts in mixed case, each 61 s apart, then a blocked one.
+    for (let i = 0; i < 9; i++) {
+      const r = granted(await reserve(biz, i % 2 ? 'Rita@X.pt' : 'rita@x.pt'))
+      await finish(r.reservation_id, 'sent')
+      await age(biz, 61)
+    }
+    const blocked = granted(await reserve(biz, 'RITA@x.pt'))
+    await finish(blocked.reservation_id, 'blocked')
+    await age(biz, 61)
+    // The blocked one doesn't count: the 10th counted attempt is still allowed.
+    const tenth = granted(await reserve(biz, 'rita@x.pt'))
+    expect(tenth.attempt).toBe(11)
+    await finish(tenth.reservation_id, 'failed') // a failed send still counts
+    await age(biz, 61)
+
+    const refused = await reserve(biz, 'Rita@X.pt')
+    expect(refused).toMatchObject({ error: 'too_many_invitations' })
+    const rows = await attempts(biz)
+    expect(rows).toHaveLength(11) // nothing was reserved
+    expect(rows.every((a) => a.recipient === 'rita@x.pt')).toBe(true)
+    const oldest = rows.find((a) => a.outcome !== 'blocked')!
+    expect(Date.parse((refused as { retry_at: string }).retry_at) - oldest.created_at.getTime()).toBe(24 * 3600 * 1000)
+
+    // The limit is per recipient: another email for the same business is not refused.
+    expect(granted(await reserve(biz, 'someone@else.test')).attempt).toBe(12)
+    await age(biz, 61)
+    // Once the oldest counted attempt is more than 24 h old, Rita can be invited again.
+    await db.query(`update private.owner_invite_attempts set created_at = now() - interval '25 hours' where id = $1`, [oldest.id])
+    expect(granted(await reserve(biz, 'rita@x.pt')).attempt).toBe(13)
+  })
+
+  it('remove the owner and re-invite the same email: the count continues', async () => {
+    const biz = BIZ(3)
+    expect(await link(biz, U_A)).toBe('linked')
+    for (let i = 0; i < 10; i++) {
+      await finish(granted(await reserve(biz, 't17-u2@test')).reservation_id, 'accepted')
+      await age(biz, 61)
+    }
+    await db.query('delete from public.business_members where business_id = $1', [biz])
+    expect(await link(biz, U_A)).toBe('linked')
+    expect(await reserve(biz, 't17-u2@test')).toMatchObject({ error: 'too_many_invitations' })
+  })
+
+  it('attempt numbers continue from max(email_log.attempt) for invite:<business>', async () => {
+    const biz = BIZ(4)
+    await db.query(
+      `insert into public.email_log (kind, recipient, subject, status, business_id, workflow, attempt) values
+         ('owner_invitation', 'old@shop.test', 'Invite', 'accepted', $1::uuid, 'invite:' || $1::uuid::text, 6),
+         ('invitation_resend', 'old@shop.test', 'Invite', 'blocked', $1::uuid, 'invite:' || $1::uuid::text, 7),
+         ('invitation_resend', 'old@shop.test', 'Invite', 'accepted', $2::uuid, 'invite:' || $2::uuid::text, 40)`,
+      [biz, BIZ(5)],
+    )
+    expect(granted(await reserve(biz, 'old@shop.test')).attempt).toBe(8)
+    await age(biz, 61)
+    expect(granted(await reserve(biz, 'old@shop.test')).attempt).toBe(9)
+  })
+
+  it('two connections reserving at once: exactly one gets a reservation, the other cooldown', async () => {
+    const biz = BIZ(6)
+    // PGlite has one connection, so the two transactions run one after the other. On Postgres the advisory lock,
+    // taken before any check, serialises them the same way.
+    const results = await Promise.all([reserve(biz, 'race@shop.test'), reserve(biz, 'race@shop.test')])
+    expect(results.filter((r) => 'reservation_id' in r)).toHaveLength(1)
+    expect(results.filter((r) => 'error' in r && r.error === 'cooldown')).toHaveLength(1)
+    expect(await attempts(biz)).toHaveLength(1)
+    const body = await fnDef('public.service_reserve_owner_invite(uuid, text, uuid)')
+    const lock = body.indexOf(`pg_advisory_xact_lock(hashtext('owner_invite:' || p_business`)
+    expect(lock).toBeGreaterThan(0)
+    expect(lock).toBeLessThan(body.indexOf('private.owner_invite_attempts'))
+  })
+
+  it('email_log accepts attempt 101', async () => {
+    const insert = (attempt: number) =>
+      db.query(`insert into public.email_log (kind, recipient, subject, status, workflow, attempt) values ('owner_invitation', 'n@shop.test', 'S', 'accepted', 't17-attempt', $1)`, [attempt])
+    await insert(101)
+    await insert(100000)
+    await expect(insert(100001)).rejects.toThrow(/email_log_attempt_check/)
+    await expect(insert(0)).rejects.toThrow(/email_log_attempt_check/)
+  })
+
+  it('two connections linking different users to the same business: one links, the other raises business_has_owner', async () => {
+    const biz = BIZ(7)
+    const results = await Promise.allSettled([link(biz, U_B), link(biz, U_C)])
+    expect(results.filter((r) => r.status === 'fulfilled').map((r) => (r as PromiseFulfilledResult<unknown>).value)).toEqual(['linked'])
+    expect(results.filter((r) => r.status === 'rejected').map((r) => (r as PromiseRejectedResult).reason)).toMatchObject([{ message: 'business_has_owner', code: '23505' }])
+    expect((await db.query('select user_id from public.business_members where business_id = $1', [biz])).rows).toHaveLength(1)
+    // The business row is locked before the membership check, and a unique violation is reported the same way.
+    const body = await fnDef('public.service_link_owner(uuid, uuid, uuid, uuid)')
+    expect(body).toMatch(/from public\.businesses\s+where id = p_business_id\s+for update/)
+    expect(body.indexOf('for update')).toBeLessThan(body.indexOf('from public.business_members'))
+    expect(body).toMatch(/when unique_violation then\s+raise exception 'business_has_owner'/)
+    // Task 2's team-email check still applies, and a missing business is still refused.
+    await expect(link(BIZ(8), STAFF_EMAIL_USER)).rejects.toMatchObject({ message: 'email_is_admin', code: '23514' })
+    await expect(link(id(99), U_B)).rejects.toMatchObject({ message: 'business_not_found' })
+  })
+
+  it("record_sign_in as an owner whose membership is pending sets accepted_at and writes owner_onboarding_completed {via:'sign_in'}; a second call inside 60 s changes nothing and writes no second row", async () => {
+    const biz = BIZ(9)
+    expect(await link(biz, PENDING)).toBe('linked')
+    const membership = async (u: string) =>
+      (await db.query<{ accepted_at: Date | null }>('select accepted_at from public.business_members where user_id = $1', [u])).rows[0]!.accepted_at
+    const completed = async (u: string) =>
+      (await db.query<{ business_id: string; metadata: J }>(
+        `select business_id, metadata from public.audit_events where actor_id = $1 and event_type = 'owner_onboarding_completed'`, [u])).rows
+    expect(await membership(PENDING)).toBeNull()
+
+    expect(await h.call(PENDING, `select to_jsonb(public.record_sign_in('Firefox')) as r`)).toBe('recorded')
+    const accepted = await membership(PENDING)
+    expect(accepted).not.toBeNull()
+    expect(await completed(PENDING)).toEqual([{ business_id: biz, metadata: { via: 'sign_in' } }])
+
+    expect(await h.call(PENDING, `select to_jsonb(public.record_sign_in('Firefox')) as r`)).toBe('rate_limited')
+    expect(await membership(PENDING)).toEqual(accepted)
+    expect(await completed(PENDING)).toHaveLength(1)
+
+    // The acceptance runs before the rate limit: a pending owner who signed in moments ago is still accepted.
+    expect(await link(BIZ(5), LIMITED)).toBe('linked')
+    await db.query(`insert into public.audit_events (event_type, actor_id) values ('account_signed_in', $1)`, [LIMITED])
+    expect(await h.call(LIMITED, `select to_jsonb(public.record_sign_in(null)) as r`)).toBe('rate_limited')
+    expect(await membership(LIMITED)).not.toBeNull()
+    expect(await completed(LIMITED)).toEqual([{ business_id: BIZ(5), metadata: { via: 'sign_in' } }])
+  })
+
+  it("admin_list_owner_states: needs_owner; invite_pending with last_invited_at from the newest attempt (or the newest invite email_log row); email_failed for a bounced or blocked newest invite; owner_active; without businesses.view → {error:'forbidden'}", async () => {
+    // Pending, two attempts: the newest (accepted) decides; the older one failed.
+    await link(PENDING_BIZ, P_STATE)
+    await finish(granted(await reserve(PENDING_BIZ, 'p@shop.test')).reservation_id, 'failed')
+    await age(PENDING_BIZ, 3600)
+    await finish(granted(await reserve(PENDING_BIZ, 'p@shop.test')).reservation_id, 'accepted')
+    const newestAt = (await attempts(PENDING_BIZ)).at(-1)!.created_at
+    // Invited before this migration (the L5 businesses): only email_log rows.
+    await link(L5_BIZ, L5_STATE)
+    const l5Log = (status: string, at: string, attempt: number) =>
+      db.query(
+        `insert into public.email_log (created_at, kind, recipient, subject, status, business_id, workflow, attempt)
+         values ($2, 'invitation_resend', 'l5@shop.test', 'Invite', $3, $1::uuid, 'invite:' || $1::uuid::text, $4)`,
+        [L5_BIZ, at, status, attempt],
+      )
+    await l5Log('blocked', '2026-10-20T09:00:00Z', 1)
+    await l5Log('delivered', '2026-10-21T09:00:00Z', 2)
+    // The newest attempt's email bounced.
+    await link(BOUNCED_BIZ, BOUNCED_STATE)
+    const bounced = granted(await reserve(BOUNCED_BIZ, 'b@shop.test'))
+    await finish(bounced.reservation_id, 'accepted')
+    await db.query(
+      `insert into public.email_log (kind, recipient, subject, status, business_id, workflow, attempt) values
+         ('owner_invitation', 'b@shop.test', 'Invite', 'bounced', $1::uuid, 'invite:' || $1::uuid::text, $2)`, [BOUNCED_BIZ, bounced.attempt])
+    // The newest attempt was blocked (the email was never sent).
+    await link(BLOCKED_BIZ, BLOCKED_STATE)
+    await finish(granted(await reserve(BLOCKED_BIZ, 'x@shop.test')).reservation_id, 'blocked')
+    // An owner who finished onboarding.
+    await link(ACTIVE_BIZ, ACTIVE)
+    await db.query('update public.business_members set accepted_at = now() where user_id = $1', [ACTIVE])
+
+    const list = (await states(OWNER)) as J[]
+    const of = (rows: J[], biz: string) => rows.find((s) => s.business_id === biz)
+    expect(of(list, NEEDS)).toEqual({ business_id: NEEDS, state: 'needs_owner', last_invited_at: null, email_failed: false })
+    expect(of(list, PENDING_BIZ)).toMatchObject({ state: 'invite_pending', email_failed: false })
+    expect(Date.parse(of(list, PENDING_BIZ)!.last_invited_at as string)).toBe(newestAt.getTime())
+    expect(of(list, L5_BIZ)).toMatchObject({ state: 'invite_pending', email_failed: false })
+    expect(Date.parse(of(list, L5_BIZ)!.last_invited_at as string)).toBe(Date.parse('2026-10-21T09:00:00Z'))
+    expect(of(list, BOUNCED_BIZ)).toMatchObject({ state: 'invite_pending', email_failed: true })
+    expect(of(list, BLOCKED_BIZ)).toMatchObject({ state: 'invite_pending', email_failed: true })
+    expect(of(list, ACTIVE_BIZ)).toMatchObject({ state: 'owner_active' })
+
+    // With no attempt row, the newest invite email decides: a failed one reads as not sent.
+    await l5Log('failed', '2026-10-22T09:00:00Z', 3)
+    expect(of((await states(OWNER)) as J[], L5_BIZ)).toMatchObject({ state: 'invite_pending', email_failed: true })
+
+    await withRolePermissions({ team: ['products.view'] }, async () => {
+      expect(await states(TEAM)).toEqual({ error: 'forbidden' })
+    })
+    await withRolePermissions({ team: ['businesses.view'] }, async () => {
+      expect(of((await states(TEAM)) as J[], NEEDS)).toMatchObject({ state: 'needs_owner' })
+    })
+    expect(await states(U_A)).toEqual({ error: 'forbidden' })
+  })
+
+  it('anon cannot select from private.owner_invite_attempts; the service functions are service-role only', async () => {
+    for (const role of ['anon', 'authenticated'] as const)
+      await expect(h.probe('', 'select 1 from private.owner_invite_attempts', [], null, role)).rejects.toThrow(/permission denied/)
+    const can = async (role: string, sig: string) =>
+      (await db.query<{ ok: boolean }>(`select has_function_privilege($1, $2, 'execute') as ok`, [role, sig])).rows[0]!.ok
+    for (const sig of ['public.service_reserve_owner_invite(uuid, text, uuid)', 'public.service_finish_owner_invite(uuid, text)']) {
+      expect(await can('anon', sig)).toBe(false)
+      expect(await can('authenticated', sig)).toBe(false)
+      expect(await can('service_role', sig)).toBe(true)
+    }
+    expect(await can('anon', 'public.admin_list_owner_states()')).toBe(false)
+    expect(await can('authenticated', 'public.admin_list_owner_states()')).toBe(true)
+    const t = (await db.query<{ rls: boolean }>(`select relrowsecurity as rls from pg_class where oid = 'private.owner_invite_attempts'::regclass`)).rows[0]!
+    expect(t.rls).toBe(true)
+  })
+
+  it('rollback restores record_sign_in, service_link_owner and the attempt check (not valid, rows kept)', async () => {
+    const defs = async (target: PGlite) => ({
+      signIn: (await target.query<{ d: string }>(`select pg_get_functiondef('public.record_sign_in(text)'::regprocedure) as d`)).rows[0]!.d.replace(/\r\n/g, '\n'),
+      linkOwner: (await target.query<{ d: string }>(
+        `select pg_get_functiondef('public.service_link_owner(uuid, uuid, uuid, uuid)'::regprocedure) as d`)).rows[0]!.d.replace(/\r\n/g, '\n'),
+      attempt: (await target.query<{ d: string }>(`select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'email_log_attempt_check'`)).rows[0]!.d,
+    })
+    const before = await freshDb((n) => n < S15_MIGRATION)
+    const rolled = await freshDb()
+    try {
+      const pre = await defs(before)
+      expect((await defs(rolled)).signIn).not.toEqual(pre.signIn)
+      await rolled.query(`insert into public.email_log (kind, recipient, subject, status, workflow, attempt) values ('owner_invitation', 'r@test', 'S', 'sent', 'w', 101)`)
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      const post = await defs(rolled)
+      expect(post.signIn).toEqual(pre.signIn)
+      expect(post.linkOwner).toEqual(pre.linkOwner)
+      expect(post.attempt).toBe(`${pre.attempt} NOT VALID`)
+      expect((await rolled.query(`select 1 from public.email_log where attempt = 101`)).rows).toHaveLength(1)
+    } finally {
+      await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
+})

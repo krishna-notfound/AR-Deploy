@@ -7,8 +7,13 @@ import type { Business } from '@/domain/types'
 import { account, service } from '@/services'
 import { ok } from '@/services/catalogService'
 import { resetMockAccount } from '@/services/mock/mockAccount'
+import type { DatePrefs } from '@/lib/format'
 import { BusinessOwnersPanel } from './BusinessOwnersPanel'
 import { closureByBusiness } from './closure'
+
+// The signed-in person's date preferences (none unless a test sets them).
+const prefsState = vi.hoisted(() => ({ prefs: undefined as DatePrefs | undefined }))
+vi.mock('@/lib/preferences', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/preferences')>()), usePreferences: () => prefsState.prefs }))
 
 const OWNER = { userId: 'usr_rita', email: 'rita@oak.example', addedAt: '2026-09-01T10:00:00.000Z', invitedAt: '2026-09-01T10:00:00.000Z', acceptedAt: '2026-09-02T10:00:00.000Z' }
 const REQUEST = { userId: 'usr_rita', email: 'rita@oak.example', businessId: 'biz_oak', businessName: 'Oak & Ember Studio', requestedAt: '2026-10-20T10:00:00.000Z' }
@@ -78,5 +83,56 @@ describe('closureByBusiness', () => {
     const map = closureByBusiness([later, staff, REQUEST])
     expect([...map.keys()]).toEqual(['biz_oak'])
     expect(map.get('biz_oak')?.userId).toBe('usr_rita')
+  })
+})
+
+describe('BusinessOwnersPanel: owner state and invitations (S1.5 Task 17: R-W2-3, R-W2-4)', () => {
+  const PENDING = { userId: 'usr_rita', email: 'rita@oak.example', addedAt: '2026-09-01T10:00:00.000Z', invitedAt: '2026-09-01T10:00:00.000Z' }
+  const STATE = { businessId: 'biz_oak', state: 'invite_pending' as const, lastInvitedAt: '2026-10-20T10:00:00.000Z', emailFailed: false }
+
+  afterEach(() => {
+    prefsState.prefs = undefined
+  })
+
+  it("a pending owner shows 'Last invitation sent {date}' from the owner state, not invitedAt", async () => {
+    vi.spyOn(service, 'getBusinessMembers').mockResolvedValue(ok([PENDING]))
+    vi.spyOn(service, 'getOwnerStates').mockResolvedValue(ok([STATE]))
+    prefsState.prefs = { timezone: 'Europe/Lisbon', dateFormat: 'yyyy-MM-dd', clock: '24h' }
+    renderPanel(await oak())
+    expect(await screen.findByText('Last invitation sent 2026-10-20 · has not set a password yet')).toBeInTheDocument()
+    expect(screen.queryByText(/2026-09-01/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Resend invitation' })).toBeInTheDocument()
+  })
+
+  it("an accepted owner shows 'Owner active', hides Resend and offers Reset 2FA", async () => {
+    vi.spyOn(service, 'getOwnerStates').mockResolvedValue(ok([{ ...STATE, state: 'owner_active' as const }]))
+    renderPanel(await oak())
+    expect(await screen.findByText('Owner active')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Resend invitation' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Reset 2FA for rita@oak.example' })).toBeInTheDocument()
+  })
+
+  it("too_many_invitations shows 'Ten invitations were sent to this owner in the last 24 hours. You can send the next one after {time}.' with retryAt in the date-format preference", async () => {
+    vi.spyOn(service, 'getBusinessMembers').mockResolvedValue(ok([PENDING]))
+    vi.spyOn(service, 'getOwnerStates').mockResolvedValue(ok([STATE]))
+    vi.spyOn(service, 'resendOwnerInvitation').mockResolvedValue({
+      ok: false,
+      error: { code: 'RATE_LIMITED', message: 'Ten invitations were sent to this owner in the last 24 hours.', reason: 'too_many_invitations', retryAt: '2026-10-21T09:30:00.000Z' },
+    })
+    prefsState.prefs = { timezone: 'Asia/Tokyo', dateFormat: 'dd/MM/yyyy', clock: '24h' }
+    renderPanel(await oak())
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Resend invitation' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Send a new invitation to rita@oak.example?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Resend invitation' }))
+    expect(await screen.findByText('Ten invitations were sent to this owner in the last 24 hours. You can send the next one after 21/10/2026, 18:30.')).toBeInTheDocument()
+  })
+
+  it('when the owner state fails to load, a pending owner shows no invitation date (never invitedAt)', async () => {
+    vi.spyOn(service, 'getBusinessMembers').mockResolvedValue(ok([PENDING]))
+    vi.spyOn(service, 'getOwnerStates').mockResolvedValue({ ok: false, error: { code: 'UNKNOWN', message: 'Network down' } })
+    renderPanel(await oak())
+    expect(await screen.findByText('Has not set a password yet')).toBeInTheDocument()
+    expect(screen.queryByText(/Invited 1 Sep|2026-09-01|Last invitation sent/)).toBeNull()
   })
 })

@@ -311,3 +311,49 @@ describe('BusinessesListPage: an open closure is visible and blocks activation (
     expect(await menuItemsFor(user, 'Oak & Ember Studio')).toContain('Activate catalog')
   })
 })
+
+describe('BusinessesListPage: owner state on every row (S1.5 Task 17: R-W2-5)', () => {
+  const STATES = [
+    { businessId: 'biz_casa', state: 'needs_owner' as const, lastInvitedAt: null, emailFailed: false },
+    { businessId: 'biz_nord', state: 'invite_pending' as const, lastInvitedAt: '2026-10-20T10:00:00.000Z', emailFailed: false },
+    { businessId: 'biz_verde', state: 'invite_pending' as const, lastInvitedAt: '2026-10-19T10:00:00.000Z', emailFailed: true },
+    { businessId: 'biz_oak', state: 'owner_active' as const, lastInvitedAt: '2026-10-01T10:00:00.000Z', emailFailed: false },
+  ]
+  const shown = (name: string) => screen.queryAllByText(name).length > 0
+
+  it("the owner column shows 'Needs owner', 'Invite pending', 'Invite pending · email not sent' and 'Owner active'; the filter narrows the rows", async () => {
+    vi.spyOn(service, 'getOwnerStates').mockResolvedValue(ok(STATES))
+    const user = userEvent.setup()
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    expect(await screen.findByRole('columnheader', { name: /Owner/ })).toBeInTheDocument()
+    expect((await screen.findAllByText('Invite pending · email not sent')).length).toBeGreaterThan(0)
+    const table = screen.getByRole('table')
+    for (const label of ['Needs owner', 'Invite pending', 'Invite pending · email not sent', 'Owner active']) expect(within(table).getByText(label)).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by owner' }), 'needs_owner')
+    await waitFor(() => expect(shown('Nordhaus Living')).toBe(false))
+    expect(shown('Casa Lisboa Interiors')).toBe(true)
+    // "Invite pending" includes the ones whose email was not sent.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by owner' }), 'invite_pending')
+    await waitFor(() => expect(shown('Casa Lisboa Interiors')).toBe(false))
+    expect(shown('Nordhaus Living')).toBe(true)
+    expect(shown('Atelier Verde')).toBe(true)
+    expect(shown('Oak & Ember Studio')).toBe(false)
+  })
+
+  it("while the states load the column shows a placeholder; on an error the list still renders, with 'Couldn't load owner states.' above it and no owner filter", async () => {
+    vi.spyOn(service, 'getOwnerStates').mockReturnValue(new Promise(() => {}))
+    const first = renderAt('/admin/businesses', <BusinessesListPage />)
+    expect((await screen.findAllByText('Nordhaus Living')).length).toBeGreaterThan(0)
+    expect(within(screen.getByRole('table')).getAllByText('Loading owner state').length).toBe(4)
+    expect(screen.queryByRole('combobox', { name: 'Filter by owner' })).toBeNull()
+    first.unmount()
+
+    vi.spyOn(service, 'getOwnerStates').mockResolvedValue(fail('UNKNOWN', 'Network down'))
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    expect(await screen.findByText("Couldn't load owner states.")).toBeInTheDocument()
+    expect((await screen.findAllByText('Nordhaus Living')).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('combobox', { name: 'Filter by owner' })).toBeNull()
+    expect(screen.queryByText('Needs owner')).toBeNull()
+  })
+})

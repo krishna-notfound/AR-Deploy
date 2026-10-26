@@ -11,10 +11,10 @@ import { SkeletonRows } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, ClosureRequest, ID, Lang } from '@/domain/types'
-import { formatDate } from '@/lib/format'
+import { type DatePrefs, formatDate, formatDateTime } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { account, service } from '@/services'
-import type { ProvisionOutcome } from '@/services/catalogService'
+import type { ProvisionOutcome, ServiceError } from '@/services/catalogService'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { emailReason } from '../applications/labels'
 import { ActionCodeDialog } from '../settings/ActionCodeDialog'
@@ -30,6 +30,9 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
   const provision = useServiceMutation((email: string, language: Lang) => service.provisionOwner({ businessId: business.id, email, language, applicationId }))
   const resend = useServiceMutation((language: Lang) => service.resendOwnerInvitation(business.id, language))
   const removal = useServiceMutation((userId: ID) => service.removeBusinessMember(business.id, userId))
+  // The newest invitation (R-W2-3, R-W2-4): from the reserved attempts, not the first invitation (invitedAt).
+  const states = useServiceQuery(() => service.getOwnerStates(), [business.id])
+  const lastInvitedAt = states.data?.find((s) => s.businessId === business.id)?.lastInvitedAt ?? null
   const can = useCan()
   const manage = can('owners.manage')
   const isPlatformOwner = can('owner')
@@ -67,7 +70,7 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
     })
     if (!ok) return
     const res = await provision.mutate(value, language)
-    if (!res.ok) return setError(res.error.message)
+    if (!res.ok) return setError(invitationError(res.error, prefs))
     setError(null)
     members.refetch()
     report(res.data, 'Owner provisioned')
@@ -78,7 +81,7 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
     const ok = await confirm({ title: `Send a new invitation to ${owner.email}?`, body: 'Earlier invitation links stop working once a new one is used.', confirmLabel: 'Resend invitation' })
     if (!ok) return
     const res = await resend.mutate(language)
-    if (!res.ok) return toast.error('Invitation not resent', res.error.message)
+    if (!res.ok) return toast.error('Invitation not resent', invitationError(res.error, prefs))
     report(res.data, 'New invitation created')
   }
 
@@ -120,15 +123,17 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
                 <p className="mt-0.5 text-ui-small text-ink-muted tabular-nums">
                   {owner.acceptedAt
                     ? `Active since ${formatDate(owner.acceptedAt, 'en', prefs)}`
-                    : owner.invitedAt
-                      ? `Invited ${formatDate(owner.invitedAt, 'en', prefs)} · has not set a password yet`
-                      : `Added ${formatDate(owner.addedAt, 'en', prefs)}`}
+                    : lastInvitedAt
+                      ? `Last invitation sent ${formatDate(lastInvitedAt, 'en', prefs)} · has not set a password yet`
+                      : owner.invitedAt
+                        ? 'Has not set a password yet'
+                        : `Added ${formatDate(owner.addedAt, 'en', prefs)}`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 {owner.acceptedAt ? (
                   <Badge tone="success">
-                    <UserCheck className="size-3" aria-hidden /> Active
+                    <UserCheck className="size-3" aria-hidden /> Owner active
                   </Badge>
                 ) : (
                   <Badge tone="warning">Invitation pending</Badge>
@@ -203,4 +208,11 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
       )}
     </Card>
   )
+}
+
+/** The refusal in words; the 24-hour limit says when the next invitation can go out, in the person's date format. */
+function invitationError(e: ServiceError, prefs: DatePrefs | undefined): string {
+  if (e.reason === 'too_many_invitations' && e.retryAt)
+    return `Ten invitations were sent to this owner in the last 24 hours. You can send the next one after ${formatDateTime(e.retryAt, 'en', prefs)}.`
+  return e.message
 }

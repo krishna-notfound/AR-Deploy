@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import type { EmailConfig, LogEntry } from '../_shared/email'
-import { MAX_INVITATION_ATTEMPTS, type ProvisionDeps, RESEND_COOLDOWN_SECONDS, handleProvisionOwner } from './handler'
+import { type ProvisionDeps, handleProvisionOwner } from './handler'
 
 const BIZ = '11111111-1111-4111-8111-111111111111'
 const APP = '22222222-2222-4222-8222-222222222222'
@@ -21,6 +21,9 @@ function deps(over: Partial<ProvisionDeps> = {}) {
   const audits: { eventType: string; metadata?: Record<string, unknown> }[] = []
   const links: { type: string; email: string }[] = []
   const bodies: string[] = []
+  /** Reservations granted (R-W2-4), each with the outcome it was finished with. */
+  const reservations: { businessId: string; recipient: string; actorId: string; attempt: number; outcome?: string }[] = []
+  const deleted: string[] = []
   const fetchFn = vi.fn(async (_u: string, init?: RequestInit) => {
     bodies.push(String(init?.body))
     return new Response(JSON.stringify({ id: `msg-${bodies.length}-abcdef` }), { status: 200 })
@@ -28,7 +31,6 @@ function deps(over: Partial<ProvisionDeps> = {}) {
   const d: ProvisionDeps = {
     config: { ok: true, config: CONFIG },
     fetch: fetchFn as unknown as typeof fetch,
-    now: () => NOW,
     userIdFromToken: async (t) => ({ 'admin-token': 'admin-id', 'admin-aal1-token': 'admin-id', 'team-token': 'team-id', 'owner-token': 'owner-id' })[t] ?? null,
     // The 2FA gate (R-W1-1): an aal2 admin with owners.manage passes; aal1 needs the second step; others lack the permission.
     gate: async (t) => (t === 'admin-token' ? 'ok' : t === 'admin-aal1-token' ? 'aal2_required' : 'forbidden'),
@@ -45,12 +47,17 @@ function deps(over: Partial<ProvisionDeps> = {}) {
       owner = { userId, email: links.at(-1)!.email, acceptedAt: null }
       return 'linked'
     },
-    invitationAttempts: async () => ({ count: logs.length, lastAt: logs[0]?.createdAt ?? null }),
+    reserveInvite: async (businessId, recipient, actorId) => {
+      reservations.push({ businessId, recipient, actorId, attempt: reservations.length + 1 })
+      return { reservationId: `res-${reservations.length}`, attempt: reservations.length }
+    },
+    finishInvite: async (id, outcome) => void (reservations[Number(id.slice(4)) - 1]!.outcome = outcome),
+    deleteAuthUser: async (id) => void deleted.push(id),
     audit: async (e) => void audits.push(e),
     log: async (e) => (logs.unshift({ ...e, createdAt: new Date(NOW.getTime() - 120_000).toISOString() }), `log-${logs.length}`),
     ...over,
   }
-  return { d, logs, audits, links, bodies, fetchFn, setOwner: (o: typeof owner) => (owner = o) }
+  return { d, logs, audits, links, bodies, fetchFn, reservations, deleted, setOwner: (o: typeof owner) => (owner = o) }
 }
 
 const post = (body: unknown, token = 'admin-token', origin?: string) =>
@@ -105,11 +112,14 @@ describe('provision-owner', () => {
     expect(fetchFn).not.toHaveBeenCalled()
   })
 
-  it('a link refused by the database for a team email (a race) is 409 email_is_admin', async () => {
-    const { d } = deps({ linkOwner: async () => 'email_is_admin' })
+  it('a link refused by the database for a team email (a race) is 409 email_is_admin; the login this request created is deleted', async () => {
+    const { d, deleted, reservations, fetchFn } = deps({ linkOwner: async () => 'email_is_admin' })
     const res = await handleProvisionOwner(post(provision()), d)
     expect(res.status).toBe(409)
     expect(await res.json()).toEqual({ error: 'email_is_admin' })
+    expect(deleted).toEqual(['new-user'])
+    expect(reservations.map((r) => r.outcome)).toEqual(['blocked'])
+    expect(fetchFn).not.toHaveBeenCalled()
   })
 
   it('links the owner, emails the invitation code and never returns or logs it', async () => {
@@ -127,6 +137,85 @@ describe('provision-owner', () => {
     expect(JSON.stringify(audits)).not.toContain(CODE)
     expect(logs[0]).toMatchObject({ kind: 'owner_invitation', status: 'accepted', workflow: `invite:${BIZ}`, attempt: 1, applicationId: APP, businessId: BIZ, triggeredBy: 'admin-id' })
     expect(audits).toEqual([{ eventType: 'invitation_requested', actorId: 'admin-id', businessId: BIZ, applicationId: APP, metadata: { attempt: 1, email_status: 'accepted' } }])
+  })
+
+  it("the 11th attempt → 429 {error:'too_many_invitations', retryAt}; no generateCode", async () => {
+    const retryAt = '2026-10-21T09:00:00.000+00:00'
+    const { d, links, fetchFn, logs } = deps({ reserveInvite: async () => ({ error: 'too_many_invitations', retryAt }) })
+    const res = await handleProvisionOwner(post(provision()), d)
+    expect(res.status).toBe(429)
+    expect(await res.json()).toEqual({ error: 'too_many_invitations', retryAt })
+    expect(links).toHaveLength(0)
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(logs).toHaveLength(0)
+  })
+
+  it("cooldown → 429 {error:'cooldown', retryAt}; no generateCode", async () => {
+    const retryAt = '2026-10-20T10:00:30.000+00:00'
+    const { d, links, fetchFn, setOwner } = deps({ reserveInvite: async () => ({ error: 'cooldown', retryAt }) })
+    const res = await handleProvisionOwner(post(provision()), d)
+    expect(res.status).toBe(429)
+    expect(await res.json()).toEqual({ error: 'cooldown', retryAt })
+    setOwner({ userId: 'u1', email: 'owner@shop.test', acceptedAt: null })
+    const resend = await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), d)
+    expect(resend.status).toBe(429)
+    expect(await resend.json()).toEqual({ error: 'cooldown', retryAt })
+    expect(links).toHaveLength(0)
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('provision reserves before generateCode and finishes with the email status; the Idempotency-Key is invite:<business>:<reserved attempt>', async () => {
+    const { d, reservations, fetchFn, logs } = deps()
+    const order: string[] = []
+    const { reserveInvite, generateCode, finishInvite } = d
+    // The database numbers the attempt (here 7: earlier invitations were logged before the reservations table).
+    d.reserveInvite = async (...a) => (order.push('reserve'), { ...((await reserveInvite(...a)) as { reservationId: string }), attempt: 7 })
+    d.generateCode = async (...a) => (order.push('code'), generateCode(...a))
+    d.finishInvite = async (id, outcome) => (order.push(`finish:${outcome}`), finishInvite(id, outcome))
+    const res = await handleProvisionOwner(post(provision()), d)
+    expect(await res.json()).toEqual({ owner: 'linked', email: { status: 'accepted', attempt: 7 } })
+    expect(order).toEqual(['reserve', 'code', 'finish:accepted'])
+    expect(reservations).toEqual([{ businessId: BIZ, recipient: 'owner@shop.test', actorId: 'admin-id', attempt: 1, outcome: 'accepted' }])
+    expect(new Headers((fetchFn.mock.calls[0]![1] as RequestInit).headers).get('Idempotency-Key')).toBe(`invite:${BIZ}:7`)
+    expect(logs[0]).toMatchObject({ attempt: 7, workflow: `invite:${BIZ}` })
+
+    // An email that could not be sent finishes the reservation as blocked.
+    const blocked = deps({ config: { ok: false, missing: ['RESEND_API_KEY'] } })
+    await handleProvisionOwner(post(provision(), 'admin-token', 'https://sanctus-preview.vercel.app'), blocked.d)
+    expect(blocked.reservations.map((r) => r.outcome)).toEqual(['blocked'])
+  })
+
+  it('a failed code finishes the reservation as blocked', async () => {
+    const { d, reservations, deleted } = deps({ generateCode: async () => ({ ok: false, error: 'rate limited' }) })
+    expect((await handleProvisionOwner(post(provision()), d)).status).toBe(502)
+    expect(reservations.map((r) => r.outcome)).toEqual(['blocked'])
+    expect(deleted).toEqual([])
+  })
+
+  it('a link refused with business_has_owner after this request created the account → 409, finishInvite blocked and deleteAuthUser(userId) called; for an account that existed before, deleteAuthUser is not called', async () => {
+    // A parallel provision with another email linked first (the reservation was granted: R-W2-7 with R-W2-4).
+    const created = deps({ linkOwner: async () => 'business_has_owner' })
+    const res = await handleProvisionOwner(post(provision()), created.d)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'business_has_owner' })
+    expect(created.reservations.map((r) => r.outcome)).toEqual(['blocked'])
+    expect(created.deleted).toEqual(['new-user'])
+    expect(created.fetchFn).not.toHaveBeenCalled()
+
+    const existed = deps({
+      linkOwner: async () => 'business_has_owner',
+      accountByEmail: async () => ({ id: 'existing', invited: true, ownsBusiness: false }),
+      generateCode: async () => ({ ok: true, code: CODE, userId: 'existing' }),
+    })
+    expect((await handleProvisionOwner(post(provision()), existed.d)).status).toBe(409)
+    expect(existed.reservations.map((r) => r.outcome)).toEqual(['blocked'])
+    expect(existed.deleted).toEqual([])
+
+    // A link that fails outright cleans up the same way, then reports the error.
+    const thrown = deps({ linkOwner: async () => Promise.reject(new Error('link failed: timeout')) })
+    await expect(handleProvisionOwner(post(provision()), thrown.d)).rejects.toThrow('link failed')
+    expect(thrown.deleted).toEqual(['new-user'])
+    expect(thrown.reservations.map((r) => r.outcome)).toEqual(['blocked'])
   })
 
   it('keeps exactly one owner: a different email is refused', async () => {
@@ -203,23 +292,29 @@ describe('provision-owner', () => {
     expect((await handleProvisionOwner(post(provision(), 'admin-token', 'http://evil.test'), b.d)).status).toBe(503)
   })
 
-  it('resends with a cooldown and an attempt limit, appending to the history', async () => {
-    const { d, logs, setOwner, audits } = deps()
+  // R-W2-4: the cooldown and the limit are the database reservation's, per recipient over a rolling 24 h.
+  it('resends through a reservation (cooldown and the rolling limit come from the database), appending to the history', async () => {
+    const { d, logs, setOwner, audits, reservations } = deps()
     setOwner({ userId: 'u1', email: 'owner@shop.test', acceptedAt: null })
     const first = await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), d)
     expect(await first.json()).toEqual({ owner: 'already_linked', email: { status: 'accepted', attempt: 1 } })
     expect(logs[0]).toMatchObject({ kind: 'invitation_resend', attempt: 1 })
     expect(audits.at(-1)).toMatchObject({ eventType: 'invitation_resent' })
+    expect(reservations).toEqual([{ businessId: BIZ, recipient: 'owner@shop.test', actorId: 'admin-id', attempt: 1, outcome: 'accepted' }])
 
-    // A log entry from just now triggers the cooldown.
-    logs[0]!.createdAt = new Date(NOW.getTime() - (RESEND_COOLDOWN_SECONDS - 5) * 1000).toISOString()
-    const cooled = await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), d)
-    expect(cooled.status).toBe(429)
-    expect(await cooled.json()).toEqual({ error: 'cooldown' })
-
-    const many = deps({ invitationAttempts: async () => ({ count: MAX_INVITATION_ATTEMPTS, lastAt: '2026-10-19T00:00:00Z' }) })
+    const retryAt = '2026-10-21T08:00:00.000+00:00'
+    const many = deps({ reserveInvite: async () => ({ error: 'too_many_invitations', retryAt }) })
     many.setOwner({ userId: 'u1', email: 'owner@shop.test', acceptedAt: null })
-    expect(await (await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), many.d)).json()).toEqual({ error: 'too_many_attempts' })
+    const refused = await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), many.d)
+    expect(refused.status).toBe(429)
+    expect(await refused.json()).toEqual({ error: 'too_many_invitations', retryAt })
+    expect(many.links).toHaveLength(0)
+
+    // A failed code on a resend finishes the reservation as blocked.
+    const noCode = deps({ generateCode: async () => ({ ok: false, error: 'rate limited' }) })
+    noCode.setOwner({ userId: 'u1', email: 'owner@shop.test', acceptedAt: null })
+    expect((await handleProvisionOwner(post({ action: 'resend', businessId: BIZ }), noCode.d)).status).toBe(502)
+    expect(noCode.reservations.map((r) => r.outcome)).toEqual(['blocked'])
   })
 
   it('does not resend once the owner has accepted, or when there is no owner', async () => {

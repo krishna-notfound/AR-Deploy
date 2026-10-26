@@ -27,12 +27,46 @@ function audit(db: Db, e: Omit<AuditEvent, 'id' | 'createdAt' | 'metadata'> & { 
 }
 
 /** Demo mode never sends email: each attempt is logged as blocked ("demo_mode"), so the history stays honest. */
-function demoEmail(db: Db, e: Pick<EmailAttempt, 'kind' | 'recipient' | 'subject'> & { applicationId?: ID; businessId?: ID; workflow?: string }): EmailAttempt {
+function demoEmail(db: Db, e: Pick<EmailAttempt, 'kind' | 'recipient' | 'subject'> & { applicationId?: ID; businessId?: ID; workflow?: string; attempt?: number }): EmailAttempt {
   const prior = (db.emails ?? []).filter((x) => e.workflow && x.workflow === e.workflow).length
   const ts = nowIso()
   const attempt: EmailAttempt = { id: newId('eml'), createdAt: ts, updatedAt: ts, status: 'blocked', error: 'demo_mode', attempt: prior + 1, ...e }
   ;(db.emails ??= []).unshift(attempt)
   return attempt
+}
+
+/**
+ * The owner-invitation reservation, as service_reserve_owner_invite (S1.5 R-W2-4): `cooldown` while a non-blocked
+ * attempt for the business is under 60 s old; `too_many_invitations` at 10 non-blocked attempts for the business and
+ * recipient in 24 h; otherwise the next attempt number (continuing the logged invitation emails).
+ */
+function reserveDemoInvite(db: Db, businessId: ID, recipient: string): { attempt: number } | { refusal: Result<never> } {
+  const now = Date.now()
+  const counted = (db.ownerInviteAttempts ?? []).filter((a) => a.businessId === businessId && a.outcome !== 'blocked')
+  const last = counted.reduce((max, a) => Math.max(max, Date.parse(a.createdAt)), 0)
+  if (last && now - last < RESEND_COOLDOWN_SECONDS * 1000)
+    return { refusal: { ok: false, error: { code: 'RATE_LIMITED', message: 'Wait a minute between invitations.', reason: 'cooldown', retryAt: new Date(last + RESEND_COOLDOWN_SECONDS * 1000).toISOString() } } }
+  const window = counted
+    .filter((a) => a.recipient === recipient && now - Date.parse(a.createdAt) < 24 * 3600 * 1000)
+    .map((a) => Date.parse(a.createdAt))
+    .sort((a, b) => a - b)
+  if (window.length >= MAX_INVITATION_ATTEMPTS) {
+    const retryAt = new Date(window[window.length - MAX_INVITATION_ATTEMPTS]! + 24 * 3600 * 1000).toISOString()
+    return { refusal: { ok: false, error: { code: 'RATE_LIMITED', message: 'Ten invitations were sent to this owner in the last 24 hours.', reason: 'too_many_invitations', retryAt } } }
+  }
+  const numbers = [
+    ...(db.ownerInviteAttempts ?? []).filter((a) => a.businessId === businessId).map((a) => a.attempt),
+    ...(db.emails ?? []).filter((e) => e.workflow === `invite:${businessId}`).map((e) => e.attempt),
+  ]
+  return { attempt: 1 + Math.max(0, ...numbers) }
+}
+
+/**
+ * Records a reserved attempt. Demo mode never sends email (the log says blocked, "demo_mode"), but the attempt counts
+ * as accepted, so the cooldown and the limit behave as they do on the server.
+ */
+function recordDemoInvite(db: Db, businessId: ID, recipient: string, attempt: number): void {
+  ;(db.ownerInviteAttempts ??= []).unshift({ businessId, recipient, attempt, outcome: 'accepted', createdAt: nowIso() })
 }
 
 /** Application and/or business scope: with both, entries of either match (an application and the business it created). */
@@ -390,36 +424,40 @@ export const mockCatalogService: CatalogService = {
       return ok(undefined)
     }),
 
-  provisionOwner: ({ businessId, email, applicationId }) =>
-    run(() => {
+  provisionOwner: ({ businessId, email, language, applicationId }) => {
+    // R-W8-1: inviting the current owner again is a resend, with its cooldown, limit and already_accepted.
+    if (store.get().owners?.[businessId]?.email === email.trim().toLowerCase()) return mockCatalogService.resendOwnerInvitation(businessId, language)
+    return run(() => {
       const db = store.get()
       const business = db.businesses.find((b) => b.id === businessId)
       if (!business) return fail('NOT_FOUND', 'Business not found.')
       const addr = email.trim().toLowerCase()
       if (!EMAIL.test(addr)) return fail('VALIDATION', 'Enter a valid email address.', { email: 'Enter a valid email address.' })
-      const existing = db.owners?.[businessId]
-      if (existing && existing.email !== addr) return fail('CONFLICT', 'This business already has an owner. Remove them first to invite someone else.')
+      if (db.owners?.[businessId]) return fail('CONFLICT', 'This business already has an owner. Remove them first to invite someone else.')
       if (Object.entries(db.owners ?? {}).some(([id, o]) => id !== businessId && o.email === addr))
         return fail('CONFLICT', 'This email already owns another business. Each owner account manages one business; use a different address.')
+      const reserved = reserveDemoInvite(db, businessId, addr)
+      if ('refusal' in reserved) return reserved.refusal
       let outcome!: ProvisionOutcome
       store.update((d) => {
-        if (!existing) {
-          ;(d.owners ??= {})[businessId] = { email: addr, invitedAt: nowIso() }
-          audit(d, { eventType: 'owner_provisioned', actorId: DEMO_ADMIN.id, businessId, applicationId })
-        }
+        ;(d.owners ??= {})[businessId] = { email: addr, invitedAt: nowIso() }
+        audit(d, { eventType: 'owner_provisioned', actorId: DEMO_ADMIN.id, businessId, applicationId })
+        recordDemoInvite(d, businessId, addr, reserved.attempt)
         const sent = demoEmail(d, {
-          kind: existing ? 'invitation_resend' : 'owner_invitation',
+          kind: 'owner_invitation',
           recipient: addr,
           subject: `You're invited to manage ${business.name} on Sanctus`,
           businessId,
           applicationId,
           workflow: `invite:${businessId}`,
+          attempt: reserved.attempt,
         })
-        audit(d, { eventType: existing ? 'invitation_resent' : 'invitation_requested', actorId: DEMO_ADMIN.id, businessId, applicationId, metadata: { attempt: sent.attempt, email_status: sent.status } })
-        outcome = { owner: existing ? 'already_linked' : 'linked', email: { status: sent.status, error: sent.error, attempt: sent.attempt } }
+        audit(d, { eventType: 'invitation_requested', actorId: DEMO_ADMIN.id, businessId, applicationId, metadata: { attempt: sent.attempt, email_status: sent.status } })
+        outcome = { owner: 'linked', email: { status: sent.status, error: sent.error, attempt: sent.attempt } }
       })
       return ok(outcome)
-    }),
+    })
+  },
 
   resendOwnerInvitation: (businessId) =>
     run(() => {
@@ -427,19 +465,41 @@ export const mockCatalogService: CatalogService = {
       const business = db.businesses.find((b) => b.id === businessId)
       const owner = db.owners?.[businessId]
       if (!business || !owner) return fail('NOT_FOUND', 'This business has no invited owner yet.')
-      if (owner.acceptedAt) return fail('CONFLICT', 'The owner has already accepted the invitation and can sign in.')
-      const attempts = (db.emails ?? []).filter((e) => e.workflow === `invite:${businessId}`)
-      if (attempts.length >= MAX_INVITATION_ATTEMPTS) return fail('RATE_LIMITED', 'Too many invitations were sent for this business. Contact the owner directly.')
-      const last = attempts[0]
-      if (last && Date.now() - Date.parse(last.createdAt) < RESEND_COOLDOWN_SECONDS * 1000)
-        return fail('RATE_LIMITED', `Wait ${RESEND_COOLDOWN_SECONDS} seconds between invitations.`)
+      if (owner.acceptedAt) return { ok: false, error: { code: 'CONFLICT', message: 'The owner has already accepted the invitation and can sign in.', reason: 'already_accepted' } }
+      const reserved = reserveDemoInvite(db, businessId, owner.email)
+      if ('refusal' in reserved) return reserved.refusal
       let outcome!: ProvisionOutcome
       store.update((d) => {
-        const sent = demoEmail(d, { kind: 'invitation_resend', recipient: owner.email, subject: `New invitation link for ${business.name}`, businessId, workflow: `invite:${businessId}` })
+        recordDemoInvite(d, businessId, owner.email, reserved.attempt)
+        const sent = demoEmail(d, { kind: 'invitation_resend', recipient: owner.email, subject: `New invitation link for ${business.name}`, businessId, workflow: `invite:${businessId}`, attempt: reserved.attempt })
         audit(d, { eventType: 'invitation_resent', actorId: DEMO_ADMIN.id, businessId, metadata: { attempt: sent.attempt, email_status: sent.status } })
         outcome = { owner: 'already_linked', email: { status: sent.status, error: sent.error, attempt: sent.attempt } }
       })
       return ok(outcome)
+    }),
+
+  getOwnerStates: () =>
+    run(() => {
+      const db = store.get()
+      // As admin_list_owner_states: the newest attempt decides (its outcome, or its email bounced or was a complaint);
+      // with no attempt, the newest invitation email.
+      return ok(
+        db.businesses.map((b) => {
+          const owner = db.owners?.[b.id]
+          const attempt = (db.ownerInviteAttempts ?? []).filter((a) => a.businessId === b.id).sort((x, y) => y.createdAt.localeCompare(x.createdAt))[0]
+          const emails = (db.emails ?? []).filter((e) => e.workflow === `invite:${b.id}`).sort((x, y) => y.createdAt.localeCompare(x.createdAt))
+          const attemptEmail = attempt && emails.find((e) => e.attempt === attempt.attempt)
+          const emailFailed = attempt
+            ? attempt.outcome === 'failed' || attempt.outcome === 'blocked' || attemptEmail?.status === 'bounced' || attemptEmail?.status === 'complained'
+            : !!emails[0] && ['failed', 'blocked', 'bounced', 'complained'].includes(emails[0].status)
+          return {
+            businessId: b.id,
+            state: !owner ? ('needs_owner' as const) : owner.acceptedAt ? ('owner_active' as const) : ('invite_pending' as const),
+            lastInvitedAt: attempt?.createdAt ?? emails[0]?.createdAt ?? null,
+            emailFailed,
+          }
+        }),
+      )
     }),
 
   // ---------------- business applications ----------------

@@ -10,10 +10,11 @@ import { type Column, DataTable } from '@/components/ui/DataTable'
 import { FormField, Select } from '@/components/ui/Form'
 import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { SearchInput } from '@/components/ui/SearchInput'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { Business, BusinessCatalog, BusinessStatus, ClosureRequest } from '@/domain/types'
+import type { Business, BusinessCatalog, BusinessStatus, ClosureRequest, OwnerState } from '@/domain/types'
 import { formatDate, formatNumber } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
@@ -45,6 +46,7 @@ export default function BusinessesListPage() {
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
   const status = (params.get('status') ?? '') as '' | BusinessStatus
+  const ownerFilter = (params.get('owner') ?? '') as '' | OwnerState['state']
   const page = Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1)
   // Closure requests are the Owner's to handle (spec 8): the filter, its count and the orphan requests are the Owner's.
   // Everyone with businesses.view sees which business has one (a read-only badge) and gets no Activate there (R-W1-3).
@@ -61,6 +63,10 @@ export default function BusinessesListPage() {
 
   const catalogs = useServiceQuery(() => service.getCatalogs(), [])
   const analytics = useServiceQuery(() => service.getAnalytics(), [])
+  // Owner state of every row (R-W2-5). A failure leaves the list usable: a notice above it and no owner filter.
+  const ownerStates = useServiceQuery(() => service.getOwnerStates(), [])
+  const ownerOf = useMemo(() => new Map((ownerStates.data ?? []).map((s) => [s.businessId, s])), [ownerStates.data])
+  const ownersLoading = ownerStates.status === 'loading' && !ownerStates.data
   // null (not an empty list) until the requests are really loaded for this user: Activate never shows on a placeholder.
   const closures = useServiceQuery<ClosureRequest[] | null>(
     () => (canViewClosures ? account.listClosureRequests() : Promise.resolve(ok(null))),
@@ -89,9 +95,10 @@ export default function BusinessesListPage() {
     return (catalogs.data ?? [])
       .filter((c) => !closureOnly || closing.has(c.business.id))
       .filter((c) => !status || c.business.status === status)
+      .filter((c) => !ownerFilter || !ownerStates.data || ownerOf.get(c.business.id)?.state === ownerFilter)
       .filter((c) => !term || c.business.name.toLowerCase().includes(term) || c.business.slug.includes(term))
       .map((c) => ({ catalog: c, views: perf.get(c.business.id)?.views ?? 0, ar: perf.get(c.business.id)?.arActivations ?? 0 }))
-  }, [catalogs.data, analytics.data, q, status, closureOnly, closing])
+  }, [catalogs.data, analytics.data, q, status, ownerFilter, ownerStates.data, ownerOf, closureOnly, closing])
 
   const menu = (b: Business, count: number): (MenuItem | 'separator')[] => [
     { label: can('businesses.edit') ? 'Edit details' : 'View details', icon: <Pencil />, onSelect: () => navigate(businessAdminPath(b.id)) },
@@ -136,6 +143,12 @@ export default function BusinessesListPage() {
     { key: 'published', header: 'Published', align: 'right', sortValue: (r) => r.catalog.publishedProductCount, cell: (r) => formatNumber(r.catalog.publishedProductCount) },
     { key: 'views', header: 'Views', align: 'right', priority: 'low', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
     { key: 'ar', header: 'AR', align: 'right', priority: 'low', sortValue: (r) => r.ar, cell: (r) => formatNumber(r.ar) },
+    {
+      key: 'owner',
+      header: 'Owner',
+      sortValue: (r) => OWNER_ORDER[ownerOf.get(r.catalog.business.id)?.state ?? 'needs_owner'],
+      cell: (r) => <OwnerStateBadge state={ownerOf.get(r.catalog.business.id)} loading={ownersLoading} />,
+    },
     { key: 'status', header: 'Status', sortValue: (r) => r.catalog.business.status, cell: (r) => <StatusBadges b={r.catalog.business} closure={closureOf.get(r.catalog.business.id)} /> },
     { key: 'updated', header: 'Last updated', align: 'right', sortValue: (r) => r.catalog.business.updatedAt, cell: (r) => <span className="whitespace-nowrap">{formatDate(r.catalog.business.updatedAt, 'en', prefs)}</span> },
     {
@@ -173,6 +186,16 @@ export default function BusinessesListPage() {
               <option value="draft">Draft</option>
             </Select>
           </FormField>
+          {ownerStates.data && (
+            <FormField label="Owner">
+              <Select aria-label="Filter by owner" value={ownerFilter} onChange={(e) => setParam('owner', e.target.value)} className="sm:w-44">
+                <option value="">All owners</option>
+                <option value="needs_owner">Needs owner</option>
+                <option value="invite_pending">Invite pending</option>
+                <option value="owner_active">Owner active</option>
+              </Select>
+            </FormField>
+          )}
           {isPlatformOwner && (
             <Button aria-pressed={closureOnly} variant={closureOnly ? 'primary' : 'secondary'} onClick={() => setParam('closure', closureOnly ? '' : '1')}>
               Closure requested{' '}
@@ -183,6 +206,9 @@ export default function BusinessesListPage() {
         {closureOnly && orphans.length > 0 && <OrphanRequests requests={orphans} onChanged={closures.refetch} />}
         {!closureOnly && closures.status === 'error' && !closures.data && (
           <ErrorState className="border-b border-line py-4" message={`Could not load the closure requests. ${closures.error.message}`} onRetry={closures.refetch} />
+        )}
+        {ownerStates.status === 'error' && !ownerStates.data && (
+          <ErrorState className="border-b border-line py-4" message="Couldn't load owner states." onRetry={ownerStates.refetch} />
         )}
         {catalogs.status === 'error' && !catalogs.data ? (
           <ErrorState message={catalogs.error.message} onRetry={catalogs.refetch} />
@@ -207,8 +233,8 @@ export default function BusinessesListPage() {
                 ) : (
                   <EmptyState title="No closure requests" body="When a business owner asks to close their account, their business shows here." />
                 )
-              ) : q || status || closureOnly ? (
-                <EmptyState title="No businesses match" body="Try a different search or status." />
+              ) : q || status || closureOnly || (ownerFilter && ownerStates.data) ? (
+                <EmptyState title="No businesses match" body="Try a different search, status or owner." />
               ) : (
                 <EmptyState
                   icon={Building2}
@@ -231,6 +257,7 @@ export default function BusinessesListPage() {
                   </Link>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-small text-ink-muted tabular-nums">
                     <StatusBadges b={r.catalog.business} closure={closureOf.get(r.catalog.business.id)} />
+                    <OwnerStateBadge state={ownerOf.get(r.catalog.business.id)} loading={ownersLoading} />
                     <span>
                       {r.catalog.publishedProductCount}/{r.catalog.totalProductCount} published
                     </span>
@@ -245,6 +272,23 @@ export default function BusinessesListPage() {
       </Card>
     </>
   )
+}
+
+const OWNER_ORDER: Record<OwnerState['state'], number> = { needs_owner: 0, invite_pending: 1, owner_active: 2 }
+
+/** Owner state (R-W2-5); "email not sent" when the newest invitation was not sent, failed or bounced. */
+function OwnerStateBadge({ state, loading }: { state?: OwnerState; loading: boolean }) {
+  if (loading)
+    return (
+      <span className="inline-block">
+        <Skeleton className="h-4 w-24" />
+        <span className="sr-only">Loading owner state</span>
+      </span>
+    )
+  if (!state) return null
+  if (state.state === 'needs_owner') return <Badge tone="neutral">Needs owner</Badge>
+  if (state.state === 'owner_active') return <Badge tone="success">Owner active</Badge>
+  return state.emailFailed ? <Badge tone="danger">Invite pending · email not sent</Badge> : <Badge tone="warning">Invite pending</Badge>
 }
 
 /** The status, and the read-only closure badge whose tooltip says why the business can't be activated (R-W1-3). */
