@@ -284,7 +284,7 @@ export const en = {
   'apply.done.keepReference': 'Keep this reference if you contact us about your application.',
   'apply.done.nextTitle': 'What happens next',
   'apply.done.next1': 'Our team reviews your application.',
-  'apply.done.next2': 'We send our decision by email to {email}. Please also check your spam folder.',
+  'apply.done.next2': 'We email our decision to {email}. If approved, you receive an invitation to set up your catalog.',
   'apply.done.next2NoEmail': 'We send our decision by email to the address you gave. Please also check your spam folder.',
   'apply.done.next3': 'If approved, you receive an invitation link to set your password and set up your catalogue.',
   'apply.done.demo': 'Demo: this application is stored in this browser only, and no email is sent.',

@@ -436,6 +436,11 @@ verify_jwt = false
 [functions.provision-owner]
 verify_jwt = true
 
+# Application review (R-W2-1): every review action; staff only, 2FA-gated in the handler, the per-action permission
+# in SQL. A rejection emails the applicant.
+[functions.review-application]
+verify_jwt = true
+
 # Platform team (ADR-0029, ADR-0030). invite-member and manage-member need a signed-in caller; accept-member-invite is
 # public (the link secret is the credential) and checks the JWT itself for "accept".
 [functions.invite-member]

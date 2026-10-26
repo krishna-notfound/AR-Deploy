@@ -373,6 +373,7 @@ const MEDIA_TABLES = ['product_images', 'product_models', 'product_variant_image
 
 const SUBMIT_APPLICATION_FUNCTION = 'submit-application'
 const PROVISION_OWNER_FUNCTION = 'provision-owner'
+const REVIEW_APPLICATION_FUNCTION = 'review-application'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export interface ApplicationRow {
@@ -510,6 +511,10 @@ const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string 
     message: 'An account with this email already exists but was not created by an invitation, so it cannot be made owner. Use a different address, or remove that account in Supabase Auth first.',
   },
   invalid_request: { code: 'VALIDATION', message: 'Check the details and try again.' },
+  // review-application (R-W2-1): admin_review_application's refusals.
+  reason_required: { code: 'VALIDATION', message: 'Give a reason for the rejection.' },
+  invalid_transition: { code: 'CONFLICT', message: 'This application can no longer change to that status.' },
+  application_not_found: { code: 'NOT_FOUND', message: 'Application not found.' },
 }
 
 export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService {
@@ -923,15 +928,22 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         return data ? ok(toApplication(data)) : fail('NOT_FOUND', 'Application not found.')
       }),
 
-    reviewApplication: (id, action, reason) =>
+    // Every review action goes through review-application (R-W2-1): it runs admin_review_application as the caller
+    // and, on a rejection, emails the applicant. The function answers with the new status; the row is then re-read.
+    reviewApplication: (id, action, reason, opts) =>
       guard(async () => {
-        const { data, error } = await sb.rpc('admin_review_application', { p_application_id: id, p_action: action, p_reason: reason ?? null })
-        if (error) {
-          if (error.message === 'reason_required') return fail('VALIDATION', 'Give a reason for the rejection.', { reason: 'Give a reason for the rejection.' })
-          if (error.message === 'invalid_transition') return fail('CONFLICT', 'This application can no longer change to that status.')
-          return mapDbError(error, { notFound: 'Application not found.' })
-        }
-        return changed(ok(toApplication(data as ApplicationRow)))
+        if (!UUID_PATTERN.test(id)) return fail('NOT_FOUND', 'Application not found.')
+        const r = await invokeFunction<{ ok: true; status: string; businessId?: string; email?: { status: EmailAttemptStatus; error?: string } }>(REVIEW_APPLICATION_FUNCTION, {
+          applicationId: id,
+          action,
+          reason: reason ?? null,
+          includeReason: opts?.includeReason === true,
+        })
+        if (!r.ok) return r
+        listeners.forEach((l) => l())
+        const { data, error } = await sb.from('business_applications').select('*').eq('id', id).maybeSingle<ApplicationRow>()
+        if (error || !data) return fail('UNKNOWN', 'The application was updated, but it could not be reloaded. Refresh the page.')
+        return ok(r.data.email ? { ...toApplication(data), decisionEmail: r.data.email } : toApplication(data))
       }),
 
     getAuditEvents: (q = {}) =>

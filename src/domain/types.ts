@@ -255,6 +255,9 @@ export interface BusinessApplication {
   updatedAt: ISODate
 }
 
+/** A reviewed application; a rejection also says what happened to the decision email (R-W2-1). Not proof of delivery. */
+export type ReviewedApplication = BusinessApplication & { decisionEmail?: { status: EmailAttemptStatus; error?: string } }
+
 export interface AuditEvent {
   id: ID
   createdAt: ISODate
