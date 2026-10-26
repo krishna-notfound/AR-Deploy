@@ -237,7 +237,7 @@ function ModelSlot({
           )}
         </p>
       )}
-      {unsupported.length > 0 && asset && <p className="mt-2 text-[13px] text-warning">{sceneViewerWarning(unsupported)}</p>}
+      {unsupported.length > 0 && asset && <p className="mt-2 text-[13px] leading-[1.45] text-ink-muted">{sceneViewerWarning(unsupported)}</p>}
       {error && (
         <p role="alert" className="mt-2 text-[13px] text-danger">
           {error}

@@ -16,7 +16,18 @@ export interface ReadinessItem {
 
 /** Message for a GLB that requires glTF extensions Scene Viewer (Android AR) does not support. */
 export function sceneViewerWarning(unsupported: string[]): string {
-  return `This GLB requires ${unsupported.join(', ')}, which Google Scene Viewer does not support. It works in the 3D viewer, but Android AR may fail, so customers on Android are not offered AR. Ask for a file exported without it.`
+  const names = [...new Set(unsupported.map((e) => EXTENSION_NAMES[e] ?? e))].join(' and ')
+  return `This model uses ${names} compression, which Android AR (Google ARCore) cannot open, so Android customers see it in 3D only. For AR on Android, upload a lighter model without this compression: textures up to 2048 px, about 100,000 triangles or fewer, and a file under ${formatFileSize(LARGE_MODEL_BYTES)}.`
+}
+
+/** Plain names for the glTF extensions Scene Viewer cannot open (owner 2026-10-26: no raw extension names). */
+const EXTENSION_NAMES: Record<string, string> = {
+  KHR_draco_mesh_compression: 'Draco',
+  KHR_texture_basisu: 'KTX2',
+  EXT_meshopt_compression: 'meshopt',
+  KHR_mesh_quantization: 'quantization',
+  EXT_texture_webp: 'WebP texture',
+  EXT_texture_avif: 'AVIF texture',
 }
 
 /** What a product's customers will get on each platform. Admin-only, English (dashboards are English-only). */

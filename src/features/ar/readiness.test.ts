@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelAsset } from '@/domain/types'
 import { MB } from '@/lib/files'
-import { arReadiness, variantMediaSummary } from './readiness'
+import { arReadiness, sceneViewerWarning, variantMediaSummary } from './readiness'
 
 const glb: ModelAsset = { format: 'glb', url: 'https://x.test/a.glb', fileName: 'a.glb', sizeBytes: 2 * MB, status: 'valid' }
 const usdz: ModelAsset = { format: 'usdz', url: 'https://x.test/a.usdz', fileName: 'a.usdz', status: 'valid' }
@@ -63,11 +63,25 @@ describe('arReadiness', () => {
 
   it('Android AR is a warning for a GLB that requires an extension Scene Viewer cannot open (AR-01/02)', () => {
     const stored = arReadiness({ glb: { ...glb, requiredExtensions: ['KHR_texture_transform', 'EXT_texture_webp'] }, usdz, preview: 'loaded', scale: verified })
-    expect(stored.find((i) => i.key === 'android')).toMatchObject({ level: 'warning', detail: expect.stringContaining('EXT_texture_webp') })
+    expect(stored.find((i) => i.key === 'android')).toMatchObject({ level: 'warning', detail: expect.stringContaining('WebP') })
     // Read from the loaded file when nothing was stored (linked or older models).
     const detected = arReadiness({ glb, usdz, preview: 'loaded', scale: verified, requiredExtensions: ['KHR_draco_mesh_compression'] })
     expect(levels(detected).android).toBe('warning')
     expect(levels(arReadiness({ glb: { ...glb, requiredExtensions: ['KHR_texture_transform'] }, usdz, preview: 'loaded', scale: verified })).android).toBe('ready')
+  })
+})
+
+describe('sceneViewerWarning', () => {
+  // Owner 2026-10-26: guidance, not an alarm. Say what to upload instead (a lighter model Google ARCore opens), in plain
+  // words, without raw glTF extension names.
+  it('names the compression in plain words and says what to upload instead', () => {
+    const text = sceneViewerWarning(['KHR_draco_mesh_compression', 'KHR_texture_basisu'])
+    expect(text).toContain('Draco')
+    expect(text).toContain('KTX2')
+    expect(text).not.toContain('KHR_')
+    expect(text).toMatch(/2048 px/)
+    expect(text).toMatch(/100,000 triangles/)
+    expect(text).toMatch(/Google ARCore/)
   })
 })
 
