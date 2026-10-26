@@ -1,18 +1,23 @@
 // Mock implementation of CatalogService. Simulates latency, never throws, returns copies.
 // Demo persistence only (localStorage). NOT a backend.
-import type { ApplicationDuplicates, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product, ReviewedApplication } from '@/domain/types'
+import type { ApplicationDuplicates, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, ModelAsset, Product, ProductModels, ReviewedApplication } from '@/domain/types'
 import { createSessionModelAsset, imageToPersistableDataUrl } from '@/lib/files'
 import { localDayBounds } from '@/lib/format'
 import { newId } from '@/lib/id'
 import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
+import { modelRequestError } from '../modelRequestRules'
 import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview, normalizeBusinessName } from '../applicationRules'
-import { CLOSURE_PENDING_ERROR, type CatalogService, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok, toAuditEntry } from '../catalogService'
+import { CLOSURE_PENDING_ERROR, type CatalogService, type ProductInput, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok, toAuditEntry } from '../catalogService'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { mockClosureOpen, noteMockClosureStatus, voidMockClosure } from './mockAccount'
 import { createMockTeam, demoPlatformRole, demoViewer } from './mockTeam'
+import { createMockModelRequestsBusiness } from './mockModelRequestsBusiness'
+import { createMockModelRequestsRead } from './mockModelRequestsRead'
+import { clearSessionRequestMedia, mockActor, sessionRequestMedia } from './mockModelRequestShared'
+import { createMockModelRequestsStaff } from './mockModelRequestsStaff'
 import { createSeed } from './seed'
 import { store } from './store'
 import { normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
@@ -130,6 +135,26 @@ const EVENTS_PER_MINUTE = 30
 const clone = <T>(v: T): T => structuredClone(v)
 const nowIso = () => new Date().toISOString()
 
+/** S4 R-S4-18: drops the requests `gone` selects (their photo and staged rows go with them, as the cascade does) and revokes their session photo and staged-file URLs. */
+function dropModelRequests(d: Db, gone: (r: NonNullable<Db['modelRequests']>[number]) => boolean): void {
+  const dropped = (d.modelRequests ?? []).filter(gone)
+  if (!dropped.length) return
+  d.modelRequests = (d.modelRequests ?? []).filter((r) => !gone(r))
+  const revoke = (url: string) => {
+    try {
+      if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+    } catch {
+      // best effort
+    }
+  }
+  for (const r of dropped) {
+    for (const url of sessionRequestMedia.photos.get(r.id) ?? []) revoke(url)
+    for (const f of Object.values(sessionRequestMedia.staged.get(r.id) ?? {})) if (f) revoke(f.url)
+    sessionRequestMedia.photos.delete(r.id)
+    sessionRequestMedia.staged.delete(r.id)
+  }
+}
+
 /** Wraps every call: latency, optional failure injection, catch-all. */
 async function run<T>(fn: () => Result<T>, opts: { inject?: boolean } = {}): Promise<Result<T>> {
   try {
@@ -150,6 +175,57 @@ const demoActor = () => (demoPlatformRole() ? DEMO_ADMIN.id : undefined)
 /** The rows the Supabase audit triggers write for a product and a catalog status change (R-W5-5), mirrored here. */
 function auditProduct(db: Db, eventType: string, p: Product, extra: { fromStatus?: string; toStatus?: string; metadata?: Record<string, unknown> } = {}): AuditEvent {
   return audit(db, { eventType, actorId: demoActor(), businessId: p.businessId, ...(extra.fromStatus ? { fromStatus: extra.fromStatus, toStatus: extra.toStatus } : {}), metadata: { product_id: p.id, name: p.name.en, ...extra.metadata } })
+}
+
+/**
+ * S4 R-S4-3, as can_write_own_models: staff with products.edit or models.manage, or an owner of the business with
+ * its switch on. Without a demo account the demo's writes stay open, as before S4.
+ */
+function demoCanWriteOwnModels(db: Db, businessId: ID): boolean {
+  const actor = mockActor()
+  if (actor.kind === 'staff') return actor.can('products.edit') || actor.can('models.manage')
+  if (actor.kind === 'owner') return actor.businessId === businessId && db.businesses.find((b) => b.id === businessId)?.allowOwnModels === true
+  return true
+}
+
+/** A model set as save_product compares it: sorted (format, path or url, required extensions). */
+const modelSetKey = (m: ProductModels | undefined) =>
+  [m?.glb, m?.usdz]
+    .filter((x): x is ModelAsset => !!x)
+    .map((x) => `${x.format}|${x.storagePath ?? x.url}|${(x.requiredExtensions ?? []).join(',')}`)
+    .sort()
+    .join(';')
+
+const withoutModels = (p: Product): Product => ({ ...p, models: {}, variants: p.variants.map(({ models: _models, ...v }) => v) })
+
+/**
+ * S4 R-S4-3/R-S4-17 on a demo save, as save_product: with keepModels every stored model stays; otherwise a changed
+ * set needs the switch (own_models_not_allowed) and an editor that loaded the current modelsChangedAt
+ * (models_changed_elsewhere). A change stamps modelsChangedAt. `data` is what the caller sent.
+ */
+function applyModelRules(db: Db, current: Product | undefined, data: Partial<ProductInput>, next: Product): Result<Product> {
+  const { keepModels: _keep, ...clean } = next as Product & { keepModels?: boolean }
+  const out: Product = clean
+  const stored = (variantId: ID) => current?.variants.find((v) => v.id === variantId)?.models
+  if (data.keepModels === true) {
+    out.models = current?.models ?? {}
+    out.variants = out.variants.map(({ models: _models, ...v }) => {
+      const kept = stored(v.id)
+      return kept ? { ...v, models: kept } : v
+    })
+  } else {
+    const changed =
+      modelSetKey(current?.models) !== modelSetKey(out.models) || out.variants.some((v) => modelSetKey(stored(v.id)) !== modelSetKey(v.models))
+    if (changed) {
+      if (!demoCanWriteOwnModels(db, out.businessId)) return { ok: false, error: modelRequestError('own_models_not_allowed')! }
+      const loaded = data.modelsChangedAt
+      if (current?.modelsChangedAt && 'modelsChangedAt' in data && (!loaded || current.modelsChangedAt > loaded))
+        return { ok: false, error: modelRequestError('models_changed_elsewhere')! }
+      return ok({ ...out, modelsChangedAt: nowIso() })
+    }
+  }
+  const { modelsChangedAt: _at, ...rest } = out
+  return ok(current?.modelsChangedAt ? { ...rest, modelsChangedAt: current.modelsChangedAt } : rest)
 }
 function auditCatalogStatus(db: Db, from: Business, to: Business): AuditEvent | undefined {
   if (from.status !== to.status) return audit(db, { eventType: 'business_status_changed', actorId: demoActor(), businessId: to.id, fromStatus: from.status, toStatus: to.status })
@@ -191,6 +267,9 @@ function demoCanRead(b: Business): boolean {
 
 export const mockCatalogService: CatalogService = {
   ...createMockTeam(run),
+  ...createMockModelRequestsRead({ run, audit }),
+  ...createMockModelRequestsBusiness({ run, audit }),
+  ...createMockModelRequestsStaff({ run, audit }),
 
   // ---------------- businesses ----------------
   getBusinesses: () => run(() => ok([...store.get().businesses].sort(byUpdatedDesc))),
@@ -216,7 +295,7 @@ export const mockCatalogService: CatalogService = {
         return fail(code, 'Please fix the highlighted fields.', errors)
       }
       const ts = nowIso()
-      const business: Business = { ...data, name: data.name.trim(), id: newId('biz'), createdAt: ts, updatedAt: ts }
+      const business: Business = { ...data, name: data.name.trim(), allowOwnModels: false, id: newId('biz'), createdAt: ts, updatedAt: ts }
       store.update((d) => {
         d.businesses.push(business)
       })
@@ -264,6 +343,7 @@ export const mockCatalogService: CatalogService = {
       store.update((d) => {
         d.businesses = d.businesses.filter((b) => b.id !== id)
         d.products = d.products.filter((p) => p.businessId !== id)
+        dropModelRequests(d, (r) => r.businessId === id) // R-S4-18: their photos and staged files go too
         if (d.owners) delete d.owners[id] // R-W8-2: the owner goes with the business
         d.ownerInviteAttempts = d.ownerInviteAttempts?.filter((a) => a.businessId !== id) // as the cascade does
         d.dailyStats = d.dailyStats.filter((s) => s.businessId !== id)
@@ -338,7 +418,7 @@ export const mockCatalogService: CatalogService = {
         return fail(code, 'Please fix the highlighted fields.', errors)
       }
       const ts = nowIso()
-      const product: Product = {
+      const ruled = applyModelRules(db, undefined, data, {
         ...data,
         images: normalizeImages(data.images),
         variants: normalizeVariants(data.variants),
@@ -346,7 +426,9 @@ export const mockCatalogService: CatalogService = {
         status: 'draft',
         createdAt: ts,
         updatedAt: ts,
-      }
+      })
+      if (!ruled.ok) return ruled
+      const product = ruled.data
       store.update((d) => {
         d.products.push(product)
         auditProduct(d, 'product_created', product)
@@ -359,7 +441,7 @@ export const mockCatalogService: CatalogService = {
       const db = store.get()
       const current = db.products.find((p) => p.id === id)
       if (!current) return fail('NOT_FOUND', 'Product not found.')
-      const next: Product = { ...current, ...data, id, businessId: current.businessId, status: current.status, updatedAt: nowIso() }
+      let next: Product = { ...current, ...data, id, businessId: current.businessId, status: current.status, updatedAt: nowIso() }
       next.images = normalizeImages(next.images)
       next.variants = normalizeVariants(next.variants)
       const siblings = db.products.filter((p) => p.businessId === current.businessId && p.id !== id)
@@ -370,8 +452,14 @@ export const mockCatalogService: CatalogService = {
         if (Object.keys(pubErrors).length)
           return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
       }
+      const ruled = applyModelRules(db, current, data, next)
+      if (!ruled.ok) return ruled
+      next = ruled.data
       store.update((d) => {
         d.products = d.products.map((p) => (p.id === id ? next : p))
+        // R-S4-18: an option removed in this save takes its requests, photos and staged files with it.
+        const kept = new Set(next.variants.map((v) => v.id))
+        dropModelRequests(d, (r) => r.productId === id && !!r.variantId && !kept.has(r.variantId))
         if (next.slug !== current.slug) auditProduct(d, 'product_slug_changed', next, { metadata: { from: current.slug, to: next.slug } })
       })
       return ok(next)
@@ -385,14 +473,16 @@ export const mockCatalogService: CatalogService = {
       const taken = db.products.filter((p) => p.businessId === src.businessId).map((p) => p.slug)
       const slug = uniqueSlug(`${src.slug}-copy`, taken, PRODUCT_SLUG_MAX)
       const ts = nowIso()
+      // S4 R-S4-3 (Review Focus 1): without the right to write its own 3D files the copy is photo-only.
+      const from = demoCanWriteOwnModels(db, src.businessId) ? src : withoutModels(src)
       const copy: Product = {
-        ...clone(src),
+        ...clone(from),
         id: newId('prd'),
         slug,
         name: { en: `${src.name.en} (copy)`, ...(src.name.pt ? { pt: `${src.name.pt} (cópia)` } : {}) },
         images: src.images.map((img) => ({ ...img, id: newId('img') })),
         // Variant photos and models are copied with the option (same files, new ids).
-        variants: clone(src.variants).map((v) => ({ ...v, id: newId('var'), ...(v.images ? { images: v.images.map((img) => ({ ...img, id: newId('img') })) } : {}) })),
+        variants: clone(from.variants).map((v) => ({ ...v, id: newId('var'), ...(v.images ? { images: v.images.map((img) => ({ ...img, id: newId('img') })) } : {}) })),
         status: 'draft',
         publishedAt: undefined,
         createdAt: ts,
@@ -411,6 +501,7 @@ export const mockCatalogService: CatalogService = {
       if (!current) return fail('NOT_FOUND', 'Product not found.')
       store.update((d) => {
         d.products = d.products.filter((p) => p.id !== id)
+        dropModelRequests(d, (r) => r.productId === id) // R-S4-18
         // Its history stays in the business totals as "Deleted product" (R-W5-4).
         d.dailyStats = d.dailyStats.map((s) => (s.productId === id ? { ...s, productId: null } : s))
         d.events = d.events.map((e) => (e.productId === id ? { ...e, productId: null } : e))
@@ -679,6 +770,7 @@ export const mockCatalogService: CatalogService = {
             status: 'draft',
             branding: { accentColor: '#7A5C45' },
             defaultCurrency: 'EUR',
+            allowOwnModels: false,
             createdAt: ts,
             updatedAt: ts,
           }
@@ -779,8 +871,12 @@ export const mockCatalogService: CatalogService = {
     run(() => ok((store.get().emails ?? []).filter((e) => matchesScope(e, q)))),
 
   // Images become data URLs stored with the demo data; 3D files are session-only blob URLs (ADR-0007).
-  uploadAsset: async ({ kind, file }) => {
+  uploadAsset: async ({ kind, file, businessId }) => {
     if (kind === 'glb' || kind === 'usdz') {
+      // S4 R-S4-3, as the product-media upload policy: a .glb or .usdz needs the right to write own 3D files.
+      const actor = mockActor()
+      const target = businessId ?? (actor.kind === 'owner' ? actor.businessId : undefined)
+      if (target && !demoCanWriteOwnModels(store.get(), target)) return { ok: false, error: modelRequestError('own_models_not_allowed')! }
       const asset = createSessionModelAsset(file, kind)
       return ok({ url: asset.url, status: asset.status })
     }
@@ -794,6 +890,7 @@ export const mockCatalogService: CatalogService = {
     run(
       () => {
         store.replace(createSeed())
+        clearSessionRequestMedia()
         return ok(undefined)
       },
       { inject: false },

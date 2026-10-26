@@ -627,7 +627,7 @@ describe('account settings: review fixes (round 1)', () => {
       insert into auth.users (id, email) values ('${R_OWNER_U}', 'mod@shop.test');
       insert into public.businesses (id, name, slug, status) values ('${BIZ_R}', 'Moderated Co', 'moderated-co', 'active');
       insert into public.business_members (business_id, user_id) values ('${BIZ_R}', '${R_OWNER_U}');
-      insert into storage.objects (bucket_id, name) values ('business-logos', '${BIZ}/old.png'), ('product-media', '${BIZ}/old.glb');
+      insert into storage.objects (bucket_id, name) values ('business-logos', '${BIZ}/old.png'), ('product-media', '${BIZ}/old.webp'); -- an image: a .glb also needs the S4 own-upload switch (R-S4-3)
     `)
   })
 
@@ -637,7 +637,7 @@ describe('account settings: review fixes (round 1)', () => {
         const put = `insert into storage.objects (bucket_id, name) values ('${bucket}', '${BIZ}/new.png')`
         await expect(probe(BIZ_OWNER_U, put, [], 'aal1')).rejects.toThrow(/row-level security/)
         expect((await probe(BIZ_OWNER_U, put, [], 'aal2')).affectedRows).toBe(1)
-        const file = bucket === 'business-logos' ? `${BIZ}/old.png` : `${BIZ}/old.glb`
+        const file = bucket === 'business-logos' ? `${BIZ}/old.png` : `${BIZ}/old.webp`
         for (const sql of [`update storage.objects set metadata = '{}' where name = $1`, `delete from storage.objects where name = $1`]) {
           expect(await affected(BIZ_OWNER_U, sql, [file], 'aal1')).toBe(0)
           expect(await affected(BIZ_OWNER_U, sql, [file], 'aal2')).toBe(1)
@@ -812,7 +812,8 @@ describe('opt-in 2FA (follow-up)', () => {
 
   it('a user with only an unverified factor at aal1 is allowed', async () => {
     expect(await flag(UNVERIFIED_U, `public.is_business_member('${U_BIZ}')`, 'aal1')).toBe(true)
-    expect((await probe(UNVERIFIED_U, `insert into storage.objects (bucket_id, name) values ('product-media', '${U_BIZ}/m.glb')`, [], 'aal1')).affectedRows).toBe(1)
+    // An image: a .glb also needs the S4 own-upload switch (R-S4-3).
+    expect((await probe(UNVERIFIED_U, `insert into storage.objects (bucket_id, name) values ('product-media', '${U_BIZ}/m.webp')`, [], 'aal1')).affectedRows).toBe(1)
   })
 
   it('my_security_state and the own profile still work at aal1 with a factor', async () => {

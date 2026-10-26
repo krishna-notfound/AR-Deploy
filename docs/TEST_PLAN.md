@@ -94,6 +94,25 @@ Run on `zggylkbgajamhriebdrg` with accounts and businesses labelled "QA", and Re
 
 **Rollback rehearsal** (optional, on a copy): run the rollback script, confirm the audit and email rows remain, and that `select count(*) from public.product_analytics where product_id is null` was the number of rows lost.
 
+## S4 live checks (after the release, with the owner's OK)
+
+Run on `zggylkbgajamhriebdrg` with accounts and businesses labelled "QA", a QA Team member with and without `models.manage`, and Resend test addresses. The automated suites (PGlite in `supabase/tests`, handler, service, component and the demo Playwright journeys in `tests/e2e/model-requests*.spec.ts`) cover the rules; these checks prove what they cannot: hosted Storage, the real function and email, and real devices. Do the first six straight after applying the migration.
+
+| Check | Expected |
+|---|---|
+| A QA owner (switch off) sends a request with real phone photos | "Request sent", the request is `requested`, the photos are in `model-request-photos/{business}/{request}/`. This proves the definer functions read `storage.objects` on hosted Supabase |
+| The same request opened by a Team member without `models.manage`, then by one with it | no nav item and no access without the key; the queue, photos and detail with it |
+| Staff start work, stage a real GLB and USDZ, deliver | the toast says the owner was emailed; the QA owner gets `model_request_update` (Resend test address) in the business's language; the public page shows 3D and AR; the replaced files are gone from `product-media` |
+| Decline a second request with a reason | the email carries the reason; the owner sees "Declined on {date}. Reason: ..." and "Send a new request" |
+| A direct REST `PATCH` of `businesses.allow_own_models` as the QA owner, then as an Admin | 42501 for the owner; `own_models_admin_only` for the Admin; the Business 3D models switch works and writes one audit row |
+| With the switch off, a direct REST insert into `product_models` and a Storage upload of a `.glb` as the QA owner | 42501 and a refused upload; a `.png` upload still works |
+| Open the editor before a delivery, deliver as staff, then save a changed model in the old editor | "The Sanctus team delivered a 3D model while you were editing. Reload to see it." and the delivered files stay |
+| A request photo URL requested without a session, and as a member of another business | refused |
+| Cancel a `requested` request; try to cancel one in progress | photos removed; the in-progress one cannot be cancelled |
+| Delete a QA product that has a request | its request photos and staged files are removed from Storage |
+| **Real devices:** open a delivered model in Android Scene Viewer and iPhone Quick Look (see the AR checklist above) | opens at true size (ADR-0021); only a device test closes this row |
+| **Rollback rehearsal** (optional, on a copy): export and empty the bucket, run the S4 rollback, re-apply | the script refuses while the bucket has objects; delivered models stay |
+
 ## Pending manual checks
 
 | Check | Needs |

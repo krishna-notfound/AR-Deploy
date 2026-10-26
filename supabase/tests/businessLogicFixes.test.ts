@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MIGRATIONS, ROLLBACK_SQL, S15_MIGRATION, UP_TO_S15, freshDb, ids, makeHelpers, type Helpers } from './harness'
+import { LATER_PERMISSIONS, MIGRATIONS, ROLLBACK_SQL, S15_MIGRATION, UP_TO_S15, freshDb, ids, makeHelpers, type Helpers } from './harness'
 import { createHash } from 'node:crypto'
 
 /**
@@ -135,6 +135,7 @@ describe('S1.5 Task 1: scaffold and privacy', () => {
     })
   })
 
+  // This suite runs on the database as S1.5 left it (UP_TO_S15): 15 keys. S4's 16th (models.manage) is checked in s4ModelRequests.test.ts.
   it("after Admin and Team permission sets are both {}, the Owner's my_platform_access().permissions has length 15", async () => {
     const access = (uid: string) => h.call(uid, 'select public.my_platform_access() as r') as Promise<{ role: string; permissions: string[] } | null>
     await withRolePermissions({ admin: [], team: [] }, async () => {
@@ -201,6 +202,7 @@ describe('S1.5 rollback', () => {
       // Re-apply: the migration runs cleanly on the rolled-back database.
       await rolled.exec(readFileSync(join(MIGRATIONS, S15_MIGRATION), 'utf8'))
       const again = await definitions(rolled)
+      // The database as S1.5 left it (later migrations, such as S2's and S4's, redefine some of these again).
       const applied = await freshDb(UP_TO_S15)
       try {
         expect(again).toEqual(await definitions(applied))
@@ -361,11 +363,13 @@ describe('S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)', (
   }, 60_000)
 
   it('SQL closure equals withPrerequisites for every single permission', async () => {
+    // The S1.5 database has no S4 keys; the full set (with models.manage) is checked in s4ModelRequests.test.ts.
+    const later = new Set<string>(LATER_PERMISSIONS)
     const edges = (await db.query<{ permission: string; requires: string }>('select permission, requires from private.permission_prerequisites() order by 1, 2')).rows
-    const tsEdges = Object.entries(P.PERMISSION_PREREQUISITES).flatMap(([permission, reqs]) => reqs.map((requires) => ({ permission, requires })))
+    const tsEdges = Object.entries(P.PERMISSION_PREREQUISITES).filter(([permission]) => !later.has(permission)).flatMap(([permission, reqs]) => reqs.map((requires) => ({ permission, requires })))
     expect(edges).toEqual([...tsEdges].sort((a, b) => (a.permission < b.permission ? -1 : a.permission > b.permission ? 1 : a.requires < b.requires ? -1 : 1)))
     await withRolePermissions({ team: [] }, async () => {
-      for (const p of P.ALL_PERMISSIONS) {
+      for (const p of P.ALL_PERMISSIONS.filter((k) => !later.has(k))) {
         const closed = P.withPrerequisites([p])
         const sql = (await db.query<{ r: string[] }>('select private.with_prerequisites(array[$1]) as r', [p])).rows[0]!.r
         expect({ p, sql: [...sql].sort() }).toEqual({ p, sql: [...closed].sort() })

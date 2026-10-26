@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MIGRATIONS, ROLLBACK_SQL, S2_MIGRATION, S2_ROLLBACK_SQL, UP_TO_S15, freshDb, ids, makeHelpers, type Helpers } from './harness'
+import { BEFORE_S2, MIGRATIONS, ROLLBACK_SQL, S15_MIGRATION, S2_MIGRATION, S2_ROLLBACK_SQL, S4_MIGRATION, UP_TO_S2, freshDb, ids, makeHelpers, type Helpers } from './harness'
 
 /** Names S2 adds that must be gone after the S2 rollback (`schema.name` or `schema.name(args)`). Tasks push onto it. */
 const GONE_AFTER_ROLLBACK: string[] = []
@@ -12,8 +12,10 @@ const GONE_AFTER_ROLLBACK: string[] = []
 let db: PGlite
 let h: Helpers
 
+// This suite runs on the database as S2 left it (UP_TO_S2): S1.5 and S2, without the later S4. S4 on top of S2 (the
+// live order) and the full rollback chain (S4, S2, S1.5) are checked in s4ModelRequests.test.ts.
 beforeAll(async () => {
-  db = await freshDb()
+  db = await freshDb(UP_TO_S2)
   h = makeHelpers(db)
 }, 120_000)
 
@@ -22,10 +24,12 @@ afterAll(async () => {
 })
 
 describe('S2 scaffold and rollback', () => {
-  it('the S2 migration is the last migration and applies after every earlier one', async () => {
+  it('the S2 migration comes after S1.5 and before S4, and applies on the database just before it (up to S1.5, no S4)', async () => {
     const all = readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()
-    expect(all.at(-1)).toBe(S2_MIGRATION)
-    const earlier = await freshDb(UP_TO_S15)
+    expect(all.indexOf(S2_MIGRATION)).toBe(all.indexOf(S15_MIGRATION) + 1)
+    expect(all.indexOf(S4_MIGRATION)).toBeGreaterThan(all.indexOf(S2_MIGRATION))
+    expect(all.filter(BEFORE_S2)).not.toContain(S4_MIGRATION)
+    const earlier = await freshDb(BEFORE_S2)
     try {
       await earlier.exec(readFileSync(join(MIGRATIONS, S2_MIGRATION), 'utf8'))
     } finally {
@@ -34,7 +38,7 @@ describe('S2 scaffold and rollback', () => {
   }, 120_000)
 
   it('apply → S2 rollback → re-apply S2 succeeds, and every GONE_AFTER_ROLLBACK name is gone after the rollback', async () => {
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S2)
     try {
       await rolled.exec(readFileSync(S2_ROLLBACK_SQL, 'utf8'))
       for (const name of GONE_AFTER_ROLLBACK) {
@@ -48,8 +52,8 @@ describe('S2 scaffold and rollback', () => {
     }
   }, 120_000)
 
-  it('the S2 rollback followed by the S1.5 rollback both succeed', async () => {
-    const rolled = await freshDb()
+  it('the rollbacks chain in reverse order on the S2 database: S2, then S1.5 both succeed', async () => {
+    const rolled = await freshDb(UP_TO_S2)
     try {
       await rolled.exec(readFileSync(S2_ROLLBACK_SQL, 'utf8'))
       await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
@@ -87,9 +91,9 @@ describe('S2 Task 2: one description limit', () => {
     expect(rows[0]!.n).toBe(1000)
   })
 
-  it('after the S2 rollback, pg_get_functiondef(admin_review_application) equals the one on freshDb(UP_TO_S15)', async () => {
-    const before = await freshDb(UP_TO_S15)
-    const rolled = await freshDb()
+  it('after the S2 rollback, pg_get_functiondef(admin_review_application) equals the one on freshDb(BEFORE_S2)', async () => {
+    const before = await freshDb(BEFORE_S2)
+    const rolled = await freshDb(UP_TO_S2)
     try {
       const pre = await fnDef(before)
       expect(await fnDef(rolled)).not.toEqual(pre)

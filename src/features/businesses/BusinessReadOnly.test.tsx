@@ -13,6 +13,7 @@ const business: Business = {
   status: 'inactive',
   branding: { accentColor: '#7A5C45' },
   defaultCurrency: 'EUR',
+  allowOwnModels: false,
   createdAt: '2026-10-01T00:00:00Z',
   updatedAt: '2026-10-01T00:00:00Z',
 }

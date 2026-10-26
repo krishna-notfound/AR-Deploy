@@ -107,3 +107,33 @@ Team members with "Create and edit products" change published products directly;
 - **Rolling back the analytics foreign key** deletes the rows kept for deleted products (stated in the rollback script header and the runbook).
 - **Embed views before the release** were stored as page views and cannot be split. The analytics page says so.
 - **Moved out of this release:** address history and redirects (BIZ-04, PUB-03), the not-found window (PUB-04), the stale-product-save check and the Email log page. They are tracked in S2 and S4.
+
+## S4: 3D model requests (ADR-0034)
+
+Status: built on the branch `s4/integration`; to be applied to `zggylkbgajamhriebdrg` after the pre-flight in `docs/OPERATIONS_RUNBOOK.md` ("S4 3D model requests"). Migration `20261026120000_s4_model_requests`. Source: `docs/superpowers/specs/2026-10-26-s4-3d-model-requests-design.md`.
+
+### What is enforced, and where
+
+| Control | Enforced by |
+|---|---|
+| Who handles requests (R-S4-1) | The 16th permission, `models.manage`, through `platform_can()`, which is 2FA-aware. Each `admin_*` request function checks it (`aal2_required` before `forbidden`). The role editor and the nav item are UX only. |
+| Own 3D uploads (R-S4-2, R-S4-3) | `businesses.allow_own_models` is changed only by `admin_set_own_models` (a `BEFORE UPDATE OF` trigger refuses direct updates, for staff and owners alike). With the switch off, `can_write_own_models()` is false and triggers on `product_models` and `product_variant_models`, `save_product` and the `product-media` storage policy refuse GLB and USDZ writes with `own_models_not_allowed`. The editor hiding the controls is not the boundary. |
+| Request privacy (R-S4-5, R-S4-6) | Request photos are in the private `model-request-photos` bucket. `anon` cannot read them. A member reads and adds only under their own business folder, and cannot add to a request already sent. Staff read them only with `models.manage`; a Team member with `products.view` alone cannot. Photos are shown through signed URLs (1 hour). They are never copied into a catalog gallery. |
+| Request rows | Reads are plain selects under RLS (members of the business and `models.manage` staff); writes only through the definer functions. No API write grants on the three request tables, and `anon` cannot execute any new function. |
+| Hidden until ready (R-S4-16) | Public pages read only product and option model rows. Request rows, request photos and staged files are not readable by `anon` (RLS and storage). A model file is publicly readable only when a model row points at it, which only delivery writes. |
+| Delivery (R-S4-13) | One transaction replaces the target's whole model set (`app.model_delivery` lets the trigger pass only inside it). A GLB is required. Replaced paths are returned only when no product row still uses them. |
+| Stale model saves (R-S4-17) | `save_product` refuses a changed model set when `models_changed_at` is newer than the editor's copy (`models_changed_elsewhere`). Unchanged sets and `keep_models` skip the check, so a business with the switch off is never blocked. |
+| Email (R-S4-15) | `review-model-request` (`verify_jwt = true`) uses the shared 2FA gate, runs the SQL as the caller, and emails the business owner once per workflow. The staff reason is escaped and limited to 1000 characters. An email failure does not roll the status back. |
+| Clean-up (R-S4-18) | Product, option and business deletes and the closure sweep remove request photos and staged files; cancelling a request deletes its photos. |
+
+### Accepted risks and open items
+
+- **Staged files are readable by the business before delivery.** Staged GLB and USDZ files sit in the business's own `product-media` folder, so its owner could list that folder through the API and download a staged file. They are files of the owner's own product, never public, and not served by any public policy. Staging in the private bucket would need a cross-bucket copy at delivery. Accepted and documented.
+- **A direct SQL call of an `admin_*` request function sends no email.** Only `review-model-request` emails. This matches `admin_review_application` (S1.5). The status and the owner's "Changes by the platform team" list are the durable record.
+- **Request photos are kept after a request ends** (delivered or declined) so the team can revise a model; they are deleted on cancel and with the product, business or closure. They are customer data: the rollback refuses to drop the bucket while it holds objects.
+- **Orphan files.** A tab closed mid-send leaves photos under an unused request id, and a failed clean-up after delivery leaves replaced files. Partial clean-up is reported to the person who acted; there is no sweeper.
+- **Delivery replaces the whole set.** A business's own USDZ is removed when staff deliver only a GLB. The deliver dialog says so.
+- **No limit on open requests per business** (owner decision, 2026-10-26). Staff decline abusive requests with a reason; there is no cost per request.
+- **The backfills decide who keeps what.** Admin gains `models.manage`, and every business with a 3D file starts with own uploads on. The pre-flight shows both before anything is applied.
+- **Mixed versions:** the old role editor would drop `models.manage` from a role it saves. The runbook says to keep the gap before the frontend release short and to leave roles alone during it.
+- **Demo mode** keeps request photos and staged models in the browser session only, labelled as such. It is not a security boundary.

@@ -15,7 +15,7 @@ import type {
   ProductVariant,
 } from '@/domain/types'
 import { type DailyStat, isoDay } from '../analytics'
-import { type Db, SCHEMA_VERSION } from './db'
+import { type Db, type DemoModelRequest, SCHEMA_VERSION } from './db'
 
 const KHRONOS = 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models'
 
@@ -142,6 +142,39 @@ interface ProductSeed {
 
 const CTA_DEFAULT = L('Contact seller', 'Contactar vendedor')
 
+/**
+ * The e2e target of the request journey (S4): a published, photos-only Casa Lisboa product with dimensions and no
+ * 3D model request.
+ */
+export const DEMO_REQUEST_TARGET_SLUG = 'mustard-tufted-armchair'
+
+/**
+ * Casa Lisboa's sample 3D model requests (S4 R-S4-19), one per status. Their photos are the product's catalog photos,
+ * labelled as samples. The Atlantic table was declined for dark photos, then requested again and started.
+ */
+function seedModelRequests(products: Product[], now: number): DemoModelRequest[] {
+  const at = (days: number) => daysAgo(days, now)
+  const photosOf = (productId: string, requestId: string) => {
+    const imgs = products.find((p) => p.id === productId)?.images ?? []
+    const urls = imgs.length >= 2 ? imgs.map((i) => i.url) : [imgs[0]?.url ?? '', imgs[0]?.url ?? '']
+    return urls.map((url, i) => ({ storagePath: `sample/${requestId}/${i + 1}.jpg`, fileName: `sample-photo-${i + 1}.jpg`, sizeBytes: 2_400_000 + i * 150_000, url, sample: true }))
+  }
+  const base = (id: string, productId: string, created: number) => ({
+    id,
+    businessId: 'biz_casa',
+    productId,
+    requestedBy: 'demo-business-owner',
+    createdAt: at(created),
+    photos: photosOf(productId, id),
+  })
+  return [
+    { ...base('mrq_bookcase', 'prd_bookcase', 1), status: 'requested', note: 'The shelves are oak veneer; the back panel is painted white.', updatedAt: at(1) },
+    { ...base('mrq_table_dark', 'prd_round_table', 12), status: 'rejected', reason: 'The photos are too dark. Please send new ones taken in daylight.', handledBy: 'usr_mem_ana', updatedAt: at(10), closedAt: at(10) },
+    { ...base('mrq_table', 'prd_round_table', 6), status: 'in_progress', handledBy: 'usr_mem_ana', updatedAt: at(4), startedAt: at(4) },
+    { ...base('mrq_glam_sofa', 'prd_glam_sofa', 40), status: 'delivered', handledBy: 'usr_mem_ana', updatedAt: at(35), startedAt: at(38), deliveredAt: at(35), closedAt: at(35) },
+  ]
+}
+
 export function createSeed(now: number = Date.now()): Db {
   imgCounter = 0
   varCounter = 0
@@ -157,6 +190,7 @@ export function createSeed(now: number = Date.now()): Db {
       status: 'active',
       branding: { accentColor: '#7A5C45' },
       defaultCurrency: 'EUR',
+      allowOwnModels: false,
       createdAt: daysAgo(120, now),
       updatedAt: daysAgo(3, now),
     },
@@ -170,6 +204,8 @@ export function createSeed(now: number = Date.now()): Db {
       status: 'active',
       branding: { accentColor: '#2F5D62' },
       defaultCurrency: 'EUR',
+      // S4 R-S4-19: one demo business may upload its own 3D files (Nordhaus); the others request them.
+      allowOwnModels: true,
       createdAt: daysAgo(90, now),
       updatedAt: daysAgo(1, now),
     },
@@ -183,6 +219,7 @@ export function createSeed(now: number = Date.now()): Db {
       status: 'active',
       branding: { accentColor: '#4F6B3A' },
       defaultCurrency: 'BRL',
+      allowOwnModels: false,
       createdAt: daysAgo(45, now),
       updatedAt: daysAgo(6, now),
     },
@@ -196,6 +233,7 @@ export function createSeed(now: number = Date.now()): Db {
       status: 'inactive',
       branding: { accentColor: '#5A4636' },
       defaultCurrency: 'USD',
+      allowOwnModels: false,
       createdAt: daysAgo(200, now),
       updatedAt: daysAgo(20, now),
     },
@@ -644,6 +682,7 @@ export function createSeed(now: number = Date.now()): Db {
     ),
     audit: seedActivity(businesses, products),
     team: createDemoTeam(now),
+    modelRequests: seedModelRequests(products, now),
     // The sample owner behind the demo's open closure request (mockAccount.ts): Oak & Ember asked to close.
     owners: { biz_oak: { email: 'closing@demo.example', invitedAt: daysAgo(30, now), acceptedAt: daysAgo(29, now) } },
   }

@@ -146,3 +146,12 @@ export function readImageSize(b: Uint8Array): { width: number; height: number } 
   }
   return null
 }
+
+/** A photo's pixel size from its header (PNG, JPEG or WebP), without decoding it; null when it can't be read (S4 R-S4-5). */
+export async function imageSize(file: Blob): Promise<{ width: number; height: number } | null> {
+  try {
+    return readImageSize(await readHead(file))
+  } catch {
+    return null
+  }
+}

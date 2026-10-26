@@ -8,7 +8,21 @@ import type { Business } from '@/domain/types'
 import { service } from '@/services'
 import { ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
+import { modelRequestError } from '@/services/modelRequestRules'
+import { store } from '@/services/mock/store'
+import { modelRequestAdminPath } from '@/lib/urls'
 import { ProductEditorForm } from './ProductEditorForm'
+
+// S4 Task 3: the request panel is Task 4's; here it only has to be mounted with the saved product. Permissions are
+// all granted (as outside the app shell) unless a test denies one.
+const perms = vi.hoisted(() => ({ deny: [] as string[] }))
+vi.mock('./ModelRequestPanel', () => ({
+  ModelRequestPanel: (p: { product?: { id: string } }) => <div data-testid="request-panel" data-product={p.product?.id ?? ''} />,
+}))
+vi.mock('@/auth/usePermission', async (orig) => ({
+  ...(await orig<typeof import('@/auth/usePermission')>()),
+  useCan: () => (need: string) => !perms.deny.includes(need),
+}))
 
 let business: Business
 
@@ -58,6 +72,9 @@ function renderNew() {
 }
 
 const summary = () => screen.getByText(/to continue$/).closest('[role="alert"]') as HTMLElement
+
+/** S4 R-S4-4: an owner whose business may upload its own 3D files picks "Upload your own" to get the model slots. */
+const chooseUpload = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('radio', { name: 'Upload your own' }))
 
 /** Smallest well-formed files the upload check accepts: a glTF 2.0 binary and a stored zip led by a .usdc scene. */
 function glbFile(name: string): File {
@@ -220,6 +237,7 @@ describe('product editor: uploads and units', () => {
     const user = userEvent.setup()
     const resolveUpload = deferUploads()
     renderNew()
+    await chooseUpload(user) // R-S4-4: Nordhaus may upload its own; "Request from Sanctus" is the default choice
     await user.upload(screen.getByLabelText('Upload .glb file'), glbFile('chair.glb'))
     await user.upload(screen.getByLabelText('Upload .usdz file'), usdzFile('chair.usdz'))
     await resolveUpload('chair.usdz')
@@ -268,8 +286,9 @@ describe('product editor: per-variant photos and 3D', () => {
   it('uploads a GLB for one option with the shared model slots (upload only) and reports it per option', async () => {
     const user = userEvent.setup()
     renderNew()
+    await chooseUpload(user) // R-S4-4
     await user.click(screen.getByRole('button', { name: 'Add colour or option' }))
-    await user.type(screen.getByLabelText('Option name (English)'), 'Walnut')
+    await user.type(screen.getAllByLabelText('Option name (English)').at(-1)!, 'Walnut')
     const toggle = screen.getByRole('button', { name: /Photos and 3D for Walnut/ })
     expect(toggle).toHaveTextContent('uses the product’s photos and model')
     await user.click(toggle)
@@ -291,6 +310,7 @@ describe('product editor: per-variant photos and 3D', () => {
   it('rejects a renamed file that only starts with the GLB magic bytes (AR-03)', async () => {
     const user = userEvent.setup()
     renderNew()
+    await chooseUpload(user) // R-S4-4
     await user.upload(screen.getByLabelText('Upload .glb file'), new File([new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0])], 'stub.glb'))
     expect(await screen.findByText(/stub\.glb does not look like a valid GLB file/)).toBeInTheDocument()
   })
@@ -333,5 +353,177 @@ describe('product editor header and price row at narrow widths', () => {
     const row = screen.getByLabelText('Price').closest('.grid')!
     expect(row.className).toContain('grid-cols-[1fr_96px]')
     expect(row.className).toContain('sm:grid-cols-[2fr_1fr_1fr]')
+  })
+})
+
+describe('S4 Task 3: the 3D section by role and switch (R-S4-4, R-S4-17)', () => {
+  afterEach(() => {
+    perms.deny = []
+  })
+
+  async function renderEditor(scope: 'admin' | 'business', businessId: string, productId: string) {
+    const b = await service.getBusinessById(businessId)
+    const p = await service.getProductById(productId)
+    if (!b.ok || !p.ok) throw new Error('seed missing')
+    const router = createMemoryRouter(
+      [
+        { path: '/edit', element: <ProductEditorForm scope={scope} product={p.data} currentStatus={p.data.status} businesses={[b.data]} fixedBusiness={scope === 'business' ? b.data : undefined} breadcrumbs={crumbs} /> },
+        { path: '*', element: <p data-testid="other-route" /> },
+      ],
+      { initialEntries: ['/edit'] },
+    )
+    render(
+      <ToastProvider>
+        <ConfirmProvider>
+          <RouterProvider router={router} />
+        </ConfirmProvider>
+      </ToastProvider>,
+    )
+    return p.data
+  }
+  const asOwner = (businessId: string) => localStorage.setItem('arfurn:account', JSON.stringify({ role: 'business_admin', businessId }))
+  const modelInputs = () => [...document.querySelectorAll<HTMLInputElement>('input[type="file"]')].filter((i) => /\.(glb|usdz)/.test(i.accept))
+  const models = () => within(document.getElementById('models')!)
+
+  it("owner + switch off: no .glb/.usdz file input anywhere (product and options), the managed files read-only, 'made by the Sanctus team' with none, and the request panel", async () => {
+    const user = userEvent.setup()
+    asOwner('biz_casa')
+    const p = await renderEditor('business', 'biz_casa', 'prd_glam_sofa')
+    expect(models().getByText('Current 3D files, managed by the Sanctus team')).toBeInTheDocument()
+    expect(models().getByText(p.models.glb!.fileName)).toBeInTheDocument()
+    expect(models().getByTestId('request-panel')).toHaveAttribute('data-product', p.id)
+    expect(models().queryByRole('radio', { name: 'Upload your own' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Add colour or option' }))
+    await user.type(screen.getAllByLabelText('Option name (English)').at(-1)!, 'Walnut')
+    await user.click(screen.getByRole('button', { name: /Photos and 3D for Walnut/ }))
+    expect(screen.getAllByText('No 3D files yet.').length).toBeGreaterThan(0)
+    expect(modelInputs()).toEqual([])
+  })
+
+  it("owner + switch off, product without files: '3D models for your products are made by the Sanctus team. Request one below.'", async () => {
+    asOwner('biz_casa')
+    await renderEditor('business', 'biz_casa', 'prd_mustard_chair')
+    expect(models().getByText('3D models for your products are made by the Sanctus team. Request one below.')).toBeInTheDocument()
+    expect(models().queryByText('Current 3D files, managed by the Sanctus team')).toBeNull()
+    expect(modelInputs()).toEqual([])
+  })
+
+  it("owner + switch on: 'Request from Sanctus (recommended)' first and 'Upload your own' second; request shows the panel, upload shows the model slots", async () => {
+    const user = userEvent.setup()
+    asOwner('biz_nord')
+    await renderEditor('business', 'biz_nord', 'prd_shell_chair')
+    const choices = models().getAllByRole('radio')
+    expect(choices.map((c) => c.textContent)).toEqual(['Request from Sanctus (recommended)', 'Upload your own'])
+    expect(choices[0]).toHaveAttribute('aria-checked', 'true')
+    expect(models().getByTestId('request-panel')).toBeInTheDocument()
+    expect(models().queryByLabelText('Upload .glb file')).toBeNull()
+    await user.click(choices[1]!)
+    expect(models().getByLabelText('Upload .glb file')).toBeInTheDocument()
+    expect(models().queryByTestId('request-panel')).toBeNull()
+  })
+
+  it("Admin: the model slots whatever the switch says, plus 'Open 3D request: {status}' linking to the request with models.manage, and no line without it", async () => {
+    const spy = vi.spyOn(service, 'getModelRequests').mockResolvedValue(
+      ok({ items: [{ id: 'mrq_x', status: 'in_progress', productId: 'prd_glam_sofa', businessId: 'biz_casa' } as never], total: 1 }),
+    )
+    await renderEditor('admin', 'biz_casa', 'prd_glam_sofa')
+    expect(models().getByLabelText(/(Upload|Replace) .glb file/)).toBeInTheDocument()
+    expect(models().queryByTestId('request-panel')).toBeNull()
+    const link = await models().findByRole('link', { name: 'Open 3D request: In progress' })
+    expect(link).toHaveAttribute('href', modelRequestAdminPath('mrq_x'))
+    expect(spy).toHaveBeenCalledWith({ productId: 'prd_glam_sofa', status: ['requested', 'in_progress'] })
+    // Final review: a router link, so it opens in the app without a full page load.
+    await userEvent.click(link)
+    expect(await screen.findByTestId('other-route')).toBeInTheDocument()
+  })
+
+  it('Admin without models.manage: no open-request line and no request read', async () => {
+    perms.deny = ['models.manage']
+    const spy = vi.spyOn(service, 'getModelRequests')
+    await renderEditor('admin', 'biz_casa', 'prd_glam_sofa')
+    expect(models().getByLabelText(/(Upload|Replace) .glb file/)).toBeInTheDocument()
+    expect(models().queryByRole('link', { name: /Open 3D request/ })).toBeNull()
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it("Admin: the open-request line has loading and error states with Retry", async () => {
+    const user = userEvent.setup()
+    const spy = vi.spyOn(service, 'getModelRequests').mockResolvedValueOnce({ ok: false, error: { code: 'UNKNOWN', message: 'x' } })
+    await renderEditor('admin', 'biz_casa', 'prd_glam_sofa')
+    expect(await models().findByText("Couldn't load 3D model requests.")).toBeInTheDocument()
+    spy.mockResolvedValueOnce(ok({ items: [], total: 0 }))
+    await user.click(models().getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(models().queryByText("Couldn't load 3D model requests.")).toBeNull())
+    expect(spy).toHaveBeenCalledTimes(2)
+  })
+
+  it('owner + switch off: a save sends keepModels and the models_changed_at it loaded', async () => {
+    const user = userEvent.setup()
+    asOwner('biz_casa')
+    const spy = vi.spyOn(service, 'updateProduct')
+    const p = await renderEditor('business', 'biz_casa', 'prd_glam_sofa')
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), ' II')
+    await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
+    await waitFor(() => expect(spy).toHaveBeenCalled())
+    const sent = spy.mock.calls[0]![1]
+    expect(sent).toMatchObject({ keepModels: true })
+    expect(Object.hasOwn(sent, 'modelsChangedAt')).toBe(true)
+    expect(sent.modelsChangedAt).toBe(p.modelsChangedAt)
+  })
+
+  it('Review Focus 5: a save refused with own_models_not_allowed shows the copy and keeps the form values; the new file is not attached', async () => {
+    const user = userEvent.setup()
+    asOwner('biz_nord')
+    const p = await renderEditor('business', 'biz_nord', 'prd_shell_chair')
+    await chooseUpload(user)
+    await user.upload(models().getByLabelText('Upload .glb file'), glbFile('mine.glb'))
+    expect(await models().findByText('mine.glb')).toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), ' II')
+    // Staff turn the switch off while the editor is open.
+    store.update((d) => {
+      d.businesses = d.businesses.map((b) => (b.id === 'biz_nord' ? { ...b, allowOwnModels: false } : b))
+    })
+    await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
+    expect(await screen.findByText(/to continue$/)).toBeInTheDocument()
+    expect(summary()).toHaveTextContent('3D files for this business are made by the Sanctus team. Request a 3D model instead.')
+    expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(`${p.name.en} II`)
+    expect(models().getByText('mine.glb')).toBeInTheDocument()
+    const stored = await service.getProductById(p.id)
+    expect(stored.ok && stored.data.models.glb).toBeFalsy()
+    expect(stored.ok && stored.data.name.en).toBe(p.name.en)
+  })
+
+  it('models_changed_elsewhere shows its copy with a Reload button that loads the stored 3D files and keeps the unsaved edits (final review)', async () => {
+    const user = userEvent.setup()
+    asOwner('biz_nord')
+    const p = await renderEditor('business', 'biz_nord', 'prd_shell_chair')
+    const update = vi.spyOn(service, 'updateProduct').mockResolvedValueOnce({ ok: false, error: modelRequestError('models_changed_elsewhere')! })
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), ' II')
+    await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
+    await screen.findByText(/to continue$/)
+    const alert = summary()
+    expect(alert).toHaveTextContent('The Sanctus team delivered a 3D model while you were editing. Reload to see it.')
+    // The team delivered a GLB for the product and one for its first option meanwhile.
+    const glb = { format: 'glb' as const, url: 'blob:delivered', fileName: 'delivered.glb', status: 'valid' as const }
+    const stamp = '2026-10-26T12:00:00.000Z'
+    store.update((d) => {
+      d.products = d.products.map((x) => (x.id === p.id
+        ? { ...x, name: { ...x.name, en: 'Renamed elsewhere' }, models: { glb }, modelsChangedAt: stamp, variants: x.variants.map((v, i) => (i === 0 ? { ...v, models: { glb: { ...glb, fileName: 'option.glb' } } } : v)) }
+        : x))
+    })
+    const read = vi.spyOn(service, 'getProductById')
+    await user.click(within(alert).getByRole('button', { name: 'Reload' }))
+    await waitFor(() => expect(screen.queryByText(/to continue$/)).toBeNull())
+    expect(read).toHaveBeenCalledWith(p.id)
+    // The unsaved name stays; the stored 3D files and their stamp come in, so the next save is not refused again.
+    expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(`${p.name.en} II`)
+    expect(screen.getAllByText('Unsaved changes').length).toBeGreaterThan(0)
+    await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2))
+    const sent = update.mock.calls[1]![1]
+    expect(sent.name?.en).toBe(`${p.name.en} II`)
+    expect(sent.modelsChangedAt).toBe(stamp)
+    expect(sent.models?.glb?.fileName).toBe('delivered.glb')
+    if (p.variants[0]) expect(sent.variants?.[0]?.models?.glb?.fileName).toBe('option.glb')
   })
 })

@@ -25,6 +25,7 @@ import { BusinessForm } from '../businesses/BusinessForm'
 import { BusinessReadOnly } from '../businesses/BusinessReadOnly'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
+import { BusinessModelsCard } from '../businesses/BusinessModelsCard'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 import { closureByBusiness } from '../businesses/closure'
 import { useBusinessActions } from '../businesses/useBusinessActions'
@@ -167,7 +168,12 @@ export default function BusinessDetailPage() {
           { value: 'qr', label: 'Catalog & QR' },
         ]}
       />
-      {tab === 'details' && (can('businesses.edit') ? <BusinessForm business={b} mode="edit" /> : <BusinessReadOnly business={b} />)}
+      {tab === 'details' && (
+        <div className="space-y-6">
+          {can('businesses.edit') ? <BusinessForm business={b} mode="edit" /> : <BusinessReadOnly business={b} />}
+          <BusinessModelsCard business={b} onChanged={business.refetch} />
+        </div>
+      )}
       {tab === 'products' && (
         <Card>
           <div className="flex items-center justify-between gap-3 border-b border-line p-4">

@@ -1,26 +1,33 @@
 import { useCan } from '@/auth/usePermission'
 import { AlertCircle, ExternalLink, EyeOff, Trash2 } from 'lucide-react'
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { useBlocker, useLocation, useNavigate } from 'react-router'
+import { Link, useBlocker, useLocation, useNavigate } from 'react-router'
 import { type Crumb, PageHeader } from '@/components/layout/PageHeader'
 import { ProductStatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { CopyButton } from '@/components/ui/CopyButton'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { FormField, Input, InputAddon, Select } from '@/components/ui/Form'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
+import { OPEN_REQUEST_STATUSES } from '@/domain/modelRequests'
 import { type Business, CATEGORIES, CURRENCIES, type Category, type Currency, type Product, type ProductStatus } from '@/domain/types'
 import { cn } from '@/lib/cn'
 import { PRODUCT_SLUG_MAX, slugInput, slugify } from '@/lib/slug'
-import { PUBLIC_URLS_ARE_LIVE, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, modelRequestAdminPath, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import { validateForPublish } from '@/services/validation'
 import { primaryImage } from '@/lib/product'
+import { LOAD_ERROR } from '@/features/modelRequests/copy'
+import { useModelRequests } from '@/features/modelRequests/hooks'
+import { modelRequestStatusLabel } from '@/features/modelRequests/ModelRequestStatusBadge'
 import { type EditorScope, editPath, useProductActions } from '../useProductActions'
-import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput } from './formModel'
+import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput, withStoredModels } from './formModel'
 import { LocalizedField } from './LocalizedField'
+import { ModelFilesReadOnly } from './ModelFilesReadOnly'
+import { ModelRequestPanel } from './ModelRequestPanel'
 import { ModelSection } from './ModelSection'
 import { Segmented } from './Segmented'
 import { VariantsEditor } from './VariantsEditor'
@@ -78,6 +85,8 @@ function checkForm(f: EditorForm) {
   for (const [k, msg] of Object.entries(validateForPublish(input as Product))) if (!errors[k]) publish[k] = msg
   return { input, errors, publish }
 }
+
+const hasModels = (m: Product['models'] | undefined) => !!m?.glb || !!m?.usdz
 
 /** Identical messages (the three dimensions) count and show once. */
 const issueCount = (e: Errors) => new Set(Object.values(e)).size
@@ -210,6 +219,16 @@ export function ProductEditorForm({
     !!form.input.models.usdz?.storagePath ||
     form.input.variants.some((v) => v.images?.some((i) => i.storagePath) || !!v.models?.glb?.storagePath || !!v.models?.usdz?.storagePath)
   const base = scope === 'admin' ? '/admin/products' : '/dashboard/products'
+  // S4 R-S4-4: a business owner uploads 3D files only when the business's switch allows it; otherwise the Sanctus
+  // team manages them and every save keeps the stored ones. Staff always get the upload controls.
+  const ownerUploadsOff = scope === 'business' && business?.allowOwnModels !== true
+  const ownerChoice = scope === 'business' && business?.allowOwnModels === true
+  const [modelChoice, setModelChoice] = useState<'request' | 'upload'>(() =>
+    product && (hasModels(product.models) || product.variants.some((v) => hasModels(v.models))) ? 'upload' : 'request',
+  )
+  /** The last save was refused because the Sanctus team changed the 3D files meanwhile (R-S4-17). */
+  const [staleModels, setStaleModels] = useState(false)
+  const [reloading, setReloading] = useState(false)
 
   // ---- unsaved-changes guard ----
   const blocker = useBlocker(({ currentLocation, nextLocation }) => !skipBlock.current && dirty && currentLocation.pathname !== nextLocation.pathname)
@@ -263,16 +282,38 @@ export function ProductEditorForm({
       showErrors(local)
       return null
     }
-    const res = product ? await service.updateProduct(product.id, input) : await service.createProduct(input)
+    // The models_changed_at this editor loaded (R-S4-17), sent even when unset, and keepModels when own uploads are off.
+    const payload = { ...input, modelsChangedAt: latest?.modelsChangedAt, ...(ownerUploadsOff ? { keepModels: true } : {}) }
+    const res = product ? await service.updateProduct(product.id, payload) : await service.createProduct(payload)
     if (!res.ok) {
+      setStaleModels(res.error.reason === 'models_changed_elsewhere')
       showErrors(res.error.fieldErrors ?? { _: res.error.message })
       toast.error('Could not save product', res.error.message)
       return null
     }
     setErrors({})
+    setStaleModels(false)
     setSnapshot(JSON.stringify(form))
     setLatest(res.data)
     return res.data
+  }
+
+  /**
+   * Loads the stored product into the editor again (after a delivery, or a save refused as stale). Unsaved edits are
+   * kept: a dirty form only takes the stored 3D files and their stamp, and stays unsaved.
+   */
+  const onReload = async () => {
+    if (!latest) return
+    setReloading(true)
+    const res = await service.getProductById(latest.id)
+    setReloading(false)
+    if (!res.ok) return toast.error('Could not reload the product', res.error.message)
+    const stored = formFromProduct(res.data)
+    setForm((current) => (JSON.stringify(current) !== snapshot ? withStoredModels(current, res.data) : stored))
+    setSnapshot(JSON.stringify(stored))
+    setLatest(res.data)
+    setErrors({})
+    setStaleModels(false)
   }
 
   const goToEdit = (p: Product, state?: NavState) => {
@@ -452,6 +493,11 @@ export function ProductEditorForm({
                     <li key={k}>{FIELD_SECTION[k] ? <a href={`#${FIELD_SECTION[k]}`} className="underline underline-offset-2">{msg}</a> : msg}</li>
                   ))}
                 </ul>
+                {staleModels && latest && (
+                  <Button size="sm" className="mt-3" onClick={onReload} loading={reloading}>
+                    Reload
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -546,14 +592,45 @@ export function ProductEditorForm({
           </Section>
 
           <Section id="models" title="3D models" description="Optional. Products without a model show photos only. Colours and options can have their own photos and models (under Colours and variants).">
-            <ModelSection
-              businessId={form.input.businessId}
-              models={form.input.models}
-              onChange={(format, asset) => setForm((f) => ({ ...f, input: { ...f.input, models: { ...f.input.models, [format]: asset } } }))}
-              dimensions={toInput(form).input.dimensions}
-              poster={poster}
-              name={form.input.name.en || 'product'}
-            />
+            {scope === 'admin' && latest && can('models.manage') && <OpenModelRequests productId={latest.id} />}
+            {ownerChoice && (
+              <Segmented
+                kind="radio"
+                fill
+                label="How to get the 3D model"
+                value={modelChoice}
+                onChange={setModelChoice}
+                options={[
+                  { value: 'request', label: 'Request from Sanctus (recommended)' },
+                  { value: 'upload', label: 'Upload your own' },
+                ]}
+              />
+            )}
+            {ownerUploadsOff &&
+              (hasModels(form.input.models) ? (
+                <ModelFilesReadOnly models={form.input.models} label="the product" />
+              ) : (
+                <p className="text-[13px] leading-[1.45] text-ink-body">3D models for your products are made by the Sanctus team. Request one below.</p>
+              ))}
+            {(ownerUploadsOff || (ownerChoice && modelChoice === 'request')) && (
+              <ModelRequestPanel
+                product={latest ?? undefined}
+                formDimensions={toInput(form).input.dimensions}
+                saving={busy === 'save'}
+                onSaveDraft={() => void onSaveDraft()}
+                onReload={() => void onReload()}
+              />
+            )}
+            {(scope === 'admin' || (ownerChoice && modelChoice === 'upload')) && (
+              <ModelSection
+                businessId={form.input.businessId}
+                models={form.input.models}
+                onChange={(format, asset) => setForm((f) => ({ ...f, input: { ...f.input, models: { ...f.input.models, [format]: asset } } }))}
+                dimensions={toInput(form).input.dimensions}
+                poster={poster}
+                name={form.input.name.en || 'product'}
+              />
+            )}
           </Section>
 
           <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale.">
@@ -625,6 +702,7 @@ export function ProductEditorForm({
                 businessId={form.input.businessId}
                 dimensions={toInput(form).input.dimensions}
                 poster={poster}
+                modelsReadOnly={ownerUploadsOff}
               />
             </div>
           </Section>
@@ -740,6 +818,34 @@ export function ProductEditorForm({
         }
       />
     </div>
+  )
+}
+
+/** Staff: the product's open 3D model requests, each linked to its page (S4 R-S4-4, with models.manage). */
+function OpenModelRequests({ productId }: { productId: string }) {
+  const q = useModelRequests({ productId, status: [...OPEN_REQUEST_STATUSES] })
+  if (q.status === 'loading') return <Skeleton className="h-5 w-56" />
+  if (q.status === 'error')
+    return (
+      <p className="flex flex-wrap items-center gap-2 text-[13px] leading-[1.45] text-danger">
+        {LOAD_ERROR}
+        <Button size="sm" variant="ghost" onClick={q.refetch}>
+          Retry
+        </Button>
+      </p>
+    )
+  if (!q.data.items.length) return null
+  return (
+    <ul className="space-y-1">
+      {q.data.items.map((r) => (
+        <li key={r.id} className="text-[13px] leading-[1.45] text-ink-body">
+          <Link to={modelRequestAdminPath(r.id)} className="font-medium text-ink underline underline-offset-2">
+            Open 3D request: {modelRequestStatusLabel(r.status)}
+          </Link>
+          {r.variantName && <span className="text-ink-muted"> · {r.variantName.en}</span>}
+        </li>
+      ))}
+    </ul>
   )
 }
 

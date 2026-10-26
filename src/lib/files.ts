@@ -25,6 +25,17 @@ export const LOGO_RULES = {
 }
 
 /**
+ * Photos sent with a 3D model request (S4 R-S4-5): originals, never downscaled (the modeller needs them). Under
+ * `minLongSide` px on the long side is a warning, not a refusal. No HEIC: iPhone Safari converts to JPEG.
+ */
+export const REQUEST_PHOTO_RULES = {
+  accept: ['image/jpeg', 'image/png', 'image/webp'],
+  extensions: ['.jpg', '.jpeg', '.png', '.webp'],
+  maxBytes: 10 * MB,
+  minLongSide: 1000,
+}
+
+/**
  * Upload limits for AR (AR audit 2026-10-26, AR-10). Google Scene Viewer recommends GLBs of 10 MB or less and its
  * validation can fail above 15 MB; a USDZ is opened by Quick Look on the phone, so it is held to a phone-sized limit
  * too. Client-side only: the storage bucket keeps its own (larger) limit.

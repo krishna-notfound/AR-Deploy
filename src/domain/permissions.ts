@@ -5,7 +5,7 @@ import type { Permission, RolePermissions } from './types'
 export const ALL_PERMISSIONS: Permission[] = [
   'businesses.view', 'businesses.edit', 'businesses.status', 'businesses.delete', 'owners.manage',
   'applications.view', 'applications.approve', 'applications.reject',
-  'products.view', 'products.edit', 'products.publish', 'products.delete',
+  'products.view', 'products.edit', 'products.publish', 'products.delete', 'models.manage',
   'analytics.view', 'records.view', 'access.view',
 ]
 
@@ -34,6 +34,7 @@ export const PERMISSION_PREREQUISITES: Readonly<Record<Permission, readonly Perm
   'products.edit': ['products.view'],
   'products.publish': ['products.edit'],
   'products.delete': ['products.edit'],
+  'models.manage': ['businesses.view', 'products.view'],
   'analytics.view': [],
   'records.view': [],
   'access.view': [],

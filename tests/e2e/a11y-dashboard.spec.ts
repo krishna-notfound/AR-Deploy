@@ -75,6 +75,9 @@ const ADMIN_ROUTES: Route[] = [
   { name: 'role permissions', path: '/admin/team/permissions', ready: h1(/./), loaded: (page) => page.locator('main').getByRole('checkbox').first() },
   { name: 'new product', path: '/admin/products/new', ready: h1(/./), loaded: field('Product name') },
   { name: 'product editor', path: '/admin/products/prd_sheen_chair/edit', ready: h1(/./), loaded: field('Product name') },
+  // S4: the staff queue and a request's detail (seeded sample requests, with a photo grid and the model files).
+  { name: '3D requests queue', path: '/admin/model-requests', ready: h1('3D model requests'), loaded: inMain('Alfama Tall Bookcase') },
+  { name: '3D request detail', path: '/admin/model-requests/mrq_table', ready: h1('Atlantic Round Dining Table'), loaded: inMain('Product facts') },
   { name: 'page not found in the shell', path: '/admin/no-such-page', ready: h1('Page not found'), min: 3 },
 ]
 
@@ -85,6 +88,13 @@ const BUSINESS_ROUTES: Route[] = [
   { name: 'business products', path: '/dashboard/products', ready: h1(/./), loaded: inMain('Glam Velvet Sofa') },
   { name: 'business analytics', path: '/dashboard/analytics', ready: h1('Analytics'), loaded: chart },
   { name: 'business product editor', path: '/dashboard/products/prd_glam_sofa/edit', ready: h1('Glam Velvet Sofa'), loaded: field('Product name') },
+  // S4: the editor with the "Request a 3D model" panel (this product has no request yet, so the photo form shows).
+  {
+    name: 'business product editor: 3D request panel',
+    path: '/dashboard/products/prd_mustard_chair/edit',
+    ready: h1('Mustard Tufted Armchair'),
+    loaded: (page) => page.locator('main').getByRole('heading', { name: 'Request a 3D model' }),
+  },
   { name: 'settings: my account', path: '/dashboard/settings/account', ready: h1('My account'), loaded: card('Password'), min: 10 },
   { name: 'settings: profile', path: '/dashboard/settings/profile', ready: h1('Profile'), loaded: field('Name'), min: 8 },
   { name: 'settings: security and 2FA', path: '/dashboard/settings/security', ready: h1('Security & 2FA'), loaded: card('Two-step verification (2FA)'), min: 10 },

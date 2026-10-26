@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 import { minorToInput, parseMoneyInput } from '@/lib/format'
 import { newId } from '@/lib/id'
 import { MAX_VARIANT_IMAGES } from '@/services/validation'
+import { ModelFilesReadOnly } from './ModelFilesReadOnly'
 import { ModelSection } from './ModelSection'
 
 type Update = (variants: ProductVariant[]) => ProductVariant[]
@@ -32,6 +33,7 @@ export function VariantsEditor({
   dimensions,
   poster,
   error,
+  modelsReadOnly = false,
 }: {
   variants: ProductVariant[]
   /** Receives an updater, so uploads that finish later never overwrite changes made meanwhile. */
@@ -42,6 +44,8 @@ export function VariantsEditor({
   poster?: string
   /** The variants' save error, shown under the heading. */
   error?: string
+  /** S4 R-S4-4: an owner whose own uploads are off sees each option's 3D files read-only, with no upload controls. */
+  modelsReadOnly?: boolean
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const set = (id: string, fn: (v: ProductVariant) => ProductVariant) => onChange((list) => list.map((v) => (v.id === id ? fn(v) : v)))
@@ -163,15 +167,19 @@ export function VariantsEditor({
                     </div>
                     <div className="border-t border-line pt-4">
                       <h4 className="mb-3 text-[14px] font-semibold text-ink">3D models for {label}</h4>
-                      <ModelSection
-                        context="variant"
-                        businessId={businessId}
-                        models={v.models ?? {}}
-                        onChange={(format: ModelFormat, asset: ModelAsset | undefined) => set(v.id, (cur) => withMedia(cur, cur.images, { ...cur.models, [format]: asset }))}
-                        dimensions={dimensions}
-                        poster={v.images?.find((x) => x.isPrimary)?.url ?? v.images?.[0]?.url ?? poster}
-                        name={`${label}`}
-                      />
+                      {modelsReadOnly ? (
+                        <ModelFilesReadOnly models={v.models ?? {}} label={label} />
+                      ) : (
+                        <ModelSection
+                          context="variant"
+                          businessId={businessId}
+                          models={v.models ?? {}}
+                          onChange={(format: ModelFormat, asset: ModelAsset | undefined) => set(v.id, (cur) => withMedia(cur, cur.images, { ...cur.models, [format]: asset }))}
+                          dimensions={dimensions}
+                          poster={v.images?.find((x) => x.isPrimary)?.url ?? v.images?.[0]?.url ?? poster}
+                          name={`${label}`}
+                        />
+                      )}
                     </div>
                   </div>
                 )}

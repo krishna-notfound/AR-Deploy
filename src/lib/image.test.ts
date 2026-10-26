@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ImageTooLargeError, squareResize } from './image'
+import { ImageTooLargeError, imageSize, squareResize } from './image'
 
 // jsdom has no canvas and no image decoding: both are mocked here, and the test checks what is asked of them.
 let drawImage: ReturnType<typeof vi.fn>
@@ -139,5 +139,13 @@ describe('squareResize', () => {
     expect(decode).toHaveBeenCalledTimes(2)
     expect(decode.mock.calls[0]![1]).toEqual({ imageOrientation: 'from-image' })
     expect(decode.mock.calls[1]).toHaveLength(1)
+  })
+})
+
+describe('S4 Task 4: imageSize', () => {
+  it('reads the width and height of a JPEG and a PNG from the header, and gives null for a file that is not an image', async () => {
+    expect(await imageSize(jpeg(900, 600))).toEqual({ width: 900, height: 600 })
+    expect(await imageSize(png(2400, 1600))).toEqual({ width: 2400, height: 1600 })
+    expect(await imageSize(new Blob(['GIF89a not read']))).toBeNull()
   })
 })

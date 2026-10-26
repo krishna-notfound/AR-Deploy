@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Result } from '../catalogService'
 import { DEMO_CODE, mockAccountService, resetMockAccount } from './mockAccount'
 import { mockCatalogService as svc } from './mockCatalogService'
+import { upgradeDemoTeam } from './mockTeam'
 import { createSeed } from './seed'
 import { store } from './store'
 
@@ -229,5 +230,25 @@ describe('team (demo service): the database rules (S1.5 R-W8-5)', () => {
     const denied = unwrap(await svc.getAccessEvents({ userId: 'usr_mem_joao' })).items
     expect(denied.map((e) => e.action)).toEqual(['denied'])
     expect(unwrap(await svc.getAccessEvents({ memberId: 'nobody' })).items).toEqual([])
+  })
+
+  it('R-S4-1: a stored demo Admin set that predates S4 gains models.manage once on load (as the SQL backfill)', () => {
+    const old = createSeed()
+    const t = old.team!
+    // Demo data saved before S4: no marker, and an Admin set without the new key.
+    delete t.modelsManageBackfilled
+    t.rolePermissions.admin = t.rolePermissions.admin.filter((p) => p !== 'models.manage')
+    expect(upgradeDemoTeam(old)).toBe(true)
+    expect(t.rolePermissions.admin).toContain('models.manage')
+    expect(t.rolePermissions.team).not.toContain('models.manage')
+    expect(t.events[0]).toMatchObject({ action: 'permissions_changed', details: 'Admin: +models.manage' })
+    // Once: the Owner may remove it again afterwards, and a later load keeps that choice.
+    t.rolePermissions.admin = t.rolePermissions.admin.filter((p) => p !== 'models.manage')
+    expect(upgradeDemoTeam(old)).toBe(false)
+    expect(t.rolePermissions.admin).not.toContain('models.manage')
+    // New demo data already has it.
+    const fresh = createSeed()
+    expect(upgradeDemoTeam(fresh)).toBe(false)
+    expect(fresh.team!.rolePermissions.admin).toContain('models.manage')
   })
 })

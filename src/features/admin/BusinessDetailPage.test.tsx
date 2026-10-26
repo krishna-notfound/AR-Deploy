@@ -38,6 +38,17 @@ function renderPage(tab = 'products') {
 }
 
 describe('BusinessDetailPage', () => {
+  it("the Details tab ends with the '3D models' card, whose switch saves for the business", async () => {
+    const user = userEvent.setup()
+    renderPage('details')
+    const card = (await screen.findByRole('heading', { name: '3D models' })).closest('.shadow-\\[var\\(--shadow-card\\)\\]') as HTMLElement
+    const sw = within(card).getByRole('switch', { name: 'Can upload its own 3D files' })
+    expect(sw).toHaveAttribute('aria-checked', 'true') // Nordhaus may upload its own files
+    await user.click(sw)
+    await user.click(await screen.findByRole('button', { name: 'Turn off' }))
+    await waitFor(() => expect(within(card).getByRole('switch', { name: 'Can upload its own 3D files' })).toHaveAttribute('aria-checked', 'false'))
+  })
+
   // Regression (COR-06): a failed product load rendered "No products yet" and the delete dialog said "0 products".
   it('shows an error with retry, not "No products yet", when the products fail to load', async () => {
     const user = userEvent.setup()

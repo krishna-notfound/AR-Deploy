@@ -1,4 +1,4 @@
-// The 15 platform permissions (ADR-0029) as the dashboards show them: labels, groups, warnings and defaults.
+// The 16 platform permissions (ADR-0029) as the dashboards show them: labels, groups, warnings and defaults.
 // The database holds the same keys (platform_role_permissions check constraint); this is the single UI source.
 import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from '@/domain/permissions'
 import type { MemberRole, Permission, PlatformRole } from '@/domain/types'
@@ -43,6 +43,11 @@ export const PERMISSION_GROUPS: { title: string; items: PermissionItem[] }[] = [
         label: 'Delete products',
         description: 'Remove a product for good.',
         warning: "Deletes the product and its media. This can't be undone.",
+      },
+      {
+        key: 'models.manage',
+        label: 'Handle 3D model requests',
+        description: 'See request photos, upload models, and deliver or decline requests. Also changes whether a business may upload its own 3D files.',
       },
     ],
   },

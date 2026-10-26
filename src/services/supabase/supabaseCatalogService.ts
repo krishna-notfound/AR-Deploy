@@ -2,6 +2,10 @@
 // Access control is enforced by RLS and storage policies in supabase/migrations; checks here are for UX only.
 // Every failure is returned as an error Result. Nothing falls back to demo data.
 import { createSupabaseTeam } from './supabaseTeam'
+import { createSupabaseModelRequestsBusiness } from './modelRequestsBusiness'
+import { createSupabaseModelRequestsRead } from './modelRequestsRead'
+import { createSupabaseModelRequestsStaff } from './modelRequestsStaff'
+import { MODEL_REQUEST_ERRORS } from '../modelRequestRules'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   ApplicationStatus,
@@ -37,13 +41,14 @@ import { type AuditEntry, type BusinessInput, CLOSURE_PENDING_ERROR, type Catalo
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
+const REQUEST_PHOTO_BUCKET = 'model-request-photos'
 export const LOGO_BUCKET = 'business-logos'
 export const TRACK_EVENT_FUNCTION = 'track-event'
 export const NOTIFY_OWNER_FUNCTION = 'notify-business-owner'
 // 12 h: anonymous visitors can already sign any published product's media (storage policy), so a longer
 // lifetime only widens the window in which a just-unpublished file stays reachable by an old link.
 const SIGNED_URL_TTL_SECONDS = MEDIA_URL_TTL_SECONDS
-const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*, product_variant_images(*), product_variant_models(*))'
+export const PRODUCT_SELECT = '*, product_images(*), product_models(*), product_variants(*, product_variant_images(*), product_variant_models(*))'
 
 // Hand-written row shapes matching supabase/migrations; schemaDrift.check.ts compares them with the
 // schema is applied (`npm run db:types`, see design/19-supabase.md).
@@ -60,6 +65,7 @@ export interface BusinessRow {
   status: BusinessStatus
   accent_color: string
   default_currency: Currency
+  allow_own_models: boolean
   created_at: string
   updated_at: string
 }
@@ -125,6 +131,7 @@ export interface ProductRow {
   weight_value: number | null
   weight_unit: WeightUnit | null
   published_at: string | null
+  models_changed_at?: string | null
   created_at: string
   updated_at: string
   product_images?: ImageRow[]
@@ -169,6 +176,9 @@ const ACCOUNT_RULES: Record<string, ServiceError> = {
   reopen_not_allowed: REOPEN_NOT_ALLOWED_ERROR,
 }
 
+/** S4 keys whose shared meaning is application review: only mapModelRequestError gives them the S4 copy. */
+const S4_REQUEST_ONLY = new Set(['invalid_transition', 'reason_required'])
+
 /**
  * Maps Postgres/PostgREST/Storage errors to service errors with a message the user can act on.
  * Raw database text (policy, constraint and column names) is never shown; in development it is logged.
@@ -177,6 +187,9 @@ export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictFiel
   if (import.meta.env.DEV) console.error('[supabase]', e.code, e.message)
   const account = ACCOUNT_RULES[e.message]
   if (account) return { ok: false, error: account }
+  // S4 keys raised only by S4 (invalid_transition and reason_required mean application review here; mapModelRequestError).
+  const s4 = Object.hasOwn(MODEL_REQUEST_ERRORS, e.message) && !S4_REQUEST_ONLY.has(e.message) ? MODEL_REQUEST_ERRORS[e.message] : undefined
+  if (s4) return { ok: false, error: s4 }
   const rule = DB_RULES[e.message]
   if (rule) return fail('VALIDATION', 'Please fix the highlighted fields.', { [rule.field]: rule.message })
   switch (e.code) {
@@ -204,7 +217,7 @@ export function isStorageForbidden(e: { statusCode?: string | number; message?: 
   return String(e.statusCode ?? '') === '403' || /row-level security/i.test(e.message ?? '')
 }
 
-const toBusiness = (r: BusinessRow): Business => ({
+export const toBusiness = (r: BusinessRow): Business => ({
   id: r.id,
   name: r.name,
   slug: r.slug,
@@ -219,6 +232,7 @@ const toBusiness = (r: BusinessRow): Business => ({
   status: r.status,
   branding: { accentColor: r.accent_color },
   defaultCurrency: r.default_currency,
+  allowOwnModels: r.allow_own_models === true,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 })
@@ -277,7 +291,7 @@ function toVariant(v: VariantRow, resolve: Resolve): ProductVariant {
   }
 }
 
-function toProduct(r: ProductRow, signed: Map<string, string>): Product {
+export function toProduct(r: ProductRow, signed: Map<string, string>): Product {
   const resolve: Resolve = (x) => (x.storage_path ? (signed.get(x.storage_path) ?? '') : (x.url ?? ''))
   const models = toModels(r.product_models ?? [], resolve)
   return {
@@ -303,6 +317,7 @@ function toProduct(r: ProductRow, signed: Map<string, string>): Product {
     cta: { label: r.cta_label, url: r.cta_url ?? undefined },
     status: r.status,
     publishedAt: r.published_at ?? undefined,
+    ...(r.models_changed_at ? { modelsChangedAt: r.models_changed_at } : {}),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -331,6 +346,9 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
       dimension_unit: p.dimensions.unit,
       weight_value: p.weight?.value ?? null,
       weight_unit: p.weight?.unit ?? null,
+      // S4 R-S4-3/R-S4-17: leave every model row alone (own uploads off), and the models_changed_at the editor loaded.
+      keep_models: p.keepModels === true,
+      expected_models_changed_at: p.modelsChangedAt ?? null,
     },
     p_images: normalizeImages(p.images).map((img, i) => ({ ...stored(img), alt: img.alt ?? null, is_primary: img.isPrimary, kind: img.kind, sort_order: i })),
     p_models: modelList(p.models).map((m) => ({ ...stored(m), format: m.format, file_name: m.fileName, size_bytes: m.sizeBytes ?? null, required_extensions: m.requiredExtensions ?? null })),
@@ -354,6 +372,9 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
 }
 
 const modelList = (m: ProductModels | undefined): ModelAsset[] => [m?.glb, m?.usdz].filter((x): x is ModelAsset => !!x)
+
+/** The product with no 3D files on it or its options (a photo-only duplicate, S4 R-S4-3). */
+const withoutModels = (p: Product): Product => ({ ...p, models: {}, variants: p.variants.map(({ models: _models, ...v }) => v) })
 
 /** Storage paths a product points at: its images and models and every variant's photos and models. */
 export function mediaPaths(p: Pick<Product, 'images' | 'models' | 'variants'>): string[] {
@@ -672,10 +693,11 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
    * Empties `folder`. Lists every page of 1000 first (removing while listing would shift the offsets), then removes
    * each page. A page that cannot be listed counts as one failed file: the real number is unknown, never zero.
    */
-  async function removeFolder(bucket: string, folder: string): Promise<{ removed: number; failed: number; handled: Set<string> }> {
+  async function removeFolder(bucket: string, folder: string): Promise<{ removed: number; failed: number; handled: Set<string>; subfolders: string[] }> {
     const PAGE = 1000
     const pages: string[][] = []
     const handled = new Set<string>()
+    const subfolders: string[] = []
     let failed = 0
     for (let offset = 0; ; offset += PAGE) {
       const { data, error } = await sb.storage.from(bucket).list(folder, { limit: PAGE, offset })
@@ -684,6 +706,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         break
       }
       const files = data.filter((f) => f.id).map((f) => `${folder}/${f.name}`)
+      subfolders.push(...data.filter((f) => !f.id).map((f) => `${folder}/${f.name}`))
       if (files.length) pages.push(files)
       for (const f of files) handled.add(f)
       if (data.length < PAGE) break
@@ -694,7 +717,56 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       if (error) failed += files.length
       else removed += files.length
     }
-    return { removed, failed, handled }
+    return { removed, failed, handled, subfolders }
+  }
+
+  /** Empties `folder` and each request subfolder one level below it (request photos: {business}/{request}/{file}). */
+  async function removeFolderWithSubfolders(bucket: string, folder: string): Promise<{ removed: number; failed: number }> {
+    const top = await removeFolder(bucket, folder)
+    let removed = top.removed
+    let failed = top.failed
+    for (const sub of top.subfolders) {
+      const inner = await removeFolder(bucket, sub)
+      removed += inner.removed
+      failed += inner.failed
+    }
+    return { removed, failed }
+  }
+
+  /**
+   * R-S4-18: the request photos and staged model files of a product, from model_request_storage_paths. Read before the
+   * rows go (the cascade removes the request rows that name them). null when they could not be read.
+   */
+  async function requestFilePaths(productId: ID): Promise<{ bucket: string; path: string; variantId: string | null }[] | null> {
+    const { data, error } = await sb.rpc('model_request_storage_paths', { p_product: productId })
+    if (error) return null
+    if (!Array.isArray(data)) return []
+    return data.flatMap((row) => {
+      const r = row as { bucket?: unknown; path?: unknown; variant_id?: unknown }
+      return typeof r.bucket === 'string' && typeof r.path === 'string' ? [{ bucket: r.bucket, path: r.path, variantId: typeof r.variant_id === 'string' ? r.variant_id : null }] : []
+    })
+  }
+
+  /**
+   * Removes exactly the paths given (never a folder): photos from model-request-photos, staged files from product-media
+   * unless another row still references them. Best effort; the counts are exact.
+   */
+  async function removeRequestFiles(files: { bucket: string; path: string }[]): Promise<{ removed: number; failed: number }> {
+    const photos = [...new Set(files.filter((f) => f.bucket === REQUEST_PHOTO_BUCKET).map((f) => f.path))]
+    const staged = files.filter((f) => f.bucket === MEDIA_BUCKET).map((f) => f.path)
+    let removed = 0
+    let failed = 0
+    if (photos.length) {
+      const { data, error } = await sb.storage.from(REQUEST_PHOTO_BUCKET).remove(photos)
+      // Storage answers with the objects it removed. A path RLS hides is not removed yet the call still succeeds,
+      // so only the paths it returned count as removed.
+      const gone = new Set((error ? [] : (data ?? [])).map((o) => o.name))
+      const done = photos.filter((p) => gone.has(p)).length
+      removed += done
+      failed += photos.length - done
+    }
+    const media = await removeUnreferencedMedia(staged)
+    return { removed: removed + media.removed, failed: failed + media.failed }
   }
 
   async function saveProduct(id: ID | null, input: ProductInput): Promise<Result<Product>> {
@@ -797,6 +869,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
 
   return {
     ...createSupabaseTeam(sb, () => listeners.forEach((l) => l())),
+    ...createSupabaseModelRequestsRead(sb, () => listeners.forEach((l) => l())),
+    ...createSupabaseModelRequestsBusiness(sb, () => listeners.forEach((l) => l())),
+    ...createSupabaseModelRequestsStaff(sb, () => listeners.forEach((l) => l())),
 
     // ---------------- businesses ----------------
     getBusinesses: () =>
@@ -866,8 +941,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (error) return mapDbError(error)
         if (!data.length) return refusedOrMissing('businesses', { id }, 'Business not found.')
         // Rows cascade in the database; files live in Storage and are removed here (folder = business id).
-        const [media, logos] = await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id)])
-        const sweep: StorageSweep = { removedFiles: media.removed + logos.removed, failedFiles: media.failed + logos.failed }
+        const [media, logos, photos] = await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id), removeFolderWithSubfolders(REQUEST_PHOTO_BUCKET, id)])
+        const sweep: StorageSweep = { removedFiles: media.removed + logos.removed + photos.removed, failedFiles: media.failed + logos.failed + photos.failed }
         const logo = current.ok ? ownedLogoPath(current.data.logoUrl, id) : null
         // The folder sweep already counted a logo it listed; only a logo it could not list is removed (and counted) here.
         if (logo && !logos.handled.has(logo)) {
@@ -928,8 +1003,21 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           const pubErrors = validateForPublish(next)
           if (Object.keys(pubErrors).length) return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
         }
+        // R-S4-18: an option this save drops takes its requests with it (cascade), so read their files first.
+        const droppingOptions = current.data.variants.some((v) => !next.variants.some((n) => n.id === v.id))
+        const requestFiles = droppingOptions ? await requestFilePaths(id) : null
+        // The Result<Product> cannot carry a sweep, so photos that cannot be located are named in the console, never dropped silently.
+        if (droppingOptions && !requestFiles) console.warn('updateProduct: the request files of a removed option could not be read, so they were not removed.')
         const saved = await saveProduct(id, next)
-        if (saved.ok) await removeUnreferencedMedia(mediaPaths(current.data))
+        if (saved.ok) {
+          await removeUnreferencedMedia(mediaPaths(current.data))
+          const kept = new Set(saved.data.variants.map((v) => v.id))
+          const dropped = requestFiles?.filter((f) => f.variantId && !kept.has(f.variantId)) ?? []
+          if (dropped.length) {
+            const swept = await removeRequestFiles(dropped)
+            if (swept.failed) console.warn(`updateProduct: ${swept.failed} request file(s) of a removed option could not be removed.`)
+          }
+        }
         return changed(saved)
       }),
     duplicateProduct: (id) =>
@@ -940,12 +1028,18 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (siblings.error) return mapDbError(siblings.error)
         const slug = uniqueSlug(`${src.data.slug}-copy`, siblings.data.map((s) => s.slug), PRODUCT_SLUG_MAX)
         const name = { en: `${src.data.name.en} (copy)`, ...(src.data.name.pt ? { pt: `${src.data.name.pt} (cópia)` } : {}) }
+        // S4 R-S4-3 (Review Focus 1): a business that may not write its own 3D files gets a photo-only copy; the
+        // original keeps its files.
+        const own = await sb.rpc('can_write_own_models', { p_business: src.data.businessId })
+        if (own.error) return mapDbError(own.error)
+        const from = own.data === true ? src.data : withoutModels(src.data)
         // Copies reference the same stored files; nothing is re-uploaded.
-        return changed(await saveProduct(null, { ...src.data, slug, name }))
+        return changed(await saveProduct(null, { ...from, slug, name }))
       }),
     deleteProduct: (id) =>
       guard(async () => {
         const current = await productById(id)
+        const requestFiles = await requestFilePaths(id) // R-S4-18: read before the rows cascade away
         const { data, error } = await sb.from('products').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
         if (!data.length) return refusedOrMissing('products', { id }, 'Product not found.')
@@ -954,6 +1048,12 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           notifyOwner(current.data.businessId)
           const media = await removeUnreferencedMedia(mediaPaths(current.data))
           sweep = { removedFiles: media.removed, failedFiles: media.failed }
+        }
+        // Unreadable paths are reported as one failed file (the real number is unknown, never zero).
+        if (!requestFiles) sweep.failedFiles += 1
+        else if (requestFiles.length) {
+          const files = await removeRequestFiles(requestFiles)
+          sweep = { removedFiles: sweep.removedFiles + files.removed, failedFiles: sweep.failedFiles + files.failed }
         }
         return changed(ok(sweep))
       }),
