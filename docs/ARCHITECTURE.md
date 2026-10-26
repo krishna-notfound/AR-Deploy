@@ -21,7 +21,7 @@ All URLs are built in `src/lib/urls.ts`, which has three modes (`PUBLIC_URL_MODE
 
 The catalog QR always encodes `catalogPublicUrl`. Claim links are `/claim#<token>`: the token sits in the URL fragment, so it never reaches server logs.
 
-## Supabase (project `pmnjchhrgvajtjpadpqo`)
+## Supabase (client project `zggylkbgajamhriebdrg`; the old dev project `pmnjchhrgvajtjpadpqo` is not used. The lists below describe the first 7 migrations; 18 are applied, see `supabase/migrations/`)
 - **Public tables (8, all with RLS):** `businesses`, `platform_admins`, `business_members`, `products`, `product_images`, `product_models`, `product_variants`, `product_analytics`. Anonymous users read only active businesses and their published products (and the child rows of those products).
 - **`private` schema:** `analytics_hits` (rate-limit counters) and `business_claims` (only the SHA-256 hash of each claim token is stored). Neither is exposed through the Data API.
 - **Storage:**

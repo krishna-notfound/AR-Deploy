@@ -1,6 +1,6 @@
 # Production readiness
 
-**Release gate: NOT READY TO SHIP** (updated 2026-10-20). Everything below is merged and live on `main` (`3ada1b9`, 2026-10-14), including native-only AR. Remaining: the client's acceptance test on their own devices; the client's Supabase Pro (obtained 2026-10-20, to be set up as staging and production per `OPERATIONS_RUNBOOK.md`); domain and SSL; custom SMTP; sample-data removal; client answers in `PRD.md`. Wherever this file says "on branch" or "not deployed", the change is now live.
+**Release gate: NOT READY TO SHIP** (state re-checked 2026-10-27; see `System_arch/HANDOFF.md` "Live state"). The live site `sanctus.warpkit.online` is built from `feature/sanctus-brand-design-system` (Vercel Preview); `main` (last commit `3ada1b9`, 2026-10-14) is not the live site. The live database is the client project `zggylkbgajamhriebdrg` (18 migrations applied, 13 Edge Functions active). Remaining: the client's acceptance test on their own devices; Production env vars and the domain switched to `main`; custom SMTP; removal of test content; client answers in `PRD.md`. Not checkable from the repo: Auth Site URL and redirects (only a 2026-10-20 QA note, default `http://localhost:3000/`), Vercel env vars, real-device AR results. Sections 1 to 6g below are dated records from 2026-10-13/14 on the old dev project `pmnjchhrgvajtjpadpqo` (not used by the live site); wording such as "live" or "production" in them refers to that time.
 
 Requirements and their status: [PRD.md](PRD.md). Background and older audits: `System_arch/HANDOFF.md` (authoritative), `System_arch/audit/` (partly stale, see §5).
 
@@ -17,9 +17,9 @@ Commit `048cd01` on `feature/ar-experience-2` (= `main` `8026a37` + handoff doc)
 | `npm audit --omit=dev` | 0 vulnerabilities |
 | `npm run test:e2e` | not re-run in Phase 0; last recorded 26/26 after the AR revert (HANDOFF) |
 | Secret scan (src, scripts, supabase, git history) | no secret or service_role keys found |
-| Production deploy | `main` `8026a37` → Vercel project `ar-deploy` (team `track0`), status success. Vercel MCP has no access to the team (403), so env vars can't be inspected from here |
+| Production deploy | 2026-10-13 (history; superseded 2026-10-27, see top and `System_arch/HANDOFF.md` Live state): `main` `8026a37` → Vercel project `ar-deploy` (team `track0`), status success. Vercel MCP has no access to the team (403), so env vars can't be inspected from here |
 
-## 2. Live Supabase (`pmnjchhrgvajtjpadpqo`), read-only check 2026-10-13
+## 2. Old dev Supabase (`pmnjchhrgvajtjpadpqo`, then called live), read-only check 2026-10-13 (history; not used by the live site, see `System_arch/HANDOFF.md` Live state)
 
 - Migrations: first 5 applied and identical to the repo; `20261013093006_publish_rules.sql` **not applied**. No drift.
 - RLS on all 8 public tables. Anon can read only active businesses, published products and their children. No analytics, members or admins exposed.
@@ -173,7 +173,7 @@ Deleting needs the owner's separate approval: delete the 4 businesses (products,
 
 Local infrastructure: Docker is not installed, so `supabase start` (local Supabase) is unavailable; database behaviour is tested in PGlite (real Postgres, Supabase auth/storage stubbed), which cannot test Auth emails, Storage file serving or the Edge Function.
 
-## 6g. Client preview deployment (2026-10-14, owner-approved)
+## 6g. Client preview deployment (2026-10-14, owner-approved; history, superseded 2026-10-27: see `System_arch/HANDOFF.md` Live state)
 
 - Branch `chore/production-readiness` pushed to GitHub (`677ad00`); Vercel built a **Preview** (READY): `ar-deploy-git-chore-production-readiness-track0.vercel.app` (branch alias) / `ar-deploy-4s0as2pew-track0.vercel.app` (deployment). Production unchanged (`main` `8026a37`, `ar-deploy-sage.vercel.app`).
 - **Not isolated:** Preview uses the same `VITE_*` values as Production, so it reads and writes the live Supabase project `pmnjchhrgvajtjpadpqo` (verified: the public production bundle calls only that project, contains only the publishable key, no secret patterns).

@@ -48,7 +48,7 @@ Architecture: static Vite SPA on Vercel, with Supabase Postgres, Auth and Storag
 - **Not verified:** a real DNS/TLS deployment on Vercel.
 
 ## Supabase Auth settings for production (owner applies; not changed by Claude)
-Project `pmnjchhrgvajtjpadpqo`. Replace `furnish.app` with the real domain.
+Written for the old dev project `pmnjchhrgvajtjpadpqo` (2026-10-13; not used by the live site, which uses `zggylkbgajamhriebdrg`; the live Auth URLs are not verified, see `System_arch/HANDOFF.md`). Replace `furnish.app` with the real domain.
 
 | # | Dashboard page | Setting | Value |
 |---|---|---|---|
@@ -96,7 +96,7 @@ Project `pmnjchhrgvajtjpadpqo`. Replace `furnish.app` with the real domain.
 |---|---|---|
 | Local `npm run dev` | unset → demo | none |
 | Vercel Preview + Development | `demo` | none, so previews can never touch production data |
-| Vercel Production | `supabase` + URL + publishable key | `pmnjchhrgvajtjpadpqo` |
+| Vercel Production | `supabase` + URL + publishable key | `pmnjchhrgvajtjpadpqo` (2026-10-13 plan; the live site now builds from a feature branch as a Preview and uses `zggylkbgajamhriebdrg`, see HANDOFF Live state) |
 
 **First release** (needs a Vercel token or MCP connection allowed to write to team `track0`; see blockers):
 1. Create project `ar-furniture` in team `track0`:

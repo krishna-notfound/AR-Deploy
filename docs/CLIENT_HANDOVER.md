@@ -3,7 +3,7 @@
 Written for the people who will run the platform day to day. No technical knowledge needed.
 Last checked against the code: 2026-10-13.
 
-> **Which version this guide describes.** It describes the release that is ready but **not yet published** to the live website. The live site still runs an earlier version. Until the release goes out, these items are missing or different there: business applications and owner invitations, the "AR launch attempts" wording, the QR warning on preview addresses, and the Android AR behaviour (the older version tries an in-browser AR mode first). The database is already up to date.
+> **Which version this guide describes.** It describes the current release. As checked on 2026-10-27, the live website is built from the `feature/sanctus-brand-design-system` branch and the database has all 18 migrations applied. The `main` branch is older and is not what the live site shows. Settings that cannot be checked from the code (the sign-in Site URL and redirect addresses, hosting environment values, real-device AR results) are not recorded here as done.
 
 ---
 
@@ -270,7 +270,7 @@ Products you deleted keep their numbers and appear as one **Deleted products** r
 - **Options (variants) don't swap the 3D model or photos.** They change only the swatch and the price.
 - **Material is a single text field** per language. There is no material picker.
 - **USDZ files are not lightened** (see section 5). Only GLB files are.
-- **Sample data is still in the live database** (4 sample businesses with their products and seeded report numbers). It will be removed, with your approval, once the real catalog is ready.
+- **Test content is still in the live database** (a test catalog with two test products, as checked on 2026-10-27). It will be removed, with your approval, before handover.
 - **Public sign-up is off by design.** Businesses apply, and owners are invited. Until the client's email domain is verified in Resend, invitation and confirmation emails reach only the Resend account owner; other recipients are listed as "Not sent".
 
 ---
@@ -279,9 +279,9 @@ Products you deleted keep their numbers and appear as one **Deleted products** r
 
 Transfer each account using the provider's own transfer or invite tools. **Never put passwords or secret keys in documents, email or chat.**
 
-- [ ] **GitHub repository:** `krishna-notfound/AR-Deploy` (the code).
-- [ ] **Vercel project:** `ar-deploy` in team `track0` (hosting; the `main` branch publishes the live site).
-- [ ] **Supabase project:** `pmnjchhrgvajtjpadpqo` (database, sign-in, file storage, reports).
+- [ ] **GitHub repository:** the project's GitHub repository (address supplied at handover).
+- [ ] **Vercel project:** the hosting project (name and team supplied at handover). As checked on 2026-10-27, the live site is built from the `feature/sanctus-brand-design-system` branch as a Vercel Preview; switching it to the `main` branch is still to be done.
+- [ ] **Supabase project:** `zggylkbgajamhriebdrg` (Sanctus AR; database, sign-in, file storage, reports).
 - [ ] **Domain and DNS:** pending your domain.
 - [ ] **Email sending (Resend or other SMTP):** not set up yet. Needed before owners can sign up and receive emails reliably.
 - [ ] Confirm who holds platform admin access after handover.

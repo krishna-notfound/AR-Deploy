@@ -14,7 +14,7 @@ Three kinds of evidence, never mixed: **automated** (local, demo mode or disposa
 
 `src/services/supabase/live.integration.test.ts`: 15 tests. Roles from tables, owner uploads into own folder, cross-business isolation, private draft files, owners can't change address/status or manage owners, publish → public + signed URLs, analytics insert-only + owner-only reads, rate limit, unpublish hides files, unreferenced files removed, logo bucket refuses SVG, draft registration invisible to public, contact-email match grants nothing, claim link single use.
 
-**Latest run:** 2026-10-13 on `pmnjchhrgvajtjpadpqo` (owner-approved), 15 passed / 0 failed / 0 skipped, after migrations `20261013093006` and `20261013144121` were applied. QA users created with a throwaway in-memory password and deleted afterwards; no QA businesses, products, files, analytics, claims or memberships left (read-only check). How to re-run: `docs/OPERATIONS_RUNBOOK.md`.
+**Latest run of this live suite:** 2026-10-13 on `pmnjchhrgvajtjpadpqo` (the old dev project, not used by the live site since; live is `zggylkbgajamhriebdrg`, see `System_arch/HANDOFF.md` Live state) (owner-approved), 15 passed / 0 failed / 0 skipped, after migrations `20261013093006` and `20261013144121` were applied. QA users created with a throwaway in-memory password and deleted afterwards; no QA businesses, products, files, analytics, claims or memberships left (read-only check). How to re-run: `docs/OPERATIONS_RUNBOOK.md`.
 
 ## Real-device AR checklist
 

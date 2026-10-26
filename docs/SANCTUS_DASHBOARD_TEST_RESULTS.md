@@ -80,7 +80,7 @@ Defects found and fixed earlier in this work (the dashboard and AR workstreams) 
 | Real camera QR scan | **BLOCKED** | No device. The Preview host is also behind Vercel protection. |
 | Owner probing another business's products (GET by id, child tables, UPDATE) | **BLOCKED** | No other business in the dev project has products, and creating one would mean writing outside the QA business. The same paths are proven in PGlite (about 60 probes). |
 | INSERT or DELETE attempts against another business | **NOT TESTED** (on purpose) | A broken policy would change shared client data. Covered in PGlite instead. |
-| Real email invitation delivery and its redirect | **BLOCKED** | No Resend secrets. Also, the Auth Site URL is still the default `http://localhost:3000/` (seen in the QA run), so an emailed link would land there. Needs Administrator access. |
+| Real email invitation delivery and its redirect | **BLOCKED** | No Resend secrets. Also, the Auth Site URL was the default `http://localhost:3000/` in the QA run (a dated record; not re-verified, see `System_arch/HANDOFF.md` Live state), so an emailed link would land there. Needs Administrator access. |
 
 ## 6. Remaining risks and release blockers
 

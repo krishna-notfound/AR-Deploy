@@ -1,8 +1,8 @@
 # Sanctus: project completion status
 
 **Last updated:** 2026-10-26
-**Branch:** `feature/sanctus-brand-design-system`, pushed. Last pushed commit: `b7b4688` (2026-10-26). The test environment for client review is `https://sanctus.warpkit.online`, which serves this branch with the client test project. `main` and production are not part of it.
-**Data:** the client dev project `zggylkbgajamhriebdrg`, used by the Preview. The live project `pmnjchhrgvajtjpadpqo` and `main` are untouched.
+**Branch:** `feature/sanctus-brand-design-system`, pushed. Last pushed commit: `b7b4688` (2026-10-26). The test environment for client review is `https://sanctus.warpkit.online`, which serves this branch (a Vercel Preview) with the client project. It is the live site as of 2026-10-27; `main` is not part of it.
+**Data:** the client project `zggylkbgajamhriebdrg`, which the live site uses (checked 2026-10-27: 18 migrations applied, 13 Edge Functions active; see `System_arch/HANDOFF.md` Live state). The old dev project `pmnjchhrgvajtjpadpqo` (not used) and `main` are untouched.
 
 This is the single place for **what is done, what is blocked and what decides the release**. Detailed evidence is linked, not repeated.
 
@@ -21,7 +21,7 @@ This is the single place for **what is done, what is blocked and what decides th
 | Test stability | Worker cap and timeouts; the suite went from intermittent timeouts to stable | `f00f7c7` | 4 consecutive full runs green |
 | Website embedding (ADR-0026) | `/embed/products/...` and a dashboard snippet | `a350156` | Live on the Preview: `/embed/*` sends `frame-ancestors *` and every other path sends `'none'`. Rendered inside a cross-origin page on desktop and Pixel 7, with the AR link opening the full page in a new tab. |
 | Security hardening migration `20261024065538` | Owner column allow-list, https media, path shape, AR events need a model, slug audit, safe onboarding | `8df5b42` | Pre-check clean, then applied to zggyl on 2026-10-24. Live checks passed afterwards (owner product save, settings save, unpublish and re-publish, view and AR attempt 204). Generated types unchanged, no new advisor findings. |
-| Auth settings (zggyl) | Site URL = Preview; exact redirects for `/login`, `/reset-password` and `/accept-invite` (plus localhost for dev); public sign-up refused (`signup_disabled` verified); minimum password length 12 | n/a | Verified by sign-in (200) and a sign-up probe (422) |
+| Auth settings (zggyl) | Recorded 2026-10-24, not re-checked since (a 2026-10-20 QA note saw Site URL `http://localhost:3000/`; unverified, see `System_arch/HANDOFF.md`): Site URL = Preview; exact redirects for `/login`, `/reset-password` and `/accept-invite` (plus localhost for dev); public sign-up refused (`signup_disabled` verified); minimum password length 12 | n/a | Verified by sign-in (200) and a sign-up probe (422) |
 | Email functions redeployed | `submit-application`, `provision-owner`, `send-test-email` | n/a | Preflight 204 |
 | Email delivery (Resend) | All secrets set: a new sending-only key "Sanctus server 2026-10-24" (temporary, the owner will replace it), the test sender `onboarding@resend.dev`, the Preview as `APP_BASE_URL`, a test admin inbox, and the signed webhook | n/a | 2026-10-24 on the Preview: applicant confirmation, admin notification and owner invitation all reached **delivered** through the signed webhook (`email_log`, application `ABE43EC0` and business "QA Preview Atelier 10201001") |
 | Password reset | `/reset-password` crashed on the Preview ("Something went wrong": the page uses `t()` but its route sat outside the `LanguageProvider`). Moved under the public layout. Auth emails now go through Resend SMTP. | `26c03a5` | e2e regression test. On the Preview, 2026-10-24: a reset for the QA owner's test inbox was **delivered** by Resend (sender "Sanctus"), and its link opened the Preview's "Choose a new password" form. The password was not changed. |
@@ -46,7 +46,7 @@ This is the single place for **what is done, what is blocked and what decides th
 
 | # | Blocker | Needed from | Exact input |
 |---|---|---|---|
-| B1 | ~~Auth Site URL and redirects~~ **Done 2026-10-24** | n/a | n/a |
+| B1 | ~~Auth Site URL and redirects~~ Recorded done 2026-10-24; not re-verified (HANDOFF Live state) | n/a | n/a |
 | B2 | ~~Leaked-password protection~~ **Done 2026-10-24** (`password_hibp_enabled = true`, set through the Supabase Management API) | n/a | n/a |
 | B3 | ~~Resend key and webhook~~ **Done 2026-10-24** (temporary key; the old exposed "Sanctus server (Edge Functions)" key was revoked 2026-10-24). Still open: the real sender address and admin inbox (client decision). | Owner and client | n/a |
 | B4 | Sending domain | Client (DNS) | Verify a domain in Resend. Until then, mail only reaches the Resend account's own address. |
@@ -102,7 +102,7 @@ Earlier run (tree `26c03a5`, 2026-10-24):
 
 ## 6. Incident log
 
-- **2026-10-24, Auth settings on zggyl (dev project, not live).** `supabase config push` auto-applied the repo's local-dev Auth config without prompting. It changed the Site URL and redirects, turned off MFA (TOTP) and email confirmations, set the email rate limit to 1 s, and **disabled email login** (`[auth.email] enable_signup` is the provider switch). All of it was reverted from a corrected config within about 30 minutes. Sign-in is verified working again, and sign-up still refused.
+- **2026-10-24, Auth settings on zggyl (then called the dev project; it is the live project as of 2026-10-27).** `supabase config push` auto-applied the repo's local-dev Auth config without prompting. It changed the Site URL and redirects, turned off MFA (TOTP) and email confirmations, set the email rate limit to 1 s, and **disabled email login** (`[auth.email] enable_signup` is the provider switch). All of it was reverted from a corrected config within about 30 minutes. Sign-in is verified working again, and sign-up still refused.
 - A newer CLI version also flipped `storage.analytics`; that was restored to on.
 - Still different from before: the SMS and phone OTP template text, which has no effect because both features are disabled.
 - `supabase/config.toml` now carries a warning not to push it.

@@ -47,7 +47,7 @@ All run on 2026-10-20 against the current working tree:
 The live integration suite has **not** been run against any project in this audit.
 
 ### Supabase
-- **Live production backend: `pmnjchhrgvajtjpadpqo`.** It sits in a non-client organisation, and the live bundle on the custom domain references it. It holds 7 migrations, `track-event`, sample data and demo accounts according to the docs. **It is not reachable from the current CLI login**, so its schema, auth settings, backups and secrets are UNVERIFIED in this audit.
+- **(2026-10-20; superseded: see `System_arch/HANDOFF.md` Live state, the live site now uses `zggylkbgajamhriebdrg`) Live production backend: `pmnjchhrgvajtjpadpqo`.** It sits in a non-client organisation, and the live bundle on the custom domain references it. It holds 7 migrations, `track-event`, sample data and demo accounts according to the docs. **It is not reachable from the current CLI login**, so its schema, auth settings, backups and secrets are UNVERIFIED in this audit.
 - **Client project: `zggylkbgajamhriebdrg` ("Sanctus AR", org `vxoqgtqqvgqlmfggxhdu`, eu-west-1, Pro).** It is empty:
   - 0 migrations, 0 tables, 0 buckets, 0 functions, 0 secrets, 0 users
   - 5 daily backups exist (of the empty database); PITR is off

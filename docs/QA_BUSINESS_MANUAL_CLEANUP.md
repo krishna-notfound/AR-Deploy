@@ -1,6 +1,6 @@
 # QA business: records and manual cleanup
 
-These records exist on purpose, for manual review. **Do not delete them automatically.** Remove them only when the review is finished, by following this procedure. They live in the client dev project `zggylkbgajamhriebdrg`, which the Preview uses. The live project `pmnjchhrgvajtjpadpqo` holds none of them.
+These records exist on purpose, for manual review. **Do not delete them automatically.** Remove them only when the review is finished, by following this procedure. They live in the client project `zggylkbgajamhriebdrg`, which the live site uses (checked 2026-10-27). The old dev project `pmnjchhrgvajtjpadpqo` (not used) holds none of them.
 
 ## 1. QA records (created 2026-10-20)
 

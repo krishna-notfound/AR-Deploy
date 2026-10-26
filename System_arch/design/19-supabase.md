@@ -1,7 +1,7 @@
 # 19 · Supabase backend (foundation)
 Decisions: ADR-0015 (dual mode), ADR-0016 (routes). This file is the setup guide.
 
-## Status (2026-10-20): 7 migrations + Edge Function live on `pmnjchhrgvajtjpadpqo` (previous demo project). The client now has Supabase Pro; staging and production move there (`docs/OPERATIONS_RUNBOOK.md`).
+## Status (2026-10-27): the live project is the client's `zggylkbgajamhriebdrg` (18 migrations applied, 13 Edge Functions active; see `System_arch/HANDOFF.md` Live state). `pmnjchhrgvajtjpadpqo` is the old dev project and is not used. The sections below are dated records of the old project (2026-10-13/20) and of the first 7 migrations.
 - **Migrations:** `20261012192143_init_schema`, `20261012192159_storage`, `20261012192454_save_product`, `20261012200810_analytics_rate_limit`, `20261012200813_business_member_admin`.
 - **Edge Function:** `track-event` (version 1, ACTIVE).
 - **Live suite:** 13/13.
@@ -134,7 +134,7 @@ Who can do what:
 `npx vitest run src/services/supabase/live.integration.test.ts`, with `SUPABASE_IT_URL`, `SUPABASE_IT_KEY` (publishable) and `SUPABASE_IT_PASSWORD` set. It needs the users `qa-admin@`, `qa-owner-a@` and `qa-owner-b@furnish.example`, with that password, and qa-admin in `platform_admins`. It creates and deletes its own businesses, products and files. The suite is skipped when the variables are unset. Delete the QA users afterwards; never run it against a project with real customer data you can't afford to have touched.
 
 ## Sample data (loaded 2026-10-13)
-`pmnjchhrgvajtjpadpqo` holds the demo catalog as sample data: 4 businesses (Oak & Ember is inactive), 21 products (18 published, 3 drafts), 7 real 3D models, variants, and about 16.8k analytics events for the last 30 days.
+The old dev project `pmnjchhrgvajtjpadpqo` (not used by the live site; as of 2026-10-13) holds the demo catalog as sample data: 4 businesses (Oak & Ember is inactive), 21 products (18 published, 3 drafts), 7 real 3D models, variants, and about 16.8k analytics events for the last 30 days.
 - **Intentional test cases:**
   - Tejo Side Table has a missing GLB (viewer error state)
   - Damask Accent Chair has a scale mismatch (AR scale unverified)

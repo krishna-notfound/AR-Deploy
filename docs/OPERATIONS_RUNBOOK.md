@@ -4,7 +4,9 @@ Environments, how to set up staging, and the rules that keep production safe. De
 
 ## Environments
 
-> **Current setup (owner decision 2026-10-13):** there is no separate staging project. Tests run on the live project `pmnjchhrgvajtjpadpqo`, one approved step at a time (below), and it is cleaned before launch. Vercel Preview and Production share the same `VITE_*` values (one value each, targets `production,preview`), so preview deploys also use the live database. The table shows the intended split if a staging project is added later.
+> **Superseded 2026-10-27 (see `System_arch/HANDOFF.md` "Live state"):** the live site `sanctus.warpkit.online` is built from `feature/sanctus-brand-design-system` (Vercel Preview) and uses the client project `zggylkbgajamhriebdrg`. The project `pmnjchhrgvajtjpadpqo` named below is the old dev project and is not used; treat the rest of this note and the table as the 2026-10-13 setup.
+>
+> **Setup of 2026-10-13 (owner decision):** there is no separate staging project. Tests run on the live project `pmnjchhrgvajtjpadpqo`, one approved step at a time (below), and it is cleaned before launch. Vercel Preview and Production share the same `VITE_*` values (one value each, targets `production,preview`), so preview deploys also use the live database. The table shows the intended split if a staging project is added later.
 
 | | Local | Staging | Production |
 |---|---|---|---|
@@ -20,7 +22,7 @@ Rules:
 - The Supabase MCP server connected to Claude Code points at **production**: read-only use only.
 - Never put a secret / `service_role` key in a `VITE_*` variable or a committed file.
 
-## Testing on the live project (current)
+## Testing on the old dev project (2026-10-13 procedure; the live project is now `zggylkbgajamhriebdrg`)
 
 Repo linked to `pmnjchhrgvajtjpadpqo` (`cat supabase/.temp/project-ref`). Each step needs the owner's explicit OK.
 
@@ -73,7 +75,7 @@ Every production change (migration, auth setting, Edge Function deploy, env var,
 ## Staging: what is needed (status 2026-10-13)
 
 A client-review environment needs its own Supabase project. Today none exists:
-- `pmnjchhrgvajtjpadpqo` = production (live site).
+- `pmnjchhrgvajtjpadpqo` = was production on 2026-10-13; now the old dev project, not used by the live site (client project: `zggylkbgajamhriebdrg`, see `System_arch/HANDOFF.md` Live state).
 - `bothonopxtznzviieoic` = **another live application** (read-only check 2026-10-13: 8 users, 5 stores, 14 products, profiles, try-on assets). Not usable for staging.
 - The free plan allows 2 active projects, both used.
 

@@ -154,7 +154,7 @@ Earlier findings that still matter: SEC-22 (`X-Forwarded-For` keying) and SEC-27
 
 ## 6. Prioritised remaining work
 
-1. **Client access (BLOCKED).** Set the Auth Site URL and redirect URLs. The QA run showed invitation links currently redirect to `http://localhost:3000/`, so a real emailed invitation would land on a dead page. Also set the email secrets, the verified domain and the webhook (B1 to B8 in `nextlevel/`).
+1. **Client access (BLOCKED).** Set the Auth Site URL and redirect URLs. The QA run showed invitation links redirecting to `http://localhost:3000/` (a dated record; not re-verified, see `System_arch/HANDOFF.md` Live state), so a real emailed invitation would land on a dead page. Also set the email secrets, the verified domain and the webhook (B1 to B8 in `nextlevel/`).
 2. **Real-device AR check:** Android Scene Viewer and iOS Quick Look, with tape-measure checks (3D/AR report, section 7).
 3. **Migrations needing approval:**
    - SEC-27 and OWN-06: owner column grants and https-only media URLs.
