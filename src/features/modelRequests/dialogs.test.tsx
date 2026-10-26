@@ -41,6 +41,10 @@ describe('S4 Task 6: deliver and decline dialogs', () => {
       tone: 'error', title: 'Model delivered, but the email was not sent: The email service is not configured on the server yet.',
     })
     expect(reviewToast('decline', { status: 'rejected', email: { status: 'blocked', error: 'no_recipient' } }).title).toBe('Request declined, but the email was not sent: The account has no email address.')
+    // Fix round 1: unknown (provider) text is never shown, only the fixed fallback.
+    const leaked = reviewToast('deliver', { status: 'delivered', email: { status: 'failed', error: 'Resend 500: upstream token sk_live_123 rejected' } })
+    expect(leaked).toEqual({ tone: 'error', title: 'Model delivered, but the email was not sent: the email service did not take it.' })
+    expect(leaked.title).not.toContain('Resend')
     expect(reviewToast('deliver', { status: 'delivered', email: { status: 'skipped' } }).title).toBe('Model delivered. The business has no owner, so no email was sent.')
     expect(reviewToast('deliver', { status: 'delivered', email: { status: 'demo' } }).title).toBe('Model delivered. Demo: no email was sent.')
     expect(reviewToast('decline', { status: 'rejected', email: { status: 'demo' } }).title).toBe('Request declined. Demo: no email was sent.')

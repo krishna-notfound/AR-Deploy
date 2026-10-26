@@ -166,8 +166,8 @@ export function createSupabaseModelRequestsStaff(sb: SupabaseClient, notify: () 
           return mapModelRequestError(error)
         }
         notify()
-        await removeMedia([(data as { replaced_path?: string | null } | null)?.replaced_path])
-        return ok(undefined)
+        const removed = await removeMedia([(data as { replaced_path?: string | null } | null)?.replaced_path])
+        return ok(removed ? {} : { cleanup: 'partial' as const })
       }),
 
     unstageModelFile: (id, format) =>
@@ -175,8 +175,8 @@ export function createSupabaseModelRequestsStaff(sb: SupabaseClient, notify: () 
         const { data, error } = await sb.rpc('admin_unstage_model_file', { p_request: id, p_format: format })
         if (error) return mapModelRequestError(error)
         notify()
-        await removeMedia([(data as { path?: string | null } | null)?.path])
-        return ok(undefined)
+        const removed = await removeMedia([(data as { path?: string | null } | null)?.path])
+        return ok(removed ? {} : { cleanup: 'partial' as const })
       }),
   }
 }

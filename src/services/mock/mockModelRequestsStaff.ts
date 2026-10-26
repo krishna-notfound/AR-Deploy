@@ -98,7 +98,7 @@ export function createMockModelRequestsStaff({ run, audit }: MockModelRequestDep
         const staged = sessionRequestMedia.staged.get(id) ?? {}
         if (staged[format]?.url !== asset.url) revoke(staged[format])
         sessionRequestMedia.staged.set(id, { ...staged, [format]: asset })
-        return ok(undefined)
+        return ok({})
       }),
 
     unstageModelFile: (id, format) =>
@@ -110,7 +110,7 @@ export function createMockModelRequestsStaff({ run, audit }: MockModelRequestDep
         revoke(staged[format])
         delete staged[format]
         sessionRequestMedia.staged.set(id, staged)
-        return ok(undefined)
+        return ok({})
       }),
 
     deliverModelRequest: (id) =>

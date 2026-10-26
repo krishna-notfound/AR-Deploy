@@ -81,6 +81,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
   const onModel = async (format: ModelFormat, asset: ModelAsset | undefined) => {
     const res = asset ? await service.stageModelFile(r.id, format, asset) : await service.unstageModelFile(r.id, format)
     if (!res.ok) toast.error(asset ? 'The file was not added to the request' : 'The file was not removed', res.error.message)
+    else if (res.data.cleanup === 'partial') toast.info("Some old files couldn't be removed.")
     onChanged()
   }
 

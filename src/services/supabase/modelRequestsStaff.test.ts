@@ -83,7 +83,7 @@ describe('S4 Task 6: Supabase staff model request calls', () => {
 
   it('stageModelFile calls admin_stage_model_file with the uploaded asset and removes the replaced path', async () => {
     const f = fake({ rpc: { data: { status: 'in_progress', replaced_path: 'b1/old.glb' }, error: null } })
-    expect(await createSupabaseModelRequestsStaff(f.sb, () => {}).stageModelFile(REQ, 'glb', asset)).toEqual({ ok: true, data: undefined })
+    expect(await createSupabaseModelRequestsStaff(f.sb, () => {}).stageModelFile(REQ, 'glb', asset)).toEqual({ ok: true, data: {} })
     expect(f.rpc).toHaveBeenCalledWith('admin_stage_model_file', {
       p_request: REQ, p_format: 'glb', p_storage_path: 'b1/new.glb', p_file_name: 'chair.glb', p_size_bytes: 2048, p_required_extensions: ['KHR_draco_mesh_compression'],
     })
@@ -97,9 +97,16 @@ describe('S4 Task 6: Supabase staff model request calls', () => {
     expect(f.remove).toHaveBeenCalledWith(['b1/new.glb'])
   })
 
+  it("fix round 1: a failed removal of the replaced or unstaged file gives cleanup 'partial'", async () => {
+    const f = fake({ rpc: { data: { status: 'in_progress', replaced_path: 'b1/old.glb' }, error: null }, removeError: { message: 'denied' } })
+    expect(await createSupabaseModelRequestsStaff(f.sb, () => {}).stageModelFile(REQ, 'glb', asset)).toEqual({ ok: true, data: { cleanup: 'partial' } })
+    const g = fake({ rpc: { data: { path: 'b1/s.usdz' }, error: null }, removeError: { message: 'denied' } })
+    expect(await createSupabaseModelRequestsStaff(g.sb, () => {}).unstageModelFile(REQ, 'usdz')).toEqual({ ok: true, data: { cleanup: 'partial' } })
+  })
+
   it('unstageModelFile removes the returned path', async () => {
     const f = fake({ rpc: { data: { path: 'b1/s.usdz' }, error: null } })
-    expect(await createSupabaseModelRequestsStaff(f.sb, () => {}).unstageModelFile(REQ, 'usdz')).toEqual({ ok: true, data: undefined })
+    expect(await createSupabaseModelRequestsStaff(f.sb, () => {}).unstageModelFile(REQ, 'usdz')).toEqual({ ok: true, data: {} })
     expect(f.rpc).toHaveBeenCalledWith('admin_unstage_model_file', { p_request: REQ, p_format: 'usdz' })
     expect(f.remove).toHaveBeenCalledWith(['b1/s.usdz'])
   })

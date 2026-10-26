@@ -277,8 +277,9 @@ export interface CatalogService {
   cancelModelRequest(id: ID): Promise<Result<ModelRequestOutcome>>
   getModelRequest(id: ID): Promise<Result<ModelRequestDetail>>
   startModelRequest(id: ID): Promise<Result<ModelRequestOutcome>>
-  stageModelFile(id: ID, format: ModelFormat, asset: ModelAsset): Promise<Result<void>>
-  unstageModelFile(id: ID, format: ModelFormat): Promise<Result<void>>
+  /** `cleanup: 'partial'`: the replaced or removed file could not be deleted from storage (the change itself was made). */
+  stageModelFile(id: ID, format: ModelFormat, asset: ModelAsset): Promise<Result<{ cleanup?: 'partial' }>>
+  unstageModelFile(id: ID, format: ModelFormat): Promise<Result<{ cleanup?: 'partial' }>>
   deliverModelRequest(id: ID): Promise<Result<ModelRequestOutcome>>
   rejectModelRequest(id: ID, reason: string): Promise<Result<ModelRequestOutcome>>
 

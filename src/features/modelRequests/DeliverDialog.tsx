@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import type { ModelRequestOutcome } from '@/domain/modelRequests'
-import { emailReason } from '@/features/applications/labels'
+import { knownEmailReason } from '@/features/applications/labels'
 import { DEMO_NO_EMAIL } from './copy'
 
 export const NO_USDZ_WARNING = "There's no USDZ file. iPhone AR then depends on the phone converting the GLB, which isn't guaranteed."
@@ -63,7 +63,8 @@ export function reviewToast(action: 'start' | 'deliver' | 'decline', o: ModelReq
       return { tone: 'success', title: `${done}. ${DEMO_NO_EMAIL}${cleanup}` }
     case 'failed':
     case 'blocked': {
-      const why = (emailReason(email.error) ?? 'the email service did not take it').replace(/\.$/, '')
+      // Fixed copy for known codes only: unknown (provider) text is never shown.
+      const why = (knownEmailReason(email.error) ?? 'the email service did not take it').replace(/\.$/, '')
       return { tone: 'error', title: `${done}, but the email was not sent: ${why}.${cleanup}` }
     }
   }

@@ -55,13 +55,13 @@ describe('S4 Task 6: demo staff model request calls', () => {
 
   it('staging a requested request starts it; staging again replaces the file; unstage removes it', async () => {
     asStaff('owner')
-    expect(await svc.stageModelFile(REQUESTED, 'glb', asset('glb', 'a.glb'))).toEqual({ ok: true, data: undefined })
+    expect(await svc.stageModelFile(REQUESTED, 'glb', asset('glb', 'a.glb'))).toEqual({ ok: true, data: {} })
     expect(request(REQUESTED).status).toBe('in_progress')
     await svc.stageModelFile(REQUESTED, 'glb', asset('glb', 'b.glb'))
     const detail = await svc.getModelRequest(REQUESTED)
     if (!detail.ok) throw new Error(detail.error.message)
     expect(detail.data.staged.glb?.fileName).toBe('b.glb')
-    expect(await svc.unstageModelFile(REQUESTED, 'glb')).toEqual({ ok: true, data: undefined })
+    expect(await svc.unstageModelFile(REQUESTED, 'glb')).toEqual({ ok: true, data: {} })
     expect(sessionRequestMedia.staged.get(REQUESTED)?.glb).toBeUndefined()
   })
 
