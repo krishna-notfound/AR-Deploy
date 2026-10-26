@@ -112,7 +112,7 @@ test.describe('Android', () => {
     expect(await intents()).toHaveLength(1)
     const intent = (await intents())[0]!
     expect(intent).toMatch(/^intent:\/\/arvr\.google\.com\/scene-viewer\/1\.2\?file=/)
-    expect(intent).toContain('#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=')
+    expect(intent).toContain('#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=')
     expect(intent).toContain('mode=ar_preferred')
     expect(intent).toContain('resizable=false') // verified true size: no pinch scaling
     const file = new URLSearchParams(intent.slice(intent.indexOf('?') + 1, intent.indexOf('#Intent'))).get('file')
@@ -135,8 +135,11 @@ test('switches language between English and Portuguese', async ({ page }) => {
 })
 
 test('inactive catalogs and unknown products show friendly states', async ({ page }) => {
+  // R-W8-2: a paused catalog reads as not found to a signed-out visitor, and nothing of it leaks.
   await page.goto('/catalog/oak-ember')
-  await expect(page.getByText('This catalog is currently unavailable')).toBeVisible()
+  await expect(page.getByText('Catalog not found')).toBeVisible()
+  await expect(page.getByText('Oak & Ember Studio')).toHaveCount(0)
+  await expect(page.getByText('Walnut Writing Desk')).toHaveCount(0)
   await page.goto('/products/nordhaus/does-not-exist')
   await expect(page.getByText('Product not available')).toBeVisible()
   await page.goto('/catalog/nope')

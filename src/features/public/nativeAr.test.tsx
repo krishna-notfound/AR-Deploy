@@ -89,7 +89,7 @@ describe('product page: direct native AR launch on Android (Scene Viewer)', () =
     expect(navigate).toHaveBeenCalledTimes(1)
     const intent = navigate.mock.calls[0]![0]
     expect(intent).toMatch(/^intent:\/\/arvr\.google\.com\/scene-viewer\/1\.2\?file=/)
-    expect(intent).toContain('#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=')
+    expect(intent).toContain('#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=')
     const q = intentParams(intent)
     expect(q.get('file')).toBe(el.getAttribute('src')) // exactly the model the 3D view shows
     expect(q.get('title')).toBe('Sheen Lounge Chair')

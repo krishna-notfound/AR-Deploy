@@ -43,7 +43,7 @@ describe('native AR launch URLs', () => {
   it('builds the Scene Viewer intent with the exact model URL, the title and a fallback to the page', () => {
     const intent = sceneViewerIntentUrl({ file: SIGNED, title: 'Glam Sofa & Co', pageUrl: PAGE, trueToSize: true })
     expect(intent.startsWith('intent://arvr.google.com/scene-viewer/1.2?file=')).toBe(true)
-    expect(intent).toContain('#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=')
+    expect(intent).toContain('#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=')
     expect(intent.endsWith(';end;')).toBe(true)
     const q = params(intent)
     // Regression (blank Scene Viewer with signed URLs): the decoded file is the exact model URL, its token once,

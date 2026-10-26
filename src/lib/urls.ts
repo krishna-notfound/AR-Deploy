@@ -147,8 +147,8 @@ export function settingsPath(scope: 'admin' | 'business', section: SettingsSecti
 
 /** Hash on the Scene Viewer fallback URL: Chrome opens it when the native viewer could not start (ADR-0021). */
 export const AR_FALLBACK_HASH = '#ar-unavailable'
-/** Android app that hosts Scene Viewer for the direct launch (owner decision 2026-10-26). */
-export const SCENE_VIEWER_PACKAGE = 'com.google.ar.core'
+/** Android app that hosts Scene Viewer: the Google app, as model-viewer used on main (proven on the owner's phone). */
+export const SCENE_VIEWER_PACKAGE = 'com.google.android.googlequicksearchbox'
 
 /**
  * Android's native AR: the Google Scene Viewer intent (ADR-0021). The model URL goes in once, whole and encoded, so a
