@@ -21,7 +21,7 @@ test('catalog → product navigation with search and categories', async ({ page 
 test('product without a model shows photos and no AR button', async ({ page }) => {
   await page.goto('/products/nordhaus/fjord-shell-chair')
   await expect(page.getByText('3D view is not available for this product yet.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'View in AR' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'View in my home' })).toHaveCount(0)
   await expect(page.getByText('W 48', { exact: false }).or(page.getByText('48 cm')).first()).toBeVisible()
 })
 
@@ -42,7 +42,7 @@ test('model loads, scale is checked, and AR falls back honestly on desktop', asy
   await page.goto('/products/nordhaus/sheen-lounge-chair')
   await expect(page.getByText('True-to-size model')).toBeVisible({ timeout: 60_000 })
   // Desktop Chromium cannot launch AR: the button is not shown, a phone hand-off is offered instead.
-  await expect(page.getByRole('button', { name: 'View in AR' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'View in my home' })).toHaveCount(0)
   await expect(page.getByText('View in your space on a phone')).toBeVisible()
   await page.getByRole('button', { name: 'Show QR code' }).click()
   await expect(page.getByRole('img', { name: 'Scan with your phone camera to open this product.' })).toBeVisible()
@@ -71,7 +71,7 @@ test('in-browser WebXR is never used, even when the browser offers it', async ({
   })
   await page.goto('/products/nordhaus/sheen-lounge-chair')
   await expect(page.getByText('True-to-size model')).toBeVisible({ timeout: 60_000 }) // model loaded and measured
-  await expect(page.getByRole('button', { name: 'View in AR' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'View in my home' })).toHaveCount(0)
   await expect(page.getByText('View in your space on a phone')).toBeVisible() // 3D + phone hand-off fallback
   expect(await page.evaluate(() => (window as unknown as { __xrRequests: number }).__xrRequests)).toBe(0)
 })
@@ -96,7 +96,7 @@ test.describe('Android', () => {
       if (r.url().endsWith('.glb')) glbFetches.push(r.url())
     })
     await page.goto('/products/nordhaus/sheen-lounge-chair')
-    const button = page.getByRole('button', { name: 'View in AR' })
+    const button = page.getByRole('button', { name: 'View in my home' })
     await expect(button).toBeEnabled({ timeout: 60_000 })
     await button.click()
     await page.getByRole('checkbox').check() // "don't show again", so the next tap launches directly

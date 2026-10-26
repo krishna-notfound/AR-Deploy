@@ -59,7 +59,6 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'product.viewCatalog': 'Ver o catálogo',
   'product.draftPreview': 'Pré-visualização de rascunho. Os clientes só veem esta página depois de publicada.',
   'product.view3d': 'Visualizar em 3D',
-  'product.view3dAr': 'Ver em 3D / AR',
   'product.viewPhotos': 'Fotografias',
   'product.mediaLabel': 'Imagens do produto',
   'product.photo': 'Fotografia {n} de {total}',
@@ -84,7 +83,7 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'viewer.timeout': 'O modelo 3D está a demorar demasiado a carregar. Verifique a ligação e tente novamente.',
   'viewer.unavailable': 'A vista 3D ainda não está disponível para este produto.',
 
-  'ar.button': 'Ver em AR',
+  'ar.button': 'Ver na minha casa',
   'ar.unsupportedTitle': 'Veja no seu espaço com o telemóvel',
   'ar.unsupportedBody': 'A RA funciona em iPhones, iPads e telemóveis Android compatíveis. Abra esta página no seu dispositivo móvel.',
   'ar.copyLink': 'Copiar link',

@@ -57,7 +57,6 @@ export const en = {
   'product.viewCatalog': 'Browse the catalog',
   'product.draftPreview': 'Draft preview. Customers cannot see this page until it is published.',
   'product.view3d': 'View in 3D',
-  'product.view3dAr': 'View in 3D / AR',
   'product.viewPhotos': 'Photos',
   'product.mediaLabel': 'Product media',
   'product.photo': 'Photo {n} of {total}',
@@ -82,7 +81,7 @@ export const en = {
   'viewer.timeout': 'The 3D model is taking too long to load. Check your connection and try again.',
   'viewer.unavailable': '3D view is not available for this product yet.',
 
-  'ar.button': 'View in AR',
+  'ar.button': 'View in my home',
   'ar.unsupportedTitle': 'View in your space on a phone',
   'ar.unsupportedBody': 'AR works on compatible iPhones, iPads and Android phones. Open this page on your mobile device.',
   'ar.copyLink': 'Copy link',

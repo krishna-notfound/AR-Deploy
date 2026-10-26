@@ -37,7 +37,7 @@ export function BusinessIdentityPreview({ business }: { business: Pick<BusinessI
             ))}
           </div>
           <span className="mt-4 inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium text-white" style={{ background: accent }}>
-            View in AR
+            View in my home
           </span>
         </div>
       </div>
