@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { type ManageDeps, handleManageMember } from './handler'
 
 const MEMBER = '00000000-0000-0000-0000-0000000000c1'
@@ -101,10 +101,22 @@ describe('manage-member (ADR-0029)', () => {
     expect(never.deleted).toEqual([])
 
     // The row is gone even when deleting the login fails: reported, not an error.
-    const broken = deps({ deleteLoginIfUnused: async () => { throw new Error('auth down') } })
-    const failed = await handleManageMember(post({ action: 'remove', memberId: MEMBER }), broken.d)
-    expect(failed.status).toBe(200)
-    expect(await failed.json()).toEqual({ ok: true, loginDeleted: false })
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const broken = deps({ deleteLoginIfUnused: async () => { throw new Error('auth down for gone@x.pt') } })
+      const failed = await handleManageMember(post({ action: 'remove', memberId: MEMBER }), broken.d)
+      expect(failed.status).toBe(200)
+      expect(await failed.json()).toEqual({ ok: true, loginDeleted: false })
+      // The failure leaves a trace: one fixed line, with no address and no token in it.
+      expect(logged).toHaveBeenCalledTimes(1)
+      const line = String(logged.mock.calls[0]![0])
+      expect(line).toMatch(/^manage-member: delete login failed: /)
+      expect(line).toContain('auth down')
+      expect(line).not.toMatch(/[^\s@]+@[^\s@]+/)
+      expect(line).not.toContain('owner-token')
+    } finally {
+      logged.mockRestore()
+    }
   })
 
   it('remove: a refusal deletes nothing (not_deactivated 409, self 409, forbidden 403)', async () => {

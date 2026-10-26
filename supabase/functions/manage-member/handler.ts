@@ -51,7 +51,13 @@ export async function handleManageMember(req: Request, deps: ManageDeps): Promis
   if (action === 'remove') {
     // The row is already gone; a login that could not be deleted is reported, not an error (it grants nothing now).
     let loginDeleted = false
-    if (typeof result.user_id === 'string') loginDeleted = await deps.deleteLoginIfUnused(result.user_id).catch(() => false)
+    if (typeof result.user_id === 'string') {
+      loginDeleted = await deps.deleteLoginIfUnused(result.user_id).catch((e: unknown) => {
+        // A trace for the operator: a fixed prefix and the cause, never a token, and any address masked.
+        console.error('manage-member: delete login failed: ' + String(e).replace(/[^\s@]+@[^\s@]+/g, '[email]').slice(0, 200))
+        return false
+      })
+    }
     return reply(200, { ok: true, loginDeleted })
   }
 
