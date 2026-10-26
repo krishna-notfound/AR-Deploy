@@ -532,6 +532,27 @@ describe('account-security', () => {
     expect(s.codes.find((c) => c.user === OWNER && !c.consumed)).toBeDefined()
   })
 
+  // R-W1-2: the request ended with the owner's membership (service_closure_target is not_found), e.g. A was removed
+  // and B now owns the business. Nothing is deleted, and the code stays usable.
+  it('complete_closure returns not_found and deletes nothing when service_closure_target is not_found', async () => {
+    const { d, s } = deps()
+    const code = await codeFor(d, s, OWNER, 'complete_closure')
+    const r = await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code })
+    expect(await json(r)).toEqual({ ok: false, error: 'not_found' })
+    expect(s.deletedBusinesses).toEqual([])
+    expect(s.deletedUsers).toEqual([])
+    expect(s.events.filter((e) => e.event === 'account_closure_completed')).toEqual([])
+    expect(s.codes.find((c) => c.user === OWNER && !c.consumed)).toBeDefined()
+
+    // An answer that is neither ok nor an error is refused the same way, never read as "no business".
+    const base = d.rpc
+    d.rpc = async (fn, args) => (fn === 'service_closure_target' ? {} : base(fn, args))
+    const odd = await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code })
+    expect(await json(odd)).toEqual({ ok: false, error: 'not_found' })
+    expect(s.deletedBusinesses).toEqual([])
+    expect(s.deletedUsers).toEqual([])
+  })
+
   it('complete_closure: a failed user delete is logged and can be retried without deleting the business again', async () => {
     const { d, s } = deps()
     s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }

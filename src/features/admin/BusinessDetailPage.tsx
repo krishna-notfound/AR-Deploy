@@ -4,7 +4,7 @@ import { useId, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { BusinessStatusBadge } from '@/components/ui/Badge'
+import { Badge, BusinessStatusBadge } from '@/components/ui/Badge'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -13,16 +13,18 @@ import { EmptyState, ErrorState } from '@/components/ui/States'
 import { Tabs } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/ToastProvider'
 import { Package } from 'lucide-react'
-import type { Business, ClosureRequest } from '@/domain/types'
+import type { Business, BusinessStatus, ClosureRequest } from '@/domain/types'
 import { formatDate } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { catalogLocalPath } from '@/lib/urls'
 import { account, service } from '@/services'
+import { CLOSURE_PENDING_ERROR, ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
+import { closureByBusiness } from '../businesses/closure'
 import { useBusinessActions } from '../businesses/useBusinessActions'
 import { CatalogQrPanel } from '../catalogs/CatalogQrPanel'
 import { ProductTable } from '../products/ProductTable'
@@ -45,12 +47,16 @@ export default function BusinessDetailPage() {
   const stats = useProductStats(businessId)
   const actions = useBusinessActions()
   const [deleting, setDeleting] = useState(false)
-  // Closure requests are the Owner's to complete or restore (spec 8); nobody else sees or loads them.
+  // Closure requests are the Owner's to complete or restore (spec 8). Everyone with businesses.view sees that one is
+  // open (a read-only badge), and nobody is offered Activate while it is (R-W1-3).
   const isPlatformOwner = can('owner')
-  const closures = useServiceQuery(
-    () => (isPlatformOwner ? account.listClosureRequests() : Promise.resolve({ ok: true as const, data: [] as ClosureRequest[] })),
-    [isPlatformOwner],
+  const canViewClosures = can('businesses.view')
+  // null (not an empty list) until the requests are really loaded for this user: Activate never shows on a placeholder.
+  const closures = useServiceQuery<ClosureRequest[] | null>(
+    () => (canViewClosures ? account.listClosureRequests() : Promise.resolve(ok(null))),
+    [canViewClosures],
   )
+  const prefs = usePreferences()
 
   if (business.status === 'loading' && !b) return <FullPageSpinner />
   if (!b) {
@@ -73,8 +79,10 @@ export default function BusinessDetailPage() {
   const productCount = products.data?.length ?? catalog.data?.totalProductCount
   const bizMap = new Map([[b.id, b]])
 
-  // Same gates and handlers as the inline buttons; below sm these two live in the header's More menu.
-  const canToggle = can('businesses.status') && can('businesses.edit')
+  const closure = closures.data ? closureByBusiness(closures.data).get(b.id) : undefined
+  // Same gates and handlers as the inline buttons; below sm these two live in the header's More menu. Activate is
+  // offered only once the closure requests are known and none is open for this business.
+  const canToggle = can('businesses.status') && can('businesses.edit') && (b.status === 'active' || (canViewClosures && !!closures.data && !closure))
   const canDelete = can('businesses.delete')
   const toggleActive = () => void actions.setActive(b, b.status !== 'active')
   const onDelete = async () => {
@@ -87,7 +95,6 @@ export default function BusinessDetailPage() {
     ...(canToggle ? [{ label: b.status === 'active' ? 'Deactivate' : 'Activate', onSelect: toggleActive }] : []),
     ...(canDelete ? [{ label: 'Delete', icon: <Trash2 aria-hidden />, destructive: true, disabled: deleting, onSelect: () => void onDelete() }] : []),
   ]
-  const closure = closures.data?.find((r) => r.businessId === b.id)
 
   return (
     <>
@@ -97,6 +104,11 @@ export default function BusinessDetailPage() {
         meta={
           <>
             <BusinessStatusBadge status={b.status} />
+            {closure && (
+              <span title={CLOSURE_PENDING_ERROR.message}>
+                <Badge tone="warning">Closure requested on {formatDate(closure.requestedAt, 'en', prefs)}</Badge>
+              </span>
+            )}
             <span className="min-w-0 truncate text-ui-small text-ink-muted">/catalog/{b.slug}</span>
           </>
         }
@@ -125,12 +137,12 @@ export default function BusinessDetailPage() {
           </>
         }
       />
-      {isPlatformOwner && closures.status === 'error' && !closures.data && (
+      {canViewClosures && closures.status === 'error' && !closures.data && (
         <Card className="mb-6">
           <ErrorState message={`Could not check for a closure request. ${closures.error.message}`} onRetry={closures.refetch} />
         </Card>
       )}
-      {closure && (
+      {isPlatformOwner && closure && (
         <ClosureBanner
           business={b}
           request={closure}
@@ -212,7 +224,14 @@ export default function BusinessDetailPage() {
 
 const ALREADY_HANDLED = 'This closure was already handled.'
 
-/** A business owner asked to close their account (spec 8): the catalog is offline until the Owner completes or restores. */
+/** What the closure means for the catalog now, from its real status (R-W3-6): never "offline" for a live catalog. */
+const CLOSURE_STATUS_SENTENCE: Record<BusinessStatus, string> = {
+  inactive: 'The catalog is inactive and offline until you complete the closure, which deletes the business and their account, or restore it.',
+  draft: 'The catalog is a draft and offline until you complete the closure, which deletes the business and their account, or restore it, which keeps it as a draft.',
+  active: 'The catalog is still live. Complete the closure, which deletes the business and their account, or restore it.',
+}
+
+/** A business owner asked to close their account (spec 8): the Owner completes or restores it. */
 function ClosureBanner({ business, request, onRestored }: { business: Business; request: ClosureRequest; onRestored: () => void }) {
   const prefs = usePreferences()
   const confirm = useConfirm()
@@ -254,8 +273,7 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
             Closure requested
           </h2>
           <p className="mt-1 text-ui-body break-words text-ink-body">
-            {request.email} asked to close their account on {formatDate(request.requestedAt, 'en', prefs)}. The catalog is offline until you complete the closure,
-            which deletes the business and their account, or restore it.
+            {request.email} asked to close their account on {formatDate(request.requestedAt, 'en', prefs)}. {CLOSURE_STATUS_SENTENCE[business.status]}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

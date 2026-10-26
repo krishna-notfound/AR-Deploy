@@ -22,7 +22,8 @@ export function useBusinessActions() {
       )
       if (!ok) return
       const r = await service.setBusinessStatus(b.id, active ? 'active' : 'inactive')
-      if (!r.ok) return toast.error('Could not update catalog status', r.error.message)
+      // A closure request opened after the page loaded (R-W1-3): the server refuses and says why.
+      if (!r.ok) return toast.error(r.error.reason === 'closure_pending' ? 'Catalog not activated' : 'Could not update catalog status', r.error.message)
       toast.success(active ? 'Catalog activated' : 'Catalog deactivated')
     },
     /** `productCount` is undefined when the products could not be counted; the dialog then says "all of its products", never a wrong number. */

@@ -245,6 +245,13 @@ export const TEAM_ERRORS: Record<string, { code: ServiceErrorCode; message: stri
   weak_password: { code: 'VALIDATION', message: 'Choose a stronger password.' },
 }
 
+/** R-W1-3: activating a business while its owner's closure request is open (SQL `closure_pending`), demo and Supabase. */
+export const CLOSURE_PENDING_ERROR: ServiceError = {
+  code: 'CONFLICT',
+  message: 'This business has an open closure request. Only the platform Owner can restore it or complete it.',
+  reason: 'closure_pending',
+}
+
 export function teamFail<T = never>(reason: string, message?: string): Result<T> {
   const e = TEAM_ERRORS[reason] ?? { code: 'UNKNOWN' as const, message: 'Something went wrong. Try again.' }
   return { ok: false, error: { code: e.code, message: message ?? e.message, reason } }

@@ -577,3 +577,116 @@ create trigger email_log_apply_pending_events
   after insert or update of provider_message_id on public.email_log
   for each row execute function private.apply_pending_email_events();
 -- ---- end S1.5 Task 12 ----
+
+-- =============================================================================
+-- S1.5 Task 3: closure integrity: a closure follows the owner's membership; no activation around an open closure (R-W1-2, R-W1-3)
+-- =============================================================================
+
+-- R-W1-2: a closure request belongs to the owner's membership. Removing the owner cancels it, logged as
+-- account_closure_voided; the business keeps its status. When the business itself is being deleted (this delete is
+-- then its cascade), nothing is done: the request keeps its row with business_id set null, so a complete_closure retry
+-- still finds it, and no audit row names a business that is gone.
+create function private.void_closure_on_owner_removed()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (select 1 from public.businesses where id = old.business_id) then
+    return null;
+  end if;
+  delete from public.account_closure_requests where user_id = old.user_id and business_id = old.business_id;
+  if found then
+    insert into public.audit_events (event_type, actor_id, business_id, metadata)
+    values ('account_closure_voided', (select u.id from auth.users u where u.id = auth.uid()), old.business_id,
+            jsonb_build_object('subject_id', old.user_id, 'business_id', old.business_id, 'reason', 'owner_removed'));
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function private.void_closure_on_owner_removed() from public, anon, authenticated;
+create trigger business_members_void_closure after delete on public.business_members
+  for each row execute function private.void_closure_on_owner_removed();
+
+-- R-W1-3: while a closure request is open, nobody activates the business through the Data API, the Owner included.
+-- Only cancel_account_closure and service_restore_closure (private.undo_closure sets app.account_closure) bring it
+-- back. Draft and inactive stay allowed, and closure_follow_status records them as the status to restore.
+-- The role test sits in the trigger's WHEN clause: it is evaluated as the caller, while inside this security definer
+-- function (which must see every request, whatever the caller's RLS view) current_user is the function owner.
+create function private.guard_activate_during_closure()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('app.account_closure', true), '') <> 'on'
+     and exists (select 1 from public.account_closure_requests where business_id = new.id) then
+    raise exception 'closure_pending' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function private.guard_activate_during_closure() from public, anon, authenticated;
+create trigger businesses_guard_activate_during_closure before update of status on public.businesses
+  for each row
+  when (new.status = 'active' and old.status <> 'active' and current_user in ('anon', 'authenticated'))
+  execute function private.guard_activate_during_closure();
+
+-- R-W1-2: restores the business only while the requester is still its member; otherwise the request is deleted and
+-- logged with the status unchanged. Otherwise as in 20261025163627_account_settings.
+create or replace function private.undo_closure(p_user uuid, p_actor uuid, p_event text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_req public.account_closure_requests;
+  v_old text;
+  v_new text;
+begin
+  select * into v_req from public.account_closure_requests where user_id = p_user for update;
+  if not found then
+    return false;
+  end if;
+  if v_req.business_id is not null then
+    select status into v_old from public.businesses where id = v_req.business_id for update;
+    if exists (select 1 from public.business_members where user_id = p_user and business_id = v_req.business_id) then
+      perform set_config('app.account_closure', 'on', true);
+      update public.businesses set status = coalesce(v_req.previous_business_status, 'draft')
+       where id = v_req.business_id and status = 'inactive'
+      returning status into v_new;
+    end if;
+    v_new := coalesce(v_new, v_old);
+  end if;
+  delete from public.account_closure_requests where user_id = p_user;
+  insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status, metadata)
+  values (p_event, (select u.id from auth.users u where u.id = p_actor), v_req.business_id, v_old, v_new,
+          jsonb_build_object('subject_id', p_user));
+  return true;
+end;
+$$;
+revoke execute on function private.undo_closure(uuid, uuid, text) from public, anon, authenticated;
+
+-- R-W1-2: not_found unless the requester is still a member of the business. A request whose business is gone
+-- (business_id null: a complete_closure retry after a failed user delete) is still returned.
+create or replace function public.service_closure_target(p_user uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    (select jsonb_build_object('ok', true, 'business_id', r.business_id, 'email', u.email::text)
+       from public.account_closure_requests r join auth.users u on u.id = r.user_id
+      where r.user_id = p_user
+        and (r.business_id is null
+             or exists (select 1 from public.business_members m where m.user_id = r.user_id and m.business_id = r.business_id))),
+    jsonb_build_object('error', 'not_found'));
+$$;
+revoke execute on function public.service_closure_target(uuid) from public, anon, authenticated;
+grant execute on function public.service_closure_target(uuid) to service_role;
+-- ---- end S1.5 Task 3 ----

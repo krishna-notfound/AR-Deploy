@@ -298,7 +298,112 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
       expect(screen.queryByRole('button', { name: 'Complete closure' })).toBeNull()
       cleanup()
     }
-    expect(list).not.toHaveBeenCalled()
+    // R-W1-3: loaded for everyone with businesses.view, for the read-only badge; Complete and Restore stay the Owner's.
+    expect(list).toHaveBeenCalled()
+  })
+})
+
+describe('BusinessDetailPage: an open closure is visible and blocks activation (R-W1-3)', () => {
+  const CLOSURE_PENDING = 'This business has an open closure request. Only the platform Owner can restore it or complete it.'
+  const OAK_REQUEST = { userId: 'usr_oak', email: 'owner@oak.example', businessId: 'biz_oak', businessName: 'Oak & Ember Studio', requestedAt: '2026-10-20T10:00:00.000Z' }
+
+  function renderOak() {
+    const router = createMemoryRouter([{ path: '/admin/businesses/:businessId', element: <BusinessDetailPage /> }], { initialEntries: ['/admin/businesses/biz_oak'] })
+    render(
+      <AccountProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <RouterProvider router={router} />
+          </ConfirmProvider>
+        </ToastProvider>
+      </AccountProvider>,
+    )
+  }
+  const as = (platformRole?: 'admin' | 'team') =>
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(platformRole ? { role: 'super_admin', platformRole } : { role: 'super_admin' }))
+  /** Every place the status action can be: the inline button and the More menu. */
+  async function statusActions(user: ReturnType<typeof userEvent.setup>) {
+    const inline = screen.queryAllByRole('button', { name: /^(Activate|Deactivate)$/ }).map((b) => b.textContent?.trim())
+    const more = screen.queryByRole('button', { name: 'More actions' })
+    if (!more) return inline
+    await user.click(more)
+    const items = screen.getAllByRole('menuitem').map((m) => m.textContent?.trim()).filter((t) => t === 'Activate' || t === 'Deactivate')
+    await user.keyboard('{Escape}')
+    return [...inline, ...items]
+  }
+
+  it("'Closure requested on {date}' badge for a businesses.view user", async () => {
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([OAK_REQUEST]))
+    as('team')
+    renderOak()
+    expect(await screen.findByText(/^Closure requested on .*2026/)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Closure requested' })).toBeNull()
+  })
+
+  it('Activate is hidden while a request is open, with the closure_pending copy as its tooltip', async () => {
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([OAK_REQUEST]))
+    const user = userEvent.setup()
+    for (const role of ['admin', undefined] as const) {
+      as(role)
+      renderOak()
+      const badge = await screen.findByText(/^Closure requested on /)
+      expect(badge.closest('[title]')).toHaveAttribute('title', CLOSURE_PENDING)
+      expect(await statusActions(user)).toEqual([])
+      cleanup()
+    }
+  })
+
+  it('Complete and Restore show for the Owner only', async () => {
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([OAK_REQUEST]))
+    for (const role of ['admin', 'team'] as const) {
+      as(role)
+      renderOak()
+      await screen.findByText(/^Closure requested on /)
+      expect(screen.queryByRole('button', { name: 'Complete closure' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull()
+      cleanup()
+    }
+    as()
+    renderOak()
+    const banner = await screen.findByRole('region', { name: 'Closure requested' })
+    expect(within(banner).getByRole('button', { name: 'Complete closure' })).toBeInTheDocument()
+    expect(within(banner).getByRole('button', { name: 'Restore' })).toBeInTheDocument()
+  })
+
+  it('the offline sentence is chosen from the real status (draft vs inactive)', async () => {
+    vi.spyOn(account, 'listClosureRequests').mockResolvedValue(ok([OAK_REQUEST]))
+    renderOak()
+    let banner = await screen.findByRole('region', { name: 'Closure requested' })
+    expect(within(banner).getByText(/The catalog is inactive and offline until you complete the closure/)).toBeInTheDocument()
+    cleanup()
+
+    expect((await service.setBusinessStatus('biz_oak', 'draft')).ok).toBe(true)
+    renderOak()
+    banner = await screen.findByRole('region', { name: 'Closure requested' })
+    expect(within(banner).getByText(/The catalog is a draft and offline until you complete the closure/)).toBeInTheDocument()
+    expect(within(banner).queryByText(/inactive/)).toBeNull()
+  })
+
+  it('while the closure list loads, Activate is not offered', async () => {
+    vi.spyOn(account, 'listClosureRequests').mockReturnValue(new Promise(() => {}))
+    const user = userEvent.setup()
+    as('admin')
+    renderOak()
+    await screen.findByRole('heading', { level: 1, name: 'Oak & Ember Studio' })
+    expect(await statusActions(user)).toEqual([])
+  })
+
+  it('a failed closure list shows an error with retry; Activate is offered once it loads without a request', async () => {
+    const list = vi.spyOn(account, 'listClosureRequests').mockResolvedValue(fail('UNKNOWN', 'Network down.'))
+    const user = userEvent.setup()
+    as('admin')
+    renderOak()
+    expect(await screen.findByText('Could not check for a closure request. Network down.')).toBeInTheDocument()
+    expect(await statusActions(user)).toEqual([])
+    list.mockResolvedValue(ok([]))
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.queryByText(/Could not check for a closure request/)).toBeNull())
+    expect(await statusActions(user)).toEqual(['Activate', 'Activate'])
   })
 })
 

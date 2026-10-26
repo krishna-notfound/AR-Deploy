@@ -66,6 +66,22 @@ let state = initial()
  * Back to the starting state (tests, demo reset). `onboarding: 'new'` starts like a new account, with the setup
  * neither completed nor dismissed (tests of the setup checklist).
  */
+/** Whether a closure request is open for this business (the demo catalog service refuses activation, R-W1-3). */
+export function mockClosureOpen(businessId: string): boolean {
+  return state.closure?.businessId === businessId || state.closureRequests.some((r) => r.businessId === businessId)
+}
+
+/** Removing a business's owner cancels their closure request (R-W1-2). Returns the user ids of the cancelled requests. */
+export function voidMockClosure(businessId: string): string[] {
+  const gone = state.closureRequests.filter((r) => r.businessId === businessId).map((r) => r.userId)
+  state.closureRequests = state.closureRequests.filter((r) => r.businessId !== businessId)
+  if (state.closure?.businessId === businessId) {
+    state.closure = null
+    gone.push(state.profile.userId)
+  }
+  return gone
+}
+
 export function resetMockAccount(opts: { onboarding?: 'completed' | 'new' } = {}): void {
   state = initial(opts.onboarding)
 }

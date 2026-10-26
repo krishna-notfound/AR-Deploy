@@ -21,6 +21,65 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 3 rollback: closure integrity: a closure follows the owner's membership; no activation around an open closure (R-W1-2, R-W1-3)
+-- =============================================================================
+
+drop trigger businesses_guard_activate_during_closure on public.businesses;
+drop function private.guard_activate_during_closure();
+drop trigger business_members_void_closure on public.business_members;
+drop function private.void_closure_on_owner_removed();
+
+-- Back to the bodies of 20261025163627_account_settings (no membership check).
+create or replace function private.undo_closure(p_user uuid, p_actor uuid, p_event text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_req public.account_closure_requests;
+  v_old text;
+  v_new text;
+begin
+  select * into v_req from public.account_closure_requests where user_id = p_user for update;
+  if not found then
+    return false;
+  end if;
+  if v_req.business_id is not null then
+    select status into v_old from public.businesses where id = v_req.business_id for update;
+    perform set_config('app.account_closure', 'on', true);
+    update public.businesses set status = coalesce(v_req.previous_business_status, 'draft')
+     where id = v_req.business_id and status = 'inactive'
+    returning status into v_new;
+    v_new := coalesce(v_new, v_old);
+  end if;
+  delete from public.account_closure_requests where user_id = p_user;
+  insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status, metadata)
+  values (p_event, (select u.id from auth.users u where u.id = p_actor), v_req.business_id, v_old, v_new,
+          jsonb_build_object('subject_id', p_user));
+  return true;
+end;
+$$;
+revoke execute on function private.undo_closure(uuid, uuid, text) from public, anon, authenticated;
+
+create or replace function public.service_closure_target(p_user uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    (select jsonb_build_object('ok', true, 'business_id', r.business_id, 'email', u.email::text)
+       from public.account_closure_requests r join auth.users u on u.id = r.user_id
+      where r.user_id = p_user),
+    jsonb_build_object('error', 'not_found'));
+$$;
+revoke execute on function public.service_closure_target(uuid) from public, anon, authenticated;
+grant execute on function public.service_closure_target(uuid) to service_role;
+-- ---- end S1.5 Task 3 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 12 rollback: email status integrity (R-W7-3, R-W7-4, R-W7-5)
 -- =============================================================================
 

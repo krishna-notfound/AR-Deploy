@@ -771,3 +771,150 @@ describe('S1.5 Task 12: email status integrity', () => {
     expect(rows).toEqual(rows.map((r) => ({ fn: r.fn, anon: false, authenticated: false, service: true })))
   })
 })
+
+describe('S1.5 Task 3: closure integrity', () => {
+  GONE_AFTER_ROLLBACK.push('private.void_closure_on_owner_removed()', 'private.guard_activate_during_closure()')
+
+  const id = ids(3)
+  const OWNER = id(1)
+  const ADMIN = id(2)
+  const A = id(3)
+  const B = id(4)
+  const C = id(5)
+  const D = id(6)
+  const E = id(7)
+  const BIZ_A = id(10)
+  const BIZ_C = id(11)
+  const BIZ_D = id(12)
+  const BIZ_E = id(13)
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ('${OWNER}', 't3-owner@test', now()), ('${ADMIN}', 't3-admin@test', now()), ('${A}', 't3-a@test', now()),
+        ('${B}', 't3-b@test', now()), ('${C}', 't3-c@test', now()), ('${D}', 't3-d@test', now()), ('${E}', 't3-e@test', now());
+      insert into public.platform_admins (user_id) values ('${OWNER}');
+      insert into public.platform_members (user_id, email, role, status) values ('${ADMIN}', 't3-admin@test', 'admin', 'active');
+      insert into public.businesses (id, name, slug, status) values
+        ('${BIZ_A}', 'Task Three A', 't3-a', 'active'), ('${BIZ_C}', 'Task Three C', 't3-c', 'active'),
+        ('${BIZ_D}', 'Task Three D', 't3-d', 'active'), ('${BIZ_E}', 'Task Three E', 't3-e', 'inactive');
+      insert into public.business_members (business_id, user_id) values ('${BIZ_A}', '${A}'), ('${BIZ_C}', '${C}'), ('${BIZ_D}', '${D}');
+    `)
+  })
+
+  const status = async (biz: string) => (await db.query<{ status: string }>('select status from public.businesses where id = $1', [biz])).rows[0]?.status
+  const request = async (user: string) =>
+    (await db.query<{ business_id: string | null; previous_business_status: string | null }>(
+      'select business_id, previous_business_status from public.account_closure_requests where user_id = $1', [user])).rows[0]
+  const voided = async (subject: string) =>
+    (await db.query<{ actor_id: string | null; business_id: string | null; metadata: Record<string, unknown> }>(
+      `select actor_id, business_id, metadata from public.audit_events where event_type = 'account_closure_voided' and metadata->>'subject_id' = $1`, [subject])).rows
+  const requestClosure = (user: string) => h.svc('select public.service_request_closure($1) as r', [user])
+  const cancelAs = (user: string) => h.call(user, 'select public.cancel_account_closure() as r')
+  /** A status change through the Data API as `uid` (committed when it succeeds). */
+  const setStatus = (uid: string, biz: string, to: string) =>
+    h.as(uid, (tx) => tx.query('update public.businesses set status = $2 where id = $1', [biz, to]))
+
+  it("owner A requests closure, A's membership is deleted: the request row is gone, account_closure_voided exists with business_id, the business stays inactive", async () => {
+    expect(await requestClosure(A)).toEqual({ ok: true, kind: 'business', business_id: BIZ_A })
+    expect(await status(BIZ_A)).toBe('inactive')
+
+    const removed = await h.as(OWNER, (tx) => tx.query('delete from public.business_members where business_id = $1 and user_id = $2', [BIZ_A, A]))
+    expect(removed.affectedRows).toBe(1)
+
+    expect(await request(A)).toBeUndefined()
+    expect(await voided(A)).toEqual([{ actor_id: OWNER, business_id: BIZ_A, metadata: { subject_id: A, business_id: BIZ_A, reason: 'owner_removed' } }])
+    expect(await status(BIZ_A)).toBe('inactive')
+  })
+
+  it('after removal: service_closure_target(A) → not_found; cancel_account_closure() as A → not_found and the status is unchanged; after owner B is linked nothing A does changes the status', async () => {
+    expect(await h.svc('select public.service_closure_target($1) as r', [A])).toEqual({ error: 'not_found' })
+    expect(await cancelAs(A)).toEqual({ error: 'not_found' })
+    expect(await status(BIZ_A)).toBe('inactive')
+
+    await db.query('insert into public.business_members (business_id, user_id) values ($1, $2)', [BIZ_A, B])
+    expect(await cancelAs(A)).toEqual({ error: 'not_found' })
+    expect(await h.affected(A, `update public.businesses set status = 'active' where id = $1`, [BIZ_A])).toBe(0)
+    expect(await requestClosure(A)).toEqual({ error: 'not_allowed' })
+    expect(await h.svc('select public.service_restore_closure($1, $2) as r', [A, OWNER])).toEqual({ error: 'not_found' })
+    expect(await status(BIZ_A)).toBe('inactive')
+  })
+
+  it('a request whose requester is no longer a member of its business: service_closure_target → not_found; undo deletes it and logs without touching the status', async () => {
+    // A stale row (as one left from before S1.5 could be): E never owned BIZ_E.
+    await db.query(`insert into public.account_closure_requests (user_id, business_id, previous_business_status) values ($1, $2, 'active')`, [E, BIZ_E])
+    expect(await h.svc('select public.service_closure_target($1) as r', [E])).toEqual({ error: 'not_found' })
+    expect(await h.svc('select public.service_restore_closure($1, $2) as r', [E, OWNER])).toEqual({ ok: true })
+    expect(await request(E)).toBeUndefined()
+    expect(await status(BIZ_E)).toBe('inactive')
+    const ev = (await db.query<{ business_id: string; from_status: string; to_status: string }>(
+      `select business_id, from_status, to_status from public.audit_events where event_type = 'account_closure_restored' and metadata->>'subject_id' = $1`, [E])).rows
+    expect(ev).toEqual([{ business_id: BIZ_E, from_status: 'inactive', to_status: 'inactive' }])
+  })
+
+  it('deleting a business whose owner has an open closure request succeeds and writes no account_closure_voided', async () => {
+    expect(await requestClosure(D)).toEqual({ ok: true, kind: 'business', business_id: BIZ_D })
+    const deleted = await h.as(OWNER, (tx) => tx.query('delete from public.businesses where id = $1', [BIZ_D]))
+    expect(deleted.affectedRows).toBe(1)
+    expect(await status(BIZ_D)).toBeUndefined()
+    expect(await voided(D)).toEqual([])
+    // The request stays (business_id null), so a complete_closure retry still finds it.
+    expect(await request(D)).toEqual({ business_id: null, previous_business_status: 'active' })
+    expect(await h.svc('select public.service_closure_target($1) as r', [D])).toEqual({ ok: true, business_id: null, email: 't3-d@test' })
+  })
+
+  it("an Admin and the Owner PATCHing status 'active' while a request is open both get closure_pending; setting draft or inactive is allowed and closure_follow_status records it; cancel_account_closure and service_restore_closure still bring it back", async () => {
+    expect(await requestClosure(C)).toEqual({ ok: true, kind: 'business', business_id: BIZ_C })
+    for (const who of [ADMIN, OWNER]) {
+      const err = await setStatus(who, BIZ_C, 'active').then(() => null, (e: { code?: string; message?: string }) => e)
+      expect({ who, code: err?.code, message: err?.message }).toEqual({ who, code: 'P0001', message: 'closure_pending' })
+    }
+    expect(await status(BIZ_C)).toBe('inactive')
+
+    // The requester cancels: back to active.
+    expect(await cancelAs(C)).toEqual({ ok: true })
+    expect(await status(BIZ_C)).toBe('active')
+
+    // The Owner restores: back to active.
+    expect(await requestClosure(C)).toMatchObject({ ok: true })
+    expect(await h.svc('select public.service_restore_closure($1, $2) as r', [C, OWNER])).toEqual({ ok: true })
+    expect(await status(BIZ_C)).toBe('active')
+
+    // Draft and inactive stay allowed during a closure, and become the status that cancel or restore brings back.
+    expect(await requestClosure(C)).toMatchObject({ ok: true })
+    await setStatus(ADMIN, BIZ_C, 'draft')
+    expect(await request(C)).toMatchObject({ previous_business_status: 'draft' })
+    await setStatus(ADMIN, BIZ_C, 'inactive')
+    expect(await request(C)).toMatchObject({ previous_business_status: 'inactive' })
+    await expect(setStatus(ADMIN, BIZ_C, 'active')).rejects.toThrow(/closure_pending/)
+    expect(await h.svc('select public.service_restore_closure($1, $2) as r', [C, OWNER])).toEqual({ ok: true })
+    expect(await status(BIZ_C)).toBe('inactive')
+
+    // With no request open, activating works as before.
+    await setStatus(ADMIN, BIZ_C, 'active')
+    expect(await status(BIZ_C)).toBe('active')
+  })
+
+  it('rollback restores the S1 bodies of service_closure_target and undo_closure and drops both triggers', async () => {
+    const defs = async (target: PGlite) => {
+      const fns = (await target.query<{ d: string }>(
+        `select pg_get_functiondef(p) as d from unnest(array['public.service_closure_target(uuid)'::regprocedure,
+           'private.undo_closure(uuid, uuid, text)'::regprocedure]) p`)).rows.map((r) => r.d.replace(/\r\n/g, '\n'))
+      const triggers = (await target.query<{ tgname: string }>(
+        `select tgname from pg_trigger where tgname in ('business_members_void_closure', 'businesses_guard_activate_during_closure') order by 1`)).rows.map((r) => r.tgname)
+      return { fns, triggers }
+    }
+    const before = await freshDb((n) => n < S15_MIGRATION)
+    const rolled = await freshDb()
+    try {
+      expect((await defs(rolled)).triggers).toEqual(['business_members_void_closure', 'businesses_guard_activate_during_closure'])
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      const after = await defs(rolled)
+      expect(after).toEqual(await defs(before))
+      expect(after.triggers).toEqual([])
+    } finally {
+      await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
+})

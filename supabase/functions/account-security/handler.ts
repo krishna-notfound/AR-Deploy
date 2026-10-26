@@ -260,7 +260,10 @@ const ACTIONS: Record<string, Action> = {
     await requireOwnerAal2(ctx)
     if (target === ctx.userId) throw new Refusal('not_allowed')
     if ((await classify(ctx, target)) === 'owner') throw new Refusal('not_allowed')
+    // Refused before anything is deleted (and before the code is used) unless the request is still open and its
+    // requester still owns the business (R-W1-2): `not_found` from SQL, or any answer that is not an explicit ok.
     const t = await sql(ctx, 'service_closure_target', { p_user: target })
+    if (t.ok !== true) throw new Refusal('not_found')
     await checkCode(ctx, 'complete_closure', ctx.body.code)
     const email = typeof t.email === 'string' ? t.email : await deps.userEmail(target)
     // null once the business is gone (business_id is on delete set null), e.g. on a retry after a failed user delete.

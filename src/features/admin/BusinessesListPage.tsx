@@ -18,7 +18,9 @@ import { formatDate, formatNumber } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
 import { account, isDemoMode, service } from '@/services'
+import { CLOSURE_PENDING_ERROR, ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
+import { closureByBusiness } from '../businesses/closure'
 import { useBusinessActions } from '../businesses/useBusinessActions'
 import { Monogram } from '../applications/Monogram'
 import { ActionCodeDialog } from '../settings/ActionCodeDialog'
@@ -44,8 +46,10 @@ export default function BusinessesListPage() {
   const q = params.get('q') ?? ''
   const status = (params.get('status') ?? '') as '' | BusinessStatus
   const page = Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1)
-  // Closure requests are the Owner's to handle (spec 8): the filter and its count are hidden, and not loaded, for anyone else.
+  // Closure requests are the Owner's to handle (spec 8): the filter, its count and the orphan requests are the Owner's.
+  // Everyone with businesses.view sees which business has one (a read-only badge) and gets no Activate there (R-W1-3).
   const isPlatformOwner = can('owner')
+  const canViewClosures = can('businesses.view')
   const closureOnly = isPlatformOwner && params.get('closure') === '1'
   const setParam = (k: string, v: string) => {
     const next = new URLSearchParams(params)
@@ -57,18 +61,20 @@ export default function BusinessesListPage() {
 
   const catalogs = useServiceQuery(() => service.getCatalogs(), [])
   const analytics = useServiceQuery(() => service.getAnalytics(), [])
-  const closures = useServiceQuery(
-    () => (isPlatformOwner ? account.listClosureRequests() : Promise.resolve({ ok: true as const, data: [] as ClosureRequest[] })),
-    [isPlatformOwner],
+  // null (not an empty list) until the requests are really loaded for this user: Activate never shows on a placeholder.
+  const closures = useServiceQuery<ClosureRequest[] | null>(
+    () => (canViewClosures ? account.listClosureRequests() : Promise.resolve(ok(null))),
+    [canViewClosures],
   )
   const actions = useBusinessActions()
   const navigate = useNavigate()
 
-  // Businesses with an open closure request (a staff closure has no business and is never listed here).
-  const closing = useMemo(() => {
-    const ids = new Set((closures.data ?? []).flatMap((r) => (r.businessId ? [r.businessId] : [])))
-    return new Set((catalogs.data ?? []).filter((c) => ids.has(c.business.id)).map((c) => c.business.id))
-  }, [closures.data, catalogs.data])
+  // Open closure requests by business (a staff closure has no business and is never listed here).
+  const closureOf = useMemo(() => closureByBusiness(closures.data ?? []), [closures.data])
+  const closing = useMemo(
+    () => new Set((catalogs.data ?? []).filter((c) => closureOf.has(c.business.id)).map((c) => c.business.id)),
+    [closureOf, catalogs.data],
+  )
   // Requests whose business is no longer listed (a closure that stopped part-way): still the Owner's to finish.
   const orphans = useMemo(() => {
     if (!catalogs.data) return []
@@ -98,11 +104,12 @@ export default function BusinessesListPage() {
       : []),
     ...(!can(['businesses.status']) || !can('businesses.edit')
       ? []
-      : [
-          b.status === 'active'
-            ? { label: 'Deactivate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, false) }
-            : { label: 'Activate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, true) },
-        ]),
+      : b.status === 'active'
+        ? [{ label: 'Deactivate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, false) }]
+        : // Offered only once the closure requests are known and none is open for this business (R-W1-3).
+          canViewClosures && closures.data && !closureOf.has(b.id)
+          ? [{ label: 'Activate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, true) }]
+          : []),
     ...(can('businesses.delete')
       ? (['separator', { label: 'Delete business', icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(b, count) }] as const)
       : []),
@@ -129,7 +136,7 @@ export default function BusinessesListPage() {
     { key: 'published', header: 'Published', align: 'right', sortValue: (r) => r.catalog.publishedProductCount, cell: (r) => formatNumber(r.catalog.publishedProductCount) },
     { key: 'views', header: 'Views', align: 'right', priority: 'low', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
     { key: 'ar', header: 'AR', align: 'right', priority: 'low', sortValue: (r) => r.ar, cell: (r) => formatNumber(r.ar) },
-    { key: 'status', header: 'Status', sortValue: (r) => r.catalog.business.status, cell: (r) => <BusinessStatusBadge status={r.catalog.business.status} /> },
+    { key: 'status', header: 'Status', sortValue: (r) => r.catalog.business.status, cell: (r) => <StatusBadges b={r.catalog.business} closure={closureOf.get(r.catalog.business.id)} /> },
     { key: 'updated', header: 'Last updated', align: 'right', sortValue: (r) => r.catalog.business.updatedAt, cell: (r) => <span className="whitespace-nowrap">{formatDate(r.catalog.business.updatedAt, 'en', prefs)}</span> },
     {
       key: 'actions',
@@ -174,6 +181,9 @@ export default function BusinessesListPage() {
           )}
         </div>
         {closureOnly && orphans.length > 0 && <OrphanRequests requests={orphans} onChanged={closures.refetch} />}
+        {!closureOnly && closures.status === 'error' && !closures.data && (
+          <ErrorState className="border-b border-line py-4" message={`Could not load the closure requests. ${closures.error.message}`} onRetry={closures.refetch} />
+        )}
         {catalogs.status === 'error' && !catalogs.data ? (
           <ErrorState message={catalogs.error.message} onRetry={catalogs.refetch} />
         ) : closureOnly && closures.status === 'error' && !closures.data ? (
@@ -220,7 +230,7 @@ export default function BusinessesListPage() {
                     {r.catalog.business.name}
                   </Link>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-small text-ink-muted tabular-nums">
-                    <BusinessStatusBadge status={r.catalog.business.status} />
+                    <StatusBadges b={r.catalog.business} closure={closureOf.get(r.catalog.business.id)} />
                     <span>
                       {r.catalog.publishedProductCount}/{r.catalog.totalProductCount} published
                     </span>
@@ -234,6 +244,21 @@ export default function BusinessesListPage() {
         )}
       </Card>
     </>
+  )
+}
+
+/** The status, and the read-only closure badge whose tooltip says why the business can't be activated (R-W1-3). */
+function StatusBadges({ b, closure }: { b: Business; closure?: ClosureRequest }) {
+  const prefs = usePreferences()
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <BusinessStatusBadge status={b.status} />
+      {closure && (
+        <span title={CLOSURE_PENDING_ERROR.message}>
+          <Badge tone="warning">Closure requested on {formatDate(closure.requestedAt, 'en', prefs)}</Badge>
+        </span>
+      )}
+    </span>
   )
 }
 

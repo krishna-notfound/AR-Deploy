@@ -10,7 +10,7 @@ import { FormField, Input, Select } from '@/components/ui/Form'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { Business, ID, Lang } from '@/domain/types'
+import type { Business, ClosureRequest, ID, Lang } from '@/domain/types'
 import { formatDate } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { account, service } from '@/services'
@@ -18,6 +18,7 @@ import type { ProvisionOutcome } from '@/services/catalogService'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { emailReason } from '../applications/labels'
 import { ActionCodeDialog } from '../settings/ActionCodeDialog'
+import { closureByBusiness } from './closure'
 
 /**
  * The business's single owner (ADR-0024): invite, resend the invitation, or remove.
@@ -39,6 +40,11 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
   const [language, setLanguage] = useState<Lang>(defaultLanguage)
   const [error, setError] = useState<string | null>(null)
   const owner = members.data?.[0]
+  // R-W1-2: removing the owner cancels their open closure request; the dialog says so (businesses.view reads requests).
+  const canViewClosures = can('businesses.view')
+  const closures = useServiceQuery<ClosureRequest[] | null>(() => (canViewClosures ? account.listClosureRequests() : Promise.resolve({ ok: true as const, data: null })), [canViewClosures])
+  const closure = closures.data ? closureByBusiness(closures.data).get(business.id) : undefined
+  const ownerClosure = owner && closure?.userId === owner.userId ? closure : undefined
   // Owner support action (spec 8): only once the owner has an account of their own (invitation accepted).
   const canReset = isPlatformOwner && !!owner?.acceptedAt
 
@@ -80,7 +86,13 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
     if (!owner) return
     const ok = await confirm({
       title: `Remove ${owner.email}?`,
-      body: `They will no longer be able to manage ${business.name}. Their account is not deleted. You can then invite another owner.`,
+      body: [
+        `They will no longer be able to manage ${business.name}. Their account is not deleted. You can then invite another owner.`,
+        ownerClosure &&
+          `This owner asked to close their account on ${formatDate(ownerClosure.requestedAt, 'en', prefs)}. Removing them cancels that request. The catalog stays ${business.status}.`,
+      ]
+        .filter(Boolean)
+        .join(' '),
       confirmLabel: 'Remove owner',
       destructive: true,
     })

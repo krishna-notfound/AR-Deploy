@@ -317,6 +317,16 @@ describe('database errors shown to users', () => {
     const r = mapDbError({ code: 'P0002', message: 'No account uses this email address' })
     expect(r.ok === false && r.error.message).toBe('No account uses this email address')
   })
+
+  it('maps closure_pending (activation during an open closure request, R-W1-3) to its fixed copy', async () => {
+    const { mapDbError } = await import('./supabase/supabaseCatalogService')
+    const r = mapDbError({ code: 'P0001', message: 'closure_pending' })
+    expect(r.ok === false && r.error).toEqual({
+      code: 'CONFLICT',
+      message: 'This business has an open closure request. Only the platform Owner can restore it or complete it.',
+      reason: 'closure_pending',
+    })
+  })
 })
 
 describe('logo cleanup', () => {

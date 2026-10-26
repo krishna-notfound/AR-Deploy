@@ -5,6 +5,7 @@ import { isValidDb } from './db'
 import { mockCatalogService as svc } from './mockCatalogService'
 import { createSeed } from './seed'
 import { DB_KEY, store } from './store'
+import { mockAccountService, resetMockAccount } from './mockAccount'
 
 function unwrap<T>(r: Result<T>): T {
   if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message} ${JSON.stringify(r.error.fieldErrors ?? {})}`)
@@ -283,5 +284,42 @@ describe('business applications and owner access (demo, ADR-0024)', () => {
     const second = await svc.provisionOwner({ businessId: 'biz_nord', email: 'Owner@Casa.test', language: 'en' })
     expect(second.ok === false && second.error.code).toBe('CONFLICT')
     expect(unwrap(await svc.getBusinessMembers('biz_nord'))).toEqual([])
+  })
+})
+
+describe('closure rules (S1.5 Task 3, as the database: R-W1-2, R-W1-3)', () => {
+  // The demo's one closure request names 'demo-business'; give it a business and an owner here.
+  beforeEach(() => {
+    resetMockAccount()
+    store.update((d) => {
+      const oak = d.businesses.find((b) => b.id === 'biz_oak')!
+      d.businesses.push({ ...oak, id: 'demo-business', slug: 'demo-closing', name: 'Demo closing business', status: 'inactive' })
+      ;(d.owners ??= {})['demo-business'] = { email: 'closing@demo.example', invitedAt: '2026-10-01T10:00:00.000Z', acceptedAt: '2026-10-02T10:00:00.000Z' }
+    })
+  })
+
+  it("setBusinessStatus(…, 'active') refuses with closure_pending while a request is open; draft is allowed", async () => {
+    const r = await svc.setBusinessStatus('demo-business', 'active')
+    expect(r.ok === false && r.error).toEqual({
+      code: 'CONFLICT',
+      message: 'This business has an open closure request. Only the platform Owner can restore it or complete it.',
+      reason: 'closure_pending',
+    })
+    expect(unwrap(await svc.setBusinessStatus('demo-business', 'draft')).status).toBe('draft')
+    // The edit form's status field too.
+    const viaForm = await svc.updateBusiness('demo-business', { status: 'active' })
+    expect(viaForm.ok === false && viaForm.error.reason).toBe('closure_pending')
+  })
+
+  it('removeBusinessMember voids the request (account_closure_voided), keeps the status, and activation works again', async () => {
+    unwrap(await svc.removeBusinessMember('demo-business', 'demo-owner-demo-business'))
+    expect(unwrap(await mockAccountService.listClosureRequests())).toEqual([])
+    const audit = store.get().audit ?? []
+    expect(audit.find((e) => e.eventType === 'account_closure_voided')).toMatchObject({
+      businessId: 'demo-business',
+      metadata: { subject_id: 'demo-closing-owner', business_id: 'demo-business', reason: 'owner_removed' },
+    })
+    expect(unwrap(await svc.getBusinessById('demo-business')).status).toBe('inactive')
+    expect(unwrap(await svc.setBusinessStatus('demo-business', 'active')).status).toBe('active')
   })
 })
