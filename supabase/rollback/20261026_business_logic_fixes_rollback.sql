@@ -21,6 +21,18 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 8 rollback: dashboard numbers and activity: product audit events, catalogue activity and owner reads (R-W5-5, R-W7-2)
+-- =============================================================================
+
+-- The product_* audit rows already written stay; nothing new is written once the trigger is gone.
+drop policy if exists "Business owners read platform changes to their business" on public.audit_events;
+drop policy if exists "Platform members read catalogue activity" on public.audit_events;
+drop trigger if exists products_audit on public.products;
+drop function if exists private.audit_product_change();
+
+-- ---- end S1.5 Task 8 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 10 rollback: invitation note, exact access history, 2FA reset only when set (R-W6-4, R-W6-5, R-W6-6, R-W6-9)
 -- =============================================================================
 

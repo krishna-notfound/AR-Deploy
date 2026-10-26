@@ -77,6 +77,19 @@ describe('BusinessDetailPage', () => {
     expect(within(await screen.findByRole('dialog')).getByText(new RegExp(`${n} product${n === 1 ? '' : 's'}\\.`))).toBeInTheDocument()
   })
 
+  it('the delete dialog and the Products tab use the exact count, not the length of a capped product read (R-W5-6)', async () => {
+    const user = userEvent.setup()
+    // A product read stops at 1000 rows; business_product_counts (behind getCatalog, as on the list) has 1200.
+    const catalog = await service.getCatalog('nordhaus')
+    if (!catalog.ok) throw new Error('seed catalogue missing')
+    vi.spyOn(service, 'getCatalog').mockResolvedValue(ok({ ...catalog.data, totalProductCount: 1200 }))
+    renderPage()
+    expect((await screen.findAllByText('Sheen Lounge Chair')).length).toBeGreaterThan(0)
+    expect(await screen.findByRole('tab', { name: /Products\s*1200/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(within(await screen.findByRole('dialog')).getByText(/1200 products\./)).toBeInTheDocument()
+  })
+
   it('scopes the products tab to one business: no Business column, no repeated name, short panel subtitle', async () => {
     renderPage()
     const table = await screen.findByRole('table')

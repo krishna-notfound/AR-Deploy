@@ -1,6 +1,6 @@
 // Mock implementation of CatalogService. Simulates latency, never throws, returns copies.
 // Demo persistence only (localStorage). NOT a backend.
-import type { ActivityItem, ActivityKind, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product, ReviewedApplication } from '@/domain/types'
+import type { AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product, ReviewedApplication } from '@/domain/types'
 import { createSessionModelAsset, imageToPersistableDataUrl } from '@/lib/files'
 import { localDayBounds } from '@/lib/format'
 import { newId } from '@/lib/id'
@@ -9,10 +9,10 @@ import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
 import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview } from '../applicationRules'
 import { CLOSURE_PENDING_ERROR, type CatalogService, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
-import { deviceTimeZone, summarize } from '../analytics'
+import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { mockClosureOpen, voidMockClosure } from './mockAccount'
-import { createMockTeam } from './mockTeam'
+import { createMockTeam, demoPlatformRole } from './mockTeam'
 import { createSeed } from './seed'
 import { store } from './store'
 import { normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
@@ -73,10 +73,28 @@ async function run<T>(fn: () => Result<T>, opts: { inject?: boolean } = {}): Pro
   }
 }
 
-function logActivity(db: Db, kind: ActivityKind, message: string, ids: { businessId?: ID; productId?: ID }): void {
-  const item: ActivityItem = { id: newId('act'), at: nowIso(), kind, message, ...ids }
-  db.activity.unshift(item)
-  if (db.activity.length > 200) db.activity.length = 200
+/** The demo actor of a change: the platform user, or no one for a business owner (there are no owner accounts in demo). */
+const demoActor = () => (demoPlatformRole() ? DEMO_ADMIN.id : undefined)
+
+/** The rows the Supabase audit triggers write for a product and a catalog status change (R-W5-5), mirrored here. */
+function auditProduct(db: Db, eventType: string, p: Product, extra: { fromStatus?: string; toStatus?: string; metadata?: Record<string, unknown> } = {}): void {
+  audit(db, { eventType, actorId: demoActor(), businessId: p.businessId, ...(extra.fromStatus ? { fromStatus: extra.fromStatus, toStatus: extra.toStatus } : {}), metadata: { product_id: p.id, name: p.name.en, ...extra.metadata } })
+}
+function auditCatalogStatus(db: Db, from: Business, to: Business): void {
+  if (from.status !== to.status) audit(db, { eventType: 'business_status_changed', actorId: demoActor(), businessId: to.id, fromStatus: from.status, toStatus: to.status })
+}
+
+/** What business owners read of their business's history (the R-W7-2 policy). */
+const OWNER_READS = new Set(['business_status_changed', 'business_slug_changed', 'product_created', 'product_published', 'product_unpublished', 'product_slug_changed', 'product_deleted', 'account_closure_voided'])
+
+/** Whether the demo viewer reads an activity row, as the audit_events policies decide in Supabase mode (R-W5-5). */
+function demoReadsActivity(db: Db, e: AuditEvent): boolean {
+  const role = demoPlatformRole()
+  if (!role) return OWNER_READS.has(e.eventType)
+  if (role === 'owner') return true
+  const perms: readonly string[] = db.team?.rolePermissions[role] ?? []
+  if (perms.includes('records.view')) return true
+  return e.eventType.startsWith('product_') ? perms.includes('products.view') : perms.includes('businesses.view')
 }
 
 function toCatalog(db: Db, b: Business): BusinessCatalog {
@@ -122,7 +140,6 @@ export const mockCatalogService: CatalogService = {
       const business: Business = { ...data, name: data.name.trim(), id: newId('biz'), createdAt: ts, updatedAt: ts }
       store.update((d) => {
         d.businesses.push(business)
-        logActivity(d, 'business_created', `Business “${business.name}” was created`, { businessId: business.id })
       })
       return ok(business)
     }),
@@ -139,7 +156,7 @@ export const mockCatalogService: CatalogService = {
       if (next.status === 'active' && current.status !== 'active' && mockClosureOpen(id)) return { ok: false, error: CLOSURE_PENDING_ERROR }
       store.update((d) => {
         d.businesses = d.businesses.map((b) => (b.id === id ? next : b))
-        logActivity(d, 'business_updated', `Business “${next.name}” was updated`, { businessId: id })
+        auditCatalogStatus(d, current, next)
       })
       return ok(next)
     }),
@@ -153,8 +170,7 @@ export const mockCatalogService: CatalogService = {
       const next: Business = { ...current, status, updatedAt: nowIso() }
       store.update((d) => {
         d.businesses = d.businesses.map((b) => (b.id === id ? next : b))
-        const label = status === 'active' ? 'activated' : status === 'inactive' ? 'deactivated' : 'set to draft'
-        logActivity(d, 'business_updated', `Catalog for “${next.name}” was ${label}`, { businessId: id })
+        auditCatalogStatus(d, current, next)
       })
       return ok(next)
     }),
@@ -164,12 +180,12 @@ export const mockCatalogService: CatalogService = {
       const current = store.get().businesses.find((b) => b.id === id)
       if (!current) return fail('NOT_FOUND', 'Business not found.')
       store.update((d) => {
-        const productIds = new Set(d.products.filter((p) => p.businessId === id).map((p) => p.id))
         d.businesses = d.businesses.filter((b) => b.id !== id)
         d.products = d.products.filter((p) => p.businessId !== id)
         d.dailyStats = d.dailyStats.filter((s) => s.businessId !== id)
         d.events = d.events.filter((e) => e.businessId !== id)
-        logActivity(d, 'business_deleted', `Business “${current.name}” and its ${productIds.size} products were deleted`, {})
+        // As the business trigger: one business_deleted row; the products deleted with it write none.
+        audit(d, { eventType: 'business_deleted', actorId: demoActor(), metadata: { business_id: id, name: current.name } })
       })
       return ok(undefined)
     }),
@@ -245,7 +261,7 @@ export const mockCatalogService: CatalogService = {
       }
       store.update((d) => {
         d.products.push(product)
-        logActivity(d, 'product_created', `Product “${product.name.en}” was added`, { businessId: product.businessId, productId: product.id })
+        auditProduct(d, 'product_created', product)
       })
       return ok(product)
     }),
@@ -268,7 +284,7 @@ export const mockCatalogService: CatalogService = {
       }
       store.update((d) => {
         d.products = d.products.map((p) => (p.id === id ? next : p))
-        logActivity(d, 'product_updated', `Product “${next.name.en}” was updated`, { businessId: next.businessId, productId: id })
+        if (next.slug !== current.slug) auditProduct(d, 'product_slug_changed', next, { metadata: { from: current.slug, to: next.slug } })
       })
       return ok(next)
     }),
@@ -296,7 +312,7 @@ export const mockCatalogService: CatalogService = {
       }
       store.update((d) => {
         d.products.push(copy)
-        logActivity(d, 'product_created', `Product “${src.name.en}” was duplicated`, { businessId: copy.businessId, productId: copy.id })
+        auditProduct(d, 'product_created', copy)
       })
       return ok(copy)
     }),
@@ -310,7 +326,7 @@ export const mockCatalogService: CatalogService = {
         // Its history stays in the business totals as "Deleted product" (R-W5-4).
         d.dailyStats = d.dailyStats.map((s) => (s.productId === id ? { ...s, productId: null } : s))
         d.events = d.events.map((e) => (e.productId === id ? { ...e, productId: null } : e))
-        logActivity(d, 'product_deleted', `Product “${current.name.en}” was deleted`, { businessId: current.businessId })
+        auditProduct(d, 'product_deleted', current)
       })
       return ok(undefined)
     }),
@@ -325,7 +341,7 @@ export const mockCatalogService: CatalogService = {
       const next: Product = { ...current, status: 'published', publishedAt: ts, updatedAt: ts }
       store.update((d) => {
         d.products = d.products.map((p) => (p.id === id ? next : p))
-        logActivity(d, 'product_published', `Product “${next.name.en}” was published`, { businessId: next.businessId, productId: id })
+        if (current.status !== 'published') auditProduct(d, 'product_published', next, { fromStatus: current.status, toStatus: 'published' })
       })
       return ok(next)
     }),
@@ -337,7 +353,7 @@ export const mockCatalogService: CatalogService = {
       const next: Product = { ...current, status: 'draft', updatedAt: nowIso() }
       store.update((d) => {
         d.products = d.products.map((p) => (p.id === id ? next : p))
-        logActivity(d, 'product_unpublished', `Product “${next.name.en}” was unpublished`, { businessId: next.businessId, productId: id })
+        if (current.status !== 'draft') auditProduct(d, 'product_unpublished', next, { fromStatus: current.status, toStatus: 'draft' })
       })
       return ok(next)
     }),
@@ -367,8 +383,9 @@ export const mockCatalogService: CatalogService = {
 
   getRecentActivity: (opts = {}) =>
     run(() => {
-      const items = store.get().activity.filter((a) => !opts.businessId || a.businessId === opts.businessId)
-      return ok(items.slice(0, opts.limit ?? 10))
+      const db = store.get()
+      const rows = (db.audit ?? []).filter((e) => (!opts.businessId || e.businessId === opts.businessId) && demoReadsActivity(db, e))
+      return ok(deriveActivity(rows, new Map(db.businesses.map((b) => [b.id, b.name]))).slice(0, opts.limit ?? 10))
     }),
 
   // ---------------- owners (demo: invitation state only; there are no real accounts in demo mode) ----------------
@@ -540,7 +557,6 @@ export const mockCatalogService: CatalogService = {
           }
           d.businesses.push(business)
           businessId = business.id
-          logActivity(d, 'business_created', `Business “${business.name}” was created from an approved application`, { businessId })
           audit(d, { eventType: 'business_created', actorId: DEMO_ADMIN.id, applicationId: id, businessId, metadata: { source: 'application' } })
         }
         const decided = t.status === 'approved' || t.status === 'rejected'

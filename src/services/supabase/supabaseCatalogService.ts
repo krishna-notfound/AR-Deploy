@@ -27,6 +27,7 @@ import type {
   ProductVariant,
   WeightUnit,
 } from '@/domain/types'
+import { ACTIVITY_KINDS } from '@/domain/types'
 import { localDayBounds } from '@/lib/format'
 import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
@@ -580,19 +581,24 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
   async function catalogs(slug?: string): Promise<Result<BusinessCatalog[]>> {
     let bq = sb.from('businesses').select('*').order('name')
     if (slug) bq = bq.eq('slug', slug)
-    const [b, p] = await Promise.all([bq.returns<BusinessRow[]>(), sb.from('products').select('business_id, status').returns<{ business_id: string; status: ProductStatus }[]>()])
+    // Exact counts, one row per business (R-W5-6): a plain products read stops at the API's 1000-row cap.
+    const [b, c] = await Promise.all([
+      bq.returns<BusinessRow[]>(),
+      sb.from('business_product_counts').select('business_id, total, published').returns<{ business_id: string; total: number; published: number }[]>(),
+    ])
     if (b.error) return mapDbError(b.error)
-    if (p.error) return mapDbError(p.error)
+    if (c.error) return mapDbError(c.error)
+    const counts = new Map(c.data.map((x) => [x.business_id, x]))
     return ok(
       b.data.map((row) => {
         const business = toBusiness(row)
-        const own = p.data.filter((x) => x.business_id === row.id)
+        const own = counts.get(row.id)
         return {
           business,
           catalogUrl: catalogPublicUrl(business),
           localPath: catalogLocalPath(business),
-          publishedProductCount: own.filter((x) => x.status === 'published').length,
-          totalProductCount: own.length,
+          publishedProductCount: Number(own?.published ?? 0),
+          totalProductCount: Number(own?.total ?? 0),
         }
       }),
     )
@@ -878,23 +884,21 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       }),
     getRecentActivity: (opts = {}) =>
       guard(async () => {
-        let bq = sb.from('businesses').select('id, name, created_at')
-        let pq = sb.from('products').select('id, business_id, name, created_at, published_at')
-        if (opts.businessId) {
-          bq = bq.eq('id', opts.businessId)
-          pq = pq.eq('business_id', opts.businessId)
+        // Audit events written by the database (R-W5-5); RLS decides which ones this person reads.
+        let q = sb.from('audit_events').select('*').in('event_type', [...ACTIVITY_KINDS]).order('created_at', { ascending: false })
+        if (opts.businessId) q = q.eq('business_id', opts.businessId)
+        const { data, error } = await q.limit(opts.limit ?? 10).returns<AuditRow[]>()
+        if (error) return mapDbError(error)
+        const events = (data ?? []).map(toAuditEvent)
+        // Catalog status rows carry the business id only: name the businesses from their rows.
+        const unnamed = [...new Set(events.filter((e) => e.eventType === 'business_status_changed' && e.businessId && !e.metadata.business_name).map((e) => e.businessId!))]
+        const names = new Map<ID, string>()
+        if (unnamed.length) {
+          const b = await sb.from('businesses').select('id, name').in('id', unnamed).returns<{ id: string; name: string }[]>()
+          if (b.error) return mapDbError(b.error)
+          for (const x of b.data ?? []) names.set(x.id, x.name)
         }
-        const [b, p] = await Promise.all([
-          bq.returns<{ id: string; name: string; created_at: string }[]>(),
-          pq.returns<{ id: string; business_id: string; name: LocalizedText; created_at: string; published_at: string | null }[]>(),
-        ])
-        const err = b.error ?? p.error
-        if (err) return mapDbError(err)
-        const items = deriveActivity(
-          (b.data ?? []).map((x) => ({ id: x.id, name: x.name, createdAt: x.created_at })),
-          (p.data ?? []).map((x) => ({ id: x.id, businessId: x.business_id, name: x.name, createdAt: x.created_at, publishedAt: x.published_at ?? undefined })),
-        )
-        return ok(items.slice(0, opts.limit ?? 10))
+        return ok(deriveActivity(events, names))
       }),
 
     // ---------------- business owners ----------------

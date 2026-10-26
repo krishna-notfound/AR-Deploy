@@ -7,12 +7,13 @@ import { PageHeader, PanelHeader, panelLinkClass } from '@/components/layout/Pag
 import { SampleDataTag } from '@/components/ui/Badge'
 import { ButtonLink } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
-import { StatGroup } from '@/components/ui/StatGroup'
+import { type Stat, StatGroup } from '@/components/ui/StatGroup'
 import { SkeletonRows, Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { formatNumber } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
+import { ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
 import { ActivityList } from '../shared/ActivityList'
 import { applicationsAdminPath } from '@/lib/urls'
@@ -26,8 +27,14 @@ export default function AdminOverviewPage() {
   const navigate = useNavigate()
   const prefs = usePreferences()
   const timeZone = prefs?.timezone
-  const summary = useServiceQuery(() => service.getAnalytics({ timeZone }), [timeZone])
-  const products = useServiceQuery(() => service.getProducts(), [])
+  // Each part needs its own permission (R-W5-1): the figures and Most viewed need analytics.view, the product counts
+  // products.view and the business counts businesses.view. The database filters the same way.
+  const canAnalytics = can('analytics.view')
+  const canProducts = can('products.view')
+  const canBusinesses = can('businesses.view')
+  const needsSummary = canAnalytics || canProducts || canBusinesses
+  const summary = useServiceQuery(() => (needsSummary ? service.getAnalytics({ timeZone }) : Promise.resolve(ok(null))), [timeZone, needsSummary])
+  const products = useServiceQuery(() => (canProducts ? service.getProducts() : Promise.resolve(ok(null))), [canProducts])
   const { list: businesses, map: bizMap, query: bizQuery } = useBusinesses()
   const activity = useServiceQuery(() => service.getRecentActivity({ limit: 6 }), [])
   const s = summary.data
@@ -36,6 +43,37 @@ export default function AdminOverviewPage() {
   const top = mostViewed(s?.byProduct ?? [], productMap)
   const activeBusinesses = businesses.filter((b) => b.status === 'active').length
   const withModel = products.data?.filter(hasArModel).length
+  const stats: Stat[] = [
+    ...(canBusinesses
+      ? [{ label: 'Businesses', value: formatNumber(s?.totals.businesses ?? 0), hint: bizQuery.data ? `${formatNumber(activeBusinesses)} active` : undefined }]
+      : []),
+    ...(canProducts
+      ? [
+          { label: 'Products', value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
+          { label: 'Published', value: formatNumber(s?.totals.published ?? 0), hint: s ? `of ${formatNumber(s.totals.products)} products` : undefined },
+          { label: 'Drafts', value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
+        ]
+      : []),
+    ...(canAnalytics
+      ? [
+          { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+          {
+            label: 'AR launch attempts',
+            value: formatNumber(s?.totals.arActivations ?? 0),
+            hint: s && s.totals.views + s.totals.embedViews ? `Last 30 days · ${formatArRate(s.totals.arActivations / (s.totals.views + s.totals.embedViews))}` : 'Last 30 days',
+          },
+        ]
+      : []),
+  ]
+
+  const recentActivity = (
+    <Card role="region" aria-label="Recent activity" className={canAnalytics ? 'lg:col-span-5' : 'lg:col-span-12'}>
+      <PanelHeader title="Recent activity" description="Businesses and products" />
+      <CardBody className="sm:px-6">
+        <ActivityList query={activity} />
+      </CardBody>
+    </Card>
+  )
 
   return (
     <>
@@ -67,7 +105,7 @@ export default function AdminOverviewPage() {
         }
       />
 
-      <PendingApplications />
+      {can('applications.view') && <PendingApplications />}
       <SetupProgressCard scope="admin" className="mb-6 block" />
 
       {summary.status === 'error' && !s ? (
@@ -76,74 +114,64 @@ export default function AdminOverviewPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          <StatGroup
-            loading={!s}
-            stats={[
-              { label: 'Businesses', value: formatNumber(s?.totals.businesses ?? 0), hint: bizQuery.data ? `${formatNumber(activeBusinesses)} active` : undefined },
-              { label: 'Products', value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
-              { label: 'Published', value: formatNumber(s?.totals.published ?? 0), hint: s ? `of ${formatNumber(s.totals.products)} products` : undefined },
-              { label: 'Drafts', value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
-              { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
-              {
-                label: 'AR launch attempts',
-                value: formatNumber(s?.totals.arActivations ?? 0),
-                hint: s && s.totals.views + s.totals.embedViews ? `Last 30 days · ${formatArRate(s.totals.arActivations / (s.totals.views + s.totals.embedViews))}` : 'Last 30 days',
-              },
-            ]}
-            footer={
-              s?.isSample ? (
-                <span className="flex flex-wrap items-center gap-2">
-                  <SampleDataTag /> Views and AR figures are seeded sample data plus visits made in this demo, not live production analytics.
-                </span>
-              ) : undefined
-            }
-          />
-
-          <Card>
-            <PanelHeader
-              title="Views and AR launch attempts"
-              description="Page and embed views, all businesses, last 30 days"
-              actions={
-                <Link to="/admin/analytics" className={panelLinkClass}>
-                  Open analytics <ArrowRight className="size-3.5" aria-hidden />
-                </Link>
+          {stats.length > 0 && (
+            <StatGroup
+              loading={!s}
+              stats={stats}
+              footer={
+                canAnalytics && s?.isSample ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <SampleDataTag /> Views and AR figures are seeded sample data plus visits made in this demo, not live production analytics.
+                  </span>
+                ) : undefined
               }
             />
-            <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact prefs={prefs} emptyBody="Views and AR opens will appear here once people visit published catalogs." /> : <Skeleton className="h-32 w-full" />}</CardBody>
-          </Card>
+          )}
 
-          {/* Grid items default to min-width: auto, so a long product name would widen the card past a phone screen. */}
-          <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
-            <Card className="lg:col-span-7">
+          {canAnalytics ? (
+            <Card>
               <PanelHeader
-                title="Most viewed products"
-                description="Page and embed views, last 30 days"
+                title="Views and AR launch attempts"
+                description="Page and embed views, all businesses, last 30 days"
                 actions={
                   <Link to="/admin/analytics" className={panelLinkClass}>
-                    Full ranking <ArrowRight className="size-3.5" aria-hidden />
+                    Open analytics <ArrowRight className="size-3.5" aria-hidden />
                   </Link>
                 }
               />
-              <CardBody className="sm:px-6">
-                {products.status === 'error' && !products.data ? (
-                  <ErrorState message={products.error.message} onRetry={products.refetch} />
-                ) : !s || products.status === 'loading' ? (
-                  <SkeletonRows rows={4} />
-                ) : top.length === 0 ? (
-                  <EmptyState title="No product activity yet" />
-                ) : (
-                  <MostViewedList rows={top} products={productMap} businesses={bizMap} editBase="/admin/products" />
-                )}
-              </CardBody>
+              <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact prefs={prefs} emptyBody="Views and AR opens will appear here once people visit published catalogs." /> : <Skeleton className="h-32 w-full" />}</CardBody>
             </Card>
+          ) : (
+            <p className="rounded-[var(--radius-card)] border border-line px-4 py-4 text-[length:var(--text-ui-body)] text-ink-muted sm:px-6">You don't have access to analytics.</p>
+          )}
 
-            <Card className="lg:col-span-5">
-              <PanelHeader title="Recent activity" description="Businesses and products" />
-              <CardBody className="sm:px-6">
-                <ActivityList query={activity} />
-              </CardBody>
-            </Card>
-
+          {/* Grid items default to min-width: auto, so a long product name would widen the card past a phone screen. */}
+          <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+            {canAnalytics && (
+              <Card className="lg:col-span-7">
+                <PanelHeader
+                  title="Most viewed products"
+                  description="Page and embed views, last 30 days"
+                  actions={
+                    <Link to="/admin/analytics" className={panelLinkClass}>
+                      Full ranking <ArrowRight className="size-3.5" aria-hidden />
+                    </Link>
+                  }
+                />
+                <CardBody className="sm:px-6">
+                  {products.status === 'error' && !products.data ? (
+                    <ErrorState message={products.error.message} onRetry={products.refetch} />
+                  ) : !s || products.status === 'loading' ? (
+                    <SkeletonRows rows={4} />
+                  ) : top.length === 0 ? (
+                    <EmptyState title="No product activity yet" />
+                  ) : (
+                    <MostViewedList rows={top} products={productMap} businesses={bizMap} editBase={can('products.edit') ? '/admin/products' : undefined} />
+                  )}
+                </CardBody>
+              </Card>
+            )}
+            {recentActivity}
           </div>
         </div>
       )}

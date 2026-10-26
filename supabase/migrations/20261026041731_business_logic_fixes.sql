@@ -1006,3 +1006,77 @@ begin
 end;
 $$;
 -- ---- end S1.5 Task 10 ----
+
+-- =============================================================================
+-- S1.5 Task 8: dashboard numbers and activity: product audit events, catalogue activity and owner reads (R-W5-5, R-W7-2)
+-- =============================================================================
+
+-- R-W5-5: the Overviews' Recent activity reads audit events instead of guessing from timestamps. Every product
+-- insert, publish, unpublish, address change and delete writes one row with the product's (English) name, so a
+-- deleted product still reads by name. A product deleted by its business's delete (the cascade) writes nothing:
+-- by then the business row is gone, and business_deleted already records it.
+create function private.audit_product_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_type text;
+  v_row public.products;
+begin
+  if tg_op = 'INSERT' then
+    v_type := 'product_created';
+    v_row := new;
+  elsif tg_op = 'DELETE' then
+    if not exists (select 1 from public.businesses b where b.id = old.business_id) then
+      return null;
+    end if;
+    v_type := 'product_deleted';
+    v_row := old;
+  else
+    if new.status is distinct from old.status then
+      v_type := case when new.status = 'published' then 'product_published' else 'product_unpublished' end;
+      insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status, metadata)
+      values (v_type, auth.uid(), new.business_id, old.status, new.status,
+              jsonb_build_object('product_id', new.id, 'name', left(coalesce(new.name ->> 'en', ''), 200)));
+    end if;
+    if new.slug is distinct from old.slug then
+      insert into public.audit_events (event_type, actor_id, business_id, metadata)
+      values ('product_slug_changed', auth.uid(), new.business_id,
+              jsonb_build_object('product_id', new.id, 'name', left(coalesce(new.name ->> 'en', ''), 200),
+                                 'from', old.slug, 'to', new.slug));
+    end if;
+    return null;
+  end if;
+  insert into public.audit_events (event_type, actor_id, business_id, metadata)
+  values (v_type, auth.uid(), v_row.business_id,
+          jsonb_build_object('product_id', v_row.id, 'name', left(coalesce(v_row.name ->> 'en', ''), 200)));
+  return null;
+end;
+$$;
+revoke all on function private.audit_product_change() from public, anon, authenticated;
+
+create trigger products_audit
+  after insert or update of status, slug or delete on public.products
+  for each row execute function private.audit_product_change();
+
+-- R-W5-5: staff read the catalogue activity their permissions cover, without records.view: product events need
+-- products.view, business lifecycle events need businesses.view. Additive (ORed with the other read policies);
+-- platform_can carries the staff 2FA gate.
+create policy "Platform members read catalogue activity" on public.audit_events
+  for select to authenticated
+  using ((event_type like 'product\_%' and (select public.platform_can('products.view')))
+         or (event_type in ('business_created', 'business_status_changed', 'business_deleted')
+             and (select public.platform_can('businesses.view'))));
+
+-- R-W7-2: a business owner reads what happened to their own business's catalogue, the platform team's changes
+-- included. is_business_member carries the business 2FA gate.
+create policy "Business owners read platform changes to their business" on public.audit_events
+  for select to authenticated
+  using (event_type in ('business_status_changed', 'business_slug_changed', 'product_created', 'product_published',
+                        'product_unpublished', 'product_slug_changed', 'product_deleted', 'account_closure_voided')
+         and business_id is not null
+         and public.is_business_member(business_id));
+
+-- ---- end S1.5 Task 8 ----

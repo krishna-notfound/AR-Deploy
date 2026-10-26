@@ -503,7 +503,12 @@ describe('applications, review, one owner, audit (20261020091428_applications_an
     await expect(asService((tx) => tx.query('delete from public.audit_events'))).rejects.toThrow(/permission denied/)
     await expect(as(ADMIN, (tx) => tx.query(`insert into public.audit_events (event_type) values ('forged_event')`))).rejects.toThrow(/permission denied/)
     expect((await as(ADMIN, (tx) => tx.query('select 1 from public.audit_events'))).rows.length).toBeGreaterThan(0)
-    expect((await as(OWNER, (tx) => tx.query('select 1 from public.audit_events'))).rows).toHaveLength(0)
+    // S1.5 R-W7-2: a business owner also reads their own business's catalogue changes, and nothing else.
+    expect((await as(OWNER, (tx) => tx.query(
+      `select 1 from public.audit_events
+        where business_id is distinct from $1
+           or event_type not in ('business_status_changed', 'business_slug_changed', 'product_created', 'product_published',
+                                 'product_unpublished', 'product_slug_changed', 'product_deleted', 'account_closure_voided')`, [BIZ]))).rows).toHaveLength(0)
   })
 
   it('records who changed a catalogue status', async () => {

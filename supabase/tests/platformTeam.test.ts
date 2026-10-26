@@ -264,7 +264,9 @@ describe('permission matrix (Task 2)', () => {
     expect(await count(TEAM_U, 'select count(*)::int as n from public.email_log')).toBe(0)
     expect(await count(ADMIN_U, ACCESS_EVENTS)).toBeGreaterThan(0)
     expect(await count(ADMIN_U, OTHER_EVENTS)).toBeGreaterThan(0)
-    expect(await count(TEAM_U, 'select count(*)::int as n from public.audit_events')).toBe(0)
+    // S1.5 R-W5-5: without records.view, Team reads only the catalogue activity its permissions cover.
+    expect(await count(TEAM_U, `select count(*)::int as n from public.audit_events
+      where event_type not like 'product\\_%' and event_type not in ('business_created', 'business_status_changed', 'business_deleted')`)).toBe(0)
     await db.exec(`delete from public.platform_role_permissions where role = 'admin' and permission = 'access.view'`)
     try {
       expect(await count(ADMIN_U, ACCESS_EVENTS)).toBe(0)

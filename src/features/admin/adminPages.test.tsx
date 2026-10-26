@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
+import type { Permission } from '@/domain/types'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { DashboardContext } from '@/components/layout/dashboardContext'
 import { Monogram } from '../applications/Monogram'
@@ -309,5 +310,118 @@ describe('BusinessesListPage: an open closure is visible and blocks activation (
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(screen.queryByText(/Could not load the closure requests/)).toBeNull())
     expect(await menuItemsFor(user, 'Oak & Ember Studio')).toContain('Activate catalog')
+  })
+})
+
+describe('AdminOverviewPage: Recent activity from audit events (R-W5-5)', () => {
+  const feed = () => screen.getByRole('region', { name: 'Recent activity' })
+
+  it("unpublishing shows '{name} was unpublished'; a draft is never 'was published'; a paused catalog and a deleted product appear", async () => {
+    const all = await service.getProducts()
+    if (!all.ok) throw new Error('seed products missing')
+    const [live, gone] = all.data.filter((p) => p.status === 'published')
+    const draft = all.data.find((p) => p.status === 'draft')!
+    expect(await service.unpublishProduct(live!.id)).toMatchObject({ ok: true })
+    expect(await service.setBusinessStatus('biz_casa', 'inactive')).toMatchObject({ ok: true })
+    expect(await service.deleteProduct(gone!.id)).toMatchObject({ ok: true })
+    renderAt('/admin', <AdminOverviewPage />)
+    expect(await within(feed()).findByText(`${live!.name.en} was unpublished`)).toBeInTheDocument()
+    expect(within(feed()).getByText('Catalog for Casa Lisboa Interiors was paused')).toBeInTheDocument()
+    expect(within(feed()).getByText(`${gone!.name.en} was deleted`)).toBeInTheDocument()
+    // Newest first: the delete, the pause, the unpublish.
+    expect(within(feed()).getAllByRole('listitem').slice(0, 3).map((li) => li.querySelector('p')?.textContent)).toEqual([
+      `${gone!.name.en} was deleted`,
+      'Catalog for Casa Lisboa Interiors was paused',
+      `${live!.name.en} was unpublished`,
+    ])
+    // A product that was never published never reads "was published", anywhere in its history.
+    const history = await service.getRecentActivity({ limit: 500 })
+    if (!history.ok) throw new Error(history.error.message)
+    expect(history.data.map((a) => a.message)).toContain(`${draft.name.en} was added`)
+    expect(history.data.map((a) => a.message)).not.toContain(`${draft.name.en} was published`)
+  })
+
+  it('shows loading, then the empty state', async () => {
+    let resolve!: (v: Awaited<ReturnType<typeof service.getRecentActivity>>) => void
+    vi.spyOn(service, 'getRecentActivity').mockReturnValue(new Promise((r) => (resolve = r)))
+    renderAt('/admin', <AdminOverviewPage />)
+    expect(await within(await screen.findByRole('region', { name: 'Recent activity' })).findByRole('status', { name: 'Loading' })).toBeInTheDocument()
+    resolve(ok([]))
+    expect(await within(feed()).findByText('No activity yet')).toBeInTheDocument()
+  })
+
+  it('shows an error with retry', async () => {
+    const spy = vi.spyOn(service, 'getRecentActivity').mockResolvedValue(fail('UNKNOWN', 'Could not load the activity.'))
+    const user = userEvent.setup()
+    renderAt('/admin', <AdminOverviewPage />)
+    expect(await within(await screen.findByRole('region', { name: 'Recent activity' })).findByText('Could not load the activity.')).toBeInTheDocument()
+    spy.mockResolvedValue(ok([{ id: 'a1', at: new Date().toISOString(), kind: 'product_created', message: 'Oslo sofa was added' }]))
+    await user.click(within(feed()).getByRole('button', { name: 'Try again' }))
+    expect(await within(feed()).findByText('Oslo sofa was added')).toBeInTheDocument()
+  })
+})
+
+describe('AdminOverviewPage follows permissions (R-W5-1)', () => {
+  /** The Overview for a Team member whose role holds exactly `permissions`; resolves once the page has loaded. */
+  async function overviewAs(permissions: Permission[]) {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    vi.spyOn(service, 'getMyAccess').mockResolvedValue(ok({ role: 'team', permissions, status: 'active' }))
+    const view = renderAt('/admin', <AdminOverviewPage />)
+    await screen.findByRole('region', { name: 'Recent activity' })
+    return view
+  }
+  const figures = () => within(screen.getByRole('region', { name: 'Key figures' }))
+
+  it("without analytics.view: 'You don't have access to analytics.'", async () => {
+    await overviewAs(['products.view', 'businesses.view'])
+    expect(await screen.findByText("You don't have access to analytics.")).toBeInTheDocument()
+    await waitFor(() => expect(figures().getByText('Drafts')).toBeInTheDocument())
+    expect(figures().queryByText('Product page views')).toBeNull()
+    expect(figures().queryByText('AR launch attempts')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Views and AR launch attempts' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Most viewed products' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /Open analytics|Full ranking/ })).toBeNull()
+  })
+
+  it('product counts need products.view, business counts need businesses.view', async () => {
+    const first = await overviewAs(['analytics.view', 'products.view'])
+    await waitFor(() => expect(figures().getByText('Products')).toBeInTheDocument())
+    expect(figures().getByText('Published')).toBeInTheDocument()
+    expect(figures().getByText('Drafts')).toBeInTheDocument()
+    expect(figures().queryByText('Businesses')).toBeNull()
+    expect(screen.queryByText("You don't have access to analytics.")).toBeNull()
+    first.unmount()
+
+    await overviewAs(['analytics.view', 'businesses.view'])
+    await waitFor(() => expect(figures().getByText('Businesses')).toBeInTheDocument())
+    expect(figures().queryByText('Products')).toBeNull()
+    expect(figures().queryByText('Published')).toBeNull()
+    expect(figures().queryByText('Drafts')).toBeNull()
+    expect(figures().getByText('Product page views')).toBeInTheDocument()
+  })
+
+  it("Team without applications.view never sees 'No applications awaiting review'", async () => {
+    const apps = vi.spyOn(service, 'getApplications')
+    await overviewAs(['analytics.view', 'products.view', 'businesses.view'])
+    await screen.findByRole('heading', { name: 'Most viewed products' })
+    expect(screen.queryByText('No applications awaiting review')).toBeNull()
+    expect(screen.queryByRole('link', { name: /applications/i })).toBeNull()
+    expect(apps).not.toHaveBeenCalled()
+  })
+
+  it('Most viewed rows link to edit only with products.edit', async () => {
+    const first = await overviewAs(['analytics.view', 'products.view'])
+    const list = async () => {
+      const card = (await screen.findByRole('heading', { name: 'Most viewed products' })).closest('.shadow-\\[var\\(--shadow-card\\)\\]') as HTMLElement
+      await waitFor(() => expect(within(card).getAllByRole('listitem').length).toBeGreaterThan(0))
+      return card
+    }
+    expect(within(await list()).queryAllByRole('link').filter((a) => /\/edit$/.test(a.getAttribute('href') ?? ''))).toHaveLength(0)
+    first.unmount()
+
+    await overviewAs(['analytics.view', 'products.view', 'products.edit'])
+    const card = await list()
+    const rows = within(card).getAllByRole('listitem')
+    for (const li of rows) expect(within(li).getByRole('link')).toHaveAttribute('href', expect.stringMatching(/^\/admin\/products\/[^/]+\/edit$/))
   })
 })

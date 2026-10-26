@@ -10,7 +10,7 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { StatGroup } from '@/components/ui/StatGroup'
 import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
-import type { Business, Product } from '@/domain/types'
+import type { Business, BusinessStatus, Product } from '@/domain/types'
 import { formatDate, formatNumber } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { myProductsPath } from '@/lib/urls'
@@ -22,6 +22,9 @@ import { ActivityList } from '../shared/ActivityList'
 import { MostViewedList, formatArRate, mostViewed } from '../analytics/MostViewedList'
 import { hasArModel, productArReadiness } from '../products/productReadiness'
 
+/** Where published products are, by the catalog's status (R-W5-8). */
+const PUBLISHED_HINT: Record<BusinessStatus, string> = { active: 'In your catalog', draft: 'Catalog not public yet', inactive: 'Catalog paused' }
+
 export default function BusinessOverviewPage() {
   const business = useCurrentBusiness()
   const prefs = usePreferences()
@@ -30,7 +33,6 @@ export default function BusinessOverviewPage() {
   const products = useServiceQuery(() => service.getProductsByBusiness(business.id), [business.id])
   const activity = useServiceQuery(() => service.getRecentActivity({ businessId: business.id, limit: 6 }), [business.id])
   const s = summary.data
-  const isPublic = business.status === 'active'
   const nothingPublished = !!products.data && !products.data.some((p) => p.status === 'published')
   const productMap = new Map((products.data ?? []).map((p) => [p.id, p]))
   const top = mostViewed(s?.byProduct ?? [], productMap)
@@ -62,7 +64,7 @@ export default function BusinessOverviewPage() {
             loading={!s}
             stats={[
               { label: 'Products', value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
-              { label: 'Published', value: formatNumber(s?.totals.published ?? 0), hint: isPublic ? 'In your catalog' : 'Catalog not public yet' },
+              { label: 'Published', value: formatNumber(s?.totals.published ?? 0), hint: PUBLISHED_HINT[business.status] },
               { label: 'Drafts', value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
               { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
               {
@@ -117,7 +119,7 @@ export default function BusinessOverviewPage() {
                 )}
               </CardBody>
             </Card>
-            <Card className="lg:col-span-5">
+            <Card role="region" aria-label="Recent activity" className="lg:col-span-5">
               <PanelHeader title="Recent activity" />
               <CardBody>
                 <ActivityList query={activity} />

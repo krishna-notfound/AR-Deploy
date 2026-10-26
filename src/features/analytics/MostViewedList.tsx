@@ -23,6 +23,8 @@ export function mostViewed(rows: ProductAnalytics[], products: Map<string, Produ
   return rows.filter((r) => products.has(r.productId) && allViews(r) > 0).slice(0, limit)
 }
 
+const NAME_CLASS = 'block truncate text-ui-body font-medium text-ink max-sm:whitespace-normal max-sm:[overflow-wrap:anywhere]'
+
 /**
  * Ranked list of the most viewed products (index, thumbnail, name, views and AR launch attempts). Shared by both
  * overviews and the analytics page; rows must already be sorted by views and limited by the caller (`mostViewed`).
@@ -38,7 +40,8 @@ export function MostViewedList({
   products: Map<string, Product>
   /** Pass to show the business name under each product (platform-wide lists). */
   businesses?: Map<string, Business>
-  editBase: string
+  /** Where the name links to edit the product; without it the name is plain text (no products.edit, R-W5-1). */
+  editBase?: string
 }) {
   return (
     <ol className="divide-y divide-line">
@@ -57,9 +60,13 @@ export function MostViewedList({
               </span>
               <SmartImage src={primaryImage(p)?.url} alt="" className="size-11 shrink-0 border border-line" />
               <div className="min-w-0">
-                <Link to={`${editBase}/${p.id}/edit`} className="block truncate text-ui-body font-medium text-ink hover:underline max-sm:whitespace-normal max-sm:[overflow-wrap:anywhere]">
-                  {p.name.en}
-                </Link>
+                {editBase ? (
+                  <Link to={`${editBase}/${p.id}/edit`} className={`${NAME_CLASS} hover:underline`}>
+                    {p.name.en}
+                  </Link>
+                ) : (
+                  <p className={NAME_CLASS}>{p.name.en}</p>
+                )}
                 <p className="flex min-w-0 text-ui-small text-ink-muted" title={[businessName, price].filter(Boolean).join(' · ')}>
                   {businessName && <span className="truncate">{businessName}</span>}
                   {businessName && price && (

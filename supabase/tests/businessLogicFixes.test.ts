@@ -1310,3 +1310,112 @@ describe('S1.5 Task 10: invitation note, exact access history, 2FA reset only wh
     }
   }, 120_000)
 })
+
+describe('S1.5 Task 8: catalogue activity from audit events', () => {
+  GONE_AFTER_ROLLBACK.push('private.audit_product_change()')
+  const id = ids(8)
+  const TEAM = id(2)
+  const OWNER_A = id(3) // business owner of A
+  const OWNER_B = id(4)
+  const BIZ_A = id(10)
+  const BIZ_B = id(11)
+  const BIZ_GONE = id(12) // deleted with its products
+  const P_LIFE = id(20) // insert → publish → unpublish → slug → delete
+  const P_GONE = id(21) // in BIZ_GONE
+  const P_B = id(22) // in BIZ_B
+
+  const product = (pid: string, biz: string, slug: string, name: string) =>
+    `insert into public.products (id, business_id, slug, name, category, price, currency, status, width, height, depth, dimension_unit)
+       values ('${pid}', '${biz}', '${slug}', '{"en":"${name}","pt":"PT ${name}"}', 'sofa', 1000, 'EUR', 'draft', 10, 10, 10, 'cm');`
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ('${TEAM}', 't8-team@test', now()), ('${OWNER_A}', 't8-a@test', now()), ('${OWNER_B}', 't8-b@test', now());
+      insert into public.platform_members (user_id, email, role, status) values ('${TEAM}', 't8-team@test', 'team', 'active');
+      insert into public.businesses (id, name, slug, status) values
+        ('${BIZ_A}', 'T8 A', 't8-a', 'active'), ('${BIZ_B}', 'T8 B', 't8-b', 'active'), ('${BIZ_GONE}', 'T8 Gone', 't8-gone', 'active');
+      insert into public.business_members (business_id, user_id) values ('${BIZ_A}', '${OWNER_A}'), ('${BIZ_B}', '${OWNER_B}');
+      ${product(P_GONE, BIZ_GONE, 'gone', 'T8 Gone sofa')}
+      ${product(P_B, BIZ_B, 'b', 'T8 B sofa')}
+    `)
+  })
+
+  type Row = { event_type: string; business_id: string | null; name: string | null; from: string | null; to: string | null }
+  /** Audit rows for one product id (as the database owner), oldest first. */
+  const productEvents = async (pid: string) =>
+    (await db.query<Row>(
+      `select event_type, business_id, metadata->>'name' as name, metadata->>'from' as from, metadata->>'to' as to
+         from public.audit_events where metadata->>'product_id' = $1 order by created_at, id`, [pid])).rows
+
+  it('insert, publish, unpublish, slug change and delete each write one event with name and business_id', async () => {
+    await db.exec(product(P_LIFE, BIZ_A, 'life', 'T8 Life sofa'))
+    expect((await productEvents(P_LIFE)).map((r) => r.event_type)).toEqual(['product_created'])
+    // The deferred publish check needs a gallery image by the time the publish commits.
+    await db.exec(`
+      begin;
+      insert into public.product_images (product_id, url, kind, is_primary) values ('${P_LIFE}', 'https://example.test/t8.jpg', 'gallery', true);
+      update public.products set status = 'published' where id = '${P_LIFE}';
+      commit;`)
+    // An edit that changes neither the status nor the address writes nothing.
+    await db.exec(`update public.products set price = 1200 where id = '${P_LIFE}'`)
+    await db.exec(`update public.products set status = 'draft' where id = '${P_LIFE}'`)
+    await db.exec(`update public.products set slug = 'life-2' where id = '${P_LIFE}'`)
+    await db.exec(`delete from public.products where id = '${P_LIFE}'`)
+    const rows = await productEvents(P_LIFE)
+    expect(rows.map((r) => r.event_type)).toEqual(['product_created', 'product_published', 'product_unpublished', 'product_slug_changed', 'product_deleted'])
+    for (const r of rows) expect(r).toMatchObject({ business_id: BIZ_A, name: 'T8 Life sofa' })
+    expect(rows[3]).toMatchObject({ from: 'life', to: 'life-2' })
+  })
+
+  it('a business delete writes no product_deleted rows', async () => {
+    await db.exec(`delete from public.businesses where id = '${BIZ_GONE}'`)
+    expect((await productEvents(P_GONE)).map((r) => r.event_type)).toEqual(['product_created'])
+    // The business delete itself is still recorded.
+    expect((await db.query(`select 1 from public.audit_events where event_type = 'business_deleted' and metadata->>'business_id' = $1`, [BIZ_GONE])).rows).toHaveLength(1)
+  })
+
+  it('staff read product_% only with products.view, and business_% only with businesses.view', async () => {
+    await db.exec(`update public.businesses set status = 'inactive' where id = '${BIZ_B}'; update public.businesses set status = 'active' where id = '${BIZ_B}';`)
+    const seen = async () =>
+      (await h.probe(TEAM, `select distinct event_type from public.audit_events where business_id = $1 order by 1`, [BIZ_B])).rows.map(
+        (r) => (r as { event_type: string }).event_type)
+    await withRolePermissions({ team: ['products.view'] }, async () => {
+      expect(await seen()).toEqual(['product_created'])
+    })
+    await withRolePermissions({ team: ['businesses.view'] }, async () => {
+      expect(await seen()).toEqual(['business_status_changed'])
+    })
+    await withRolePermissions({ team: ['analytics.view'] }, async () => {
+      expect(await seen()).toEqual([])
+    })
+    // Behind the staff 2FA gate, like every staff read.
+    await withRolePermissions({ team: ['products.view', 'businesses.view'] }, async () => {
+      expect(await seen()).toEqual(['business_status_changed', 'product_created'])
+      await h.withPolicy(true, false, async () => {
+        expect(await seen()).toEqual([])
+      })
+    })
+  })
+
+  it("an owner reads only their business's whitelisted events", async () => {
+    const WHITELIST = ['business_status_changed', 'business_slug_changed', 'product_created', 'product_published', 'product_unpublished',
+      'product_slug_changed', 'product_deleted', 'account_closure_voided']
+    // One row of every whitelisted type and two that are not, for A and for B.
+    for (const biz of [BIZ_A, BIZ_B])
+      for (const t of [...WHITELIST, 'business_created', 'owner_provisioned'])
+        await db.query(`insert into public.audit_events (event_type, business_id, metadata) values ($1, $2, '{"t8":true}')`, [t, biz])
+    const read = async (uid: string) =>
+      (await h.probe(uid, `select business_id, event_type from public.audit_events where metadata->>'t8' = 'true' order by 2`)).rows as { business_id: string; event_type: string }[]
+    const a = await read(OWNER_A)
+    expect(a.every((r) => r.business_id === BIZ_A)).toBe(true)
+    expect(a.map((r) => r.event_type)).toEqual([...WHITELIST].sort())
+    const b = await read(OWNER_B)
+    expect(b.every((r) => r.business_id === BIZ_B)).toBe(true)
+    expect(b).toHaveLength(WHITELIST.length)
+    // Behind the business 2FA gate.
+    await h.withPolicy(false, true, async () => {
+      expect(await read(OWNER_A)).toEqual([])
+    })
+  })
+})

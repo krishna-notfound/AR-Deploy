@@ -1,5 +1,5 @@
 // Shared by the mock and Supabase services: turns daily aggregates + raw events into an AnalyticsSummary.
-import type { ActivityItem, AnalyticsEvent, AnalyticsSummary, Business, DailyPoint, ID, Product, ProductAnalytics } from '@/domain/types'
+import { ACTIVITY_KINDS, type ActivityItem, type ActivityKind, type AnalyticsEvent, type AnalyticsSummary, type AuditEvent, type Business, type DailyPoint, type ID, type Product, type ProductAnalytics } from '@/domain/types'
 
 const DAYS = 30
 
@@ -179,20 +179,49 @@ export function summarize(db: AnalyticsInput, businessId?: ID, now: Date = new D
   }
 }
 
-/** Activity derived from record timestamps (used to seed the demo and by the Supabase service, which keeps no activity log). */
-export function deriveActivity(
-  businesses: Pick<Business, 'id' | 'name' | 'createdAt'>[],
-  products: Pick<Product, 'id' | 'businessId' | 'name' | 'createdAt' | 'publishedAt'>[],
-): ActivityItem[] {
+/** "Catalog for {business} …" by the status the catalog moved to. */
+const CATALOG_STATUS_SENTENCE: Record<string, string> = { active: 'was activated', inactive: 'was paused', draft: 'was set to draft' }
+
+const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+
+/** One Recent activity sentence for an audit event, or null for a type the feed does not show. */
+export function activityMessage(e: Pick<AuditEvent, 'eventType' | 'businessId' | 'toStatus' | 'metadata'>, businessName?: string): string | null {
+  const product = text(e.metadata.name) ?? 'A product'
+  const business = text(e.metadata.business_name) ?? businessName ?? (e.eventType === 'business_deleted' ? text(e.metadata.name) : undefined)
+  switch (e.eventType) {
+    case 'product_created':
+      return `${product} was added`
+    case 'product_published':
+      return `${product} was published`
+    case 'product_unpublished':
+      return `${product} was unpublished`
+    case 'product_slug_changed':
+      return text(e.metadata.to) ? `${product} has a new address: /${text(e.metadata.to)}` : `${product} has a new address`
+    case 'product_deleted':
+      return `${product} was deleted`
+    case 'business_status_changed':
+      return `Catalog for ${business ?? 'a business'} ${CATALOG_STATUS_SENTENCE[e.toStatus ?? ''] ?? 'changed status'}`
+    case 'business_created':
+      return `${business ?? 'A business'} was created`
+    case 'business_deleted':
+      return `${business ?? 'A business'} was deleted`
+    default:
+      return null
+  }
+}
+
+/**
+ * Recent activity from audit events (R-W5-5), newest first: product events and catalog status changes, as written
+ * by the database triggers (Supabase) or the demo service. `businessNames` names businesses the rows don't.
+ */
+export function deriveActivity(events: AuditEvent[], businessNames: ReadonlyMap<ID, string> = new Map()): ActivityItem[] {
   const items: ActivityItem[] = []
-  let n = 0
-  for (const b of businesses) {
-    items.push({ id: `act_${++n}`, at: b.createdAt, kind: 'business_created', businessId: b.id, message: `Business “${b.name}” was created` })
+  for (const e of events) {
+    if (!(ACTIVITY_KINDS as readonly string[]).includes(e.eventType)) continue
+    const message = activityMessage(e, e.businessId ? businessNames.get(e.businessId) : undefined)
+    if (!message) continue
+    const productId = e.eventType !== 'product_deleted' ? text(e.metadata.product_id) : undefined
+    items.push({ id: e.id, at: e.createdAt, kind: e.eventType as ActivityKind, message, ...(e.businessId ? { businessId: e.businessId } : {}), ...(productId ? { productId } : {}) })
   }
-  for (const p of products) {
-    items.push({ id: `act_${++n}`, at: p.createdAt, kind: 'product_created', businessId: p.businessId, productId: p.id, message: `Product “${p.name.en}” was added` })
-    if (p.publishedAt)
-      items.push({ id: `act_${++n}`, at: p.publishedAt, kind: 'product_published', businessId: p.businessId, productId: p.id, message: `Product “${p.name.en}” was published` })
-  }
-  return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60)
+  return items.sort((a, b) => b.at.localeCompare(a.at))
 }
