@@ -864,6 +864,7 @@ export type Database = {
       admin_list_member_invites: { Args: { p_member: string }; Returns: Json }
       admin_list_members: { Args: never; Returns: Json }
       admin_reactivate_member: { Args: { p_member: string }; Returns: Json }
+      admin_remove_member: { Args: { p_member: string }; Returns: Json }
       admin_review_application: {
         Args: { p_action: string; p_application_id: string; p_reason?: string }
         Returns: {

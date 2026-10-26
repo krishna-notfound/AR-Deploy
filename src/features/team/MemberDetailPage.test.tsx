@@ -89,6 +89,41 @@ describe('Member detail (ADR-0029)', () => {
     expect(within(dialog).getByText(/loses access immediately and is signed out on every device/)).toBeInTheDocument()
   })
 
+  it("S1.5 Task 9: Remove shows only on a deactivated member, with the §11.1 title, body and button; toast '{email} was removed.'", { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    const remove = vi.spyOn(service, 'removeMember')
+    const { unmount } = open('/admin/team/mem_ana')
+    await screen.findByRole('heading', { level: 1, name: 'Ana Ribeiro' })
+    expect(screen.getByRole('button', { name: 'Deactivate' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+    unmount()
+
+    open('/admin/team/mem_pedro')
+    await screen.findByRole('heading', { level: 1, name: 'Pedro Alves' })
+    expect(screen.getByRole('button', { name: 'Reactivate' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Remove pedro.alves@sanctus.example from the team?' })
+    expect(within(dialog).getByText("Their access record and login are deleted. Past actions stay in the audit log as 'Deleted user (Admin)'. They can be invited again later.")).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Remove member' }))
+    expect(await screen.findByText('pedro.alves@sanctus.example was removed.')).toBeInTheDocument()
+    expect(remove).toHaveBeenCalledWith('mem_pedro')
+    // The member no longer exists: back to the team list, without them.
+    await waitFor(() => expect(window.location.pathname).toBe('/admin/team'))
+    const after = await service.listMembers()
+    expect(after.ok && after.data.some((m) => m.id === 'mem_pedro')).toBe(false)
+  })
+
+  it('S1.5 Task 9: a refused removal keeps the member and says why', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    vi.spyOn(service, 'removeMember').mockResolvedValue({ ok: false, error: { code: 'CONFLICT', message: 'This member is not deactivated.', reason: 'not_deactivated' } })
+    open('/admin/team/mem_pedro')
+    await screen.findByRole('heading', { level: 1, name: 'Pedro Alves' })
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remove member' }))
+    expect(await screen.findByText('This member is not deactivated.')).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/admin/team/mem_pedro')
+  })
+
   it('shows no actions for the Owner and a not-found state for an unknown id', { timeout: 20_000 }, async () => {
     const { unmount } = open('/admin/team/usr_platform')
     await screen.findByRole('heading', { level: 1, name: 'Platform Admin' })

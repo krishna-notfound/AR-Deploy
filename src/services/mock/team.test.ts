@@ -88,4 +88,34 @@ describe('team (demo service)', () => {
     expect(after.items[0]!.action).toBe('member_reactivated')
     expect(unwrap(await svc.getAccessEvents({ outcome: 'denied' })).items.every((e) => e.outcome === 'denied')).toBe(true)
   })
+
+  it('S1.5 Task 9: removes only a deactivated member (Owner only), records it and frees the email', async () => {
+    const before = unwrap(await svc.listMembers())
+    const pedro = before.find((m) => m.email.startsWith('pedro'))!
+    const ana = before.find((m) => m.email.startsWith('ana'))!
+    expect(pedro.status).toBe('deactivated')
+    const active = await svc.removeMember(ana.id)
+    expect(active.ok === false && active.error.reason).toBe('not_deactivated')
+    as('admin')
+    const forbidden = await svc.removeMember(pedro.id)
+    expect(forbidden.ok === false && forbidden.error.reason).toBe('forbidden')
+    as('owner')
+    expect(unwrap(await svc.removeMember(pedro.id))).toEqual({ loginDeleted: true })
+    expect(unwrap(await svc.listMembers()).some((m) => m.id === pedro.id)).toBe(false)
+    expect(unwrap(await svc.listMemberInvites(pedro.id))).toEqual([])
+    expect(unwrap(await svc.getAccessEvents()).items[0]).toMatchObject({ action: 'member_removed', member: pedro.email, fromRole: 'admin' })
+    const missing = await svc.removeMember(pedro.id)
+    expect(missing.ok === false && missing.error.reason).toBe('not_found')
+    expect(unwrap(await svc.inviteMember({ email: pedro.email, role: 'team' })).status).toBe('sent')
+  })
+
+  it('S1.5 Task 9: the demo access of a deactivated demo member says so', async () => {
+    as('owner')
+    const ana = unwrap(await svc.listMembers()).find((m) => m.email.startsWith('ana'))!
+    unwrap(await svc.deactivateMember(ana.id))
+    as('admin') // the demo Admin is Ana
+    expect(unwrap(await svc.getMyAccess())).toEqual({ role: null, permissions: [], status: 'deactivated' })
+    as('team')
+    expect(unwrap(await svc.getMyAccess())?.status).toBe('active')
+  })
 })

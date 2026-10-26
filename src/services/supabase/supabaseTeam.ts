@@ -10,7 +10,7 @@ import { type CatalogService, type Result, fail, ok, teamFail } from '../catalog
 type TeamMethods = Pick<
   CatalogService,
   | 'getMyAccess' | 'listMembers' | 'getMember' | 'listMemberInvites' | 'inviteMember' | 'resendMemberInvite' | 'revokeMemberInvite'
-  | 'setMemberRole' | 'deactivateMember' | 'reactivateMember' | 'getRolePermissions' | 'setRolePermissions' | 'getAccessEvents'
+  | 'setMemberRole' | 'deactivateMember' | 'reactivateMember' | 'removeMember' | 'getRolePermissions' | 'setRolePermissions' | 'getAccessEvents'
   | 'inspectInvite' | 'acceptInviteCreate' | 'acceptInviteExisting'
 >
 
@@ -40,6 +40,8 @@ const ACTION_OF: Record<string, AccessAction> = {
   access_member_deactivated: 'member_deactivated',
   access_member_reactivated: 'member_reactivated',
   access_denied: 'denied',
+  access_member_removed: 'member_removed',
+  access_member_email_changed: 'member_email_changed',
 }
 const TYPE_OF = Object.fromEntries(Object.entries(ACTION_OF).map(([k, v]) => [v, k])) as Record<AccessAction, string>
 
@@ -72,6 +74,12 @@ function details(action: AccessAction, m: Record<string, unknown>, to?: string |
       return 'Reactivated'
     case 'denied':
       return `Refused: ${String(m.action ?? 'unknown action').replace(/_/g, ' ')}`
+    case 'member_removed':
+      return `Removed from the team (was ${ROLE(m.role)})`
+    case 'member_email_changed':
+      return m.conflict
+        ? `Sign-in email changed to ${String(m.to ?? '')}, not applied: another member uses it`
+        : `Sign-in email changed from ${String(m.from ?? '')} to ${String(m.to ?? '')}`
   }
 }
 
@@ -145,7 +153,10 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
     async getMyAccess() {
       try {
         const { data, error } = await sb.rpc('my_platform_access')
-        return error ? teamFail('unknown') : ok((data ?? null) as PlatformAccess | null)
+        if (error) return teamFail('unknown')
+        const a = (data ?? null) as Partial<PlatformAccess> | null
+        // A deactivated member gets { role: null, status: 'deactivated' } (S1.5 R-W6-7); everyone else is active.
+        return ok(a ? { role: a.role ?? null, permissions: a.permissions ?? [], status: a.status === 'deactivated' ? 'deactivated' : 'active' } : null)
       } catch {
         return UNREACHABLE()
       }
@@ -175,6 +186,10 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
       return r.ok ? ok(r.data?.signOut === 'failed' ? { signOut: 'failed' as const } : {}) : r
     },
     reactivateMember: async (id) => done(await invoke('manage-member', { action: 'reactivate', memberId: id })),
+    removeMember: async (id) => {
+      const r = changed(await invoke<{ loginDeleted?: unknown }>('manage-member', { action: 'remove', memberId: id }))
+      return r.ok ? ok({ loginDeleted: r.data?.loginDeleted === true }) : r
+    },
 
     async getRolePermissions() {
       try {
@@ -226,7 +241,8 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
             id: r.id,
             at: r.created_at,
             actor: r.actor_id ? (emails.get(r.actor_id) ?? null) : null,
-            member: typeof r.metadata.email === 'string' ? r.metadata.email : null,
+            // A removed member's address is kept only as a hash; an email change names the address before the change.
+            member: typeof r.metadata.email === 'string' ? r.metadata.email : typeof r.metadata.from === 'string' ? r.metadata.from : null,
             action,
             ...(r.from_status ? { fromRole: r.from_status } : {}),
             ...(r.to_status ? { toRole: r.to_status } : {}),

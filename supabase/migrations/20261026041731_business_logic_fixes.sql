@@ -156,6 +156,13 @@ revoke execute on function private.with_prerequisites(text[]) from public, anon,
 -- added/removed are the stored change, so prerequisites that were not stored before are listed there too.
 -- Body from 20261025070915_platform_team_roles; only the closure and the answer are new.
 create or replace function public.admin_set_role_permissions(p_role public.platform_role, p_permissions text[])
+-- S1.5 Task 9: team membership lifecycle: remove, email sync, deactivated access (R-W6-1, R-W6-2, R-W6-7)
+-- =============================================================================
+
+-- R-W6-1: the Owner removes a deactivated member for good: their invitations and their row go, so the address can be
+-- invited again (as staff or as a business owner). The audit row keeps a hash of the address, not the address. The
+-- manage-member Edge Function then deletes the login when nothing else uses it.
+create function public.admin_remove_member(p_member uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -413,6 +420,37 @@ grant execute on function public.service_apply_provider_status(text, text) to se
 -- R-W7-4: when a log row gets its provider message id, the events that arrived first are applied, oldest first,
 -- each exactly once (applied = true afterwards).
 create function private.apply_pending_email_events()
+  v_member public.platform_members;
+begin
+  if not private.owner_or_deny('remove_member') then
+    return jsonb_build_object('error', 'forbidden');
+  end if;
+  select * into v_member from public.platform_members where id = p_member for update;
+  if not found then
+    return jsonb_build_object('error', 'not_found');
+  end if;
+  if v_member.user_id = (select auth.uid()) then
+    return jsonb_build_object('error', 'self');
+  end if;
+  if v_member.status <> 'deactivated' then
+    return jsonb_build_object('error', 'not_deactivated');
+  end if;
+  delete from private.platform_invites where member_id = p_member;
+  delete from public.platform_members where id = p_member;
+  insert into public.audit_events (event_type, actor_id, from_status, metadata)
+  values ('access_member_removed', (select auth.uid()), 'deactivated',
+          jsonb_build_object('member_id', p_member, 'email_sha256', encode(sha256(convert_to(v_member.email, 'UTF8')), 'hex'),
+                             'role', v_member.role::text));
+  return jsonb_build_object('ok', true, 'user_id', v_member.user_id);
+end;
+$$;
+revoke execute on function public.admin_remove_member(uuid) from public, anon;
+grant execute on function public.admin_remove_member(uuid) to authenticated, service_role;
+
+-- R-W6-2: a member's row follows their sign-in address, so staff alerts reach the current one. An address that
+-- another member's row already holds changes nothing (the event says conflict). This runs inside every auth.users
+-- update, so it never raises: a failure is logged as a warning and the address change goes through.
+create function private.sync_member_email()
 returns trigger
 language plpgsql
 security definer
@@ -442,3 +480,79 @@ create trigger email_log_apply_pending_events
   after insert or update of provider_message_id on public.email_log
   for each row execute function private.apply_pending_email_events();
 -- ---- end S1.5 Task 12 ----
+  v_member public.platform_members;
+  v_to text := lower(new.email);
+begin
+  begin
+    select * into v_member from public.platform_members where user_id = new.id;
+    if not found or v_to is null or v_member.email = v_to then
+      return new;
+    end if;
+    if exists (select 1 from public.platform_members where email = v_to and id <> v_member.id) then
+      insert into public.audit_events (event_type, actor_id, metadata)
+      values ('access_member_email_changed', new.id,
+              jsonb_build_object('member_id', v_member.id, 'from', v_member.email, 'to', v_to, 'conflict', true));
+    else
+      update public.platform_members set email = v_to where id = v_member.id;
+      insert into public.audit_events (event_type, actor_id, metadata)
+      values ('access_member_email_changed', new.id, jsonb_build_object('member_id', v_member.id, 'from', v_member.email, 'to', v_to));
+    end if;
+  exception when others then
+    raise warning 'sync_member_email: % (%)', sqlerrm, sqlstate;
+  end;
+  return new;
+end;
+$$;
+revoke execute on function private.sync_member_email() from public, anon, authenticated;
+create trigger on_auth_user_email_sync_member after update of email on auth.users
+  for each row when (old.email is distinct from new.email) execute function private.sync_member_email();
+
+-- Backfill: rows that drifted before the trigger existed. A target address that another row holds (or that two
+-- drifted rows would share) is left alone and recorded as a conflict, as the trigger does.
+with drift as (
+  select m.id, m.email as from_email, lower(u.email) as to_email
+    from public.platform_members m join auth.users u on u.id = m.user_id
+   where u.email is not null and m.email <> lower(u.email)
+), marked as (
+  select d.*, (exists (select 1 from public.platform_members o where o.email = d.to_email and o.id <> d.id)
+               or count(*) over (partition by d.to_email) > 1) as conflict
+    from drift d
+), synced as (
+  update public.platform_members m set email = k.to_email from marked k where m.id = k.id and not k.conflict returning m.id
+)
+insert into public.audit_events (event_type, metadata)
+select 'access_member_email_changed',
+       jsonb_build_object('member_id', k.id, 'from', k.from_email, 'to', k.to_email)
+         || case when k.conflict then '{"conflict": true}'::jsonb else '{}'::jsonb end
+  from marked k
+ where k.conflict or k.id in (select id from synced);
+
+-- R-W6-7: a deactivated member is told so ({role: null, status: 'deactivated'}) instead of getting nothing, so the
+-- sign-in page can say why. From Task 1's body: the Owner keeps the literal 15 keys behind the same ungated check.
+create or replace function public.my_platform_access()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when exists (select 1 from public.platform_admins where user_id = (select auth.uid())) then
+      jsonb_build_object('role', 'owner', 'permissions', to_jsonb(array[
+        'access.view', 'analytics.view', 'applications.approve', 'applications.reject', 'applications.view',
+        'businesses.delete', 'businesses.edit', 'businesses.status', 'businesses.view', 'owners.manage',
+        'products.delete', 'products.edit', 'products.publish', 'products.view', 'records.view']))
+    else (
+      select case m.status
+        when 'active' then jsonb_build_object('role', m.role::text, 'permissions',
+          (select coalesce(jsonb_agg(rp.permission order by rp.permission), '[]'::jsonb)
+             from public.platform_role_permissions rp where rp.role = m.role))
+        when 'deactivated' then jsonb_build_object('role', null, 'permissions', '[]'::jsonb, 'status', 'deactivated')
+      end
+      from public.platform_members m
+      where m.user_id = (select auth.uid()))
+  end;
+$$;
+revoke execute on function public.my_platform_access() from public, anon;
+grant execute on function public.my_platform_access() to authenticated, service_role;
+-- ---- end S1.5 Task 9 ----

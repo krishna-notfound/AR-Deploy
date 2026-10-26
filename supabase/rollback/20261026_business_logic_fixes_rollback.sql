@@ -162,6 +162,41 @@ grant execute on function public.admin_set_role_permissions(public.platform_role
 drop function private.with_prerequisites(text[]);
 drop function private.permission_prerequisites();
 -- ---- end S1.5 Task 5 rollback ----
+-- S1.5 Task 9 rollback: team membership lifecycle: remove, email sync, deactivated access (R-W6-1, R-W6-2, R-W6-7)
+-- =============================================================================
+
+-- R-W6-7: back to Task 1's body (a deactivated member gets null again).
+create or replace function public.my_platform_access()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when exists (select 1 from public.platform_admins where user_id = (select auth.uid())) then
+      jsonb_build_object('role', 'owner', 'permissions', to_jsonb(array[
+        'access.view', 'analytics.view', 'applications.approve', 'applications.reject', 'applications.view',
+        'businesses.delete', 'businesses.edit', 'businesses.status', 'businesses.view', 'owners.manage',
+        'products.delete', 'products.edit', 'products.publish', 'products.view', 'records.view']))
+    else (
+      select jsonb_build_object('role', m.role::text, 'permissions',
+        (select coalesce(jsonb_agg(rp.permission order by rp.permission), '[]'::jsonb)
+           from public.platform_role_permissions rp where rp.role = m.role))
+      from public.platform_members m
+      where m.user_id = (select auth.uid()) and m.status = 'active')
+  end;
+$$;
+revoke execute on function public.my_platform_access() from public, anon;
+grant execute on function public.my_platform_access() to authenticated, service_role;
+
+-- R-W6-2: member rows stop following the sign-in address. Addresses already synced (and their audit rows) stay.
+drop trigger if exists on_auth_user_email_sync_member on auth.users;
+drop function if exists private.sync_member_email();
+
+-- R-W6-1: removing members goes away; removed members stay removed and their access_member_removed rows stay.
+drop function if exists public.admin_remove_member(uuid);
+-- ---- end S1.5 Task 9 rollback ----
 
 -- =============================================================================
 -- S1.5 Task 1 rollback: security-activity privacy, profile visibility and Owner permissions; email kinds (R-W1-4, R-W1-5, R-W1-6, §10.4)

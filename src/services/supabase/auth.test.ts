@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { authMessage, createSupabaseAuthService } from './auth'
 
 /** Just enough of supabase-js for getCurrentUser: auth.getUser, my_platform_access and the business lookup. */
-function stub(getUser: () => unknown, roles: { admin?: boolean; platform?: { role: string; permissions: string[] }; businessId?: string; acceptedAt?: string | null } = {}) {
+function stub(getUser: () => unknown, roles: { admin?: boolean; platform?: { role: string | null; permissions: string[]; status?: string }; businessId?: string; acceptedAt?: string | null } = {}) {
   const query = (data: unknown) => {
     const q = { select: () => q, eq: () => q, order: () => q, limit: () => q, maybeSingle: async () => ({ data, error: null }) }
     return q
@@ -54,7 +54,12 @@ describe('Supabase auth: getCurrentUser', () => {
 
   it('a platform Team member signs in as a platform user with their role and permissions', async () => {
     const r = await createSupabaseAuthService(stub(() => user(), { platform: { role: 'team', permissions: ['products.view', 'products.edit'] } })).getCurrentUser()
-    expect(r.ok && r.data?.user).toEqual({ id: 'u1', name: 'owner@test', email: 'owner@test', role: 'super_admin', platform: { role: 'team', permissions: ['products.view', 'products.edit'] } })
+    expect(r.ok && r.data?.user).toEqual({ id: 'u1', name: 'owner@test', email: 'owner@test', role: 'super_admin', platform: { role: 'team', permissions: ['products.view', 'products.edit'], status: 'active' } })
+  })
+
+  it('S1.5 Task 9: a deactivated platform member is signed in with no role, marked deactivated', async () => {
+    const r = await createSupabaseAuthService(stub(() => user(), { platform: { role: null, permissions: [], status: 'deactivated' } })).getCurrentUser()
+    expect(r).toEqual({ ok: true, data: { email: 'owner@test', user: null, deactivated: true } })
   })
 
   it('treats a network or server failure as an error, not as signed out', async () => {

@@ -2,16 +2,21 @@
 // again (they run with the caller's own token) and write the access audit.
 //   POST { action: "set_role", memberId, role: "admin"|"team" }
 //   POST { action: "deactivate" | "reactivate" | "revoke_invite", memberId }
+//   POST { action: "remove", memberId } -> { ok, loginDeleted } (S1.5 R-W6-1: deactivated members only)
 // Deactivation also signs the member out on every device. The database already refuses their next request, so a
-// failed sign-out is reported but does not fail the action.
+// failed sign-out is reported but does not fail the action. Removal deletes the member's row in the database, then
+// their login (sessions ended, auth user deleted) when no business and no Owner row still uses it.
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
 
-type DbResult = ({ ok: true } & Record<string, unknown>) | { error: string }
+/** What an admin_* function answers: { ok: true, ... } or { error }. */
+type DbResult = { ok?: true; error?: string } & Record<string, unknown>
 
 export interface ManageDeps {
   userIdFromToken(token: string): Promise<string | null>
   rpcAsCaller(token: string, fn: string, args: Record<string, unknown>): Promise<DbResult>
   signOutUser(userId: string): Promise<void>
+  /** Service role: when the user has no business_members and no platform_admins row, ends their sessions and deletes the auth user. True when deleted. */
+  deleteLoginIfUnused(userId: string): Promise<boolean>
 }
 
 const FUNCTIONS = {
@@ -19,6 +24,7 @@ const FUNCTIONS = {
   deactivate: 'admin_deactivate_member',
   reactivate: 'admin_reactivate_member',
   revoke_invite: 'admin_revoke_member_invite',
+  remove: 'admin_remove_member',
 } as const
 
 const STATUS_FOR: Record<string, number> = {
@@ -40,7 +46,20 @@ export async function handleManageMember(req: Request, deps: ManageDeps): Promis
 
   const args: Record<string, unknown> = { p_member: body.memberId, ...(action === 'set_role' ? { p_role: body.role } : {}) }
   const result = await deps.rpcAsCaller(token, FUNCTIONS[action as keyof typeof FUNCTIONS], args)
-  if ('error' in result) return reply(STATUS_FOR[result.error] ?? 400, { error: result.error })
+  if (typeof result.error === 'string') return reply(STATUS_FOR[result.error] ?? 400, { error: result.error })
+
+  if (action === 'remove') {
+    // The row is already gone; a login that could not be deleted is reported, not an error (it grants nothing now).
+    let loginDeleted = false
+    if (typeof result.user_id === 'string') {
+      loginDeleted = await deps.deleteLoginIfUnused(result.user_id).catch((e: unknown) => {
+        // A trace for the operator: a fixed prefix and the cause, never a token, and any address masked.
+        console.error('manage-member: delete login failed: ' + String(e).replace(/[^\s@]+@[^\s@]+/g, '[email]').slice(0, 200))
+        return false
+      })
+    }
+    return reply(200, { ok: true, loginDeleted })
+  }
 
   if (action === 'deactivate' && typeof result.userId === 'string') {
     try {

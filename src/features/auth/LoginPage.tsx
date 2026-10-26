@@ -20,7 +20,7 @@ export default function LoginPage() {
   useDocumentTitle('Sign in')
   const [params] = useSearchParams()
   const next = params.get('next')
-  const { user, signedInEmail, accountError } = useAccount()
+  const { user, signedInEmail, accessDeactivated, accountError } = useAccount()
   const security = useSecurityState()
   const leave = useLeaveAccount()
   const toast = useToast()
@@ -94,12 +94,15 @@ export default function LoginPage() {
       {signedInEmail ? (
         <div className="mt-8 space-y-6">
           <InlineNotice tone="neutral">
-            Signed in as <strong className="font-medium">{signedInEmail}</strong>. This account does not manage a business.
+            Signed in as <strong className="font-medium">{signedInEmail}</strong>.{' '}
+            <span>{accessDeactivated ? 'Your platform access was turned off by the Owner. Contact them if you need it back.' : 'This account does not manage a business.'}</span>
           </InlineNotice>
-          <p className="text-sm leading-6 text-ink-muted">
-            Business owners get access by invitation from the Sanctus team after their application is approved. If you applied, we will email you
-            when it has been reviewed.
-          </p>
+          {!accessDeactivated && (
+            <p className="text-sm leading-6 text-ink-muted">
+              Business owners get access by invitation from the Sanctus team after their application is approved. If you applied, we will email you
+              when it has been reviewed.
+            </p>
+          )}
           <Button onClick={() => void leave({ signOut: true })}>Sign out</Button>
         </div>
       ) : (

@@ -200,6 +200,8 @@ export interface CatalogService {
   /** `signOut: 'failed'`: deactivated (the database refuses them), but ending their sessions failed. */
   deactivateMember(id: ID): Promise<Result<{ signOut?: 'failed' }>>
   reactivateMember(id: ID): Promise<Result<void>>
+  /** Deactivated members only (S1.5 R-W6-1). `loginDeleted`: their login was deleted too (nothing else used it). */
+  removeMember(id: ID): Promise<Result<{ loginDeleted: boolean }>>
   getRolePermissions(): Promise<Result<RolePermissions>>
   /** Stores the set with its prerequisites (R-W3-3); `added` lists the prerequisites that were not in `permissions`. */
   setRolePermissions(role: MemberRole, permissions: Permission[]): Promise<Result<{ added: Permission[] }>>
