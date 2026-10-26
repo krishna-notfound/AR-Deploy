@@ -1,7 +1,7 @@
 import { useCan } from '@/auth/usePermission'
 import { AlertCircle, ExternalLink, EyeOff, Trash2 } from 'lucide-react'
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { useBlocker, useLocation, useNavigate } from 'react-router'
+import { Link, useBlocker, useLocation, useNavigate } from 'react-router'
 import { type Crumb, PageHeader } from '@/components/layout/PageHeader'
 import { ProductStatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -24,7 +24,7 @@ import { LOAD_ERROR } from '@/features/modelRequests/copy'
 import { useModelRequests } from '@/features/modelRequests/hooks'
 import { modelRequestStatusLabel } from '@/features/modelRequests/ModelRequestStatusBadge'
 import { type EditorScope, editPath, useProductActions } from '../useProductActions'
-import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput } from './formModel'
+import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput, withStoredModels } from './formModel'
 import { LocalizedField } from './LocalizedField'
 import { ModelFilesReadOnly } from './ModelFilesReadOnly'
 import { ModelRequestPanel } from './ModelRequestPanel'
@@ -298,16 +298,19 @@ export function ProductEditorForm({
     return res.data
   }
 
-  /** Loads the stored product into the editor again (after a delivery, or a save refused as stale). */
+  /**
+   * Loads the stored product into the editor again (after a delivery, or a save refused as stale). Unsaved edits are
+   * kept: a dirty form only takes the stored 3D files and their stamp, and stays unsaved.
+   */
   const onReload = async () => {
     if (!latest) return
     setReloading(true)
     const res = await service.getProductById(latest.id)
     setReloading(false)
     if (!res.ok) return toast.error('Could not reload the product', res.error.message)
-    const next = formFromProduct(res.data)
-    setForm(next)
-    setSnapshot(JSON.stringify(next))
+    const stored = formFromProduct(res.data)
+    setForm((current) => (JSON.stringify(current) !== snapshot ? withStoredModels(current, res.data) : stored))
+    setSnapshot(JSON.stringify(stored))
     setLatest(res.data)
     setErrors({})
     setStaleModels(false)
@@ -610,7 +613,13 @@ export function ProductEditorForm({
                 <p className="text-[13px] leading-[1.45] text-ink-body">3D models for your products are made by the Sanctus team. Request one below.</p>
               ))}
             {(ownerUploadsOff || (ownerChoice && modelChoice === 'request')) && (
-              <ModelRequestPanel product={latest ?? undefined} onSaveDraft={() => void onSaveDraft()} onReload={() => void onReload()} />
+              <ModelRequestPanel
+                product={latest ?? undefined}
+                formDimensions={toInput(form).input.dimensions}
+                saving={busy === 'save'}
+                onSaveDraft={() => void onSaveDraft()}
+                onReload={() => void onReload()}
+              />
             )}
             {(scope === 'admin' || (ownerChoice && modelChoice === 'upload')) && (
               <ModelSection
@@ -830,9 +839,9 @@ function OpenModelRequests({ productId }: { productId: string }) {
     <ul className="space-y-1">
       {q.data.items.map((r) => (
         <li key={r.id} className="text-[13px] leading-[1.45] text-ink-body">
-          <a href={modelRequestAdminPath(r.id)} className="font-medium text-ink underline underline-offset-2">
+          <Link to={modelRequestAdminPath(r.id)} className="font-medium text-ink underline underline-offset-2">
             Open 3D request: {modelRequestStatusLabel(r.status)}
-          </a>
+          </Link>
           {r.variantName && <span className="text-ink-muted"> · {r.variantName.en}</span>}
         </li>
       ))}

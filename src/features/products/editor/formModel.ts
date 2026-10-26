@@ -50,6 +50,27 @@ export function formFromProduct(p: Product): EditorForm {
   }
 }
 
+/**
+ * The unsaved form with the stored product's 3D files taken in (S4 final review): the product's models, each kept
+ * option's models (by id) and modelsChangedAt come from `stored`; every other field keeps what the user typed.
+ * An option the user added keeps its own files; one the user removed stays removed.
+ */
+export function withStoredModels(form: EditorForm, stored: Product): EditorForm {
+  const byId = new Map(stored.variants.map((v) => [v.id, v]))
+  return {
+    ...form,
+    input: {
+      ...form.input,
+      models: stored.models,
+      modelsChangedAt: stored.modelsChangedAt,
+      variants: form.input.variants.map((v) => {
+        const s = byId.get(v.id)
+        return s ? { ...v, models: s.models } : v
+      }),
+    },
+  }
+}
+
 const num = (s: string) => {
   const v = parseFloat(s.replace(',', '.'))
   return Number.isFinite(v) ? v : NaN

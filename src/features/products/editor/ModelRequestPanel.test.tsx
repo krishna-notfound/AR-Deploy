@@ -94,10 +94,51 @@ describe('S4 Task 4: ModelRequestPanel', () => {
   it('dimensions missing: the form shows and Send is replaced by the dimensions line linking to #specs', async () => {
     requests([])
     renderPanel({ ...product, dimensions: { ...product.dimensions, depth: 0 } })
-    const link = await screen.findByRole('link', { name: 'Add width, height and depth above first. The model is made to that size.' })
+    const link = await screen.findByRole('link', { name: 'Add width, height and depth in Specifications first. The model is made to that size.' })
     expect(link).toHaveAttribute('href', '#specs')
     expect(screen.getByLabelText('Add photos')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Send request' })).not.toBeInTheDocument()
+  })
+
+  it('final review: dimensions typed in the form but not saved ask to save the product, with a working Save', async () => {
+    requests([])
+    const saved = { ...product, dimensions: { ...product.dimensions, depth: 0 } }
+    const h = { onSaveDraft: vi.fn(), onReload: vi.fn() }
+    const { rerender } = render(
+      <ToastProvider>
+        <ModelRequestPanel product={saved} formDimensions={{ ...saved.dimensions, depth: 40 }} {...h} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('Save the product to use its dimensions.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Add width, height and depth/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Send request' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(h.onSaveDraft).toHaveBeenCalledTimes(1)
+    // Once saved, the panel's product carries the same dimensions and Send is back.
+    const after = { ...saved, dimensions: { ...saved.dimensions, depth: 40 } }
+    rerender(
+      <ToastProvider>
+        <ModelRequestPanel product={after} formDimensions={after.dimensions} {...h} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByRole('button', { name: 'Send request' })).toBeInTheDocument()
+    expect(screen.queryByText('Save the product to use its dimensions.')).toBeNull()
+  })
+
+  it('final review: saved dimensions changed in the form also ask to save first; cleared ones show the missing line', async () => {
+    requests([])
+    const { rerender } = render(
+      <ToastProvider>
+        <ModelRequestPanel product={product} formDimensions={{ ...product.dimensions, width: product.dimensions.width + 10 }} onSaveDraft={vi.fn()} onReload={vi.fn()} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('Save the product to use its dimensions.')).toBeInTheDocument()
+    rerender(
+      <ToastProvider>
+        <ModelRequestPanel product={product} formDimensions={{ ...product.dimensions, height: 0 }} onSaveDraft={vi.fn()} onReload={vi.fn()} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByRole('link', { name: 'Add width, height and depth in Specifications first. The model is made to that size.' })).toBeInTheDocument()
   })
 
   it('form: Model for lists the product and its saved options (hidden with none); the count line; Send needs 2 photos; an 11th, a 12 MB photo and a GIF are refused; a 900 px photo warns; the demo label', async () => {
@@ -195,6 +236,15 @@ describe('S4 Task 4: ModelRequestPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel request' }))
     expect(cancel).toHaveBeenCalledWith('r-requested-p')
     expect(await screen.findByText('Request cancelled.')).toBeInTheDocument()
+  })
+
+  it("final review: a cancel whose photo clean-up was partial also says 'Some photos couldn't be removed.'", async () => {
+    requests([request({ status: 'requested' })])
+    vi.spyOn(service, 'cancelModelRequest').mockResolvedValue(ok({ status: 'cancelled', cleanup: 'partial' }))
+    renderPanel()
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel request' }))
+    expect(await screen.findByText('Request cancelled.')).toBeInTheDocument()
+    expect(await screen.findByText("Some photos couldn't be removed.")).toBeInTheDocument()
   })
 
   it('in progress: the status line and the contact line, no Cancel', async () => {

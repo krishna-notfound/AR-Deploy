@@ -13,14 +13,15 @@ import { formatFileSize } from '@/lib/format'
 export const PHOTO_FAILED = "This photo couldn't be loaded."
 
 /**
- * Load state of one photo; `retry` mounts the image again (and asks the page for fresh links when it has none).
- * Callers key the component by the photo's URL, so fresh links start a fresh state.
+ * Load state of one photo; `retry` asks the page for fresh links (its refetch signs them again, so an expired
+ * one-hour link recovers) and mounts the image again. Callers key the component by the photo's URL, so fresh links
+ * start a fresh state.
  */
 function usePhotoLoad(photo: ModelRequestPhoto, onReload?: () => void) {
   const [failed, setFailed] = useState(!photo.url)
   const [attempt, setAttempt] = useState(0)
   const retry = () => {
-    if (!photo.url) onReload?.()
+    onReload?.()
     setFailed(!photo.url)
     setAttempt((a) => a + 1)
   }
@@ -84,7 +85,9 @@ export function PhotoViewer({ photos, index, onIndex, onClose, onReload }: { pho
     try {
       await downloadUrl(photo.url, photo.fileName)
     } catch {
-      toast.error("The photo couldn't be downloaded.", 'Try again in a moment.')
+      // The link may have expired: fetch fresh ones so the next try uses a newly signed link.
+      onReload?.()
+      toast.error("The photo couldn't be downloaded.", 'Try again.')
     } finally {
       setDownloading(false)
     }

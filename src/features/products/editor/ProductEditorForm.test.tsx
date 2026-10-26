@@ -366,7 +366,10 @@ describe('S4 Task 3: the 3D section by role and switch (R-S4-4, R-S4-17)', () =>
     const p = await service.getProductById(productId)
     if (!b.ok || !p.ok) throw new Error('seed missing')
     const router = createMemoryRouter(
-      [{ path: '/edit', element: <ProductEditorForm scope={scope} product={p.data} currentStatus={p.data.status} businesses={[b.data]} fixedBusiness={scope === 'business' ? b.data : undefined} breadcrumbs={crumbs} /> }],
+      [
+        { path: '/edit', element: <ProductEditorForm scope={scope} product={p.data} currentStatus={p.data.status} businesses={[b.data]} fixedBusiness={scope === 'business' ? b.data : undefined} breadcrumbs={crumbs} /> },
+        { path: '*', element: <p data-testid="other-route" /> },
+      ],
       { initialEntries: ['/edit'] },
     )
     render(
@@ -426,8 +429,12 @@ describe('S4 Task 3: the 3D section by role and switch (R-S4-4, R-S4-17)', () =>
     await renderEditor('admin', 'biz_casa', 'prd_glam_sofa')
     expect(models().getByLabelText(/(Upload|Replace) .glb file/)).toBeInTheDocument()
     expect(models().queryByTestId('request-panel')).toBeNull()
-    expect(await models().findByRole('link', { name: 'Open 3D request: In progress' })).toHaveAttribute('href', modelRequestAdminPath('mrq_x'))
+    const link = await models().findByRole('link', { name: 'Open 3D request: In progress' })
+    expect(link).toHaveAttribute('href', modelRequestAdminPath('mrq_x'))
     expect(spy).toHaveBeenCalledWith({ productId: 'prd_glam_sofa', status: ['requested', 'in_progress'] })
+    // Final review: a router link, so it opens in the app without a full page load.
+    await userEvent.click(link)
+    expect(await screen.findByTestId('other-route')).toBeInTheDocument()
   })
 
   it('Admin without models.manage: no open-request line and no request read', async () => {
@@ -486,20 +493,37 @@ describe('S4 Task 3: the 3D section by role and switch (R-S4-4, R-S4-17)', () =>
     expect(stored.ok && stored.data.name.en).toBe(p.name.en)
   })
 
-  it('models_changed_elsewhere shows its copy with a Reload button that loads the stored product', async () => {
+  it('models_changed_elsewhere shows its copy with a Reload button that loads the stored 3D files and keeps the unsaved edits (final review)', async () => {
     const user = userEvent.setup()
     asOwner('biz_nord')
     const p = await renderEditor('business', 'biz_nord', 'prd_shell_chair')
-    vi.spyOn(service, 'updateProduct').mockResolvedValue({ ok: false, error: modelRequestError('models_changed_elsewhere')! })
+    const update = vi.spyOn(service, 'updateProduct').mockResolvedValueOnce({ ok: false, error: modelRequestError('models_changed_elsewhere')! })
     await user.type(screen.getByRole('textbox', { name: /^Product name/ }), ' II')
     await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
     await screen.findByText(/to continue$/)
     const alert = summary()
     expect(alert).toHaveTextContent('The Sanctus team delivered a 3D model while you were editing. Reload to see it.')
+    // The team delivered a GLB for the product and one for its first option meanwhile.
+    const glb = { format: 'glb' as const, url: 'blob:delivered', fileName: 'delivered.glb', status: 'valid' as const }
+    const stamp = '2026-10-26T12:00:00.000Z'
+    store.update((d) => {
+      d.products = d.products.map((x) => (x.id === p.id
+        ? { ...x, name: { ...x.name, en: 'Renamed elsewhere' }, models: { glb }, modelsChangedAt: stamp, variants: x.variants.map((v, i) => (i === 0 ? { ...v, models: { glb: { ...glb, fileName: 'option.glb' } } } : v)) }
+        : x))
+    })
     const read = vi.spyOn(service, 'getProductById')
     await user.click(within(alert).getByRole('button', { name: 'Reload' }))
-    await waitFor(() => expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(p.name.en))
+    await waitFor(() => expect(screen.queryByText(/to continue$/)).toBeNull())
     expect(read).toHaveBeenCalledWith(p.id)
-    expect(screen.queryByText(/to continue$/)).toBeNull()
+    // The unsaved name stays; the stored 3D files and their stamp come in, so the next save is not refused again.
+    expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(`${p.name.en} II`)
+    expect(screen.getAllByText('Unsaved changes').length).toBeGreaterThan(0)
+    await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2))
+    const sent = update.mock.calls[1]![1]
+    expect(sent.name?.en).toBe(`${p.name.en} II`)
+    expect(sent.modelsChangedAt).toBe(stamp)
+    expect(sent.models?.glb?.fileName).toBe('delivered.glb')
+    if (p.variants[0]) expect(sent.variants?.[0]?.models?.glb?.fileName).toBe('option.glb')
   })
 })

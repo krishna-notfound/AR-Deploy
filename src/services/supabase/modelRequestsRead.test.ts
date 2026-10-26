@@ -114,4 +114,11 @@ describe('S4 Task 2: Supabase model request reads', () => {
       data: { p1: { open: 'in_progress', latestClosed: 'rejected' }, p2: { latestClosed: 'delivered' } },
     })
   })
+
+  it('final review: setBusinessOwnModels maps business_not_found (P0002) to fixed copy, never the raw key', async () => {
+    const { sb } = fakeClient({ data: [], error: null })
+    ;(sb.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: { code: 'P0002', message: 'business_not_found' } })
+    const r = await createSupabaseModelRequestsRead(sb, () => {}).setBusinessOwnModels('b1', true)
+    expect(r).toEqual({ ok: false, error: { code: 'NOT_FOUND', message: 'Business not found.' } })
+  })
 })

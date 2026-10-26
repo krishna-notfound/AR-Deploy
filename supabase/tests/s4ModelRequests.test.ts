@@ -1255,7 +1255,7 @@ describe('S4 Task 7: email kind', () => {
 
 // ---- S4 Task 8 tests ----
 describe('S4 Task 8: clean-up paths', () => {
-  GONE_AFTER_ROLLBACK.push('public.model_request_storage_paths(uuid)')
+  GONE_AFTER_ROLLBACK.push('public.model_request_storage_paths(uuid)', 'public.request_photo_cleanable(text)')
   let f: S4Fixture
   const id8 = ids(8)
   const reqCancelled = id8(50)
@@ -1327,6 +1327,41 @@ describe('S4 Task 8: clean-up paths', () => {
     expect(await count('model_request_photos', 'request_id = $1', [reqPlain])).toBe(0)
     expect(await count('model_requests', 'id = any($1::uuid[])', [[reqCancelled, reqOther]])).toBe(2)
     expect(await count('model_request_photos', 'request_id = any($1::uuid[])', [[reqCancelled, reqOther]])).toBe(3)
+  })
+
+  it('clean-up staff without models.manage read and delete a photo only once its request is gone (final review)', async () => {
+    const B = 'model-request-photos'
+    const open = photo(f.bizB, reqOther, 6)
+    const loose = `${f.bizB}/${id8(80)}/${id8(81)}.jpg` // no request row at all, e.g. left after a cascade
+    for (const p of [open, loose]) await putObject(db, B, p)
+    const read = (name: string) => `select count(*)::int as n from storage.objects where bucket_id = '${B}' and name = '${name}'`
+    const del = (name: string) => `delete from storage.objects where bucket_id = '${B}' and name = '${name}'`
+    try {
+      await withTeam([...TEAM_DEFAULTS, 'products.delete'], async () => {
+        // The request is still open: no read, so the storage delete (which must also pass the read policy) removes nothing.
+        expect(await h.count(f.team, read(open))).toBe(0)
+        expect(await h.affected(f.team, del(open))).toBe(0)
+        // A photo whose request no longer exists is readable and removable.
+        expect(await h.count(f.team, read(loose))).toBe(1)
+        expect(await h.affected(f.team, del(loose))).toBe(1)
+        // After its product is deleted (requests cascade), the open request's photo can be cleaned up.
+        await db.query('delete from public.products where id = $1', [f.productR])
+        expect(await h.count(f.team, read(open))).toBe(1)
+        expect(await h.affected(f.team, del(open))).toBe(1)
+      })
+      // Team with no clean-up key never reads a photo, even an orphaned one.
+      await putObject(db, B, loose)
+      await withTeam(TEAM_DEFAULTS, async () => {
+        expect(await h.count(f.team, read(loose))).toBe(0)
+      })
+      // A malformed name is refused, never a cast error.
+      await putObject(db, B, `${f.bizB}/not-a-uuid/${id8(82)}.jpg`)
+      await withTeam([...TEAM_DEFAULTS, 'products.delete'], async () => {
+        expect(await h.count(f.team, read(`${f.bizB}/not-a-uuid/${id8(82)}.jpg`))).toBe(0)
+      })
+    } finally {
+      await db.query(`delete from storage.objects where bucket_id = $1 and name like $2`, [B, `${f.bizB}/%`])
+    }
   })
 })
 // ---- end S4 Task 8 tests ----

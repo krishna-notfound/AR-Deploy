@@ -437,13 +437,33 @@ create policy "Members add request photos" on storage.objects
                             and not exists (select 1 from public.model_requests r
                                              where r.id = split_part(name, '/', 2)::uuid)
                        else false end);
+-- Clean-up staff (R-S4-18): true when the caller holds businesses.delete or products.delete and `p_name` is a
+-- {uuid}/{uuid}/... photo whose request no longer exists (it cascaded with its product, option or business). Security
+-- definer because the caller cannot read model_requests through RLS; a malformed name gives false, never a cast error.
+create function public.request_photo_cleanable(p_name text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (public.platform_can('businesses.delete') or public.platform_can('products.delete'))
+     and case when p_name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/'
+              then not exists (select 1 from public.model_requests r where r.id = split_part(p_name, '/', 2)::uuid)
+              else false end;
+$$;
+revoke execute on function public.request_photo_cleanable(text) from public, anon;
+grant execute on function public.request_photo_cleanable(text) to authenticated;
 create policy "Members and model staff read request photos" on storage.objects
   for select to authenticated
   using (bucket_id = 'model-request-photos'
          and ((select public.platform_can('models.manage'))
               or case when (storage.foldername(name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
                       then public.is_business_member(((storage.foldername(name))[1])::uuid)
-                      else false end));
+                      else false end
+              -- Clean-up staff (R-S4-18): a storage delete or list must also pass this read policy, so staff holding
+              -- businesses.delete or products.delete see a photo once its request no longer exists (after the cascade).
+              or public.request_photo_cleanable(name)));
 create policy "Members and clean-up staff delete request photos" on storage.objects
   for delete to authenticated
   using (bucket_id = 'model-request-photos'

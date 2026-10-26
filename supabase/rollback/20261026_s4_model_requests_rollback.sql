@@ -266,6 +266,7 @@ $$;
 drop policy "Members add request photos" on storage.objects;
 drop policy "Members and model staff read request photos" on storage.objects;
 drop policy "Members and clean-up staff delete request photos" on storage.objects;
+drop function public.request_photo_cleanable(text);
 -- The bucket, only when empty. Hosted Storage blocks direct deletes from its tables unless storage.allow_delete_query
 -- is on (ignored where the setting does not exist, e.g. PGlite). If the delete is still refused, the refusal is only
 -- a notice (the rest of this rollback commits): delete the empty bucket in the dashboard then
