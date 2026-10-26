@@ -70,6 +70,7 @@ export const EMAIL_KIND_LABEL: Record<string, string> = {
   team_notice: 'Team notice',
   admin_notification: 'Admin notification',
   test: 'Test email',
+  model_request_update: '3D model update',
 }
 
 const EVENT_LABEL: Record<string, string> = {
@@ -91,9 +92,18 @@ const EVENT_LABEL: Record<string, string> = {
   invitation_requested: 'Invitation requested',
   invitation_resent: 'Invitation resent',
   invitation_failed: 'Invitation failed',
+  model_request_created: '3D model requested',
+  model_request_cancelled: '3D model request cancelled',
+  model_request_started: '3D model work started',
+  model_request_delivered: '3D model delivered',
+  model_request_rejected: '3D model request declined',
 }
 
-export const eventLabel = (type: string) => EVENT_LABEL[type] ?? type.replace(/_/g, ' ')
+/** An audit event's label; `metadata` picks the wording where the event carries its direction (S4 §9.1). */
+export const eventLabel = (type: string, metadata?: Record<string, unknown>) =>
+  type === 'business_own_models_changed'
+    ? metadata?.to === true ? 'Own 3D uploads allowed' : 'Own 3D uploads turned off'
+    : (EVENT_LABEL[type] ?? type.replace(/_/g, ' '))
 
 const STATUS_WORD: Record<string, string> = { submitted: 'Submitted', under_review: 'Under review', approved: 'Approved', rejected: 'Rejected', active: 'Active', inactive: 'Inactive', draft: 'Draft' }
 export const statusWord = (s?: string) => (s ? (STATUS_WORD[s] ?? s) : '')

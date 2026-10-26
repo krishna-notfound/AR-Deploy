@@ -33,6 +33,8 @@ import type {
   ReviewedApplication,
   RolePermissions,
 } from '@/domain/types'
+import type { ModelAsset, ModelFormat } from '@/domain/types'
+import type { ModelRequest, ModelRequestDetail, ModelRequestOutcome, ModelRequestQuery, ProductRequestState } from '@/domain/modelRequests'
 
 export type ServiceErrorCode =
   | 'NOT_FOUND'
@@ -72,9 +74,12 @@ export const fail = <T = never>(code: ServiceErrorCode, message: string, fieldEr
   error: fieldErrors ? { code, message, fieldErrors } : { code, message },
 })
 
-export type BusinessInput = Omit<Business, 'id' | 'createdAt' | 'updatedAt'>
+/** `allowOwnModels` is changed only by setBusinessOwnModels (S4 R-S4-2). */
+export type BusinessInput = Omit<Business, 'id' | 'createdAt' | 'updatedAt' | 'allowOwnModels'>
 export type ProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'status'> & {
   status?: ProductStatus
+  /** Leave every stored 3D file of the product and its options as it is (S4 R-S4-3/R-S4-4: own uploads off). */
+  keepModels?: boolean
 }
 
 export interface ProductQuery {
@@ -250,6 +255,23 @@ export interface CatalogService {
   inspectInvite(token: string): Promise<Result<InviteInspection>>
   acceptInviteCreate(input: { token: string; fullName: string; password: string }): Promise<Result<{ email: string }>>
   acceptInviteExisting(token: string): Promise<Result<void>>
+
+  // 3D model requests (S4). Business owners read their own business's; staff need models.manage (RLS in Supabase).
+  getModelRequests(query?: ModelRequestQuery): Promise<Result<Page<ModelRequest>>>
+  getProductRequestStates(businessId: ID): Promise<Result<Record<ID, ProductRequestState>>>
+  /** Staff with models.manage only; audited as business_own_models_changed (R-S4-2). */
+  setBusinessOwnModels(businessId: ID, allow: boolean): Promise<Result<Business>>
+  requestModel(
+    input: { businessId: ID; productId: ID; variantId?: ID; note?: string; photos: File[] },
+    onProgress?: (index: number, state: 'uploading' | 'done') => void,
+  ): Promise<Result<ModelRequest>>
+  cancelModelRequest(id: ID): Promise<Result<ModelRequestOutcome>>
+  getModelRequest(id: ID): Promise<Result<ModelRequestDetail>>
+  startModelRequest(id: ID): Promise<Result<ModelRequestOutcome>>
+  stageModelFile(id: ID, format: ModelFormat, asset: ModelAsset): Promise<Result<void>>
+  unstageModelFile(id: ID, format: ModelFormat): Promise<Result<void>>
+  deliverModelRequest(id: ID): Promise<Result<ModelRequestOutcome>>
+  rejectModelRequest(id: ID, reason: string): Promise<Result<ModelRequestOutcome>>
 
   // demo utilities
   resetDemoData(): Promise<Result<void>>

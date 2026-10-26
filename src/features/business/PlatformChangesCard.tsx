@@ -32,7 +32,7 @@ export function PlatformChangesCard({ businessId, className }: { businessId: ID;
           <ol className="space-y-4">
             {q.data.map((e) => (
               <li key={e.id} className="min-w-0">
-                <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{activityMessage(e) ?? eventLabel(e.eventType)}</p>
+                <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{activityMessage(e) ?? eventLabel(e.eventType, e.metadata)}</p>
                 <p className="mt-0.5 text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
                   <time dateTime={e.createdAt}>{formatDateTime(e.createdAt, 'en', prefs)}</time> · Sanctus team
                 </p>

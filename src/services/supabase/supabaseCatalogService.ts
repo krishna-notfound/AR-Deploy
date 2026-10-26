@@ -2,6 +2,10 @@
 // Access control is enforced by RLS and storage policies in supabase/migrations; checks here are for UX only.
 // Every failure is returned as an error Result. Nothing falls back to demo data.
 import { createSupabaseTeam } from './supabaseTeam'
+import { createSupabaseModelRequestsBusiness } from './modelRequestsBusiness'
+import { createSupabaseModelRequestsRead } from './modelRequestsRead'
+import { createSupabaseModelRequestsStaff } from './modelRequestsStaff'
+import { MODEL_REQUEST_ERRORS } from '../modelRequestRules'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   ApplicationStatus,
@@ -60,6 +64,7 @@ export interface BusinessRow {
   status: BusinessStatus
   accent_color: string
   default_currency: Currency
+  allow_own_models: boolean
   created_at: string
   updated_at: string
 }
@@ -125,6 +130,7 @@ export interface ProductRow {
   weight_value: number | null
   weight_unit: WeightUnit | null
   published_at: string | null
+  models_changed_at?: string | null
   created_at: string
   updated_at: string
   product_images?: ImageRow[]
@@ -169,6 +175,9 @@ const ACCOUNT_RULES: Record<string, ServiceError> = {
   reopen_not_allowed: REOPEN_NOT_ALLOWED_ERROR,
 }
 
+/** S4 keys whose shared meaning is application review: only mapModelRequestError gives them the S4 copy. */
+const S4_REQUEST_ONLY = new Set(['invalid_transition', 'reason_required'])
+
 /**
  * Maps Postgres/PostgREST/Storage errors to service errors with a message the user can act on.
  * Raw database text (policy, constraint and column names) is never shown; in development it is logged.
@@ -177,6 +186,9 @@ export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictFiel
   if (import.meta.env.DEV) console.error('[supabase]', e.code, e.message)
   const account = ACCOUNT_RULES[e.message]
   if (account) return { ok: false, error: account }
+  // S4 keys raised only by S4 (invalid_transition and reason_required mean application review here; mapModelRequestError).
+  const s4 = Object.hasOwn(MODEL_REQUEST_ERRORS, e.message) && !S4_REQUEST_ONLY.has(e.message) ? MODEL_REQUEST_ERRORS[e.message] : undefined
+  if (s4) return { ok: false, error: s4 }
   const rule = DB_RULES[e.message]
   if (rule) return fail('VALIDATION', 'Please fix the highlighted fields.', { [rule.field]: rule.message })
   switch (e.code) {
@@ -199,7 +211,7 @@ export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictFiel
   }
 }
 
-const toBusiness = (r: BusinessRow): Business => ({
+export const toBusiness = (r: BusinessRow): Business => ({
   id: r.id,
   name: r.name,
   slug: r.slug,
@@ -214,6 +226,7 @@ const toBusiness = (r: BusinessRow): Business => ({
   status: r.status,
   branding: { accentColor: r.accent_color },
   defaultCurrency: r.default_currency,
+  allowOwnModels: r.allow_own_models === true,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 })
@@ -298,6 +311,7 @@ function toProduct(r: ProductRow, signed: Map<string, string>): Product {
     cta: { label: r.cta_label, url: r.cta_url ?? undefined },
     status: r.status,
     publishedAt: r.published_at ?? undefined,
+    ...(r.models_changed_at ? { modelsChangedAt: r.models_changed_at } : {}),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -762,6 +776,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
 
   return {
     ...createSupabaseTeam(sb, () => listeners.forEach((l) => l())),
+    ...createSupabaseModelRequestsRead(sb, () => listeners.forEach((l) => l())),
+    ...createSupabaseModelRequestsBusiness(sb, () => listeners.forEach((l) => l())),
+    ...createSupabaseModelRequestsStaff(sb, () => listeners.forEach((l) => l())),
 
     // ---------------- businesses ----------------
     getBusinesses: () =>

@@ -1,6 +1,7 @@
 import type { AnalyticsEvent, AuditEvent, Business, BusinessApplication, EmailAttempt, ID, Product } from '@/domain/types'
 import type { DailyStat } from '../analytics'
 import type { DemoTeam } from './teamSeed'
+import type { ModelRequest, ModelRequestPhoto } from '@/domain/modelRequests'
 
 export type { DailyStat }
 
@@ -15,6 +16,14 @@ export interface DemoInviteAttempt {
   createdAt: string
 }
 
+
+/**
+ * A stored demo 3D model request (S4). The names and photo count are read from the products and businesses, as the
+ * Supabase select embeds them. Photos picked in this session have their object URLs in sessionRequestMedia.
+ */
+export type DemoModelRequest = Omit<ModelRequest, 'photoCount' | 'productName' | 'businessName' | 'variantName' | 'productPhotoUrl'> & {
+  photos: ModelRequestPhoto[]
+}
 
 export interface Db {
   schemaVersion: typeof SCHEMA_VERSION
@@ -34,6 +43,8 @@ export interface Db {
   ownerInviteAttempts?: DemoInviteAttempt[]
   /** Sample platform team (ADR-0029). Optional so demo data saved earlier stays valid. */
   team?: DemoTeam
+  /** 3D model requests (S4). Optional so demo data saved earlier stays valid. */
+  modelRequests?: DemoModelRequest[]
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
