@@ -12,7 +12,7 @@ import { MODEL_RULES, fetchRequiredExtensions, formatMb, isHttpsUrl, isStaleSess
 import { cn } from '@/lib/cn'
 import { formatFileSize } from '@/lib/format'
 import { type ScaleCheck, type ScaleMismatchReason, checkScale } from '@/lib/scale'
-import { MODEL_OPTIMIZATION_ENABLED, optimizeModel } from './modelOptimizeClient'
+import { MODEL_OPTIMIZATION_ENABLED, optimizeModel, optimizedNote } from './modelOptimizeClient'
 
 type ModelContext = 'product' | 'variant' | 'request'
 
@@ -53,7 +53,7 @@ export function ModelSection({
       {context === 'product' && (
         <InlineNotice tone="neutral" className="border border-line text-ink-body" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
           Upload the files your 3D artist delivered. <strong className="font-medium">GLB</strong> powers the 3D viewer and Android AR.{' '}
-          <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are optimized for size before upload; USDZ files are stored as uploaded. Nothing is converted.' : 'Files are stored as uploaded: they are not converted or compressed.'}
+          <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are made lighter before upload (smaller textures, fewer triangles; no compression, so Android AR still opens them); USDZ files are stored as uploaded. Nothing is converted.' : 'Files are stored as uploaded: they are not converted or compressed.'}
         </InlineNotice>
       )}
       {context === 'request' && (
@@ -110,7 +110,7 @@ function ModelSlot({
       file = r.file
       setOptimizeNote(
         r.optimized
-          ? { text: `Optimized for faster loading: ${formatFileSize(r.originalBytes)} → ${formatFileSize(r.outputBytes)} (textures above 2048 px reduced, unused data removed; size and shape unchanged).`, original }
+          ? { text: optimizedNote(r), original }
           : { text: r.reason ?? 'Kept the original file.' },
       )
     } else {

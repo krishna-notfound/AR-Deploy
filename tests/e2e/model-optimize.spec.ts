@@ -34,7 +34,7 @@ async function glbWithLargeTexture(): Promise<Buffer> {
   return Buffer.from(await new WebIO().writeBinary(doc))
 }
 
-// Runs with VITE_MODEL_OPTIMIZATION=on (playwright.config.ts). Production keeps it off until the client signs off.
+// Runs with optimization on (the default since ADR-0038; playwright.config.ts sets it explicitly).
 test('GLB upload: oversized textures are reduced in the browser, with the original still available', async ({ page }) => {
   test.setTimeout(120_000)
   const buffer = await glbWithLargeTexture()

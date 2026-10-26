@@ -45,6 +45,6 @@ Other behaviour:
 ## Model checks and optimization (2026-10-13)
 - **Scale check:** a mismatch names the likely cause: W/D swapped, the other unit, a model in cm/mm, or a uniform factor (`lib/scale.ts`). Tolerance is the larger of 5% and 1 cm. The model is never rescaled.
 - **Scene Viewer check:** a GLB that *requires* a glTF extension Scene Viewer doesn't support gets a warning on upload (`lib/files.ts unsupportedForSceneViewer`).
-- **Optimization:** off unless `VITE_MODEL_OPTIMIZATION=on` (ADR-0019; client sign-off pending). It runs in a worker, shows the sizes before and after, and offers "Upload the original instead".
+- **Optimization:** on by default; `VITE_MODEL_OPTIMIZATION=off` disables it (ADR-0019, switched on and extended with triangle reduction by ADR-0038, owner 2026-10-26). It runs in a worker, shows the sizes before and after, and offers "Upload the original instead".
 - **Business locked after uploads:** once files are stored, the business select is locked (files live under `{businessId}/`).
 - **Unit switch:** the cm/in switch labels the numbers; it does not convert them (the section text says so).

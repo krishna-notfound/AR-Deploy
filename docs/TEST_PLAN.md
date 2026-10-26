@@ -41,6 +41,7 @@ Use a product with a GLB **and** a USDZ whose scale shows "True-to-size model", 
 - **Model URL refresh:** open a product page, leave the tab in the background for 6 h+ (or overnight), return, then start AR. **Expected:** AR opens (the page fetched fresh 12 h signed URLs on return). Only meaningful for products whose files are stored in Supabase (the sample products use external URLs).
 - **In-app browsers:** open a catalog link from Instagram, Facebook and WhatsApp. **Expected:** the notice to open in Safari/Chrome on the catalog and product pages; copy-link works.
 - **Fallback:** on a computer, no AR button; 3D viewer + "view on a phone" QR that opens the same product.
+- **Heavy model optimization (ADR-0038):** in the dashboard, upload a heavy GLB (more than 100,000 triangles, 4096 px textures; the Tripo chair with 440,384 triangles is a good one). **Expected:** the editor says the model was optimized and shows fewer triangles and a smaller size; the true-size check still passes. Publish it and open the product on a phone: the model looks the same as the original (compare with "Upload the original instead" on a second product), and AR opens at true size (measure one side, within 5% or 1 cm) on Android and, with its USDZ, on iPhone. Also confirm that a USDZ uploaded alongside is stored unchanged.
 - **Never claimed:** wall detection, collisions, room fit, guaranteed occlusion.
 
 ## S1.5 live checks (after the release, with the owner's OK)
@@ -120,4 +121,4 @@ Run on `zggylkbgajamhriebdrg` with accounts and businesses labelled "QA", a QA T
 | `/signup` email confirmation flow | Production sign-ups stay off. Needs approval + custom SMTP (Resend) before real owners |
 | Admin creates a claim link in the UI and an owner redeems it in a browser | A test owner account; can run on the live site with approval |
 | Subdomain routing + SSL | Client domain and DNS access |
-| Optimized model (compression) in Scene Viewer + Quick Look | Client sign-off (A-2) and devices |
+| Optimized heavy model on a phone (see "Heavy model optimization" under the real-device checklist) | Devices (A-2 answered 2026-10-26, ADR-0038) |

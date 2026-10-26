@@ -1,5 +1,5 @@
 # ADR-0019: Safe GLB optimization in the browser before upload (glTF-Transform)
-- **Status:** Accepted for implementation. **Off in production** until the client signs off (APPROVAL_REQUIRED.md, A-2).
+- **Status:** Accepted for implementation. Extended and switched on by default by ADR-0038 (owner, 2026-10-26: adds triangle reduction; `VITE_MODEL_OPTIMIZATION=off` now opts out).
 - **Date:** 2026-10-13
 - **Affects:** design/15-product-editor.md, audit/PRIORITIZED_ISSUES.md P1-01
 

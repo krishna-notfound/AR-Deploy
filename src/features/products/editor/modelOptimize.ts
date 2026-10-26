@@ -1,15 +1,23 @@
-// Safe GLB size optimization before upload (contract: "automatic model compression"; ADR-0019).
+// Safe GLB size optimization before upload (contract: "automatic model compression"; ADR-0019, ADR-0038).
 // Scene Viewer only accepts a few glTF extensions, so nothing here adds one: no Draco, meshopt, KTX2,
-// WebP or quantization. Only lossless cleanup plus downscaling textures larger than 2048 px (Google's
-// limit for Android AR), in the texture's own format. The output is re-read and compared with the input;
-// on any doubt the original file is kept.
-// Loaded only through modelOptimizeClient.ts, which is off unless VITE_MODEL_OPTIMIZATION=on (client sign-off pending).
+// WebP or quantization. Lossless cleanup, downscaling textures larger than 2048 px (Google's limit for
+// Android AR) in the texture's own format, and, above 100,000 triangles, mesh simplification
+// (meshoptimizer, the algorithm @gltf-transform/cli uses). The output is re-read and compared with the
+// input; on any doubt the original file is kept.
+// Loaded only through modelOptimizeClient.ts (on unless VITE_MODEL_OPTIMIZATION=off; owner 2026-10-26).
 import { type Document, WebIO, getBounds } from '@gltf-transform/core'
 import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions'
-import { dedup, prune, resample } from '@gltf-transform/functions'
+import { dedup, prune, resample, simplify, weld } from '@gltf-transform/functions'
+import { MeshoptSimplifier } from 'meshoptimizer'
 
 /** Scene Viewer's maximum texture size (developers.google.com/ar/develop/scene-viewer). */
 export const MAX_TEXTURE_PX = 2048
+/** Google's guidance for phone AR: about 100,000 triangles (ADR-0038). Heavier models are simplified toward it. */
+export const MAX_TRIANGLES = 100_000
+/** Simplification never moves the surface more than this fraction of the model's size (0.1%: under 1 mm on a chair). */
+const SIMPLIFY_ERROR = 0.001
+/** The true size may move this much (relative) through simplification; beyond it the original is kept. */
+const SIZE_TOLERANCE = 0.005
 /** Keep the original unless the result is at least 5% smaller. */
 const MIN_SAVING = 0.05
 
@@ -20,6 +28,9 @@ export interface OptimizeResult {
   outputBytes: number
   /** Why the original was kept (when optimized is false). */
   reason?: string
+  /** Triangle counts before and after (equal when the model was not simplified). */
+  trianglesBefore?: number
+  trianglesAfter?: number
 }
 
 /** Returns a smaller encoding of the image in the same format, or null to leave it unchanged. */
@@ -47,10 +58,12 @@ export function summarize(doc: Document): ModelSummary {
 }
 
 /** Reason the optimized model is not equivalent to the original, or null when it is. */
-export function compareSummaries(before: ModelSummary, after: ModelSummary): string | null {
-  const off = [...before.min, ...before.max].some((v, i) => Math.abs(v - [...after.min, ...after.max][i]!) > 0.001)
+export function compareSummaries(before: ModelSummary, after: ModelSummary, opts: { simplified?: boolean } = {}): string | null {
+  const extent = Math.max(...before.max.map((v, i) => v - before.min[i]!), 0)
+  const tolerance = opts.simplified ? Math.max(0.001, extent * SIZE_TOLERANCE) : 0.001
+  const off = [...before.min, ...before.max].some((v, i) => Math.abs(v - [...after.min, ...after.max][i]!) > tolerance)
   if (off) return 'its size changed'
-  if (before.triangles !== after.triangles) return 'its geometry changed'
+  if (opts.simplified ? after.triangles > before.triangles : before.triangles !== after.triangles) return 'its geometry changed'
   if (after.materials > before.materials) return 'its materials changed'
   if (after.extensions.some((e) => !before.extensions.includes(e))) return 'it would need a new glTF extension'
   return null
@@ -87,6 +100,11 @@ export async function optimizeGlb(file: File, resize: ImageResizer = canvasResiz
     const doc = await io.readBinary(new Uint8Array(await file.arrayBuffer()))
     const before = summarize(doc)
     await doc.transform(dedup(), prune(), resample())
+    const simplified = before.triangles > MAX_TRIANGLES
+    if (simplified) {
+      await MeshoptSimplifier.ready
+      await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: MAX_TRIANGLES / before.triangles, error: SIMPLIFY_ERROR }), prune())
+    }
     for (const texture of doc.getRoot().listTextures()) {
       const mime = texture.getMimeType()
       const size = texture.getSize()
@@ -96,14 +114,18 @@ export async function optimizeGlb(file: File, resize: ImageResizer = canvasResiz
       if (resized && resized.byteLength < image.byteLength) texture.setImage(resized)
     }
     const out = await io.writeBinary(doc)
-    const problem = compareSummaries(before, summarize(await io.readBinary(out)))
-    if (problem) return keep(`Kept the original: optimizing would have meant ${problem}.`)
-    if (out.byteLength > originalBytes * (1 - MIN_SAVING)) return keep('Kept the original: it is already compact.')
+    const after = summarize(await io.readBinary(out))
+    const counts = { trianglesBefore: before.triangles, trianglesAfter: before.triangles }
+    const problem = compareSummaries(before, after, { simplified })
+    if (problem) return { ...keep(`Kept the original: optimizing would have meant ${problem}.`), ...counts }
+    if (out.byteLength > originalBytes * (1 - MIN_SAVING)) return { ...keep('Kept the original: it is already compact.'), ...counts }
     return {
       file: new File([out as BlobPart], file.name, { type: file.type }),
       optimized: true,
       originalBytes,
       outputBytes: out.byteLength,
+      trianglesBefore: before.triangles,
+      trianglesAfter: after.triangles,
     }
   } catch {
     return keep('Kept the original: the file could not be optimized safely.')

@@ -187,9 +187,21 @@ Most businesses do not make their own 3D files. Instead you ask the Sanctus team
 
 ---
 
-## 5. Model compression
+## 5. Preparing 3D models
 
-A tool that shrinks GLB files before upload is built, but it is **switched OFF** until you approve it. It never changes size or shape: it reduces large textures and removes unused data. **USDZ files are never changed.** Today every file is stored exactly as uploaded.
+Models made by AI tools or scanners are often far too heavy for a phone. Aim for these targets:
+
+| Target | Why |
+|---|---|
+| **GLB under 10 MB** | Heavier files load slowly on mobile data |
+| **About 100,000 triangles or fewer** | More adds weight without a visible difference on a phone |
+| **Textures up to 2048 px, JPEG or PNG** | Android AR does not open larger textures |
+| **No Draco, KTX2, meshopt or WebP compression** | Android AR cannot open files that use them |
+| **Real size in metres** | The size check compares the model with the width, height and depth you entered |
+
+**The dashboard now makes oversized models lighter for you.** When you upload a GLB, it shrinks textures above 2048 px and reduces models above 100,000 triangles to about 100,000. This happens in your browser before the file is uploaded and takes a few seconds. The shape does not visibly change, the real size is checked to stay within 0.5%, and the editor shows the size before and after. If anything looks wrong, or the check fails, the original is kept, and you can always choose **Upload the original instead**. As an example, a 17.5 MB chair with 440,384 triangles came out at 3.4 MB with 88,076 triangles and looked identical side by side.
+
+**The iPhone file (USDZ) is not changed.** Export it light too (same targets), or leave it out and the iPhone builds one from the GLB.
 
 ---
 
@@ -255,7 +267,7 @@ Products you deleted keep their numbers and appear as one **Deleted products** r
 - **No custom domain or business subdomains yet.** Catalogs currently live at `/catalog/<business-address>` on the current Vercel address.
 - **Options (variants) don't swap the 3D model or photos.** They change only the swatch and the price.
 - **Material is a single text field** per language. There is no material picker.
-- **Model compression is off** (see section 5).
+- **USDZ files are not lightened** (see section 5). Only GLB files are.
 - **Sample data is still in the live database** (4 sample businesses with their products and seeded report numbers). It will be removed, with your approval, once the real catalog is ready.
 - **Public sign-up is off by design.** Businesses apply, and owners are invited. Until the client's email domain is verified in Resend, invitation and confirmation emails reach only the Resend account owner; other recipients are listed as "Not sent".
 

@@ -19,7 +19,7 @@ Read when: writing tests, verifying a task, or doing the QA phase.
 It runs in `npm test`. It does not replace the live integration test (`live.integration.test.ts`, which needs the `SUPABASE_IT_*` variables and writes data).
 
 ## E2E notes
-- **Model optimization:** E2E runs with `VITE_MODEL_OPTIMIZATION=on` to cover that feature (production default: off).
+- **Model optimization:** on by default (ADR-0038); E2E covers it with the default setting and with `VITE_MODEL_OPTIMIZATION=off`.
 - **Network dependency:** sample models load from raw.githubusercontent.com, so model tests depend on the network. Their budgets are sized for that.
 
 ## Definition of done (every task)

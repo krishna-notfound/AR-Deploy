@@ -71,7 +71,7 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 
 | ID | Requirement | Src | Status | Evidence | Gap / risk | Acceptance | Client approval |
 |---|---|---|---|---|---|---|---|
-| R-31 | Automatic model compression | C | REQUIRES_OWNER_APPROVAL | ADR-0019; glTF-Transform pipeline behind `VITE_MODEL_OPTIMIZATION` (off) | GLB only; USDZ untouched. Needs a device check of an optimized model before switching on | Client agrees on meaning (A-2); optimized model passes Scene Viewer + Quick Look | Y (A-2) |
+| R-31 | Automatic model compression | C | APPROVED (owner, 2026-10-26) | ADR-0019 + ADR-0038; on by default, `VITE_MODEL_OPTIMIZATION=off` disables. In the uploader's browser worker: textures above 2048 px downscaled, models above 100,000 triangles simplified toward 100,000 (meshoptimizer, error 0.001); no Draco/KTX2/meshopt/WebP/quantization | GLB only; USDZ untouched. Result is re-read: true size within 0.5%, no new extensions or materials, else the original is kept; "Upload the original instead" stays. Owner's real chair: 17.5 MB, 440,384 triangles → 3.4 MB, 88,076 triangles by hand | Device check of an optimized heavy model: looks the same, AR opens at true size (TEST_PLAN) | Answered (A-2) |
 | R-32 | Domain, subdomain routing, HTTPS | C | BLOCKED | Code ready (R-15); `System_arch/design/20-*` runbook | Needs the owner's domain and DNS access. Vercel wildcard domains require the domain's nameservers to point at Vercel | `https://{slug}.{domain}` works for every active business | Y |
 | R-33 | Source, schema, models handover | C | INCOMPLETE | Repo, 6 migrations, `System_arch/` | Several audit docs are stale (see PRODUCTION_READINESS §5) | Repo + Supabase + Vercel transferred via provider tools | Y |
 | R-34 | Non-technical user guide + walkthrough | C | INCOMPLETE | — | Not written | Client can create a business and publish a product from the guide alone | N |
@@ -97,7 +97,7 @@ Not decided on the client's behalf. What the platform does today:
 
 1. **Variants (A-3):** is a colour swatch with an optional price difference enough, or should a variant change the 3D model/photos, or carry its own size/finish?
 2. **Materials (A-3):** is one free-text material line per language enough, or is a structured list needed?
-3. **Compression (A-2):** may the platform shrink uploaded GLB files (textures to ≤ 2048 px, unused data removed; shape and size unchanged; USDZ untouched)? It stays off until you say yes.
+3. **Compression (A-2): answered "yes, turn it on" by the owner on 2026-10-26 (ADR-0038).** The platform now lightens uploaded GLB files automatically: textures above 2048 px are shrunk and models above 100,000 triangles are simplified toward 100,000 (the surface never moves more than 0.1% of the model's size), unused data is removed, and the real size is checked to stay within 0.5%. No compression formats that Android AR cannot open are used. USDZ is untouched. The business can still choose "Upload the original instead".
 4. **Owner accounts (A-5 / ADR-0022):** do you want business owners to log in themselves (dashboard, claim links, self-registration as drafts you approve), or will your team manage everything from the admin panel?
 5. **Domain:** which domain should catalogs use (`<business>.<domain>`), and who controls its DNS?
 6. **Sample data:** may the 4 sample businesses (casa-lisboa, nordhaus, atelier-verde, oak-ember) be deleted once your real products are in? Is `digital-heroes-buisness` yours?

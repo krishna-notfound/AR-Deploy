@@ -157,7 +157,7 @@ Deleting needs the owner's separate approval: delete the 4 businesses (products,
 | 7 | Production Auth: min password 12, leaked-password protection (if plan allows), sign-ups stay off | Needs separate approval |
 | 8 | Sample data removal (6e) | Needs separate approval, after real catalog exists |
 | 9 | Client domain, wildcard subdomains, SSL, `VITE_ROOT_DOMAIN` | BLOCKED: client domain |
-| 10 | Compression switched on | BLOCKED: client sign-off (A-2) |
+| 10 | Compression switched on | DONE: owner decision 2026-10-26 (ADR-0038); on by default, device check of a heavy optimized model still listed in TEST_PLAN |
 | 11 | Variants/materials meaning confirmed | BLOCKED: client decision (A-3, see PRD) |
 | 12 | Handover docs + walkthrough video | docs in progress; video owner action |
 
