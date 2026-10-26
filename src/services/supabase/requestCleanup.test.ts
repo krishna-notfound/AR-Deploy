@@ -17,7 +17,7 @@ const PATHS = [
   { bucket: 'product-media', path: 'b1/staged.glb', variant_id: 'v1' },
 ]
 
-type Opts = { tree?: Record<string, { name: string; id: string | null }[]>; variants?: string[]; variantsAfter?: string[]; paths?: unknown; pathsError?: boolean; saveError?: boolean; removeFail?: string[] }
+type Opts = { tree?: Record<string, { name: string; id: string | null }[]>; variants?: string[]; variantsAfter?: string[]; paths?: unknown; pathsError?: boolean; saveError?: boolean; removeFail?: string[]; removeNone?: string[] }
 
 function fake(o: Opts, log: string[]) {
   let saved = false
@@ -54,7 +54,9 @@ function fake(o: Opts, log: string[]) {
         },
         remove: (paths: string[]) => {
           log.push(`remove ${bucket} ${[...paths].sort().join(',')}`)
-          return Promise.resolve(o.removeFail?.includes(bucket) ? { data: null, error: { message: 'denied' } } : { data: [], error: null })
+          if (o.removeFail?.includes(bucket)) return Promise.resolve({ data: null, error: { message: 'denied' } })
+          // Storage answers with the objects it removed; RLS that hides a row removes nothing and still says ok.
+          return Promise.resolve({ data: o.removeNone?.includes(bucket) ? [] : paths.map((name) => ({ name, bucket_id: bucket })), error: null })
         },
         getPublicUrl: (p: string) => ({ data: { publicUrl: p } }),
       }),
@@ -74,6 +76,11 @@ describe('request clean-up (R-S4-18)', () => {
 
   it('deleteProduct counts a photo removal that fails, and still succeeds', async () => {
     const svc = createSupabaseCatalogService(fake({ paths: PATHS, removeFail: ['model-request-photos'] }, []))
+    expect(await svc.deleteProduct('p1')).toEqual({ ok: true, data: { removedFiles: 1, failedFiles: 3 } })
+  })
+
+  it('deleteProduct counts photos the storage call did not remove (an empty answer) as failed, not removed', async () => {
+    const svc = createSupabaseCatalogService(fake({ paths: PATHS, removeNone: ['model-request-photos'] }, []))
     expect(await svc.deleteProduct('p1')).toEqual({ ok: true, data: { removedFiles: 1, failedFiles: 3 } })
   })
 

@@ -757,9 +757,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     let removed = 0
     let failed = 0
     if (photos.length) {
-      const { error } = await sb.storage.from(REQUEST_PHOTO_BUCKET).remove(photos)
-      if (error) failed += photos.length
-      else removed += photos.length
+      const { data, error } = await sb.storage.from(REQUEST_PHOTO_BUCKET).remove(photos)
+      // Storage answers with the objects it removed. A path RLS hides is not removed yet the call still succeeds,
+      // so only the paths it returned count as removed.
+      const gone = new Set((error ? [] : (data ?? [])).map((o) => o.name))
+      const done = photos.filter((p) => gone.has(p)).length
+      removed += done
+      failed += photos.length - done
     }
     const media = await removeUnreferencedMedia(staged)
     return { removed: removed + media.removed, failed: failed + media.failed }

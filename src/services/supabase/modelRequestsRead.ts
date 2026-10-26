@@ -138,7 +138,8 @@ export function createSupabaseModelRequestsRead(sb: SupabaseClient, notify: () =
     setBusinessOwnModels: (businessId, allow) =>
       guard(async () => {
         const res = await sb.rpc('admin_set_own_models', { p_business: businessId, p_allow: allow })
-        if (res.error) return mapModelRequestError(res.error)
+        // business_not_found (P0002): the same fixed copy as the demo and the read below, never the raw key.
+        if (res.error) return res.error.message === 'business_not_found' ? fail('NOT_FOUND', 'Business not found.') : mapModelRequestError(res.error)
         notify()
         const { data, error } = await sb.from('businesses').select('*').eq('id', businessId).maybeSingle<BusinessRow>()
         if (error) return mapDbError(error)

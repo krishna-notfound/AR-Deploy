@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { type ModelRequest, OPEN_REQUEST_STATUSES, REQUEST_PHOTOS_MAX, REQUEST_PHOTOS_MIN, REQUEST_TEXT_MAX } from '@/domain/modelRequests'
-import type { ID, Product } from '@/domain/types'
+import type { Dimensions, ID, Product } from '@/domain/types'
 import { ModelRequestStatusBadge } from '@/features/modelRequests/ModelRequestStatusBadge'
 import { DEMO_SESSION_PHOTOS, LOAD_ERROR, statusLine } from '@/features/modelRequests/copy'
 import { useModelRequests } from '@/features/modelRequests/hooks'
@@ -21,6 +21,10 @@ export interface ModelRequestPanelProps {
   product: Product | undefined
   onSaveDraft: () => void
   onReload: () => void
+  /** The dimensions on screen (parsed from the form). The request uses the saved ones, so differing ones ask to save. */
+  formDimensions?: Dimensions
+  /** The editor is saving (the Save action shows as busy). */
+  saving?: boolean
 }
 
 /** Status is re-read on focus once it is this old. */
@@ -48,7 +52,7 @@ function revoke(url: string): void {
   if (url && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(url)
 }
 
-export function ModelRequestPanel({ product, onSaveDraft, onReload }: ModelRequestPanelProps): JSX.Element | null {
+export function ModelRequestPanel({ product, onSaveDraft, onReload, formDimensions, saving }: ModelRequestPanelProps): JSX.Element | null {
   const titleId = useId()
   return (
     <section aria-labelledby={titleId} className="space-y-4 rounded-[var(--radius-card)] border border-line bg-surface p-4 sm:p-5">
@@ -59,7 +63,7 @@ export function ModelRequestPanel({ product, onSaveDraft, onReload }: ModelReque
         <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">{INTRO}</p>
       </div>
       {product ? (
-        <SavedProductPanel product={product} onReload={onReload} />
+        <SavedProductPanel product={product} onReload={onReload} onSave={onSaveDraft} formDimensions={formDimensions} saving={saving} />
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-[14px] text-ink-body">Save this product first, then request its 3D model.</p>
@@ -72,7 +76,19 @@ export function ModelRequestPanel({ product, onSaveDraft, onReload }: ModelReque
   )
 }
 
-function SavedProductPanel({ product, onReload }: { product: Product; onReload: () => void }) {
+function SavedProductPanel({
+  product,
+  onReload,
+  onSave,
+  formDimensions,
+  saving,
+}: {
+  product: Product
+  onReload: () => void
+  onSave: () => void
+  formDimensions?: Dimensions
+  saving?: boolean
+}) {
   const query = useModelRequests({ productId: product.id })
   useRefreshWhenStale(query.refetch, STALE_MS, query.data)
   const toast = useToast()
@@ -123,6 +139,7 @@ function SavedProductPanel({ product, onReload }: { product: Product; onReload: 
       return
     }
     toast.success('Request cancelled.')
+    if (res.data.cleanup === 'partial') toast.info("Some photos couldn't be removed.")
     query.refetch()
   }
   const newRequestFor = (target: string) => {
@@ -181,6 +198,9 @@ function SavedProductPanel({ product, onReload }: { product: Product; onReload: 
           <RequestForm
             key={preferredTarget ?? 'form'}
             product={product}
+            formDimensions={formDimensions}
+            onSave={onSave}
+            saving={saving}
             targets={freeTargets}
             showTargets={product.variants.length > 0}
             initialTarget={preferredTarget && freeTargets.some((t) => t.value === preferredTarget) ? preferredTarget : freeTargets[0]!.value}
@@ -207,12 +227,18 @@ function RequestLine({ request, optionName }: { request: ModelRequest; optionNam
 
 function RequestForm({
   product,
+  formDimensions,
+  onSave,
+  saving,
   targets,
   showTargets,
   initialTarget,
   onSent,
 }: {
   product: Product
+  formDimensions?: Dimensions
+  onSave: () => void
+  saving?: boolean
   targets: { value: string; label: string }[]
   showTargets: boolean
   initialTarget: string
@@ -235,8 +261,12 @@ function RequestForm({
   }, [picked])
   useEffect(() => () => pickedRef.current.forEach((p) => revoke(p.url)), [])
 
-  const d = product.dimensions
-  const hasDimensions = d.width > 0 && d.height > 0 && d.depth > 0
+  // The request is made to the saved size, so on-screen dimensions that differ from it are saved first.
+  const saved = product.dimensions
+  const shown = formDimensions ?? saved
+  const hasDimensions = shown.width > 0 && shown.height > 0 && shown.depth > 0
+  const unsavedDimensions =
+    hasDimensions && (shown.width !== saved.width || shown.height !== saved.height || shown.depth !== saved.depth || shown.unit !== saved.unit)
   const enough = picked.length >= REQUEST_PHOTOS_MIN
 
   const onFiles = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -385,7 +415,14 @@ function RequestForm({
           {sendError}
         </p>
       )}
-      {hasDimensions ? (
+      {unsavedDimensions ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-[13px] text-ink-body">Save the product to use its dimensions.</p>
+          <Button size="sm" loading={saving} onClick={onSave}>
+            Save changes
+          </Button>
+        </div>
+      ) : hasDimensions ? (
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="primary" loading={sending} disabled={!enough} onClick={() => void send()}>
             Send request
@@ -394,7 +431,7 @@ function RequestForm({
         </div>
       ) : (
         <a href="#specs" className="text-[13px] font-medium text-accent-ink underline underline-offset-2">
-          Add width, height and depth above first. The model is made to that size.
+          Add width, height and depth in Specifications first. The model is made to that size.
         </a>
       )}
     </fieldset>
