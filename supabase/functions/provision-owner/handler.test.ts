@@ -211,6 +211,11 @@ describe('provision-owner', () => {
     expect(existed.reservations.map((r) => r.outcome)).toEqual(['blocked'])
     expect(existed.deleted).toEqual([])
 
+    // A failing finishInvite still deletes the login this request created.
+    const finishFails = deps({ linkOwner: async () => 'business_has_owner', finishInvite: async () => Promise.reject(new Error('reservation update failed: 08006')) })
+    await expect(handleProvisionOwner(post(provision()), finishFails.d)).rejects.toThrow('reservation update failed')
+    expect(finishFails.deleted).toEqual(['new-user'])
+
     // A link that fails outright cleans up the same way, then reports the error.
     const thrown = deps({ linkOwner: async () => Promise.reject(new Error('link failed: timeout')) })
     await expect(handleProvisionOwner(post(provision()), thrown.d)).rejects.toThrow('link failed')

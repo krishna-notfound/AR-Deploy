@@ -108,9 +108,13 @@ export async function handleProvisionOwner(req: Request, deps: ProvisionDeps): P
       return reply(502, { error: 'invite_link_failed' })
     }
     // A refused or failed link leaves no login behind that this request created (a parallel provision won the race).
+    // The delete runs even when the finish fails. A failed delete throws: a 500 by design (logged), not a silent orphan.
     const discard = async () => {
-      await deps.finishInvite(reserved.reservationId, 'blocked')
-      if (!existing) await deps.deleteAuthUser(issued.userId)
+      try {
+        await deps.finishInvite(reserved.reservationId, 'blocked')
+      } finally {
+        if (!existing) await deps.deleteAuthUser(issued.userId)
+      }
     }
     let linked: Awaited<ReturnType<ProvisionDeps['linkOwner']>>
     try {

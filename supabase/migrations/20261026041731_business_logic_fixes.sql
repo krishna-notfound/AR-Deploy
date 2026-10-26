@@ -894,7 +894,8 @@ begin
                            else 'owner_active' end,
              'last_invited_at', coalesce(a.created_at, l.created_at),
              'email_failed', case
-                               when a.id is not null then a.outcome in ('failed', 'blocked') or coalesce(ae.status in ('bounced', 'complained'), false)
+                               -- A pending attempt (outcome null) has not failed.
+                               when a.id is not null then coalesce(a.outcome in ('failed', 'blocked'), false) or coalesce(ae.status in ('bounced', 'complained'), false)
                                when l.status is not null then l.status in ('failed', 'blocked', 'bounced', 'complained')
                                else false
                              end)

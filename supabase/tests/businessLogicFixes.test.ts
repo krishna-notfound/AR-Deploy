@@ -1177,6 +1177,12 @@ describe('S1.5 Task 17: owner invitations and onboarding', () => {
     await l5Log('failed', '2026-10-22T09:00:00Z', 3)
     expect(of((await states(OWNER)) as J[], L5_BIZ)).toMatchObject({ state: 'invite_pending', email_failed: true })
 
+    // A pending newest attempt (reserved, not finished yet) has not failed: false, not null, even after a failed one.
+    await finish(granted(await reserve(BIZ(8), 'pending@shop.test')).reservation_id, 'failed')
+    await age(BIZ(8), 61)
+    granted(await reserve(BIZ(8), 'pending@shop.test'))
+    expect(of((await states(OWNER)) as J[], BIZ(8))!.email_failed).toBe(false)
+
     await withRolePermissions({ team: ['products.view'] }, async () => {
       expect(await states(TEAM)).toEqual({ error: 'forbidden' })
     })
