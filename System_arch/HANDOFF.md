@@ -2,7 +2,7 @@
 
 ## Live state (checked 2026-10-27; re-check before relying on it, see CLAUDE.md "Facts and live state")
 - **Site:** `sanctus.warpkit.online` is built from `feature/sanctus-brand-design-system` (Vercel Preview). `main` (last commit 2026-10-14) is not live. Before merging to `main`: Production env vars must point at `zggylkbgajamhriebdrg`, and the domain must be switched to `main` in Vercel (not checkable from here).
-- **Supabase `zggylkbgajamhriebdrg`:** all 18 migrations applied; 13 Edge Functions active. 10 were deployed on 2026-10-26 07:52 UTC, before `_shared/team.ts` gained `models.manage` (only effect: team invitation emails omit that permission line); redeploy only with the owner's go-ahead.
+- **Supabase `zggylkbgajamhriebdrg`:** all 18 migrations applied; 13 Edge Functions active. `invite-member` redeployed 2026-10-26 19:43 UTC (v4, owner's go-ahead) so team invitation emails list "Handle 3D model requests"; the other functions deployed before the later `_shared` changes behave the same (refactor/type-only differences).
 - **Not checkable from here:** Auth Site URL and redirect URLs. The only record is a 2026-10-20 QA note that the Site URL was the default `http://localhost:3000/`; it may have been fixed. Ask the owner before stating it either way. Same for the `APP_BASE_URL` secret's value (it is set) and Vercel env vars.
 - **Live test content:** catalog `idk` (products `idkidk` Astronaut, `chair` 17.5 MB Tripo chair). Remove before handover, with the owner's OK.
 
