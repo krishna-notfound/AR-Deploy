@@ -94,3 +94,151 @@ alter table public.email_log add constraint email_log_kind_check
                   'security_code', 'security_notice', 'closure_request',
                   'application_decision', 'business_notice', 'team_notice'));
 -- ---- end S1.5 Task 1 ----
+
+-- =============================================================================
+-- S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)
+-- =============================================================================
+
+-- R-W3-3: what each permission needs to be usable (§4, §16 ruling-11 adjustment). One edge per row; the closure is
+-- transitive. src/domain/permissions.ts (PERMISSION_PREREQUISITES) mirrors it, pinned by the PGlite suite.
+create function private.permission_prerequisites()
+returns table (permission text, requires text)
+language sql
+immutable
+security definer
+set search_path = ''
+as $$
+  values
+    ('businesses.edit', 'businesses.view'),
+    ('businesses.status', 'businesses.edit'),
+    ('businesses.delete', 'businesses.edit'),
+    ('businesses.delete', 'products.delete'),
+    ('owners.manage', 'businesses.view'),
+    ('applications.approve', 'applications.view'),
+    ('applications.reject', 'applications.view'),
+    ('products.edit', 'products.view'),
+    ('products.publish', 'products.edit'),
+    ('products.delete', 'products.edit');
+$$;
+revoke execute on function private.permission_prerequisites() from public, anon, authenticated;
+
+-- A permission set plus everything it needs, sorted. Used by admin_set_role_permissions and the backfill below.
+create function private.with_prerequisites(p_permissions text[])
+returns text[]
+language sql
+immutable
+security definer
+set search_path = ''
+as $$
+  with recursive closed (permission) as (
+    select unnest(coalesce(p_permissions, '{}'::text[]))
+    union
+    select pp.requires from closed c join private.permission_prerequisites() pp on pp.permission = c.permission
+  )
+  select coalesce(array_agg(permission order by permission), '{}'::text[]) from closed where permission is not null;
+$$;
+revoke execute on function private.with_prerequisites(text[]) from public, anon, authenticated;
+
+-- Saving a role set stores it with its prerequisites and answers {ok, added}: `added` lists the prerequisites the
+-- caller did not send, in the dashboard's order (ALL_PERMISSIONS in src/domain/permissions.ts). The audit row's
+-- added/removed are the stored change, so prerequisites that were not stored before are listed there too.
+-- Body from 20261025070915_platform_team_roles; only the closure and the answer are new.
+create or replace function public.admin_set_role_permissions(p_role public.platform_role, p_permissions text[])
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_known constant text[] := array[
+    'businesses.view', 'businesses.edit', 'businesses.status', 'businesses.delete', 'owners.manage',
+    'applications.view', 'applications.approve', 'applications.reject',
+    'products.view', 'products.edit', 'products.publish', 'products.delete',
+    'analytics.view', 'records.view', 'access.view'];
+  v_asked text[] := array(select distinct unnest(coalesce(p_permissions, '{}')) order by 1);
+  v_new text[];
+  v_implied text[];
+  v_old text[];
+  v_added text[];
+  v_removed text[];
+begin
+  if not private.owner_or_deny('set_role_permissions') then
+    return jsonb_build_object('error', 'forbidden');
+  end if;
+  if not (v_asked <@ v_known) then
+    return jsonb_build_object('error', 'unknown_permission');
+  end if;
+  v_new := private.with_prerequisites(v_asked);
+  v_implied := array(select p from unnest(v_new) p where p <> all (v_asked) order by array_position(v_known, p));
+  v_old := array(select permission from public.platform_role_permissions where role = p_role order by 1);
+  v_added := array(select unnest(v_new) except select unnest(v_old) order by 1);
+  v_removed := array(select unnest(v_old) except select unnest(v_new) order by 1);
+  if cardinality(v_added) = 0 and cardinality(v_removed) = 0 then
+    return jsonb_build_object('ok', true, 'added', to_jsonb(v_implied));
+  end if;
+  delete from public.platform_role_permissions where role = p_role and permission = any (v_removed);
+  insert into public.platform_role_permissions (role, permission) select p_role, unnest(v_added);
+  insert into public.audit_events (event_type, actor_id, metadata)
+  values ('access_permissions_changed', (select auth.uid()),
+          jsonb_build_object('role', p_role::text, 'added', to_jsonb(v_added), 'removed', to_jsonb(v_removed)));
+  return jsonb_build_object('ok', true, 'added', to_jsonb(v_implied));
+end;
+$$;
+revoke execute on function public.admin_set_role_permissions(public.platform_role, text[]) from public, anon;
+grant execute on function public.admin_set_role_permissions(public.platform_role, text[]) to authenticated, service_role;
+
+-- Backfill: every stored role set gets its prerequisites. This can WIDEN a role (e.g. products.edit for a role that
+-- has products.publish); the owner sees it first with the read-only pre-flight below and may narrow the sets before
+-- release. One access_permissions_changed row per changed role, by the system (actor null), with exactly what was
+-- added (sorted), removed [] and reason 'prerequisites'. A role with nothing missing gets no row.
+--
+-- Pre-flight for the runbook (read-only; runs before this migration, so it carries its own copy of the map):
+-- PRE-FLIGHT (R-W3-3) BEGIN
+-- with recursive prereq (permission, requires) as (
+--   values ('businesses.edit', 'businesses.view'), ('businesses.status', 'businesses.edit'),
+--          ('businesses.delete', 'businesses.edit'), ('businesses.delete', 'products.delete'),
+--          ('owners.manage', 'businesses.view'), ('applications.approve', 'applications.view'),
+--          ('applications.reject', 'applications.view'), ('products.edit', 'products.view'),
+--          ('products.publish', 'products.edit'), ('products.delete', 'products.edit')),
+-- closed (role, permission) as (
+--   select role, permission from public.platform_role_permissions
+--   union
+--   select c.role, p.requires from closed c join prereq p on p.permission = c.permission)
+-- select role::text as role, array_agg(permission order by permission) as will_add
+--   from (select role, permission from closed
+--         except select role, permission from public.platform_role_permissions) missing
+--  group by role order by role;
+-- PRE-FLIGHT (R-W3-3) END
+do $$
+declare
+  r record;
+  v_added text[];
+begin
+  for r in select role, array_agg(permission order by permission) as perms
+             from public.platform_role_permissions group by role order by role loop
+    v_added := array(select unnest(private.with_prerequisites(r.perms)) except select unnest(r.perms) order by 1);
+    if cardinality(v_added) > 0 then
+      insert into public.platform_role_permissions (role, permission) select r.role, unnest(v_added);
+      insert into public.audit_events (event_type, actor_id, metadata)
+      values ('access_permissions_changed', null,
+              jsonb_build_object('role', r.role::text, 'added', to_jsonb(v_added), 'removed', '[]'::jsonb,
+                                 'reason', 'prerequisites'));
+    end if;
+  end loop;
+end;
+$$;
+
+-- Storage deletes follow the permission that deletes the row (BIZ-06 storage part): media with products.edit
+-- (replacing files), products.delete or businesses.delete; logos with businesses.edit or businesses.delete.
+drop policy "Platform members delete media" on storage.objects;
+create policy "Platform members delete media" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'product-media'
+         and ((select public.platform_can('products.edit')) or (select public.platform_can('products.delete'))
+              or (select public.platform_can('businesses.delete'))));
+drop policy "Platform members delete logos" on storage.objects;
+create policy "Platform members delete logos" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'business-logos'
+         and ((select public.platform_can('businesses.edit')) or (select public.platform_can('businesses.delete'))));
+-- ---- end S1.5 Task 5 ----

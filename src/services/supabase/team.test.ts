@@ -102,6 +102,11 @@ describe('Supabase team service', () => {
     expect(rpc).toHaveBeenCalledWith('admin_set_role_permissions', { p_role: 'team', p_permissions: ['products.view'] })
   })
 
+  it('answers the prerequisites the database added (R-W3-3), keeping only known keys', async () => {
+    const { sb } = stub({ admin_set_role_permissions: { ok: true, added: ['products.view', 'products.edit', 'nope'] } })
+    expect(await createSupabaseTeam(sb).setRolePermissions('team', ['products.publish'])).toEqual({ ok: true, data: { added: ['products.view', 'products.edit'] } })
+  })
+
   it('says plainly when the database update has not been applied yet', async () => {
     const sb = { rpc: async () => ({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } }) } as unknown as SupabaseClient
     const r = await createSupabaseTeam(sb).listMembers()

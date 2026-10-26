@@ -1,7 +1,8 @@
 // What Admin and Team may do (ADR-0029). Owner only; the Owner always has everything. Removing a permission is
-// confirmed with who loses it; unsaved changes are counted and leaving asks first.
+// confirmed with who loses it; unsaved changes are counted and leaving asks first. A permission includes the
+// permissions it needs (R-W3-3): they are ticked and locked while it is ticked, and the database adds them too.
 import { AlertTriangle, RotateCcw, Save } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useBlocker } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -11,14 +12,18 @@ import { Modal } from '@/components/ui/Modal'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
+import { withPrerequisites } from '@/domain/permissions'
 import type { MemberRole, Permission, RolePermissions } from '@/domain/types'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { DEFAULT_ROLE_PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABEL, ROLE_LABEL } from './permissions'
+import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABEL, ROLE_LABEL } from './permissions'
 
 const ROLES: MemberRole[] = ['admin', 'team']
 const same = (a: Permission[], b: Permission[]) => a.length === b.length && a.every((p) => b.includes(p))
 const diff = (from: Permission[], to: Permission[]) => ({ added: to.filter((p) => !from.includes(p)), removed: from.filter((p) => !to.includes(p)) })
+/** The permissions `p` needs, transitively, without `p` itself. */
+const needs = (p: Permission) => withPrerequisites([p]).filter((x) => x !== p)
+const labels = (ps: Permission[]) => ps.map((p) => PERMISSION_LABEL[p]).join(', ')
 
 export default function RolePermissionsPage() {
   const saved = useServiceQuery(() => service.getRolePermissions(), [])
@@ -26,7 +31,10 @@ export default function RolePermissionsPage() {
   // `base` is the last saved state this page knows of; it is set from the first load and from each save, so a slow
   // reload can never put an older state back on screen.
   const [base, setBase] = useState<RolePermissions | null>(null)
+  // `draft` holds what the Owner ticked; `effective` adds what those permissions need (what is shown and stored).
   const [draft, setDraft] = useState<RolePermissions | null>(null)
+  const effective = useMemo(() => (draft ? { admin: withPrerequisites(draft.admin), team: withPrerequisites(draft.team) } : null), [draft])
+  const lockId = useId()
   const [saving, setSaving] = useState(false)
   const confirm = useConfirm()
   const toast = useToast()
@@ -39,12 +47,12 @@ export default function RolePermissionsPage() {
   }, [saved.data, base])
 
   const changes = useMemo(() => {
-    if (!base || !draft) return 0
+    if (!base || !effective) return 0
     return ROLES.reduce((n, r) => {
-      const d = diff(base[r], draft[r])
+      const d = diff(base[r], effective[r])
       return n + d.added.length + d.removed.length
     }, 0)
-  }, [base, draft])
+  }, [base, effective])
   const dirty = changes > 0
   const statusText = dirty ? `${changes} unsaved change${changes === 1 ? '' : 's'}` : ''
   // After a save the bar unmounts; focus the page heading so keyboard and screen reader users keep their place.
@@ -61,13 +69,15 @@ export default function RolePermissionsPage() {
 
   const toggle = (role: MemberRole, p: Permission) =>
     setDraft((d) => (d ? { ...d, [role]: d[role].includes(p) ? d[role].filter((x) => x !== p) : [...d[role], p] } : d))
+  /** The ticked permissions of `role` that need `p`; while there are any, `p` stays ticked and locked. */
+  const neededBy = (role: MemberRole, p: Permission) => (effective ? effective[role].filter((q) => q !== p && needs(q).includes(p)) : [])
 
   const activeIn = (role: MemberRole) => (members.data ?? []).filter((m) => m.role === role && m.status === 'active').length
 
   const save = async () => {
-    if (!base || !draft) return
-    const changed = ROLES.filter((r) => !same(base[r], draft[r]))
-    const removals = changed.map((r) => ({ role: r, removed: diff(base[r], draft[r]).removed })).filter((x) => x.removed.length)
+    if (!base || !draft || !effective) return
+    const changed = ROLES.filter((r) => !same(base[r], effective[r]))
+    const removals = changed.map((r) => ({ role: r, removed: diff(base[r], effective[r]).removed })).filter((x) => x.removed.length)
     if (removals.length) {
       const yes = await confirm({
         title: 'Remove permissions?',
@@ -87,6 +97,9 @@ export default function RolePermissionsPage() {
       if (!yes) return
     }
     setSaving(true)
+    // The prerequisites the database added, and the newly ticked permissions that needed them.
+    const alsoAdded = new Set<Permission>()
+    const causes = new Set<Permission>()
     for (const r of changed) {
       const res = await service.setRolePermissions(r, draft[r])
       if (!res.ok) {
@@ -94,10 +107,18 @@ export default function RolePermissionsPage() {
         toast.error('Permissions not saved', res.error.message)
         return
       }
+      for (const p of res.data.added) alsoAdded.add(p)
+      for (const q of draft[r]) if (!base[r].includes(q) && needs(q).some((p) => res.data.added.includes(p))) causes.add(q)
     }
     setSaving(false)
-    toast.success('Permissions saved', 'They apply to each member on their next action.')
-    setBase({ admin: [...draft.admin], team: [...draft.team] })
+    if (alsoAdded.size) {
+      const added = ALL_PERMISSIONS.filter((p) => alsoAdded.has(p))
+      toast.success(`Saved. Also added: ${labels(added)}, which ${causes.size === 1 ? 'it needs' : 'they need'}.`, 'They apply to each member on their next action.')
+    } else {
+      toast.success('Permissions saved', 'They apply to each member on their next action.')
+    }
+    setBase({ admin: [...effective.admin], team: [...effective.team] })
+    setDraft({ admin: [...effective.admin], team: [...effective.team] })
     setSavedTick((n) => n + 1)
   }
 
@@ -146,6 +167,7 @@ export default function RolePermissionsPage() {
                     <div className="min-w-0">
                       <p className="text-ui-body font-medium text-ink">{item.label}</p>
                       <p className="mt-0.5 text-ui-body text-ink-muted">{item.description}</p>
+                      {needs(item.key).length > 0 && <p className="mt-1 text-ui-small text-ink-muted">Includes: {labels(needs(item.key))}</p>}
                       {item.warning && (
                         <p className="mt-1.5 flex items-start gap-1.5 text-ui-small text-warning">
                           <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
@@ -157,18 +179,30 @@ export default function RolePermissionsPage() {
                       <span className="text-ui-small text-ink-muted" title="The Owner always has every permission">
                         <span className="sm:hidden">Owner: </span>All
                       </span>
-                      {ROLES.map((r) => (
-                        <label key={r} className="inline-flex min-h-11 items-center justify-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="size-4 accent-[var(--color-ink)]"
-                            checked={draft[r].includes(item.key)}
-                            onChange={() => toggle(r, item.key)}
-                            aria-label={`${ROLE_LABEL[r]}: ${item.label}`}
-                          />
-                          <span className="text-ui-small text-ink-muted sm:hidden">{ROLE_LABEL[r]}</span>
-                        </label>
-                      ))}
+                      {ROLES.map((r) => {
+                        const by = neededBy(r, item.key)
+                        const why = by.length ? `Needed by ${labels(by)}` : undefined
+                        const whyId = `${lockId}-${r}-${item.key}`
+                        return (
+                          <label key={r} className="inline-flex min-h-11 items-center justify-center gap-2" title={why}>
+                            <input
+                              type="checkbox"
+                              className="size-4 accent-[var(--color-ink)] disabled:opacity-60"
+                              checked={effective?.[r].includes(item.key) ?? false}
+                              disabled={!!why}
+                              onChange={() => toggle(r, item.key)}
+                              aria-label={`${ROLE_LABEL[r]}: ${item.label}`}
+                              aria-describedby={why ? whyId : undefined}
+                            />
+                            <span className="text-ui-small text-ink-muted sm:hidden">{ROLE_LABEL[r]}</span>
+                            {why && (
+                              <span id={whyId} className="sr-only">
+                                {why}
+                              </span>
+                            )}
+                          </label>
+                        )
+                      })}
                     </div>
                   </li>
                 ))}

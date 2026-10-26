@@ -370,9 +370,10 @@ describe('member management (Task 3)', () => {
     expect(await call(OWNER_U, `select public.admin_set_role_permissions('team', array['products.view', 'x']) as r`)).toEqual({ error: 'unknown_permission' })
     expect(await call(ADMIN_U, `select public.admin_set_role_permissions('team', array['products.view']) as r`)).toEqual({ error: 'forbidden' })
     const r = await call(OWNER_U, `select public.admin_set_role_permissions('team', array['businesses.view', 'applications.view', 'products.view', 'analytics.view', 'products.publish']) as r`)
-    expect(r).toEqual({ ok: true })
+    // S1.5 R-W3-3: products.publish includes products.edit, so it is kept (and answered as added) rather than removed.
+    expect(r).toEqual({ ok: true, added: ['products.edit'] })
     const ev = await db.query<{ metadata: J }>(`select metadata from public.audit_events where event_type = 'access_permissions_changed' order by created_at desc limit 1`)
-    expect(ev.rows[0]!.metadata).toEqual({ role: 'team', added: ['products.publish'], removed: ['products.edit'] })
+    expect(ev.rows[0]!.metadata).toEqual({ role: 'team', added: ['products.publish'], removed: [] })
     await call(OWNER_U, `select public.admin_set_role_permissions('team', array['businesses.view', 'applications.view', 'products.view', 'analytics.view', 'products.edit']) as r`)
   })
 

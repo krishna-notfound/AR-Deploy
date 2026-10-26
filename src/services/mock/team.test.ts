@@ -56,6 +56,12 @@ describe('team (demo service)', () => {
     if (!bad.ok) expect(bad.error.reason).toBe('unknown_permission')
   })
 
+  it('stores a set with its prerequisites and answers what it added (R-W3-3)', async () => {
+    expect(unwrap(await svc.setRolePermissions('team', ['products.publish']))).toEqual({ added: ['products.view', 'products.edit'] })
+    expect(unwrap(await svc.getRolePermissions()).team.sort()).toEqual(['products.edit', 'products.publish', 'products.view'])
+    expect(unwrap(await svc.setRolePermissions('team', ['products.view', 'products.edit', 'products.publish']))).toEqual({ added: [] })
+  })
+
   it('never changes the owner', async () => {
     const owner = unwrap(await svc.listMembers()).find((m) => m.role === 'owner')!
     const r = await svc.setMemberRole(owner.id, 'team')

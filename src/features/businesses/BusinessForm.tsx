@@ -1,6 +1,7 @@
 import { Info, Save } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useBlocker } from 'react-router'
+import { useCan } from '@/auth/usePermission'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -45,6 +46,8 @@ export function changedBusinessFields(next: BusinessInput, base: BusinessInput, 
 export function BusinessForm({ business, mode, onSaved }: { business: Business | null; mode: BusinessFormMode; onSaved?: (b: Business) => void }) {
   const toast = useToast()
   const confirm = useConfirm()
+  // Creating a live business needs businesses.status (R-W3-3; the database refuses it too); otherwise only a draft.
+  const canCreateActive = useCan()('businesses.status')
   const [data, setData] = useState<BusinessInput>(() => toInput(business))
   const [snapshot, setSnapshot] = useState(() => JSON.stringify(toInput(business)))
   const [slugTouched, setSlugTouched] = useState(mode !== 'create')
@@ -122,7 +125,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        void submit(business ? 'save' : 'create')
+        void submit(business ? 'save' : canCreateActive ? 'create' : 'draft')
       }}
       noValidate
       className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"
@@ -258,12 +261,14 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
             </Button>
           ) : (
             <>
-              <Button onClick={() => void submit('draft')} loading={busy === 'draft'} disabled={!!busy}>
+              <Button variant={canCreateActive ? 'secondary' : 'primary'} onClick={() => void submit('draft')} loading={busy === 'draft'} disabled={!!busy}>
                 Save as draft
               </Button>
-              <Button type="submit" variant="primary" loading={busy === 'create'} disabled={!!busy}>
-                Create business
-              </Button>
+              {canCreateActive && (
+                <Button type="submit" variant="primary" loading={busy === 'create'} disabled={!!busy}>
+                  Create business
+                </Button>
+              )}
             </>
           )}
         </div>
