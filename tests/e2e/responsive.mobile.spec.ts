@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { signInAsSuperAdmin } from './helpers'
+import { confirmDialog, signInAsSuperAdmin } from './helpers'
 
 // §19.14 Responsive layouts (runs in the mobile project)
 test('mobile navigation drawer opens, navigates and closes', async ({ page }) => {
@@ -32,4 +32,30 @@ test('the business application wizard fits a phone and shows its step counter', 
   expect(overflow).toBeLessThanOrEqual(1)
   // The split sign-up layout replaces the site header: the way back is the "Voltar ao site" link.
   await expect(page.getByRole('link', { name: 'Voltar ao site' })).toBeVisible()
+})
+
+// S1.5 at 390: the closure badge on the business list and the team Remove dialog.
+test.describe('at 390', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('the closure badge shows on the business list and the page fits a phone', async ({ page }) => {
+    await signInAsSuperAdmin(page)
+    await page.goto('/admin/businesses')
+    await expect(page.getByText(/^Closure requested on /).locator('visible=true')).toHaveCount(1)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
+  })
+
+  test('the team Remove dialog fits a phone and removes a deactivated member', async ({ page }) => {
+    await signInAsSuperAdmin(page)
+    await page.goto('/admin/team/mem_pedro')
+    await expect(page.getByRole('heading', { level: 1, name: 'Pedro Alves' })).toBeVisible()
+    await page.getByRole('button', { name: 'Remove', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Remove pedro.alves@sanctus.example from the team?')).toBeVisible()
+    const box = await dialog.boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+    await confirmDialog(page, 'Remove member')
+    await expect(page).toHaveURL(/\/admin\/team$/)
+  })
 })

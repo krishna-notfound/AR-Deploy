@@ -115,3 +115,51 @@ test('the application wizard keeps a draft across a reload and offers the CTA fr
   await page.reload()
   await expect(page.getByLabel('Business name')).toHaveValue('Kept Draft')
 })
+
+// S1.5 R-W2-1: a rejection takes a reason and emails the applicant; the reason goes into the email only when the
+// reviewer ticks "Include the reason in the email". Demo mode sends no email, so the decision email is recorded as
+// not sent and the toast says so; what the demo can show is the tick state and the reason kept on the application.
+async function submitAndOpen(page: Page, name: string, email: string) {
+  await fillWizard(page, name, email)
+  await page.getByLabel(/I confirm the information is accurate/).check()
+  await page.getByRole('checkbox', { name: /^I agree to the Terms/ }).check()
+  await page.getByRole('button', { name: 'Send application' }).click()
+  await expect(page.getByRole('heading', { name: 'Application received' })).toBeVisible()
+  await signInAsSuperAdmin(page)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Applications' }).click()
+  await page.getByRole('link', { name }).click()
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+}
+
+test('a rejection without the box ticked keeps the reason for staff and says the email was not sent', async ({ page }) => {
+  await submitAndOpen(page, 'Rejected Plain', 'plain@rejected.test')
+  await page.getByRole('button', { name: 'Reject', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  const box = dialog.getByRole('checkbox', { name: 'Include the reason in the email' })
+  await expect(box).not.toBeChecked() // off by default
+  await expect(dialog.getByText('Off: the applicant is told the application was not approved, with no reason.')).toBeVisible()
+  await dialog.getByRole('textbox', { name: 'Reason' }).fill('Outside our region')
+  await dialog.getByRole('button', { name: 'Reject application' }).click()
+  await expect(dialog).toBeHidden()
+  // Demo mode: the decision email is recorded as not sent, so the toast is the error variant.
+  await expectErrorToast(page, /Application rejected, but the email was not sent: Demo mode: no email is sent/)
+  await expect(page.getByText(/Rejected.* on .*: Outside our region/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Reject', exact: true })).toHaveCount(0)
+})
+
+test('a rejection with the box ticked still needs the reason and records it', async ({ page }) => {
+  await submitAndOpen(page, 'Rejected Told', 'told@rejected.test')
+  await page.getByRole('button', { name: 'Reject', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('checkbox', { name: 'Include the reason in the email' }).check()
+  await dialog.getByRole('button', { name: 'Reject application' }).click()
+  await expect(dialog.getByText('Give a reason for the rejection.')).toBeVisible()
+  await dialog.getByRole('textbox', { name: 'Reason' }).fill('Catalogue too small for now')
+  await expect(dialog.getByRole('checkbox', { name: 'Include the reason in the email' })).toBeChecked()
+  await dialog.getByRole('button', { name: 'Reject application' }).click()
+  await expect(dialog).toBeHidden()
+  await expectErrorToast(page, /Application rejected, but the email was not sent: Demo mode: no email is sent/)
+  await expect(page.getByText(/Rejected.* on .*: Catalogue too small for now/)).toBeVisible()
+  // The email history lists the decision email attempt.
+  await expect(page.getByText('Demo mode: no email is sent.').first()).toBeVisible()
+})
