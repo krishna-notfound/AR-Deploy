@@ -153,3 +153,28 @@ export function shareableCurrentUrl(): string {
 export function settingsPath(scope: 'admin' | 'business', section: SettingsSection = 'account'): string {
   return `${scope === 'admin' ? '/admin' : '/dashboard'}/settings/${section}`
 }
+
+/** Hash on the Scene Viewer fallback URL: Chrome opens it when the native viewer could not start (ADR-0021). */
+export const AR_FALLBACK_HASH = '#ar-unavailable'
+/** Android app that hosts Scene Viewer: the Google app, as model-viewer used on main (proven on the owner's phone). */
+export const SCENE_VIEWER_PACKAGE = 'com.google.android.googlequicksearchbox'
+
+/**
+ * Android's native AR: the Google Scene Viewer intent (ADR-0021). The model URL goes in once, whole and encoded, so a
+ * signed URL keeps its single token (model-viewer's own intent also copied the token out as a parameter: AR-12).
+ * `trueToSize` (scale verified) locks the size; otherwise the visitor may resize the piece.
+ */
+export function sceneViewerIntentUrl({ file, title, pageUrl, trueToSize }: { file: string; title: string; pageUrl: string; trueToSize: boolean }): string {
+  const model = new URL(file, pageUrl).toString()
+  const fallback = new URL(pageUrl)
+  fallback.hash = AR_FALLBACK_HASH
+  const query = `file=${encodeURIComponent(model)}&mode=ar_preferred&title=${encodeURIComponent(title)}${trueToSize ? '&resizable=false' : ''}`
+  return `intent://arvr.google.com/scene-viewer/1.2?${query}#Intent;scheme=https;package=${SCENE_VIEWER_PACKAGE};action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(fallback.toString())};end;`
+}
+
+/** iPhone/iPad native AR: the AR Quick Look link for an uploaded USDZ. `trueToSize` turns off pinch scaling. */
+export function quickLookHref(usdz: string, { trueToSize, pageUrl }: { trueToSize: boolean; pageUrl: string }): string {
+  const url = new URL(usdz, pageUrl)
+  if (trueToSize) url.hash = url.hash ? `${url.hash.slice(1)}&allowsContentScaling=0` : 'allowsContentScaling=0'
+  return url.toString()
+}

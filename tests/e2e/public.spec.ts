@@ -83,14 +83,17 @@ test.describe('Android', () => {
   test.use({ userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36' })
 
   test('AR opens Google Scene Viewer at fixed real-world scale, once per tap', async ({ page }) => {
+    // The page navigates straight to the Scene Viewer intent (owner 2026-10-26). The Navigation API sees the whole
+    // URL (with its #Intent part); the navigation is cancelled so the page stays put.
     await page.addInitScript(() => {
-      const w = window as unknown as { __intents: string[] }
+      const w = window as unknown as { __intents: string[]; navigation?: EventTarget }
       w.__intents = []
-      const click = HTMLAnchorElement.prototype.click
-      HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
-        if (this.href.startsWith('intent:')) w.__intents.push(this.href)
-        else click.call(this)
-      }
+      w.navigation?.addEventListener('navigate', (e) => {
+        const ev = e as Event & { destination: { url: string } }
+        if (!ev.destination.url.startsWith('intent:')) return
+        w.__intents.push(ev.destination.url)
+        ev.preventDefault()
+      })
     })
     const glbFetches: string[] = []
     page.on('request', (r) => {
@@ -102,17 +105,18 @@ test.describe('Android', () => {
     await button.click()
     await page.getByRole('checkbox').check() // "don't show again", so the next tap launches directly
     await page.getByRole('button', { name: 'Start AR' }).click()
-    await button.click() // impatient second tap while Scene Viewer opens: ignored
+    await button.click({ force: true }) // impatient second tap while Scene Viewer opens (button busy): ignored
     const intents = () => page.evaluate(() => (window as unknown as { __intents: string[] }).__intents)
     await expect.poll(intents).toHaveLength(1)
     await page.waitForTimeout(500)
     expect(await intents()).toHaveLength(1)
     const intent = (await intents())[0]!
-    expect(intent).toContain('arvr.google.com/scene-viewer')
-    expect(intent).toContain('package=com.google.android.googlequicksearchbox')
-    expect(intent).toContain('mode=ar_preferred') // 3D view instead of a failure on phones without ARCore
-    expect(intent).toContain('resizable=false') // true size: no pinch scaling
-    expect(decodeURIComponent(intent)).toContain('SheenChair.glb') // the same model as the 3D view
+    expect(intent).toMatch(/^intent:\/\/arvr\.google\.com\/scene-viewer\/1\.2\?file=/)
+    expect(intent).toContain('#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=')
+    expect(intent).toContain('mode=ar_preferred')
+    expect(intent).toContain('resizable=false') // verified true size: no pinch scaling
+    const file = new URLSearchParams(intent.slice(intent.indexOf('?') + 1, intent.indexOf('#Intent'))).get('file')
+    expect(file).toBe(await page.locator('model-viewer').evaluate((el) => (el as HTMLElement & { src: string }).src)) // exactly the model the 3D view shows
     expect(glbFetches).toHaveLength(1) // the page's 3D view only; Scene Viewer downloads its own copy
   })
 })
@@ -131,8 +135,11 @@ test('switches language between English and Portuguese', async ({ page }) => {
 })
 
 test('inactive catalogs and unknown products show friendly states', async ({ page }) => {
+  // R-W8-2: a paused catalog reads as not found to a signed-out visitor, and nothing of it leaks.
   await page.goto('/catalog/oak-ember')
-  await expect(page.getByText('This catalog is currently unavailable')).toBeVisible()
+  await expect(page.getByText('Catalog not found')).toBeVisible()
+  await expect(page.getByText('Oak & Ember Studio')).toHaveCount(0)
+  await expect(page.getByText('Walnut Writing Desk')).toHaveCount(0)
   await page.goto('/products/nordhaus/does-not-exist')
   await expect(page.getByText('Product not available')).toBeVisible()
   await page.goto('/catalog/nope')
