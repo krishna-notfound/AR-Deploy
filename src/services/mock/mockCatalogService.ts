@@ -562,6 +562,7 @@ export const mockCatalogService: CatalogService = {
       const list = (store.get().audit ?? [])
         .filter((e) => matchesScope(e, q))
         .filter((e) => !term || e.eventType.includes(term))
+        .filter((e) => q.includeSignIns === true || e.eventType !== 'account_signed_in')
         .map((e) => ({ ...e, actorEmail: e.actorId === DEMO_ADMIN.id ? DEMO_ADMIN.email : undefined }))
       return ok(page(list, q.page, q.pageSize))
     }),

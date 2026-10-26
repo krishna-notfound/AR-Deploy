@@ -1,42 +1,15 @@
 // @vitest-environment node
 // Account settings, security and 2FA (S1): applies every migration to a disposable in-process Postgres (PGlite)
-// with the same Supabase stand-ins as platformTeam.test.ts, then checks the rules as the API roles, at aal1 and aal2.
+// with the shared Supabase stand-ins (harness.ts), then checks the rules as the API roles, at aal1 and aal2.
 // Nothing here touches a live project.
 import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { PGlite, type Transaction } from '@electric-sql/pglite'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { MIGRATIONS, SUPABASE_STUBS, applyAll } from './harness'
 
-const MIGRATIONS = join(__dirname, '..', 'migrations')
 const ACCOUNT_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_account_settings.sql'))!
-
-const SUPABASE_STUBS = `
-  create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
-  create schema auth;
-  create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, last_sign_in_at timestamptz,
-    raw_user_meta_data jsonb default '{}');
-  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
-  create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('test.jwt', true), ''), '{}')::jsonb $$;
-  create type auth.factor_status as enum ('unverified', 'verified'); create type auth.factor_type as enum ('totp', 'webauthn', 'phone');
-  create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, status auth.factor_status not null,
-    factor_type auth.factor_type not null);
-  grant usage on schema auth to anon, authenticated, service_role;
-  create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid);
-  create schema storage;
-  create table storage.buckets (id text primary key, name text not null, public boolean default false,
-    file_size_limit bigint, allowed_mime_types text[]);
-  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id),
-    name text, owner uuid, metadata jsonb, created_at timestamptz default now());
-  alter table storage.objects enable row level security;
-  grant select, insert, update, delete on storage.objects to anon, authenticated;
-  create function storage.foldername(name text) returns text[] language sql immutable
-    as $$ select (string_to_array(name, '/'))[1:cardinality(string_to_array(name, '/')) - 1] $$;
-  grant usage on schema storage to anon, authenticated, service_role;
-  -- As on Supabase: new tables and functions in public are granted to the API roles unless a migration revokes them.
-  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
-`
 
 const OWNER_U = '00000000-0000-0000-0000-0000000000a1'
 const ADMIN_U = '00000000-0000-0000-0000-0000000000a2'
@@ -94,10 +67,6 @@ async function withPolicy(staff: boolean, business: boolean, fn: () => Promise<v
   }
 }
 
-async function applyAll(target: PGlite, filter: (name: string) => boolean = () => true) {
-  for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql') && filter(n)).sort()) await target.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
-}
-
 let application = ''
 
 beforeAll(async () => {
@@ -153,11 +122,16 @@ describe('account settings: profiles and policy (Task 1)', () => {
     }
   })
 
-  it('a user reads and updates only their own profile; staff can read other profiles; a stranger cannot', async () => {
+  it('a user reads and updates only their own profile; staff read the profiles their role needs (R-W1-5); a stranger cannot', async () => {
     expect(await count(STRANGER_U, 'select count(*)::int as n from public.profiles')).toBe(1)
     expect(await count(BIZ_OWNER_U, 'select count(*)::int as n from public.profiles where user_id = $1', [STRANGER_U])).toBe(0)
     const all = (await db.query<{ n: number }>('select count(*)::int as n from public.profiles')).rows[0]!.n
-    expect(await count(TEAM_U, 'select count(*)::int as n from public.profiles')).toBe(all)
+    // Default Team (businesses.view): their own row and business owners' rows, not other staff (R-W1-5).
+    const teamReads = (await db.query<{ n: number }>(
+      'select count(*)::int as n from public.profiles p where p.user_id = $1 or exists (select 1 from public.business_members b where b.user_id = p.user_id)', [TEAM_U])).rows[0]!.n
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.profiles')).toBe(teamReads)
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.profiles where user_id = $1', [BIZ_OWNER_U])).toBe(1)
+    expect(await count(TEAM_U, 'select count(*)::int as n from public.profiles where user_id = $1', [ADMIN_U])).toBe(0)
     expect(await count(OWNER_U, 'select count(*)::int as n from public.profiles')).toBe(all)
     expect(await affected(STRANGER_U, `update public.profiles set display_name = 'Me' where user_id = $1`, [STRANGER_U])).toBe(1)
     expect(await affected(STRANGER_U, `update public.profiles set display_name = 'You' where user_id = $1`, [BIZ_OWNER_U])).toBe(0)

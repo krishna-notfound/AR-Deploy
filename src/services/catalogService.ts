@@ -120,6 +120,8 @@ export interface AuditQuery {
   businessId?: ID
   /** Matches the event type. */
   search?: string
+  /** Include `account_signed_in` events (left out unless true; R-W1-4). Only the Owner can read other people's. */
+  includeSignIns?: boolean
   page?: number
   pageSize?: number
 }

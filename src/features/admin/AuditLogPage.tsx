@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { useCan } from '@/auth/usePermission'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
+import { Checkbox } from '@/components/ui/Form'
 import { Pagination } from '@/components/ui/Pagination'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SkeletonRows } from '@/components/ui/Skeleton'
@@ -25,6 +27,9 @@ export default function AuditLogPage() {
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
   const page = Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1)
+  // Other people's sign-ins (IP and device) are the Owner's to see (R-W1-4): left out unless the Owner asks.
+  const isOwner = useCan()('owner')
+  const includeSignIns = isOwner && params.get('signins') === '1'
   const set = (k: string, v: string) => {
     const next = new URLSearchParams(params)
     if (v) next.set(k, v)
@@ -32,7 +37,7 @@ export default function AuditLogPage() {
     if (k !== 'page') next.delete('page')
     setParams(next, { replace: true })
   }
-  const q = useServiceQuery(() => service.getAuditEvents({ search, page, pageSize: PAGE_SIZE }), [search, page])
+  const q = useServiceQuery(() => service.getAuditEvents({ search, includeSignIns, page, pageSize: PAGE_SIZE }), [search, includeSignIns, page])
   // Names for the rows' subjects, so each row says which business or application it is about. Best effort:
   // while these load or if they fail, the rows keep their plain "Application" / "Business" links.
   const subjects = useServiceQuery(async () => {
@@ -78,11 +83,12 @@ export default function AuditLogPage() {
     <>
       <PageHeader title="Audit log" description="Who did what, recorded by the server. Entries cannot be edited or deleted." />
       <Card>
-        <div className="border-b border-line p-4 sm:p-6">
+        <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:items-end sm:gap-6 sm:p-6">
           <label className="flex flex-col gap-2 sm:w-[420px]">
             <span className="text-[length:var(--text-ui-body)] leading-5 font-medium text-ink">Search events</span>
             <SearchInput value={search} onChange={(v) => set('q', v)} label="Search events" placeholder="Event, e.g. status, invitation, owner" className="w-full" />
           </label>
+          {isOwner && <Checkbox label="Show sign-ins" className="min-h-11" checked={includeSignIns} onChange={(e) => set('signins', e.target.checked ? '1' : '')} />}
         </div>
         <h2 className="sr-only">Events</h2>
         {q.status === 'loading' && !q.data ? (
