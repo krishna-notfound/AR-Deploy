@@ -21,8 +21,9 @@ function deps(over: Partial<TestEmailDeps> = {}) {
   const d: TestEmailDeps = {
     config: { ok: true, config: CONFIG },
     fetch: resendOk() as unknown as typeof fetch,
-    userIdFromToken: async (t) => (t === 'admin-token' ? 'admin-id' : t === 'owner-token' ? 'owner-id' : null),
-    isPlatformAdmin: async (id) => id === 'admin-id',
+    userIdFromToken: async (t) => ({ 'admin-token': 'admin-id', 'admin-aal1-token': 'admin-id', 'owner-token': 'owner-id' })[t] ?? null,
+    // The 2FA gate (R-W1-1): the platform Owner at aal2 passes, at aal1 needs the second step; others are refused.
+    gate: async (t) => (t === 'admin-token' ? 'ok' : t === 'admin-aal1-token' ? 'aal2_required' : 'forbidden'),
     log: async (e) => (logs.push(e), `log-${logs.length}`),
     updateStatus: async (id, s) => void updates.push([id, s]),
     ...over,
@@ -107,6 +108,21 @@ describe('send-test-email handler', () => {
     const { d } = deps()
     expect((await handleTestEmail(post({ action: 'send', to: 'delivered@resend.dev' }, 'bad'), d)).status).toBe(401)
     expect((await handleTestEmail(post({ action: 'send', to: 'delivered@resend.dev' }, 'owner-token'), d)).status).toBe(403)
+  })
+  it('403 aal2_required at aal1; works at aal2 for the Owner', async () => {
+    const fetchFn = resendOk()
+    const { d, logs } = deps({ fetch: fetchFn as unknown as typeof fetch })
+    const refused = await handleTestEmail(post({ action: 'send', to: 'delivered@resend.dev' }, 'admin-aal1-token'), d)
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toEqual({ error: 'aal2_required' })
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(logs).toHaveLength(0)
+    const forbidden = await handleTestEmail(post({ action: 'send', to: 'delivered@resend.dev' }, 'owner-token'), d)
+    expect(await forbidden.json()).toEqual({ error: 'forbidden' })
+    const sent = await handleTestEmail(post({ action: 'send', to: 'delivered@resend.dev' }, 'admin-token'), d)
+    expect(sent.status).toBe(200)
+    expect((await sent.json()).status).toBe('accepted')
+    expect(fetchFn).toHaveBeenCalledTimes(1)
   })
   it('says which secrets are missing, without values', async () => {
     const { d } = deps({ config: { ok: false, missing: ['RESEND_API_KEY'] } })

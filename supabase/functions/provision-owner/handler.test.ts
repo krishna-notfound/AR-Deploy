@@ -29,8 +29,10 @@ function deps(over: Partial<ProvisionDeps> = {}) {
     config: { ok: true, config: CONFIG },
     fetch: fetchFn as unknown as typeof fetch,
     now: () => NOW,
-    userIdFromToken: async (t) => (t === 'admin-token' ? 'admin-id' : t === 'owner-token' ? 'owner-id' : null),
-    isPlatformAdmin: async (id) => id === 'admin-id',
+    userIdFromToken: async (t) => ({ 'admin-token': 'admin-id', 'admin-aal1-token': 'admin-id', 'team-token': 'team-id', 'owner-token': 'owner-id' })[t] ?? null,
+    // The 2FA gate (R-W1-1): an aal2 admin with owners.manage passes; aal1 needs the second step; others lack the permission.
+    gate: async (t) => (t === 'admin-token' ? 'ok' : t === 'admin-aal1-token' ? 'aal2_required' : 'forbidden'),
+    isTeamEmail: async (e) => e === 'team@platform.test' || e === 'rita@x.pt',
     isPlatformStaff: async (id) => id === 'admin-id' || id === 'team-id',
     getBusiness: async (id) => (id === BIZ ? { id, name: 'Casa Lisboa' } : null),
     getOwner: async () => owner,
@@ -65,6 +67,49 @@ describe('provision-owner', () => {
     const { d } = deps()
     expect((await handleProvisionOwner(post(provision(), 'bad'), d)).status).toBe(401)
     expect((await handleProvisionOwner(post(provision(), 'owner-token'), d)).status).toBe(403)
+  })
+
+  it('aal1 caller under the staff policy gets 403 aal2_required; no linkOwner, generateCode or email', async () => {
+    const linkOwner = vi.fn<ProvisionDeps['linkOwner']>()
+    const { d, links, logs, fetchFn, audits } = deps({ linkOwner })
+    for (const body of [provision(), { action: 'resend', businessId: BIZ }]) {
+      const res = await handleProvisionOwner(post(body, 'admin-aal1-token'), d)
+      expect(res.status).toBe(403)
+      expect(await res.json()).toEqual({ error: 'aal2_required' })
+    }
+    expect(linkOwner).not.toHaveBeenCalled()
+    expect(links).toHaveLength(0)
+    expect(logs).toHaveLength(0)
+    expect(audits).toHaveLength(0)
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('aal2 without owners.manage gets 403 forbidden', async () => {
+    const { d, links, fetchFn } = deps()
+    const res = await handleProvisionOwner(post(provision(), 'team-token'), d)
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
+    expect(links).toHaveLength(0)
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('an email with a pending platform_members row gets 409 email_is_admin before generateCode is called', async () => {
+    // Rita was invited to the team (no login yet, so no account to find): the email alone is enough to refuse (R-W1-8).
+    const accountByEmail = vi.fn<ProvisionDeps['accountByEmail']>(async () => null)
+    const { d, links, fetchFn } = deps({ accountByEmail })
+    const res = await handleProvisionOwner(post(provision({ email: 'Rita@X.pt' })), d)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'email_is_admin' })
+    expect(accountByEmail).not.toHaveBeenCalled()
+    expect(links).toHaveLength(0)
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('a link refused by the database for a team email (a race) is 409 email_is_admin', async () => {
+    const { d } = deps({ linkOwner: async () => 'email_is_admin' })
+    const res = await handleProvisionOwner(post(provision()), d)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'email_is_admin' })
   })
 
   it('links the owner, emails the invitation code and never returns or logs it', async () => {

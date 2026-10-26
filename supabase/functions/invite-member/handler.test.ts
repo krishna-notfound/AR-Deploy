@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { LogEntry } from '../_shared/email'
 import { type InviteDeps, handleInviteMember } from './handler'
 
@@ -22,8 +22,9 @@ function deps(over: Partial<InviteDeps> = {}) {
       return new Response(JSON.stringify({ id: 'msg_1' }), { status: 200 })
     }) as never,
     now: () => NOW,
-    userIdFromToken: async (t) => (t === 'owner-token' ? OWNER : t === 'admin-token' ? 'someone-else' : null),
-    isOwner: async (id) => id === OWNER,
+    userIdFromToken: async (t) => (t === 'owner-token' || t === 'owner-aal1-token' ? OWNER : t === 'admin-token' ? 'someone-else' : null),
+    // The 2FA gate (R-W1-1): the Owner at aal2 passes, at aal1 needs the second step; anyone else is not the Owner.
+    gate: async (t) => (t === 'owner-token' ? 'ok' : t === 'owner-aal1-token' ? 'aal2_required' : 'forbidden'),
     inviteMember: async () => ({ ok: true, memberId: MEMBER }),
     getMember: async () => ({ id: MEMBER, email: 'ana@studio.test', role: 'team', status: 'invited' }),
     createInvite: async (_m, hash, expiresAt) => (created.push({ hash, expiresAt }), { ok: true, inviteId: 'inv_1' }),
@@ -46,6 +47,31 @@ describe('invite-member (ADR-0030)', () => {
     expect(res.status).toBe(403)
     expect(denied).toEqual(['invite_member'])
     expect(bodies).toHaveLength(0)
+  })
+
+  it('invite and resend both return 403 aal2_required at aal1', async () => {
+    const inviteMember = vi.fn<InviteDeps['inviteMember']>()
+    const createInvite = vi.fn<InviteDeps['createInvite']>()
+    const { d, bodies, denied } = deps({ inviteMember, createInvite })
+    for (const body of [{ action: 'invite', email: 'ana@studio.test', role: 'team' }, { action: 'resend', memberId: MEMBER }]) {
+      const res = await handleInviteMember(post(body, 'owner-aal1-token'), d)
+      expect(res.status).toBe(403)
+      expect(await res.json()).toEqual({ error: 'aal2_required' })
+    }
+    expect(inviteMember).not.toHaveBeenCalled()
+    expect(createInvite).not.toHaveBeenCalled()
+    expect(bodies).toHaveLength(0)
+    // The Owner is not refused a permission, only asked for the second step: not an access-denied event.
+    expect(denied).toEqual([])
+  })
+
+  it('refuses a non-owner on resend too', async () => {
+    const { d, denied, created } = deps()
+    const res = await handleInviteMember(post({ action: 'resend', memberId: MEMBER }, 'admin-token'), d)
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
+    expect(denied).toEqual(['resend_member_invite'])
+    expect(created).toHaveLength(0)
   })
 
   it('emails a /join link and never returns, logs or stores the secret', async () => {

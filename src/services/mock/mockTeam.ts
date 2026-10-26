@@ -4,6 +4,7 @@
 import { ALL_PERMISSIONS, isPermission } from '@/domain/permissions'
 import type { AccessAction, AccessEvent, InviteInspection, InviteOutcome, MemberInvite, PlatformAccess, PlatformMember, PlatformRole } from '@/domain/types'
 import { newId } from '@/lib/id'
+import { PASSWORD_MIN } from '../accountService'
 import { type CatalogService, type Result, ok, teamFail } from '../catalogService'
 import type { Db } from './db'
 import { type DemoTeam, DEMO_OWNER_EMAIL, createDemoTeam } from './teamSeed'
@@ -293,7 +294,9 @@ export function createMockTeam(run: Run): TeamMethods {
 
     acceptInviteCreate: ({ token, fullName, password }) =>
       run(() => {
-        if (password.length < 8) return teamFail('weak_password', 'Use at least 8 characters.')
+        // The same limits as accept-member-invite (R-W1-7): 12 to 72 characters.
+        if (password.length < PASSWORD_MIN) return teamFail('weak_password', `Use at least ${PASSWORD_MIN} characters.`)
+        if (password.length > 72) return teamFail('weak_password', 'Use at most 72 characters.')
         const t = team(store.get())
         const ref = t.tokens[token]
         const invite = ref && t.invites[ref.memberId]?.find((i) => i.id === ref.inviteId)

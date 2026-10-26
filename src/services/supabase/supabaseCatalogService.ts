@@ -491,6 +491,9 @@ const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string 
   rate_limited: { code: 'RATE_LIMITED', message: 'Too many requests. Wait a little and try again.' },
   not_signed_in: { code: 'PERMISSION', message: 'Sign in again to continue.' },
   platform_admin_only: { code: 'PERMISSION', message: 'Only platform admins can do this.' },
+  // The 2FA gate of the staff Edge Functions (R-W1-1).
+  aal2_required: { code: 'PERMISSION', message: 'This needs 2FA. Sign in with your authenticator code first.' },
+  forbidden: { code: 'PERMISSION', message: "You don't have permission to do this." },
   business_not_found: { code: 'NOT_FOUND', message: 'This business no longer exists.' },
   business_has_owner: { code: 'CONFLICT', message: 'This business already has an owner. Remove them first to invite someone else.' },
   no_owner: { code: 'NOT_FOUND', message: 'This business has no invited owner yet.' },

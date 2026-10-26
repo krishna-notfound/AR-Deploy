@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
-import { useAccount } from '@/auth/AccountProvider'
+import { type LogoutResult, useAccount } from '@/auth/AccountProvider'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { Button } from '@/components/ui/Button'
@@ -18,11 +18,14 @@ import { authErrorText, normalizeCode } from './authErrors'
  * Landing page of an owner invitation (ADR-0024, ADR-0027). The owner signs in with the email address and the
  * one-time code from the invitation email (verified by Supabase Auth, never stored by us), then sets a password;
  * the acceptance is recorded by complete_owner_onboarding().
+ *
+ * It never sets the password of whoever happens to be signed in (R-W1-9): staff and owners who already accepted go to
+ * their console, and an owner with a pending invitation is told which account is signed in, with a way to sign out.
  */
 export default function AcceptInvitePage() {
   const { t } = useI18n()
   useDocumentTitle(t('invite.title'))
-  const { user, business, accountError, retry } = useAccount()
+  const { user, business, accountError, retry, logout } = useAccount()
   // Links from invitations sent before ADR-0027 still land here; Supabase reports expired or used ones in the fragment.
   const [linkError] = useState(() => new URLSearchParams(window.location.hash.replace(/^#/, '')).get('error_code'))
 
@@ -37,9 +40,15 @@ export default function AcceptInvitePage() {
     body = <EnterCode linkError={linkError} />
   }
   else if (user.role === 'super_admin') return <Navigate to="/admin" replace />
+  else if (!user.invitationPending) return <Navigate to="/dashboard" replace />
   else {
     step = 1
-    body = <SetPassword userId={user.id} businessName={business?.name ?? ''} />
+    body = (
+      <>
+        <SignedInAs email={user.email} logout={logout} />
+        <SetPassword userId={user.id} businessName={business?.name ?? ''} />
+      </>
+    )
   }
 
   return (
@@ -48,6 +57,40 @@ export default function AcceptInvitePage() {
       <AuthHeading eyebrow={t('invite.eyebrow')} title={t('invite.title')} />
       <div className="mt-6 space-y-6">{body}</div>
     </AuthLayout>
+  )
+}
+
+/** Which account is signed in, above the password step: the invitation may be meant for someone else (R-W1-9). */
+function SignedInAs({ email, logout }: { email: string; logout: () => Promise<LogoutResult> }) {
+  const { t } = useI18n()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const signOut = async () => {
+    setPending(true)
+    setError(null)
+    const r = await logout()
+    // Signed out: the account reload swaps this step for the code step.
+    if (!r.signedOut) {
+      setPending(false)
+      setError(t('auth.error.network'))
+    }
+  }
+
+  return (
+    <InlineNotice tone="neutral">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <span>{t('invite.signedInAs', { email })}</span>
+        <Button type="button" variant="secondary" size="sm" loading={pending} onClick={signOut}>
+          {t('invite.signOut')}
+        </Button>
+      </div>
+      {error && (
+        <span role="alert" className="mt-2 block">
+          {error}
+        </span>
+      )}
+    </InlineNotice>
   )
 }
 

@@ -1,13 +1,17 @@
 // Supabase Edge Function: owner invitations (ADR-0024). JWT verification stays on (supabase/config.toml) and the
-// handler re-checks the caller (Owner, or a member with owners.manage). Uses the service role for auth.admin.generateLink and the service_* functions.
+// handler re-checks the caller through the 2FA gate (R-W1-1): caller_mfa_satisfied() then platform_can('owners.manage'),
+// both with the caller's own token. Uses the service role for auth.admin.generateLink and the service_* functions.
 // Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
+import { callerRpc } from '../_shared/caller.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
+import { gateCaller } from '../_shared/gate.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
 import { handleProvisionOwner } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
-const admin = createClient(env('SUPABASE_URL') ?? '', serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
+const url = env('SUPABASE_URL') ?? ''
+const admin = createClient(url, serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
 
 Deno.serve((req) =>
   handleProvisionOwner(req, {
@@ -17,10 +21,11 @@ Deno.serve((req) =>
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)
     },
-    async isPlatformAdmin(userId) {
-      // Owners, and active Admin/Team members whose role has owners.manage (ADR-0029).
-      const { data, error } = await admin.rpc('service_user_can', { p_user: userId, p_permission: 'owners.manage' })
-      return !error && data === true
+    gate: (token) => gateCaller(callerRpc(url, env('SUPABASE_ANON_KEY') ?? '', token), { permission: 'owners.manage' }),
+    async isTeamEmail(email) {
+      const { count, error } = await admin.from('platform_members').select('id', { count: 'exact', head: true }).eq('email', email.toLowerCase())
+      if (error) throw new Error(`team email lookup failed: ${error.code ?? 'unknown'}`)
+      return (count ?? 0) > 0
     },
     async isPlatformStaff(userId) {
       const [owner, member] = await Promise.all([
@@ -65,6 +70,7 @@ Deno.serve((req) =>
     async linkOwner(businessId, userId, actorId, applicationId) {
       const { data, error } = await admin.rpc('service_link_owner', { p_business_id: businessId, p_user_id: userId, p_actor: actorId, p_application_id: applicationId })
       if (error?.message.includes('business_has_owner')) return 'business_has_owner'
+      if (error?.message.includes('email_is_admin')) return 'email_is_admin'
       if (error) throw new Error(`link failed: ${error.message}`)
       return data as 'linked' | 'already_linked'
     },

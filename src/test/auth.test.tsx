@@ -47,6 +47,8 @@ function fakeAuth(overrides: Partial<AuthService> = {}) {
 
 const admin: SignedInAccount = { email: 'ana@test', user: { id: 'u1', name: 'Ana', email: 'ana@test', role: 'super_admin' } }
 const owner: SignedInAccount = { email: 'rui@test', user: { id: 'u2', name: 'Rui', email: 'rui@test', role: 'business_admin', businessId: 'biz_casa' } }
+/** An owner who has not finished the invitation yet (business_members.accepted_at is null). */
+const pendingOwner: SignedInAccount = { email: 'rui@test', user: { ...owner.user!, invitationPending: true } }
 
 let logoutResult: LogoutResult | undefined
 function Probe() {
@@ -177,7 +179,7 @@ describe('AcceptInvitePage (COR-15)', () => {
       .fn<AuthService['completeOwnerOnboarding']>()
       .mockResolvedValueOnce(fail('UNKNOWN', 'rpc failed'))
       .mockResolvedValue(ok({ businessId: 'biz_casa' }))
-    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(owner)), completeOwnerOnboarding })
+    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(pendingOwner)), completeOwnerOnboarding })
     fake.auth = auth
     const user = userEvent.setup()
     const first = renderPage()
@@ -198,7 +200,7 @@ describe('AcceptInvitePage (COR-15)', () => {
   it('shows auth errors in the visitor language', async () => {
     sessionStorage.setItem(LANG_KEY, 'pt')
     const { auth } = fakeAuth({
-      getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(owner)),
+      getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(pendingOwner)),
       updatePassword: vi.fn(async () => ({ ok: false as const, error: { code: 'VALIDATION' as const, message: 'Choose a stronger password.', reason: 'weak_password' } })),
     })
     fake.auth = auth
@@ -209,6 +211,56 @@ describe('AcceptInvitePage (COR-15)', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar e continuar' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Escolha uma palavra-passe mais forte')
     expect(auth.completeOwnerOnboarding).not.toHaveBeenCalled()
+  })
+
+  it('a signed-in owner whose invitation is already accepted goes to /dashboard; the password form is never rendered (R-W1-9)', async () => {
+    // Records whether a password field is ever put in the page, even for a moment before the redirect.
+    let sawPassword = false
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('input[type="password"]')) sawPassword = true
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    try {
+      const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(owner)) })
+      fake.auth = auth
+      renderPage()
+      expect(await screen.findByText('owner dashboard')).toBeInTheDocument()
+      expect(sawPassword).toBe(false)
+      expect(auth.updatePassword).not.toHaveBeenCalled()
+      expect(auth.completeOwnerOnboarding).not.toHaveBeenCalled()
+    } finally {
+      observer.disconnect()
+    }
+  })
+
+  it('a signed-in owner with a pending invitation sees who is signed in and can sign out first (R-W1-9)', async () => {
+    const getCurrentUser = vi.fn<AuthService['getCurrentUser']>().mockResolvedValue(ok(pendingOwner))
+    const { auth, emit } = fakeAuth({ getCurrentUser })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    expect(await screen.findByText("You're signed in as rui@test. If this invitation is for someone else, sign out first.")).toBeInTheDocument()
+    // The notice comes before the password step.
+    const signOut = screen.getByRole('button', { name: 'Sign out' })
+    const password = screen.getByLabelText(/^Password/)
+    expect(signOut.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    getCurrentUser.mockResolvedValue(ok(null))
+    await user.click(signOut)
+    expect(auth.signOut).toHaveBeenCalled()
+    await emit()
+    // Signed out: the invitation starts again from the code step.
+    expect(await screen.findByLabelText(/^Code from the email/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Password/)).not.toBeInTheDocument()
+    expect(auth.updatePassword).not.toHaveBeenCalled()
+  })
+
+  it('the signed-in notice is translated (R-W1-9)', async () => {
+    sessionStorage.setItem(LANG_KEY, 'pt')
+    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(pendingOwner)) })
+    fake.auth = auth
+    renderPage()
+    expect(await screen.findByText('Tem sessão iniciada como rui@test. Se este convite for para outra pessoa, termine a sessão primeiro.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Terminar sessão' })).toBeInTheDocument()
   })
 })
 
@@ -237,7 +289,7 @@ describe('AcceptInvitePage: invitation code (ADR-0027)', () => {
     await user.type(screen.getByLabelText(/^Code from the email/), '4821 3907')
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(auth.verifyEmailCode).toHaveBeenCalledWith('rui@test.pt', '48213907', 'invite')
-    getCurrentUser.mockResolvedValue(ok(owner))
+    getCurrentUser.mockResolvedValue(ok(pendingOwner))
     await emit()
     expect(await screen.findByLabelText(/^Password/)).toBeInTheDocument()
   })

@@ -1,10 +1,12 @@
-// Request handling for the invite-member Edge Function (ADR-0029, ADR-0030). Platform Owner only.
+// Request handling for the invite-member Edge Function (ADR-0029, ADR-0030). Platform Owner only, on every action, at
+// the 2FA level the staff policy requires (R-W1-1).
 //   POST { action: "invite", email, role: "admin"|"team", note? } → creates the invited member and emails a /join link
 //   POST { action: "resend", memberId }                         → a new link for someone still invited (the old one stops working)
 // The link secret is 32 random bytes; only its SHA-256 is stored. The secret goes into the email only: it is never
 // returned, logged or put in the audit log. A provider failure is reported as email_failed, never as sent.
 import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
+import { type GateResult, gateReply } from '../_shared/gate.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
 import { type MemberRole, hashSecret, newInviteSecret } from '../_shared/team.ts'
 
@@ -18,7 +20,8 @@ export interface InviteDeps {
   fetch: typeof fetch
   now?: () => Date
   userIdFromToken(token: string): Promise<string | null>
-  isOwner(userId: string): Promise<boolean>
+  /** The 2FA gate with the caller's own token (R-W1-1): caller_mfa_satisfied(), then is_platform_admin(). */
+  gate(token: string): Promise<GateResult>
   /** admin_invite_member, called with the caller's own token so the database re-checks the Owner. */
   inviteMember(token: string, email: string, role: MemberRole): Promise<DbResult<{ memberId: string }>>
   getMember(id: string): Promise<{ id: string; email: string; role: MemberRole; status: string } | null>
@@ -46,9 +49,11 @@ export async function handleInviteMember(req: Request, deps: InviteDeps): Promis
   const action = body?.action
   if (!body || (action !== 'invite' && action !== 'resend')) return reply(400, { error: 'invalid_request' })
 
-  if (!(await deps.isOwner(actorId))) {
-    await deps.logDenied(actorId, action === 'invite' ? 'invite_member' : 'resend_member_invite')
-    return reply(403, { error: 'forbidden' })
+  const gate = await deps.gate(token)
+  if (gate !== 'ok') {
+    // A missing permission is an access-denied event; an Owner asked for the 2FA step is not.
+    if (gate === 'forbidden') await deps.logDenied(actorId, action === 'invite' ? 'invite_member' : 'resend_member_invite')
+    return gateReply(gate)
   }
   if (!deps.config.ok) return reply(503, { error: 'not_configured' })
   const config = deps.config.config

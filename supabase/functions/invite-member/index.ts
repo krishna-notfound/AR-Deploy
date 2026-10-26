@@ -1,9 +1,11 @@
 // Supabase Edge Function: platform team invitations (ADR-0029, ADR-0030). JWT verification stays on
-// (supabase/config.toml); the handler re-checks the Owner, and admin_invite_member runs with the caller's own token so
-// the database checks again. The service role is used only for the service_* functions and the email log.
+// (supabase/config.toml); the handler re-checks the Owner through the 2FA gate (R-W1-1, caller_mfa_satisfied() then
+// is_platform_admin() with the caller's own token), and admin_invite_member runs with that token so the database checks again. The service role is used only for the service_* functions and the email log.
 // Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
+import { callerRpc } from '../_shared/caller.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
+import { gateCaller } from '../_shared/gate.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
 import { handleInviteMember } from './handler.ts'
 
@@ -24,10 +26,7 @@ Deno.serve((req) =>
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)
     },
-    async isOwner(userId) {
-      const { data, error } = await admin.from('platform_admins').select('user_id').eq('user_id', userId).maybeSingle()
-      return !error && !!data
-    },
+    gate: (token) => gateCaller(callerRpc(url, env('SUPABASE_ANON_KEY') ?? '', token), 'owner'),
     async inviteMember(token, email, role) {
       const { data, error } = await asCaller(token).rpc('admin_invite_member', { p_email: email, p_role: role })
       if (error) throw new Error(`invite failed: ${error.message}`)
