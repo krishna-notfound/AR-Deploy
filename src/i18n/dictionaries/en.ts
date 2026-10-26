@@ -92,6 +92,8 @@ export const en = {
   'ar.preparing': 'Preparing AR…',
   'ar.phoneUnsupportedTitle': "AR isn't available in this browser",
   'ar.phoneUnsupportedBody': 'Open this page in {browser} to place the piece in your room.',
+  'ar.deviceUnsupportedTitle': "AR isn't available on this device",
+  'ar.deviceUnsupportedBody': "This phone can't start AR. You can still explore the piece in 3D.",
   'ar.inAppTitle': 'Open this page in {browser} to use AR',
   'ar.inAppBody': '{app} opens links in its own browser, which cannot start AR. Copy the link and paste it into {browser}.',
   'ar.checking': 'Checking AR support…',

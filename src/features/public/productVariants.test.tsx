@@ -4,6 +4,7 @@ import { App } from '@/app/App'
 import type { Product } from '@/domain/types'
 import { service } from '@/services'
 import { AR_TIPS_KEY } from './ArTips'
+import { AR_PENDING_MAX_MS } from './ProductPage'
 
 // The real web component needs WebGL: the element is a plain custom tag here, and the tests play its events.
 vi.mock('@google/model-viewer', () => ({}))
@@ -215,6 +216,7 @@ describe('product page: AR audit quick wins', () => {
   const ANDROID_FIREFOX = 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0'
   const IPHONE_TIKTOK = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 musical_ly_33.0.0'
   const ANDROID_LINKEDIN = `${ANDROID_CHROME} [LinkedInApp]/4.1`
+  const IPHONE_SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
   const asUserAgent = (ua: string) => vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua)
   const cta = () => document.querySelector('[data-ar-cta]') as HTMLElement
   beforeEach(() => {
@@ -294,6 +296,43 @@ describe('product page: AR audit quick wins', () => {
     openApp('/products/nordhaus/sheen-lounge-chair?lang=pt')
     loaded(await viewerFor(/SheenChair\.glb$/), false)
     expect(screen.getByText('Abra esta página no Safari para usar a RA')).toBeInTheDocument()
+  })
+
+  it("in the phone's own AR browser, does not tell the visitor to open that same browser (AR-07, review)", async () => {
+    asUserAgent(IPHONE_SAFARI)
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    loaded(await viewerFor(/SheenChair\.glb$/), false)
+    expect(screen.queryByText(/Open this page in Safari/)).toBeNull()
+    expect(screen.getByText("This phone can't start AR. You can still explore the piece in 3D.")).toBeInTheDocument()
+  })
+
+  it("in Portuguese, the same neutral line in the phone's own AR browser (AR-07, review)", async () => {
+    asUserAgent(IPHONE_SAFARI)
+    openApp('/products/nordhaus/sheen-lounge-chair?lang=pt')
+    loaded(await viewerFor(/SheenChair\.glb$/), false)
+    expect(screen.getByText('Este telemóvel não consegue iniciar a RA. Pode explorar a peça em 3D.')).toBeInTheDocument()
+  })
+
+  it('clears "Preparing AR…" after a safety timeout when the hand-off never settles (AR-06, review)', async () => {
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    el.activateAR = vi.fn(() => new Promise<void>(() => {}))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      fireEvent.click(arButton()!)
+      expect(screen.getByRole('button', { name: /Preparing AR/ })).toBeDisabled()
+      act(() => {
+        vi.advanceTimersByTime(AR_PENDING_MAX_MS - 1)
+      })
+      expect(screen.getByRole('button', { name: /Preparing AR/ })).toBeDisabled()
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
+      expect(screen.getByRole('button', { name: 'View in my home' })).toBeEnabled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows the scale label next to the AR action, and flags a model that does not match (AR-09)', async () => {

@@ -34,6 +34,8 @@ import { VariantPicker } from './VariantPicker'
 
 /** Ignore AR taps this soon after a launch settles (double taps, impatient re-taps while the native viewer opens). */
 export const AR_RELAUNCH_MS = 2000
+/** Clear "Preparing AR…" if the native hand-off never settles (the page may never hear back from the viewer). */
+export const AR_PENDING_MAX_MS = 20_000
 /** Signed media URLs last MEDIA_URL_TTL_SECONDS; refetch on return to the tab once half of that has passed. */
 const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
 
@@ -172,6 +174,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const modelUnsupported = isAndroid() && sceneViewerUnsupported(model.required ?? media.models.glb?.requiredExtensions).length > 0
   const availability = arAvailability(modelState, canAR, modelUnsupported)
   const additional = product.images.filter((i) => i.kind === 'additional')
+  const hasCta = modelState === 'loaded' || availability !== 'none'
 
   const open3d = () => {
     setMode('3d')
@@ -199,14 +202,20 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     lastLaunch.current = now
     setMode('3d') // if AR cannot start, the visitor is left on the 3D model rather than a photo
     if (!isPreview) void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
+    const done = () => {
+      clearTimeout(safety)
+      if (!launchingRef.current) return
+      launchingRef.current = false
+      setLaunching(false)
+      lastLaunch.current = performance.now()
+    }
+    const safety = setTimeout(done, AR_PENDING_MAX_MS)
     try {
       await viewerRef.current?.activateAR()
     } catch {
       toast.error(arFailedMessage())
     } finally {
-      launchingRef.current = false
-      setLaunching(false)
-      lastLaunch.current = performance.now()
+      done()
     }
   }
 
@@ -313,8 +322,8 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             </div>
           </div>
 
-          {(modelState === 'loaded' || availability !== 'none') && (
-            <div data-ar-cta className="mt-6 flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2 lg:mt-8">
+          {hasCta && (
+            <div data-ar-cta className="mt-6 flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:mt-8">
               {/* Only for a model that loaded (AR-08). Where model-viewer can open AR, the primary action launches it
                   ("View in my home", as on main); elsewhere it opens the 3D view and ArSection explains the phone hand-off. */}
               {modelState === 'loaded' &&
@@ -345,7 +354,8 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           </div>
 
           <div className="min-w-0 lg:col-start-1 lg:row-start-3">
-            <div className="mt-8 lg:mt-6">
+            {/* Desktop spacing as before: gap-5 under the call to action, mt-8 under the finish picker when there is none. */}
+            <div className={cn('mt-8', hasCta ? 'lg:mt-5' : 'lg:mt-8')}>
               <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
                 {product.cta.url ? (
                   <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={textAction}>

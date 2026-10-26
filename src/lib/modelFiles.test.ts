@@ -144,7 +144,7 @@ describe('validateModelFile: sizes that Android AR handles (AR-10)', () => {
     const big = new File([new Uint8Array(16 * 1024 * 1024)], 'sofa.glb')
     const r = await validateModelFile(big, 'glb')
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.message).toMatch(/Maximum is 15 MB.*Android AR/)
+    if (!r.ok) expect(r.message).toMatch(/sofa\.glb is 16 MB\. Maximum is 15 MB\..*Android AR/)
   })
 
   it('refuses a USDZ above 25 MB', async () => {

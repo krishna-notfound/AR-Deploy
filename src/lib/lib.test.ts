@@ -7,7 +7,7 @@ import { initialPrice } from './product'
 import { checkScale } from './scale'
 import { isValidSlug, slugInput, slugify, uniqueSlug } from './slug'
 import { catalogLocalPath, catalogPublicUrl, productLocalPath, productPublicUrl, shareableCurrentUrl } from './urls'
-import { detectInAppBrowser } from './userAgent'
+import { browserName, detectInAppBrowser } from './userAgent'
 import { resolveTenant } from '@/tenant/resolveTenant'
 
 describe('slug', () => {
@@ -105,6 +105,7 @@ describe('detectInAppBrowser', () => {
     expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Snapchat/12.80.0.38')).toBe('snapchat')
     expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Safari Line/13.17.0')).toBe('line')
     expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Twitter for iPhone/10.50')).toBe('x')
+    expect(detectInAppBrowser('Mozilla/5.0 (Linux; Android 14; Pixel 7) Chrome/129.0 Mobile Safari/537.36 TwitterAndroid')).toBe('x')
     // The Google app on iPhone cannot open Quick Look (model-viewer excludes it); on Android it is not an in-app browser here.
     expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 GSA/330.0.0 Mobile/15E148 Safari/604.1')).toBe('google')
     expect(detectInAppBrowser('Mozilla/5.0 (Linux; Android 14) Chrome/129.0 Mobile Safari/537.36 GSA/15.0')).toBeNull()
@@ -213,5 +214,15 @@ describe('localDayBounds', () => {
     expect(new Date(start).getDate()).toBe(20)
     expect(new Date(end).getDate()).toBe(21)
     expect(new Date(end).getHours()).toBe(0)
+  })
+})
+
+describe('browserName (AR-07 review)', () => {
+  it('names the current browser from the user agent', () => {
+    expect(browserName('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1')).toBe('Safari')
+    expect(browserName('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 CriOS/129.0 Mobile/15E148 Safari/604.1')).toBe('Chrome')
+    expect(browserName('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/129.0 Mobile Safari/537.36')).toBe('Chrome')
+    expect(browserName('Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0')).toBe('Firefox')
+    expect(browserName('')).toBeNull()
   })
 })

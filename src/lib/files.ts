@@ -4,6 +4,11 @@ import { formatFileSize } from './format'
 
 export const MB = 1024 * 1024
 
+/** "15 MB", "16.4 MB": megabytes without a trailing ".0", so limits read the same in hints and errors. */
+export function formatMb(bytes: number): string {
+  return `${Math.round((bytes / MB) * 10) / 10} MB`
+}
+
 export const IMAGE_RULES = {
   accept: ['image/jpeg', 'image/png', 'image/webp'],
   extensions: ['.jpg', '.jpeg', '.png', '.webp'],
@@ -152,7 +157,7 @@ export async function validateModelFile(file: File, format: ModelFormat): Promis
   if (extOf(file.name) !== rule.extension)
     return { ok: false, message: `${file.name}: expected a ${rule.extension} file.` }
   if (file.size > rule.maxBytes)
-    return { ok: false, message: `${file.name} is ${formatFileSize(file.size)}. Maximum is ${rule.maxBytes / MB} MB. ${rule.why}` }
+    return { ok: false, message: `${file.name} is ${formatMb(file.size)}. Maximum is ${formatMb(rule.maxBytes)}. ${rule.why}` }
   const glb = format === 'glb' ? await readGlb(file) : null
   const problem = glb ? (glb.ok ? null : glb.problem) : await usdzProblem(file)
   if (problem) return { ok: false, message: `${file.name} does not look like a valid ${format.toUpperCase()} file: ${problem}. Export it again.` }

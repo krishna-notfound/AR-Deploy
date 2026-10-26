@@ -8,7 +8,7 @@ import { CopyLink } from './ShareActions'
 import type { ModelState } from './ProductMedia'
 import { TAP_TARGET } from './tapTarget'
 import { shareableCurrentUrl } from '@/lib/urls'
-import { IN_APP_NAME, arBrowserName, detectInAppBrowser, isAndroid, isIOS } from '@/lib/userAgent'
+import { IN_APP_NAME, arBrowserName, browserName, detectInAppBrowser, isAndroid, isIOS } from '@/lib/userAgent'
 
 /** 'model-unsupported': this phone's AR viewer cannot open this model (Android + a GLB Scene Viewer does not support). */
 export type ArAvailability = 'none' | 'checking' | 'available' | 'unavailable' | 'model-unsupported'
@@ -58,8 +58,16 @@ export function ArSection({ availability, onShowTips }: { availability: ArAvaila
   const inApp = detectInAppBrowser()
   const onPhone = isIOS() || isAndroid()
   const browser = arBrowserName()
-  const title = inApp ? t('ar.inAppTitle', { browser }) : onPhone ? t('ar.phoneUnsupportedTitle') : t('ar.unsupportedTitle')
-  const body = inApp ? t('ar.inAppBody', { app: IN_APP_NAME[inApp], browser }) : onPhone ? t('ar.phoneUnsupportedBody', { browser }) : t('ar.unsupportedBody')
+  // Already in Safari (iOS) / Chrome (Android): pointing to the same browser would be no help, so say it plainly.
+  const inArBrowser = onPhone && browserName() === browser
+  const phoneKind = inApp ? 'inApp' : !onPhone ? 'desktop' : inArBrowser ? 'device' : 'browser'
+  const title = { inApp: t('ar.inAppTitle', { browser }), desktop: t('ar.unsupportedTitle'), device: t('ar.deviceUnsupportedTitle'), browser: t('ar.phoneUnsupportedTitle') }[phoneKind]
+  const body = {
+    inApp: inApp ? t('ar.inAppBody', { app: IN_APP_NAME[inApp], browser }) : '',
+    desktop: t('ar.unsupportedBody'),
+    device: t('ar.deviceUnsupportedBody'),
+    browser: t('ar.phoneUnsupportedBody', { browser }),
+  }[phoneKind]
   return (
     <div className="border border-line bg-surface p-4 sm:p-5">
       <div className="flex gap-3.5">
