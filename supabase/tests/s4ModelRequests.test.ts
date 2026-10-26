@@ -560,6 +560,38 @@ describe('S4 rollback', () => {
 // ---- end S4 Task 6 tests ----
 
 // ---- S4 Task 7 tests ----
+describe('S4 Task 7: email kind', () => {
+  const insert = (target: PGlite, kind: string) =>
+    target.query(`insert into public.email_log (kind, recipient, subject, status) values ($1, 't7@test', 'Subject', 'sent')`, [kind])
+
+  it("email_log accepts model_request_update and still rejects 'nope'", async () => {
+    await insert(db, 'model_request_update')
+    await expect(insert(db, 'nope')).rejects.toThrow(/email_log_kind_check/)
+  })
+
+  it('rollback restores the 12-kind check when no model_request_update row exists', async () => {
+    const rolled = await freshDb()
+    try {
+      await rolled.exec(readFileSync(S4_ROLLBACK_SQL, 'utf8'))
+      await expect(insert(rolled, 'model_request_update')).rejects.toThrow(/email_log_kind_check/)
+      await insert(rolled, 'team_notice')
+    } finally {
+      await rolled.close()
+    }
+  }, 60_000)
+
+  it('rollback keeps the wider check when a model_request_update row exists', async () => {
+    const rolled = await freshDb()
+    try {
+      await insert(rolled, 'model_request_update')
+      await rolled.exec(readFileSync(S4_ROLLBACK_SQL, 'utf8'))
+      expect((await rolled.query(`select 1 from public.email_log where kind = 'model_request_update'`)).rows).toHaveLength(1)
+      await insert(rolled, 'model_request_update')
+    } finally {
+      await rolled.close()
+    }
+  }, 60_000)
+})
 // ---- end S4 Task 7 tests ----
 
 // ---- S4 Task 8 tests ----

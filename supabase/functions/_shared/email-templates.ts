@@ -36,7 +36,13 @@ export interface TemplateData {
   /** Inbox closure alert (R-W7-9): the request was cancelled, and the catalog status it went back to. */
   closureCancelled?: boolean
   catalogStatus?: string
+  /** Model request update (R-S4-15): what happened, and the option's name when the request was for an option. */
+  modelEvent?: ModelRequestEmailEvent
+  optionName?: string
 }
+
+/** What the owner is told about a 3D model request (S4 section 9.2): delivered to a published or a draft product, or declined. */
+export type ModelRequestEmailEvent = 'delivered_published' | 'delivered_draft' | 'declined'
 
 /** The platform-team changes a business owner is emailed about (R-W7-2, §11.2). */
 export type BusinessNoticeEvent = 'paused' | 'live' | 'product_unpublished' | 'product_deleted'
@@ -237,6 +243,41 @@ const teamNotice = (d: TemplateData): Copy => {
   }
 }
 
+// Model request update (S4 section 9.2): the product and option names come in already in the email's language. The
+// reason is the staff's text as typed: escaped in the HTML by renderEmail, kept as written in the text version.
+const MODEL_UPDATE: Record<EmailLang, { subject: (p: string) => string; declinedSubject: (p: string) => string; done: (t: string) => string; published: string; draft: string; declined: (t: string, r: string) => string; footer: string }> = {
+  en: {
+    subject: (p) => `The 3D model for ${p} is ready`,
+    declinedSubject: (p) => `Your 3D model request for ${p}`,
+    done: (t) => `The Sanctus team finished the 3D model for ${t}.`,
+    published: 'It is now attached to the product, and customers can view it in 3D and in AR on the product page.',
+    draft: "It is attached to the product in your dashboard. Publish the product when you're ready, and customers can view it in 3D and in AR.",
+    declined: (t, r) => `The Sanctus team couldn't make the 3D model for ${t} from this request. Reason: ${r}. You can send a new request from the product in your dashboard.`,
+    footer: 'Contact the Sanctus team if you have questions.',
+  },
+  pt: {
+    subject: (p) => `O modelo 3D de ${p} está pronto`,
+    declinedSubject: (p) => `O seu pedido de modelo 3D para ${p}`,
+    done: (t) => `A equipa Sanctus terminou o modelo 3D de ${t}.`,
+    published: 'Já está associado ao produto, e os clientes podem vê-lo em 3D e em AR na página do produto.',
+    draft: 'Já está associado ao produto no seu painel. Publique o produto quando quiser, e os clientes poderão vê-lo em 3D e em AR.',
+    declined: (t, r) => `A equipa Sanctus não conseguiu criar o modelo 3D de ${t} com este pedido. Motivo: ${r}. Pode enviar um novo pedido a partir do produto no seu painel.`,
+    footer: 'Contacte a equipa Sanctus se tiver dúvidas.',
+  },
+}
+const modelRequestUpdate = (lang: EmailLang) => (d: TemplateData): Copy => {
+  const c = MODEL_UPDATE[lang]
+  const product = d.productName ?? ''
+  const target = `${product}${d.optionName ? ` (${d.optionName})` : ''}`
+  const event = d.modelEvent ?? 'delivered_draft'
+  if (event === 'declined') {
+    const subject = c.declinedSubject(product)
+    return { subject, heading: subject, body: c.declined(target, d.reason ?? ''), closing: c.footer }
+  }
+  const subject = c.subject(product)
+  return { subject, heading: subject, body: `${c.done(target)} ${event === 'delivered_published' ? c.published : c.draft}`, closing: c.footer }
+}
+
 /** Every email kind has its copy in COPY below. */
 export type TemplateKind = EmailKind
 
@@ -248,6 +289,7 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
   application_decision: applicationDecision,
   business_notice: { en: businessNotice('en'), pt: businessNotice('pt') },
   team_notice: { en: teamNotice, pt: teamNotice },
+  model_request_update: { en: modelRequestUpdate('en'), pt: modelRequestUpdate('pt') },
   owner_invitation: {
     en: (d) => ({
       subject: `You're invited to manage ${d.businessName ?? 'your catalogue'} on Sanctus`,
@@ -367,6 +409,10 @@ export const applicationDecisionEmail = (lang: EmailLang, businessName: string, 
 /** A platform-team change, told to the business owner (R-W7-2), in the application's language. */
 export const businessNoticeEmail = (lang: EmailLang, event: BusinessNoticeEvent, d: { businessName: string; productName?: string }): RenderedEmail =>
   renderEmail('business_notice', lang, { businessEvent: event, businessName: d.businessName, productName: d.productName })
+
+/** The owner's notice that a 3D model request was delivered or declined (R-S4-15), in the owner's language. */
+export const modelRequestUpdateEmail = (lang: EmailLang, event: ModelRequestEmailEvent, d: { productName: string; optionName?: string; reason?: string }): RenderedEmail =>
+  renderEmail('model_request_update', lang, { modelEvent: event, productName: d.productName, optionName: d.optionName, reason: d.reason })
 
 /** The only link an account-security email may carry: the app's own https base URL. */
 const appLink = (appBaseUrl: string | undefined) => (appBaseUrl && /^https:\/\/[^\s/]+$/.test(appBaseUrl) ? appBaseUrl : undefined)
