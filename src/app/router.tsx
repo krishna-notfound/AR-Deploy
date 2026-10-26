@@ -1,5 +1,5 @@
 import { RequirePermission } from '@/auth/usePermission'
-import { JOIN_PATH } from '@/lib/urls'
+import { JOIN_PATH, PRIVACY_PATH, TERMS_PATH } from '@/lib/urls'
 import { lazy, Suspense } from 'react'
 import { Outlet, type RouteObject, createBrowserRouter } from 'react-router'
 import { RequireRole } from '@/auth/RequireRole'
@@ -21,6 +21,7 @@ const AcceptInvitePage = lazy(() => import('@/features/auth/AcceptInvitePage'))
 const ApplyPage = lazy(() => import('@/features/apply/ApplyPage'))
 const NotFoundPage = lazy(() => import('@/features/demo/NotFoundPage'))
 const PublicNotFoundPage = lazy(() => import('@/features/marketing/PublicNotFoundPage'))
+const LegalPage = lazy(() => import('@/features/legal/LegalPage'))
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/AdminOverviewPage'))
 const BusinessesListPage = lazy(() => import('@/features/admin/BusinessesListPage'))
@@ -163,6 +164,8 @@ function pathModeRoutes(): RouteObject[] {
           children: [
             { path: '/', element: <LandingPage /> },
             { path: '/apply', element: <ApplyPage /> },
+            { path: PRIVACY_PATH, element: <LegalPage doc="privacy" /> },
+            { path: TERMS_PATH, element: <LegalPage doc="terms" /> },
             // Both use t(), so they need the LanguageProvider of this layout.
             { path: '/reset-password', element: <ResetPasswordPage /> },
             { path: '/accept-invite', element: <AcceptInvitePage /> },
@@ -191,6 +194,9 @@ function hostnameModeRoutes(slug: string): RouteObject[] {
             { path: '/', element: <CatalogPage tenantSlug={slug} /> },
             { path: '/products/:productSlug', element: <ProductPage tenantSlug={slug} /> },
             { path: '/embed/products/:productSlug', element: <EmbedProductPage tenantSlug={slug} /> },
+            // The catalogue and product footers link here, so the legal pages answer on business subdomains too.
+            { path: PRIVACY_PATH, element: <LegalPage doc="privacy" tenant /> },
+            { path: TERMS_PATH, element: <LegalPage doc="terms" tenant /> },
             { path: '*', element: <PublicNotFoundPage tenant /> },
           ],
         },

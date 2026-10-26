@@ -42,6 +42,7 @@ async function submitApplication(): Promise<string> {
     modelReadiness: 'none',
     notes: '',
     consent: true,
+    acceptedTerms: true,
     submissionKey: crypto.randomUUID(),
   })
   if (!res.ok) throw new Error(res.error.message)

@@ -12,6 +12,7 @@ import { cn } from '@/lib/cn'
 import { isDemoMode, service } from '@/services'
 import { APPLICATION_STEPS, MODEL_READINESS, PHOTO_READINESS, PRODUCT_COUNT_RANGES, validateApplication } from '../../../supabase/functions/_shared/application.ts'
 import { AuthHeading, AuthLayout, StepIndicator, authFieldsClass } from '../auth/AuthLayout'
+import { LegalLinks, TermsAgreement } from '../legal/LegalLinks'
 
 type Step = keyof typeof APPLICATION_STEPS
 const STEPS = Object.keys(APPLICATION_STEPS) as Step[]
@@ -39,6 +40,7 @@ const empty = (lang: Lang): Draft => ({
   modelReadiness: '',
   notes: '',
   consent: false,
+  acceptedTerms: false,
   submissionKey: crypto.randomUUID(),
 })
 
@@ -131,7 +133,11 @@ export default function ApplyPage() {
 
   /** Errors of the given steps only, as translated messages. */
   const stepErrors = (steps: Step[]) => {
-    const v = validateApplication({ ...toInput(draft), consent: steps.includes('review') ? draft.consent : true })
+    const v = validateApplication({
+      ...toInput(draft),
+      consent: steps.includes('review') ? draft.consent : true,
+      acceptedTerms: steps.includes('review') ? draft.acceptedTerms : true,
+    })
     if (v.ok) return {}
     const own = new Set<string>(steps.flatMap((s) => APPLICATION_STEPS[s] as readonly string[]))
     return Object.fromEntries(Object.entries(v.errors).filter(([f]) => own.has(f)).map(([f, c]) => [f, message(f, c)]))
@@ -186,7 +192,7 @@ export default function ApplyPage() {
   }
 
   return (
-    <AuthLayout photo="sofa" wide>
+    <AuthLayout photo="sofa" wide footer={<LegalLinks linkClassName="transition-colors hover:text-ink" />}>
       {done ? (
         <Success
           done={done}
@@ -323,6 +329,7 @@ export default function ApplyPage() {
                   <Review draft={draft} onEdit={go} />
                   <Checkbox label={t('apply.f.consent')} checked={draft.consent} onChange={(e) => set('consent', e.target.checked)} aria-invalid={!!errors.consent} />
                   {errors.consent && <p className="text-[13px] text-danger">{errors.consent}</p>}
+                  <TermsAgreement checked={!!draft.acceptedTerms} onChange={(v) => set('acceptedTerms', v)} error={errors.acceptedTerms} />
                   {submitError && (
                     <InlineNotice tone="warning">
                       <span role="alert">{submitError}</span>

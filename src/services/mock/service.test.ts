@@ -217,6 +217,7 @@ describe('business applications and owner access (demo, ADR-0024)', () => {
     modelReadiness: 'none',
     notes: '',
     consent: true,
+    acceptedTerms: true,
     submissionKey: crypto.randomUUID(),
     ...over,
   })

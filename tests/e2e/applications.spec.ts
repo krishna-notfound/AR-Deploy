@@ -51,6 +51,7 @@ test('a business applies, is reviewed, approved as a draft and its owner invited
   await page.getByRole('button', { name: 'Send application' }).click()
   await expect(page.getByText('Please confirm to send your application.')).toBeVisible()
   await page.getByLabel(/I confirm the information is accurate/).check()
+  await page.getByRole('checkbox', { name: /^I agree to the Terms/ }).check()
   await page.getByRole('button', { name: 'Send application' }).click()
   await expect(page.getByRole('heading', { name: 'Application received' })).toBeVisible()
   await expect(page.getByText(/^Reference: [A-Z0-9]{8}$/)).toBeVisible()
@@ -58,6 +59,7 @@ test('a business applies, is reviewed, approved as a draft and its owner invited
   // A second open application for the same business and email is refused.
   await fillWizard(page, 'atelier norte', 'rita@atelier-norte.test')
   await page.getByLabel(/I confirm the information is accurate/).check()
+  await page.getByRole('checkbox', { name: /^I agree to the Terms/ }).check()
   await page.getByRole('button', { name: 'Send application' }).click()
   await expect(page.getByText(/already being reviewed/)).toBeVisible()
 

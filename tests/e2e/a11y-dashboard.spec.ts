@@ -115,6 +115,7 @@ async function submitApplication(page: Page) {
   await page.getByRole('group', { name: /3D models/ }).getByRole('radio', { name: 'We need help creating them' }).check()
   await page.getByRole('button', { name: 'Continue' }).click()
   await page.getByLabel(/I confirm the information is accurate/).check()
+  await page.getByRole('checkbox', { name: /^I agree to the Terms/ }).check()
   await page.getByRole('button', { name: 'Send application' }).click()
   await expect(page.getByRole('heading', { name: 'Application received' })).toBeVisible()
 }

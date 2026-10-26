@@ -10,6 +10,7 @@ import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
 import { cn } from '@/lib/cn'
+import { TermsAgreement } from '../legal/LegalLinks'
 import { AuthHeading, AuthLayout, StepIndicator, authFieldsClass } from './AuthLayout'
 import { MIN_PASSWORD_LENGTH } from './ResetPasswordPage'
 import { authErrorText, normalizeCode } from './authErrors'
@@ -177,10 +178,14 @@ function SetPassword({ userId, businessName }: { userId: string; businessName: s
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [passwordSaved, setPasswordSaved] = useState(() => readPasswordSaved(userId))
+  // The owner accepts the Terms before the password is set (Terms B1.5). Not stored yet: a later item records version and time.
+  const [agreed, setAgreed] = useState(false)
+  const [agreeError, setAgreeError] = useState<string | null>(null)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!auth) return
+    if (!agreed) return setAgreeError(t('legal.agree.required'))
     if (!passwordSaved) {
       if (password.length < MIN_PASSWORD_LENGTH) return setError(t('invite.passwordShort', { n: MIN_PASSWORD_LENGTH }))
       if (password !== confirm) return setError(t('invite.passwordMismatch'))
@@ -225,6 +230,14 @@ function SetPassword({ userId, businessName }: { userId: string; businessName: s
           </FormField>
         </>
       )}
+      <TermsAgreement
+        checked={agreed}
+        onChange={(v) => {
+          setAgreed(v)
+          if (v) setAgreeError(null)
+        }}
+        error={agreeError}
+      />
       <Button
         type="submit"
         variant="primary"

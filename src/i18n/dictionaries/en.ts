@@ -375,6 +375,25 @@ export const en = {
   'common.retry': 'Try again',
   'common.errorTitle': 'Something went wrong',
   'common.close': 'Close',
+
+  // Legal pages (/privacy, /terms) and the "I agree" ticks. The page text itself comes from docs/legal/drafts.
+  'legal.privacy.link': 'Privacy',
+  'legal.terms.link': 'Terms',
+  'legal.nav': 'Legal',
+  'legal.privacy.title': 'Privacy Policy',
+  'legal.terms.title': 'Terms and Conditions',
+  'legal.privacy.description': 'How Sanctus handles personal data: what we collect and why, device storage, providers, retention and your rights.',
+  'legal.terms.description': 'The terms for using Sanctus: rules for visitors, the business account contract, content reports and contacts.',
+  'legal.contents': 'Contents',
+  'legal.placeholder': 'To be completed',
+  'legal.placeholderNote': 'Highlighted items are details still to be completed before publication.',
+  'legal.agree.prefix': 'I agree to the',
+  'legal.agree.terms': 'Terms',
+  'legal.agree.and': 'and the',
+  'legal.agree.privacy': 'Privacy Policy',
+  'legal.agree.newTab': '(opens in a new tab)',
+  'legal.agree.required': 'Please agree to the Terms and the Privacy Policy to continue.',
+  'apply.err.terms_required': 'Please agree to the Terms and the Privacy Policy to send your application.',
 } as const
 
 export type TranslationKey = keyof typeof en

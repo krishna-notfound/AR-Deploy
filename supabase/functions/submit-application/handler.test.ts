@@ -30,6 +30,7 @@ const VALID = {
   modelReadiness: 'need_help',
   notes: '',
   consent: true,
+  acceptedTerms: true,
   submissionKey: '6f1c1b1e-3c55-4a1c-9d47-0a3c1e2b9f10',
 }
 
@@ -122,6 +123,16 @@ describe('submit-application', () => {
     // R-W2-10: the stored hash is today's (UTC) hash.
     expect(rows[0]!.hash).toBe(await submitterHash('203.0.113.9', 'salt', '2026-10-26'))
     expect(rows[0]!.hash).not.toContain('203.0.113.9')
+  })
+
+  // S2 legal: the applicant must tick "I agree to the Terms and the Privacy Policy"; nothing is stored or sent without it.
+  it.each([['missing', undefined], ['false', false], ['a string', 'true']])('rejects acceptedTerms %s with 422 invalid_request', async (_label, value) => {
+    const { d, rows, sends } = deps()
+    const res = await handleSubmitApplication(post({ ...VALID, acceptedTerms: value }), d)
+    expect(res.status).toBe(422)
+    expect(await res.json()).toEqual({ error: 'invalid_request' })
+    expect(rows).toHaveLength(0)
+    expect(sends).toHaveLength(0)
   })
 
   it('returns field codes for invalid answers and stores nothing', async () => {

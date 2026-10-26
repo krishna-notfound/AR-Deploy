@@ -1,7 +1,7 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '@/i18n/LanguageProvider'
 import { service } from '@/services'
 import ApplyPage from './ApplyPage'
@@ -85,8 +85,43 @@ describe('ApplyPage', () => {
     await stepHeading('Your business')
   })
 
+  // S2 legal: the final step requires "I agree to the Terms and the Privacy Policy" (the function refuses it too).
+  it('does not send the application until the Terms tick is set, and links both documents in a new tab', async () => {
+    const draft = {
+      businessName: 'Atelier Norte', website: '', description: 'Handmade oak furniture from Porto.', categoryKey: 'furniture', categoryOther: '',
+      country: 'Portugal', city: 'Porto', applicantName: 'Ana Silva', applicantRole: '', applicantEmail: 'ana@example.com', applicantPhone: '',
+      language: 'en', productCount: '1-10', photoReadiness: 'all', modelReadiness: 'none', notes: '', consent: true, acceptedTerms: false,
+      submissionKey: '6f1c1b1e-3c55-4a1c-9d47-0a3c1e2b9f10',
+    }
+    sessionStorage.setItem('sanctus:apply:draft', JSON.stringify({ draft, step: 'review' }))
+    const submit = vi.spyOn(service, 'submitApplication')
+    const user = userEvent.setup()
+    renderApply(['/apply?step=review'])
+    await stepHeading('Review and send')
+    expect(screen.getByRole('link', { name: 'Terms (opens in a new tab)' })).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('link', { name: 'Privacy Policy (opens in a new tab)' })).toHaveAttribute('href', '/privacy')
+
+    await user.click(screen.getByRole('button', { name: 'Send application' }))
+    expect(await screen.findByText('Please agree to the Terms and the Privacy Policy to send your application.')).toBeInTheDocument()
+    expect(submit).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('checkbox', { name: /^I agree to the Terms/ }))
+    await user.click(screen.getByRole('button', { name: 'Send application' }))
+    expect(await screen.findByText(/^Reference:/)).toBeInTheDocument()
+    expect(submit).toHaveBeenCalledWith(expect.objectContaining({ acceptedTerms: true }))
+    submit.mockRestore()
+  })
+
   it('opening /apply again after a submission starts a fresh form', async () => {
     renderApply(['/', '/apply'])
     expect(await stepHeading('Your business')).toBeInTheDocument()
   })
+})
+
+it('the apply page footer links the Privacy Policy and the Terms', async () => {
+  renderApply(['/apply'])
+  await stepHeading('Your business')
+  const legal = screen.getByRole('navigation', { name: 'Legal' })
+  expect(within(legal).getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
+  expect(within(legal).getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms')
 })

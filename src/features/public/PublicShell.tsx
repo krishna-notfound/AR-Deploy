@@ -6,6 +6,7 @@ import type { Business, Lang } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { safeBrandAccent } from '@/lib/color'
+import { LegalLinks } from '../legal/LegalLinks'
 import { InAppNotice } from './InAppNotice'
 import { TAP_TARGET } from './tapTarget'
 
@@ -65,6 +66,7 @@ export function PublicShell({ business, catalogHref, children }: { business?: Bu
       <footer className="mt-auto border-t border-line bg-canvas">
         <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-x-8 gap-y-4 px-5 py-8 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted sm:px-10 sm:py-10">
           <span>{business ? `© ${business.name}` : ''}</span>
+          <LegalLinks linkClassName={cn(TAP_TARGET, 'transition-colors hover:text-ink')} />
           <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <Wordmark size={9} />
             <span className="h-3 w-px bg-line" aria-hidden />
