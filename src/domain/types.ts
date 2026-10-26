@@ -295,8 +295,10 @@ export type Permission =
 export type PlatformRole = 'owner' | 'admin' | 'team'
 export type MemberRole = Exclude<PlatformRole, 'owner'>
 export interface PlatformAccess {
-  role: PlatformRole
+  /** null with status 'deactivated': the Owner turned this member's access off (S1.5 R-W6-7). */
+  role: PlatformRole | null
   permissions: Permission[]
+  status: 'active' | 'deactivated'
 }
 export type MemberStatus = 'invited' | 'active' | 'deactivated'
 export type InviteStatus = 'pending' | 'sent' | 'email_failed' | 'accepted' | 'expired' | 'revoked'
@@ -339,6 +341,7 @@ export type RolePermissions = Record<MemberRole, Permission[]>
 export type AccessAction =
   | 'invite_created' | 'invite_email_sent' | 'invite_email_failed' | 'invite_accepted' | 'invite_revoked' | 'invite_expired_attempt'
   | 'role_changed' | 'permissions_changed' | 'member_deactivated' | 'member_reactivated' | 'denied'
+  | 'member_removed' | 'member_email_changed'
 export interface AccessEvent {
   id: ID
   at: ISODate

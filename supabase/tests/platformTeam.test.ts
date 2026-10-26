@@ -94,7 +94,9 @@ describe('membership tables and platform_can (Task 1)', () => {
     expect((await access(ADMIN_U))?.role).toBe('admin')
     expect([...((await access(ADMIN_U))?.permissions ?? [])].sort()).toEqual(ALL)
     expect([...((await access(TEAM_U))?.permissions ?? [])].sort()).toEqual(TEAM_DEFAULTS)
-    for (const u of [DEACT_U, INVITED_U, BIZ_OWNER_U, STRANGER_U]) expect(await access(u)).toBeNull()
+    // S1.5 R-W6-7: a deactivated member is told so (no role, no permissions) instead of getting nothing.
+    expect(await access(DEACT_U)).toEqual({ role: null, permissions: [], status: 'deactivated' })
+    for (const u of [INVITED_U, BIZ_OWNER_U, STRANGER_U]) expect(await access(u)).toBeNull()
   })
 
   it('platform_can is false for deactivated and invited members', async () => {

@@ -1,8 +1,8 @@
 // One platform member (ADR-0029): who they are, their role and what it allows, their invitations and their
-// access history, with Change role, Deactivate or Reactivate. Only real recorded data is shown.
+// access history, with Change role, Deactivate, Reactivate or Remove. Only real recorded data is shown.
 import { Check, ChevronDown, UserX } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useCan } from '@/auth/usePermission'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
@@ -66,6 +66,7 @@ export default function MemberDetailPage() {
 function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Record<MemberRole, string[]> | null; onChanged: () => void; crumbs: { label: string; to?: string }[] }) {
   const prefs = usePreferences()
   const actions = useMemberActions()
+  const navigate = useNavigate()
   const can = useCan()
   const toast = useToast()
   const [resetting, setResetting] = useState(false)
@@ -124,6 +125,15 @@ function Member({ m, perms, onChanged, crumbs }: { m: PlatformMember; perms: Rec
                 </Button>
               )}
               {m.status === 'deactivated' && <Button onClick={() => after(actions.reactivate(m))}>Reactivate</Button>}
+              {m.status === 'deactivated' && (
+                <Button
+                  variant="ghost"
+                  className="text-danger hover:bg-danger-soft"
+                  onClick={() => void actions.remove(m).then((ok) => ok && navigate('/admin/team'))}
+                >
+                  Remove
+                </Button>
+              )}
               {resetTarget && <Button onClick={() => setResetting(true)}>Reset 2FA</Button>}
             </>
           )

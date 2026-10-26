@@ -104,6 +104,21 @@ export function useMemberActions() {
     [confirm, report],
   )
 
+  // S1.5 R-W6-1: deactivated members only; the copy is spec §11.1.
+  const remove = useCallback(
+    async (m: PlatformMember) => {
+      const yes = await confirm({
+        title: `Remove ${m.email} from the team?`,
+        body: `Their access record and login are deleted. Past actions stay in the audit log as 'Deleted user (${ROLE_LABEL[m.role]})'. They can be invited again later.`,
+        confirmLabel: 'Remove member',
+        destructive: true,
+      })
+      if (!yes) return false
+      return report(await service.removeMember(m.id), `${m.email} was removed.`)
+    },
+    [confirm, report],
+  )
+
   const changeRole = useCallback(
     async (m: PlatformMember, role: MemberRole, lost: string[], gained: string[]) => {
       const who = m.fullName ?? m.email
@@ -124,5 +139,5 @@ export function useMemberActions() {
     [confirm, report],
   )
 
-  return { resend, revoke, deactivate, reactivate, changeRole, reportInvite }
+  return { resend, revoke, deactivate, reactivate, remove, changeRole, reportInvite }
 }

@@ -9,6 +9,19 @@ export type QueryState<T> =
 
 export type QueryResult<T> = QueryState<T> & { refetch: () => void; refreshing: boolean }
 
+const permissionListeners = new Set<() => void>()
+/**
+ * Called whenever a query or mutation is refused with PERMISSION (S1.5 R-W6-8: the account then reloads the
+ * platform access, as a role or permission change made elsewhere is the usual cause). Returns an unsubscribe function.
+ */
+export function onPermissionError(listener: () => void): () => void {
+  permissionListeners.add(listener)
+  return () => void permissionListeners.delete(listener)
+}
+function reportRefusal(res: Result<unknown>) {
+  if (!res.ok && res.error.code === 'PERMISSION') permissionListeners.forEach((l) => l())
+}
+
 /**
  * Runs a service call and re-runs it whenever deps change or the data store changes.
  * A deps change is a new query: it starts empty, so an earlier result (e.g. a placeholder `[]` while a parent
@@ -29,6 +42,7 @@ export function useServiceQuery<T>(fn: () => Promise<Result<T>>, deps: readonly 
     fnRef
       .current()
       .then((res) => {
+        reportRefusal(res)
         if (id !== requestId.current) return
         setState((prev) => (res.ok ? { status: 'success', data: res.data } : { status: 'error', error: res.error, data: prev.data }))
       })
@@ -55,7 +69,9 @@ export function useServiceMutation<A extends unknown[], T>(fn: (...args: A) => P
   const mutate = useCallback(async (...args: A): Promise<Result<T>> => {
     setPending(true)
     try {
-      return await fnRef.current(...args)
+      const res = await fnRef.current(...args)
+      reportRefusal(res)
+      return res
     } finally {
       setPending(false)
     }

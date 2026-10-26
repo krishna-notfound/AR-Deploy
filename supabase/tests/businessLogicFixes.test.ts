@@ -2,6 +2,7 @@
 // S1.5 business-logic fixes (docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md): one describe per task,
 // on the shared PGlite harness. Each task seeds its own users and businesses with ids(task), so describes are
 // independent; a test that changes shared settings (role sets, the 2FA policy) restores them before it ends.
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
@@ -211,4 +212,186 @@ describe('S1.5 rollback', () => {
       await rolled.close()
     }
   }, 120_000)
+})
+
+describe('S1.5 Task 9: team membership lifecycle', () => {
+  GONE_AFTER_ROLLBACK.push('public.admin_remove_member(uuid)', 'private.sync_member_email()')
+  const id = ids(9)
+  const OWNER = id(1)
+  const ADMIN = id(2)
+  const DEACT = id(3)
+  const REM_OWNER = id(4)
+  const REM_INVITE = id(5)
+  const SYNC = id(6)
+  const CONFLICT = id(7)
+  const TAKEN = id(8)
+  const BROKEN = id(9)
+  const OFF = id(11)
+  const BIZ = id(10)
+  const M_DEACT = id(20)
+  const M_REM_OWNER = id(21)
+  const M_REM_INVITE = id(22)
+  const M_ADMIN = id(23)
+  const M_OFF = id(24)
+
+  type Answer = { ok?: boolean; user_id?: string; error?: string; memberId?: string }
+  const remove = (caller: string, member: string, aal: 'aal1' | 'aal2' = 'aal1') =>
+    h.call(caller, 'select public.admin_remove_member($1) as r', [member], aal) as Promise<Answer>
+  const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex')
+  const memberEmail = async (memberId: string) =>
+    (await db.query<{ email: string }>('select email from public.platform_members where id = $1', [memberId])).rows[0]?.email
+  const memberOf = async (userId: string) => (await db.query<{ id: string }>('select id from public.platform_members where user_id = $1', [userId])).rows[0]!.id
+  const emailEvents = async (memberId: string) =>
+    (await db.query<{ actor_id: string | null; metadata: Record<string, unknown> }>(
+      `select actor_id, metadata from public.audit_events where event_type = 'access_member_email_changed' and metadata->>'member_id' = $1 order by created_at`,
+      [memberId])).rows
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ('${OWNER}', 't9-owner@test', now()), ('${ADMIN}', 't9-admin@test', now()), ('${DEACT}', 't9-deact@test', now()),
+        ('${REM_OWNER}', 't9-rem-owner@test', now()), ('${REM_INVITE}', 't9-rem-invite@x.pt', now()),
+        ('${SYNC}', 't9-sync@test', now()), ('${CONFLICT}', 't9-conflict@test', now()), ('${TAKEN}', 't9-taken@test', now()),
+        ('${BROKEN}', 't9-broken@test', now()), ('${OFF}', 't9-off@test', now());
+      insert into public.platform_admins (user_id) values ('${OWNER}');
+      insert into public.platform_members (id, user_id, email, role, status, deactivated_at) values
+        ('${M_ADMIN}', '${ADMIN}', 't9-admin@test', 'admin', 'active', null),
+        ('${M_DEACT}', '${DEACT}', 't9-deact@test', 'admin', 'deactivated', now()),
+        ('${M_REM_OWNER}', '${REM_OWNER}', 't9-rem-owner@test', 'team', 'deactivated', now()),
+        ('${M_REM_INVITE}', '${REM_INVITE}', 't9-rem-invite@x.pt', 'team', 'deactivated', now()),
+        ('${M_OFF}', '${OFF}', 't9-off@test', 'team', 'deactivated', now());
+      insert into public.platform_members (user_id, email, role, status) values
+        ('${SYNC}', 't9-sync@test', 'team', 'active'), ('${CONFLICT}', 't9-conflict@test', 'team', 'active'),
+        ('${TAKEN}', 't9-taken@test', 'team', 'active'), ('${BROKEN}', 't9-broken@test', 'team', 'active');
+      insert into private.platform_invites (member_id, token_hash, status, expires_at) values
+        ('${M_DEACT}', '${'9a'.repeat(32)}', 'revoked', now() + interval '7 days'),
+        ('${M_DEACT}', '${'9b'.repeat(32)}', 'accepted', now() - interval '1 day');
+      insert into public.businesses (id, name, slug, status) values ('${BIZ}', 'Task Nine Co', 't9-co', 'draft');
+    `)
+  })
+
+  it('admin_remove_member: Owner only, refuses an active member (not_deactivated) and self, deletes the invites and the row, writes access_member_removed', async () => {
+    expect(await remove(ADMIN, M_DEACT)).toEqual({ error: 'forbidden' })
+    expect(await remove(OWNER, M_ADMIN)).toEqual({ error: 'not_deactivated' })
+    expect(await remove(OWNER, id(99))).toEqual({ error: 'not_found' })
+    // 2FA-gated through owner_or_deny: with the staff policy on, an aal1 Owner is refused.
+    await h.withPolicy(true, false, async () => {
+      expect(await remove(OWNER, M_DEACT, 'aal1')).toEqual({ error: 'forbidden' })
+    })
+    // Self: an Owner who also holds a (deactivated) member row can't remove it.
+    const selfRow = id(30)
+    await db.query(`insert into public.platform_members (id, user_id, email, role, status) values ($1, $2, 't9-owner@test', 'team', 'deactivated')`, [selfRow, OWNER])
+    try {
+      expect(await remove(OWNER, selfRow)).toEqual({ error: 'self' })
+    } finally {
+      await db.query('delete from public.platform_members where id = $1', [selfRow])
+    }
+    expect(await memberEmail(M_DEACT)).toBe('t9-deact@test')
+
+    expect(await remove(OWNER, M_DEACT)).toEqual({ ok: true, user_id: DEACT })
+    expect(await memberEmail(M_DEACT)).toBeUndefined()
+    expect((await db.query('select 1 from private.platform_invites where member_id = $1', [M_DEACT])).rows).toHaveLength(0)
+    const events = (await db.query<{ actor_id: string; metadata: Record<string, unknown> }>(
+      `select actor_id, metadata from public.audit_events where event_type = 'access_member_removed' and metadata->>'member_id' = $1`, [M_DEACT])).rows
+    expect(events).toEqual([{ actor_id: OWNER, metadata: { member_id: M_DEACT, email_sha256: sha('t9-deact@test'), role: 'admin' } }])
+    // The refusal is audited as access_denied, not as a removal.
+    expect((await db.query(`select 1 from public.audit_events where event_type = 'access_denied' and actor_id = $1 and metadata->>'action' = 'remove_member'`, [ADMIN])).rows).toHaveLength(1)
+    // Only signed-in callers may execute it.
+    const grants = (await db.query<{ anon: boolean; auth: boolean }>(
+      `select has_function_privilege('anon', 'public.admin_remove_member(uuid)', 'execute') as anon,
+              has_function_privilege('authenticated', 'public.admin_remove_member(uuid)', 'execute') as auth`)).rows[0]
+    expect(grants).toEqual({ anon: false, auth: true })
+  })
+
+  it('after removal the email can be provisioned as an owner (service_link_owner) and invited again', async () => {
+    expect(await remove(OWNER, M_REM_OWNER)).toEqual({ ok: true, user_id: REM_OWNER })
+    expect(await h.svc(`select to_jsonb(public.service_link_owner($1, $2, $3)) as r`, [BIZ, REM_OWNER, OWNER])).toBe('linked')
+
+    expect(await remove(OWNER, M_REM_INVITE)).toEqual({ ok: true, user_id: REM_INVITE })
+    const invited = (await h.call(OWNER, `select public.admin_invite_member('t9-rem-invite@x.pt', 'admin') as r`)) as Answer
+    expect(invited).toMatchObject({ ok: true })
+    expect(invited.memberId).not.toBe(M_REM_INVITE)
+    expect((await db.query<{ status: string; role: string }>('select status::text, role::text from public.platform_members where email = $1', ['t9-rem-invite@x.pt'])).rows)
+      .toEqual([{ status: 'invited', role: 'admin' }])
+  })
+
+  it("updating auth.users.email to 'New@X.pt' sets platform_members.email 'new@x.pt' and audits from/to", async () => {
+    const memberId = await memberOf(SYNC)
+    await db.query(`update auth.users set email = 'New@X.pt' where id = $1`, [SYNC])
+    expect(await memberEmail(memberId)).toBe('new@x.pt')
+    expect(await emailEvents(memberId)).toEqual([{ actor_id: SYNC, metadata: { member_id: memberId, from: 't9-sync@test', to: 'new@x.pt' } }])
+    // Another column changing, or the same address in another case, writes nothing.
+    await db.query(`update auth.users set last_sign_in_at = now() where id = $1`, [SYNC])
+    await db.query(`update auth.users set email = 'new@X.PT' where id = $1`, [SYNC])
+    expect(await emailEvents(memberId)).toHaveLength(1)
+  })
+
+  it('an address already used by another member changes nothing and audits conflict:true', async () => {
+    const memberId = await memberOf(CONFLICT)
+    await db.query(`update auth.users set email = 'T9-Taken@test' where id = $1`, [CONFLICT])
+    expect((await db.query<{ email: string }>('select email from auth.users where id = $1', [CONFLICT])).rows[0]!.email).toBe('T9-Taken@test')
+    expect(await memberEmail(memberId)).toBe('t9-conflict@test')
+    expect(await emailEvents(memberId)).toEqual([{ actor_id: CONFLICT, metadata: { member_id: memberId, from: 't9-conflict@test', to: 't9-taken@test', conflict: true } }])
+  })
+
+  it("an exception inside sync_member_email doesn't block the auth.users update", async () => {
+    const memberId = await memberOf(BROKEN)
+    await db.exec(`
+      create function public.t9_explode() returns trigger language plpgsql as $$ begin raise exception 't9 boom'; end $$;
+      create trigger t9_explode before update on public.platform_members for each row execute function public.t9_explode();
+    `)
+    try {
+      await db.query(`update auth.users set email = 't9-renamed@test' where id = $1`, [BROKEN])
+    } finally {
+      await db.exec('drop trigger t9_explode on public.platform_members; drop function public.t9_explode();')
+    }
+    expect((await db.query<{ email: string }>('select email from auth.users where id = $1', [BROKEN])).rows[0]!.email).toBe('t9-renamed@test')
+    expect(await memberEmail(memberId)).toBe('t9-broken@test')
+    expect(await emailEvents(memberId)).toEqual([])
+  })
+
+  it('the backfill syncs drifted rows', async () => {
+    const pre = await freshDb((n) => n < S15_MIGRATION)
+    try {
+      await pre.exec(`
+        insert into auth.users (id, email) values ('${id(40)}', 'T9-Drift-New@test'), ('${id(41)}', 't9-same@test'),
+          ('${id(42)}', 't9-wanted@test'), ('${id(43)}', 't9-holder@test');
+        insert into public.platform_members (id, user_id, email, role, status) values
+          ('${id(50)}', '${id(40)}', 't9-drift-old@test', 'team', 'active'),
+          ('${id(51)}', '${id(41)}', 't9-same@test', 'team', 'active'),
+          ('${id(52)}', '${id(42)}', 't9-before@test', 'team', 'active'),
+          ('${id(53)}', null, 't9-wanted@test', 'team', 'invited');
+      `)
+      await pre.exec(readFileSync(join(MIGRATIONS, S15_MIGRATION), 'utf8'))
+      const emails = (await pre.query<{ id: string; email: string }>('select id, email from public.platform_members order by id')).rows
+      expect(emails).toEqual([
+        { id: id(50), email: 't9-drift-new@test' },
+        { id: id(51), email: 't9-same@test' },
+        { id: id(52), email: 't9-before@test' }, // the address is another member's row: left alone
+        { id: id(53), email: 't9-wanted@test' },
+      ])
+      const events = (await pre.query<{ metadata: Record<string, unknown> }>(
+        `select metadata from public.audit_events where event_type = 'access_member_email_changed' order by metadata->>'member_id'`)).rows
+      expect(events.map((e) => e.metadata)).toEqual([
+        { member_id: id(50), from: 't9-drift-old@test', to: 't9-drift-new@test' },
+        { member_id: id(52), from: 't9-before@test', to: 't9-wanted@test', conflict: true },
+      ])
+    } finally {
+      await pre.close()
+    }
+  }, 60_000)
+
+  it('my_platform_access for a deactivated member → role null, status deactivated; the Owner still gets 15', async () => {
+    const access = (uid: string) => h.call(uid, 'select public.my_platform_access() as r') as Promise<Record<string, unknown> | null>
+    expect(await access(OFF)).toEqual({ role: null, permissions: [], status: 'deactivated' })
+    const owner = await access(OWNER)
+    expect(owner?.role).toBe('owner')
+    expect(owner?.permissions).toHaveLength(15)
+    expect((await access(ADMIN))?.role).toBe('admin')
+    expect(await access(id(98))).toBeNull() // no row at all
+    await withRolePermissions({ admin: [], team: [] }, async () => {
+      expect((await access(OWNER))?.permissions).toHaveLength(15)
+      expect(await access(OFF)).toEqual({ role: null, permissions: [], status: 'deactivated' })
+    })
+  })
 })

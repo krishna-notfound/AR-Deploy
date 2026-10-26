@@ -2,9 +2,10 @@
 // Supabase mode: the real Supabase Auth session, with the role read from platform_admins / business_members.
 // Either way this only drives navigation; access control is enforced by RLS in the database.
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import type { Business, ID, PlatformRole, SecurityState, User } from '@/domain/types'
+import { useOptionalToast } from '@/components/ui/ToastProvider'
+import type { Business, ID, PlatformAccess, PlatformRole, SecurityState, User } from '@/domain/types'
 import { type AssuranceLevels, type AuthService, type SignedInAccount, account as accountApi, auth, service } from '@/services'
-import { useServiceQuery } from '@/services/hooks'
+import { onPermissionError, useServiceQuery } from '@/services/hooks'
 import { DEMO_PLATFORM_USERS, SUPER_ADMIN, businessAdminFor } from './accounts'
 
 export const ACCOUNT_KEY = 'arfurn:account'
@@ -38,6 +39,8 @@ interface AccountCtx {
   logout: () => Promise<LogoutResult>
   /** Supabase mode: email of a signed-in user who has no role (or no business) yet. */
   signedInEmail?: string
+  /** Supabase mode, with signedInEmail: the Owner turned this platform member's access off (S1.5 R-W6-7). */
+  accessDeactivated?: boolean
   /** Why the account or its business could not be loaded. A user who was already signed in stays signed in. */
   accountError?: string
   /** Loads the account and its business again (after accountError). */
@@ -139,13 +142,16 @@ export function AccountProvider({ children }: { children: ReactNode }) {
  * account does), so a network blip on a token refresh never flashes the 2FA gate. A failed first load lets the app
  * through (the database still refuses data) and retries in the background: on window focus and with a backoff.
  */
-function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
+function useSecurityLoader(onChange?: (info: SecurityInfo) => void, onScheduledReload?: () => void) {
   const [sec, setSec] = useState<SecurityInfo>(NO_SECURITY)
   const secRef = useRef(sec)
   const loadId = useRef(0)
   const onChangeRef = useRef(onChange)
+  // Told on each reload of the focus, visibility, route and aal1-interval cadence (the platform access follows it).
+  const onScheduledRef = useRef(onScheduledReload)
   useEffect(() => {
     onChangeRef.current = onChange
+    onScheduledRef.current = onScheduledReload
   })
   // The last patch, held over reloads until one confirms it (or a minute has passed).
   const pending = useRef<{ patch: SecurityPatch; at: number } | null>(null)
@@ -219,6 +225,7 @@ function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
     if (!secRef.current.state) return
     if (Date.now() - lastLoadAt.current < STALE_AFTER_MS) return
     void refresh()
+    onScheduledRef.current?.()
   }, [refresh])
 
   const known = !!sec.state
@@ -242,7 +249,9 @@ function useSecurityLoader(onChange?: (info: SecurityInfo) => void) {
   useEffect(() => {
     if (!atAal1) return
     const timer = setInterval(() => {
-      if (document.visibilityState !== 'hidden') void refresh()
+      if (document.visibilityState === 'hidden') return
+      void refresh()
+      onScheduledRef.current?.()
     }, AAL1_RELOAD_MS)
     return () => clearInterval(timer)
   }, [atAal1, refresh])
@@ -262,6 +271,14 @@ function applyPatch(info: Pick<SecurityInfo, 'state' | 'assurance'>, p: Security
     assurance: p.assurance ? { currentLevel: 'aal1', nextLevel: 'aal1', ...info.assurance, ...p.assurance } : info.assurance,
   }
 }
+
+/** Shown when a reload finds that the signed-in platform user's role or permissions changed (S1.5 R-W6-8). */
+export const ACCESS_CHANGED = 'Your access changed. This page was updated.'
+/** A PERMISSION error reloads the platform access at most this often. */
+const ACCESS_ON_REFUSAL_MS = 2_000
+
+const accessKey = (a: PlatformAccess) => `${a.role}|${a.status}|${[...a.permissions].sort().join(',')}`
+const sameAccess = (a: PlatformAccess, b: PlatformAccess | null) => !!b && accessKey(a) === accessKey(b)
 
 function useBusiness(businessId: ID | null) {
   return useServiceQuery(() => (businessId ? service.getBusinessById(businessId) : Promise.resolve({ ok: true as const, data: null })), [businessId])
@@ -292,6 +309,8 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     setHiddenRefetch(shownWithoutBusiness.current ? (accountRef.current?.user?.businessId ?? null) : null)
     b.refetch()
   }, [])
+  // The platform access reload (below), called on the security state's cadence.
+  const refreshAccessRef = useRef<() => void>(() => {})
   const { security, refresh: refreshSecurity, refreshIfStale: refreshSecurityIfStale, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader((info) => {
     if (!info.loaded || !info.state) return
     // A business hidden while a 2FA step was due is fetched again once the step is done.
@@ -302,7 +321,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       // At most one per minute on the server; a failure to record never blocks the user.
       void accountApi.recordSignIn()
     }
-  })
+  }, () => refreshAccessRef.current())
 
   const load = useCallback(() => {
     const id = ++loadId.current
@@ -332,6 +351,42 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     if (bizRef.current.status !== 'error') bizRef.current.refetch()
     load()
   }, [load])
+
+  // R-W6-8: a platform user's role and permissions are read again on the security state's cadence and after a
+  // PERMISSION error, so a change the Owner makes elsewhere reaches this session. A change updates the account (the
+  // nav and permission checks follow) and says so; access turned off reloads the account, which signs them out of
+  // the dashboard. Business owners have no platform access to reload.
+  const toast = useOptionalToast()
+  const accessLoad = useRef({ running: false, at: 0 })
+  const refreshAccess = useCallback(async () => {
+    const cur = accountRef.current
+    const platform = cur?.user?.role === 'super_admin' ? cur.user.platform : undefined
+    if (!cur?.user || !platform || accessLoad.current.running) return
+    accessLoad.current = { running: true, at: Date.now() }
+    try {
+      const id = loadId.current
+      const r = await service.getMyAccess()
+      // A failed read keeps what is known; a newer account lookup (or a sign-out) answers for itself.
+      if (!r.ok || id !== loadId.current || accountRef.current !== cur || sameAccess(platform, r.data)) return
+      if (!r.data?.role || r.data.status !== 'active') return load()
+      const next: SignedInAccount = { ...cur, user: { ...cur.user, platform: r.data } }
+      accountRef.current = next
+      setAccount(next)
+      toast?.info(ACCESS_CHANGED)
+    } finally {
+      accessLoad.current.running = false
+    }
+  }, [load, toast])
+  useEffect(() => {
+    refreshAccessRef.current = () => void refreshAccess()
+  }, [refreshAccess])
+  useEffect(
+    () =>
+      onPermissionError(() => {
+        if (Date.now() - accessLoad.current.at >= ACCESS_ON_REFUSAL_MS) void refreshAccess()
+      }),
+    [refreshAccess],
+  )
 
   useEffect(() => {
     const ids = loadId
@@ -368,6 +423,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       retry,
       accountError,
       signedInEmail: noRole ? account.email : undefined,
+      accessDeactivated: noRole && account.deactivated ? true : undefined,
       security,
       refreshSecurity,
       refreshSecurityIfStale,
@@ -414,8 +470,33 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   const platformRole = session?.role === 'super_admin' ? (session.platformRole ?? 'owner') : null
   // The demo role's permissions come from the demo team data, so changes on Team & Access apply straight away.
   const access = useServiceQuery(() => (platformRole ? service.getMyAccess() : Promise.resolve({ ok: true as const, data: null })), [platformRole])
+  const { refetch: refetchAccess } = access
   const bizFailed = biz.status === 'error'
-  const { security, refresh: refreshSecurity, refreshIfStale: refreshSecurityIfStale, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader()
+  // R-W6-8, as in Supabase mode: the access is read again on the security state's cadence and after a PERMISSION error.
+  const accessAt = useRef(0)
+  const reloadAccess = useCallback(() => {
+    if (!platformRole) return
+    accessAt.current = Date.now()
+    refetchAccess()
+  }, [platformRole, refetchAccess])
+  const { security, refresh: refreshSecurity, refreshIfStale: refreshSecurityIfStale, patch: patchSecurity, clear: clearSecurity } = useSecurityLoader(undefined, reloadAccess)
+  useEffect(
+    () =>
+      onPermissionError(() => {
+        if (Date.now() - accessAt.current >= ACCESS_ON_REFUSAL_MS) reloadAccess()
+      }),
+    [reloadAccess],
+  )
+  // A changed role or permission set for the same demo account says so (the nav follows the new access).
+  const toast = useOptionalToast()
+  const seenAccess = useRef<{ role: PlatformRole; access: PlatformAccess } | null>(null)
+  useEffect(() => {
+    const now = access.data
+    if (!platformRole || !now) return
+    const prev = seenAccess.current
+    seenAccess.current = { role: platformRole, access: now }
+    if (prev?.role === platformRole && now.status === 'active' && !sameAccess(prev.access, now)) toast?.info(ACCESS_CHANGED)
+  }, [access.data, platformRole, toast])
   const [gateHeld, setGateHeld] = useState(false)
   const holdGate = useCallback((on: boolean) => setGateHeld(on), [])
   // The demo security state follows the chosen account (the staff and business policies differ).
@@ -465,6 +546,8 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
     }
     if (!session) return { ...base, user: null }
     if (session.role === 'super_admin') {
+      // The demo member was deactivated on Team & Access: no dashboard (as in Supabase mode).
+      if (access.data?.status === 'deactivated') return { ...base, user: null }
       if (!access.data || access.data.role !== platformRole) return access.status === 'error' ? { ...base, user: undefined, accountError: access.error.message } : { ...base, user: undefined }
       const person = platformRole === 'owner' ? SUPER_ADMIN : DEMO_PLATFORM_USERS[platformRole as 'admin' | 'team']
       return { ...base, user: { ...person, platform: access.data } }

@@ -10,6 +10,8 @@ import { mapDbError } from './supabaseCatalogService'
 export interface SignedInAccount {
   email: string
   user: User | null
+  /** A platform member whose access the Owner turned off (with `user: null`; S1.5 R-W6-7). */
+  deactivated?: boolean
 }
 
 /** An auth failure with Supabase's error code (or 'network') as `reason`, so public pages can word it in the visitor's language. */
@@ -89,11 +91,14 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       ])
       // Until the team-roles migration is applied, my_platform_access does not exist (PostgREST PGRST202): an Owner
       // (platform_admins) is then still recognised, with every permission, so sign-in keeps working during the rollout.
-      let platform = admin.data as PlatformAccess | null
+      const answer = admin.data as Partial<PlatformAccess> | null
+      // A deactivated member gets { role: null, status: 'deactivated' } (S1.5 R-W6-7); a role means active access.
+      const deactivated = answer?.status === 'deactivated'
+      let platform: PlatformAccess | null = answer?.role && !deactivated ? { role: answer.role, permissions: answer.permissions ?? [], status: 'active' } : null
       if (admin.error?.code === 'PGRST202') {
         const owner = await sb.from('platform_admins').select('user_id').eq('user_id', u.id).maybeSingle()
         if (owner.error) return mapDbError(owner.error)
-        platform = owner.data ? { role: 'owner', permissions: [...ALL_PERMISSIONS] } : null
+        platform = owner.data ? { role: 'owner', permissions: [...ALL_PERMISSIONS], status: 'active' } : null
       } else if (admin.error) return mapDbError(admin.error)
       if (member.error) return mapDbError(member.error)
       const meta = (u.user_metadata ?? {}) as { display_name?: unknown }
@@ -102,7 +107,7 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       if (platform) return ok({ email, user: { ...base, role: 'super_admin', platform } })
       // A business has exactly one owner (ADR-0024); a user owning several businesses gets the newest one until a switcher exists.
       if (member.data) return ok({ email, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
-      return ok({ email, user: null })
+      return ok(deactivated ? { email, user: null, deactivated: true } : { email, user: null })
     },
 
     async signInWithPassword(email, password) {

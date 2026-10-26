@@ -17,7 +17,25 @@ const httpError = (status: number, body: unknown) => ({ name: 'FunctionsHttpErro
 describe('Supabase team service', () => {
   it('reads the caller access from my_platform_access', async () => {
     const { sb } = stub({ my_platform_access: { role: 'team', permissions: ['products.view'] } })
-    expect(await createSupabaseTeam(sb).getMyAccess()).toEqual({ ok: true, data: { role: 'team', permissions: ['products.view'] } })
+    expect(await createSupabaseTeam(sb).getMyAccess()).toEqual({ ok: true, data: { role: 'team', permissions: ['products.view'], status: 'active' } })
+  })
+
+  it('S1.5 Task 9: a deactivated member gets role null and status deactivated; no row stays null', async () => {
+    const off = stub({ my_platform_access: { role: null, permissions: [], status: 'deactivated' } })
+    expect(await createSupabaseTeam(off.sb).getMyAccess()).toEqual({ ok: true, data: { role: null, permissions: [], status: 'deactivated' } })
+    expect(await createSupabaseTeam(stub().sb).getMyAccess()).toEqual({ ok: true, data: null })
+  })
+
+  it('S1.5 Task 9: removeMember asks manage-member to remove, reports loginDeleted and tells open queries', async () => {
+    const notify = vi.fn()
+    const { sb, invoke } = stub({}, { data: { ok: true, loginDeleted: true } })
+    expect(await createSupabaseTeam(sb, notify).removeMember('m1')).toEqual({ ok: true, data: { loginDeleted: true } })
+    expect(invoke).toHaveBeenCalledWith('manage-member', { body: { action: 'remove', memberId: 'm1' } })
+    expect(notify).toHaveBeenCalledTimes(1)
+    const refused = stub({}, { error: httpError(409, { error: 'not_deactivated' }) })
+    const r = await createSupabaseTeam(refused.sb, notify).removeMember('m1')
+    expect(r.ok === false && r.error.reason).toBe('not_deactivated')
+    expect(notify).toHaveBeenCalledTimes(1)
   })
 
   it('maps the member list rows', async () => {

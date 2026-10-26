@@ -18,7 +18,7 @@ const LIVE = new Set(['pending', 'sent', 'email_failed'])
 type TeamMethods = Pick<
   CatalogService,
   | 'getMyAccess' | 'listMembers' | 'getMember' | 'listMemberInvites' | 'inviteMember' | 'resendMemberInvite' | 'revokeMemberInvite'
-  | 'setMemberRole' | 'deactivateMember' | 'reactivateMember' | 'getRolePermissions' | 'setRolePermissions' | 'getAccessEvents'
+  | 'setMemberRole' | 'deactivateMember' | 'reactivateMember' | 'removeMember' | 'getRolePermissions' | 'setRolePermissions' | 'getAccessEvents'
   | 'inspectInvite' | 'acceptInviteCreate' | 'acceptInviteExisting'
 >
 
@@ -100,7 +100,10 @@ export function createMockTeam(run: Run): TeamMethods {
         const role = demoPlatformRole()
         if (!role) return ok<PlatformAccess | null>(null)
         const t = store.get().team ?? createDemoTeam()
-        return ok<PlatformAccess | null>({ role, permissions: role === 'owner' ? [...ALL_PERMISSIONS] : [...t.rolePermissions[role]] })
+        // The demo Admin and Team are sample members: deactivated on Team & Access, they are told so (S1.5 R-W6-7).
+        const me = t.members.find((m) => m.userId === DEMO_VIEWER[role])
+        if (role !== 'owner' && me?.status === 'deactivated') return ok<PlatformAccess | null>({ role: null, permissions: [], status: 'deactivated' })
+        return ok<PlatformAccess | null>({ role, permissions: role === 'owner' ? [...ALL_PERMISSIONS] : [...t.rolePermissions[role]], status: 'active' })
       }),
 
     listMembers: async () =>
@@ -230,6 +233,23 @@ export function createMockTeam(run: Run): TeamMethods {
           record(team(d), { action: 'member_reactivated', member: mm.email, toRole: mm.role, details: mm.userId ? 'Reactivated' : 'Reactivated; needs a new invitation' })
         })
         return ok(undefined)
+      }),
+
+    removeMember: (id) =>
+      run(() => {
+        if (denied('remove a member')) return teamFail('forbidden')
+        const m = team(store.get()).members.find((x) => x.id === id)
+        if (!m) return teamFail('not_found')
+        if (m.role === 'owner') return teamFail('owner_protected')
+        if (m.status !== 'deactivated') return teamFail('not_deactivated')
+        store.update((d) => {
+          const tt = team(d)
+          tt.members = tt.members.filter((x) => x.id !== id)
+          delete tt.invites[id]
+          record(tt, { action: 'member_removed', member: m.email, fromRole: m.role, details: `Removed from the team (was ${m.role === 'admin' ? 'Admin' : 'Team'})` })
+        })
+        // Demo logins belong to nothing else, so a removed member's login always goes with them.
+        return ok({ loginDeleted: !!m.userId })
       }),
 
     getRolePermissions: () =>

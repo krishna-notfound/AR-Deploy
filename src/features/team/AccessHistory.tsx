@@ -29,6 +29,8 @@ export const ACTION_LABEL: Record<AccessAction, string> = {
   member_deactivated: 'Member deactivated',
   member_reactivated: 'Member reactivated',
   denied: 'Access refused',
+  member_removed: 'Member removed',
+  member_email_changed: 'Sign-in email changed',
 }
 
 const roleName = (r?: string) => (r === 'owner' || r === 'admin' || r === 'team' ? ROLE_LABEL[r] : r)

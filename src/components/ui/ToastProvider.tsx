@@ -84,6 +84,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** The toasts, or null outside <ToastProvider> (the account provider in standalone tests). */
+export function useOptionalToast(): ToastApi | null {
+  return useContext(ToastContext)
+}
+
 export function useToast(): ToastApi {
   const ctx = useContext(ToastContext)
   if (!ctx) throw new Error('useToast must be used inside <ToastProvider>')
