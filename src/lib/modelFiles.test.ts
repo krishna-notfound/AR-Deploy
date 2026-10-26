@@ -140,17 +140,21 @@ function glbWithPng(width: number, height: number): Uint8Array {
 }
 
 describe('validateModelFile: sizes that Android AR handles (AR-10)', () => {
-  it('refuses a GLB above 15 MB with a clear reason', async () => {
-    const big = new File([new Uint8Array(16 * 1024 * 1024)], 'sofa.glb')
+  it('refuses a GLB above 30 MB with a clear reason, and accepts one of 30 MB (owner 2026-10-26)', async () => {
+    const big = new File([new Uint8Array(31 * 1024 * 1024)], 'sofa.glb')
     const r = await validateModelFile(big, 'glb')
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.message).toMatch(/sofa\.glb is 16 MB\. Maximum is 15 MB\..*Android AR/)
+    if (!r.ok) expect(r.message).toMatch(/sofa\.glb is 31 MB\. Maximum is 30 MB\..*Android AR/)
+    const r16 = await validateModelFile(new File([new Uint8Array(16 * 1024 * 1024)], 'sofa.glb'), 'glb')
+    if (!r16.ok) expect(r16.message).not.toMatch(/Maximum is/)
   })
 
-  it('refuses a USDZ above 25 MB', async () => {
-    const r = await validateModelFile(new File([new Uint8Array(26 * 1024 * 1024)], 'sofa.usdz'), 'usdz')
+  it('refuses a USDZ above 40 MB, and not one of 26 MB', async () => {
+    const r = await validateModelFile(new File([new Uint8Array(41 * 1024 * 1024)], 'sofa.usdz'), 'usdz')
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.message).toMatch(/Maximum is 25 MB/)
+    if (!r.ok) expect(r.message).toMatch(/Maximum is 40 MB/)
+    const r26 = await validateModelFile(new File([new Uint8Array(26 * 1024 * 1024)], 'sofa.usdz'), 'usdz')
+    if (!r26.ok) expect(r26.message).not.toMatch(/Maximum is/)
   })
 
   it('accepts textures up to 2048 px and warns (without refusing) above it', async () => {

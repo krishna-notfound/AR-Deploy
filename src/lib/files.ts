@@ -36,13 +36,14 @@ export const REQUEST_PHOTO_RULES = {
 }
 
 /**
- * Upload limits for AR (AR audit 2026-10-26, AR-10). Google Scene Viewer recommends GLBs of 10 MB or less and its
- * validation can fail above 15 MB; a USDZ is opened by Quick Look on the phone, so it is held to a phone-sized limit
- * too. Client-side only: the storage bucket keeps its own (larger) limit.
+ * Upload limits for AR (AR audit 2026-10-26, AR-10; raised by the owner 2026-10-26 to 30 MB GLB and 40 MB USDZ).
+ * Android AR now opens inside Chrome first (WebXR, ADR-0035), which handles larger GLBs than Google Scene Viewer
+ * (it recommends 10 MB or less; the editor still warns above LARGE_MODEL_BYTES). A USDZ is opened by Quick Look on
+ * the phone. Client-side only: the storage buckets keep their own 50 MB limit.
  */
 export const MODEL_RULES: Record<ModelFormat, { extension: string; maxBytes: number; why: string }> = {
-  glb: { extension: '.glb', maxBytes: 15 * MB, why: 'Larger files often fail to open in Android AR (Google Scene Viewer). Reduce the textures (2048 px or less) or the polygon count and export again.' },
-  usdz: { extension: '.usdz', maxBytes: 25 * MB, why: 'Larger files are slow to open in iPhone AR (Quick Look). Reduce the textures (2048 px or less) and export again.' },
+  glb: { extension: '.glb', maxBytes: 30 * MB, why: 'Larger files often fail to open in Android AR. Reduce the textures (2048 px or less) or the polygon count and export again.' },
+  usdz: { extension: '.usdz', maxBytes: 40 * MB, why: 'Larger files are slow to open in iPhone AR (Quick Look). Reduce the textures (2048 px or less) and export again.' },
 }
 
 /** Textures above this many pixels on a side slow AR down and can run phones out of memory (Scene Viewer guidance). */
