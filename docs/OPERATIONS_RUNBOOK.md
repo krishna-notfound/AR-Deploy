@@ -107,7 +107,7 @@ Deploy only with the owner's explicit go-ahead, and only to the client project `
 
 ## Account settings and 2FA (S1)
 
-Settings hub, profile, email and password change, authenticator-app 2FA, recovery codes, the Owner's Security policy and account closure requests (ADR-0032). Deploy only with the owner's explicit go-ahead, and only to the client project `zggylkbgajamhriebdrg`. Status: built and reviewed on a branch, **not yet applied to Supabase**.
+Settings hub, profile, email and password change, authenticator-app 2FA, recovery codes, the Owner's Security policy and account closure requests (ADR-0032). Deploy only with the owner's explicit go-ahead, and only to the client project `zggylkbgajamhriebdrg`. Status: **applied to `zggylkbgajamhriebdrg` on 2026-10-26** (migrations, both functions, branch pushed to the Preview). The dashboard settings below are the owner's to switch on.
 
 ### Release order
 

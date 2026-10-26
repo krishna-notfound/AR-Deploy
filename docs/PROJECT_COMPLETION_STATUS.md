@@ -1,6 +1,6 @@
 # Sanctus: project completion status
 
-**Last updated:** 2026-10-24
+**Last updated:** 2026-10-26
 **Branch:** `feature/sanctus-brand-design-system`, pushed. Tested code commit: `26c03a5`. Later commits change only docs and config.
 **Data:** the client dev project `zggylkbgajamhriebdrg`, used by the Preview. The live project `pmnjchhrgvajtjpadpqo` and `main` are untouched.
 
@@ -26,6 +26,7 @@ This is the single place for **what is done, what is blocked and what decides th
 | Email delivery (Resend) | All secrets set: a new sending-only key "Sanctus server 2026-10-24" (temporary, the owner will replace it), the test sender `onboarding@resend.dev`, the Preview as `APP_BASE_URL`, a test admin inbox, and the signed webhook | n/a | 2026-10-24 on the Preview: applicant confirmation, admin notification and owner invitation all reached **delivered** through the signed webhook (`email_log`, application `ABE43EC0` and business "QA Preview Atelier 10201001") |
 | Password reset | `/reset-password` crashed on the Preview ("Something went wrong": the page uses `t()` but its route sat outside the `LanguageProvider`). Moved under the public layout. Auth emails now go through Resend SMTP. | `26c03a5` | e2e regression test. On the Preview, 2026-10-24: a reset for the QA owner's test inbox was **delivered** by Resend (sender "Sanctus"), and its link opened the Preview's "Choose a new password" form. The password was not changed. |
 | Leaked-password protection | `password_hibp_enabled = true` on zggyl | n/a | Management API read-back |
+| **Account settings and 2FA (S1, ADR-0032)** | Migrations `20261025163627` and `20261025180600` applied to zggyl on 2026-10-26 (dry run and read-only pre-checks first). `account-security` deployed (new, `verify_jwt = true`) and `submit-application` redeployed. Branch pushed: the Preview and `sanctus.warpkit.online` serve it. Types regenerated (`f9644b7`). | `5f5adf1`, `f9644b7` | Live API check with the labelled QA owner, 2026-10-26: **31 of 31 passed**. Covered: 2FA on with an authenticator; a password-only session refused business data and security activity; the code step restores access; 8 recovery codes, a wrong code refused, a real one removes 2FA and wipes the rest; turning 2FA off refused at aal1, a wrong or reused emailed code refused; closure request takes the business offline, a second request refused, cancelling restores `active`. Every email arrived from `no-reply@sanctus.warpkit.online`. Cleanup: no factor left, QA business `active`. Not covered live: the Owner's policy switches, Reset 2FA and complete or restore closure (they need the Owner at aal2), and the clicks in the browser. |
 | Public Preview | Vercel protection off (owner request, 2026-10-22). `main` and production unchanged. | n/a | https://ar-deploy-git-feature-sanctus-brand-design-system-track0.vercel.app opens with no login |
 
 ## 2. Implemented, but not yet verified externally
@@ -62,6 +63,8 @@ These are not to be decided silently.
 - **Landing quote attribution "— SANCTUS":** this is the client's reference copy, so the dash was kept.
 
 ## 5. Test results
+
+Account settings S1, on the branch at `5f5adf1` (2026-10-26): typecheck, lint (0 errors) and build pass; `npm test` **868 passed, 15 skipped**; database tests **143 passed**; Playwright **121 passed**, 4 not verified (the browser crashed while the machine was low on memory, not a failed check); the pixel guard was not re-run after the final fixes. Live API check: 31 of 31 (section 1).
 
 Dashboard clarity pass A1, on the branch at tree `32ae117` (2026-10-25):
 - `npm test`: **564 passed, 15 skipped**. One run had an auth timing flake; that file passed 3 of 3 on its own and the next full run passed.

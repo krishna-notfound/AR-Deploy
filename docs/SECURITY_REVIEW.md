@@ -30,7 +30,7 @@ Scope: multi-business catalog with Supabase (Postgres + RLS, Auth, Storage, one 
 
 ## S1: Account settings, 2FA and closure (ADR-0032)
 
-Status: built and reviewed on a branch, not yet applied to Supabase. Migrations `20261025163627_account_settings` and `20261025180600_account_settings_optin_2fa`, Edge Function `account-security`.
+Status: applied to `zggylkbgajamhriebdrg` on 2026-10-26 and checked live (31 of 31 API checks, `docs/PROJECT_COMPLETION_STATUS.md`). Migrations `20261025163627_account_settings` and `20261025180600_account_settings_optin_2fa`, Edge Function `account-security`.
 
 ### What is enforced, and where
 

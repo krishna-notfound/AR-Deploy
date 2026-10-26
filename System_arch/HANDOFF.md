@@ -1,5 +1,11 @@
 # Handoff: read this first in a new session (updated 2026-10-20)
 
+## Account settings and 2FA, S1 (2026-10-26)
+- Settings hub at `/admin/settings/:section` and `/dashboard/settings/:section`, authenticator 2FA with recovery codes, emailed codes for risky actions, the Owner's 2FA policy and closure requests (ADR-0032).
+- **2FA is enforced in the database access helpers**, not only in the app (`SecurityGate` is UX).
+- **Applied to `zggylkbgajamhriebdrg` on 2026-10-26** and checked live (`docs/PROJECT_COMPLETION_STATUS.md`). Release order, dashboard settings, lockout recovery and rollback: `docs/OPERATIONS_RUNBOOK.md` ("Account settings and 2FA (S1)").
+- `ADMIN_NOTIFICATION_EMAIL` is a Resend test address, so closure alerts reach no one until it is set to a real inbox.
+
 ## Platform team roles (2026-10-25, branch `feature/sanctus-brand-design-system`)
 - **Roles:** Owner (`platform_admins`), Admin and Team (`platform_members`).
 - **Permissions:** 15 per role, enforced by additive RLS through `public.platform_can()`.

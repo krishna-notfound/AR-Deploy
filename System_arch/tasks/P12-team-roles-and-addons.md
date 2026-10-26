@@ -100,7 +100,7 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
 
 **Split into sub-projects**, each with its own spec → plan → build:
 - **S1:** a settings hub (full-screen, Discord-style) plus "Your account" for every role: profile and photo, email change, password, authenticator 2FA, an emailed code for risky actions, notifications, timezone and date format, security activity, the deletion request, and "complete your profile" onboarding. Also the Platform → Security policy (2FA requirement).
-  - **Status (2026-10-26):** built on the branch; not yet applied to Supabase. The ADR is ADR-0032; the runbook has the release order ("Account settings and 2FA (S1)"). The release needs the owner's go-ahead.
+  - **Status (2026-10-26):** applied to `zggylkbgajamhriebdrg` on 2026-10-26 with the owner's go-ahead, and checked live (31 of 31 API checks). The ADR is ADR-0032; the runbook has the release order and the dashboard settings ("Account settings and 2FA (S1)").
   - **Deferred minors** (none blocks release):
     - clear the `app.account_closure` flag right after the closure's own update;
     - recovery-code redemption has no throttle or failed-attempt audit;
