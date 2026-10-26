@@ -2,11 +2,13 @@
 // state in memory (gone on reload), sends no email and checks no real authenticator. Every action code and TOTP code
 // is the demo code 123456, and the setup QR code says "Demo". The rules mirror the real service so the UI can be
 // driven by tests: same validation, same reasons, aal2 needed for the platform policy.
-import type { ClosureRequest, PlatformSettings, Profile, SecurityEvent, SecurityState } from '@/domain/types'
+import type { BusinessStatus, ClosureRequest, PlatformSettings, Profile, SecurityEvent, SecurityState } from '@/domain/types'
 import { newId } from '@/lib/id'
 import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, PASSWORD_MAX, PASSWORD_MIN, accountFail } from '../accountService'
 import { type Result, ok } from '../catalogService'
+import { mockCatalogService } from './mockCatalogService'
 import { clearDemoMember2fa, demoMemberHas2fa, demoPlatformRole } from './mockTeam'
+import { store } from './store'
 
 /** The only code the demo accepts, for action codes and the authenticator alike. */
 export const DEMO_CODE = '123456'
@@ -16,6 +18,10 @@ const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 const LATENCY_MS = import.meta.env.MODE === 'test' ? 0 : 150
 
 const DEMO_QR = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Demo QR code"><rect width="120" height="120" fill="#fff" stroke="#999"/><text x="60" y="56" text-anchor="middle" font-family="sans-serif" font-size="16">Demo</text><text x="60" y="76" text-anchor="middle" font-family="sans-serif" font-size="10">code 123456</text></svg>`
+
+/** The sample closure request: the seeded business Oak & Ember and its sample owner (the id the demo owner list uses). */
+const DEMO_CLOSING_BUSINESS = 'biz_oak'
+const DEMO_CLOSING_OWNER = `demo-owner-${DEMO_CLOSING_BUSINESS}`
 
 interface State {
   profile: Profile
@@ -55,12 +61,47 @@ function initial(onboarding: 'completed' | 'new' = 'completed'): State {
     platform: { require2faStaff: false, require2faBusiness: false, updatedAt: null },
     events: [],
     closureRequests: [
-      { userId: 'demo-closing-owner', email: 'closing@demo.example', businessId: 'demo-business', businessName: 'Demo closing business', requestedAt: '2026-10-20T10:00:00.000Z' },
+      // The seeded business and owner (seed.ts), so the owner-removal dialog and Complete/Restore have a real target.
+      { userId: DEMO_CLOSING_OWNER, email: 'closing@demo.example', businessId: DEMO_CLOSING_BUSINESS, businessName: 'Oak & Ember Studio', requestedAt: '2026-10-20T10:00:00.000Z' },
     ],
   }
 }
 
 let state = initial()
+/** The status each business had when its closure request was made, to restore on cancel (as account_closure_requests). */
+let statusBefore: Record<string, BusinessStatus> = { [DEMO_CLOSING_BUSINESS]: 'inactive' }
+
+/** A draft or inactive status chosen while a request is open is the one to restore (closure_follow_status). */
+export function noteMockClosureStatus(businessId: string, status: BusinessStatus): void {
+  if (businessId in statusBefore && status !== 'active') statusBefore[businessId] = status
+}
+
+/** The business is inactive for the request; remember what it was. */
+function pauseForClosure(businessId: string): void {
+  const b = store.get().businesses.find((x) => x.id === businessId)
+  if (!b) return
+  statusBefore[businessId] = b.status
+  if (b.status !== 'inactive') store.update((d) => void (d.businesses = d.businesses.map((x) => (x.id === businessId ? { ...x, status: 'inactive' as const, updatedAt: nowIso() } : x))))
+}
+
+/** Cancel or Restore: the business goes back to the status it had (a business already deleted is left alone). */
+function restoreAfterClosure(businessId: string | null): void {
+  if (!businessId) return
+  const status = statusBefore[businessId]
+  delete statusBefore[businessId]
+  if (status) store.update((d) => void (d.businesses = d.businesses.map((x) => (x.id === businessId ? { ...x, status, updatedAt: nowIso() } : x))))
+}
+
+/** The business of the demo business account picked on /demo (the account service has no other way to know it). */
+function sessionBusinessId(): string | null {
+  try {
+    const raw = localStorage.getItem('arfurn:account')
+    const s = raw ? (JSON.parse(raw) as { role?: unknown; businessId?: unknown }) : null
+    return s?.role === 'business_admin' && typeof s.businessId === 'string' ? s.businessId : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * Back to the starting state (tests, demo reset). `onboarding: 'new'` starts like a new account, with the setup
@@ -75,6 +116,7 @@ export function mockClosureOpen(businessId: string): boolean {
 export function voidMockClosure(businessId: string): string[] {
   const gone = state.closureRequests.filter((r) => r.businessId === businessId).map((r) => r.userId)
   state.closureRequests = state.closureRequests.filter((r) => r.businessId !== businessId)
+  delete statusBefore[businessId]
   if (state.closure?.businessId === businessId) {
     state.closure = null
     gone.push(state.profile.userId)
@@ -84,6 +126,7 @@ export function voidMockClosure(businessId: string): string[] {
 
 export function resetMockAccount(opts: { onboarding?: 'completed' | 'new' } = {}): void {
   state = initial(opts.onboarding)
+  statusBefore = { [DEMO_CLOSING_BUSINESS]: 'inactive' }
 }
 
 const nowIso = () => new Date().toISOString()
@@ -283,7 +326,12 @@ export const mockAccountService: AccountService = {
       if (demoPlatformRole() === 'owner') return accountFail('owner_cannot_close')
       if (state.closure) return accountFail('already_requested')
       const kind = isStaff() ? ('staff' as const) : ('business' as const)
-      if (kind === 'business') state.closure = { requestedAt: nowIso(), businessId: 'demo-business' }
+      if (kind === 'business') {
+        // As request_closure: the business becomes inactive and its status is remembered.
+        const businessId = sessionBusinessId()
+        state.closure = { requestedAt: nowIso(), businessId }
+        if (businessId) pauseForClosure(businessId)
+      }
       record(kind === 'staff' ? 'account_deleted' : 'account_closure_requested')
       return ok({ kind })
     }),
@@ -291,6 +339,7 @@ export const mockAccountService: AccountService = {
   cancelClosure: () =>
     run(() => {
       if (!state.closure) return accountFail('not_found')
+      restoreAfterClosure(state.closure.businessId)
       state.closure = null
       record('account_closure_cancelled')
       return ok(undefined)
@@ -306,7 +355,7 @@ export const mockAccountService: AccountService = {
         require2faBusiness: patch.require2faBusiness ?? state.platform.require2faBusiness,
         updatedAt: nowIso(),
       }
-      record('platform_security_policy_changed')
+      // Not recorded in the person's Security activity: the platform policy log is not theirs (R-W8-6).
       return ok(state.platform)
     }),
 
@@ -322,20 +371,30 @@ export const mockAccountService: AccountService = {
 
   listClosureRequests: () => run(() => ok(state.closureRequests)),
 
-  completeClosure: (target, code) =>
-    run(() => {
+  completeClosure: async (target, code) => {
+    const found = await run(() => {
       if (state.aal !== 'aal2') return accountFail('aal2_required')
       const c = checkCode(code)
       if (!c.ok) return c
-      if (!state.closureRequests.some((r) => r.userId === target)) return accountFail('not_found')
-      state.closureRequests = state.closureRequests.filter((r) => r.userId !== target)
-      return ok(undefined)
-    }),
+      const req = state.closureRequests.find((r) => r.userId === target)
+      return req ? ok(req.businessId) : accountFail('not_found')
+    })
+    if (!found.ok) return found
+    // Complete deletes the business (with its owner, products and events) and ends the request.
+    if (found.data) {
+      await mockCatalogService.deleteBusiness(found.data)
+      delete statusBefore[found.data]
+    }
+    state.closureRequests = state.closureRequests.filter((r) => r.userId !== target)
+    return ok(undefined)
+  },
 
   restoreClosure: (target) =>
     run(() => {
       if (state.aal !== 'aal2') return accountFail('aal2_required')
-      if (!state.closureRequests.some((r) => r.userId === target)) return accountFail('not_found')
+      const req = state.closureRequests.find((r) => r.userId === target)
+      if (!req) return accountFail('not_found')
+      restoreAfterClosure(req.businessId)
       state.closureRequests = state.closureRequests.filter((r) => r.userId !== target)
       return ok(undefined)
     }),

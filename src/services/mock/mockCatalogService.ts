@@ -11,7 +11,7 @@ import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, ap
 import { CLOSURE_PENDING_ERROR, type CatalogService, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok, toAuditEntry } from '../catalogService'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
-import { mockClosureOpen, voidMockClosure } from './mockAccount'
+import { mockClosureOpen, noteMockClosureStatus, voidMockClosure } from './mockAccount'
 import { createMockTeam, demoPlatformRole } from './mockTeam'
 import { createSeed } from './seed'
 import { store } from './store'
@@ -125,6 +125,8 @@ async function simulateLatency(): Promise<void> {
   await new Promise((r) => setTimeout(r, 150 + Math.random() * 300))
 }
 
+/** The per-visitor limit of record_event_limited. */
+const EVENTS_PER_MINUTE = 30
 const clone = <T>(v: T): T => structuredClone(v)
 const nowIso = () => new Date().toISOString()
 
@@ -228,6 +230,7 @@ export const mockCatalogService: CatalogService = {
         d.businesses = d.businesses.map((b) => (b.id === id ? next : b))
         auditCatalogStatus(d, current, next)
       })
+      noteMockClosureStatus(id, next.status)
       return ok(next)
     }),
 
@@ -243,6 +246,7 @@ export const mockCatalogService: CatalogService = {
         const event = auditCatalogStatus(d, current, next)
         if (status === 'active' || status === 'inactive') demoBusinessNotice(d, event, status === 'active' ? 'live' : 'paused')
       })
+      noteMockClosureStatus(id, status)
       return ok(next)
     }),
 
@@ -253,6 +257,7 @@ export const mockCatalogService: CatalogService = {
       store.update((d) => {
         d.businesses = d.businesses.filter((b) => b.id !== id)
         d.products = d.products.filter((p) => p.businessId !== id)
+        if (d.owners) delete d.owners[id] // R-W8-2: the owner goes with the business
         d.dailyStats = d.dailyStats.filter((s) => s.businessId !== id)
         d.events = d.events.filter((e) => e.businessId !== id)
         // R-W2-2 / R-W8-2: the application that created it remembers the deletion, so it can be reopened.
@@ -442,11 +447,22 @@ export const mockCatalogService: CatalogService = {
       return ok(summarize(store.get(), businessId, new Date(), true, opts?.timeZone ?? deviceTimeZone()))
     }),
 
-  recordEvent: ({ productId, type }) =>
+  recordEvent: ({ productId, businessId, type }) =>
     run(
       () => {
-        const p = store.get().products.find((x) => x.id === productId)
+        const db = store.get()
+        const p = db.products.find((x) => x.id === productId)
         if (!p) return fail('NOT_FOUND', 'Product not found.')
+        // As record_event_limited (R-W8-4): the product is published, its business is active, and AR and model events
+        // need a model (the product's or a variant's).
+        const business = db.businesses.find((b) => b.id === p.businessId)
+        const hasModel = !!(p.models.glb || p.models.usdz || p.variants.some((v) => v.models?.glb || v.models?.usdz))
+        if (p.businessId !== businessId || p.status !== 'published' || business?.status !== 'active' || ((type === 'ar_activation' || type === 'model_interaction') && !hasModel))
+          return fail('VALIDATION', 'This event cannot be recorded for this product.')
+        // 30 events per visitor per minute (this browser is the one visitor).
+        const since = Date.now() - 60_000
+        if (db.events.filter((e) => !e.sample && Date.parse(e.at) > since).length >= EVENTS_PER_MINUTE)
+          return fail('RATE_LIMITED', 'Too many events from this visitor. Try again in a minute.')
         store.update((d) => {
           d.events.push({ id: newId('evt'), productId, businessId: p.businessId, type, at: nowIso(), sample: false })
           if (d.events.length > 5000) d.events.splice(0, d.events.length - 5000)
@@ -530,7 +546,7 @@ export const mockCatalogService: CatalogService = {
       let outcome!: ProvisionOutcome
       store.update((d) => {
         recordDemoInvite(d, businessId, owner.email, reserved.attempt)
-        const sent = demoEmail(d, { kind: 'invitation_resend', recipient: owner.email, subject: `New invitation link for ${business.name}`, businessId, workflow: `invite:${businessId}`, attempt: reserved.attempt })
+        const sent = demoEmail(d, { kind: 'invitation_resend', recipient: owner.email, subject: `New invitation code for ${business.name}`, businessId, workflow: `invite:${businessId}`, attempt: reserved.attempt })
         audit(d, { eventType: 'invitation_resent', actorId: DEMO_ADMIN.id, businessId, metadata: { attempt: sent.attempt, email_status: sent.status } })
         outcome = { owner: 'already_linked', email: { status: sent.status, error: sent.error, attempt: sent.attempt } }
       })
