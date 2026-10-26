@@ -275,7 +275,7 @@ export const mockCatalogService: CatalogService = {
         // R-W7-1: the row keeps the business id and name (the business is already gone from d.businesses).
         audit(d, { eventType: 'business_deleted', actorId: demoActor(), businessId: id, metadata: { business_id: id, name: current.name, business_name: current.name } })
       })
-      return ok(undefined)
+      return ok({ removedFiles: 0, failedFiles: 0 })
     }),
 
   getCatalog: (slug) =>
@@ -416,7 +416,7 @@ export const mockCatalogService: CatalogService = {
         d.events = d.events.map((e) => (e.productId === id ? { ...e, productId: null } : e))
         demoBusinessNotice(d, auditProduct(d, 'product_deleted', current), 'product_deleted')
       })
-      return ok(undefined)
+      return ok({ removedFiles: 0, failedFiles: 0 })
     }),
 
   publishProduct: (id) =>

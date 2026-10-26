@@ -108,7 +108,10 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
     setErrors({})
     setSnapshot(JSON.stringify(toInput(res.data)))
     setData(toInput(res.data))
-    if (!business) {
+    if (!business && 'logoMoveFailed' in res.data) {
+      toast.info('Business created', "The logo couldn't be moved into the business folder; upload it again.")
+      skipBlock.current = true
+    } else if (!business) {
       toast.success(
         intent === 'draft' ? 'Business saved as draft' : 'Business created',
         PUBLIC_URLS_ARE_LIVE ? `Catalog address: ${catalogPublicUrl(res.data)}` : 'Demo address only: a real subdomain and SSL certificate need deployment setup.',

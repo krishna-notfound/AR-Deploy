@@ -33,7 +33,7 @@ import { localDayBounds } from '@/lib/format'
 import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
-import { type AuditEntry, type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok, teamFail, toAuditEntry } from '../catalogService'
+import { type AuditEntry, type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, type CreatedBusiness, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type StorageSweep, type UploadKind, fail, ok, teamFail, toAuditEntry } from '../catalogService'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
@@ -369,6 +369,12 @@ export function ownedLogoPath(url: string | undefined, businessId: ID): string |
   return path && path.startsWith(`${businessId}/`) && !path.includes('..') ? path : null
 }
 
+/** `new/<file>` for a logo uploaded before its business existed (a logo-bucket URL directly in new/), else null. */
+export function stagedLogoPath(url: string | undefined): string | null {
+  const path = logoPath(url)
+  return path && /^new\/[^/]+$/.test(path) && !path.includes('..') ? path : null
+}
+
 const isBlobOrDataUrl = (u: string) => u.startsWith('blob:') || u.startsWith('data:')
 
 const UPLOAD_CONTENT_TYPE: Partial<Record<UploadKind, string>> = { glb: 'model/gltf-binary', usdz: 'model/vnd.usdz+zip' }
@@ -643,23 +649,47 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
    * impossible (RLS checks the path folder, and products cannot change business since 20261020143507_variant_media),
    * so the caller sees every row that could still point at the file, including a duplicate's variant media.
    */
-  async function removeUnreferencedMedia(paths: string[]): Promise<void> {
+  async function removeUnreferencedMedia(paths: string[]): Promise<{ removed: number; failed: number }> {
     const unique = [...new Set(paths)]
-    if (!unique.length) return
+    if (!unique.length) return { removed: 0, failed: 0 }
     const refs = await Promise.all(
       MEDIA_TABLES.map((table) => sb.from(table).select('storage_path').in('storage_path', unique).returns<{ storage_path: string }[]>()),
     )
-    if (refs.some((r) => r.error)) return // keep files when unsure
+    if (refs.some((r) => r.error)) return { removed: 0, failed: unique.length } // keep files when unsure, and say so
     const stillUsed = new Set(refs.flatMap((r) => r.data ?? []).map((r) => r.storage_path))
     const orphans = unique.filter((p) => !stillUsed.has(p))
-    if (orphans.length) await sb.storage.from(MEDIA_BUCKET).remove(orphans)
+    if (!orphans.length) return { removed: 0, failed: 0 }
+    const { error } = await sb.storage.from(MEDIA_BUCKET).remove(orphans)
+    return error ? { removed: 0, failed: orphans.length } : { removed: orphans.length, failed: 0 }
   }
 
-  async function removeFolder(bucket: string, folder: string): Promise<void> {
-    // ponytail: one page of 1000 objects per bucket; loop with offset if a business ever stores more.
-    const { data } = await sb.storage.from(bucket).list(folder, { limit: 1000 })
-    const files = (data ?? []).filter((f) => f.id).map((f) => `${folder}/${f.name}`)
-    if (files.length) await sb.storage.from(bucket).remove(files)
+  /**
+   * Empties `folder`. Lists every page of 1000 first (removing while listing would shift the offsets), then removes
+   * each page. A page that cannot be listed counts as one failed file: the real number is unknown, never zero.
+   */
+  async function removeFolder(bucket: string, folder: string): Promise<{ removed: number; failed: number; handled: Set<string> }> {
+    const PAGE = 1000
+    const pages: string[][] = []
+    const handled = new Set<string>()
+    let failed = 0
+    for (let offset = 0; ; offset += PAGE) {
+      const { data, error } = await sb.storage.from(bucket).list(folder, { limit: PAGE, offset })
+      if (error || !data) {
+        failed += 1
+        break
+      }
+      const files = data.filter((f) => f.id).map((f) => `${folder}/${f.name}`)
+      if (files.length) pages.push(files)
+      for (const f of files) handled.add(f)
+      if (data.length < PAGE) break
+    }
+    let removed = 0
+    for (const files of pages) {
+      const { error } = await sb.storage.from(bucket).remove(files)
+      if (error) failed += files.length
+      else removed += files.length
+    }
+    return { removed, failed, handled }
   }
 
   async function saveProduct(id: ID | null, input: ProductInput): Promise<Result<Product>> {
@@ -781,7 +811,25 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const errors = validateBusiness(input, [])
         if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
         const { data, error } = await sb.from('businesses').insert(fromBusinessInput(input)).select('*').single<BusinessRow>()
-        return changed(error ? mapDbError(error, { conflictField: 'business' }) : ok(toBusiness(data)))
+        if (error) return changed(mapDbError(error, { conflictField: 'business' }))
+        let created: CreatedBusiness = toBusiness(data)
+        // A logo uploaded before the business existed sits in new/; move it into the business folder (R-W3-4).
+        // The business is kept either way; a failed move is reported to the caller.
+        const staged = stagedLogoPath(input.logoUrl)
+        if (staged) {
+          const target = `${created.id}/${staged.slice('new/'.length)}`
+          const moved = await sb.storage.from(LOGO_BUCKET).move(staged, target)
+          const updated = moved.error
+            ? null
+            : await sb.from('businesses').update({ logo_url: sb.storage.from(LOGO_BUCKET).getPublicUrl(target).data.publicUrl }).eq('id', created.id).select('*').single<BusinessRow>()
+          if (updated && !updated.error) created = toBusiness(updated.data)
+          else {
+            // The file moved but logo_url still names new/; never hand the caller that dead URL.
+            const { logoUrl: _dead, ...rest } = created
+            created = { ...rest, logoMoveFailed: true }
+          }
+        }
+        return changed(ok(created))
       }),
     updateBusiness: (id, patch) =>
       guard(async () => {
@@ -813,10 +861,16 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (error) return mapDbError(error)
         if (!data.length) return refusedOrMissing('businesses', { id }, 'Business not found.')
         // Rows cascade in the database; files live in Storage and are removed here (folder = business id).
-        await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id)])
+        const [media, logos] = await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id)])
+        const sweep: StorageSweep = { removedFiles: media.removed + logos.removed, failedFiles: media.failed + logos.failed }
         const logo = current.ok ? ownedLogoPath(current.data.logoUrl, id) : null
-        if (logo) await sb.storage.from(LOGO_BUCKET).remove([logo])
-        return changed(ok(undefined))
+        // The folder sweep already counted a logo it listed; only a logo it could not list is removed (and counted) here.
+        if (logo && !logos.handled.has(logo)) {
+          const { error: logoError } = await sb.storage.from(LOGO_BUCKET).remove([logo])
+          if (logoError) sweep.failedFiles += 1
+          else sweep.removedFiles += 1
+        }
+        return changed(ok(sweep))
       }),
     getCatalog: (slug) =>
       guard(async () => {
@@ -890,11 +944,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const { data, error } = await sb.from('products').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
         if (!data.length) return refusedOrMissing('products', { id }, 'Product not found.')
+        let sweep: StorageSweep = { removedFiles: 0, failedFiles: 0 }
         if (current.ok) {
           notifyOwner(current.data.businessId)
-          await removeUnreferencedMedia(mediaPaths(current.data))
+          const media = await removeUnreferencedMedia(mediaPaths(current.data))
+          sweep = { removedFiles: media.removed, failedFiles: media.failed }
         }
-        return changed(ok(undefined))
+        return changed(ok(sweep))
       }),
     publishProduct: (id) =>
       guard(async () => {
