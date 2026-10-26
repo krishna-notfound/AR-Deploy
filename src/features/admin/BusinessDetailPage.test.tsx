@@ -77,6 +77,14 @@ describe('BusinessDetailPage', () => {
     expect(within(await screen.findByRole('dialog')).getByText(new RegExp(`${n} product${n === 1 ? '' : 's'}\\.`))).toBeInTheDocument()
   })
 
+  it("the delete dialog adds 'The owner's sign-in stays, but they lose access. The application that created it shows as 'Business deleted'.' (R-W2-2)", async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Nordhaus Living?' })
+    expect(within(dialog).getByText(/The owner's sign-in stays, but they lose access\. The application that created it shows as 'Business deleted'\./)).toBeInTheDocument()
+  })
+
   it('scopes the products tab to one business: no Business column, no repeated name, short panel subtitle', async () => {
     renderPage()
     const table = await screen.findByRole('table')

@@ -127,6 +127,7 @@ export type Database = {
           applicant_email: string
           applicant_name: string
           applicant_phone: string | null
+          business_deleted_at: string | null
           business_id: string | null
           business_name: string
           category: string
@@ -150,6 +151,7 @@ export type Database = {
           applicant_email: string
           applicant_name: string
           applicant_phone?: string | null
+          business_deleted_at?: string | null
           business_id?: string | null
           business_name: string
           category: string
@@ -173,6 +175,7 @@ export type Database = {
           applicant_email?: string
           applicant_name?: string
           applicant_phone?: string | null
+          business_deleted_at?: string | null
           business_id?: string | null
           business_name?: string
           category?: string
@@ -872,6 +875,7 @@ export type Database = {
       }
     }
     Functions: {
+      admin_application_duplicates: { Args: { p_application_id: string }; Returns: Json }
       admin_deactivate_member: { Args: { p_member: string }; Returns: Json }
       admin_get_member: { Args: { p_member: string }; Returns: Json }
       admin_invite_member: {
@@ -904,6 +908,7 @@ export type Database = {
           applicant_email: string
           applicant_name: string
           applicant_phone: string | null
+          business_deleted_at: string | null
           business_id: string | null
           business_name: string
           category: string

@@ -1,14 +1,14 @@
 // Mock implementation of CatalogService. Simulates latency, never throws, returns copies.
 // Demo persistence only (localStorage). NOT a backend.
-import type { ActivityItem, ActivityKind, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product, ReviewedApplication } from '@/domain/types'
+import type { ActivityItem, ActivityKind, ApplicationDuplicates, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product, ReviewedApplication } from '@/domain/types'
 import { createSessionModelAsset, imageToPersistableDataUrl } from '@/lib/files'
 import { localDayBounds } from '@/lib/format'
 import { newId } from '@/lib/id'
 import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
-import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview } from '../applicationRules'
-import { CLOSURE_PENDING_ERROR, type CatalogService, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
+import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview, normalizeBusinessName } from '../applicationRules'
+import { CLOSURE_PENDING_ERROR, type CatalogService, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
 import { deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { mockClosureOpen, voidMockClosure } from './mockAccount'
@@ -169,6 +169,9 @@ export const mockCatalogService: CatalogService = {
         d.products = d.products.filter((p) => p.businessId !== id)
         d.dailyStats = d.dailyStats.filter((s) => s.businessId !== id)
         d.events = d.events.filter((e) => e.businessId !== id)
+        // R-W2-2 / R-W8-2: the application that created it remembers the deletion, so it can be reopened.
+        const deletedAt = nowIso()
+        d.applications = d.applications?.map((a) => (a.businessId === id ? { ...a, businessId: undefined, businessDeletedAt: deletedAt } : a))
         logActivity(d, 'business_deleted', `Business “${current.name}” and its ${productIds.size} products were deleted`, {})
       })
       return ok(undefined)
@@ -515,11 +518,13 @@ export const mockCatalogService: CatalogService = {
       if (!current) return fail('NOT_FOUND', 'Application not found.')
       if ([...(reason?.trim() ?? '')].length > REASON_MAX_LENGTH)
         return fail('VALIDATION', 'Check the details and try again.', { reason: `Keep the reason to ${REASON_MAX_LENGTH.toLocaleString('en')} characters or fewer.` })
-      const t = applyReview(current.status, action, reason)
+      const t = applyReview(current.status, action, reason, { businessId: current.businessId })
       if (!t.ok)
         return t.reason === 'reason_required'
           ? fail('VALIDATION', 'Give a reason for the rejection.', { reason: 'Give a reason for the rejection.' })
-          : fail('CONFLICT', 'This application can no longer change to that status.')
+          : t.reason === 'reopen_not_allowed'
+            ? { ok: false, error: REOPEN_NOT_ALLOWED_ERROR }
+            : fail('CONFLICT', 'This application can no longer change to that status.')
       if (t.noop) return ok(current)
       let next!: ReviewedApplication
       store.update((d) => {
@@ -561,7 +566,7 @@ export const mockCatalogService: CatalogService = {
           businessId,
           fromStatus: current.status,
           toStatus: t.status,
-          metadata: reason?.trim() ? { reason: reason.trim() } : {},
+          metadata: action === 'reopen' ? { action: 'reopen' } : reason?.trim() ? { reason: reason.trim() } : {},
         })
         // R-W2-1: a rejection emails the applicant in their language (the reason only when ticked). Demo mode records
         // the attempt as not sent; nothing leaves the browser.
@@ -572,6 +577,37 @@ export const mockCatalogService: CatalogService = {
         }
       })
       return ok(next)
+    }),
+
+  // R-W2-9: the same rule as admin_application_duplicates. Demo owners have no login, so the invited owner email
+  // stands in for the owner's sign-in email.
+  getApplicationDuplicates: (id) =>
+    run(() => {
+      const db = store.get()
+      const current = db.applications?.find((x) => x.id === id)
+      if (!current) return fail('NOT_FOUND', 'Application not found.')
+      const email = current.applicantEmail.toLowerCase()
+      const name = normalizeBusinessName(current.businessName)
+      const sameName = (n: string) => name !== '' && normalizeBusinessName(n) === name
+      const newest = <T extends { createdAt: string; id: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)
+      const applications: ApplicationDuplicates['applications'] = (db.applications ?? [])
+        .filter((a) => a.id !== id && a.status !== 'rejected')
+        .map((a) => ({ a, byEmail: a.applicantEmail.toLowerCase() === email, byName: sameName(a.businessName) }))
+        .filter((m) => m.byEmail || m.byName)
+        .sort((x, y) => newest(x.a, y.a))
+        .slice(0, 10)
+        .map(({ a, byEmail, byName }) => ({
+          id: a.id, reference: a.reference, businessName: a.businessName, status: a.status, createdAt: a.createdAt,
+          match: byEmail && byName ? 'both' : byEmail ? 'email' : 'name',
+        }))
+      const businesses: ApplicationDuplicates['businesses'] = db.businesses
+        .filter((b) => b.id !== current.businessId)
+        .map((b) => ({ b, byOwner: db.owners?.[b.id]?.email.toLowerCase() === email, byName: sameName(b.name) }))
+        .filter((m) => m.byOwner || m.byName)
+        .sort((x, y) => newest(x.b, y.b))
+        .slice(0, 10)
+        .map(({ b, byOwner, byName }) => ({ id: b.id, name: b.name, status: b.status, match: byOwner && byName ? 'both' : byOwner ? 'owner_email' : 'name' }))
+      return ok({ applications, businesses })
     }),
 
   getAuditEvents: (q = {}) =>

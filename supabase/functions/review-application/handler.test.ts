@@ -14,8 +14,8 @@ const CONFIG: EmailConfig = {
   adminNotificationEmail: 'team@account.test',
 }
 
-type Action = 'start_review' | 'approve' | 'reject'
-const TARGET: Record<Action, string> = { start_review: 'under_review', approve: 'approved', reject: 'rejected' }
+type Action = 'start_review' | 'approve' | 'reject' | 'reopen'
+const TARGET: Record<Action, string> = { start_review: 'under_review', approve: 'approved', reject: 'rejected', reopen: 'under_review' }
 
 function deps(over: Partial<ReviewDeps> = {}, start: Record<string, string> = { [APP]: 'under_review', [PT_APP]: 'submitted' }) {
   const status = { ...start }
@@ -36,6 +36,8 @@ function deps(over: Partial<ReviewDeps> = {}, start: Record<string, string> = { 
       calls.push({ action, reason })
       const from = status[id]
       if (!from) return { error: 'application_not_found' }
+      // Reopen: only an approved application (whose business was deleted) goes back to under_review.
+      if (action === 'reopen') return from === 'approved' ? ((status[id] = 'under_review'), { ok: true, status: 'under_review' }) : { error: 'reopen_not_allowed' }
       const to = TARGET[action]
       if (from === to) return { ok: true, status: to }
       if (from === 'approved' || (from === 'rejected' && to !== 'under_review')) return { error: 'invalid_transition' }
@@ -168,12 +170,23 @@ describe('review-application (R-W2-1)', () => {
     expect(await json(res)).toEqual({ error: 'forbidden' })
   })
 
-  it('reopen → 400 invalid_request', async () => {
-    const { d, calls } = deps()
+  // R-W2-2: reopen replaces the Task 4 assertion "reopen → 400 invalid_request".
+  it("reopen → 200 {ok:true, status:'under_review'} and no email", async () => {
+    const { d, calls, sent, logs } = deps({}, { [APP]: 'approved', [PT_APP]: 'submitted' })
     const res = await handleReviewApplication(post({ applicationId: APP, action: 'reopen' }), d)
-    expect(res.status).toBe(400)
-    expect(await json(res)).toEqual({ error: 'invalid_request' })
-    expect(calls).toHaveLength(0)
+    expect(res.status).toBe(200)
+    expect(await json(res)).toEqual({ ok: true, status: 'under_review' })
+    expect(calls).toEqual([{ action: 'reopen', reason: null }])
+    expect(sent).toHaveLength(0)
+    expect(logs).toHaveLength(0)
+  })
+
+  it("reopen_not_allowed from SQL → 422 {error:'reopen_not_allowed'}", async () => {
+    const { d, sent } = deps()
+    const res = await handleReviewApplication(post({ applicationId: APP, action: 'reopen' }), d)
+    expect(res.status).toBe(422)
+    expect(await json(res)).toEqual({ error: 'reopen_not_allowed' })
+    expect(sent).toHaveLength(0)
   })
 
   it('rejects a malformed request', async () => {

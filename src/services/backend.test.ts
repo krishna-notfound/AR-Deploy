@@ -327,6 +327,16 @@ describe('database errors shown to users', () => {
       reason: 'closure_pending',
     })
   })
+
+  it('maps reopen_not_allowed (R-W2-2) to its fixed copy', async () => {
+    const { mapDbError } = await import('./supabase/supabaseCatalogService')
+    const r = mapDbError({ code: '22023', message: 'reopen_not_allowed' })
+    expect(r.ok === false && r.error).toEqual({
+      code: 'CONFLICT',
+      message: 'Only an approved application whose business was deleted can be reopened.',
+      reason: 'reopen_not_allowed',
+    })
+  })
 })
 
 describe('logo cleanup', () => {

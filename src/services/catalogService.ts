@@ -5,6 +5,7 @@ import type {
   ActivityItem,
   AnalyticsEventType,
   AnalyticsSummary,
+  ApplicationDuplicates,
   ApplicationInput,
   ApplicationStatus,
   AssetStatus,
@@ -184,6 +185,8 @@ export interface CatalogService {
    * emails the applicant, with the reason only when `includeReason` is set (R-W2-1).
    */
   reviewApplication(id: ID, action: ReviewAction, reason?: string, opts?: { includeReason?: boolean }): Promise<Result<ReviewedApplication>>
+  /** Possible duplicates of an application (R-W2-9): only a warning for the reviewer, never a block. */
+  getApplicationDuplicates(id: ID): Promise<Result<ApplicationDuplicates>>
   getAuditEvents(query?: AuditQuery): Promise<Result<Page<AuditEntry>>>
   getEmailAttempts(query: { applicationId?: ID; businessId?: ID }): Promise<Result<EmailAttempt[]>>
 
@@ -251,6 +254,13 @@ export const CLOSURE_PENDING_ERROR: ServiceError = {
   code: 'CONFLICT',
   message: 'This business has an open closure request. Only the platform Owner can restore it or complete it.',
   reason: 'closure_pending',
+}
+
+/** R-W2-2: reopen of an application that is not approved or whose business still exists (SQL `reopen_not_allowed`). */
+export const REOPEN_NOT_ALLOWED_ERROR: ServiceError = {
+  code: 'CONFLICT',
+  message: 'Only an approved application whose business was deleted can be reopened.',
+  reason: 'reopen_not_allowed',
 }
 
 export function teamFail<T = never>(reason: string, message?: string): Result<T> {

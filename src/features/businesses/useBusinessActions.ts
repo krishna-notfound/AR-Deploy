@@ -31,7 +31,7 @@ export function useBusinessActions() {
       const products = productCount === undefined ? 'all of its products' : `${productCount} product${productCount === 1 ? '' : 's'}`
       const ok = await confirm({
         title: `Delete ${b.name}?`,
-        body: `This permanently deletes the business, its catalog and ${products}. Printed QR codes will stop working. This cannot be undone.`,
+        body: `This permanently deletes the business, its catalog and ${products}. Printed QR codes will stop working. The owner's sign-in stays, but they lose access. The application that created it shows as 'Business deleted'. This cannot be undone.`,
         confirmLabel: 'Delete business',
         destructive: true,
       })
