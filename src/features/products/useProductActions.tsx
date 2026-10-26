@@ -3,7 +3,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, Product } from '@/domain/types'
 import { copyText } from '@/lib/clipboard'
-import { PUBLIC_URLS_ARE_LIVE, productLocalPath, productPublicUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import type { ServiceError } from '@/services/catalogService'
 
@@ -84,7 +84,7 @@ export function useProductActions(scope: EditorScope) {
     },
     openPreview(p: Product, business: Business | undefined) {
       if (!business) return
-      window.open(productLocalPath(business, p, { preview: p.status !== 'published' }), '_blank', 'noopener')
+      window.open(productLocalPath(business, p, { preview: needsPreview(p, business) }), '_blank', 'noopener')
     },
     edit(p: Product) {
       navigate(editPath(scope, p))

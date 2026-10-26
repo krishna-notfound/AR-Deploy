@@ -301,3 +301,21 @@ describe('BusinessDetailPage: Owner tools (closure requests, Reset 2FA)', () => 
     expect(list).not.toHaveBeenCalled()
   })
 })
+
+describe('BusinessDetailPage: catalog button by status (R-W3-8)', () => {
+  it("a non-active business shows 'Preview catalog' linking with preview; an active one shows 'Open catalog'", async () => {
+    const user = userEvent.setup()
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    renderPage('details')
+    await screen.findByRole('heading', { level: 1, name: 'Nordhaus Living' })
+    await user.click(screen.getByRole('button', { name: /Open catalog/ }))
+    expect(open).toHaveBeenLastCalledWith('/catalog/nordhaus', '_blank', 'noopener')
+    cleanup()
+    expect((await service.setBusinessStatus('biz_nord', 'draft')).ok).toBe(true)
+    renderPage('details')
+    await screen.findByRole('heading', { level: 1, name: 'Nordhaus Living' })
+    expect(screen.queryByRole('button', { name: /Open catalog/ })).toBeNull()
+    await user.click(screen.getByRole('button', { name: /Preview catalog/ }))
+    expect(open).toHaveBeenLastCalledWith('/catalog/nordhaus?preview=1', '_blank', 'noopener')
+  })
+})

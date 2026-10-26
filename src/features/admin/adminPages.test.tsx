@@ -215,3 +215,20 @@ describe('BusinessesListPage: closure requests (Owner only)', () => {
     expect(screen.getByRole('button', { name: 'Closure requested 0' })).toBeInTheDocument()
   })
 })
+
+describe('BusinessesListPage: catalog menu item by status (R-W3-8)', () => {
+  it("a non-active business shows 'Preview catalog' linking with preview; an active one shows 'Open catalog'", async () => {
+    const user = userEvent.setup()
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    renderAt('/admin/businesses', <BusinessesListPage />)
+    expect((await screen.findAllByText('Nordhaus Living')).length).toBeGreaterThan(0)
+    // Nordhaus is active; Oak & Ember is inactive.
+    await user.click((await screen.findAllByRole('button', { name: /Actions for Nordhaus Living/ }))[0]!)
+    await user.click(await screen.findByRole('menuitem', { name: 'Open catalog' }))
+    expect(open).toHaveBeenLastCalledWith('/catalog/nordhaus', '_blank', 'noopener')
+    await user.click((await screen.findAllByRole('button', { name: /Actions for Oak & Ember Studio/ }))[0]!)
+    expect(screen.queryByRole('menuitem', { name: 'Open catalog' })).toBeNull()
+    await user.click(await screen.findByRole('menuitem', { name: 'Preview catalog' }))
+    expect(open).toHaveBeenLastCalledWith('/catalog/oak-ember?preview=1', '_blank', 'noopener')
+  })
+})
