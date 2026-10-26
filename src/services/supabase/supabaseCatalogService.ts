@@ -31,7 +31,7 @@ import { localDayBounds } from '@/lib/format'
 import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, isoDay, summarize } from '../analytics'
-import { type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok, teamFail } from '../catalogService'
+import { type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, REOPEN_NOT_ALLOWED_ERROR, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok, teamFail } from '../catalogService'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
@@ -160,6 +160,7 @@ const ACCOUNT_RULES: Record<string, ServiceError> = {
   application_not_found: { code: 'NOT_FOUND', message: 'Application not found.' },
   business_not_found: { code: 'NOT_FOUND', message: 'This business no longer exists.' },
   closure_pending: CLOSURE_PENDING_ERROR,
+  reopen_not_allowed: REOPEN_NOT_ALLOWED_ERROR,
 }
 
 /**
@@ -395,6 +396,7 @@ export interface ApplicationRow {
   reviewed_by: string | null
   reviewed_at: string | null
   business_id: string | null
+  business_deleted_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -427,6 +429,14 @@ export interface EmailRow {
   attempt: number
 }
 
+/** admin_application_duplicates (R-W2-9). */
+type DuplicatesAnswer =
+  | { error: 'forbidden' | 'not_found' }
+  | {
+      applications: { id: string; reference: string; business_name: string; status: ApplicationStatus; created_at: string; match: 'email' | 'name' | 'both' }[]
+      businesses: { id: string; name: string; status: BusinessStatus; match: 'owner_email' | 'name' | 'both' }[]
+    }
+
 /** Application and/or business scope: with both, rows of either match (an application and the business it created). */
 function scoped<Q extends { eq(c: string, v: string): Q; or(f: string): Q }>(query: Q, s: { applicationId?: string; businessId?: string }): Q {
   const ids = [s.applicationId, s.businessId].filter((x): x is string => !!x)
@@ -455,6 +465,7 @@ const toApplication = (r: ApplicationRow): BusinessApplication => ({
   reviewedBy: r.reviewed_by ?? undefined,
   reviewedAt: r.reviewed_at ?? undefined,
   businessId: r.business_id ?? undefined,
+  businessDeletedAt: r.business_deleted_at ?? undefined,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 })
@@ -515,6 +526,7 @@ const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string 
   // review-application (R-W2-1): admin_review_application's refusals.
   reason_required: { code: 'VALIDATION', message: 'Give a reason for the rejection.' },
   invalid_transition: { code: 'CONFLICT', message: 'This application can no longer change to that status.' },
+  reopen_not_allowed: REOPEN_NOT_ALLOWED_ERROR,
   application_not_found: { code: 'NOT_FOUND', message: 'Application not found.' },
 }
 
@@ -945,6 +957,21 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const { data, error } = await sb.from('business_applications').select('*').eq('id', id).maybeSingle<ApplicationRow>()
         if (error || !data) return fail('UNKNOWN', 'The application was updated, but it could not be reloaded. Refresh the page.')
         return ok(r.data.email ? { ...toApplication(data), decisionEmail: r.data.email } : toApplication(data))
+      }),
+
+    getApplicationDuplicates: (id) =>
+      guard(async () => {
+        if (!UUID_PATTERN.test(id)) return fail('NOT_FOUND', 'Application not found.')
+        const { data, error } = await sb.rpc('admin_application_duplicates', { p_application_id: id })
+        if (error) return mapDbError(error)
+        const r = data as unknown as DuplicatesAnswer
+        if ('error' in r) return r.error === 'not_found' ? fail('NOT_FOUND', 'Application not found.') : teamFail('forbidden')
+        return ok({
+          applications: r.applications.map((a) => ({
+            id: a.id, reference: a.reference, businessName: a.business_name, status: a.status, createdAt: a.created_at, match: a.match,
+          })),
+          businesses: r.businesses.map((b) => ({ id: b.id, name: b.name, status: b.status, match: b.match })),
+        })
       }),
 
     getAuditEvents: (q = {}) =>

@@ -1,11 +1,12 @@
 // Request handling for the review-application Edge Function (R-W2-1, spec §10.3). Every review action goes through
 // here, so a rejected applicant is told, in their language.
-//   POST { applicationId, action: 'start_review' | 'approve' | 'reject', reason?, includeReason? }
+//   POST { applicationId, action: 'start_review' | 'approve' | 'reject' | 'reopen', reason?, includeReason? }
 //     → { ok: true, status, businessId?, email?: { status, error? } }
 // Staff only, at the 2FA level their policy requires (R-W1-1): the gate runs before anything is read or changed. The
 // per-action permission (applications.approve / applications.reject) stays in SQL: admin_review_application runs with
-// the caller's own token. Only a reject that changes the status emails the applicant; approve and start review send
-// nothing (the owner invitation is the approval notice). An email failure never undoes the rejection.
+// the caller's own token. Only a reject that changes the status emails the applicant; approve, start review and reopen
+// send nothing (the owner invitation is the approval notice). An email failure never undoes the rejection.
+// Reopen (R-W2-2) moves an approved application whose business was deleted back to under_review.
 import { type ConfigResult, type EmailStatus, type LogEntry, sendAndLog } from '../_shared/email.ts'
 import { REASON_MAX_LENGTH, applicationDecisionEmail } from '../_shared/email-templates.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
@@ -13,15 +14,16 @@ import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
 
 export { REASON_MAX_LENGTH }
 
-export type ReviewAction = 'start_review' | 'approve' | 'reject'
-/** The actions this function takes. Add one here and in admin_review_application (reopen arrives in S3). */
-const ACTIONS: readonly ReviewAction[] = ['start_review', 'approve', 'reject']
+export type ReviewAction = 'start_review' | 'approve' | 'reject' | 'reopen'
+/** The actions this function takes. Add one here and in admin_review_application. */
+const ACTIONS: readonly ReviewAction[] = ['start_review', 'approve', 'reject', 'reopen']
 
 /** The database's refusals, as the HTTP status the client maps (anything else is a 500). */
 const REVIEW_ERRORS: Record<string, number> = {
   forbidden: 403,
   reason_required: 422,
   invalid_transition: 422,
+  reopen_not_allowed: 422,
   application_not_found: 404,
 }
 

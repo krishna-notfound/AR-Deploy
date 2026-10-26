@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { Product } from '@/domain/types'
+import type { BusinessApplication, Product } from '@/domain/types'
 import type { ProductInput, Result } from '../catalogService'
 import { isValidDb } from './db'
 import { mockCatalogService as svc } from './mockCatalogService'
@@ -256,6 +256,53 @@ describe('business applications and owner access (demo, ADR-0024)', () => {
     expect(bad.ok).toBe(false)
     const events = unwrap(await svc.getAuditEvents({ applicationId: id })).items.map((e) => e.eventType)
     expect(events).toEqual(expect.arrayContaining(['application_submitted', 'application_status_changed', 'business_created']))
+  })
+
+  it('deleting a business clears businessId and sets businessDeletedAt on its application; reopen then works (R-W2-2)', async () => {
+    const { id } = unwrap(await svc.submitApplication(application()))
+    const approved = unwrap(await svc.reviewApplication(id, 'approve'))
+    const early = await svc.reviewApplication(id, 'reopen')
+    expect(early.ok === false && early.error).toMatchObject({ code: 'CONFLICT', reason: 'reopen_not_allowed', message: 'Only an approved application whose business was deleted can be reopened.' })
+    unwrap(await svc.deleteBusiness(approved.businessId!))
+    const after = unwrap(await svc.getApplication(id))
+    expect(after.businessId).toBeUndefined()
+    expect(after.businessDeletedAt).toEqual(expect.any(String))
+    expect(unwrap(await svc.reviewApplication(id, 'reopen')).status).toBe('under_review')
+    const reopened = unwrap(await svc.getAuditEvents({ applicationId: id })).items.find((e) => e.metadata.action === 'reopen')
+    expect(reopened).toMatchObject({ eventType: 'application_status_changed', fromStatus: 'approved', toStatus: 'under_review' })
+    const again = unwrap(await svc.reviewApplication(id, 'approve'))
+    expect(again.businessId).toBeTruthy()
+    expect(again.businessId).not.toBe(approved.businessId)
+  })
+
+  it('getApplicationDuplicates follows the SQL rule (R-W2-9)', async () => {
+    const at = (min: number) => new Date(Date.now() - min * 60_000).toISOString()
+    const row = (id: string, businessName: string, applicantEmail: string, status: BusinessApplication['status'], min: number, businessId?: string): BusinessApplication => ({
+      id, reference: id.toUpperCase(), status, businessName, applicantName: 'Ana', applicantEmail, country: 'Portugal', city: 'Lisboa',
+      category: 'furniture', language: 'en', answers: {}, businessId, createdAt: at(min), updatedAt: at(min),
+    })
+    store.update((d) => {
+      const ts = at(1)
+      const biz = (id: string, name: string, min: number) => ({ ...d.businesses[0]!, id, name, slug: id, status: 'draft' as const, createdAt: at(min), updatedAt: ts })
+      d.businesses.push(biz('b-created', 'Casa, Lda.', 1), biz('b-casa', 'Casa', 6), biz('b-owned', 'Other Shop', 7), biz('b-lda', 'Lda', 8))
+      d.owners = { ...d.owners, 'b-owned': { email: 'DUP@shop.test', invitedAt: ts } }
+      d.applications = [
+        row('a-subject', 'Casa, Lda.', 'dup@shop.test', 'approved', 1, 'b-created'),
+        row('a-email', 'Something Else', 'Dup@Shop.Test', 'approved', 5),
+        row('a-name', 'casa lda', 'other@x.test', 'submitted', 4),
+        row('a-both', 'Cása', 'dup@shop.test', 'under_review', 3),
+        row('a-rejected', 'Casa', 'dup@shop.test', 'rejected', 2),
+        row('a-lda', 'Lda', 'lda@x.test', 'submitted', 9),
+        row('a-lda2', 'LDA.', 'lda2@x.test', 'submitted', 10),
+      ]
+    })
+    const r = unwrap(await svc.getApplicationDuplicates('a-subject'))
+    expect(r.applications.map((a) => [a.id, a.match])).toEqual([['a-both', 'both'], ['a-name', 'name'], ['a-email', 'email']])
+    expect(r.businesses.map((b) => [b.id, b.match])).toEqual([['b-casa', 'name'], ['b-owned', 'owner_email']])
+    expect(JSON.stringify(r).toLowerCase()).not.toContain('dup@shop.test')
+    // An empty normalized name matches nothing.
+    expect(unwrap(await svc.getApplicationDuplicates('a-lda'))).toEqual({ applications: [], businesses: [] })
+    expect((await svc.getApplicationDuplicates('nope')).ok).toBe(false)
   })
 
   it('leaves sign-in events out of the audit log unless includeSignIns is true (R-W1-4)', async () => {

@@ -209,7 +209,8 @@ export interface ActivityItem {
 
 export type ApplicationStatus = 'submitted' | 'under_review' | 'approved' | 'rejected'
 export const APPLICATION_STATUSES: readonly ApplicationStatus[] = ['submitted', 'under_review', 'approved', 'rejected']
-export type ReviewAction = 'start_review' | 'approve' | 'reject'
+/** reopen: an approved application whose business was deleted goes back to under_review (R-W2-2). */
+export type ReviewAction = 'start_review' | 'approve' | 'reject' | 'reopen'
 
 /** What the public wizard submits. Validated by supabase/functions/_shared/application.ts (client and server). */
 export interface ApplicationInput {
@@ -251,8 +252,19 @@ export interface BusinessApplication {
   reviewedBy?: ID
   reviewedAt?: ISODate
   businessId?: ID
+  /** When the business created from this application was deleted (R-W2-2). Unknown for deletions before S1.5. */
+  businessDeletedAt?: ISODate
   createdAt: ISODate
   updatedAt: ISODate
+}
+
+/**
+ * Possible duplicates of one application (R-W2-9), newest first, at most 10 of each. Only a warning for the reviewer.
+ * A business match never carries the owner's email.
+ */
+export interface ApplicationDuplicates {
+  applications: { id: ID; reference: string; businessName: string; status: ApplicationStatus; createdAt: ISODate; match: 'email' | 'name' | 'both' }[]
+  businesses: { id: ID; name: string; status: BusinessStatus; match: 'owner_email' | 'name' | 'both' }[]
 }
 
 /** A reviewed application; a rejection also says what happened to the decision email (R-W2-1). Not proof of delivery. */

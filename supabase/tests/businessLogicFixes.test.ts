@@ -918,3 +918,199 @@ describe('S1.5 Task 3: closure integrity', () => {
     }
   }, 120_000)
 })
+
+describe('S1.5 Task 16: application review', () => {
+  GONE_AFTER_ROLLBACK.push('public.admin_application_duplicates(uuid)', 'private.normalize_business_name(text)', 'private.mark_application_business_deleted()')
+  const id = ids(16)
+  const OWNER = id(1) // the platform Owner
+  const TEAM = id(2) // a Team member; its permission set is replaced per test
+  const SHOPKEEPER = id(3) // owns businesses; login email DUP@Shop.test
+  type Row = { id: string; status: string; business_id: string | null; business_deleted_at: string | null }
+  type Dups = {
+    error?: string
+    applications?: { id: string; reference: string; business_name: string; status: string; created_at: string; match: string }[]
+    businesses?: { id: string; name: string; status: string; match: string }[]
+  }
+  let appSeq = 0
+  /** Inserts an application (as the database owner) and returns its id; `ago` is its age in minutes. */
+  async function app(o: { name: string; email: string; status?: string; business?: string | null; ago?: number }) {
+    appSeq += 1
+    const appId = id(10 + appSeq)
+    await db.query(
+      `insert into public.business_applications
+         (id, business_name, applicant_name, applicant_email, country, city, category, submission_key, status, business_id, created_at)
+       values ($1, $2, 'Ana Applicant', $3, 'Portugal', 'Lisboa', 'Furniture', gen_random_uuid(), $4, $5, now() - make_interval(mins => $6))`,
+      [appId, o.name, o.email, o.status ?? 'submitted', o.business ?? null, o.ago ?? 0])
+    return appId
+  }
+  /** Business ids use their own range (…0016-1…), so they never collide with application ids. */
+  let bizSeq = 0
+  async function biz(name: string, o: { owner?: string; ago?: number; status?: string } = {}) {
+    bizSeq += 1
+    const bizId = `00000000-0000-0000-0016-1${String(bizSeq).padStart(11, '0')}`
+    await db.query(`insert into public.businesses (id, name, slug, status, created_at) values ($1, $2, $3, $4, now() - make_interval(mins => $5))`,
+      [bizId, name, `t16-biz-${bizSeq}`, o.status ?? 'draft', o.ago ?? 0])
+    if (o.owner) await db.query('insert into public.business_members (business_id, user_id) values ($1, $2)', [bizId, o.owner])
+    return bizId
+  }
+  const row = async (appId: string) =>
+    (await db.query<Row>('select id, status, business_id, business_deleted_at from public.business_applications where id = $1', [appId])).rows[0]!
+  const review = (caller: string, appId: string, action: string) =>
+    h.call(caller, 'select to_jsonb(public.admin_review_application($1, $2)) as r', [appId, action]) as unknown as Promise<Row>
+  const dups = (caller: string, appId: string) => h.call(caller, 'select public.admin_application_duplicates($1) as r', [appId]) as Promise<Dups>
+  const norm = async (s: string) => (await db.query<{ n: string }>('select private.normalize_business_name($1) as n', [s])).rows[0]!.n
+  const dropBusiness = (bizId: string) => db.query('delete from public.businesses where id = $1', [bizId])
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ('${OWNER}', 't16-owner@test', now()), ('${TEAM}', 't16-team@test', now()), ('${SHOPKEEPER}', 'DUP@Shop.test', now());
+      insert into public.platform_admins (user_id) values ('${OWNER}');
+      insert into public.platform_members (user_id, email, role, status) values ('${TEAM}', 't16-team@test', 'team', 'active');
+    `)
+  })
+
+  it('deleting the business of an approved application sets business_deleted_at and nulls business_id', async () => {
+    const b = await biz('Deleted Co')
+    const a = await app({ name: 'Deleted Co', email: 'del@t16.test', status: 'approved', business: b })
+    const other = await app({ name: 'Untouched Co', email: 'keep@t16.test', status: 'approved', business: await biz('Untouched Co') })
+    await dropBusiness(b)
+    const r = await row(a)
+    expect(r.business_id).toBeNull()
+    expect(r.business_deleted_at).not.toBeNull()
+    expect((await row(other)).business_deleted_at).toBeNull()
+  })
+
+  it('reopen moves approved → under_review when business_id is null and writes application_status_changed with metadata action reopen; approving again creates a new draft business', async () => {
+    const b = await biz('Reopen Co')
+    const a = await app({ name: 'Reopen Co', email: 'reopen@t16.test', status: 'approved', business: b })
+    await dropBusiness(b)
+    expect(await review(OWNER, a, 'reopen')).toMatchObject({ status: 'under_review', business_id: null })
+    const audit = (await db.query<{ actor_id: string; from_status: string; to_status: string; metadata: Record<string, unknown> }>(
+      `select actor_id, from_status, to_status, metadata from public.audit_events
+        where application_id = $1 and event_type = 'application_status_changed'`, [a])).rows
+    expect(audit).toEqual([{ actor_id: OWNER, from_status: 'approved', to_status: 'under_review', metadata: { action: 'reopen' } }])
+    const approved = await review(OWNER, a, 'approve')
+    expect(approved.status).toBe('approved')
+    expect(approved.business_id).not.toBeNull()
+    expect(approved.business_id).not.toBe(b)
+    expect((await db.query('select status from public.businesses where id = $1', [approved.business_id])).rows).toEqual([{ status: 'draft' }])
+  })
+
+  it('reopen while the business exists, or from submitted/under_review/rejected, raises reopen_not_allowed', async () => {
+    const live = await app({ name: 'Still Here Co', email: 'here@t16.test', status: 'approved', business: await biz('Still Here Co') })
+    await expect(review(OWNER, live, 'reopen')).rejects.toMatchObject({ message: 'reopen_not_allowed', code: '22023' })
+    expect((await row(live)).status).toBe('approved')
+    for (const status of ['submitted', 'under_review', 'rejected']) {
+      const a = await app({ name: `State ${status}`, email: `${status}@t16.test`, status })
+      await expect(review(OWNER, a, 'reopen')).rejects.toMatchObject({ message: 'reopen_not_allowed', code: '22023' })
+      expect((await row(a)).status).toBe(status)
+    }
+  })
+
+  it('reopen needs applications.approve: a Team member with only applications.reject gets the permission error', async () => {
+    const b = await biz('Gated Co')
+    const a = await app({ name: 'Gated Co', email: 'gated@t16.test', status: 'approved', business: b })
+    await dropBusiness(b)
+    await withRolePermissions({ team: ['applications.view', 'applications.reject'] }, async () => {
+      await expect(review(TEAM, a, 'reopen')).rejects.toMatchObject({ message: 'platform_admin_only', code: '42501' })
+    })
+    expect((await row(a)).status).toBe('approved')
+    await withRolePermissions({ team: ['applications.view', 'applications.approve'] }, async () => {
+      expect((await review(TEAM, a, 'reopen')).status).toBe('under_review')
+    })
+  })
+
+  it("normalize_business_name: 'Casa, Lda.', 'casa lda' and 'Cása' give 'casa'; 'Lda' gives ''", async () => {
+    for (const s of ['Casa, Lda.', 'casa lda', 'Cása', '  CÁSA  SA ', 'Casa Unipessoal']) expect(await norm(s)).toBe('casa')
+    expect(await norm('Lda')).toBe('')
+    // One trailing legal-form word only, and only as a whole word.
+    expect(await norm('Mesa')).toBe('mesa')
+    expect(await norm('Móveis Unipessoal, Lda')).toBe('moveisunipessoal')
+    expect(await norm('Açúcar & Pão Inc.')).toBe('acucarpao')
+  })
+
+  it("admin_application_duplicates lists an approved application with the same email (match email), a business 'Casa' for 'Casa, Lda.' (match name) and a business whose owner's auth email is the applicant email (match owner_email); never the application itself, a rejected one or the business it created; at most 10 of each", async () => {
+    const created = await biz('Casa, Lda.', { ago: 1 })
+    const subject = await app({ name: 'Casa, Lda.', email: 'dup@shop.test', status: 'approved', business: created, ago: 1 })
+    const byEmail = await app({ name: 'Something Else', email: 'Dup@Shop.Test', status: 'approved', ago: 5 })
+    const byName = await app({ name: 'casa lda', email: 'other@t16.test', status: 'submitted', ago: 4 })
+    const both = await app({ name: 'Cása', email: 'dup@shop.test', status: 'under_review', ago: 3 })
+    await app({ name: 'Casa', email: 'dup@shop.test', status: 'rejected', ago: 2 })
+    const casa = await biz('Casa', { ago: 6, status: 'active' })
+    const owned = await biz('Other Shop', { owner: SHOPKEEPER, ago: 7 })
+    const ownedCasa = await biz('Casa SA', { owner: SHOPKEEPER, ago: 8 })
+    await biz('Unrelated', { ago: 9 })
+
+    const r = await dups(OWNER, subject)
+    expect(r.applications!.map((x) => [x.id, x.match])).toEqual([[both, 'both'], [byName, 'name'], [byEmail, 'email']])
+    expect(r.applications![2]).toEqual({
+      id: byEmail, reference: expect.any(String), business_name: 'Something Else', status: 'approved', created_at: expect.any(String), match: 'email',
+    })
+    expect(r.businesses).toEqual([
+      { id: casa, name: 'Casa', status: 'active', match: 'name' },
+      { id: owned, name: 'Other Shop', status: 'draft', match: 'owner_email' },
+      { id: ownedCasa, name: 'Casa SA', status: 'draft', match: 'both' },
+    ])
+    // The owner's email itself is never returned.
+    expect(JSON.stringify(r).toLowerCase()).not.toContain('dup@shop.test')
+
+    // At most 10 of each, newest first.
+    const capped = await app({ name: 'Mesa Grande', email: 'cap@t16.test' })
+    const apps: string[] = []
+    const bizs: string[] = []
+    for (let i = 1; i <= 12; i++) {
+      apps.push(await app({ name: `Cap App ${i}`, email: 'cap@t16.test', ago: i }))
+      bizs.push(await biz('Mesa Grande Lda', { ago: i }))
+    }
+    const c = await dups(OWNER, capped)
+    expect(c.applications!.map((x) => x.id)).toEqual(apps.slice(0, 10))
+    expect(c.businesses!.map((x) => x.id)).toEqual(bizs.slice(0, 10))
+  })
+
+  it('an empty normalized name matches no application and no business', async () => {
+    const subject = await app({ name: 'Lda', email: 'lda@t16.test' })
+    await app({ name: 'LDA.', email: 'lda-other@t16.test' })
+    await biz('Lda')
+    expect(await dups(OWNER, subject)).toEqual({ applications: [], businesses: [] })
+  })
+
+  it("a member without applications.view gets {error:'forbidden'}; anon cannot execute it", async () => {
+    const subject = await app({ name: 'Gate Check', email: 'gate@t16.test' })
+    expect(await dups(TEAM, subject)).toEqual({ applications: [], businesses: [] })
+    await withRolePermissions({ team: ['businesses.view'] }, async () => {
+      expect(await dups(TEAM, subject)).toEqual({ error: 'forbidden' })
+    })
+    expect(await dups(OWNER, id(99))).toEqual({ error: 'not_found' })
+    const grants = (await db.query<{ a: boolean; u: boolean; na: boolean; nu: boolean }>(
+      `select has_function_privilege('anon', 'public.admin_application_duplicates(uuid)', 'execute') as a,
+              has_function_privilege('authenticated', 'public.admin_application_duplicates(uuid)', 'execute') as u,
+              has_function_privilege('anon', 'private.normalize_business_name(text)', 'execute') as na,
+              has_function_privilege('authenticated', 'private.normalize_business_name(text)', 'execute') as nu`)).rows[0]
+    expect(grants).toEqual({ a: false, u: true, na: false, nu: false })
+    await expect(h.call('', 'select public.admin_application_duplicates($1) as r', [subject], null, 'anon')).rejects.toThrow(/permission denied/)
+  })
+
+  it('rollback restores the earlier admin_review_application and drops business_deleted_at and its trigger', async () => {
+    // The body keeps the source file's line endings (CRLF in a Windows checkout); compare the text only.
+    const def = async (target: PGlite) =>
+      (await target.query<{ d: string }>(`select pg_get_functiondef('public.admin_review_application(uuid, text, text)'::regprocedure) as d`)).rows[0]!.d
+        .replace(/\r\n/g, '\n')
+    const has = async (target: PGlite) => ({
+      column: (await target.query(`select 1 from information_schema.columns where table_name = 'business_applications' and column_name = 'business_deleted_at'`)).rows.length,
+      trigger: (await target.query(`select 1 from pg_trigger where tgname = 'businesses_mark_application_deleted'`)).rows.length,
+    })
+    const before = await freshDb((n) => n < S15_MIGRATION)
+    const rolled = await freshDb()
+    try {
+      expect(await def(rolled)).not.toEqual(await def(before))
+      expect(await has(rolled)).toEqual({ column: 1, trigger: 1 })
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      expect(await def(rolled)).toEqual(await def(before))
+      expect(await has(rolled)).toEqual({ column: 0, trigger: 0 })
+    } finally {
+      await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
+})

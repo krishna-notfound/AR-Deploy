@@ -54,10 +54,10 @@ export async function freshDb(filter?: (name: string) => boolean): Promise<PGlit
 
 /**
  * Fixture ids for one task: `ids(3)(7)` is `00000000-0000-0000-0003-000000000007`. Decimal digits are valid hex, so
- * every task (1 to 15) and n (0 to 99) gives a valid UUID, and no two tasks share one.
+ * every task (1 to 18) and n (0 to 99) gives a valid UUID, and no two tasks share one.
  */
 export function ids(task: number): (n: number) => string {
-  if (!Number.isInteger(task) || task < 1 || task > 15) throw new Error(`ids: task must be 1 to 15, got ${task}`)
+  if (!Number.isInteger(task) || task < 1 || task > 18) throw new Error(`ids: task must be 1 to 18, got ${task}`)
   return (n: number) => {
     if (!Number.isInteger(n) || n < 0 || n > 99) throw new Error(`ids: n must be 0 to 99, got ${n}`)
     return `00000000-0000-0000-${String(task).padStart(4, '0')}-${String(n).padStart(12, '0')}`

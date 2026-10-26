@@ -690,3 +690,202 @@ $$;
 revoke execute on function public.service_closure_target(uuid) from public, anon, authenticated;
 grant execute on function public.service_closure_target(uuid) to service_role;
 -- ---- end S1.5 Task 3 ----
+
+-- =============================================================================
+-- S1.5 Task 16: application review: possible duplicates, reopening after a deleted business (R-W2-2, R-W2-9)
+-- =============================================================================
+
+-- R-W2-2: an approved application remembers when its business was deleted. No backfill: the live L1 application has
+-- no known date, so the dashboard says the business was deleted without one.
+alter table public.business_applications add column business_deleted_at timestamptz;
+
+create function private.mark_application_business_deleted()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- Runs before the delete; the business_id foreign key (on delete set null) then clears the link.
+  update public.business_applications set business_deleted_at = now() where business_id = old.id;
+  return old;
+end;
+$$;
+revoke execute on function private.mark_application_business_deleted() from public, anon, authenticated;
+create trigger businesses_mark_application_deleted before delete on public.businesses
+  for each row execute function private.mark_application_business_deleted();
+
+-- R-W2-2: the action reopen (approved → under_review) for an application whose business was deleted. Body from
+-- 20261020091428_applications_and_owner_access with the check that 20261025070915 widened through widen_admin_check,
+-- now written out; the other transitions are unchanged.
+create or replace function public.admin_review_application(p_application_id uuid, p_action text, p_reason text default null)
+returns public.business_applications
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_app    public.business_applications;
+  v_new    text;
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_biz    uuid;
+  v_old    text;
+begin
+  if not (public.is_platform_admin()
+          or public.platform_can(case p_action when 'reject' then 'applications.reject' else 'applications.approve' end)) then
+    raise exception 'platform_admin_only' using errcode = '42501';
+  end if;
+  select * into v_app from public.business_applications where id = p_application_id for update;
+  if not found then
+    raise exception 'application_not_found' using errcode = 'P0002';
+  end if;
+
+  -- Reopen: only an approved application whose business no longer exists. Never a no-op repeat.
+  if p_action = 'reopen' then
+    if v_app.status <> 'approved' or v_app.business_id is not null then
+      raise exception 'reopen_not_allowed' using errcode = '22023';
+    end if;
+    update public.business_applications
+       set status = 'under_review',
+           reviewed_by = auth.uid(),
+           reviewed_at = now()
+     where id = v_app.id
+    returning * into v_app;
+    insert into public.audit_events (event_type, actor_id, application_id, business_id, from_status, to_status, metadata)
+    values ('application_status_changed', auth.uid(), v_app.id, null, 'approved', 'under_review',
+            jsonb_build_object('action', 'reopen'));
+    return v_app;
+  end if;
+
+  v_new := case p_action when 'start_review' then 'under_review' when 'approve' then 'approved' when 'reject' then 'rejected' end;
+  if v_new is null then
+    raise exception 'invalid_action' using errcode = '22023';
+  end if;
+  if v_app.status = v_new then
+    return v_app;
+  end if;
+  v_old := v_app.status;
+  if not ((v_app.status = 'submitted' and v_new in ('under_review', 'approved', 'rejected'))
+       or (v_app.status = 'under_review' and v_new in ('approved', 'rejected'))
+       or (v_app.status = 'rejected' and v_new = 'under_review')) then
+    raise exception 'invalid_transition' using errcode = '22023';
+  end if;
+  if v_new = 'rejected' and v_reason is null then
+    raise exception 'reason_required' using errcode = '22023';
+  end if;
+
+  if v_new = 'approved' then
+    -- A draft business: not public until the catalogue is activated. Contact fields stay empty on purpose:
+    -- the applicant's private email/phone must not become public catalogue contacts.
+    insert into public.businesses (name, slug, description, status)
+    values (btrim(v_app.business_name), private.unique_business_slug(v_app.business_name),
+            left(coalesce(v_app.answers ->> 'description', ''), 5000), 'draft')
+    returning id into v_biz;
+    insert into public.audit_events (event_type, actor_id, application_id, business_id, metadata)
+    values ('business_created', auth.uid(), v_app.id, v_biz, jsonb_build_object('source', 'application'));
+  end if;
+
+  update public.business_applications
+     set status = v_new,
+         decision_reason = case when v_new in ('approved', 'rejected') then v_reason else decision_reason end,
+         reviewed_by = auth.uid(),
+         reviewed_at = now(),
+         business_id = coalesce(v_biz, business_id)
+   where id = v_app.id
+  returning * into v_app;
+
+  insert into public.audit_events (event_type, actor_id, application_id, business_id, from_status, to_status, metadata)
+  values ('application_status_changed', auth.uid(), v_app.id, v_app.business_id, v_old, v_new,
+          case when v_reason is not null then jsonb_build_object('reason', v_reason) else '{}'::jsonb end);
+  return v_app;
+end;
+$$;
+revoke execute on function public.admin_review_application(uuid, text, text) from public, anon;
+grant execute on function public.admin_review_application(uuid, text, text) to authenticated;
+
+-- R-W2-9: the business-name key for possible duplicates. Lower-cased and trimmed, Portuguese accents folded with
+-- translate() (no unaccent extension), one trailing legal-form word dropped, then only a-z and 0-9 kept. An empty
+-- key matches nothing. src/services/applicationRules.ts (normalizeBusinessName) mirrors it for the demo.
+create function private.normalize_business_name(p_name text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select regexp_replace(
+           regexp_replace(
+             lower(translate(btrim(coalesce(p_name, '')),
+                             'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ',
+                             'aaaaaeeeeiiiiooooouuuucnaaaaaeeeeiiiiooooouuuucn')),
+             '(^|[^a-z0-9])(lda|limitada|unipessoal|sa|ltd|limited|llc|inc)[^a-z0-9]*$', '\1'),
+           '[^a-z0-9]', '', 'g');
+$$;
+revoke execute on function private.normalize_business_name(text) from public, anon, authenticated;
+
+-- R-W2-9: possible duplicates of one application, for the reviewer. Only a warning: it never blocks a review action.
+-- Other open or approved applications with the same email or business-name key, and businesses (never the one this
+-- application created) with the same key or whose owner signs in with the applicant's email. The owner's email itself
+-- is never returned. At most 10 of each, newest first.
+create function public.admin_application_duplicates(p_application_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_app   public.business_applications;
+  v_email text;
+  v_name  text;
+begin
+  if not (public.is_platform_admin() or public.platform_can('applications.view')) then
+    return jsonb_build_object('error', 'forbidden');
+  end if;
+  select * into v_app from public.business_applications where id = p_application_id;
+  if not found then
+    return jsonb_build_object('error', 'not_found');
+  end if;
+  v_email := lower(v_app.applicant_email);
+  v_name := nullif(private.normalize_business_name(v_app.business_name), '');
+
+  return jsonb_build_object(
+    'applications', coalesce((
+      select jsonb_agg(jsonb_build_object('id', m.id, 'reference', m.reference, 'business_name', m.business_name,
+                                          'status', m.status, 'created_at', m.created_at,
+                                          'match', case when m.by_email and m.by_name then 'both' when m.by_email then 'email' else 'name' end)
+                       order by m.created_at desc, m.id)
+        from (
+          select a.id, a.reference, a.business_name, a.status, a.created_at, c.by_email, c.by_name
+            from public.business_applications a
+            cross join lateral (
+              select lower(a.applicant_email) = v_email as by_email,
+                     coalesce(private.normalize_business_name(a.business_name) = v_name, false) as by_name
+            ) c
+           where a.id <> v_app.id
+             and a.status in ('submitted', 'under_review', 'approved')
+             and (c.by_email or c.by_name)
+           order by a.created_at desc, a.id
+           limit 10
+        ) m), '[]'::jsonb),
+    'businesses', coalesce((
+      select jsonb_agg(jsonb_build_object('id', m.id, 'name', m.name, 'status', m.status,
+                                          'match', case when m.by_owner and m.by_name then 'both' when m.by_owner then 'owner_email' else 'name' end)
+                       order by m.created_at desc, m.id)
+        from (
+          select b.id, b.name, b.status, b.created_at, c.by_owner, c.by_name
+            from public.businesses b
+            cross join lateral (
+              select exists (select 1 from public.business_members bm join auth.users u on u.id = bm.user_id
+                              where bm.business_id = b.id and bm.role = 'owner' and lower(u.email::text) = v_email) as by_owner,
+                     coalesce(private.normalize_business_name(b.name) = v_name, false) as by_name
+            ) c
+           where b.id is distinct from v_app.business_id
+             and (c.by_owner or c.by_name)
+           order by b.created_at desc, b.id
+           limit 10
+        ) m), '[]'::jsonb));
+end;
+$$;
+revoke execute on function public.admin_application_duplicates(uuid) from public, anon;
+grant execute on function public.admin_application_duplicates(uuid) to authenticated;
+-- ---- end S1.5 Task 16 ----

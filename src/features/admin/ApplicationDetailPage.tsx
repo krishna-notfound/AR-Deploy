@@ -1,6 +1,6 @@
 import { useCan } from '@/auth/usePermission'
 import { scrollBehavior } from '@/lib/motion'
-import { ArrowDown, Building2, Check, Eye, FileX, X } from 'lucide-react'
+import { ArrowDown, Building2, Check, Eye, FileX, RotateCcw, X } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { PageHeader, PanelHeader } from '@/components/layout/PageHeader'
@@ -14,7 +14,7 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessApplication, ReviewAction, ReviewedApplication } from '@/domain/types'
-import { formatDateTime } from '@/lib/format'
+import { formatDate, formatDateTime } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
@@ -22,6 +22,7 @@ import { REASON_MAX_LENGTH, availableActions } from '@/services/applicationRules
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
+import { PossibleDuplicates } from '../applications/PossibleDuplicates'
 import { ApplicationStatusBadge, emailReason } from '../applications/labels'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 
@@ -62,10 +63,16 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const confirm = useConfirm()
   const toast = useToast()
   const review = useServiceMutation((action: ReviewAction, reason?: string, includeReason?: boolean) => service.reviewApplication(app.id, action, reason, { includeReason: includeReason === true }))
-  const business = useServiceQuery(() => (app.businessId ? service.getBusinessById(app.businessId) : Promise.resolve({ ok: true as const, data: null })), [app.businessId])
+  const can = useCan()
+  // R-W2-6: the business and its owner are shown only to a role that can open businesses (no "Business not found"),
+  // and the owner invitation is pointed to only for a role that can send it.
+  const canOpenBusiness = can('businesses.view')
+  const canInviteOwner = canOpenBusiness && can('owners.manage')
+  const businessId = canOpenBusiness ? app.businessId : undefined
+  const business = useServiceQuery(() => (businessId ? service.getBusinessById(businessId) : Promise.resolve({ ok: true as const, data: null })), [businessId])
   // The owner invitation is the step after approval: it lives in the last card, so point to it at the top of the page.
-  const members = useServiceQuery(() => (app.businessId ? service.getBusinessMembers(app.businessId) : Promise.resolve({ ok: true as const, data: [] })), [app.businessId])
-  const needsOwner = app.status === 'approved' && !!business.data && members.status === 'success' && members.data.length === 0
+  const members = useServiceQuery(() => (businessId ? service.getBusinessMembers(businessId) : Promise.resolve({ ok: true as const, data: [] })), [businessId])
+  const needsOwner = canInviteOwner && app.status === 'approved' && !!business.data && members.status === 'success' && members.data.length === 0
   const ownerRef = useRef<HTMLDivElement | null>(null)
   // Set on approval; the owner card mounts once the new business has loaded and then scrolls into view.
   const revealOwner = useRef(false)
@@ -83,13 +90,14 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
     }
   }
   const [rejectOpen, setRejectOpen] = useState(false)
-  const can = useCan()
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState<string | null>(null)
   // R-W2-1: off by default; the applicant then hears only that the application was not approved.
   const [includeReason, setIncludeReason] = useState(false)
   const includeHintId = useId()
-  const actions = availableActions(app.status)
+  const actions = availableActions(app.status, { businessId: app.businessId ?? null })
+  // R-W2-2: approved, but the business it created was deleted (L1 has no date).
+  const businessDeleted = app.status === 'approved' && !app.businessId
 
   // The toast is worded from the decision email's status (§11.1); "accepted" means Resend took it, not that it arrived.
   // No email at all means nothing changed (the application was already rejected).
@@ -109,9 +117,12 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
     setRejectOpen(false)
     onChanged()
     if (action === 'approve') {
-      toast.success('Application approved', 'Next: invite the owner so they can set up the catalogue.')
-      revealOwner.current = true
+      if (canInviteOwner) {
+        toast.success('Application approved', 'Next: invite the owner so they can set up the catalogue.')
+        revealOwner.current = true
+      } else toast.success("Approved. A draft business was created. Someone with 'Invite and remove business owners' must invite the owner.")
     } else if (action === 'reject') reportRejection(res.data)
+    else if (action === 'reopen') toast.success('Reopened for review')
     else toast.success('Marked as under review')
   }
 
@@ -157,6 +168,11 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
                 Reject
               </Button>
             )}
+            {actions.includes('reopen') && can('applications.approve') && (
+              <Button icon={<RotateCcw className="size-4" aria-hidden />} loading={review.pending} onClick={() => void run('reopen')}>
+                Reopen for review
+              </Button>
+            )}
             {actions.includes('approve') && can('applications.approve') && (
               <Button variant="primary" icon={<Check className="size-4" aria-hidden />} loading={review.pending} onClick={() => void approve()}>
                 Approve
@@ -168,6 +184,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
+          <PossibleDuplicates applicationId={app.id} />
           {needsOwner && (
             <InlineNotice tone="info">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -227,12 +244,32 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               />
             </CardBody>
           </Card>
-          {app.businessId && (
+          {businessDeleted && (
+            <Card>
+              <PanelHeader title="Business record" />
+              <CardBody>
+                <p className="text-ui-body text-ink-muted">
+                  {app.businessDeletedAt
+                    ? `Business deleted on ${formatDate(app.businessDeletedAt, 'en', prefs)}`
+                    : 'The business created from this application was deleted.'}
+                </p>
+              </CardBody>
+            </Card>
+          )}
+          {app.businessId && !canOpenBusiness && (
+            <Card>
+              <PanelHeader title="Business record" />
+              <CardBody>
+                <p className="text-ui-body text-ink-muted">A draft business was created. Your role can't open businesses.</p>
+              </CardBody>
+            </Card>
+          )}
+          {businessId && (
             <Card>
               <PanelHeader
                 title="Business record"
                 actions={
-                  <ButtonLink to={businessAdminPath(app.businessId)} size="sm" icon={<Building2 className="size-4" aria-hidden />}>
+                  <ButtonLink to={businessAdminPath(businessId)} size="sm" icon={<Building2 className="size-4" aria-hidden />}>
                     Open business
                   </ButtonLink>
                 }

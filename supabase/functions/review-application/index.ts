@@ -15,7 +15,7 @@ const anonKey = env('SUPABASE_ANON_KEY') ?? ''
 const admin = createClient(url, serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
 
 /** admin_review_application's refusals, by the message it raises; everything else is a 500. */
-const KNOWN = new Set(['reason_required', 'invalid_transition', 'application_not_found'])
+const KNOWN = new Set(['reason_required', 'invalid_transition', 'reopen_not_allowed', 'application_not_found'])
 
 Deno.serve((req) =>
   handleReviewApplication(req, {
