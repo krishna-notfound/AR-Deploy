@@ -98,6 +98,7 @@ Wave 1 (parallel with Task 2). Closes **R-S4-1**, the database parts of **R-S4-2
 
 **Files:**
 - Create: `supabase/migrations/<ts>_s4_model_requests.sql` (header cites the spec and the slot convention), `supabase/rollback/20261026_s4_model_requests_rollback.sql`, `supabase/tests/s4ModelRequests.test.ts`.
+  - Re-dated on 2026-10-26 to `20261026120000_s4_model_requests.sql`: S2's `20261026075614_s2_business_logic.sql` was applied live first, so S4 must sort after it (`supabase db push` refuses an earlier, unapplied migration). Order: S1.5 < S2 < S4; rollbacks run S4, then S2, then S1.5.
 - Modify:
   - `supabase/tests/harness.ts`: `S4_MIGRATION`, `S4_ROLLBACK_SQL`;
   - `src/domain/permissions.ts` (+ `permissions.test.ts`), `src/domain/types.ts` (the `Permission` union line only), `src/features/team/permissions.ts` (+ test), `src/features/team/RolePermissionsPage.test.tsx` (the "Includes:" count), `supabase/functions/_shared/team.ts` (+ `team.test.ts`);

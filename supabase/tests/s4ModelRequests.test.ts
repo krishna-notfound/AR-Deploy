@@ -7,11 +7,11 @@
 // describe between their own `// ---- S4 Task N tests ----` markers at the end of this file, and call
 // GONE_AFTER_ROLLBACK.push(...) at their describe's body level.
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MIGRATIONS, S4_MIGRATION, S4_ROLLBACK_SQL, UP_TO_S4, freshDb, ids, makeHelpers, type Helpers } from './harness'
+import { BEFORE_S4, MIGRATIONS, ROLLBACK_SQL, S2_MIGRATION, S2_ROLLBACK_SQL, S4_MIGRATION, S4_ROLLBACK_SQL, UP_TO_S4, freshDb, ids, makeHelpers, type Helpers } from './harness'
 
 type ModelRequestStatus = 'requested' | 'in_progress' | 'delivered' | 'rejected' | 'cancelled'
 
@@ -156,17 +156,23 @@ describe('S4 Task 1: permission, switch, tables, bucket', () => {
     `insert into public.product_variant_models (variant_id, product_id, format, storage_path, file_name) values ('${variant}', '${product}', 'glb', '${path}', 'm.glb')`
   const setSwitch = (biz: string, on: boolean) => db.query('update public.businesses set allow_own_models = $2 where id = $1', [biz, on])
 
-  it('the S4 migration applies after every earlier migration', async () => {
+  it('the S4 migration is the last migration and is dated after S2 (S2 is already applied live)', async () => {
     expect(S4_MIGRATION).toMatch(/^\d{14}_s4_model_requests\.sql$/)
-    expect(S4_MIGRATION > '20261026041731').toBe(true)
+    const all = readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()
+    expect(all.at(-1)).toBe(S4_MIGRATION)
+    expect(S4_MIGRATION > S2_MIGRATION).toBe(true)
     for (const t of ['public.model_requests', 'public.model_request_photos', 'public.model_request_files']) {
       expect((await db.query<{ o: string | null }>('select to_regclass($1)::text as o', [t])).rows[0]!.o).toBe(t.replace('public.', ''))
     }
   })
 
-  it('the S4 migration also applies on a database that already has S2 (the live order: S2 shipped first)', async () => {
-    const live = await freshDb((n) => n !== S4_MIGRATION)
+  it('the S4 migration applies on top of S2 (the live order: S2 shipped first)', async () => {
+    const live = await freshDb(BEFORE_S4)
     try {
+      const { rows } = await live.query<{ d: string }>(
+        `select pg_get_functiondef('public.admin_review_application(uuid, text, text)'::regprocedure) as d`)
+      expect(rows[0]!.d).toContain('1000') // S2's description limit (5000 → 1000) is in place before S4 runs.
+      expect(rows[0]!.d).not.toContain('5000')
       await live.exec(readFileSync(join(MIGRATIONS, S4_MIGRATION), 'utf8'))
       expect((await live.query<{ o: string | null }>(`select to_regclass('public.model_requests')::text as o`)).rows[0]!.o).toBe('model_requests')
     } finally {
@@ -424,7 +430,7 @@ describe('S4 Task 1: permission, switch, tables, bucket', () => {
 
   describe('migration-time behaviour (fresh databases)', () => {
     it('backfills: the Admin set gains models.manage with one audit row; Team unchanged; a business with only a variant GLB gets true, one with photos only gets false; existing rows keep their dates', async () => {
-      const pre = await freshDb((n) => n < S4_MIGRATION)
+      const pre = await freshDb(BEFORE_S4)
       const x = ids(2)
       try {
         await pre.exec(`
@@ -467,7 +473,7 @@ describe('S4 Task 1: permission, switch, tables, bucket', () => {
     }, 60_000)
 
     it('the migration refuses when model-request-photos exists and is public', async () => {
-      const pre = await freshDb((n) => n < S4_MIGRATION)
+      const pre = await freshDb(BEFORE_S4)
       try {
         await pre.query(`insert into storage.buckets (id, name, public) values ('model-request-photos', 'model-request-photos', true)`)
         await expect(pre.exec(readFileSync(join(MIGRATIONS, S4_MIGRATION), 'utf8'))).rejects.toThrow(/model-request-photos exists and is public/)
@@ -519,7 +525,7 @@ describe('S4 rollback', () => {
   }
 
   it('apply → rollback → re-apply succeeds; every GONE_AFTER_ROLLBACK name is gone; policies, my_platform_access, admin_set_role_permissions, permission_prerequisites and save_product equal a database before S4', async () => {
-    const before = await freshDb((n) => n < S4_MIGRATION)
+    const before = await freshDb(BEFORE_S4)
     const rolled = await freshDb(UP_TO_S4)
     try {
       const pre = await definitions(before)
@@ -541,6 +547,19 @@ describe('S4 rollback', () => {
       expect((await rolled.query(`select to_regclass('public.model_requests')::text as o`)).rows[0]).toEqual({ o: 'model_requests' })
     } finally {
       await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
+
+  it('the rollbacks chain in reverse order on the full database: S4, then S2, then S1.5 all succeed', async () => {
+    const all = readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()
+    expect(all.indexOf(S4_MIGRATION)).toBeGreaterThan(all.indexOf(S2_MIGRATION))
+    const rolled = await freshDb(UP_TO_S4)
+    try {
+      await rolled.exec(readFileSync(S4_ROLLBACK_SQL, 'utf8'))
+      await rolled.exec(readFileSync(S2_ROLLBACK_SQL, 'utf8'))
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+    } finally {
       await rolled.close()
     }
   }, 120_000)

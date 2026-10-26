@@ -1,6 +1,6 @@
 -- S4 3D model requests (spec: docs/superpowers/specs/2026-10-26-s4-3d-model-requests-design.md, §8.1; the owner
 -- decisions of 2026-10-26 at its end override it: no open-request limit).
--- Rollback: supabase/rollback/20261026_s4_model_requests_rollback.sql (sections newest task first).
+-- Rollback: supabase/rollback/20261026_s4_model_requests_rollback.sql (sections newest task first). Dated after S2 (20261026075614), which was applied live first.
 -- Tests: supabase/tests/s4ModelRequests.test.ts (PGlite, one describe per task).
 --
 -- This is the only S4 migration. Task 1 wrote one empty slot per later SQL task (3, 4, 6, 7, 8), in this format:

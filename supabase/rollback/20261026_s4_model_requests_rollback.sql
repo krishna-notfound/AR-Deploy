@@ -1,4 +1,4 @@
--- Rollback for the S4 migration supabase/migrations/<ts>_s4_model_requests.sql
+-- Rollback for the S4 migration supabase/migrations/20261026120000_s4_model_requests.sql
 -- (spec: docs/superpowers/specs/2026-10-26-s4-3d-model-requests-design.md, §10.3). Run as the database owner, after
 -- deploying the Edge Functions and the app of the release before S4, and before any earlier rollback script.
 --
