@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { type ArStatus, MODEL_STALL_TIMEOUT_MS, type ModelLoadInfo, ModelViewer, type ModelViewerHandle } from '@/components/three/ModelViewer'
 import type { ProductImage, ProductModels } from '@/domain/types'
+import { arLaunchUrl } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 
@@ -64,7 +65,9 @@ export function ProductMedia({
 }) {
   const { t } = useI18n()
   const { glb, usdz } = models
-  const glbUrl = glb?.url ?? ''
+  // A published product's public copy (site /ar/ path) when it has one: model-viewer's AR (WebXR, and its Scene Viewer
+  // fallback, which cannot open a private signed link) uses this same URL (ADR-0035).
+  const glbUrl = glb ? arLaunchUrl(glb) : ''
 
   // Photo index and model load are tied to what they show; a variant switch starts both afresh.
   const galleryKey = gallery.map((i) => i.id).join('|')
@@ -114,9 +117,9 @@ export function ProductMedia({
             <ModelViewer
               key={`${glbUrl}#${attempt}`}
               ref={innerRef}
-              src={glb.url}
+              src={glbUrl}
               // Only the USDZ that belongs to this GLB; none means iPhone generates one from this GLB.
-              iosSrc={usdz?.url}
+              iosSrc={usdz ? arLaunchUrl(usdz) : undefined}
               poster={poster}
               alt={t('product.view3d') + ': ' + name}
               ar={ar}

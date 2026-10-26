@@ -209,10 +209,28 @@ describe('product page: native AR opens the public copy (ar-models) when the mod
     withPublicCopies()
     const arLinks = captureClicks()
     openApp('/products/nordhaus/sheen-lounge-chair')
-    loaded(await viewerFor(/SheenChair\.glb$/), true)
+    loaded(await viewerFor(/\/ar-models\/.+\.glb$/), true)
     fireEvent.click(arButton()!)
     expect(arLinks()).toHaveLength(1)
     expect(arLinks()[0]!.getAttribute('href')).toBe(`${PUBLIC}${await firstFinish()}.usdz#allowsContentScaling=0`)
   })
 
+})
+
+describe('product page: the 3D view and its AR use the public copy when the model has one (ADR-0035)', () => {
+  it('model-viewer src is the public GLB, so its WebXR and Scene Viewer fallback never get a private signed link', async () => {
+    asUserAgent(ANDROID_CHROME)
+    const PUBLIC = 'https://ref.supabase.co/storage/v1/object/public/ar-models/'
+    const real = service.getPublicProduct.bind(service)
+    vi.spyOn(service, 'getPublicProduct').mockImplementation(async (...args: Parameters<typeof service.getPublicProduct>) => {
+      const res = await real(...args)
+      if (!res.ok) return res
+      const p = res.data.product
+      const product = { ...p, variants: p.variants.map((v) => (v.models?.glb ? { ...v, models: { ...v.models, glb: { ...v.models.glb, publicUrl: `${PUBLIC}${v.id}.glb` } } } : v)) }
+      return { ...res, data: { ...res.data, product } }
+    })
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/\/ar-models\/.+\.glb$/)
+    expect(el.getAttribute('src')).toMatch(new RegExp(`^${PUBLIC}`))
+  })
 })

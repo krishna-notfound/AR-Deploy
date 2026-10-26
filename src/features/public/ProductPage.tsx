@@ -122,7 +122,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const variant = product.variants.find((v) => v.id === variantId)
   // Photos, 3D model and AR target of the selected variant, never a mix of two sources.
   const media = useMemo(() => variantMedia(product, variant), [product, variant])
-  const modelKey = media.models.glb?.url ?? ''
+  const modelKey = media.models.glb ? arLaunchUrl(media.models.glb) : '' // the URL ProductMedia loads (public copy first)
   const [mode, setMode] = useState<MediaMode>(() => initialMediaMode(media))
   const [storedModel, setModel] = useState<ModelInfo>(() => freshModel(modelKey))
   // A variant switch resets loading, AR and scale state, so "View in my home" never opens the previous file.
