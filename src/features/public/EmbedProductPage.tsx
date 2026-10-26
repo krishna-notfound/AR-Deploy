@@ -40,8 +40,10 @@ export default function EmbedProductPage({ tenantSlug }: { tenantSlug?: string }
       </EmbedFrame>
     )
 
-  if (!res.data || !isPublic) {
-    const notFound = !!res.data || (res.status === 'error' && res.error.code === 'NOT_FOUND')
+  // R-W4-8: a refetch that says NOT_FOUND outranks the kept-stale product.
+  const gone = res.status === 'error' && res.error.code === 'NOT_FOUND'
+  if (!res.data || !isPublic || gone) {
+    const notFound = !!res.data || gone
     return (
       <EmbedFrame>
         {notFound ? (

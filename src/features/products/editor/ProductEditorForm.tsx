@@ -45,6 +45,7 @@ const FIELD_SECTION: Record<string, (typeof SECTIONS)[number]['id']> = {
   weight: 'specs',
   variants: 'specs',
   'cta.url': 'cta',
+  'cta.label': 'cta',
 }
 
 type Errors = Record<string, string>
@@ -59,6 +60,7 @@ function fieldValue(f: EditorForm, key: string): string {
   if (key === 'weight') return `${f.weightText} ${f.input.weight?.unit ?? ''}`
   if (key === 'name.en') return f.input.name.en
   if (key === 'cta.url') return f.input.cta.url ?? ''
+  if (key === 'cta.label') return f.input.cta.label.en
   if (key.startsWith('dimensions.')) return f.dims[key.slice(11) as (typeof DIMS)[number]] ?? ''
   if (key === 'images') return JSON.stringify(f.input.images.filter((i) => i.kind === 'gallery').map((i) => i.id))
   if (key === 'variants') return JSON.stringify(f.input.variants)
@@ -629,7 +631,7 @@ export function ProductEditorForm({
 
           <Section id="cta" title="Call to action" description="The main button on the product page, for example a contact form or WhatsApp link.">
             <div className="grid items-start gap-x-6 gap-y-5 sm:grid-cols-2 [&>*:last-child]:sm:pt-1">
-              <LocalizedField label="Button label" value={form.input.cta.label} onChange={(label) => setInput({ cta: { ...form.input.cta, label } })} maxLength={40} />
+              <LocalizedField label="Button label" value={form.input.cta.label} onChange={(label) => setInput({ cta: { ...form.input.cta, label } })} maxLength={40} error={err('cta.label')} />
               <FormField label="Button link" optional error={err('cta.url')} hint="If empty, the button shows the store’s contact details.">
                 <Input type="url" placeholder="https://" value={form.input.cta.url ?? ''} onChange={(e) => setInput({ cta: { ...form.input.cta, url: e.target.value } })} />
               </FormField>

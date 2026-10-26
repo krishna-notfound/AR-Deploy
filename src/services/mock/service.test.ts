@@ -84,6 +84,9 @@ describe('businesses', () => {
     unwrap(await svc.setBusinessStatus('biz_casa', 'inactive'))
     const r = await svc.getPublicProduct('casa-lisboa', 'glam-velvet-sofa')
     expect(r.ok).toBe(false)
+    // R-W8-2: signed out, even the preview is refused; a platform admin gets it.
+    expect((await svc.getPublicProduct('casa-lisboa', 'glam-velvet-sofa', { allowDraft: true })).ok).toBe(false)
+    localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin' }))
     expect((await svc.getPublicProduct('casa-lisboa', 'glam-velvet-sofa', { allowDraft: true })).ok).toBe(true)
   })
 })

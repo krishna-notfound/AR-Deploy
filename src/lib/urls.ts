@@ -49,8 +49,12 @@ export function withVariantParam(search: URLSearchParams, variantId: string | un
  * active yet: only a signed-in owner of that business (or a platform admin) gets it; everyone else still sees
  * "catalog unavailable", and in Supabase mode RLS is the real gate.
  */
-export function catalogLocalPath(b: Sluggable, opts?: { preview?: boolean }): string {
-  return `/catalog/${b.slug}${opts?.preview ? '?preview=1' : ''}`
+export function catalogLocalPath(b: Sluggable, opts?: { preview?: boolean; category?: string }): string {
+  const q = new URLSearchParams()
+  if (opts?.category) q.set('category', opts.category)
+  if (opts?.preview) q.set('preview', '1')
+  const qs = q.toString()
+  return `/catalog/${b.slug}${qs ? `?${qs}` : ''}`
 }
 
 /**

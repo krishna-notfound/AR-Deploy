@@ -8,6 +8,7 @@ import { DashboardShell } from '@/components/layout/DashboardShell'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { adminNav, businessNav } from '@/components/layout/nav'
 import { LanguageProvider } from '@/i18n/LanguageProvider'
+import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
 import { type Tenant, resolveTenant } from '@/tenant/resolveTenant'
 import { RootLayout } from './RootLayout'
 import { RouteError } from './RouteError'
@@ -169,10 +170,10 @@ function pathModeRoutes(): RouteObject[] {
             // Both use t(), so they need the LanguageProvider of this layout.
             { path: '/reset-password', element: <ResetPasswordPage /> },
             { path: '/accept-invite', element: <AcceptInvitePage /> },
-            { path: '/catalog/:businessSlug', element: <CatalogPage /> },
-            { path: '/products/:businessSlug/:productSlug', element: <ProductPage /> },
+            { path: '/catalog/:businessSlug', element: <LowercaseSlugs route="catalog"><CatalogPage /></LowercaseSlugs> },
+            { path: '/products/:businessSlug/:productSlug', element: <LowercaseSlugs route="product"><ProductPage /></LowercaseSlugs> },
             // Framable by any website (vercel.json, ADR-0026); chrome-less, public data only.
-            { path: '/embed/products/:businessSlug/:productSlug', element: <EmbedProductPage /> },
+            { path: '/embed/products/:businessSlug/:productSlug', element: <LowercaseSlugs route="embed"><EmbedProductPage /></LowercaseSlugs> },
             { path: '*', element: <PublicNotFoundPage /> },
           ],
         },
@@ -192,8 +193,8 @@ function hostnameModeRoutes(slug: string): RouteObject[] {
           element: <PublicLayout />,
           children: [
             { path: '/', element: <CatalogPage tenantSlug={slug} /> },
-            { path: '/products/:productSlug', element: <ProductPage tenantSlug={slug} /> },
-            { path: '/embed/products/:productSlug', element: <EmbedProductPage tenantSlug={slug} /> },
+            { path: '/products/:productSlug', element: <LowercaseSlugs route="product" tenant><ProductPage tenantSlug={slug} /></LowercaseSlugs> },
+            { path: '/embed/products/:productSlug', element: <LowercaseSlugs route="embed" tenant><EmbedProductPage tenantSlug={slug} /></LowercaseSlugs> },
             // The catalogue and product footers link here, so the legal pages answer on business subdomains too.
             { path: PRIVACY_PATH, element: <LegalPage doc="privacy" tenant /> },
             { path: TERMS_PATH, element: <LegalPage doc="terms" tenant /> },

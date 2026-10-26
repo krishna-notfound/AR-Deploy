@@ -40,6 +40,8 @@ export function validateProductDraft(data: ProductInput, siblings: Product[]): F
     if (!Number.isFinite(v) || v < 0) e[`dimensions.${k}`] = 'Enter a positive number.'
   }
   if (data.cta.url && !isHttpUrl(data.cta.url)) e['cta.url'] = 'Enter a full URL starting with https://'
+  // R-W4-13: a link with no text would render as an empty, invisible button on the product page.
+  if (data.cta.url && !data.cta.label.en.trim()) e['cta.label'] = 'Add a button label, or remove the link.'
   if (data.weight && (!Number.isFinite(data.weight.value) || data.weight.value < 0)) e.weight = 'Enter a positive weight.'
   if (data.variants.some((v) => v.priceDelta !== undefined && !(Number.isInteger(v.priceDelta) && v.priceDelta >= 0))) e.variants = 'Enter each price difference as an amount such as 25.00 (no negatives), or leave it empty.'
   // Same caps as save_product (20261020143507_variant_media).

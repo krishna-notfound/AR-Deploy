@@ -2,7 +2,7 @@
 // "current role" is whatever was picked on /demo. Rules mirror the database so the demo behaves like the real thing.
 // No email is ever sent in demo mode; an invitation is recorded as sent with the sample label on the page.
 import { ALL_PERMISSIONS, isPermission, withPrerequisites } from '@/domain/permissions'
-import type { AccessAction, AccessEvent, InviteInspection, InviteOutcome, MemberInvite, PlatformAccess, PlatformMember, PlatformRole } from '@/domain/types'
+import type { AccessAction, AccessEvent, ID, InviteInspection, InviteOutcome, MemberInvite, PlatformAccess, PlatformMember, PlatformRole } from '@/domain/types'
 import { newId } from '@/lib/id'
 import { PASSWORD_MIN } from '../accountService'
 import { type CatalogService, type Result, ok, teamFail } from '../catalogService'
@@ -32,6 +32,19 @@ export function demoPlatformRole(): PlatformRole | null {
     const s = raw ? (JSON.parse(raw) as { role?: unknown; platformRole?: unknown }) : null
     if (s?.role !== 'super_admin') return null
     return s.platformRole === 'admin' || s.platformRole === 'team' ? s.platformRole : 'owner'
+  } catch {
+    return null
+  }
+}
+
+/** Who is looking in the demo, from the account picker (not authentication). `null` is a signed-out visitor. */
+export function demoViewer(): { role: 'super_admin' } | { role: 'business_admin'; businessId: ID } | null {
+  try {
+    const raw = localStorage.getItem(ACCOUNT_KEY)
+    const s = raw ? (JSON.parse(raw) as { role?: unknown; businessId?: unknown }) : null
+    if (s?.role === 'super_admin') return { role: 'super_admin' }
+    if (s?.role === 'business_admin' && typeof s.businessId === 'string') return { role: 'business_admin', businessId: s.businessId }
+    return null
   } catch {
     return null
   }
