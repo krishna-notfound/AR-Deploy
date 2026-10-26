@@ -4,6 +4,7 @@ import { Select } from '@/components/ui/Form'
 import { cn } from '@/lib/cn'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { type Business, CATEGORIES, type Category, type Product, type ProductStatus } from '@/domain/types'
+import type { ProductRequestState } from '@/domain/modelRequests'
 import { type ProductArReadiness, productArReadiness } from './productReadiness'
 
 const AR_FILTERS: readonly ProductArReadiness[] = ['ready', 'android-only', 'android-blocked', 'photos-only']
@@ -15,13 +16,15 @@ export interface ProductFilterState {
   category: '' | Category
   /** 3D / AR readiness (DUX-05). */
   ar: '' | ProductArReadiness
+  /** Only products with an open 3D model request (R-S4-9; the business list only). */
+  model: '' | 'open'
   page: number
 }
 
 /** Every filter off (page is reset by any update). */
-export const CLEARED_PRODUCT_FILTERS = { q: '', business: '', status: '', category: '', ar: '' } as const satisfies Partial<ProductFilterState>
+export const CLEARED_PRODUCT_FILTERS = { q: '', business: '', status: '', category: '', ar: '', model: '' } as const satisfies Partial<ProductFilterState>
 
-export const hasProductFilters = (f: ProductFilterState) => !!(f.q || f.business || f.status || f.category || f.ar)
+export const hasProductFilters = (f: ProductFilterState) => !!(f.q || f.business || f.status || f.category || f.ar || f.model)
 
 function readFilters(params: URLSearchParams): ProductFilterState {
   const status = params.get('status')
@@ -33,6 +36,7 @@ function readFilters(params: URLSearchParams): ProductFilterState {
     status: status === 'draft' || status === 'published' ? status : '',
     category: CATEGORIES.includes(category as Category) ? (category as Category) : '',
     ar: AR_FILTERS.includes(ar as ProductArReadiness) ? (ar as ProductArReadiness) : '',
+    model: params.get('model') === 'open' ? 'open' : '',
     page: Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1),
   }
 }
@@ -64,7 +68,8 @@ export function useProductFilterParams() {
   return [readFilters(params), update] as const
 }
 
-export function applyProductFilters(products: Product[], f: ProductFilterState): Product[] {
+/** `states`: each product's request state, needed only for the `model` filter. */
+export function applyProductFilters(products: Product[], f: ProductFilterState, states?: Record<string, ProductRequestState>): Product[] {
   const term = f.q.trim().toLowerCase()
   return products.filter(
     (p) =>
@@ -72,6 +77,7 @@ export function applyProductFilters(products: Product[], f: ProductFilterState):
       (!f.status || p.status === f.status) &&
       (!f.category || p.category === f.category) &&
       (!f.ar || productArReadiness(p) === f.ar) &&
+      (!f.model || !!states?.[p.id]?.open) &&
       (!term || p.name.en.toLowerCase().includes(term) || (p.name.pt ?? '').toLowerCase().includes(term) || p.slug.includes(term)),
   )
 }
@@ -90,10 +96,13 @@ export function ProductFilterBar({
   state,
   update,
   businesses,
+  requestFilter,
 }: {
   state: ProductFilterState
   update: (p: Partial<ProductFilterState>) => void
   businesses?: Business[]
+  /** Offer the '3D requests: open' filter (the business list, where request states are read). */
+  requestFilter?: boolean
 }) {
   return (
     <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-6">
@@ -140,6 +149,14 @@ export function ProductFilterBar({
           <option value="photos-only">No 3D model</option>
         </Select>
       </FilterField>
+      {requestFilter && (
+        <FilterField label="3D requests" className="sm:w-[180px]">
+          <Select aria-label="Filter by 3D requests" value={state.model} onChange={(e) => update({ model: e.target.value as ProductFilterState['model'] })}>
+            <option value="">All products</option>
+            <option value="open">3D requests: open</option>
+          </Select>
+        </FilterField>
+      )}
       </div>
       {hasProductFilters(state) && (
         <button type="button" onClick={() => update(CLEARED_PRODUCT_FILTERS)} className="min-h-10 text-[length:var(--text-ui-small)] font-medium text-accent-ink hover:underline sm:ml-1">

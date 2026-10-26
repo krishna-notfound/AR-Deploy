@@ -34,3 +34,12 @@ export function usePendingApplications(enabled = true) {
     return { ok: true as const, data: { submitted: submitted.data.total, underReview: reviewing.data.total, total: submitted.data.total + reviewing.data.total } }
   }, [enabled])
 }
+
+/** 3D model requests waiting for someone to start (status requested). Staff with models.manage only: pass `enabled: false` elsewhere. */
+export function useRequestedModelRequests(enabled: boolean) {
+  return useServiceQuery(async () => {
+    if (!enabled) return { ok: true as const, data: null }
+    const res = await service.getModelRequests({ status: ['requested'], pageSize: 1 })
+    return res.ok ? { ok: true as const, data: res.data.total } : res
+  }, [enabled])
+}
