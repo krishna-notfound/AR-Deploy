@@ -1,15 +1,17 @@
 // Supabase Edge Function: account security (S1, spec §7). JWT verification stays on (supabase/config.toml); the
 // caller is whoever getUser() says the token belongs to, and the aal claim is read only after that succeeds.
 // Every database step is a service_* function or the Auth admin API, with the service role, which lives only in
-// Edge Function secrets. Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS,
-// ADMIN_NOTIFICATION_EMAIL (design/23-email.md).
+// Edge Function secrets; cancel_account_closure alone runs as the caller (anon key plus their token). Secrets:
+// RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS, ADMIN_NOTIFICATION_EMAIL (design/23-email.md).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
+import { callerRpc } from '../_shared/caller.ts'
 import { type LogEntry, logRow, readEmailConfig, sendAndLog } from '../_shared/email.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
 import { aalFromJwt, handleAccountSecurity } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
-const admin = createClient(env('SUPABASE_URL') ?? '', serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
+const url = env('SUPABASE_URL') ?? ''
+const admin = createClient(url, serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
 const config = readEmailConfig(env)
 
 const MEDIA_BUCKET = 'product-media'
@@ -82,6 +84,27 @@ Deno.serve((req) =>
         return { logId, status: 'blocked', error: 'email_not_configured' }
       }
       return sendAndLog({ config: config.config, fetch, log }, email)
+    },
+    log,
+    // cancel_account_closure runs as the caller (anon key plus their token): its auth.uid() and 2FA gate are theirs.
+    async callerRpc(token, fn, args) {
+      const data = await callerRpc(url, env('SUPABASE_ANON_KEY') ?? '', token)(fn, args ?? {})
+      return (data ?? {}) as Record<string, unknown>
+    },
+    async businessSummary(businessId) {
+      const { data, error } = await admin.from('businesses').select('name, status').eq('id', businessId).maybeSingle()
+      if (error) throw new Error(`business lookup failed: ${error.code ?? 'unknown'}`)
+      return data ? { name: String(data.name), status: String(data.status) } : null
+    },
+    async ownerEmails() {
+      const { data, error } = await admin.from('platform_admins').select('user_id')
+      if (error) throw new Error(`owner lookup failed: ${error.code ?? 'unknown'}`)
+      const emails: string[] = []
+      for (const o of data ?? []) {
+        const u = await admin.auth.admin.getUserById(o.user_id as string)
+        if (u.data.user?.email) emails.push(u.data.user.email)
+      }
+      return emails
     },
     random: (n) => crypto.getRandomValues(new Uint8Array(n)),
     now: () => new Date(),

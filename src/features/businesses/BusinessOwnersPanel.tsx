@@ -18,6 +18,7 @@ import type { ProvisionOutcome, ServiceError } from '@/services/catalogService'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { emailReason } from '../applications/labels'
 import { ActionCodeDialog } from '../settings/ActionCodeDialog'
+import { useNoticeToast } from '../team/useMemberActions'
 import { closureByBusiness } from './closure'
 
 /**
@@ -39,6 +40,7 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
   const [resetting, setResetting] = useState(false)
   const confirm = useConfirm()
   const toast = useToast()
+  const noticeToast = useNoticeToast()
   const [email, setEmail] = useState(defaultEmail ?? '')
   const [language, setLanguage] = useState<Lang>(defaultLanguage)
   const [error, setError] = useState<string | null>(null)
@@ -201,7 +203,7 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
           onClose={() => setResetting(false)}
           onConfirm={async (code) => {
             const r = await account.ownerReset2fa(owner.userId, code)
-            if (r.ok) toast.success('Their 2FA was reset. They were emailed.')
+            if (r.ok) noticeToast('Their 2FA was reset', r.data.notice)
             return r
           }}
         />

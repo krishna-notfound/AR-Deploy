@@ -4,8 +4,8 @@
 // The caller comes from getUser() on their JWT, never from the body. Action codes and recovery codes exist in plain
 // text only inside this function and the email to the account holder: only salted SHA-256 hashes reach the database,
 // and neither is ever logged, audited or put in the email log (which stores the subject, kind and status only).
-import type { LogEntry, OutgoingEmail, SendAndLogResult } from '../_shared/email.ts'
-import { type SecurityNotice, closureRequestEmail, securityCodeEmail, securityNoticeEmail } from '../_shared/email-templates.ts'
+import type { EmailStatus, LogEntry, OutgoingEmail, SendAndLogResult } from '../_shared/email.ts'
+import { type RenderedEmail, type SecurityNotice, closureCancelledEmail, closureRequestEmail, securityCodeEmail, securityNoticeEmail, teamNoticeEmail } from '../_shared/email-templates.ts'
 import { UUID, bearerToken, clientIp, readJsonObject, reply, sha256Hex } from '../_shared/http.ts'
 
 export const ACTION_PURPOSES = ['disable_2fa', 'regenerate_recovery', 'request_closure', 'owner_reset_2fa', 'complete_closure'] as const
@@ -25,11 +25,12 @@ export type ErrorCode =
   | 'not_signed_in' | 'invalid_request' | 'invalid_code' | 'code_expired' | 'too_many_attempts' | 'rate_limited'
   | 'aal2_required' | 'policy_requires_2fa' | 'owner_cannot_close' | 'already_requested' | 'not_allowed'
   | 'not_found' | 'email_failed' | 'unknown'
-  | 'nothing_to_reset'
+  | 'nothing_to_reset' | 'email_blocked'
 
 const STATUS: Record<ErrorCode, number> = {
   not_signed_in: 401,
   invalid_request: 400, invalid_code: 400, code_expired: 400, already_requested: 400, not_found: 400, email_failed: 400,
+  email_blocked: 400,
   aal2_required: 403, policy_requires_2fa: 403, owner_cannot_close: 403, not_allowed: 403,
   too_many_attempts: 429, rate_limited: 429,
   nothing_to_reset: 409,
@@ -46,6 +47,12 @@ export interface Factor {
 }
 
 export type SecurityEmail = OutgoingEmail & Pick<LogEntry, 'kind' | 'businessId' | 'workflow' | 'triggeredBy'>
+
+/** What happened to a notice email (R-W7-6): the email_log status, and the reason when it was not accepted. */
+export interface NoticeOutcome {
+  status: EmailStatus
+  error?: string
+}
 
 export interface AccountSecurityDeps {
   /** The app's https base URL, the only link a notice may carry ('' when not configured). */
@@ -67,6 +74,14 @@ export interface AccountSecurityDeps {
   userEmail(userId: string): Promise<string | null>
   /** sendAndLog: sends through Resend and writes one email_log row. */
   send(email: SecurityEmail): Promise<SendAndLogResult>
+  /** Writes one email_log row without sending (a blocked alert with nowhere to go). */
+  log(entry: LogEntry): Promise<string>
+  /** A public database function as the caller (their JWT), so its own auth.uid() and 2FA checks apply. */
+  callerRpc(token: string, fn: string, args?: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** A business's name and status, read with the service role; null when it no longer exists. */
+  businessSummary(businessId: string): Promise<{ name: string; status: string } | null>
+  /** The platform Owners' sign-in addresses (team notices, R-W6-3). */
+  ownerEmails(): Promise<string[]>
   /** n bytes from a CSPRNG. */
   random(n: number): Uint8Array
   now(): Date
@@ -82,6 +97,8 @@ const done = (extra: Record<string, unknown> = {}) => reply(200, { ok: true, ...
 
 interface Ctx {
   deps: AccountSecurityDeps
+  /** The caller's own access token, for the functions that must run as them (cancel_closure). */
+  token: string
   userId: string
   aal: 'aal1' | 'aal2'
   ip: string | null
@@ -103,7 +120,7 @@ export async function handleAccountSecurity(req: Request, deps: AccountSecurityD
   if (!body || typeof action !== 'string' || !Object.hasOwn(ACTIONS, action)) return fail('invalid_request')
 
   const ip = clientIp(req)
-  const ctx: Ctx = { deps, userId, aal: deps.aalFromToken(token), ip: ip === 'unknown' ? null : ip, body }
+  const ctx: Ctx = { deps, token, userId, aal: deps.aalFromToken(token), ip: ip === 'unknown' ? null : ip, body }
   try {
     return await ACTIONS[action]!(ctx)
   } catch (e) {
@@ -142,7 +159,8 @@ const ACTIONS: Record<string, Action> = {
     }
     if (sent?.status !== 'accepted') {
       await voidCodes(ctx, purpose)
-      throw new Refusal('email_failed')
+      // R-W7-7: a blocked address won't take a retry (only a change on the platform's side will); anything else might.
+      throw new Refusal(sent?.status === 'blocked' ? 'email_blocked' : 'email_failed')
     }
     return done({ sentTo: maskEmail(email) })
   },
@@ -211,18 +229,10 @@ const ACTIONS: Record<string, Action> = {
 
     if (r.kind === 'business' && kind === 'business') {
       const businessId = typeof r.business_id === 'string' ? r.business_id : undefined
-      await logEvent(ctx, userId, 'account_closure_requested', businessId ? { business_id: businessId } : {})
+      // R-W7-9: the event names the business (column and metadata), so it filters and shows with it.
+      await logEvent(ctx, userId, 'account_closure_requested', businessId ? { business_id: businessId } : {}, businessId)
       await notify(ctx, userId, 'closure_requested', email)
-      if (deps.adminNotificationEmail && email) {
-        await sendQuietly(ctx, {
-          ...closureRequestEmail(email, deps.appBaseUrl),
-          to: deps.adminNotificationEmail,
-          kind: 'closure_request',
-          businessId,
-          workflow: `closure_request:${userId}`,
-          triggeredBy: userId,
-        })
-      }
+      await alertInbox(ctx, closureRequestEmail(email ?? 'A business owner', deps.appBaseUrl), businessId, `closure_request:${userId}`)
       return done({ kind: 'business' })
     }
 
@@ -239,7 +249,25 @@ const ACTIONS: Record<string, Action> = {
       await logEvent(ctx, userId, 'account_deleted', { ...hashed, delete_failed: true })
       throw new Refusal('unknown')
     }
+    // R-W6-3: each Owner is told. The SQL already wrote access_member_closed while the user existed.
+    if (email) await tellOwners(ctx, email, r.role === 'admin' ? 'admin' : 'team')
     return done({ kind: 'staff' })
+  },
+
+  // R-W7-9: the app's "Cancel request". The caller's own cancel_account_closure does the work (their auth.uid() and
+  // their 2FA gate), then the admin inbox hears about it.
+  async cancel_closure(ctx) {
+    const { deps, userId } = ctx
+    // Read before the request row goes: which business it names.
+    const target = await deps.rpc('service_closure_target', { p_user: userId })
+    const businessId = target?.ok === true && typeof target.business_id === 'string' ? target.business_id : undefined
+    const r = await deps.callerRpc(ctx.token, 'cancel_account_closure', {})
+    if (typeof r?.error === 'string') throw new Refusal(KNOWN.has(r.error) ? (r.error as ErrorCode) : 'unknown')
+    if (r?.ok !== true) throw new Refusal('unknown')
+    const business = businessId ? await deps.businessSummary(businessId).catch(() => null) : null
+    const name = business?.name ?? (await deps.userEmail(userId).catch(() => null)) ?? 'A business'
+    await alertInbox(ctx, closureCancelledEmail(name, business?.status ?? '', deps.appBaseUrl), businessId, `closure_cancelled:${userId}`)
+    return done()
   },
 
   async owner_reset_2fa(ctx) {
@@ -254,8 +282,7 @@ const ACTIONS: Record<string, Action> = {
     await checkCode(ctx, 'owner_reset_2fa', ctx.body.code)
     await wipeSecondFactor(ctx, target)
     await logEvent(ctx, ctx.userId, 'account_2fa_reset_by_owner', { subject_id: target })
-    await notify(ctx, target, '2fa_reset_by_owner')
-    return done()
+    return done({ notice: await notify(ctx, target, '2fa_reset_by_owner') })
   },
 
   async complete_closure(ctx) {
@@ -297,8 +324,7 @@ const ACTIONS: Record<string, Action> = {
       throw new Refusal('unknown')
     }
     await logEvent(ctx, ctx.userId, 'account_closure_completed', metadata)
-    if (email) await notify(ctx, target, 'closure_completed', email)
-    return done()
+    return done({ notice: email ? await notify(ctx, target, 'closure_completed', email) : NO_ADDRESS })
   },
 
   async restore_closure(ctx) {
@@ -306,8 +332,7 @@ const ACTIONS: Record<string, Action> = {
     await requireOwnerAal2(ctx)
     const email = await ctx.deps.userEmail(target)
     await sql(ctx, 'service_restore_closure', { p_user: target, p_actor: ctx.userId })
-    await notify(ctx, target, 'closure_restored', email)
-    return done()
+    return done({ notice: await notify(ctx, target, 'closure_restored', email) })
   },
 }
 
@@ -383,23 +408,65 @@ async function wipeSecondFactor(ctx: Ctx, user: string) {
  * The request IP is stored only on the caller's own events: an event about someone else (subject_id) shows in that
  * user's Security activity, which must not reveal where the Owner signed in from.
  */
-async function logEvent(ctx: Ctx, user: string, event: string, metadata: Record<string, unknown> = {}) {
+async function logEvent(ctx: Ctx, user: string, event: string, metadata: Record<string, unknown> = {}, businessId?: string) {
   const aboutSomeoneElse = typeof metadata.subject_id === 'string' && metadata.subject_id !== user
-  await sql(ctx, 'service_log_account_event', { p_user: user, p_event: event, p_metadata: metadata, p_ip: aboutSomeoneElse ? null : ctx.ip })
+  await sql(ctx, 'service_log_account_event', {
+    p_user: user, p_event: event, p_metadata: metadata, p_ip: aboutSomeoneElse ? null : ctx.ip,
+    ...(businessId ? { p_business_id: businessId } : {}),
+  })
 }
 
-/** A security notice to the account holder. The action already happened, so a failed notice only logs. */
-async function notify(ctx: Ctx, user: string, notice: SecurityNotice, knownEmail?: string | null) {
+/** The account has no address to write to. */
+const NO_ADDRESS: NoticeOutcome = { status: 'blocked', error: 'no_recipient' }
+
+/**
+ * A security notice to the account holder. The action already happened, so a failed notice never undoes it: the
+ * outcome is returned so the Owner's tools can say whether the person was told (R-W7-6).
+ */
+async function notify(ctx: Ctx, user: string, notice: SecurityNotice, knownEmail?: string | null): Promise<NoticeOutcome> {
   const to = knownEmail ?? (await ctx.deps.userEmail(user).catch(() => null))
-  if (!to) return
-  await sendQuietly(ctx, { ...securityNoticeEmail(notice, ctx.deps.appBaseUrl), to, kind: 'security_notice', workflow: `security_notice:${user}:${notice}`, triggeredBy: ctx.userId })
+  if (!to) return NO_ADDRESS
+  return sendQuietly(ctx, { ...securityNoticeEmail(notice, ctx.deps.appBaseUrl), to, kind: 'security_notice', workflow: `security_notice:${user}:${notice}`, triggeredBy: ctx.userId })
 }
 
-async function sendQuietly(ctx: Ctx, email: SecurityEmail) {
+async function sendQuietly(ctx: Ctx, email: SecurityEmail): Promise<NoticeOutcome> {
   try {
-    await ctx.deps.send(email)
+    const r = await ctx.deps.send(email)
+    return r.status === 'accepted' || !r.error ? { status: r.status } : { status: r.status, error: r.error }
   } catch (e) {
     console.error(`account-security: ${email.kind} email failed (${errorName(e)})`)
+    return { status: 'failed' }
+  }
+}
+
+/**
+ * A closure alert for the admin inbox. With no inbox set, a blocked row is logged instead (R-W7-9), so the email log
+ * shows the alert that had nowhere to go.
+ */
+async function alertInbox(ctx: Ctx, rendered: RenderedEmail, businessId: string | undefined, workflow: string) {
+  const to = ctx.deps.adminNotificationEmail
+  if (to) {
+    await sendQuietly(ctx, { ...rendered, to, kind: 'closure_request', businessId, workflow, triggeredBy: ctx.userId })
+    return
+  }
+  try {
+    await ctx.deps.log({ kind: 'closure_request', recipient: 'not configured', subject: rendered.subject, status: 'blocked', error: 'admin_recipient_not_configured', businessId, workflow, triggeredBy: ctx.userId })
+  } catch (e) {
+    console.error(`account-security: closure_request log failed (${errorName(e)})`)
+  }
+}
+
+/** R-W6-3: one team_notice per platform Owner. Sent after the account is gone, so no log row names the deleted user. */
+async function tellOwners(ctx: Ctx, email: string, role: 'admin' | 'team') {
+  const owners = await ctx.deps.ownerEmails().catch((e: unknown) => {
+    console.error(`account-security: owner lookup failed (${errorName(e)})`)
+    return [] as string[]
+  })
+  const closedOn = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(ctx.deps.now())
+  const rendered = teamNoticeEmail(email, role, closedOn)
+  const workflow = `team_notice:${await emailHash(email)}`
+  for (const to of new Set(owners.map((o) => o.trim()).filter(Boolean))) {
+    await sendQuietly(ctx, { ...rendered, to, kind: 'team_notice', workflow })
   }
 }
 

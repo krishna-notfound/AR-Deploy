@@ -212,7 +212,8 @@ describe('BusinessesListPage: closure requests (Owner only)', () => {
     await within(dialog).findByText(/We emailed a 6-digit code/)
     await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
     await user.click(within(dialog).getByRole('button', { name: 'Complete closure' }))
-    expect(await screen.findByText('Closure completed')).toBeInTheDocument()
+    // S1.5 R-W7-6: demo mode sends no email, and the toast says so.
+    expect(await screen.findByText('Closure completed, but the notice email was not sent: Demo mode: no email is sent.')).toBeInTheDocument()
     expect(complete).toHaveBeenCalledWith('demo-closing-owner', DEMO_CODE)
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Requests without a business' })).toBeNull())
     expect(screen.getByRole('button', { name: 'Closure requested 0' })).toBeInTheDocument()

@@ -4,9 +4,9 @@
 // driven by tests: same validation, same reasons, aal2 needed for the platform policy.
 import type { ClosureRequest, PlatformSettings, Profile, SecurityEvent, SecurityState } from '@/domain/types'
 import { newId } from '@/lib/id'
-import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, PASSWORD_MAX, PASSWORD_MIN, accountFail } from '../accountService'
+import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, type NoticeOutcome, PASSWORD_MAX, PASSWORD_MIN, accountFail } from '../accountService'
 import { type Result, ok } from '../catalogService'
-import { clearDemoMember2fa, demoMemberHas2fa, demoPlatformRole } from './mockTeam'
+import { clearDemoMember2fa, demoMemberHas2fa, demoPlatformRole, recordDemoSelfClosure } from './mockTeam'
 
 /** The only code the demo accepts, for action codes and the authenticator alike. */
 export const DEMO_CODE = '123456'
@@ -88,6 +88,8 @@ export function resetMockAccount(opts: { onboarding?: 'completed' | 'new' } = {}
 
 const nowIso = () => new Date().toISOString()
 const isStaff = () => demoPlatformRole() !== null
+/** Demo mode sends no email, so an Owner action's notice is never reported as sent (R-W7-6). */
+const DEMO_NOTICE: NoticeOutcome = { status: 'blocked', error: 'demo_mode' }
 const normalise = (code: string) => code.toUpperCase().replace(/[\s-]/g, '')
 
 function record(type: string): void {
@@ -284,6 +286,8 @@ export const mockAccountService: AccountService = {
       if (state.closure) return accountFail('already_requested')
       const kind = isStaff() ? ('staff' as const) : ('business' as const)
       if (kind === 'business') state.closure = { requestedAt: nowIso(), businessId: 'demo-business' }
+      // As the database (R-W6-3): the member's Access history shows that they closed their own account.
+      else recordDemoSelfClosure()
       record(kind === 'staff' ? 'account_deleted' : 'account_closure_requested')
       return ok({ kind })
     }),
@@ -316,8 +320,9 @@ export const mockAccountService: AccountService = {
       // As account-security (R-W6-6): a team member with no 2FA has nothing to reset, and the code is kept.
       if (demoMemberHas2fa(target) === false) return accountFail('nothing_to_reset')
       const r = checkCode(code)
-      if (r.ok) clearDemoMember2fa(target)
-      return r
+      if (!r.ok) return r
+      clearDemoMember2fa(target)
+      return ok({ notice: DEMO_NOTICE })
     }),
 
   listClosureRequests: () => run(() => ok(state.closureRequests)),
@@ -329,7 +334,7 @@ export const mockAccountService: AccountService = {
       if (!c.ok) return c
       if (!state.closureRequests.some((r) => r.userId === target)) return accountFail('not_found')
       state.closureRequests = state.closureRequests.filter((r) => r.userId !== target)
-      return ok(undefined)
+      return ok({ notice: DEMO_NOTICE })
     }),
 
   restoreClosure: (target) =>
@@ -337,6 +342,6 @@ export const mockAccountService: AccountService = {
       if (state.aal !== 'aal2') return accountFail('aal2_required')
       if (!state.closureRequests.some((r) => r.userId === target)) return accountFail('not_found')
       state.closureRequests = state.closureRequests.filter((r) => r.userId !== target)
-      return ok(undefined)
+      return ok({ notice: DEMO_NOTICE })
     }),
 }

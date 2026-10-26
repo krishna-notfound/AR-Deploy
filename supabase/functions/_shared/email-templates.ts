@@ -31,6 +31,11 @@ export interface TemplateData {
   /** Business notice (R-W7-2): which platform change the owner is told about, and the product's name for product changes. */
   businessEvent?: BusinessNoticeEvent
   productName?: string
+  /** Team notice (R-W6-3): the day the member closed their account, already formatted. */
+  closedOn?: string
+  /** Inbox closure alert (R-W7-9): the request was cancelled, and the catalog status it went back to. */
+  closureCancelled?: boolean
+  catalogStatus?: string
 }
 
 /** The platform-team changes a business owner is emailed about (R-W7-2, §11.2). */
@@ -140,7 +145,14 @@ const NOTICE: Record<SecurityNotice, Omit<Copy, 'cta'>> = {
 }
 const securityNotice = (d: TemplateData): Copy => ({ ...NOTICE[d.notice ?? '2fa_disabled'], cta: 'Open Sanctus' })
 
-const closureRequest = (d: TemplateData): Copy => ({
+// R-W7-9 (§11.3): the same inbox alert kind, when the owner withdraws the request.
+const CATALOG_STATUS_WORD: Record<string, string> = { active: 'live', draft: 'draft', inactive: 'paused' }
+const closureRequest = (d: TemplateData): Copy => d.closureCancelled ? {
+  subject: `Closure request cancelled: ${d.businessName ?? ''}`,
+  heading: `Closure request cancelled: ${d.businessName ?? ''}`,
+  body: `The owner of ${d.businessName ?? ''} cancelled their account-closure request. The catalog is back to ${CATALOG_STATUS_WORD[d.catalogStatus ?? ''] ?? 'its earlier status'}.`,
+  cta: 'Open Sanctus',
+} : ({
   subject: 'An account asked to be closed',
   heading: 'An account asked to be closed',
   body: `${d.accountEmail ?? 'A business owner'} asked to close their Sanctus account. Their catalogue is now offline. Review the request in the platform console: complete the closure, or restore the account.`,
@@ -215,8 +227,18 @@ const businessNotice = (lang: EmailLang) => (d: TemplateData): Copy => {
   return { subject: c.subject, heading: c.subject, body: c.body, closing: BUSINESS_NOTICE_FOOTER[lang] }
 }
 
-/** Kinds rendered from COPY below. The S1.5 kinds (§10.4) not listed in COPY yet have their own builders. */
-export type TemplateKind = Exclude<EmailKind, 'team_notice'>
+// Team notice (R-W6-3, §11.3): a staff member closed their own account. Sent to each platform Owner; no link.
+const teamNotice = (d: TemplateData): Copy => {
+  const role = d.role ? ROLE_NAME[d.role] : 'Team'
+  return {
+    subject: `${d.accountEmail ?? ''} left the Sanctus team`,
+    heading: `${d.accountEmail ?? ''} left the Sanctus team`,
+    body: `${d.accountEmail ?? ''} (${role}) deleted their Sanctus account on ${d.closedOn ?? ''}. Their access ended and their sessions were signed out. Their past actions show as 'Deleted user (${role})' in the audit log.`,
+  }
+}
+
+/** Every email kind has its copy in COPY below. */
+export type TemplateKind = EmailKind
 
 const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> = {
   team_invitation: { en: teamInvitation, pt: teamInvitation },
@@ -225,6 +247,7 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
   closure_request: { en: closureRequest, pt: closureRequest },
   application_decision: applicationDecision,
   business_notice: { en: businessNotice('en'), pt: businessNotice('pt') },
+  team_notice: { en: teamNotice, pt: teamNotice },
   owner_invitation: {
     en: (d) => ({
       subject: `You're invited to manage ${d.businessName ?? 'your catalogue'} on Sanctus`,
@@ -361,3 +384,11 @@ export const securityNoticeEmail = (notice: SecurityNotice, appBaseUrl?: string)
 /** The admin inbox alert for a business owner's closure request. */
 export const closureRequestEmail = (accountEmail: string, appBaseUrl?: string): RenderedEmail =>
   renderEmail('closure_request', 'en', { accountEmail, actionUrl: appLink(appBaseUrl) })
+
+/** The inbox alert when a business owner cancels their closure request (R-W7-9); `status` is the catalog's status now. */
+export const closureCancelledEmail = (businessName: string, status: string, appBaseUrl?: string): RenderedEmail =>
+  renderEmail('closure_request', 'en', { closureCancelled: true, businessName, catalogStatus: status, actionUrl: appLink(appBaseUrl) })
+
+/** To each platform Owner when an Admin or Team member closes their own account (R-W6-3). */
+export const teamNoticeEmail = (accountEmail: string, role: MemberRole, closedOn: string): RenderedEmail =>
+  renderEmail('team_notice', 'en', { accountEmail, role, closedOn })

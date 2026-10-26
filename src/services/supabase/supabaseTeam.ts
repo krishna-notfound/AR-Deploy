@@ -42,6 +42,7 @@ const ACTION_OF: Record<string, AccessAction> = {
   access_denied: 'denied',
   access_member_removed: 'member_removed',
   access_member_email_changed: 'member_email_changed',
+  access_member_closed: 'member_closed',
 }
 const TYPE_OF = Object.fromEntries(Object.entries(ACTION_OF).map(([k, v]) => [v, k])) as Record<AccessAction, string>
 
@@ -78,6 +79,8 @@ function details(action: AccessAction, m: Record<string, unknown>, to?: string |
       return `Refused: ${String(m.action ?? 'unknown action').replace(/_/g, ' ')}`
     case 'member_removed':
       return `Removed from the team (was ${ROLE(m.role)})`
+    case 'member_closed':
+      return `${ROLE(m.role)} closed their own account`
     case 'member_email_changed':
       return m.conflict
         ? `Sign-in email changed to ${String(m.to ?? '')}, not applied: another member uses it`

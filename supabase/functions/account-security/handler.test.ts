@@ -29,6 +29,8 @@ const CONFIG: EmailConfig = {
 }
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+/** R-W7-6: the Owner's notice actions answer with the outcome of the email to the account holder. */
+const NOTICE_SENT = { ok: true, notice: { status: 'accepted' } }
 
 interface ActionCodeRow { id: string; user: string; purpose: string; hash: string; salt: string; consumed: boolean; attempts: number; expired: boolean }
 
@@ -43,7 +45,7 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
       [STAFF_2]: [{ id: 'f-staff2', type: 'totp', status: 'verified', updatedAt: '2026-10-01T10:00:00Z' }],
       [BIZ_OWNER]: [{ id: 'f-biz', type: 'totp', status: 'verified', updatedAt: '2026-10-01T10:00:00Z' }],
     } as Record<string, Factor[]>,
-    events: [] as { user: string; event: string; metadata: Record<string, unknown>; ip: string | null }[],
+    events: [] as { user: string; event: string; metadata: Record<string, unknown>; ip: string | null; businessId?: unknown }[],
     rpcCalls: [] as { fn: string; args: Record<string, unknown> }[],
     logs: [] as LogEntry[],
     sends: [] as { to: string; subject: string; text: string; html: string }[],
@@ -56,6 +58,9 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
     failSend: false,
     attempts: [] as { to: string; text: string }[],
     order: [] as string[],
+    /** Task 13: the business row as the service role reads it, and calls made with the caller's own JWT. */
+    businesses: { [BUSINESS_ID]: { name: 'Casa Maria', status: 'active' } } as Record<string, { name: string; status: string }>,
+    callerCalls: [] as { token: string; fn: string }[],
   }
   const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
     const b = JSON.parse(String(init?.body)) as { to: string[]; subject: string; text: string; html: string }
@@ -109,7 +114,7 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
       case 'service_has_recovery_codes':
         return { ok: true, count: s.recovery[user]?.rows.filter((r) => !r.used).length ?? 0 }
       case 'service_log_account_event':
-        s.events.push({ user, event: a.p_event as string, metadata: a.p_metadata as Record<string, unknown>, ip: a.p_ip as string | null })
+        s.events.push({ user, event: a.p_event as string, metadata: a.p_metadata as Record<string, unknown>, ip: a.p_ip as string | null, ...('p_business_id' in a ? { businessId: a.p_business_id } : {}) })
         return { ok: true }
       case 'service_requires_2fa': {
         const kind = USERS[user]?.kind
@@ -127,7 +132,7 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
           return { ok: true, kind: 'business', business_id: BUSINESS_ID }
         }
         s.order.push('service_request_closure')
-        return { ok: true, kind: 'staff' }
+        return { ok: true, kind: 'staff', role: user === STAFF_2 ? 'team' : 'admin' }
       }
       case 'service_closure_target': {
         const c = s.closures[user]
@@ -165,6 +170,20 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
     },
     sweepBusinessStorage: async (b) => void s.order.push(`sweep:${b}`),
     userEmail: async (u) => USERS[u]?.email ?? null,
+    async callerRpc(token, fn) {
+      s.callerCalls.push({ token, fn })
+      if (fn !== 'cancel_account_closure') throw new Error(`unexpected caller rpc ${fn}`)
+      // As the SQL: the caller is whoever the token names; the business goes back to its earlier status.
+      const user = token.split(':')[1]!
+      const c = s.closures[user]
+      if (!c) return { error: 'not_found' }
+      delete s.closures[user]
+      if (c.businessId && s.businesses[c.businessId]) s.businesses[c.businessId]!.status = 'active'
+      return { ok: true }
+    },
+    businessSummary: async (b) => s.businesses[b] ?? null,
+    ownerEmails: async () => Object.values(USERS).filter((u) => u.kind === 'owner').map((u) => u.email),
+    log: async (l) => (s.logs.push(l), `log-${s.logs.length}`),
     send: (e) => sendAndLog({ config: CONFIG, fetch: fetchFn as unknown as typeof fetch, log: async (l) => (s.logs.push(l), `log-${s.logs.length}`) }, e),
     random: (n) => crypto.getRandomValues(new Uint8Array(n)),
     now: () => NOW,
@@ -450,11 +469,11 @@ describe('account-security', () => {
   it("events about another user never store the actor's IP; the caller's own events do", async () => {
     const { d, s } = deps()
     const reset = await codeFor(d, s, OWNER, 'owner_reset_2fa')
-    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code: reset }))).toEqual({ ok: true })
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code: reset }))).toEqual(NOTICE_SENT)
 
     s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
     const close = await codeFor(d, s, OWNER, 'complete_closure')
-    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: close }))).toEqual({ ok: true })
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: close }))).toEqual(NOTICE_SENT)
 
     // A failed user delete is logged too, also without the IP.
     s.closures[STAFF_2] = { businessId: null }
@@ -465,7 +484,7 @@ describe('account-security', () => {
     quiet.mockRestore()
 
     s.closures[STAFF] = { businessId: null }
-    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'restore_closure', target_user_id: STAFF }))).toEqual({ ok: true })
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'restore_closure', target_user_id: STAFF }))).toEqual(NOTICE_SENT)
 
     const about = s.rpcCalls.filter((c) => c.fn === 'service_log_account_event' && (c.args.p_metadata as Record<string, unknown>).subject_id !== undefined)
     expect(about.map((c) => c.args.p_event)).toEqual(['account_2fa_reset_by_owner', 'account_closure_completed', 'account_closure_completed'])
@@ -496,7 +515,7 @@ describe('account-security', () => {
 
     s.recovery[STAFF] = { salt: 'x', rows: [{ hash: 'h', used: false }] }
     s.sends.length = 0
-    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code }))).toEqual({ ok: true })
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code }))).toEqual(NOTICE_SENT)
     expect(s.factors[STAFF]).toEqual([])
     expect(s.recovery[STAFF]).toBeUndefined()
     expect(s.events.at(-1)).toMatchObject({ user: OWNER, event: 'account_2fa_reset_by_owner', metadata: { subject_id: STAFF } })
@@ -519,7 +538,7 @@ describe('account-security', () => {
     expect(s.deletedFactors).toEqual([])
     // The code was not used up: once there is something to reset, the same code works.
     s.recovery[STAFF] = { salt: 'x', rows: [{ hash: 'h', used: false }] }
-    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code }))).toEqual({ ok: true })
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code }))).toEqual(NOTICE_SENT)
   })
 
   it('complete_closure: Owner at aal2 with a code; deletes the business, then the user; logs with email removed', async () => {
@@ -532,7 +551,7 @@ describe('account-security', () => {
     expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: STAFF, code }))).toEqual({ ok: false, error: 'not_found' })
     const fresh = await codeFor(d, s, OWNER, 'complete_closure')
     s.sends.length = 0
-    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: fresh }))).toEqual({ ok: true })
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: fresh }))).toEqual(NOTICE_SENT)
     expect(s.order).toEqual([`deleteBusiness:${BUSINESS_ID}`, `sweep:${BUSINESS_ID}`, `deleteUser:${BIZ_OWNER}`])
     const ev = s.events.find((e) => e.event === 'account_closure_completed')!
     expect(ev.metadata.storage_sweep_incomplete).toBeUndefined()
@@ -586,7 +605,7 @@ describe('account-security', () => {
     d.deleteUser = realDelete
     s.sends.length = 0
     const retry = await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: await codeFor(d, s, OWNER, 'complete_closure') })
-    expect(await json(retry)).toEqual({ ok: true })
+    expect(await json(retry)).toEqual(NOTICE_SENT)
     expect(s.deletedBusinesses).toEqual([BUSINESS_ID])
     expect(s.deletedUsers).toEqual([BIZ_OWNER])
     expect(s.events.at(-1)!.metadata.user_delete_failed).toBeUndefined()
@@ -600,7 +619,7 @@ describe('account-security', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const r = await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code: await codeFor(d, s, OWNER, 'complete_closure') })
     vi.mocked(console.error).mockRestore()
-    expect(await json(r)).toEqual({ ok: true })
+    expect(await json(r)).toEqual(NOTICE_SENT)
     expect(s.deletedUsers).toEqual([BIZ_OWNER])
     expect(s.events.at(-1)).toMatchObject({ event: 'account_closure_completed', metadata: { storage_sweep_incomplete: true } })
   })
@@ -640,7 +659,7 @@ describe('account-security', () => {
     expect(await json(await call(d, tok(STAFF, 'aal2'), { action: 'restore_closure', target_user_id: BIZ_OWNER }))).toEqual({ ok: false, error: 'not_allowed' })
     expect(await json(await call(d, tok(OWNER, 'aal1'), { action: 'restore_closure', target_user_id: BIZ_OWNER }))).toEqual({ ok: false, error: 'aal2_required' })
     s.sends.length = 0
-    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'restore_closure', target_user_id: BIZ_OWNER }))).toEqual({ ok: true })
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'restore_closure', target_user_id: BIZ_OWNER }))).toEqual(NOTICE_SENT)
     expect(s.rpcCalls.find((c) => c.fn === 'service_restore_closure')!.args).toEqual({ p_user: BIZ_OWNER, p_actor: OWNER })
     expect(s.closures[BIZ_OWNER]).toBeUndefined()
     expect(s.sends.map((m) => m.to)).toEqual(['maria@studio.pt'])
@@ -672,5 +691,125 @@ describe('account-security', () => {
     expect(aalFromJwt(`${b64({ alg: 'HS256' })}.${b64({ sub: 'x', aal: 'aal2' })}.sig`)).toBe('aal2')
     expect(aalFromJwt(`${b64({ alg: 'HS256' })}.${b64({ sub: 'x', aal: 'aal1' })}.sig`)).toBe('aal1')
     expect(aalFromJwt('not-a-jwt')).toBe('aal1')
+  })
+})
+
+describe('account-security: S1.5 Task 13 (R-W6-3, R-W7-6, R-W7-7, R-W7-9)', () => {
+  it('notice.status accepted vs failed in the three responses', async () => {
+    const { d, s } = deps()
+    const FAILED = { ok: true, notice: { status: 'failed', error: 'provider down' } }
+    s.recovery[STAFF_2] = { salt: 'x', rows: [{ hash: 'h', used: false }] }
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF, code: await codeFor(d, s, OWNER, 'owner_reset_2fa') }))).toEqual(NOTICE_SENT)
+    let code = await codeFor(d, s, OWNER, 'owner_reset_2fa')
+    s.failSend = true
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'owner_reset_2fa', target_user_id: STAFF_2, code }))).toEqual(FAILED)
+    s.failSend = false
+
+    s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
+    s.failSend = true
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'restore_closure', target_user_id: BIZ_OWNER }))).toEqual(FAILED)
+    s.failSend = false
+    s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'restore_closure', target_user_id: BIZ_OWNER }))).toEqual(NOTICE_SENT)
+
+    s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
+    code = await codeFor(d, s, OWNER, 'complete_closure')
+    s.failSend = true
+    expect(await json(await call(d, tok(OWNER, 'aal2'), { action: 'complete_closure', target_user_id: BIZ_OWNER, code }))).toEqual(FAILED)
+    s.failSend = false
+    // A notice that the provider refuses up front (blocked) says so, with the reason.
+    s.closures[STAFF_2] = { businessId: null }
+    const blocked = { ...d, userEmail: async (u: string) => (u === STAFF_2 ? 'someone@elsewhere.test' : (USERS[u]?.email ?? null)) }
+    expect(await json(await call(blocked, tok(OWNER, 'aal2'), { action: 'restore_closure', target_user_id: STAFF_2 }))).toEqual({ ok: true, notice: { status: 'blocked', error: 'test_sender_recipient_not_allowed' } })
+  })
+
+  it('a blocked send → email_blocked, code voided; transient → email_failed', async () => {
+    const { d, s } = deps()
+    const blocked = { ...d, userEmail: async () => 'someone@elsewhere.test' }
+    const r = await call(blocked, tok(STAFF, 'aal2'), { action: 'send_code', purpose: 'disable_2fa' })
+    expect(r.status).toBe(400)
+    expect(await json(r)).toEqual({ ok: false, error: 'email_blocked' })
+    expect(s.logs.map((l) => [l.kind, l.status])).toEqual([['security_code', 'blocked']])
+    expect(s.codes.filter((c) => !c.consumed)).toHaveLength(0)
+    expect(s.rpcCalls.at(-1)).toEqual({ fn: 'service_void_action_codes', args: { p_user: STAFF, p_purpose: 'disable_2fa' } })
+
+    s.failSend = true
+    expect(await json(await call(d, tok(STAFF, 'aal2'), { action: 'send_code', purpose: 'disable_2fa' }))).toEqual({ ok: false, error: 'email_failed' })
+    expect(s.codes.filter((c) => !c.consumed)).toHaveLength(0)
+  })
+
+  it("cancel_closure calls cancel_account_closure as the caller and emails the inbox 'Closure request cancelled: {businessName}'", async () => {
+    const { d, s } = deps()
+    s.closures[BIZ_OWNER] = { businessId: BUSINESS_ID }
+    s.businesses[BUSINESS_ID]!.status = 'inactive'
+    const r = await call(d, tok(BIZ_OWNER), { action: 'cancel_closure' })
+    expect(r.status).toBe(200)
+    expect(await json(r)).toEqual({ ok: true })
+    expect(s.callerCalls).toEqual([{ token: tok(BIZ_OWNER), fn: 'cancel_account_closure' }])
+    // Nothing is undone with the service role: the caller's own function does it, with their 2FA gate.
+    expect(s.rpcCalls.map((c) => c.fn)).not.toContain('service_restore_closure')
+    expect(s.closures[BIZ_OWNER]).toBeUndefined()
+    expect(s.sends).toHaveLength(1)
+    expect(s.sends[0]!.to).toBe('inbox@sanctus.test')
+    expect(s.sends[0]!.subject).toBe('Closure request cancelled: Casa Maria')
+    expect(s.sends[0]!.text).toContain('The owner of Casa Maria cancelled their account-closure request. The catalog is back to live.')
+    expect(s.logs.at(-1)).toMatchObject({ kind: 'closure_request', status: 'accepted', businessId: BUSINESS_ID, triggeredBy: BIZ_OWNER })
+
+    // Nothing to cancel: the SQL answer, and no email.
+    const again = await call(d, tok(BIZ_OWNER), { action: 'cancel_closure' })
+    expect(await json(again)).toEqual({ ok: false, error: 'not_found' })
+    expect(s.sends).toHaveLength(1)
+    // The SQL's own refusals pass through.
+    const gated = { ...d, callerRpc: async () => ({ error: 'aal2_required' }) }
+    const g = await call(gated, tok(BIZ_OWNER), { action: 'cancel_closure' })
+    expect(g.status).toBe(403)
+    expect(await json(g)).toEqual({ ok: false, error: 'aal2_required' })
+  })
+
+  it('no inbox → a blocked closure_request row', async () => {
+    const { d, s } = deps({ adminNotificationEmail: '' })
+    s.factors[BIZ_OWNER] = []
+    const code = await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1')
+    s.sends.length = 0
+    expect(await json(await call(d, tok(BIZ_OWNER), { action: 'request_closure', code }))).toEqual({ ok: true, kind: 'business' })
+    // R-W7-9: the request event names the business.
+    expect(s.events.find((e) => e.event === 'account_closure_requested')).toMatchObject({ user: BIZ_OWNER, businessId: BUSINESS_ID })
+    expect(s.sends.map((m) => m.to)).toEqual(['maria@studio.pt'])
+    expect(s.logs.filter((l) => l.kind === 'closure_request')).toEqual([
+      expect.objectContaining({ recipient: 'not configured', status: 'blocked', error: 'admin_recipient_not_configured', businessId: BUSINESS_ID, triggeredBy: BIZ_OWNER }),
+    ])
+
+    expect(await json(await call(d, tok(BIZ_OWNER), { action: 'cancel_closure' }))).toEqual({ ok: true })
+    const rows = s.logs.filter((l) => l.kind === 'closure_request')
+    expect(rows).toHaveLength(2)
+    expect(rows[1]).toMatchObject({ recipient: 'not configured', status: 'blocked', error: 'admin_recipient_not_configured', subject: 'Closure request cancelled: Casa Maria' })
+  })
+
+  it("staff self-closure → one team_notice per Owner with subject '{email} left the Sanctus team'", async () => {
+    const { d, s } = deps()
+    const code = await codeFor(d, s, STAFF, 'request_closure')
+    s.sends.length = 0
+    s.logs.length = 0
+    expect(await json(await call(d, tok(STAFF, 'aal2'), { action: 'request_closure', code }))).toEqual({ ok: true, kind: 'staff' })
+    const notices = s.logs.filter((l) => l.kind === 'team_notice')
+    expect(notices.map((l) => l.recipient).sort()).toEqual(['owner2@sanctus.test', 'owner@sanctus.test'])
+    for (const l of notices) {
+      expect(l.subject).toBe('staff@sanctus.test left the Sanctus team')
+      // Sent after the account is gone, so the log row names no (deleted) user.
+      expect(l.triggeredBy).toBeUndefined()
+    }
+    const sent = s.sends.find((m) => m.to === 'owner@sanctus.test')!
+    expect(sent.text).toContain(
+      "staff@sanctus.test (Admin) deleted their Sanctus account on 25 October 2026. Their access ended and their sessions were signed out. Their past actions show as 'Deleted user (Admin)' in the audit log.",
+    )
+    expect(s.order).toEqual(['service_request_closure', `deleteUser:${STAFF}`])
+
+    // A failed self-delete tells nobody.
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failing = { ...d, deleteUser: async () => Promise.reject(new Error('auth down')) }
+    s.logs.length = 0
+    expect(await json(await call(failing, tok(STAFF_2, 'aal2'), { action: 'request_closure', code: await codeFor(d, s, STAFF_2, 'request_closure') }))).toEqual({ ok: false, error: 'unknown' })
+    quiet.mockRestore()
+    expect(s.logs.filter((l) => l.kind === 'team_notice')).toEqual([])
   })
 })

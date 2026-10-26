@@ -104,6 +104,24 @@ export function demoMemberHas2fa(userId: string): boolean | null {
   return m ? m.has2fa : null
 }
 
+/**
+ * A demo Admin or Team member closed their own account (R-W6-3): their membership is deactivated and their Access
+ * history says so, as service_request_closure does.
+ */
+export function recordDemoSelfClosure(): void {
+  const role = demoPlatformRole()
+  if (role !== 'admin' && role !== 'team') return
+  store.update((d) => {
+    const t = team(d)
+    const m = t.members.find((x) => x.userId === DEMO_VIEWER[role])
+    if (m) {
+      m.status = 'deactivated'
+      m.deactivatedAt = nowIso()
+    }
+    record(t, { action: 'member_closed', memberId: m?.id, details: `${role === 'admin' ? 'Admin' : 'Team'} closed their own account` })
+  })
+}
+
 /** After a demo Reset 2FA: the member has nothing left to reset. */
 export function clearDemoMember2fa(userId: string): void {
   store.update((d) => {

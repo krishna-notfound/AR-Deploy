@@ -8,10 +8,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, TotpEnrollment } from '@/domain/types'
 import { settingsPath } from '@/lib/urls'
-import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, PASSWORD_MAX, PASSWORD_MIN, type ProfilePatch, accountFail } from '../accountService'
+import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, type NoticeOutcome, PASSWORD_MAX, PASSWORD_MIN, type ProfilePatch, accountFail } from '../accountService'
 import { type Result, ok } from '../catalogService'
 
 const FUNCTION = 'account-security'
+/** The email_log statuses a notice outcome may carry (R-W7-6). */
+const EMAIL_STATUSES: ReadonlySet<string> = new Set(['blocked', 'failed', 'accepted', 'sent', 'delivered', 'delayed', 'bounced', 'complained'])
 const AVATARS = 'avatars'
 const PROFILE_COLUMNS = 'user_id, display_name, avatar_path, timezone, date_format, clock, notify_new_applications, onboarding_completed_at, onboarding_dismissed_at'
 const PLATFORM_COLUMNS = 'require_2fa_staff, require_2fa_business, updated_at'
@@ -209,6 +211,13 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
   /** Client-side audit events; a logging failure never undoes the change the user made. */
   const logEvent = (p_event: 'account_password_changed' | 'account_email_change_requested') => sb.rpc('log_account_event', { p_event }).then(() => undefined, () => undefined)
   const voidOf = (r: Result<unknown>): Result<void> => (r.ok ? ok(undefined) : r)
+  /** The notice outcome of an Owner action (R-W7-6). An answer without one is never read as "emailed". */
+  const withNotice = (r: Result<FnAnswer>): Result<{ notice: NoticeOutcome }> => {
+    if (!r.ok) return r
+    const n = (r.data as { notice?: { status?: unknown; error?: unknown } }).notice
+    const status = typeof n?.status === 'string' && EMAIL_STATUSES.has(n.status) ? (n.status as NoticeOutcome['status']) : 'failed'
+    return ok({ notice: typeof n?.error === 'string' ? { status, error: n.error } : { status } })
+  }
 
   async function listTotp(): Promise<Result<{ all: { id: string; factor_type: string; status: string }[]; verified: { id: string }[] }>> {
     try {
@@ -482,7 +491,7 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     },
 
     async cancelClosure() {
-      return voidOf(await call('cancel_account_closure'))
+      return voidOf(await invoke('cancel_closure'))
     },
 
     async getPlatformSettings() {
@@ -514,7 +523,7 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     },
 
     async ownerReset2fa(targetUserId, code) {
-      return voidOf(await invoke('owner_reset_2fa', { target_user_id: targetUserId, code }))
+      return withNotice(await invoke('owner_reset_2fa', { target_user_id: targetUserId, code }))
     },
 
     async listClosureRequests() {
@@ -527,11 +536,11 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     },
 
     async completeClosure(targetUserId, code) {
-      return voidOf(await invoke('complete_closure', { target_user_id: targetUserId, code }))
+      return withNotice(await invoke('complete_closure', { target_user_id: targetUserId, code }))
     },
 
     async restoreClosure(targetUserId) {
-      return voidOf(await invoke('restore_closure', { target_user_id: targetUserId }))
+      return withNotice(await invoke('restore_closure', { target_user_id: targetUserId }))
     },
   }
 }
