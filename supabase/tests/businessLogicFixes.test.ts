@@ -918,3 +918,73 @@ describe('S1.5 Task 3: closure integrity', () => {
     }
   }, 120_000)
 })
+
+describe('S1.5 Task 18: application submission', () => {
+  GONE_AFTER_ROLLBACK.push('private.application_attempts', 'public.service_application_attempt(text[],integer)')
+  const id = ids(18)
+  const VISITOR = id(1)
+  const attempt = async (hashes: string[]) => (await h.svc('select to_jsonb(public.service_application_attempt($1::text[])) as r', [hashes])) as unknown as boolean
+  const stored = async (hash: string) =>
+    (await db.query<{ n: number }>('select count(*)::int as n from private.application_attempts where submitter_hash = $1', [hash])).rows[0]!.n
+  const seed = (hash: string, n: number, age = '0 minutes') =>
+    db.query(`insert into private.application_attempts (submitter_hash, created_at) select $1, now() - $2::interval from generate_series(1, $3)`, [hash, age, n])
+
+  it('five calls are allowed, the sixth in the hour returns false and records nothing', async () => {
+    const results: boolean[] = []
+    for (let i = 0; i < 6; i++) results.push(await attempt(['t18-five']))
+    expect(results).toEqual([true, true, true, true, true, false])
+    expect(await stored('t18-five')).toBe(5)
+  })
+
+  it('attempts under either of two hashes count together', async () => {
+    await seed('t18-today', 3)
+    await seed('t18-yesterday', 2, '30 minutes')
+    expect(await attempt(['t18-today', 't18-yesterday'])).toBe(false)
+    expect(await stored('t18-today')).toBe(3)
+    // Only today's hash: three attempts, so this one is allowed and recorded under today's hash.
+    expect(await attempt(['t18-today'])).toBe(true)
+    expect(await stored('t18-today')).toBe(4)
+    expect(await stored('t18-yesterday')).toBe(2)
+  })
+
+  it('attempts older than 2 hours are deleted by the next call', async () => {
+    await seed('t18-old', 5, '3 hours')
+    await seed('t18-90min', 5, '90 minutes')
+    // Neither counts towards the hour; the call is recorded under its first hash.
+    expect(await attempt(['t18-new', 't18-old', 't18-90min'])).toBe(true)
+    expect(await stored('t18-new')).toBe(1)
+    expect(await stored('t18-old')).toBe(0)
+    expect(await stored('t18-90min')).toBe(5)
+  })
+
+  it('two connections at count 4: exactly one is allowed', async () => {
+    await seed('t18-race', 4)
+    // PGlite has one connection and runs the two transactions one after the other; on Postgres the advisory lock
+    // (asserted below) is what serializes them.
+    const results = await Promise.all([attempt(['t18-race']), attempt(['t18-race'])])
+    expect(results.filter(Boolean)).toHaveLength(1)
+    expect(await stored('t18-race')).toBe(5)
+    const def = (await db.query<{ d: string }>(`select pg_get_functiondef('public.service_application_attempt(text[],integer)'::regprocedure) as d`)).rows[0]!.d
+    const lock = def.indexOf(`pg_advisory_xact_lock(hashtext('application_attempt:' || p_hashes[1]))`)
+    expect(lock).toBeGreaterThan(-1)
+    expect(lock).toBeLessThan(def.indexOf('count('))
+  })
+
+  it('anon and authenticated cannot select from private.application_attempts', async () => {
+    await seed('t18-secret', 1)
+    for (const role of ['anon', 'authenticated'] as const) {
+      await expect(h.probe(VISITOR, 'select count(*)::int as n from private.application_attempts', [], 'aal2', role)).rejects.toThrow(/permission denied/)
+      const { rows } = await db.query<{ t: boolean; f: boolean }>(
+        `select has_table_privilege($1, 'private.application_attempts', 'select') as t,
+                has_function_privilege($1, 'public.service_application_attempt(text[],integer)', 'execute') as f`, [role])
+      expect(rows[0]).toEqual({ t: false, f: false })
+    }
+    const svc = (await db.query<{ s: boolean; i: boolean; d: boolean; u: boolean; f: boolean }>(
+      `select has_table_privilege('service_role', 'private.application_attempts', 'select') as s,
+              has_table_privilege('service_role', 'private.application_attempts', 'insert') as i,
+              has_table_privilege('service_role', 'private.application_attempts', 'delete') as d,
+              has_table_privilege('service_role', 'private.application_attempts', 'update') as u,
+              has_function_privilege('service_role', 'public.service_application_attempt(text[],integer)', 'execute') as f`)).rows[0]
+    expect(svc).toEqual({ s: true, i: true, d: true, u: false, f: true })
+  })
+})

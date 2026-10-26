@@ -5,7 +5,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
 import { serviceKeyFrom, sha256Hex } from '../_shared/http.ts'
-import { handleSubmitApplication } from './handler.ts'
+import { MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, handleSubmitApplication, loggable } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
 const key = serviceKeyFrom(env)
@@ -13,6 +13,24 @@ const admin = createClient(env('SUPABASE_URL') ?? '', key, { auth: { persistSess
 const salt = env('APPLICATION_SALT') || (key ? await sha256Hex(`submit-application-salt|${key}`) : '')
 
 const OPEN = ['submitted', 'under_review']
+const STORED_COLUMNS = 'id, reference, applicant_email, business_name, language, created_at'
+
+interface StoredRow {
+  id: string
+  reference: string
+  applicant_email: string
+  business_name: string
+  language: string
+  created_at: string
+}
+const stored = (r: StoredRow): StoredApplication => ({
+  id: r.id,
+  reference: r.reference,
+  applicantEmail: r.applicant_email,
+  businessName: r.business_name,
+  language: r.language === 'pt' ? 'pt' : 'en',
+  createdAt: r.created_at,
+})
 
 Deno.serve((req) =>
   handleSubmitApplication(req, {
@@ -20,9 +38,9 @@ Deno.serve((req) =>
     fetch,
     salt,
     async findByKey(submissionKey) {
-      const { data, error } = await admin.from('business_applications').select('id, reference').eq('submission_key', submissionKey).maybeSingle()
+      const { data, error } = await admin.from('business_applications').select(STORED_COLUMNS).eq('submission_key', submissionKey).maybeSingle()
       if (error) throw new Error(`lookup failed: ${error.message}`)
-      return data
+      return data ? stored(data as StoredRow) : null
     },
     async findOpenDuplicate(email, businessName) {
       const { data, error } = await admin
@@ -35,10 +53,10 @@ Deno.serve((req) =>
       if (error) throw new Error(`duplicate check failed: ${error.message}`)
       return data?.[0] ?? null
     },
-    async countRecent(hash, sinceIso) {
-      const { count, error } = await admin.from('business_applications').select('id', { count: 'exact', head: true }).eq('submitter_hash', hash).gte('created_at', sinceIso)
+    async allowAttempt(hashes) {
+      const { data, error } = await admin.rpc('service_application_attempt', { p_hashes: hashes, p_max: MAX_SUBMISSIONS_PER_HOUR })
       if (error) throw new Error(`rate check failed: ${error.message}`)
-      return count ?? 0
+      return data === true
     },
     async insert(a, hash) {
       const { data, error } = await admin
@@ -64,15 +82,25 @@ Deno.serve((req) =>
           submission_key: a.submissionKey,
           submitter_hash: hash,
         })
-        .select('id, reference')
+        .select(STORED_COLUMNS)
         .single()
       if (error?.code === '23505' && error.message.includes('submission_key')) return 'duplicate_key'
       if (error) throw new Error(`insert failed: ${error.message}`)
-      return data
+      return stored(data as StoredRow)
     },
     async audit(e) {
       const { error } = await admin.from('audit_events').insert({ event_type: e.eventType, application_id: e.applicationId, to_status: e.toStatus ?? null, metadata: e.metadata ?? {} })
       if (error) throw new Error(`audit insert failed: ${error.message}`)
+    },
+    async hasSubmittedAudit(applicationId) {
+      const { data, error } = await admin.from('audit_events').select('id').eq('application_id', applicationId).eq('event_type', 'application_submitted').limit(1)
+      if (error) throw new Error(`audit lookup failed: ${error.message}`)
+      return (data ?? []).length > 0
+    },
+    async loggedWorkflows(applicationId) {
+      const { data, error } = await admin.from('email_log').select('workflow').eq('application_id', applicationId)
+      if (error) throw new Error(`email log lookup failed: ${error.message}`)
+      return new Set((data ?? []).map((r) => r.workflow as string | null).filter((w): w is string => !!w))
     },
     async log(e) {
       const { data, error } = await admin.from('email_log').insert(logRow(e)).select('id').single()
@@ -104,7 +132,7 @@ Deno.serve((req) =>
       return [...byUser.values()]
     },
   }).catch((e) => {
-    console.error(`submit-application: ${String(e).slice(0, 300)}`)
+    console.error(`submit-application: ${loggable(e, 300)}`)
     return new Response(JSON.stringify({ error: 'unknown' }), { status: 500, headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' } })
   }),
 )
