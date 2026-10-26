@@ -51,8 +51,9 @@ as $$
       or (exists (select 1 from public.business_members b where b.user_id = p_user)
           and public.platform_can('businesses.view'));
 $$;
-revoke execute on function public.platform_can_read_profile(uuid) from public, anon;
-grant execute on function public.platform_can_read_profile(uuid) to authenticated, service_role;
+-- Only the profiles policy calls it, as the signed-in user.
+revoke execute on function public.platform_can_read_profile(uuid) from public, anon, service_role;
+grant execute on function public.platform_can_read_profile(uuid) to authenticated;
 
 -- The caller's own row stays readable through "Users read their own profile".
 drop policy "Platform members read profiles" on public.profiles;

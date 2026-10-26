@@ -5,9 +5,9 @@
 import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { PGlite, type Transaction } from '@electric-sql/pglite'
+import { PGlite } from '@electric-sql/pglite'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { MIGRATIONS, SUPABASE_STUBS, applyAll } from './harness'
+import { MIGRATIONS, SUPABASE_STUBS, applyAll, makeHelpers, type Aal, type J } from './harness'
 
 const ACCOUNT_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_account_settings.sql'))!
 
@@ -19,58 +19,14 @@ const STRANGER_U = '00000000-0000-0000-0000-0000000000a7'
 const NEW_U = '00000000-0000-0000-0000-0000000000a8'
 const BIZ = '10000000-0000-0000-0000-0000000000b1'
 
-type Aal = 'aal1' | 'aal2' | null
-type Role = 'authenticated' | 'anon' | 'service_role'
-type J = Record<string, unknown>
-
-let db: PGlite
-
-/** Runs `fn` in one transaction as an API role, signed in as `uid` with the given assurance level. */
-async function as<T>(uid: string, fn: (tx: Transaction) => Promise<T>, role: Role = 'authenticated', aal: Aal = 'aal1'): Promise<T> {
-  return db.transaction(async (tx) => {
-    await tx.exec(`set local role ${role}`)
-    await tx.query(`select set_config('test.uid', $1, true)`, [uid])
-    await tx.query(`select set_config('test.jwt', $1, true)`, [aal ? JSON.stringify({ aal }) : ''])
-    return fn(tx)
-  })
-}
-
-const ROLLBACK = new Error('rollback')
-/** Runs one statement as `uid` and always rolls back. Returns the result, or rejects with the DB error. */
-async function probe(uid: string, sql: string, params: unknown[] = [], aal: Aal = 'aal1', role: Role = 'authenticated') {
-  let res: Awaited<ReturnType<Transaction['query']>> | undefined
-  try {
-    await as(uid, async (tx) => {
-      res = await tx.query(sql, params)
-      throw ROLLBACK
-    }, role, aal)
-  } catch (e) {
-    if (e !== ROLLBACK) throw e
-  }
-  return res!
-}
-const count = async (uid: string, sql: string, params: unknown[] = [], aal: Aal = 'aal1', role: Role = 'authenticated') =>
-  ((await probe(uid, sql, params, aal, role)).rows[0] as { n: number }).n
-const affected = async (uid: string, sql: string, params: unknown[] = [], aal: Aal = 'aal1') => (await probe(uid, sql, params, aal)).affectedRows ?? 0
-const call = async (uid: string, sql: string, params: unknown[] = [], aal: Aal = 'aal1', role: Role = 'authenticated') =>
-  (await as(uid, (tx) => tx.query<{ r: J }>(sql, params), role, aal)).rows[0]!.r
-const flag = async (uid: string, expr: string, aal: Aal = 'aal1') => (await call(uid, `select to_jsonb(${expr}) as r`, [], aal)) as unknown as boolean
-const svc = (sql: string, params: unknown[] = []) => call('', sql, params, null, 'service_role')
-
-/** Turns the 2FA policy on for the duration of `fn` (as the database owner), then off again. */
-async function withPolicy(staff: boolean, business: boolean, fn: () => Promise<void>) {
-  await db.query('update public.platform_settings set require_2fa_staff = $1, require_2fa_business = $2', [staff, business])
-  try {
-    await fn()
-  } finally {
-    await db.query('update public.platform_settings set require_2fa_staff = false, require_2fa_business = false')
-  }
-}
+// The suite's database, opened in beforeAll; the shared helpers (harness.ts) are bound to it.
+const db = new PGlite()
+const { as, probe, count, affected, call, flag, svc, withPolicy } = makeHelpers(db)
 
 let application = ''
 
 beforeAll(async () => {
-  db = await PGlite.create()
+  await db.waitReady
   await db.exec(SUPABASE_STUBS)
   await applyAll(db)
   await db.exec(`

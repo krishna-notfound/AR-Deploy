@@ -72,13 +72,15 @@ describe('S1.5 Task 1: scaffold and privacy', () => {
     expect((await db.query(`select to_regprocedure('public.platform_can_read_profile(uuid)')::text as o`)).rows[0]).toEqual({ o: 'platform_can_read_profile(uuid)' })
   })
 
-  it('anon cannot execute any public.service_* function', async () => {
-    const { rows } = await db.query<{ fn: string; anon: boolean }>(
-      `select p.oid::regprocedure::text as fn, has_function_privilege('anon', p.oid, 'execute') as anon
+  it('neither anon nor authenticated can execute any public.service_* function', async () => {
+    const { rows } = await db.query<{ fn: string; anon: boolean; authenticated: boolean }>(
+      `select p.oid::regprocedure::text as fn, has_function_privilege('anon', p.oid, 'execute') as anon,
+              has_function_privilege('authenticated', p.oid, 'execute') as authenticated
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname like 'service\\_%'`)
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.filter((r) => r.anon).map((r) => r.fn)).toEqual([])
+    expect(rows.filter((r) => r.authenticated).map((r) => r.fn)).toEqual([])
   })
 
   it('an Admin with records.view reads 0 account_% events of other users and still reads their own; the Owner reads all', async () => {

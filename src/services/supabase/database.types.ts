@@ -950,6 +950,7 @@ export type Database = {
       my_recovery_codes_left: { Args: never; Returns: number }
       my_security_state: { Args: never; Returns: Json }
       platform_can: { Args: { p_permission: string }; Returns: boolean }
+      platform_can_read_profile: { Args: { p_user: string }; Returns: boolean }
       record_event_limited: {
         Args: {
           p_business_id: string
