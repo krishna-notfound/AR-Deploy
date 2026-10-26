@@ -294,7 +294,7 @@ export function createMockTeam(run: Run): TeamMethods {
             (!query.from || e.at.slice(0, 10) >= query.from) &&
             (!query.to || e.at.slice(0, 10) <= query.to) &&
             (!scoped || mine(e)) &&
-            (!q || [e.actor, e.member, e.details].some((v) => v?.toLowerCase().includes(q))),
+            (!q || e.member?.toLowerCase() === q), // an exact address, as the Supabase query does (R-W6-4)
         )
         const size = query.pageSize ?? 20
         const page = query.page ?? 1

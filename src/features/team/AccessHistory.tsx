@@ -71,7 +71,7 @@ export function AccessHistory({ member }: { member?: { id: string; userId: strin
         <div className="grid gap-3 border-b border-line p-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto_auto] lg:items-end">
           <div className="flex flex-col gap-2">
             <span aria-hidden className="text-ui-body font-medium text-ink">Member</span>
-            <SearchInput value={q} onChange={(v) => set('hq', v)} label="Search by member email" placeholder="Member email" className="sm:w-full" />
+            <SearchInput value={q} onChange={(v) => set('hq', v)} label="Member email address (exact)" placeholder="Exact email address" className="sm:w-full" />
           </div>
           <FormField label="Action">
             <Select value={action ?? ''} onChange={(e) => set('action', e.target.value)}>

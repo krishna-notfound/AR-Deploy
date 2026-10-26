@@ -212,7 +212,8 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
         if (query.memberId && query.userId) q = q.or(`metadata->>member_id.eq.${query.memberId},and(event_type.eq.access_denied,actor_id.eq.${query.userId})`)
         else if (query.memberId) q = q.eq('metadata->>member_id', query.memberId)
         else if (query.userId) q = q.eq('event_type', 'access_denied').eq('actor_id', query.userId)
-        if (query.q?.trim()) q = q.ilike('metadata->>email', `%${query.q.trim().replace(/[%_]/g, '')}%`)
+        // The member-email filter is an exact address, never a pattern (R-W6-4): 'an@x.pt' must not find 'jan@x.pt'.
+        if (query.q?.trim()) q = q.eq('metadata->>email', query.q.trim().toLowerCase())
         const { data, count, error } = await q
         if (error) return teamFail(error.code === '42501' ? 'forbidden' : 'unknown')
         type Row = { id: string; created_at: string; event_type: string; actor_id: string | null; from_status: string | null; to_status: string | null; metadata: Record<string, unknown> }

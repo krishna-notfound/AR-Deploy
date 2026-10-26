@@ -174,4 +174,36 @@ describe('Supabase team service', () => {
     const r = await createSupabaseTeam(sb).listMembers()
     expect(r.ok && r.data.map((m) => m.has2fa)).toEqual([false, true])
   })
+
+  // R-W6-4 (controller ruling): the Access history "Member email" filter is an exact address, never ilike.
+  it("the member email filter is exact: delivered+a_b@resend.dev finds its own events; an@x.pt doesn't match jan@x.pt", async () => {
+    const rows = ['delivered+a_b@resend.dev', 'an@x.pt', 'jan@x.pt'].map((email, i) => ({
+      id: `e${i}`, created_at: '2026-10-26T10:00:00Z', event_type: 'access_invite_created', actor_id: null, from_status: null, to_status: 'invited', metadata: { email, role: 'team' },
+    }))
+    const calls: [string, ...unknown[]][] = []
+    const builder: Record<string, unknown> = {}
+    for (const m of ['select', 'like', 'order', 'range', 'eq', 'neq', 'gte', 'lte', 'ilike', 'or']) {
+      builder[m] = (...args: unknown[]) => (calls.push([m, ...args]), builder)
+    }
+    // A stand-in for PostgREST: applies the eq filters on metadata->>email.
+    builder.then = (resolve: (v: unknown) => void) => {
+      const wanted = calls.filter(([m, col]) => m === 'eq' && col === 'metadata->>email').map(([, , v]) => v)
+      const data = rows.filter((r) => wanted.every((v) => r.metadata.email === v))
+      resolve({ data, count: data.length, error: null })
+    }
+    const sb = { from: vi.fn(() => builder), rpc: vi.fn() } as unknown as SupabaseClient
+    const team = createSupabaseTeam(sb)
+    const members = async (q: string) => {
+      calls.length = 0
+      const r = await team.getAccessEvents({ q })
+      return r.ok ? r.data.items.map((e) => e.member) : r
+    }
+
+    expect(await members('delivered+a_b@resend.dev')).toEqual(['delivered+a_b@resend.dev'])
+    expect(calls).toContainEqual(['eq', 'metadata->>email', 'delivered+a_b@resend.dev'])
+    expect(await members('  An@X.pt ')).toEqual(['an@x.pt'])
+    expect(calls).toContainEqual(['eq', 'metadata->>email', 'an@x.pt'])
+    expect(calls.some(([m]) => m === 'ilike')).toBe(false)
+    expect(await members('x.pt')).toEqual([])
+  })
 })

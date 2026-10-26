@@ -139,4 +139,16 @@ describe('team (demo service)', () => {
     unwrap(await mockAccountService.ownerReset2fa(ana.userId!, DEMO_CODE))
     expect(unwrap(await svc.listMembers()).find((m) => m.id === ana.id)?.has2fa).toBe(false)
   })
+
+  // R-W6-4 (controller ruling): the Access history "Member email" filter is an exact address, as in the Supabase query.
+  it("the member email filter is exact: delivered+a_b@resend.dev finds its own events; an@x.pt doesn't match jan@x.pt", async () => {
+    unwrap(await svc.inviteMember({ email: 'delivered+a_b@resend.dev', role: 'team' }))
+    unwrap(await svc.inviteMember({ email: 'an@x.pt', role: 'team' }))
+    unwrap(await svc.inviteMember({ email: 'jan@x.pt', role: 'admin' }))
+    const members = async (q: string) => [...new Set(unwrap(await svc.getAccessEvents({ q })).items.map((e) => e.member))]
+    expect(await members('delivered+a_b@resend.dev')).toEqual(['delivered+a_b@resend.dev'])
+    expect(await members('  An@X.pt ')).toEqual(['an@x.pt'])
+    expect(await members('jan@x.pt')).toEqual(['jan@x.pt'])
+    expect(await members('x.pt')).toEqual([])
+  })
 })
