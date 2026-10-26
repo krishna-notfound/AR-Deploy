@@ -286,7 +286,7 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'apply.done.keepReference': 'Guarde esta referência se nos contactar sobre a sua candidatura.',
   'apply.done.nextTitle': 'Próximos passos',
   'apply.done.next1': 'A nossa equipa analisa a sua candidatura.',
-  'apply.done.next2': 'Enviamos a nossa decisão por email para {email}. Verifique também a pasta de spam.',
+  'apply.done.next2': 'Enviamos a nossa decisão para {email}. Se for aprovada, recebe um convite para configurar o seu catálogo.',
   'apply.done.next2NoEmail': 'Enviamos a nossa decisão por email para o endereço indicado. Verifique também a pasta de spam.',
   'apply.done.next3': 'Se for aprovada, recebe um link de convite para definir a sua palavra-passe e configurar o seu catálogo.',
   'apply.done.demo': 'Demonstração: esta candidatura fica guardada apenas neste navegador e não é enviado nenhum email.',

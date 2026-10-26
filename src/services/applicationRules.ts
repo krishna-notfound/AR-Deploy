@@ -26,6 +26,9 @@ export function availableActions(status: ApplicationStatus): ReviewAction[] {
   return (Object.keys(TARGET) as ReviewAction[]).filter((a) => ALLOWED[status].includes(TARGET[a]))
 }
 
+/** The longest rejection reason (business_applications.decision_reason; review-application refuses longer ones). */
+export const REASON_MAX_LENGTH = 1000
+
 /** Seconds between invitation emails for one business; and the most attempts kept per business. */
 export const RESEND_COOLDOWN_SECONDS = 60
 export const MAX_INVITATION_ATTEMPTS = 10

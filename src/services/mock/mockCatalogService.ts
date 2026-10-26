@@ -1,13 +1,13 @@
 // Mock implementation of CatalogService. Simulates latency, never throws, returns copies.
 // Demo persistence only (localStorage). NOT a backend.
-import type { ActivityItem, ActivityKind, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product } from '@/domain/types'
+import type { ActivityItem, ActivityKind, AuditEvent, Business, BusinessApplication, BusinessCatalog, EmailAttempt, ID, Product, ReviewedApplication } from '@/domain/types'
 import { createSessionModelAsset, imageToPersistableDataUrl } from '@/lib/files'
 import { localDayBounds } from '@/lib/format'
 import { newId } from '@/lib/id'
 import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
-import { MAX_INVITATION_ATTEMPTS, RESEND_COOLDOWN_SECONDS, applyReview } from '../applicationRules'
+import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview } from '../applicationRules'
 import { type CatalogService, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
 import { summarize } from '../analytics'
 import type { Db } from './db'
@@ -504,13 +504,15 @@ export const mockCatalogService: CatalogService = {
       const db = store.get()
       const current = db.applications?.find((x) => x.id === id)
       if (!current) return fail('NOT_FOUND', 'Application not found.')
+      if ([...(reason?.trim() ?? '')].length > REASON_MAX_LENGTH)
+        return fail('VALIDATION', 'Check the details and try again.', { reason: `Keep the reason to ${REASON_MAX_LENGTH.toLocaleString('en')} characters or fewer.` })
       const t = applyReview(current.status, action, reason)
       if (!t.ok)
         return t.reason === 'reason_required'
           ? fail('VALIDATION', 'Give a reason for the rejection.', { reason: 'Give a reason for the rejection.' })
           : fail('CONFLICT', 'This application can no longer change to that status.')
       if (t.noop) return ok(current)
-      let next!: BusinessApplication
+      let next!: ReviewedApplication
       store.update((d) => {
         let businessId = current.businessId
         if (t.status === 'approved') {
@@ -552,6 +554,13 @@ export const mockCatalogService: CatalogService = {
           toStatus: t.status,
           metadata: reason?.trim() ? { reason: reason.trim() } : {},
         })
+        // R-W2-1: a rejection emails the applicant in their language (the reason only when ticked). Demo mode records
+        // the attempt as not sent; nothing leaves the browser.
+        if (t.status === 'rejected') {
+          const subject = current.language === 'pt' ? `A sua candidatura à Sanctus para ${current.businessName}` : `Your Sanctus application for ${current.businessName}`
+          const sent = demoEmail(d, { kind: 'application_decision', recipient: current.applicantEmail, subject, applicationId: id, workflow: `application:${id}:decision` })
+          next = { ...next, decisionEmail: { status: sent.status, error: sent.error } }
+        }
       })
       return ok(next)
     }),

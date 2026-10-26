@@ -1,7 +1,7 @@
 import { useCan } from '@/auth/usePermission'
 import { scrollBehavior } from '@/lib/motion'
 import { ArrowDown, Building2, Check, Eye, FileX, X } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { PageHeader, PanelHeader } from '@/components/layout/PageHeader'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
@@ -9,20 +9,20 @@ import { BusinessStatusBadge } from '@/components/ui/Badge'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { FormField, Textarea } from '@/components/ui/Form'
+import { Checkbox, FormField, Textarea } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { BusinessApplication, ReviewAction } from '@/domain/types'
+import type { BusinessApplication, ReviewAction, ReviewedApplication } from '@/domain/types'
 import { formatDateTime } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
-import { availableActions } from '@/services/applicationRules'
+import { REASON_MAX_LENGTH, availableActions } from '@/services/applicationRules'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
-import { ApplicationStatusBadge } from '../applications/labels'
+import { ApplicationStatusBadge, emailReason } from '../applications/labels'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 
 const READINESS: Record<string, string> = {
@@ -61,7 +61,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const prefs = usePreferences()
   const confirm = useConfirm()
   const toast = useToast()
-  const review = useServiceMutation((action: ReviewAction, reason?: string) => service.reviewApplication(app.id, action, reason))
+  const review = useServiceMutation((action: ReviewAction, reason?: string, includeReason?: boolean) => service.reviewApplication(app.id, action, reason, { includeReason: includeReason === true }))
   const business = useServiceQuery(() => (app.businessId ? service.getBusinessById(app.businessId) : Promise.resolve({ ok: true as const, data: null })), [app.businessId])
   // The owner invitation is the step after approval: it lives in the last card, so point to it at the top of the page.
   const members = useServiceQuery(() => (app.businessId ? service.getBusinessMembers(app.businessId) : Promise.resolve({ ok: true as const, data: [] })), [app.businessId])
@@ -86,10 +86,22 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const can = useCan()
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState<string | null>(null)
+  // R-W2-1: off by default; the applicant then hears only that the application was not approved.
+  const [includeReason, setIncludeReason] = useState(false)
+  const includeHintId = useId()
   const actions = availableActions(app.status)
 
+  // The toast is worded from the decision email's status (§11.1); "accepted" means Resend took it, not that it arrived.
+  // No email at all means nothing changed (the application was already rejected).
+  const reportRejection = (r: ReviewedApplication) => {
+    if (!r.decisionEmail) return toast.success('Application rejected')
+    if (r.decisionEmail.status === 'accepted') return toast.success('Application rejected. The applicant was emailed.')
+    const why = (emailReason(r.decisionEmail.error) ?? 'the email service did not take it').replace(/\.$/, '')
+    toast.error(`Application rejected, but the email was not sent: ${why}.`)
+  }
+
   const run = async (action: ReviewAction, why?: string) => {
-    const res = await review.mutate(action, why)
+    const res = await review.mutate(action, why, action === 'reject' && includeReason)
     if (!res.ok) {
       if (action === 'reject' && res.error.fieldErrors?.reason) return setReasonError(res.error.fieldErrors.reason)
       return toast.error('The application was not updated', res.error.message)
@@ -99,7 +111,8 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
     if (action === 'approve') {
       toast.success('Application approved', 'Next: invite the owner so they can set up the catalogue.')
       revealOwner.current = true
-    } else toast.success(action === 'reject' ? 'Application rejected' : 'Marked as under review')
+    } else if (action === 'reject') reportRejection(res.data)
+    else toast.success('Marked as under review')
   }
 
   const approve = async () => {
@@ -132,7 +145,15 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               </Button>
             )}
             {actions.includes('reject') && can('applications.reject') && (
-              <Button variant="secondary" className="border-danger! text-danger! hover:bg-danger-soft!" icon={<X className="size-4" aria-hidden />} onClick={() => setRejectOpen(true)}>
+              <Button
+                variant="secondary"
+                className="border-danger! text-danger! hover:bg-danger-soft!"
+                icon={<X className="size-4" aria-hidden />}
+                onClick={() => {
+                  setIncludeReason(false)
+                  setRejectOpen(true)
+                }}
+              >
                 Reject
               </Button>
             )}
@@ -273,13 +294,19 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
         <FormField label="Reason" required error={reasonError ?? undefined}>
           <Textarea
             value={reason}
-            maxLength={1000}
+            maxLength={REASON_MAX_LENGTH}
             onChange={(e) => {
               setReason(e.target.value)
               setReasonError(null)
             }}
           />
         </FormField>
+        <div className="mt-4 flex flex-col gap-1">
+          <Checkbox label="Include the reason in the email" checked={includeReason} onChange={(e) => setIncludeReason(e.target.checked)} aria-describedby={includeHintId} />
+          <p id={includeHintId} className="pl-6 text-ui-small text-ink-muted">
+            Off: the applicant is told the application was not approved, with no reason.
+          </p>
+        </div>
       </Modal>
     </>
   )

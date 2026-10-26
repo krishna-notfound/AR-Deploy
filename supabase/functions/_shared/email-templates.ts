@@ -24,6 +24,8 @@ export interface TemplateData {
   notice?: SecurityNotice
   /** Closure alert for the admin inbox: the account that asked to close. */
   accountEmail?: string
+  /** Application decision (R-W2-1): the rejection reason, only when the reviewer ticked "Include the reason in the email". */
+  reason?: string
 }
 
 /** The account changes a security notice can report (spec §7). */
@@ -45,7 +47,7 @@ export interface RenderedEmail {
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
-type Copy = { subject: string; heading: string; body: string; bodyHtml?: string; list?: string[]; quote?: string; cta?: string; note?: string }
+type Copy = { subject: string; heading: string; body: string; bodyHtml?: string; list?: string[]; quote?: string; closing?: string; cta?: string; note?: string }
 
 const ROLE_NAME: Record<MemberRole, string> = { admin: 'Admin', team: 'Team' }
 const longDate = (iso: string | undefined) =>
@@ -135,14 +137,34 @@ const closureRequest = (d: TemplateData): Copy => ({
   cta: 'Open Sanctus',
 })
 
-/** Kinds rendered from COPY below. The S1.5 kinds (§10.4) have their own builders. */
-export type TemplateKind = Exclude<EmailKind, 'application_decision' | 'business_notice' | 'team_notice'>
+// Application decision (R-W2-1, §11.2): sent on rejection only. The reason is the reviewer's text, so it is escaped in
+// the HTML (white-space keeps its line breaks) and kept as written in the text version.
+const applicationDecision: Record<EmailLang, (d: TemplateData) => Copy> = {
+  en: (d) => ({
+    subject: `Your Sanctus application for ${d.businessName ?? ''}`,
+    heading: `Your Sanctus application for ${d.businessName ?? ''}`,
+    body: `Thank you for applying to list ${d.businessName ?? ''} on Sanctus. After review, we are not able to approve this application.`,
+    quote: d.reason ? `Reason: ${d.reason}` : undefined,
+    closing: 'You are welcome to apply again if your situation changes.',
+  }),
+  pt: (d) => ({
+    subject: `A sua candidatura à Sanctus para ${d.businessName ?? ''}`,
+    heading: `A sua candidatura à Sanctus para ${d.businessName ?? ''}`,
+    body: `Obrigado pela sua candidatura para apresentar ${d.businessName ?? ''} na Sanctus. Após análise, não nos é possível aprovar esta candidatura.`,
+    quote: d.reason ? `Motivo: ${d.reason}` : undefined,
+    closing: 'Pode candidatar-se novamente se a sua situação mudar.',
+  }),
+}
+
+/** Kinds rendered from COPY below. The S1.5 kinds (§10.4) not listed in COPY yet have their own builders. */
+export type TemplateKind = Exclude<EmailKind, 'business_notice' | 'team_notice'>
 
 const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> = {
   team_invitation: { en: teamInvitation, pt: teamInvitation },
   security_code: { en: securityCode, pt: securityCode },
   security_notice: { en: securityNotice, pt: securityNotice },
   closure_request: { en: closureRequest, pt: closureRequest },
+  application_decision: applicationDecision,
   owner_invitation: {
     en: (d) => ({
       subject: `You're invited to manage ${d.businessName ?? 'your catalogue'} on Sanctus`,
@@ -181,12 +203,12 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
     en: () => ({
       subject: 'We received your application',
       heading: 'Thank you, your application is with us',
-      body: 'The Sanctus team reviews every business before its catalogue goes public. We will email you when your application has been reviewed. If you did not apply, you can ignore this email.',
+      body: "The Sanctus team reviews every business before its catalogue goes public. If we approve it, you will receive an invitation to set up your catalog. If we can't, we will tell you by email. If you did not apply, you can ignore this email.",
     }),
     pt: () => ({
       subject: 'Recebemos sua candidatura',
       heading: 'Obrigado, recebemos sua candidatura',
-      body: 'A equipe Sanctus analisa cada empresa antes de o catálogo ficar público. Enviaremos um e-mail quando sua candidatura for analisada. Se você não se candidatou, pode ignorar este e-mail.',
+      body: 'A equipe Sanctus analisa cada empresa antes de o catálogo ficar público. Se for aprovada, receberá um convite para configurar o seu catálogo. Se não for possível, informamos por email. Se você não se candidatou, pode ignorar este e-mail.',
     }),
   },
   admin_notification: {
@@ -217,12 +239,16 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
   },
 }
 
+/** The longest rejection reason (business_applications.decision_reason is at most 1000 characters). */
+export const REASON_MAX_LENGTH = 1000
+
 const CODE_LABEL: Record<EmailLang, string> = { en: 'Your code', pt: 'Seu código' }
 
 export function renderEmail(kind: TemplateKind, lang: EmailLang, data: TemplateData = {}): RenderedEmail {
   if (data.actionUrl && !/^https:\/\/[^\s]+$/.test(data.actionUrl)) throw new Error('actionUrl must be an absolute https:// URL')
   if (data.code !== undefined && !/^\d{6,10}$/.test(data.code)) throw new Error('code must be 6 to 10 digits')
   if (data.note !== undefined && data.note.length > 500) throw new Error('note must be at most 500 characters')
+  if (data.reason !== undefined && [...data.reason].length > REASON_MAX_LENGTH) throw new Error(`reason must be at most ${REASON_MAX_LENGTH} characters`)
   const c = COPY[kind][lang](data)
   const codeBlock = data.code
     ? `<p style="margin:28px 0 0;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#6E6559">${esc(CODE_LABEL[lang])}</p>
@@ -241,14 +267,19 @@ export function renderEmail(kind: TemplateKind, lang: EmailLang, data: TemplateD
 <p style="margin:0">${c.bodyHtml ?? esc(c.body)}</p>
 ${c.list ? `<ul style="margin:12px 0 0;padding-left:20px">${c.list.map((li) => `<li style="margin:4px 0">${esc(li)}</li>`).join('')}</ul>` : ''}
 ${c.quote ? `<p style="margin:20px 0 0;padding:12px 16px;border-left:2px solid #8A765C;background:#F3F0E9;white-space:pre-line">${esc(c.quote)}</p>` : ''}
+${c.closing ? `<p style="margin:16px 0 0">${esc(c.closing)}</p>` : ''}
 ${codeBlock}
 ${button}
 ${c.note ? `<p style="margin:0;font-size:13px;color:#5A5148">${esc(c.note)}</p>` : ''}
 ${data.actionUrl ? `<p style="margin:24px 0 0;font-size:12px;color:#6E6559;word-break:break-all">${esc(data.actionUrl)}</p>` : ''}
 </td></tr></table></td></tr></table></body></html>`
-  const text = [c.heading, '', c.body, ...(c.list ? c.list.map((li) => `- ${li}`) : []), ...(c.quote ? ['', c.quote] : []), ...(data.code ? ['', `${CODE_LABEL[lang]}: ${data.code}`] : []), ...(c.cta && data.actionUrl ? ['', `${c.cta}: ${data.actionUrl}`] : []), ...(c.note ? ['', c.note] : []), '', 'Sanctus'].join('\n')
+  const text = [c.heading, '', c.body, ...(c.list ? c.list.map((li) => `- ${li}`) : []), ...(c.quote ? ['', c.quote] : []), ...(c.closing ? ['', c.closing] : []), ...(data.code ? ['', `${CODE_LABEL[lang]}: ${data.code}`] : []), ...(c.cta && data.actionUrl ? ['', `${c.cta}: ${data.actionUrl}`] : []), ...(c.note ? ['', c.note] : []), '', 'Sanctus'].join('\n')
   return { subject: c.subject, html, text }
 }
+
+/** The rejection notice to an applicant (R-W2-1), in the application's language; the reason only when the reviewer ticked it. */
+export const applicationDecisionEmail = (lang: EmailLang, businessName: string, reason?: string): RenderedEmail =>
+  renderEmail('application_decision', lang, { businessName, reason })
 
 /** The only link an account-security email may carry: the app's own https base URL. */
 const appLink = (appBaseUrl: string | undefined) => (appBaseUrl && /^https:\/\/[^\s/]+$/.test(appBaseUrl) ? appBaseUrl : undefined)

@@ -28,6 +28,7 @@ import type {
   Product,
   ProductStatus,
   ReviewAction,
+  ReviewedApplication,
   RolePermissions,
 } from '@/domain/types'
 
@@ -177,8 +178,11 @@ export interface CatalogService {
   submitApplication(input: ApplicationInput): Promise<Result<{ id: ID; reference: string }>>
   getApplications(query?: ApplicationQuery): Promise<Result<Page<BusinessApplication>>>
   getApplication(id: ID): Promise<Result<BusinessApplication>>
-  /** Status transition through the database (approve creates the draft business in the same transaction). */
-  reviewApplication(id: ID, action: ReviewAction, reason?: string): Promise<Result<BusinessApplication>>
+  /**
+   * Status transition through the database (approve creates the draft business in the same transaction). A rejection
+   * emails the applicant, with the reason only when `includeReason` is set (R-W2-1).
+   */
+  reviewApplication(id: ID, action: ReviewAction, reason?: string, opts?: { includeReason?: boolean }): Promise<Result<ReviewedApplication>>
   getAuditEvents(query?: AuditQuery): Promise<Result<Page<AuditEntry>>>
   getEmailAttempts(query: { applicationId?: ID; businessId?: ID }): Promise<Result<EmailAttempt[]>>
 
