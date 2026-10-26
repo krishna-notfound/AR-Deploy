@@ -3,7 +3,7 @@ import { type ReactNode, useId, useState } from 'react'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { useQrCode } from '@/lib/useQrCode'
-import { CopyLink } from './ShareActions'
+import { CopyLink, PILL_SOFT } from './ShareActions'
 import type { ModelState } from './ProductMedia'
 import { TAP_TARGET } from './tapTarget'
 import { shareableCurrentUrl } from '@/lib/urls'
@@ -54,15 +54,9 @@ export function ArSection({ availability, onShowTips, actions }: { availability:
   return (
     <div className="flex flex-col gap-4">
       {(desktopHandoff || availability === 'available' || actions) && (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
           {desktopHandoff && (
-            <button
-              type="button"
-              aria-expanded={open}
-              aria-controls={panelId}
-              onClick={() => setOpen((v) => !v)}
-              className="inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full bg-surface px-6 text-[15px] font-medium text-ink transition-colors hover:bg-subtle"
-            >
+            <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((v) => !v)} className={cn(PILL_SOFT, 'flex-1 whitespace-nowrap')}>
               <QrCode className="size-4" strokeWidth={1.5} aria-hidden />
               {t('product.openOnPhone')}
             </button>

@@ -87,7 +87,7 @@ describe('product page: variants switch photos, 3D model and AR target', () => {
     expect(screen.getByRole('radio', { name: /Purple-Gold Damask/ })).toHaveAttribute('aria-checked', 'true')
   })
 
-  it("says honestly which model 3D and AR show when a variant has no model of its own", async () => {
+  it('says honestly which model 3D and AR show when a variant has no model of its own', async () => {
     openApp('/products/casa-lisboa/glam-velvet-sofa')
     await viewerFor(/GlamVelvetSofa\.glb$/)
     expect(screen.getByText('The 3D view and AR show the standard model. The Sapphire finish may look different.')).toBeInTheDocument()
@@ -129,6 +129,19 @@ describe('product page: AR fixes', () => {
     expect(screen.queryByRole('button', { name: 'View in 3D / AR' })).toBeNull()
   })
 
+  it('the "3D view" tile leads the thumbnails and switches the stage to the 3D model', async () => {
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, false)
+    const tile = screen.getByRole('button', { name: '3D view' })
+    const [firstThumb] = within(tile.closest('ul') as HTMLElement).getAllByRole('button')
+    expect(firstThumb).toBe(tile)
+    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(tile)
+    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'true')
+    expect(tile).toHaveAttribute('aria-current', 'true')
+  })
+
   it('says "View in 3D" without "AR" where AR cannot open (AR-08)', async () => {
     openApp('/products/nordhaus/sheen-lounge-chair')
     loaded(await viewerFor(/SheenChair\.glb$/), false)
@@ -150,8 +163,7 @@ describe('product page: AR fixes', () => {
 describe('product page: the primary call to action opens AR where it can', () => {
   const primaryAr = (name = 'View in my home') => screen.queryAllByRole('button', { name })
   /** Controls that offer to start AR (the "AR tips" link opens the tips; the phone card's "Copy link" / "Show QR code" do not). */
-  const arLabelled = () =>
-    screen.queryAllByRole('button').filter((b) => b.textContent !== 'AR tips' && /\bAR\b|my home|minha casa/.test(b.textContent ?? ''))
+  const arLabelled = () => screen.queryAllByRole('button').filter((b) => b.textContent !== 'AR tips' && /\bAR\b|my home|minha casa/.test(b.textContent ?? ''))
   // jsdom has no scrollIntoView; the 3D action scrolls the stage into view.
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn()

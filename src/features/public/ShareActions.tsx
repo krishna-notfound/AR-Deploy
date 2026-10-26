@@ -30,8 +30,12 @@ export function CopyLink({ size = 'md', className }: { size?: 'sm' | 'md'; class
   )
 }
 
-/** Native share sheet where available; otherwise copies the link. A text button. */
-export function ShareButton({ title, className }: { title: string; className?: string }) {
+/** The quiet pill of the product page's action row ("Open on your phone", Share, the product's own link). */
+export const PILL_SOFT =
+  'inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full bg-subtle px-5 py-2.5 text-center text-[15px] font-medium text-ink transition-[background-color,transform] hover:bg-line/70 motion-safe:duration-200 motion-safe:active:scale-[0.98]'
+
+/** Native share sheet where available; otherwise copies the link. A text button, or a soft pill (`pill`). */
+export function ShareButton({ title, className, pill = false }: { title: string; className?: string; pill?: boolean }) {
   const { t } = useI18n()
   const toast = useToast()
   const onShare = async () => {
@@ -49,7 +53,11 @@ export function ShareButton({ title, className }: { title: string; className?: s
     else toast.error(t('product.copyFailed'))
   }
   return (
-    <button type="button" onClick={onShare} className={cn(TAP_TARGET, 'inline-flex items-center gap-2 text-[15px] font-medium text-ink transition-colors hover:text-accent-ink', className)}>
+    <button
+      type="button"
+      onClick={onShare}
+      className={cn(pill ? PILL_SOFT : cn(TAP_TARGET, 'inline-flex items-center gap-2 text-[15px] font-medium text-ink transition-colors hover:text-accent-ink'), className)}
+    >
       <Share2 className="size-4" strokeWidth={1.5} aria-hidden />
       {t('product.share')}
     </button>

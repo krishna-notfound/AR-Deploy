@@ -1,10 +1,9 @@
-import { ArrowLeft, Box, Check, Eye, Globe, HelpCircle, Loader2, Mail, MapPin, PackageX, Phone, Rotate3d } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Box, Check, Eye, Globe, HelpCircle, Loader2, Mail, MapPin, MessageCircle, PackageX, Phone, Rotate3d } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { Modal } from '@/components/ui/Modal'
-import { SmartImage } from '@/components/ui/SmartImage'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { ModelLoadInfo, ModelViewerHandle } from '@/components/three/ModelViewer'
@@ -16,7 +15,18 @@ import { cn } from '@/lib/cn'
 import { sceneViewerUnsupported } from '@/lib/files'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
-import { AR_FALLBACK_HASH, VARIANT_PARAM, catalogLocalPath, needsPreview, quickLookHref, sceneViewerIntentUrl, tenantCatalogPath, withVariantParam } from '@/lib/urls'
+import {
+  AR_FALLBACK_HASH,
+  VARIANT_PARAM,
+  catalogLocalPath,
+  needsPreview,
+  productLocalPath,
+  quickLookHref,
+  sceneViewerIntentUrl,
+  tenantCatalogPath,
+  tenantProductPath,
+  withVariantParam,
+} from '@/lib/urls'
 import { arBrowserName, detectInAppBrowser, isAndroid } from '@/lib/userAgent'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
@@ -24,10 +34,15 @@ import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { ArSection, arAvailability } from './ArSection'
 import { ArTips, arTipsDismissed } from './ArTips'
 import { DimensionDiagram } from './DimensionDiagram'
+import { MoreFromBusiness } from './MoreFromBusiness'
+import { ProductArBand } from './ProductArBand'
+import { ProductContactStrip, mailtoFor, telFor } from './ProductContactStrip'
+import { ProductGallery } from './ProductGallery'
 import { type MediaMode, type ModelState, ProductMedia, initialMediaMode } from './ProductMedia'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
-import { ShareButton } from './ShareActions'
+import { Reveal } from './Reveal'
+import { PILL_SOFT, ShareButton } from './ShareActions'
 import { TAP_TARGET } from './tapTarget'
 import { VariantPicker } from './VariantPicker'
 
@@ -71,6 +86,7 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
   useRefreshWhenStale(res.refetch, MEDIA_REFRESH_MS, res.data)
   // R-W4-11: the way back keeps the owner preview.
   const catalogHref = tenantSlug ? tenantCatalogPath({ preview: canPreview }) : catalogLocalPath({ slug: businessSlug }, { preview: canPreview })
+  const productHref = (p: Product) => (tenantSlug ? tenantProductPath(p, { preview: canPreview }) : productLocalPath({ slug: businessSlug }, p, { preview: canPreview }))
   // A business admin may only preview their own unpublished products.
   const hiddenFromPublic = !!res.data && needsPreview(res.data.product, res.data.business)
   const ownerMismatch = canPreview && hiddenFromPublic && user?.role === 'business_admin' && res.data?.business.id !== user.businessId
@@ -94,7 +110,10 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
             title={t('product.notFoundTitle')}
             body={t('product.notFoundBody')}
             action={
-              <Link to={catalogHref} className="inline-flex h-12 items-center justify-center rounded-full bg-ink px-7 text-[16px] font-medium text-canvas transition-colors hover:bg-umber">
+              <Link
+                to={catalogHref}
+                className="inline-flex h-12 items-center justify-center rounded-full bg-ink px-7 text-[16px] font-medium text-canvas transition-colors hover:bg-umber"
+              >
                 {t('product.viewCatalog')}
               </Link>
             }
@@ -106,10 +125,31 @@ export default function ProductPage({ tenantSlug }: { tenantSlug?: string }) {
     )
   }
 
-  return <ProductView key={res.data.product.id} business={res.data.business} product={res.data.product} catalogHref={catalogHref} isPreview={canPreview && needsPreview(res.data.product, res.data.business)} />
+  return (
+    <ProductView
+      key={res.data.product.id}
+      business={res.data.business}
+      product={res.data.product}
+      catalogHref={catalogHref}
+      productHref={productHref}
+      isPreview={canPreview && needsPreview(res.data.product, res.data.business)}
+    />
+  )
 }
 
-function ProductView({ business, product, catalogHref, isPreview }: { business: Business; product: Product; catalogHref: string; isPreview: boolean }) {
+function ProductView({
+  business,
+  product,
+  catalogHref,
+  productHref,
+  isPreview,
+}: {
+  business: Business
+  product: Product
+  catalogHref: string
+  productHref: (p: Product) => string
+  isPreview: boolean
+}) {
   const { t, lang, localized } = useI18n()
   const toast = useToast()
   const viewerRef = useRef<ModelViewerHandle>(null)
@@ -308,10 +348,35 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
   const primaryCta =
     'inline-flex h-12 items-center justify-center gap-2.5 rounded-full bg-ink px-7 text-[16px] font-medium text-canvas transition-[background-color,transform] hover:bg-umber motion-safe:duration-200 motion-safe:active:scale-[0.98] lg:h-14 lg:w-full'
-  const textAction = cn(TAP_TARGET, 'inline-flex items-center gap-2 text-[15px] font-medium text-ink transition-colors hover:text-accent-ink')
   const material = localized(product.material)
   const description = localized(product.description)
   const shortDescription = localized(product.shortDescription)
+  // Soft facts under the price: only the fields this piece has (the material up to its first comma; the full text is
+  // in the specifications).
+  const materialShort = material.split(/[,;]/)[0]?.trim() ?? ''
+  const weightText = product.weight ? `${product.weight.value} ${product.weight.unit}` : ''
+  const facts = [t(`category.${product.category}`), materialShort, weightText].filter(Boolean)
+  // No 3D on this page (none, or it failed): the product's own link becomes the primary action.
+  const no3d = modelState === 'none' || modelState === 'error'
+  const trueToSize = modelState === 'loaded' && scale.status === 'verified' && !separateUsdz
+
+  // The product's own call to action ("button text and link" of the product form; owner 2026-10-26): a full-width pill.
+  // Without a link, the business's contact details (when it has any) open in a dialog, as before.
+  const ctaUrl = product.cta.url
+  const ctaText = localized(product.cta.label).trim() ? <LocalizedSpan text={product.cta.label} /> : t('product.contactStore')
+  const ctaClass = cn(no3d ? primaryCta : PILL_SOFT, 'w-full')
+  const ctaExternal = !!ctaUrl && isExternalUrl(ctaUrl)
+  const cta = ctaUrl ? (
+    <a href={ctaUrl} data-product-cta className={ctaClass} {...(ctaExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+      {ctaText}
+      {ctaExternal && <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />}
+    </a>
+  ) : hasContact ? (
+    <button type="button" data-product-cta className={ctaClass} onClick={() => setContactOpen(true)}>
+      <MessageCircle className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+      {t('product.contactStore')}
+    </button>
+  ) : null
 
   return (
     <PublicShell business={business} catalogHref={catalogHref}>
@@ -337,8 +402,17 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             <LocalizedSpan as="h1" text={product.name} className="line-clamp-2 font-display text-piece font-normal text-balance break-words text-ink" />
             <div data-product-meta className="mt-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 text-[17px] leading-6 text-ink lg:mt-6 lg:block">
               <p className="tabular-nums lg:text-[22px] lg:leading-7">{priceText}</p>
+              {facts.length > 0 && (
+                <ul className="flex flex-wrap gap-2 max-lg:order-last max-lg:mt-2 max-lg:basis-full lg:mt-5">
+                  {facts.map((f, i) => (
+                    <li key={i} title={f} className="max-w-[16rem] truncate rounded-full bg-subtle px-3.5 py-1.5 text-[14px] leading-5 text-ink">
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              )}
               {(dimsLine || verdict) && (
-                <p className="contents text-ink lg:mt-3 lg:flex lg:flex-wrap lg:items-center lg:gap-x-2.5 lg:gap-y-1 lg:text-[16px] lg:text-ink-body">
+                <p className="contents text-ink lg:mt-4 lg:flex lg:flex-wrap lg:items-center lg:gap-x-2.5 lg:gap-y-1 lg:text-[16px] lg:text-ink-body">
                   {dimsLine && (
                     <>
                       <span className="text-ink-faint lg:hidden" aria-hidden>
@@ -385,9 +459,9 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
           <div className="mt-8 flex min-w-0 flex-col gap-8 lg:col-start-2 lg:row-start-2">
             {shortDescription && <LocalizedSpan as="p" text={product.shortDescription} className="order-2 max-w-[38rem] text-body-public text-ink lg:order-1" />}
-            <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="order-1 lg:order-2" />
+            <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} names className="order-1 lg:order-2" />
 
-            <div data-ar-cta className="order-3 flex flex-col gap-4">
+            <div data-ar-cta className="order-3 flex flex-col gap-3">
               {/* Only for a model that loaded (AR-08). Where model-viewer can open AR, the primary action launches it
                   ("View in my home"; on phones in the bottom bar); elsewhere it opens the 3D view and ArSection explains
                   the phone hand-off. */}
@@ -400,7 +474,13 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                     <p className="min-w-0 truncate font-display text-[1.625rem] leading-none text-ink tabular-nums lg:hidden" aria-hidden>
                       {priceText}
                     </p>
-                    <button type="button" onClick={onActivate} disabled={launching} aria-busy={launching} className={cn(primaryCta, 'shrink-0 disabled:cursor-progress disabled:bg-umber')}>
+                    <button
+                      type="button"
+                      onClick={onActivate}
+                      disabled={launching}
+                      aria-busy={launching}
+                      className={cn(primaryCta, 'shrink-0 disabled:cursor-progress disabled:bg-umber')}
+                    >
                       {launching ? <Loader2 className="size-5 animate-spin" strokeWidth={1.5} aria-hidden /> : <Box className="size-5" strokeWidth={1.5} aria-hidden />}
                       {launching ? t('ar.preparing') : t('ar.button')}
                     </button>
@@ -411,38 +491,33 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                     {t('product.view3d')}
                   </button>
                 ))}
+              {/* Without 3D the product's own link leads; with 3D it sits under the "Open on your phone" / Share row. */}
+              {no3d && cta}
               <ArSection
                 availability={availability}
                 onShowTips={() => setTipsOpen('info')}
-                actions={
-                  <>
-                    {product.cta.url ? (
-                      <a href={product.cta.url} target="_blank" rel="noopener noreferrer" className={textAction}>
-                        {localized(product.cta.label).trim() ? <LocalizedSpan text={product.cta.label} /> : t('product.contactStore')}
-                      </a>
-                    ) : hasContact ? (
-                      <button type="button" className={textAction} onClick={() => setContactOpen(true)}>
-                        {t('product.contactStore')}
-                      </button>
-                    ) : null}
-                    <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
-                  </>
-                }
+                actions={<ShareButton pill className="flex-1 whitespace-nowrap" title={t('product.shareTitle', { name, business: business.name })} />}
               />
+              {!no3d && cta}
             </div>
           </div>
         </div>
 
-        {/* Details: dimensions with the drawing on the left, the material and the long text on the right. */}
-        <div className="mt-12 grid gap-10 rounded-soft-sm bg-subtle p-5 sm:rounded-soft sm:p-8 lg:mt-20 lg:grid-cols-2 lg:gap-16 lg:p-12">
-          <section className="min-w-0" aria-labelledby="dims-h">
+        {/* The dark AR band: only for a piece with a 3D model (loading or loaded). */}
+        {has3d && (
+          <ProductArBand name={name} dims={dimsLine} trueToSize={trueToSize} availability={availability} launching={launching} onActivate={onActivate} className="mt-14 lg:mt-24" />
+        )}
+
+        {/* Specifications: the dimensions card on the left, material, text, category and weight on the right. */}
+        <Reveal className="mt-14 grid gap-8 rounded-soft-sm bg-subtle p-4 sm:rounded-soft sm:p-8 lg:mt-24 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-center lg:gap-16 lg:p-12">
+          <section className="min-w-0 rounded-soft-sm bg-surface p-5 sm:rounded-soft sm:p-8" aria-labelledby="dims-h">
             <div className="flex items-center justify-between gap-3">
-              <h2 id="dims-h" className="text-[20px] leading-7 text-ink lg:text-[24px]">
+              <h2 id="dims-h" className="font-display text-[1.625rem] leading-tight font-normal text-ink">
                 {t('product.dimensions')}
               </h2>
               <UnitSwitch value={unit} onChange={setUnit} label={t('product.unitToggle')} />
             </div>
-            <div className="mt-5 rounded-soft-sm bg-surface p-5 sm:p-8">
+            <div className="mt-5">
               <DimensionDiagram dims={product.dimensions} unit={unit} />
               <dl className="mt-5 grid grid-cols-3 gap-3 text-center">
                 {(['width', 'depth', 'height'] as const).map((k) => (
@@ -455,57 +530,51 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                 ))}
               </dl>
             </div>
-            {scale.status !== 'unknown' && modelState === 'loaded' && <ScaleNote verified={scale.status === 'verified'} separateUsdz={separateUsdz} measured={scale.measured} unit={unit} />}
+            {scale.status !== 'unknown' && modelState === 'loaded' && (
+              <ScaleNote verified={scale.status === 'verified'} separateUsdz={separateUsdz} measured={scale.measured} unit={unit} />
+            )}
           </section>
 
-          <div className="flex min-w-0 flex-col gap-8">
-            {material && (
-              <section aria-labelledby="material-h">
-                <h2 id="material-h" className="text-[20px] leading-7 text-ink lg:text-[24px]">
-                  {t('product.material')}
-                </h2>
-                <LocalizedSpan as="p" text={product.material} className="mt-2 text-body-public text-ink" />
-              </section>
-            )}
-            {description && (
-              <section aria-labelledby="desc-h">
-                <h2 id="desc-h" className="text-[20px] leading-7 text-ink lg:text-[24px]">
-                  {t('product.description')}
-                </h2>
-                <LocalizedSpan as="p" text={product.description} className="mt-2 max-w-prose text-body-public whitespace-pre-line text-ink" />
-              </section>
-            )}
-            <dl className="flex flex-wrap gap-x-10 gap-y-4">
-              {product.weight && (
-                <div>
-                  <dt className="text-[14px] leading-5 text-ink-muted">{t('product.weight')}</dt>
-                  <dd className="mt-1 text-[16px] leading-6 text-ink tabular-nums">
-                    {product.weight.value} {product.weight.unit}
+          <section className="min-w-0 px-1 sm:px-0" aria-labelledby="specs-h">
+            <h2 id="specs-h" className="font-display text-[2rem] leading-tight font-normal text-ink sm:text-[2.25rem]">
+              {t('product.specifications')}
+            </h2>
+            <dl className="mt-6 grid grid-cols-2 gap-x-8 gap-y-6">
+              {material && (
+                <div className="col-span-2">
+                  <dt className="text-[14px] leading-5 text-ink-muted">{t('product.material')}</dt>
+                  <dd className="mt-1">
+                    <LocalizedSpan text={product.material} className="text-[17px] leading-7 font-medium text-ink" />
+                  </dd>
+                </div>
+              )}
+              {description && (
+                <div className="col-span-2">
+                  <dt className="text-[14px] leading-5 text-ink-muted">{t('product.description')}</dt>
+                  <dd className="mt-1">
+                    <LocalizedSpan as="p" text={product.description} className="max-w-prose text-body-public whitespace-pre-line text-ink" />
                   </dd>
                 </div>
               )}
               <div>
                 <dt className="text-[14px] leading-5 text-ink-muted">{t('product.category')}</dt>
-                <dd className="mt-1 text-[16px] leading-6 text-ink">{t(`category.${product.category}`)}</dd>
+                <dd className="mt-1 text-[17px] leading-7 font-medium text-ink">{t(`category.${product.category}`)}</dd>
               </div>
+              {product.weight && (
+                <div>
+                  <dt className="text-[14px] leading-5 text-ink-muted">{t('product.weight')}</dt>
+                  <dd className="mt-1 text-[17px] leading-7 font-medium text-ink tabular-nums">{weightText}</dd>
+                </div>
+              )}
             </dl>
-          </div>
-        </div>
-
-        {additional.length > 0 && (
-          <section className="mt-12 lg:mt-20" aria-labelledby="more-h">
-            <h2 id="more-h" className="text-[20px] leading-7 text-ink lg:text-[24px]">
-              {t('product.morePhotos')}
-            </h2>
-            <ul className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
-              {additional.map((img) => (
-                <li key={img.id}>
-                  <SmartImage src={img.url} alt={img.alt || name} className="aspect-[4/3] w-full rounded-soft-sm bg-subtle sm:rounded-soft" />
-                </li>
-              ))}
-            </ul>
           </section>
-        )}
+        </Reveal>
+
+        <ProductGallery images={additional} name={name} className="mt-14 lg:mt-24" />
+
+        <MoreFromBusiness business={business} currentId={product.id} catalogHref={catalogHref} productHref={productHref} className="mt-14 lg:mt-24" />
+
+        <ProductContactStrip business={business} subject={name} className="mt-14 lg:mt-24" />
       </div>
 
       <ArTips open={tipsOpen !== null} onClose={() => setTipsOpen(null)} onStart={tipsOpen === 'before-ar' ? () => void startAR() : undefined} />
@@ -515,7 +584,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           {business.contact.email && (
             <li className="flex items-center gap-3">
               <Mail className="size-4 text-ink-muted" aria-hidden />
-              <a className="min-w-0 break-all text-accent-ink underline underline-offset-4" href={`mailto:${business.contact.email}?subject=${encodeURIComponent(name)}`}>
+              <a className="min-w-0 break-all text-accent-ink underline underline-offset-4" href={mailtoFor(business.contact.email, name)}>
                 {business.contact.email}
               </a>
             </li>
@@ -523,7 +592,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           {business.contact.phone && (
             <li className="flex items-center gap-3">
               <Phone className="size-4 text-ink-muted" aria-hidden />
-              <a className="text-accent-ink underline underline-offset-4" href={`tel:${business.contact.phone.replace(/\s/g, '')}`}>
+              <a className="text-accent-ink underline underline-offset-4" href={telFor(business.contact.phone)}>
                 {business.contact.phone}
               </a>
             </li>
@@ -598,10 +667,20 @@ function ScaleBadge({ verified, separateUsdz }: { verified: boolean; separateUsd
   )
 }
 
+/** An absolute http(s) link to another site: opened in a new tab, marked with an arrow. */
+function isExternalUrl(url: string): boolean {
+  if (!/^https?:\/\//i.test(url)) return false
+  try {
+    return new URL(url).origin !== window.location.origin
+  } catch {
+    return false
+  }
+}
+
 /** cm / in as a pill switch (radio group). */
 function UnitSwitch({ value, onChange, label }: { value: LengthUnit; onChange: (u: LengthUnit) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-full bg-surface p-1">
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-full bg-subtle p-1">
       {(['cm', 'in'] as const).map((u) => (
         <button
           key={u}

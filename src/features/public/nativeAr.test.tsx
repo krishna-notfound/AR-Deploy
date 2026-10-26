@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import { nativeAr, nativeArRoute } from '@/features/ar/nativeAr'
@@ -35,7 +35,9 @@ function loaded(el: FakeViewer, canActivateAR: boolean, size = { x: 0.828, y: 0.
     el.dispatchEvent(new Event('load'))
   })
 }
-const arButton = () => screen.queryByRole('button', { name: 'View in my home' })
+// On a phone "View in my home" shows twice: the sticky bar (first) and the dark AR band. Both run the same launch.
+const arButtons = () => screen.queryAllByRole('button', { name: 'View in my home' })
+const arButton = () => arButtons()[0] ?? null
 const asUserAgent = (ua: string) => vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua)
 const arEvents = (record: { mock: { calls: unknown[][] } }) => record.mock.calls.filter(([e]) => (e as { type: string }).type === 'ar_activation')
 const mockNavigate = () => vi.spyOn(nativeAr, 'navigate').mockImplementation(() => {})
@@ -87,7 +89,26 @@ describe('product page: AR on Android opens inside Chrome first (model-viewer We
     await waitFor(() => expect(el.activateAR).toHaveBeenCalledTimes(1))
     expect(navigate).not.toHaveBeenCalled()
     expect(arEvents(record)).toHaveLength(1)
-    expect(await screen.findByRole('button', { name: 'View in my home' })).toBeEnabled()
+    for (const b of await screen.findAllByRole('button', { name: 'View in my home' })) expect(b).toBeEnabled()
+  })
+
+  it('the AR band offers the same launch on a phone: one activateAR call and one event, the bar guarded meanwhile', { timeout: 20_000 }, async () => {
+    asUserAgent(ANDROID_CHROME)
+    const record = vi.spyOn(service, 'recordEvent')
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    let settle: () => void = () => {}
+    el.activateAR = vi.fn(() => new Promise<void>((r) => (settle = r)))
+    const band = screen.getByRole('heading', { name: /Place the Sheen Lounge Chair in your room/ }).closest('section') as HTMLElement
+    expect(within(band).queryByRole('img', { name: /Scan with your phone camera/ })).toBeNull() // no QR code on a phone
+    fireEvent.click(within(band).getByRole('button', { name: 'View in my home' }))
+    const busy = await screen.findAllByRole('button', { name: /Preparing AR/ })
+    expect(busy).toHaveLength(2)
+    fireEvent.click(busy[0]!)
+    expect(el.activateAR).toHaveBeenCalledTimes(1)
+    await act(async () => settle())
+    expect(arEvents(record)).toHaveLength(1)
   })
 
   it('goes through the AR tips first, then starts AR from "Start AR" (one event)', async () => {
@@ -171,12 +192,12 @@ describe('product page: direct native AR launch on iPhone (Quick Look)', () => {
     let settle: () => void = () => {}
     el.activateAR = vi.fn(() => new Promise<void>((r) => (settle = r)))
     fireEvent.click(arButton()!)
-    expect(await screen.findByRole('button', { name: /Preparing AR/ })).toBeDisabled()
+    for (const b of await screen.findAllByRole('button', { name: /Preparing AR/ })) expect(b).toBeDisabled()
     expect(el.activateAR).toHaveBeenCalledTimes(1)
     expect(navigate).not.toHaveBeenCalled()
     expect(arLinks()).toHaveLength(0)
     await act(async () => settle())
-    expect(await screen.findByRole('button', { name: 'View in my home' })).toBeEnabled()
+    for (const b of await screen.findAllByRole('button', { name: 'View in my home' })) expect(b).toBeEnabled()
   })
 })
 
@@ -189,7 +210,13 @@ describe('product page: native AR opens the public copy (ar-models) when the mod
       const res = await real(...args)
       if (!res.ok) return res
       const p = res.data.product
-      const usdz = (key: string) => ({ format: 'usdz' as const, url: `https://cdn.test/sign/${key}.usdz?token=t3`, publicUrl: `${PUBLIC}${key}.usdz`, fileName: `${key}.usdz`, status: 'valid' as const })
+      const usdz = (key: string) => ({
+        format: 'usdz' as const,
+        url: `https://cdn.test/sign/${key}.usdz?token=t3`,
+        publicUrl: `${PUBLIC}${key}.usdz`,
+        fileName: `${key}.usdz`,
+        status: 'valid' as const,
+      })
       const glb = <T extends { url: string }>(m: T | undefined, key: string) => (m ? { ...m, publicUrl: `${PUBLIC}${key}.glb` } : m)
       const product = {
         ...p,
@@ -214,7 +241,6 @@ describe('product page: native AR opens the public copy (ar-models) when the mod
     expect(arLinks()).toHaveLength(1)
     expect(arLinks()[0]!.getAttribute('href')).toBe(`${PUBLIC}${await firstFinish()}.usdz#allowsContentScaling=0`)
   })
-
 })
 
 describe('product page: the 3D view and its AR use the public copy when the model has one (ADR-0035)', () => {
@@ -226,7 +252,10 @@ describe('product page: the 3D view and its AR use the public copy when the mode
       const res = await real(...args)
       if (!res.ok) return res
       const p = res.data.product
-      const product = { ...p, variants: p.variants.map((v) => (v.models?.glb ? { ...v, models: { ...v.models, glb: { ...v.models.glb, publicUrl: `${PUBLIC}${v.id}.glb` } } } : v)) }
+      const product = {
+        ...p,
+        variants: p.variants.map((v) => (v.models?.glb ? { ...v, models: { ...v.models, glb: { ...v.models.glb, publicUrl: `${PUBLIC}${v.id}.glb` } } } : v)),
+      }
       return { ...res, data: { ...res.data, product } }
     })
     openApp('/products/nordhaus/sheen-lounge-chair')

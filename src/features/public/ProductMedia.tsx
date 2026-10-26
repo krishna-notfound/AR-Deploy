@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronLeft, ChevronRight, Maximize, Rotate3d } from 'lucide-react'
+import { AlertTriangle, Box, ChevronLeft, ChevronRight, Maximize, Rotate3d } from 'lucide-react'
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { type ArStatus, MODEL_STALL_TIMEOUT_MS, type ModelLoadInfo, ModelViewer, type ModelViewerHandle } from '@/components/three/ModelViewer'
@@ -17,7 +17,11 @@ export function initialMediaMode(media: { gallery: ProductImage[]; models: Produ
   return media.gallery.length || !media.models.glb ? 'photos' : '3d'
 }
 
-const primaryIndex = (images: ProductImage[]) => Math.max(0, images.findIndex((i) => i.isPrimary))
+const primaryIndex = (images: ProductImage[]) =>
+  Math.max(
+    0,
+    images.findIndex((i) => i.isPrimary),
+  )
 
 interface Load {
   url: string
@@ -172,11 +176,19 @@ export function ProductMedia({
                   <p className="mt-3 font-display text-[1.5rem] leading-snug text-ink">{t('viewer.errorTitle')}</p>
                   <p className="mt-1.5 text-[15px] leading-6 text-ink-body">{timedOut ? t('viewer.timeout') : t('viewer.errorBody')}</p>
                   <div className="mt-5 flex justify-center gap-2">
-                    <button type="button" onClick={retry} className="inline-flex h-11 items-center rounded-full bg-ink px-5 text-[15px] font-medium text-canvas transition-colors hover:bg-umber">
+                    <button
+                      type="button"
+                      onClick={retry}
+                      className="inline-flex h-11 items-center rounded-full bg-ink px-5 text-[15px] font-medium text-canvas transition-colors hover:bg-umber"
+                    >
                       {t('viewer.retry')}
                     </button>
                     {gallery.length > 0 && (
-                      <button type="button" onClick={() => onModeChange('photos')} className="inline-flex h-11 items-center rounded-full bg-surface px-5 text-[15px] font-medium text-ink transition-colors hover:bg-canvas">
+                      <button
+                        type="button"
+                        onClick={() => onModeChange('photos')}
+                        className="inline-flex h-11 items-center rounded-full bg-surface px-5 text-[15px] font-medium text-ink transition-colors hover:bg-canvas"
+                      >
                         {t('product.viewPhotos')}
                       </button>
                     )}
@@ -224,8 +236,28 @@ export function ProductMedia({
         )}
       </div>
 
-      {gallery.length > 1 && (
-        <ul className="mt-4 hidden gap-3 overflow-x-auto p-1 sm:flex" aria-label={t('product.mediaLabel')}>
+      {/* Thumbnails from sm up: on the product page a "3D" tile leads the row while the model is (being) loaded. */}
+      {(gallery.length > 1 || showSwitch) && (
+        <ul className={cn('hidden gap-3 p-1', modeSwitch ? 'mt-3 grid-cols-4 sm:grid' : 'mt-4 overflow-x-auto sm:flex')} aria-label={t('product.mediaLabel')}>
+          {showSwitch && (
+            <li>
+              <button
+                type="button"
+                aria-label={t('product.tile3d')}
+                aria-current={mode === '3d'}
+                onClick={() => onModeChange('3d')}
+                className={cn(
+                  'flex aspect-[3/2] w-full flex-col items-center justify-center gap-2 rounded-soft-sm bg-subtle text-[13px] font-medium text-ink transition-opacity',
+                  mode === '3d' ? 'ring-2 ring-accent ring-offset-2 ring-offset-canvas' : 'opacity-75 hover:opacity-100',
+                )}
+              >
+                <span className="grid size-8 place-items-center rounded-full bg-surface" aria-hidden>
+                  <Box className="size-4" strokeWidth={1.5} />
+                </span>
+                <span aria-hidden>3D</span>
+              </button>
+            </li>
+          )}
           {gallery.map((img, i) => {
             const current = mode === 'photos' && i === idx
             return (
@@ -236,7 +268,8 @@ export function ProductMedia({
                   aria-current={current}
                   onClick={() => showPhoto(i)}
                   className={cn(
-                    'block size-24 overflow-hidden rounded-soft-sm bg-subtle transition-opacity lg:size-28',
+                    'block overflow-hidden rounded-soft-sm bg-subtle transition-opacity',
+                    modeSwitch ? 'aspect-[3/2] w-full' : 'size-24 lg:size-28',
                     current ? 'ring-2 ring-accent ring-offset-2 ring-offset-canvas' : 'opacity-75 hover:opacity-100',
                   )}
                 >

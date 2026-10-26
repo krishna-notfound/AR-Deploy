@@ -106,8 +106,10 @@ describe('owner catalogue preview (DUX-02, ADR-0025)', () => {
     openApp('/catalog/oak-ember?preview=1', asOwner('biz_oak'))
     expect(await screen.findByText('Preview. Customers cannot see this catalog until it is activated.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Oak & Ember Studio', level: 1 })).toBeInTheDocument()
-    const link = await screen.findByRole('link', { name: /Sunny Loveseat/ })
-    expect(link).toHaveAttribute('href', '/products/oak-ember/sunny-loveseat?preview=1')
+    // The piece links twice (the featured photo in the hero and its card); both keep the preview.
+    const links = await screen.findAllByRole('link', { name: /Sunny Loveseat/ })
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) expect(link).toHaveAttribute('href', '/products/oak-ember/sunny-loveseat?preview=1')
   })
 
   // R-W8-2: the demo follows the database's RLS, so a paused catalogue is not readable by outsiders at all. The page
