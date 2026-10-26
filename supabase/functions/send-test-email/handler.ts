@@ -1,16 +1,19 @@
-// Request handling for the send-test-email Edge Function (design/23-email.md). Platform admins only.
+// Request handling for the send-test-email Edge Function (design/23-email.md). The platform Owner only, at the 2FA level
+// the staff policy requires (R-W1-1).
 //   POST { "action": "send", "to": "...", "lang": "en" | "pt" }      → sends the test template, logs it
 //   POST { "action": "status", "providerMessageId": "..." }          → asks Resend what happened, updates the log
 // Web-standard APIs only, so it runs under Deno in production and under Vitest in tests.
 import { type ConfigResult, type EmailStatus, type LogEntry, fetchProviderStatus, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
+import { type GateResult, gateReply } from '../_shared/gate.ts'
 
 export interface TestEmailDeps {
   config: ConfigResult
   fetch: typeof fetch
   /** Verifies the caller's access token with Supabase Auth; null when invalid or expired. */
   userIdFromToken(token: string): Promise<string | null>
-  isPlatformAdmin(userId: string): Promise<boolean>
+  /** The 2FA gate with the caller's own token (R-W1-1): caller_mfa_satisfied(), then is_platform_admin(). */
+  gate(token: string): Promise<GateResult>
   log(entry: LogEntry): Promise<string>
   updateStatus(providerMessageId: string, status: EmailStatus): Promise<void>
 }
@@ -31,7 +34,8 @@ export async function handleTestEmail(req: Request, deps: TestEmailDeps): Promis
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? ''
   const userId = token ? await deps.userIdFromToken(token) : null
   if (!userId) return reply(401, { error: 'not_signed_in' })
-  if (!(await deps.isPlatformAdmin(userId))) return reply(403, { error: 'platform_admin_only' })
+  const gate = await deps.gate(token)
+  if (gate !== 'ok') return gateReply(gate)
 
   // Names of missing secrets are safe to show an admin; values never are.
   if (!deps.config.ok) return reply(503, { error: 'email_not_configured', missing: deps.config.missing })

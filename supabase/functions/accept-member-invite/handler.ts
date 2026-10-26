@@ -1,11 +1,12 @@
 // Request handling for the accept-member-invite Edge Function (ADR-0030). Public: the link secret is the credential.
 //   POST { action: "inspect", token }                      → what the invitation is for; uses nothing up
-//   POST { action: "create", token, fullName, password }   → creates the login (email confirmed) and accepts, once
+//   POST { action: "create", token, fullName, password }   → creates the login (email confirmed) and accepts, once;
+//                                                            the password has 12 to 72 characters (R-W1-7)
 //   POST { action: "accept", token } + the caller's JWT    → accepts for an existing login with the same email
 // Only the SHA-256 of the secret is sent to the database. Opening the link (inspect) never consumes it, so mail
 // scanners that open links cannot use an invitation up.
 import { bearerToken, clientIp, readJsonObject, reply } from '../_shared/http.ts'
-import { hashSecret, looksLikeSecret } from '../_shared/team.ts'
+import { STAFF_PASSWORD_MAX, STAFF_PASSWORD_MIN, hashSecret, looksLikeSecret } from '../_shared/team.ts'
 
 export type Inspection = { state: 'valid' | 'expired' | 'revoked' | 'used' | 'invalid'; email?: string; role?: string; invitedBy?: string; expiresAt?: string; userExists?: boolean }
 export type AcceptCode = 'ok' | 'invite_invalid' | 'invite_expired' | 'invite_revoked' | 'invite_used' | 'email_mismatch' | 'business_owner'
@@ -53,7 +54,7 @@ export async function handleAcceptMemberInvite(req: Request, deps: AcceptDeps): 
   // create
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim().slice(0, 120) : ''
   const password = typeof body.password === 'string' ? body.password : ''
-  if (!fullName || password.length < 8 || password.length > 72) return reply(422, { error: 'invalid_request' })
+  if (!fullName || password.length < STAFF_PASSWORD_MIN || password.length > STAFF_PASSWORD_MAX) return reply(422, { error: 'invalid_request' })
   const i = await deps.inspect(hash)
   if (i.state !== 'valid' || !i.email) {
     const [status, error] = STATE_ERROR[i.state] ?? [404, 'invite_invalid']

@@ -182,6 +182,8 @@ export interface User {
   businessId?: ID
   /** Platform users (role 'super_admin'): Owner, Admin or Team and what that role may do (ADR-0029). */
   platform?: PlatformAccess
+  /** Business owners: true until the owner finishes the invitation (business_members.accepted_at is unset, R-W1-9). */
+  invitationPending?: boolean
 }
 
 export type ActivityKind =

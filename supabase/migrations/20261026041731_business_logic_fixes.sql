@@ -94,3 +94,49 @@ alter table public.email_log add constraint email_log_kind_check
                   'security_code', 'security_notice', 'closure_request',
                   'application_decision', 'business_notice', 'team_notice'));
 -- ---- end S1.5 Task 1 ----
+
+-- =============================================================================
+-- S1.5 Task 2: staff 2FA gate on Edge Functions, staff password length, owner email conflict (R-W1-1, R-W1-7, R-W1-8)
+-- =============================================================================
+
+-- R-W1-1: the Edge Functions now check the caller with caller_mfa_satisfied() and the gated helpers, through the
+-- caller's own token (supabase/functions/_shared/gate.ts). service_user_can stays for rollback only.
+comment on function public.service_user_can(uuid, text) is
+  'not 2FA-aware; do not use for caller checks. Kept only so an earlier release can roll back to it (S1.5 R-W1-1).';
+
+-- R-W1-8: an email with any platform-team row (invited, active or deactivated) can't be linked as a business owner.
+-- The team row is compared with the lower-cased account email; removing the member (R-W6-1) clears the way.
+create or replace function public.service_link_owner(p_business_id uuid, p_user_id uuid, p_actor uuid, p_application_id uuid default null)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_existing uuid;
+begin
+  if not exists (select 1 from public.businesses where id = p_business_id) then
+    raise exception 'business_not_found' using errcode = 'P0002';
+  end if;
+  if exists (
+    select 1 from auth.users u join public.platform_members m on m.email = lower(u.email::text)
+     where u.id = p_user_id
+  ) then
+    raise exception 'email_is_admin' using errcode = '23514';
+  end if;
+  select user_id into v_existing from public.business_members where business_id = p_business_id for update;
+  if v_existing is not null then
+    if v_existing = p_user_id then
+      return 'already_linked';
+    end if;
+    raise exception 'business_has_owner' using errcode = '23505';
+  end if;
+  insert into public.business_members (business_id, user_id, invited_at) values (p_business_id, p_user_id, now());
+  insert into public.audit_events (event_type, actor_id, application_id, business_id, metadata)
+  values ('owner_provisioned', p_actor, p_application_id, p_business_id, '{}'::jsonb);
+  return 'linked';
+end;
+$$;
+revoke execute on function public.service_link_owner(uuid, uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.service_link_owner(uuid, uuid, uuid, uuid) to service_role;
+-- ---- end S1.5 Task 2 ----

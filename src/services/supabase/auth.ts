@@ -85,7 +85,7 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       // Platform role and permissions (ADR-0029) come from the database, never from the token's metadata.
       const [admin, member] = await Promise.all([
         sb.rpc('my_platform_access'),
-        sb.from('business_members').select('business_id').eq('user_id', u.id).order('created_at', { ascending: false }).limit(1).maybeSingle<{ business_id: string }>(),
+        sb.from('business_members').select('business_id, accepted_at').eq('user_id', u.id).order('created_at', { ascending: false }).limit(1).maybeSingle<{ business_id: string; accepted_at: string | null }>(),
       ])
       // Until the team-roles migration is applied, my_platform_access does not exist (PostgREST PGRST202): an Owner
       // (platform_admins) is then still recognised, with every permission, so sign-in keeps working during the rollout.
@@ -101,7 +101,8 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       const base = { id: u.id, name: displayName ?? (email || 'Signed-in user'), email }
       if (platform) return ok({ email, user: { ...base, role: 'super_admin', platform } })
       // A business has exactly one owner (ADR-0024); a user owning several businesses gets the newest one until a switcher exists.
-      if (member.data) return ok({ email, user: { ...base, role: 'business_admin', businessId: member.data.business_id } })
+      // invitationPending: the invitation page asks for a password only then; an accepted owner goes to the dashboard (R-W1-9).
+      if (member.data) return ok({ email, user: { ...base, role: 'business_admin', businessId: member.data.business_id, invitationPending: !member.data.accepted_at } })
       return ok({ email, user: null })
     },
 

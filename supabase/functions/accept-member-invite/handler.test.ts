@@ -54,9 +54,25 @@ describe('accept-member-invite (ADR-0030)', () => {
 
   it('returns the password rule from Auth', async () => {
     const { d } = deps({ createUser: async () => ({ ok: false, error: 'weak_password', message: 'Password is known to be weak' }) })
-    const res = await handleAcceptMemberInvite(post({ action: 'create', token: SECRET, fullName: 'Ana', password: 'password' }), d)
+    const res = await handleAcceptMemberInvite(post({ action: 'create', token: SECRET, fullName: 'Ana', password: 'password1234' }), d)
     expect(res.status).toBe(422)
     expect(await res.json()).toEqual({ error: 'weak_password', message: 'Password is known to be weak' })
+  })
+
+  it('an 11-character password gets 422 invalid_request; 12 passes; 73 gets 422', async () => {
+    for (const [password, status] of [['a'.repeat(11), 422], ['a'.repeat(73), 422]] as const) {
+      const { d, created } = deps()
+      const res = await handleAcceptMemberInvite(post({ action: 'create', token: SECRET, fullName: 'Ana', password }), d)
+      expect(res.status).toBe(status)
+      expect(await res.json()).toEqual({ error: 'invalid_request' })
+      expect(created).toHaveLength(0)
+    }
+    for (const password of ['a'.repeat(12), 'a'.repeat(72)]) {
+      const { d, created } = deps()
+      const res = await handleAcceptMemberInvite(post({ action: 'create', token: SECRET, fullName: 'Ana', password }), d)
+      expect(res.status).toBe(200)
+      expect(created).toHaveLength(1)
+    }
   })
 
   it('refuses an expired invitation without creating anyone', async () => {

@@ -23,6 +23,13 @@ export const ROLE_SUMMARY: Record<MemberRole, string[]> = {
   team: ['View businesses and applications', 'Create and edit products', 'View analytics'],
 }
 
+/**
+ * Staff passwords (R-W1-7): at least 12 characters, as for every account (src/services PASSWORD_MIN), and at most 72
+ * because Supabase Auth (bcrypt) hashes only the first 72 bytes.
+ */
+export const STAFF_PASSWORD_MIN = 12
+export const STAFF_PASSWORD_MAX = 72
+
 /** 32 random bytes, base64url without padding (43 characters). Only its hash is ever stored. */
 export function newInviteSecret(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))

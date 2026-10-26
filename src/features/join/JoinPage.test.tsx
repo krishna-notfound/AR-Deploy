@@ -47,6 +47,27 @@ describe('Join page (ADR-0030)', () => {
     expect(screen.getByText("Passwords don't match.")).toBeInTheDocument()
   })
 
+  it("shows 'Use at least 12 characters.' for 11 characters and does not submit", { timeout: 20_000 }, async () => {
+    const create = vi.spyOn(service, 'acceptInviteCreate')
+    const user = userEvent.setup()
+    open('#t=demo-invite-token')
+    await screen.findByDisplayValue('marta.lopes@sanctus.example')
+    expect(screen.getByText(/At least 12 characters/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Full name'), 'Marta Lopes')
+    await user.type(screen.getByLabelText('Password'), 'a'.repeat(11))
+    await user.type(screen.getByLabelText('Confirm password'), 'a'.repeat(11))
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(screen.getByText('Use at least 12 characters.')).toBeInTheDocument()
+    // Supabase Auth hashes only the first 72 bytes: a longer password is refused here too.
+    await user.clear(screen.getByLabelText('Password'))
+    await user.clear(screen.getByLabelText('Confirm password'))
+    await user.type(screen.getByLabelText('Password'), 'a'.repeat(73))
+    await user.type(screen.getByLabelText('Confirm password'), 'a'.repeat(73))
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(screen.getByText('Use at most 72 characters.')).toBeInTheDocument()
+    expect(create).not.toHaveBeenCalled()
+  })
+
   it('creates the account once and opens the console', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const spy = vi.spyOn(service, 'acceptInviteCreate')
@@ -83,8 +104,8 @@ describe('Join page (ADR-0030)', () => {
     open('#t=demo-invite-token')
     await screen.findByDisplayValue('marta.lopes@sanctus.example')
     await user.type(screen.getByLabelText('Full name'), 'Marta')
-    await user.type(screen.getByLabelText('Password'), 'password1')
-    await user.type(screen.getByLabelText('Confirm password'), 'password1')
+    await user.type(screen.getByLabelText('Password'), 'password1234')
+    await user.type(screen.getByLabelText('Confirm password'), 'password1234')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
     expect(await screen.findByText('Password is known to be weak')).toBeInTheDocument()
   })

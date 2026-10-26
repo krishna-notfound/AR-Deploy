@@ -212,3 +212,77 @@ describe('S1.5 rollback', () => {
     }
   }, 120_000)
 })
+
+describe('S1.5 Task 2: staff 2FA gate, team email cannot own a business', () => {
+  const id = ids(2)
+  const RITA = id(1) // invited to the platform team (no login yet); her owner-invitation account has a mixed-case email
+  const OLD = id(2) // a deactivated team member
+  const SHOP = id(3) // an ordinary owner
+  const ACTOR = id(4)
+  const BIZ_A = id(10)
+  const BIZ_B = id(11)
+  const BIZ_C = id(12)
+  const link = (biz: string, user: string) =>
+    h.svc(`select to_jsonb(public.service_link_owner($1, $2, $3, null)) as r`, [biz, user, ACTOR])
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ('${RITA}', 'Rita@X.pt', null), ('${OLD}', 't2-old@test', now()), ('${SHOP}', 't2-shop@test', null), ('${ACTOR}', 't2-actor@test', now());
+      insert into public.platform_admins (user_id) values ('${ACTOR}');
+      insert into public.platform_members (user_id, email, role, status) values
+        (null, 'rita@x.pt', 'team', 'invited'), ('${OLD}', 't2-old@test', 'admin', 'deactivated');
+      insert into public.businesses (id, name, slug, status) values
+        ('${BIZ_A}', 'Task Two A', 't2-a', 'draft'), ('${BIZ_B}', 'Task Two B', 't2-b', 'draft'), ('${BIZ_C}', 'Task Two C', 't2-c', 'draft');
+    `)
+  })
+
+  it("service_link_owner raises email_is_admin for a user whose email has a platform_members row (any status, case-insensitive: 'Rita@X.pt' vs 'rita@x.pt')", async () => {
+    await expect(link(BIZ_A, RITA)).rejects.toMatchObject({ message: 'email_is_admin', code: '23514' })
+    await expect(link(BIZ_B, OLD)).rejects.toMatchObject({ message: 'email_is_admin', code: '23514' })
+    // Nothing was linked or audited.
+    expect((await db.query(`select 1 from public.business_members where user_id = any($1)`, [[RITA, OLD]])).rows).toHaveLength(0)
+    expect((await db.query(`select 1 from public.audit_events where event_type = 'owner_provisioned' and business_id = any($1)`, [[BIZ_A, BIZ_B]])).rows).toHaveLength(0)
+    // An email with no team row links as before.
+    expect(await link(BIZ_C, SHOP)).toBe('linked')
+    expect(await link(BIZ_C, SHOP)).toBe('already_linked')
+    // Removing the team row clears the way (R-W6-1).
+    await db.query(`delete from public.platform_members where email = 'rita@x.pt'`)
+    try {
+      expect(await link(BIZ_A, RITA)).toBe('linked')
+    } finally {
+      await db.query(`insert into public.platform_members (user_id, email, role, status) values (null, 'rita@x.pt', 'team', 'invited')`)
+    }
+  })
+
+  it('service_user_can is marked as not 2FA-aware; service_link_owner stays service-role only', async () => {
+    const { rows } = await db.query<{ c: string | null }>(`select obj_description('public.service_user_can(uuid, text)'::regprocedure, 'pg_proc') as c`)
+    expect(rows[0]!.c).toMatch(/not 2FA-aware; do not use for caller checks/)
+    const grants = await db.query<{ a: boolean; u: boolean }>(
+      `select has_function_privilege('anon', 'public.service_link_owner(uuid, uuid, uuid, uuid)', 'execute') as a,
+              has_function_privilege('authenticated', 'public.service_link_owner(uuid, uuid, uuid, uuid)', 'execute') as u`)
+    expect(grants.rows[0]).toEqual({ a: false, u: false })
+  })
+
+  it('rollback restores the earlier service_link_owner and removes the service_user_can comment', async () => {
+    const defs = async (target: PGlite) => ({
+      // The body keeps the source file's line endings (CRLF in a Windows checkout); compare the text only.
+      linkOwner: (await target.query<{ d: string }>(
+        `select pg_get_functiondef('public.service_link_owner(uuid, uuid, uuid, uuid)'::regprocedure) as d`)).rows[0]!.d.replace(/\r\n/g, '\n'),
+      comment: (await target.query<{ c: string | null }>(
+        `select obj_description('public.service_user_can(uuid, text)'::regprocedure, 'pg_proc') as c`)).rows[0]!.c,
+    })
+    const before = await freshDb((n) => n < S15_MIGRATION)
+    const rolled = await freshDb()
+    try {
+      const pre = await defs(before)
+      expect(pre.comment).toBeNull()
+      expect((await defs(rolled)).linkOwner).not.toEqual(pre.linkOwner)
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      expect(await defs(rolled)).toEqual(pre)
+    } finally {
+      await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
+})

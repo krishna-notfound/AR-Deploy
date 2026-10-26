@@ -319,6 +319,8 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'invite.loadFailed': 'Não foi possível verificar o seu convite. Verifique a sua ligação e tente novamente.',
   'invite.eyebrow': 'Convite de responsável',
   'invite.steps': 'Passos do convite',
+  'invite.signedInAs': 'Tem sessão iniciada como {email}. Se este convite for para outra pessoa, termine a sessão primeiro.',
+  'invite.signOut': 'Terminar sessão',
   'invite.step.code': 'Validar código',
   'invite.step.password': 'Definir palavra-passe',
 

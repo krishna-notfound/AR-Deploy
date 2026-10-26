@@ -21,6 +21,43 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 2 rollback: staff 2FA gate on Edge Functions, staff password length, owner email conflict (R-W1-1, R-W1-7, R-W1-8)
+-- =============================================================================
+
+-- R-W1-1: service_user_can had no comment before S1.5.
+comment on function public.service_user_can(uuid, text) is null;
+
+-- R-W1-8: service_link_owner as in 20261020091428_applications_and_owner_access (no team-email check).
+create or replace function public.service_link_owner(p_business_id uuid, p_user_id uuid, p_actor uuid, p_application_id uuid default null)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_existing uuid;
+begin
+  if not exists (select 1 from public.businesses where id = p_business_id) then
+    raise exception 'business_not_found' using errcode = 'P0002';
+  end if;
+  select user_id into v_existing from public.business_members where business_id = p_business_id for update;
+  if v_existing is not null then
+    if v_existing = p_user_id then
+      return 'already_linked';
+    end if;
+    raise exception 'business_has_owner' using errcode = '23505';
+  end if;
+  insert into public.business_members (business_id, user_id, invited_at) values (p_business_id, p_user_id, now());
+  insert into public.audit_events (event_type, actor_id, application_id, business_id, metadata)
+  values ('owner_provisioned', p_actor, p_application_id, p_business_id, '{}'::jsonb);
+  return 'linked';
+end;
+$$;
+revoke execute on function public.service_link_owner(uuid, uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.service_link_owner(uuid, uuid, uuid, uuid) to service_role;
+-- ---- end S1.5 Task 2 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 1 rollback: security-activity privacy, profile visibility and Owner permissions; email kinds (R-W1-4, R-W1-5, R-W1-6, §10.4)
 -- =============================================================================
 

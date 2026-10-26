@@ -11,7 +11,7 @@ import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
 import type { InviteInspection } from '@/domain/types'
 import { formatDate } from '@/lib/format'
-import { auth, service } from '@/services'
+import { PASSWORD_MIN, auth, service } from '@/services'
 import { TEAM_ERRORS } from '@/services/catalogService'
 import { AuthHeading, AuthLayout } from '../auth/AuthLayout'
 import { ROLE_LABEL } from '../team/permissions'
@@ -87,6 +87,9 @@ function Intro({ invite }: { invite: InviteInspection }) {
   )
 }
 
+/** Supabase Auth (bcrypt) hashes only the first 72 bytes of a password, so a longer one is refused here (R-W1-7). */
+const STAFF_PASSWORD_MAX = 72
+
 function CreateAccount({ token, invite }: { token: string; invite: InviteInspection }) {
   const navigate = useNavigate()
   const { signInAs } = useAccount()
@@ -99,7 +102,8 @@ function CreateAccount({ token, invite }: { token: string; invite: InviteInspect
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!fullName.trim()) return setError('Enter your name.')
-    if (password.length < 8) return setError('Use at least 8 characters.')
+    if (password.length < PASSWORD_MIN) return setError(`Use at least ${PASSWORD_MIN} characters.`)
+    if (password.length > STAFF_PASSWORD_MAX) return setError(`Use at most ${STAFF_PASSWORD_MAX} characters.`)
     if (password !== confirm) return setError("Passwords don't match.")
     setError(null)
     setPending(true)
@@ -136,7 +140,7 @@ function CreateAccount({ token, invite }: { token: string; invite: InviteInspect
         <FormField label="Full name">
           <Input autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </FormField>
-        <FormField label="Password" hint="At least 8 characters. Passwords found in known leaks are refused.">
+        <FormField label="Password" hint={`At least ${PASSWORD_MIN} characters. Passwords found in known leaks are refused.`}>
           <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </FormField>
         <FormField label="Confirm password">

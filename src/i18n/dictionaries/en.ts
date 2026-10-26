@@ -317,6 +317,8 @@ export const en = {
   'invite.loadFailed': 'We could not check your invitation. Check your connection and try again.',
   'invite.eyebrow': 'Owner invitation',
   'invite.steps': 'Invitation steps',
+  'invite.signedInAs': "You're signed in as {email}. If this invitation is for someone else, sign out first.",
+  'invite.signOut': 'Sign out',
   'invite.step.code': 'Verify code',
   'invite.step.password': 'Set password',
 

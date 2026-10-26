@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { authMessage, createSupabaseAuthService } from './auth'
 
 /** Just enough of supabase-js for getCurrentUser: auth.getUser, my_platform_access and the business lookup. */
-function stub(getUser: () => unknown, roles: { admin?: boolean; platform?: { role: string; permissions: string[] }; businessId?: string } = {}) {
+function stub(getUser: () => unknown, roles: { admin?: boolean; platform?: { role: string; permissions: string[] }; businessId?: string; acceptedAt?: string | null } = {}) {
   const query = (data: unknown) => {
     const q = { select: () => q, eq: () => q, order: () => q, limit: () => q, maybeSingle: async () => ({ data, error: null }) }
     return q
@@ -13,7 +13,7 @@ function stub(getUser: () => unknown, roles: { admin?: boolean; platform?: { rol
   return {
     auth: { getUser: async () => getUser() },
     rpc: async () => ({ data: platform, error: null }),
-    from: () => query(roles.businessId ? { business_id: roles.businessId } : null),
+    from: () => query(roles.businessId ? { business_id: roles.businessId, accepted_at: roles.acceptedAt === undefined ? '2026-10-20T10:00:00Z' : roles.acceptedAt } : null),
   } as unknown as SupabaseClient
 }
 const user = (meta: Record<string, unknown> = {}) => ({ data: { user: { id: 'u1', email: 'owner@test', user_metadata: meta } }, error: null })
@@ -33,7 +33,12 @@ describe('Supabase auth: getCurrentUser', () => {
 
   it('uses the display name in the dashboard and takes the role from the tables, never the metadata', async () => {
     const r = await createSupabaseAuthService(stub(() => user({ display_name: '  Ana  ', role: 'super_admin' }), { businessId: 'b1' })).getCurrentUser()
-    expect(r.ok && r.data?.user).toEqual({ id: 'u1', name: 'Ana', email: 'owner@test', role: 'business_admin', businessId: 'b1' })
+    expect(r.ok && r.data?.user).toEqual({ id: 'u1', name: 'Ana', email: 'owner@test', role: 'business_admin', businessId: 'b1', invitationPending: false })
+  })
+
+  it('marks an owner whose membership is not accepted yet as invitationPending (R-W1-9)', async () => {
+    const r = await createSupabaseAuthService(stub(() => user(), { businessId: 'b1', acceptedAt: null })).getCurrentUser()
+    expect(r.ok && r.data?.user).toMatchObject({ role: 'business_admin', businessId: 'b1', invitationPending: true })
   })
 
   it('before the team-roles migration is applied, an Owner still signs in (falls back to platform_admins)', async () => {

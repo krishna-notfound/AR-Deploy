@@ -82,6 +82,13 @@ describe('Supabase team service', () => {
     if (!r.ok) expect(r.error).toMatchObject({ code: 'CONFLICT', reason: 'already_member' })
   })
 
+  it('maps the 2FA gate refusal of invite-member to the 2FA sentence (R-W1-1)', async () => {
+    const { sb } = stub({}, { error: httpError(403, { error: 'aal2_required' }) })
+    const r = await createSupabaseTeam(sb).resendMemberInvite('m1')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toEqual({ code: 'PERMISSION', reason: 'aal2_required', message: 'This needs 2FA. Sign in with your authenticator code first.' })
+  })
+
   it('passes the password rule message through', async () => {
     const { sb } = stub({}, { error: httpError(422, { error: 'weak_password', message: 'Password is known to be weak' }) })
     const r = await createSupabaseTeam(sb).acceptInviteCreate({ token: 't', fullName: 'Ana', password: 'password' })
