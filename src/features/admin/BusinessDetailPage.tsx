@@ -75,8 +75,9 @@ export default function BusinessDetailPage() {
     )
   }
 
-  // Undefined until the products (or the catalogue summary) have loaded: never show or confirm "0 products" for an unknown count.
-  const productCount = products.data?.length ?? catalog.data?.totalProductCount
+  // The exact count from business_product_counts, as on the Businesses list (R-W5-6); a products read stops at 1000
+  // rows. Undefined until it has loaded: never show or confirm "0 products" for an unknown count.
+  const productCount = catalog.data?.totalProductCount
   const bizMap = new Map([[b.id, b]])
 
   const closure = closures.data ? closureByBusiness(closures.data).get(b.id) : undefined

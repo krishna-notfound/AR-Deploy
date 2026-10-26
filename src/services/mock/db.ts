@@ -1,4 +1,4 @@
-import type { ActivityItem, AnalyticsEvent, AuditEvent, Business, BusinessApplication, EmailAttempt, ID, Product } from '@/domain/types'
+import type { AnalyticsEvent, AuditEvent, Business, BusinessApplication, EmailAttempt, ID, Product } from '@/domain/types'
 import type { DailyStat } from '../analytics'
 import type { DemoTeam } from './teamSeed'
 
@@ -24,7 +24,6 @@ export interface Db {
   events: AnalyticsEvent[]
   /** Seeded sample data (sample: true). */
   dailyStats: DailyStat[]
-  activity: ActivityItem[]
   // Added with the application workflow (ADR-0024). Optional so demo data saved earlier stays valid.
   applications?: BusinessApplication[]
   audit?: AuditEvent[]
@@ -97,7 +96,6 @@ export function isValidDb(v: unknown): v is Db {
     Array.isArray(v.products) &&
     v.products.every(isProduct) &&
     Array.isArray(v.events) &&
-    Array.isArray(v.dailyStats) &&
-    Array.isArray(v.activity)
+    Array.isArray(v.dailyStats)
   )
 }

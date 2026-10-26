@@ -21,6 +21,18 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 8 rollback: dashboard numbers and activity: product audit events, catalogue activity and owner reads (R-W5-5, R-W7-2)
+-- =============================================================================
+
+-- The product_* audit rows already written stay; nothing new is written once the trigger is gone.
+drop policy if exists "Business owners read platform changes to their business" on public.audit_events;
+drop policy if exists "Platform members read catalogue activity" on public.audit_events;
+drop trigger if exists products_audit on public.products;
+drop function if exists private.audit_product_change();
+
+-- ---- end S1.5 Task 8 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 17 rollback: owner invitations and onboarding: rolling limit with reservations, clean concurrent provisioning, acceptance on any sign-in, owner state on every business (R-W2-3, R-W2-4, R-W2-5, R-W2-7)
 -- =============================================================================
 

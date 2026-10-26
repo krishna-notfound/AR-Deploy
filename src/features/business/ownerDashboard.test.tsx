@@ -228,3 +228,42 @@ describe('QR codes (ADR-0005, ADR-0025)', () => {
     expect(qr.encoded).toHaveLength(1)
   })
 })
+
+describe('business Overview: Published hint and activity (R-W5-8, R-W5-5)', () => {
+  const publishedHint = async () => {
+    const figures = await screen.findByRole('region', { name: 'Key figures' }, { timeout: 15_000 })
+    const term = await within(figures).findByText('Published')
+    return term.closest('div')!.parentElement!
+  }
+
+  it("'In your catalog' active, 'Catalog not public yet' draft, 'Catalog paused' inactive", { timeout: 30_000 }, async () => {
+    const cases: [string, string][] = [
+      ['active', 'In your catalog'],
+      ['draft', 'Catalog not public yet'],
+      ['inactive', 'Catalog paused'],
+    ]
+    for (const [status, hint] of cases) {
+      await service.setBusinessStatus('biz_casa', status as 'active' | 'draft' | 'inactive')
+      const view = openApp('/dashboard', asOwner('biz_casa'))
+      const stat = await publishedHint()
+      expect(await within(stat).findByText(hint)).toBeInTheDocument()
+      for (const other of cases.filter(([, h]) => h !== hint)) expect(within(stat).queryByText(other[1])).toBeNull()
+      view.unmount()
+      localStorage.clear()
+    }
+  })
+
+  it("the owner's feed shows their catalog's changes, the platform team's included, and nothing of other businesses", { timeout: 20_000 }, async () => {
+    const own = await service.getProductsByBusiness('biz_casa')
+    if (!own.ok) throw new Error('seed products missing')
+    const live = own.data.find((p) => p.status === 'published')!
+    await service.unpublishProduct(live.id)
+    await service.setBusinessStatus('biz_casa', 'inactive')
+    await service.setBusinessStatus('biz_nord', 'inactive')
+    openApp('/dashboard', asOwner('biz_casa'))
+    const feed = await screen.findByRole('region', { name: 'Recent activity' }, { timeout: 15_000 })
+    expect(await within(feed).findByText('Catalog for Casa Lisboa Interiors was paused')).toBeInTheDocument()
+    expect(within(feed).getByText(`${live.name.en} was unpublished`)).toBeInTheDocument()
+    expect(within(feed).queryByText(/Nordhaus/)).toBeNull()
+  })
+})

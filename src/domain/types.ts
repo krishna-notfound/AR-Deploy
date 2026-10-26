@@ -198,15 +198,18 @@ export interface User {
   invitationPending?: boolean
 }
 
-export type ActivityKind =
-  | 'business_created'
-  | 'business_updated'
-  | 'business_deleted'
-  | 'product_created'
-  | 'product_updated'
-  | 'product_published'
-  | 'product_unpublished'
-  | 'product_deleted'
+/** The audit event types Recent activity shows (R-W5-5). */
+export const ACTIVITY_KINDS = [
+  'business_created',
+  'business_status_changed',
+  'business_deleted',
+  'product_created',
+  'product_published',
+  'product_unpublished',
+  'product_slug_changed',
+  'product_deleted',
+] as const
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number]
 
 export interface ActivityItem {
   id: ID

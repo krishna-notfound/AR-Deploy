@@ -3,6 +3,7 @@
 // Photos: Unsplash (Unsplash License).
 import { createDemoTeam } from './teamSeed'
 import type {
+  AuditEvent,
   Business,
   Category,
   Currency,
@@ -13,7 +14,7 @@ import type {
   ProductImage,
   ProductVariant,
 } from '@/domain/types'
-import { type DailyStat, deriveActivity, isoDay } from '../analytics'
+import { type DailyStat, isoDay } from '../analytics'
 import { type Db, SCHEMA_VERSION } from './db'
 
 const KHRONOS = 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models'
@@ -641,9 +642,22 @@ export function createSeed(now: number = Date.now()): Db {
       products.filter((p) => businesses.find((b) => b.id === p.businessId)?.status === 'active'),
       now,
     ),
-    activity: deriveActivity(businesses, products),
+    audit: seedActivity(businesses, products),
     team: createDemoTeam(now),
   }
+}
+
+/** The catalog history behind Recent activity, as the database's audit triggers would have written it (R-W5-5). */
+function seedActivity(businesses: Business[], products: Product[]): AuditEvent[] {
+  const rows: AuditEvent[] = []
+  const add = (createdAt: string, eventType: string, businessId: string, metadata: Record<string, unknown>) =>
+    rows.push({ id: `aud_seed_${rows.length + 1}`, createdAt, eventType, businessId, metadata })
+  for (const b of businesses) add(b.createdAt, 'business_created', b.id, {})
+  for (const p of products) {
+    add(p.createdAt, 'product_created', p.businessId, { product_id: p.id, name: p.name.en })
+    if (p.publishedAt) add(p.publishedAt, 'product_published', p.businessId, { product_id: p.id, name: p.name.en })
+  }
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
 /** Deterministic PRNG so sample charts look the same on every reset. */
