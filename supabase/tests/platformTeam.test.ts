@@ -377,7 +377,7 @@ describe('member management (Task 3)', () => {
     // S1.5 R-W3-3: products.publish includes products.edit, so it is kept (and answered as added) rather than removed.
     expect(r).toEqual({ ok: true, added: ['products.edit'] })
     const ev = await db.query<{ metadata: J }>(`select metadata from public.audit_events where event_type = 'access_permissions_changed' order by created_at desc limit 1`)
-    expect(ev.rows[0]!.metadata).toEqual({ role: 'team', added: ['products.publish'], removed: [] })
+    expect(ev.rows[0]!.metadata).toEqual({ role: 'team', added: ['products.publish'], removed: [], actor_label: 'Owner' })
     await call(OWNER_U, `select public.admin_set_role_permissions('team', array['businesses.view', 'applications.view', 'products.view', 'analytics.view', 'products.edit']) as r`)
   })
 

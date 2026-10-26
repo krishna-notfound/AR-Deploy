@@ -274,7 +274,7 @@ describe('account settings: profiles and policy (Task 1)', () => {
       `select actor_id, metadata from public.audit_events where event_type = 'platform_security_policy_changed' order by created_at desc limit 1`)
     expect(ev.rows[0]).toEqual({
       actor_id: OWNER_U,
-      metadata: { from: { require_2fa_staff: false, require_2fa_business: false }, to: { require_2fa_staff: false, require_2fa_business: true } },
+      metadata: { from: { require_2fa_staff: false, require_2fa_business: false }, to: { require_2fa_staff: false, require_2fa_business: true } , actor_label: 'Owner' },
     })
     // The trigger stamps who and when (the service layer sends neither).
     const s = (await db.query<{ updated_by: string; fresh: boolean }>(
@@ -444,7 +444,7 @@ describe('account settings: codes and closure (Task 2)', () => {
     expect(await call(DRAFT_OWNER_U, 'select public.my_security_state() as r')).toMatchObject({ closure: null })
     expect(await call(DRAFT_OWNER_U, 'select public.cancel_account_closure() as r')).toEqual({ error: 'not_found' })
     const ev = await db.query<J>(`select actor_id, business_id, to_status, metadata from public.audit_events where event_type = 'account_closure_cancelled'`)
-    expect(ev.rows).toEqual([{ actor_id: DRAFT_OWNER_U, business_id: BIZ_D, to_status: 'draft', metadata: { subject_id: DRAFT_OWNER_U } }])
+    expect(ev.rows).toEqual([{ actor_id: DRAFT_OWNER_U, business_id: BIZ_D, to_status: 'draft', metadata: { subject_id: DRAFT_OWNER_U, actor_label: 'Business owner', business_name: 'Draft Co' } }])
     await expect(probe('', 'select public.cancel_account_closure()', [], null, 'anon')).rejects.toThrow(/permission denied/)
   })
 
@@ -497,7 +497,7 @@ describe('account settings: codes and closure (Task 2)', () => {
 
     expect(await svc('select public.service_log_account_event($1, $2, $3, $4) as r', [STRANGER_U, 'account_2fa_enabled', { factor: 'totp' }, '203.0.113.9'])).toEqual({ ok: true })
     const ev = await db.query<J>(`select actor_id, metadata from public.audit_events where event_type = 'account_2fa_enabled'`)
-    expect(ev.rows).toEqual([{ actor_id: STRANGER_U, metadata: { factor: 'totp', ip: '203.0.113.9' } }])
+    expect(ev.rows).toEqual([{ actor_id: STRANGER_U, metadata: { factor: 'totp', ip: '203.0.113.9', actor_label: 'User' } }])
     expect(await svc('select public.service_log_account_event($1, $2, $3, $4) as r', [STRANGER_U, 'access_denied', {}, null])).toEqual({ error: 'invalid_request' })
     // The subject may already be deleted (account_deleted): logged without an actor.
     const gone = '00000000-0000-0000-0000-0000000000ff'
@@ -526,7 +526,7 @@ describe('account settings: codes and closure (Task 2)', () => {
     expect((await db.query('select status from public.businesses where id = $1', [BIZ_C])).rows[0]).toEqual({ status: 'active' })
     expect((await db.query('select 1 from public.account_closure_requests where user_id = $1', [CLOSE_BIZ_U])).rows).toHaveLength(0)
     const ev = await db.query<J>(`select actor_id, business_id, metadata from public.audit_events where event_type = 'account_closure_restored'`)
-    expect(ev.rows).toEqual([{ actor_id: OWNER_U, business_id: BIZ_C, metadata: { subject_id: CLOSE_BIZ_U } }])
+    expect(ev.rows).toEqual([{ actor_id: OWNER_U, business_id: BIZ_C, metadata: { subject_id: CLOSE_BIZ_U, actor_label: 'Owner', business_name: 'Closing Co' } }])
     expect(await svc('select public.service_restore_closure($1, $2) as r', [CLOSE_BIZ_U, OWNER_U])).toEqual({ error: 'not_found' })
     // The subject sees the Owner's restore in their own activity.
     const mine = (await as(CLOSE_BIZ_U, (tx) => tx.query<{ event_type: string }>('select event_type from public.list_my_security_events()'))).rows.map((r) => r.event_type)

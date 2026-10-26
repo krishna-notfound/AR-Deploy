@@ -28,7 +28,13 @@ export interface TemplateData {
   accountEmail?: string
   /** Application decision (R-W2-1): the rejection reason, only when the reviewer ticked "Include the reason in the email". */
   reason?: string
+  /** Business notice (R-W7-2): which platform change the owner is told about, and the product's name for product changes. */
+  businessEvent?: BusinessNoticeEvent
+  productName?: string
 }
+
+/** The platform-team changes a business owner is emailed about (R-W7-2, §11.2). */
+export type BusinessNoticeEvent = 'paused' | 'live' | 'product_unpublished' | 'product_deleted'
 
 /** The account changes a security notice can report (spec §7). */
 export type SecurityNotice =
@@ -160,8 +166,57 @@ const applicationDecision: Record<EmailLang, (d: TemplateData) => Copy> = {
   }),
 }
 
+// Business notice (R-W7-2, §11.2): the platform team changed the owner's catalogue. No link: the footer names the
+// dashboard card where the change is listed.
+const BUSINESS_NOTICE: Record<EmailLang, Record<BusinessNoticeEvent, (d: TemplateData) => { subject: string; body: string }>> = {
+  en: {
+    paused: (d) => ({
+      subject: 'Your Sanctus catalog has been paused',
+      body: `The Sanctus team paused the public catalog of ${d.businessName ?? ''}. Customers who open its link or QR code can't see it for now. Your products and settings are kept.`,
+    }),
+    live: (d) => ({
+      subject: 'Your Sanctus catalog is live',
+      body: `The Sanctus team made the catalog of ${d.businessName ?? ''} public. Customers can now open it from its link and QR code.`,
+    }),
+    product_unpublished: (d) => ({
+      subject: 'A product was unpublished from your catalog',
+      body: `The Sanctus team unpublished ${d.productName ?? ''}. It is kept as a draft in your dashboard.`,
+    }),
+    product_deleted: (d) => ({
+      subject: 'A product was removed from your catalog',
+      body: `The Sanctus team deleted ${d.productName ?? ''}, with its photos and 3D files.`,
+    }),
+  },
+  pt: {
+    paused: (d) => ({
+      subject: 'O seu catálogo Sanctus foi pausado',
+      body: `A equipa Sanctus pausou o catálogo público de ${d.businessName ?? ''}. Quem abrir o link ou o código QR não o consegue ver por agora. Os seus produtos e definições são mantidos.`,
+    }),
+    live: (d) => ({
+      subject: 'O seu catálogo Sanctus está disponível',
+      body: `A equipa Sanctus tornou público o catálogo de ${d.businessName ?? ''}. Os clientes já o podem abrir pelo link e pelo código QR.`,
+    }),
+    product_unpublished: (d) => ({
+      subject: 'Um produto foi retirado do seu catálogo',
+      body: `A equipa Sanctus retirou ${d.productName ?? ''} do catálogo. Fica guardado como rascunho no seu painel.`,
+    }),
+    product_deleted: (d) => ({
+      subject: 'Um produto foi eliminado do seu catálogo',
+      body: `A equipa Sanctus eliminou ${d.productName ?? ''}, com as suas fotos e ficheiros 3D.`,
+    }),
+  },
+}
+const BUSINESS_NOTICE_FOOTER: Record<EmailLang, string> = {
+  en: "You can see this change under 'Changes by the platform team' in your dashboard. Contact the Sanctus team if you have questions.",
+  pt: "Pode ver esta alteração em 'Alterações da equipa da plataforma' no seu painel. Contacte a equipa Sanctus se tiver dúvidas.",
+}
+const businessNotice = (lang: EmailLang) => (d: TemplateData): Copy => {
+  const c = BUSINESS_NOTICE[lang][d.businessEvent ?? 'paused'](d)
+  return { subject: c.subject, heading: c.subject, body: c.body, closing: BUSINESS_NOTICE_FOOTER[lang] }
+}
+
 /** Kinds rendered from COPY below. The S1.5 kinds (§10.4) not listed in COPY yet have their own builders. */
-export type TemplateKind = Exclude<EmailKind, 'business_notice' | 'team_notice'>
+export type TemplateKind = Exclude<EmailKind, 'team_notice'>
 
 const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> = {
   team_invitation: { en: teamInvitation, pt: teamInvitation },
@@ -169,6 +224,7 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
   security_notice: { en: securityNotice, pt: securityNotice },
   closure_request: { en: closureRequest, pt: closureRequest },
   application_decision: applicationDecision,
+  business_notice: { en: businessNotice('en'), pt: businessNotice('pt') },
   owner_invitation: {
     en: (d) => ({
       subject: `You're invited to manage ${d.businessName ?? 'your catalogue'} on Sanctus`,
@@ -284,6 +340,10 @@ ${data.actionUrl ? `<p style="margin:24px 0 0;font-size:12px;color:#6E6559;word-
 /** The rejection notice to an applicant (R-W2-1), in the application's language; the reason only when the reviewer ticked it. */
 export const applicationDecisionEmail = (lang: EmailLang, businessName: string, reason?: string): RenderedEmail =>
   renderEmail('application_decision', lang, { businessName, reason })
+
+/** A platform-team change, told to the business owner (R-W7-2), in the application's language. */
+export const businessNoticeEmail = (lang: EmailLang, event: BusinessNoticeEvent, d: { businessName: string; productName?: string }): RenderedEmail =>
+  renderEmail('business_notice', lang, { businessEvent: event, businessName: d.businessName, productName: d.productName })
 
 /** The only link an account-security email may carry: the app's own https base URL. */
 const appLink = (appBaseUrl: string | undefined) => (appBaseUrl && /^https:\/\/[^\s/]+$/.test(appBaseUrl) ? appBaseUrl : undefined)

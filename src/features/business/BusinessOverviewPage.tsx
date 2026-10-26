@@ -21,6 +21,7 @@ import { SetupProgressCard } from '../settings/OnboardingChecklist'
 import { ActivityList } from '../shared/ActivityList'
 import { MostViewedList, formatArRate, mostViewed } from '../analytics/MostViewedList'
 import { hasArModel, productArReadiness } from '../products/productReadiness'
+import { PlatformChangesCard } from './PlatformChangesCard'
 
 /** Where published products are, by the catalog's status (R-W5-8). */
 const PUBLISHED_HINT: Record<BusinessStatus, string> = { active: 'In your catalog', draft: 'Catalog not public yet', inactive: 'Catalog paused' }
@@ -125,6 +126,7 @@ export default function BusinessOverviewPage() {
                 <ActivityList query={activity} />
               </CardBody>
             </Card>
+            <PlatformChangesCard businessId={business.id} className="lg:col-span-12" />
           </div>
         </div>
       )}

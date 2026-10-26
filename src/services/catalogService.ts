@@ -131,8 +131,31 @@ export interface AuditQuery {
   pageSize?: number
 }
 
-/** An audit entry with the acting account's email resolved (platform admins only). */
-export type AuditEntry = AuditEvent & { actorEmail?: string }
+/** The actor's role, recorded with an audit row at insert (R-W7-1). */
+export type ActorLabel = 'Owner' | 'Admin' | 'Team' | 'Business owner' | 'User'
+
+/**
+ * An audit entry with the acting account's email resolved (platform admins only). `actorLabel` and `businessName` are
+ * the snapshot taken at insert, so a deleted person or business still reads (R-W7-1). `businessDeleted`: the row's
+ * business no longer exists.
+ */
+export type AuditEntry = AuditEvent & { actorEmail?: string; actorLabel?: ActorLabel; businessName?: string; businessDeleted?: boolean }
+
+const ACTOR_LABELS: readonly ActorLabel[] = ['Owner', 'Admin', 'Team', 'Business owner', 'User']
+/** An audit event with the snapshot taken at insert read out of its metadata: the actor label and the business name (R-W7-1). */
+export function toAuditEntry(e: AuditEvent): AuditEntry {
+  const label = ACTOR_LABELS.find((l) => l === e.metadata.actor_label)
+  const name = typeof e.metadata.business_name === 'string' && e.metadata.business_name ? e.metadata.business_name : undefined
+  return { ...e, ...(label ? { actorLabel: label } : {}), ...(name ? { businessName: name } : {}) }
+}
+
+/** Platform-team actor labels: the rows an owner sees under "Changes by the platform team" (R-W7-2). */
+export const PLATFORM_ACTOR_LABELS: readonly ActorLabel[] = ['Owner', 'Admin', 'Team']
+/** The event types a business owner may read about their business (the R-W7-2 policy's whitelist). */
+export const PLATFORM_CHANGE_EVENTS: readonly string[] = [
+  'business_status_changed', 'business_slug_changed', 'product_created', 'product_published', 'product_unpublished',
+  'product_slug_changed', 'product_deleted', 'account_closure_voided',
+]
 
 export interface ProvisionOutcome {
   owner: 'linked' | 'already_linked'
@@ -196,6 +219,8 @@ export interface CatalogService {
   /** Possible duplicates of an application (R-W2-9): only a warning for the reviewer, never a block. */
   getApplicationDuplicates(id: ID): Promise<Result<ApplicationDuplicates>>
   getAuditEvents(query?: AuditQuery): Promise<Result<Page<AuditEntry>>>
+  /** The last 20 changes the platform team (Owner, Admin, Team) made to a business, newest first (R-W7-2). */
+  getPlatformChanges(businessId: ID): Promise<Result<AuditEntry[]>>
   getEmailAttempts(query: { applicationId?: ID; businessId?: ID }): Promise<Result<EmailAttempt[]>>
 
   // files: validate on the client first (lib/files.ts); this only stores them

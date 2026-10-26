@@ -245,3 +245,21 @@ describe('ApplicationDetailPage: deleted business, reopen, duplicates, approval 
     expect(lookups).not.toHaveBeenCalled()
   })
 })
+
+describe('ApplicationDetailPage: history gating (R-W7-8)', () => {
+  it("without records.view: 'Showing application events only.' and the history asks for the application only", async () => {
+    const id = await submitApplication()
+    const spy = vi.spyOn(service, 'getAuditEvents')
+    renderAsTeam(id, ['applications.view', 'businesses.view'])
+    expect(await screen.findByText('Showing application events only.')).toBeInTheDocument()
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ applicationId: id, businessId: undefined }))
+  })
+
+  it('with records.view: no note', async () => {
+    const id = await submitApplication()
+    renderAsTeam(id, ['applications.view', 'records.view'])
+    expect(await screen.findByText('History')).toBeInTheDocument()
+    expect(await screen.findByText('Email activity')).toBeInTheDocument()
+    expect(screen.queryByText('Showing application events only.')).not.toBeInTheDocument()
+  })
+})
