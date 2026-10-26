@@ -329,7 +329,7 @@ describe('S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)', (
     await withRolePermissions({ team: [] }, async () => {
       expect(await save(['products.publish'])).toEqual({ ok: true, added: ['products.view', 'products.edit'] })
       expect(await stored('team')).toEqual(['products.edit', 'products.publish', 'products.view'])
-      expect(await lastAudit()).toEqual({ role: 'team', added: ['products.edit', 'products.publish', 'products.view'], removed: [] })
+      expect(await lastAudit()).toEqual({ role: 'team', added: ['products.edit', 'products.publish', 'products.view'], removed: [], actor_label: 'Owner' })
       // Saving the closed set again changes nothing and adds nothing.
       expect(await save(['products.view', 'products.edit', 'products.publish'])).toEqual({ ok: true, added: [] })
       // Unknown keys and non-Owners are still refused.
@@ -515,7 +515,7 @@ describe('S1.5 Task 9: team membership lifecycle', () => {
     expect((await db.query('select 1 from private.platform_invites where member_id = $1', [M_DEACT])).rows).toHaveLength(0)
     const events = (await db.query<{ actor_id: string; metadata: Record<string, unknown> }>(
       `select actor_id, metadata from public.audit_events where event_type = 'access_member_removed' and metadata->>'member_id' = $1`, [M_DEACT])).rows
-    expect(events).toEqual([{ actor_id: OWNER, metadata: { member_id: M_DEACT, email_sha256: sha('t9-deact@test'), role: 'admin' } }])
+    expect(events).toEqual([{ actor_id: OWNER, metadata: { member_id: M_DEACT, email_sha256: sha('t9-deact@test'), role: 'admin', actor_label: 'Owner' } }])
     // The refusal is audited as access_denied, not as a removal.
     expect((await db.query(`select 1 from public.audit_events where event_type = 'access_denied' and actor_id = $1 and metadata->>'action' = 'remove_member'`, [ADMIN])).rows).toHaveLength(1)
     // Only signed-in callers may execute it.
@@ -541,7 +541,7 @@ describe('S1.5 Task 9: team membership lifecycle', () => {
     const memberId = await memberOf(SYNC)
     await db.query(`update auth.users set email = 'New@X.pt' where id = $1`, [SYNC])
     expect(await memberEmail(memberId)).toBe('new@x.pt')
-    expect(await emailEvents(memberId)).toEqual([{ actor_id: SYNC, metadata: { member_id: memberId, from: 't9-sync@test', to: 'new@x.pt' } }])
+    expect(await emailEvents(memberId)).toEqual([{ actor_id: SYNC, metadata: { member_id: memberId, from: 't9-sync@test', to: 'new@x.pt', actor_label: 'Team' } }])
     // Another column changing, or the same address in another case, writes nothing.
     await db.query(`update auth.users set last_sign_in_at = now() where id = $1`, [SYNC])
     await db.query(`update auth.users set email = 'new@X.PT' where id = $1`, [SYNC])
@@ -553,7 +553,7 @@ describe('S1.5 Task 9: team membership lifecycle', () => {
     await db.query(`update auth.users set email = 'T9-Taken@test' where id = $1`, [CONFLICT])
     expect((await db.query<{ email: string }>('select email from auth.users where id = $1', [CONFLICT])).rows[0]!.email).toBe('T9-Taken@test')
     expect(await memberEmail(memberId)).toBe('t9-conflict@test')
-    expect(await emailEvents(memberId)).toEqual([{ actor_id: CONFLICT, metadata: { member_id: memberId, from: 't9-conflict@test', to: 't9-taken@test', conflict: true } }])
+    expect(await emailEvents(memberId)).toEqual([{ actor_id: CONFLICT, metadata: { member_id: memberId, from: 't9-conflict@test', to: 't9-taken@test', conflict: true, actor_label: 'Team' } }])
   })
 
   it("an exception inside sync_member_email doesn't block the auth.users update", async () => {
@@ -823,7 +823,7 @@ describe('S1.5 Task 3: closure integrity', () => {
     expect(removed.affectedRows).toBe(1)
 
     expect(await request(A)).toBeUndefined()
-    expect(await voided(A)).toEqual([{ actor_id: OWNER, business_id: BIZ_A, metadata: { subject_id: A, business_id: BIZ_A, reason: 'owner_removed' } }])
+    expect(await voided(A)).toEqual([{ actor_id: OWNER, business_id: BIZ_A, metadata: { subject_id: A, business_id: BIZ_A, reason: 'owner_removed', actor_label: 'Owner', business_name: 'Task Three A' } }])
     expect(await status(BIZ_A)).toBe('inactive')
   })
 
@@ -1253,7 +1253,7 @@ describe('S1.5 Task 10: invitation note, exact access history, 2FA reset only wh
     expect(await h.svc(`select to_jsonb(public.service_accept_invite($1, $2)) as r`, [HASH(8), LATE])).toBe('invite_expired')
     const { rows } = await db.query<{ metadata: Record<string, unknown> }>(
       `select metadata from public.audit_events where event_type = 'access_invite_expired_attempt' and actor_id = $1`, [LATE])
-    expect(rows).toEqual([{ metadata: { member_id: m } }])
+    expect(rows).toEqual([{ metadata: { member_id: m, actor_label: 'User' } }])
   })
 
   it('has_2fa true for a verified factor or recovery codes, else false', async () => {
@@ -1381,7 +1381,7 @@ describe('S1.5 Task 16: application review', () => {
     const audit = (await db.query<{ actor_id: string; from_status: string; to_status: string; metadata: Record<string, unknown> }>(
       `select actor_id, from_status, to_status, metadata from public.audit_events
         where application_id = $1 and event_type = 'application_status_changed'`, [a])).rows
-    expect(audit).toEqual([{ actor_id: OWNER, from_status: 'approved', to_status: 'under_review', metadata: { action: 'reopen' } }])
+    expect(audit).toEqual([{ actor_id: OWNER, from_status: 'approved', to_status: 'under_review', metadata: { action: 'reopen', actor_label: 'Owner' } }])
     const approved = await review(OWNER, a, 'approve')
     expect(approved.status).toBe('approved')
     expect(approved.business_id).not.toBeNull()
@@ -1705,7 +1705,7 @@ describe('S1.5 Task 17: owner invitations and onboarding', () => {
     expect(await h.call(PENDING, `select to_jsonb(public.record_sign_in('Firefox')) as r`)).toBe('recorded')
     const accepted = await membership(PENDING)
     expect(accepted).not.toBeNull()
-    expect(await completed(PENDING)).toEqual([{ business_id: biz, metadata: { via: 'sign_in' } }])
+    expect(await completed(PENDING)).toEqual([{ business_id: biz, metadata: { via: 'sign_in', actor_label: 'Business owner', business_name: 'Task Seventeen 9' } }])
 
     expect(await h.call(PENDING, `select to_jsonb(public.record_sign_in('Firefox')) as r`)).toBe('rate_limited')
     expect(await membership(PENDING)).toEqual(accepted)
@@ -1716,7 +1716,7 @@ describe('S1.5 Task 17: owner invitations and onboarding', () => {
     await db.query(`insert into public.audit_events (event_type, actor_id) values ('account_signed_in', $1)`, [LIMITED])
     expect(await h.call(LIMITED, `select to_jsonb(public.record_sign_in(null)) as r`)).toBe('rate_limited')
     expect(await membership(LIMITED)).not.toBeNull()
-    expect(await completed(LIMITED)).toEqual([{ business_id: BIZ(5), metadata: { via: 'sign_in' } }])
+    expect(await completed(LIMITED)).toEqual([{ business_id: BIZ(5), metadata: { via: 'sign_in', actor_label: 'Business owner', business_name: 'Task Seventeen 5' } }])
   })
 
   it("admin_list_owner_states: needs_owner; invite_pending with last_invited_at from the newest attempt (or the newest invite email_log row); email_failed for a bounced or blocked newest invite; owner_active; without businesses.view → {error:'forbidden'}", async () => {
@@ -1945,6 +1945,111 @@ describe('S1.5 Task 8: catalogue activity from audit events', () => {
       await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
       expect(await objects()).toEqual({ trigger: 0, policies: [] })
       expect((await rolled.query(`select 1 from public.audit_events where event_type = 'product_created' and metadata->>'product_id' = $1`, [id(31)])).rows).toHaveLength(1)
+    } finally {
+      await rolled.close()
+    }
+  }, 120_000)
+})
+
+describe('S1.5 Task 11: history that survives deletion, owner notices', () => {
+  GONE_AFTER_ROLLBACK.push('private.snapshot_audit_event()')
+  const id = ids(11)
+  const P_OWNER = id(1) // platform Owner
+  const ADMIN = id(2)
+  const TEAM = id(3)
+  const OWNER_A = id(4) // business owner of A
+  const OWNER_B = id(5)
+  const USER = id(6) // signed-in, no role
+  const BIZ_A = id(10)
+  const BIZ_B = id(11)
+  const BIZ_GONE = id(12)
+  const P_GONE = id(20)
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values
+        ('${P_OWNER}', 't11-owner@test', now()), ('${ADMIN}', 't11-admin@test', now()), ('${TEAM}', 't11-team@test', now()),
+        ('${OWNER_A}', 't11-a@test', now()), ('${OWNER_B}', 't11-b@test', now()), ('${USER}', 't11-user@test', now());
+      insert into public.platform_admins (user_id) values ('${P_OWNER}');
+      insert into public.platform_members (user_id, email, full_name, role, status) values
+        ('${ADMIN}', 't11-admin@test', 'Ada Admin', 'admin', 'active'), ('${TEAM}', 't11-team@test', 'Tom Team', 'team', 'active');
+      insert into public.businesses (id, name, slug, status) values
+        ('${BIZ_A}', 'T11 A', 't11-a', 'active'), ('${BIZ_B}', 'T11 B', 't11-b', 'active'), ('${BIZ_GONE}', 'T11 Gone Co', 't11-gone', 'active');
+      insert into public.business_members (business_id, user_id) values ('${BIZ_A}', '${OWNER_A}'), ('${BIZ_B}', '${OWNER_B}');
+      insert into public.products (id, business_id, slug, name, category, price, currency, status, width, height, depth, dimension_unit)
+        values ('${P_GONE}', '${BIZ_GONE}', 'gone', '{"en":"T11 Gone sofa"}', 'sofa', 1000, 'EUR', 'draft', 10, 10, 10, 'cm');
+    `)
+  })
+
+  it('after a business is deleted, its earlier rows still filter by business_id and carry business_name', async () => {
+    // The platform Owner pauses the catalogue, then deletes the business.
+    await h.as(P_OWNER, (tx) => tx.query(`update public.businesses set status = 'inactive' where id = $1`, [BIZ_GONE]))
+    await h.as(P_OWNER, (tx) => tx.query(`delete from public.businesses where id = $1`, [BIZ_GONE]))
+    expect((await db.query(`select 1 from public.businesses where id = $1`, [BIZ_GONE])).rows).toHaveLength(0)
+    const rows = (await db.query<{ event_type: string; business_name: string | null; actor_label: string | null }>(
+      `select event_type, metadata->>'business_name' as business_name, metadata->>'actor_label' as actor_label
+         from public.audit_events where business_id = $1 order by created_at, event_type`, [BIZ_GONE])).rows
+    expect(rows.map((r) => r.event_type).sort()).toEqual(['business_deleted', 'business_status_changed', 'product_created'])
+    for (const r of rows) expect(r.business_name).toBe('T11 Gone Co')
+    expect(rows.find((r) => r.event_type === 'business_status_changed')!.actor_label).toBe('Owner')
+    expect(rows.find((r) => r.event_type === 'business_deleted')!.actor_label).toBe('Owner')
+    // The audit_events.business_id foreign key is gone; actor_id keeps its own.
+    const fks = (await db.query<{ conname: string }>(
+      `select conname from pg_constraint where conrelid = 'public.audit_events'::regclass and contype = 'f' order by 1`)).rows.map((r) => r.conname)
+    expect(fks).not.toContain('audit_events_business_id_fkey')
+    expect(fks).toContain('audit_events_actor_id_fkey')
+  })
+
+  it('actor_label is Owner, Admin, Team, Business owner or User, and no email or name is stored', async () => {
+    const insert = async (actor: string | null, metadata: Record<string, unknown> = {}) =>
+      (await db.query<{ metadata: Record<string, unknown> }>(
+        `insert into public.audit_events (event_type, actor_id, business_id, metadata) values ('t11_label', $1, $2, $3) returning metadata`,
+        [actor, BIZ_A, JSON.stringify(metadata)])).rows[0]!.metadata
+    const cases: [string, string][] = [[P_OWNER, 'Owner'], [ADMIN, 'Admin'], [TEAM, 'Team'], [OWNER_A, 'Business owner'], [USER, 'User']]
+    for (const [actor, label] of cases) {
+      const m = await insert(actor)
+      expect(m).toEqual({ business_name: 'T11 A', actor_label: label })
+      const stored = JSON.stringify(m)
+      for (const leak of ['@test', 'Ada Admin', 'Tom Team']) expect(stored).not.toContain(leak)
+    }
+    // No actor (the system): no label. A label the writer supplies is replaced by the actor's real one.
+    expect(await insert(null)).toEqual({ business_name: 'T11 A' })
+    expect((await insert(USER, { actor_label: 'Owner' })).actor_label).toBe('User')
+    // A name the writer already recorded is kept.
+    expect((await insert(null, { business_name: 'Earlier name' })).business_name).toBe('Earlier name')
+  })
+
+  it("the owner reads their business's whitelisted platform rows and not another business's", async () => {
+    // Staff changes, made as the platform Owner and recorded with the actor's label.
+    await h.as(P_OWNER, (tx) => tx.query(`update public.businesses set status = 'inactive' where id = $1`, [BIZ_A]))
+    await h.as(P_OWNER, (tx) => tx.query(`update public.businesses set status = 'inactive' where id = $1`, [BIZ_B]))
+    const platformRows = async (uid: string) =>
+      (await h.probe(uid, `select business_id, event_type, metadata->>'actor_label' as actor_label, metadata->>'business_name' as business_name
+                             from public.audit_events where metadata->>'actor_label' in ('Owner', 'Admin', 'Team') order by created_at`)).rows as
+        { business_id: string; event_type: string; actor_label: string; business_name: string }[]
+    const a = await platformRows(OWNER_A)
+    expect(a).toEqual([{ business_id: BIZ_A, event_type: 'business_status_changed', actor_label: 'Owner', business_name: 'T11 A' }])
+    const b = await platformRows(OWNER_B)
+    expect(b).toEqual([{ business_id: BIZ_B, event_type: 'business_status_changed', actor_label: 'Owner', business_name: 'T11 B' }])
+    // Rows outside the whitelist (the label test's rows) stay hidden from the owner.
+    expect(await h.count(OWNER_A, `select count(*)::int as n from public.audit_events where event_type = 't11_label'`)).toBe(0)
+  })
+
+  it('the rollback re-adds the business_id FK NOT VALID, keeps rows of deleted businesses, and business_deleted no longer sets business_id', async () => {
+    const rolled = await freshDb()
+    try {
+      await rolled.exec(`insert into public.businesses (id, name, slug, status) values ('${id(30)}', 'T11 R', 't11-r', 'active'), ('${id(31)}', 'T11 R2', 't11-r2', 'active');
+        delete from public.businesses where id = '${id(30)}';`)
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      const fk = (await rolled.query<{ convalidated: boolean }>(
+        `select convalidated from pg_constraint where conname = 'audit_events_business_id_fkey'`)).rows
+      expect(fk).toEqual([{ convalidated: false }])
+      expect((await rolled.query(`select 1 from public.audit_events where event_type = 'business_deleted' and business_id = $1`, [id(30)])).rows).toHaveLength(1)
+      expect((await rolled.query(`select 1 from pg_trigger where tgname = 'audit_events_snapshot'`)).rows).toHaveLength(0)
+      await rolled.exec(`delete from public.businesses where id = '${id(31)}'`)
+      const r2 = (await rolled.query<{ business_id: string | null; mid: string }>(
+        `select business_id, metadata->>'business_id' as mid from public.audit_events where event_type = 'business_deleted' and metadata->>'business_id' = $1`, [id(31)])).rows
+      expect(r2).toEqual([{ business_id: null, mid: id(31) }])
     } finally {
       await rolled.close()
     }

@@ -3,10 +3,10 @@ import { ExternalLink, PackagePlus, Trash2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { PageHeader, PanelHeader } from '@/components/layout/PageHeader'
 import { Badge, BusinessStatusBadge } from '@/components/ui/Badge'
 import { Button, ButtonLink } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { Card, CardBody } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { MenuItem } from '@/components/ui/Menu'
 import { EmptyState, ErrorState } from '@/components/ui/States'
@@ -203,10 +203,20 @@ export default function BusinessDetailPage() {
       {tab === 'owners' && (
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <BusinessOwnersPanel business={b} />
-          <div className="space-y-6">
-            <AuditTimeline businessId={b.id} />
-            <EmailActivity businessId={b.id} />
-          </div>
+          {/* R-W7-8: a business's history and emails are records.view; without it, say what is needed. */}
+          {can('records.view') ? (
+            <div className="space-y-6">
+              <AuditTimeline businessId={b.id} />
+              <EmailActivity businessId={b.id} />
+            </div>
+          ) : (
+            <Card>
+              <PanelHeader title="History" />
+              <CardBody>
+                <p className="text-ui-body text-ink-muted">{RECORDS_NEEDED}</p>
+              </CardBody>
+            </Card>
+          )}
         </div>
       )}
       {tab === 'qr' &&
@@ -224,6 +234,8 @@ export default function BusinessDetailPage() {
 }
 
 const ALREADY_HANDLED = 'This closure was already handled.'
+/** R-W7-8: shown in place of History and Email activity without records.view. */
+const RECORDS_NEEDED = "This business's history needs 'View the audit log and email log'."
 
 /** What the closure means for the catalog now, from its real status (R-W3-6): never "offline" for a live catalog. */
 const CLOSURE_STATUS_SENTENCE: Record<BusinessStatus, string> = {

@@ -441,6 +441,11 @@ verify_jwt = true
 [functions.review-application]
 verify_jwt = true
 
+# Owner notices (R-W7-2): after a platform-team change to a catalogue, the app asks this to email the business owner.
+# Staff only, 2FA-gated in the handler.
+[functions.notify-business-owner]
+verify_jwt = true
+
 # Platform team (ADR-0029, ADR-0030). invite-member and manage-member need a signed-in caller; accept-member-invite is
 # public (the link secret is the credential) and checks the JWT itself for "accept".
 [functions.invite-member]

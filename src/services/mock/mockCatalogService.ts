@@ -8,7 +8,7 @@ import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
 import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview, normalizeBusinessName } from '../applicationRules'
-import { CLOSURE_PENDING_ERROR, type CatalogService, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok } from '../catalogService'
+import { CLOSURE_PENDING_ERROR, type CatalogService, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok, toAuditEntry } from '../catalogService'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { mockClosureOpen, voidMockClosure } from './mockAccount'
@@ -22,8 +22,43 @@ export const FAIL_RATE_KEY = 'arfurn:debug:failRate'
 const DEMO_ADMIN = { id: 'demo-super-admin', email: 'Demo Super Admin' }
 const PAGE_SIZE = 20
 
-function audit(db: Db, e: Omit<AuditEvent, 'id' | 'createdAt' | 'metadata'> & { metadata?: Record<string, unknown> }): void {
-  ;(db.audit ??= []).unshift({ id: newId('aud'), createdAt: nowIso(), metadata: {}, ...e })
+/** The demo platform roles as the audit actor labels (R-W7-1). */
+const DEMO_ACTOR_LABEL = { owner: 'Owner', admin: 'Admin', team: 'Team' } as const
+
+/**
+ * Records an audit row, stamped as the database's snapshot trigger does (R-W7-1): the business's name when the row
+ * names a business without it, and the demo platform user's role label (never an email or name).
+ */
+function audit(db: Db, e: Omit<AuditEvent, 'id' | 'createdAt' | 'metadata'> & { metadata?: Record<string, unknown> }): AuditEvent {
+  const metadata = { ...e.metadata }
+  const businessName = e.businessId ? db.businesses.find((b) => b.id === e.businessId)?.name : undefined
+  if (businessName && metadata.business_name === undefined) metadata.business_name = businessName
+  const role = e.actorId === DEMO_ADMIN.id ? demoPlatformRole() : null
+  if (role) metadata.actor_label = DEMO_ACTOR_LABEL[role]
+  const event: AuditEvent = { id: newId('aud'), createdAt: nowIso(), ...e, metadata }
+  ;(db.audit ??= []).unshift(event)
+  return event
+}
+
+/** The business_notice subjects (§11.2), for the demo attempt; the copy itself is the Edge Function's template. */
+const NOTICE_SUBJECT: Record<'paused' | 'live' | 'product_unpublished' | 'product_deleted', { en: string; pt: string }> = {
+  paused: { en: 'Your Sanctus catalog has been paused', pt: 'O seu catálogo Sanctus foi pausado' },
+  live: { en: 'Your Sanctus catalog is live', pt: 'O seu catálogo Sanctus está disponível' },
+  product_unpublished: { en: 'A product was unpublished from your catalog', pt: 'Um produto foi retirado do seu catálogo' },
+  product_deleted: { en: 'A product was removed from your catalog', pt: 'Um produto foi eliminado do seu catálogo' },
+}
+
+/**
+ * As notify-business-owner (R-W7-2): a platform-team change to a catalogue records one demo business_notice attempt
+ * for the business's owner, in the source application's language. Demo mode sends nothing (logged as blocked). A
+ * business owner's own change, or a business without an owner, records nothing.
+ */
+function demoBusinessNotice(db: Db, event: AuditEvent | undefined, notice: keyof typeof NOTICE_SUBJECT): void {
+  if (!event?.businessId || !event.metadata.actor_label) return
+  const owner = db.owners?.[event.businessId]
+  if (!owner) return
+  const lang = db.applications?.find((a) => a.businessId === event.businessId)?.language === 'pt' ? 'pt' : 'en'
+  demoEmail(db, { kind: 'business_notice', recipient: owner.email, subject: NOTICE_SUBJECT[notice][lang], businessId: event.businessId, workflow: `business_notice:${event.id}` })
 }
 
 /** Demo mode never sends email: each attempt is logged as blocked ("demo_mode"), so the history stays honest. */
@@ -111,11 +146,12 @@ async function run<T>(fn: () => Result<T>, opts: { inject?: boolean } = {}): Pro
 const demoActor = () => (demoPlatformRole() ? DEMO_ADMIN.id : undefined)
 
 /** The rows the Supabase audit triggers write for a product and a catalog status change (R-W5-5), mirrored here. */
-function auditProduct(db: Db, eventType: string, p: Product, extra: { fromStatus?: string; toStatus?: string; metadata?: Record<string, unknown> } = {}): void {
-  audit(db, { eventType, actorId: demoActor(), businessId: p.businessId, ...(extra.fromStatus ? { fromStatus: extra.fromStatus, toStatus: extra.toStatus } : {}), metadata: { product_id: p.id, name: p.name.en, ...extra.metadata } })
+function auditProduct(db: Db, eventType: string, p: Product, extra: { fromStatus?: string; toStatus?: string; metadata?: Record<string, unknown> } = {}): AuditEvent {
+  return audit(db, { eventType, actorId: demoActor(), businessId: p.businessId, ...(extra.fromStatus ? { fromStatus: extra.fromStatus, toStatus: extra.toStatus } : {}), metadata: { product_id: p.id, name: p.name.en, ...extra.metadata } })
 }
-function auditCatalogStatus(db: Db, from: Business, to: Business): void {
-  if (from.status !== to.status) audit(db, { eventType: 'business_status_changed', actorId: demoActor(), businessId: to.id, fromStatus: from.status, toStatus: to.status })
+function auditCatalogStatus(db: Db, from: Business, to: Business): AuditEvent | undefined {
+  if (from.status !== to.status) return audit(db, { eventType: 'business_status_changed', actorId: demoActor(), businessId: to.id, fromStatus: from.status, toStatus: to.status })
+  return undefined
 }
 
 /** What business owners read of their business's history (the R-W7-2 policy). */
@@ -204,7 +240,8 @@ export const mockCatalogService: CatalogService = {
       const next: Business = { ...current, status, updatedAt: nowIso() }
       store.update((d) => {
         d.businesses = d.businesses.map((b) => (b.id === id ? next : b))
-        auditCatalogStatus(d, current, next)
+        const event = auditCatalogStatus(d, current, next)
+        if (status === 'active' || status === 'inactive') demoBusinessNotice(d, event, status === 'active' ? 'live' : 'paused')
       })
       return ok(next)
     }),
@@ -222,7 +259,8 @@ export const mockCatalogService: CatalogService = {
         const deletedAt = nowIso()
         d.applications = d.applications?.map((a) => (a.businessId === id ? { ...a, businessId: undefined, businessDeletedAt: deletedAt } : a))
         // As the business trigger: one business_deleted row; the products deleted with it write none.
-        audit(d, { eventType: 'business_deleted', actorId: demoActor(), metadata: { business_id: id, name: current.name } })
+        // R-W7-1: the row keeps the business id and name (the business is already gone from d.businesses).
+        audit(d, { eventType: 'business_deleted', actorId: demoActor(), businessId: id, metadata: { business_id: id, name: current.name, business_name: current.name } })
       })
       return ok(undefined)
     }),
@@ -363,7 +401,7 @@ export const mockCatalogService: CatalogService = {
         // Its history stays in the business totals as "Deleted product" (R-W5-4).
         d.dailyStats = d.dailyStats.map((s) => (s.productId === id ? { ...s, productId: null } : s))
         d.events = d.events.map((e) => (e.productId === id ? { ...e, productId: null } : e))
-        auditProduct(d, 'product_deleted', current)
+        demoBusinessNotice(d, auditProduct(d, 'product_deleted', current), 'product_deleted')
       })
       return ok(undefined)
     }),
@@ -390,7 +428,7 @@ export const mockCatalogService: CatalogService = {
       const next: Product = { ...current, status: 'draft', updatedAt: nowIso() }
       store.update((d) => {
         d.products = d.products.map((p) => (p.id === id ? next : p))
-        if (current.status !== 'draft') auditProduct(d, 'product_unpublished', next, { fromStatus: current.status, toStatus: 'draft' })
+        if (current.status !== 'draft') demoBusinessNotice(d, auditProduct(d, 'product_unpublished', next, { fromStatus: current.status, toStatus: 'draft' }), 'product_unpublished')
       })
       return ok(next)
     }),
@@ -693,9 +731,25 @@ export const mockCatalogService: CatalogService = {
         .filter((e) => matchesScope(e, q))
         .filter((e) => !term || e.eventType.includes(term))
         .filter((e) => q.includeSignIns === true || e.eventType !== 'account_signed_in')
-        .map((e) => ({ ...e, actorEmail: e.actorId === DEMO_ADMIN.id ? DEMO_ADMIN.email : undefined }))
+        .map((e) => ({
+          ...toAuditEntry(e),
+          actorEmail: e.actorId === DEMO_ADMIN.id ? DEMO_ADMIN.email : undefined,
+          ...(e.businessId ? { businessDeleted: !store.get().businesses.some((b) => b.id === e.businessId) } : {}),
+        }))
       return ok(page(list, q.page, q.pageSize))
     }),
+
+  getPlatformChanges: (businessId) =>
+    run(() =>
+      ok(
+        (store.get().audit ?? [])
+          .filter((e) => e.businessId === businessId && PLATFORM_CHANGE_EVENTS.includes(e.eventType))
+          .map(toAuditEntry)
+          .filter((e) => !!e.actorLabel && PLATFORM_ACTOR_LABELS.includes(e.actorLabel))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 20),
+      ),
+    ),
 
   getEmailAttempts: (q) =>
     run(() => ok((store.get().emails ?? []).filter((e) => matchesScope(e, q)))),

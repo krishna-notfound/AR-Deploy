@@ -267,3 +267,17 @@ describe('business Overview: Published hint and activity (R-W5-8, R-W5-5)', () =
     expect(within(feed).queryByText(/Nordhaus/)).toBeNull()
   })
 })
+
+describe('business Overview: Changes by the platform team (R-W7-2)', () => {
+  it("lists an Admin's pause of this catalogue and not the owner's own changes or another business's", { timeout: 20_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
+    await service.setBusinessStatus('biz_casa', 'inactive')
+    await service.setBusinessStatus('biz_nord', 'inactive')
+    localStorage.clear()
+    openApp('/dashboard', asOwner('biz_casa'))
+    const card = await screen.findByRole('region', { name: 'Changes by the platform team' }, { timeout: 15_000 })
+    expect(await within(card).findByText('Catalog for Casa Lisboa Interiors was paused')).toBeInTheDocument()
+    expect(within(card).getAllByRole('listitem')).toHaveLength(1)
+    expect(within(card).queryByText(/Nordhaus/)).toBeNull()
+  })
+})

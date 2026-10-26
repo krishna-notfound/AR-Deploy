@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+import type { Permission } from '@/domain/types'
 import { account, service } from '@/services'
 import { fail, ok } from '@/services/catalogService'
 import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
@@ -443,5 +444,29 @@ describe('BusinessDetailPage: catalog button by status (R-W3-8)', () => {
     expect(screen.queryByRole('button', { name: /Open catalog/ })).toBeNull()
     await user.click(screen.getByRole('button', { name: /Preview catalog/ }))
     expect(open).toHaveBeenLastCalledWith('/catalog/nordhaus?preview=1', '_blank', 'noopener')
+  })
+})
+
+describe('BusinessDetailPage: history gating (R-W7-8)', () => {
+  function renderAsTeam(permissions: Permission[]) {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    vi.spyOn(service, 'getMyAccess').mockResolvedValue(ok({ role: 'team', permissions, status: 'active' }))
+    renderPage('owners')
+  }
+
+  it("without records.view, History and Email activity say 'This business's history needs 'View the audit log and email log'.'", async () => {
+    const events = vi.spyOn(service, 'getAuditEvents')
+    const emails = vi.spyOn(service, 'getEmailAttempts')
+    renderAsTeam(['businesses.view'])
+    expect(await screen.findByText("This business's history needs 'View the audit log and email log'.")).toBeInTheDocument()
+    expect(screen.queryByText('Email activity')).not.toBeInTheDocument()
+    expect(events).not.toHaveBeenCalled()
+    expect(emails).not.toHaveBeenCalled()
+  })
+
+  it('with records.view, both panels render', async () => {
+    renderAsTeam(['businesses.view', 'records.view'])
+    expect(await screen.findByText('Email activity')).toBeInTheDocument()
+    expect(screen.queryByText("This business's history needs 'View the audit log and email log'.")).not.toBeInTheDocument()
   })
 })

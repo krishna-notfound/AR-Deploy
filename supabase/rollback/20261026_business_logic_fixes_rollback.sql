@@ -21,6 +21,45 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 11 rollback: history that survives deletion, owner notices, history gating (R-W7-1, R-W7-2, R-W7-8)
+-- =============================================================================
+
+-- Rows keep their business_name and actor_label metadata. The FK comes back NOT VALID, so rows that point at deleted
+-- businesses stay; new rows must name an existing business again.
+drop trigger if exists audit_events_snapshot on public.audit_events;
+drop function if exists private.snapshot_audit_event();
+alter table public.audit_events add constraint audit_events_business_id_fkey
+  foreign key (business_id) references public.businesses (id) on delete set null not valid;
+
+-- private.audit_business_change as in 20261024065538_security_hardening (business_deleted without business_id).
+create or replace function private.audit_business_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op = 'UPDATE' then
+    if new.status is distinct from old.status then
+      insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status)
+      values ('business_status_changed', auth.uid(), new.id, old.status, new.status);
+    end if;
+    if new.slug is distinct from old.slug then
+      insert into public.audit_events (event_type, actor_id, business_id, metadata)
+      values ('business_slug_changed', auth.uid(), new.id, jsonb_build_object('from', old.slug, 'to', new.slug));
+    end if;
+  elsif tg_op = 'DELETE' then
+    insert into public.audit_events (event_type, actor_id, metadata)
+    values ('business_deleted', auth.uid(), jsonb_build_object('business_id', old.id, 'name', old.name));
+  end if;
+  return null;
+end;
+$$;
+revoke all on function private.audit_business_change() from public;
+
+-- ---- end S1.5 Task 11 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 8 rollback: dashboard numbers and activity: product audit events, catalogue activity and owner reads (R-W5-5, R-W7-2)
 -- =============================================================================
 

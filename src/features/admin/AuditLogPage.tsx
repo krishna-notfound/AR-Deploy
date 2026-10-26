@@ -14,6 +14,7 @@ import { applicationAdminPath, businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import type { AuditEntry } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
+import { actorText } from '../applications/AuditTimeline'
 import { eventLabel, statusWord } from '../applications/labels'
 
 const PAGE_SIZE = 30
@@ -57,10 +58,12 @@ export default function AuditLogPage() {
   /** The second line of a row: which business and application the event is about (links), or the recorded name. */
   const subjectLine = (e: AuditEntry): ReactNode[] | null => {
     const parts: ReactNode[] = []
-    if (e.businessId) {
+    // R-W7-1: a deleted business keeps its recorded name, without a link to a page that no longer exists.
+    if (e.businessId && e.businessDeleted) parts.push(<span key="business">{`${e.businessName ?? 'Business'} (deleted)`}</span>)
+    else if (e.businessId) {
       parts.push(
         <Link key="business" to={businessAdminPath(e.businessId)} className="text-accent-ink hover:underline">
-          {bizName(e.businessId) ?? 'Business'}
+          {bizName(e.businessId) ?? e.businessName ?? 'Business'}
         </Link>,
       )
     }
@@ -126,7 +129,7 @@ export default function AuditLogPage() {
                       {subject && <p className="mt-0.5 text-[length:var(--text-ui-small)] leading-[1.35] break-words text-ink-muted">{subject}</p>}
                     </div>
                     <span title={e.actorEmail} className="min-w-0 truncate text-[length:var(--text-ui-small)] text-ink-muted text-right max-md:order-3 md:max-w-[260px] md:text-[length:var(--text-ui-body)]">
-                      {e.actorEmail ?? (e.actorId ? `User ${e.actorId.slice(0, 8)}` : 'System')}
+                      {actorText(e)}
                     </span>
                   </li>
                 )

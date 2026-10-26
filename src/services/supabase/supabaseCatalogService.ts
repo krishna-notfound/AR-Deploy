@@ -33,12 +33,13 @@ import { localDayBounds } from '@/lib/format'
 import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
-import { type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, REOPEN_NOT_ALLOWED_ERROR, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok, teamFail } from '../catalogService'
+import { type AuditEntry, type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type UploadKind, fail, ok, teamFail, toAuditEntry } from '../catalogService'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
 export const LOGO_BUCKET = 'business-logos'
 export const TRACK_EVENT_FUNCTION = 'track-event'
+export const NOTIFY_OWNER_FUNCTION = 'notify-business-owner'
 // 12 h: anonymous visitors can already sign any published product's media (storage policy), so a longer
 // lifetime only widens the window in which a just-unpublished file stays reachable by an old link.
 const SIGNED_URL_TTL_SECONDS = MEDIA_URL_TTL_SECONDS
@@ -487,6 +488,9 @@ const toAuditEvent = (r: AuditRow): AuditEvent => ({
   metadata: r.metadata ?? {},
 })
 
+/** An audit row with the snapshot taken at insert (R-W7-1): the actor's role label and the business's name. */
+const rowToAuditEntry = (r: AuditRow): AuditEntry => toAuditEntry(toAuditEvent(r))
+
 const toEmailAttempt = (r: EmailRow): EmailAttempt => ({
   id: r.id,
   createdAt: r.created_at,
@@ -550,6 +554,19 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     } catch (err) {
       return fail('UNKNOWN', `Could not reach Supabase: ${err instanceof Error ? err.message : String(err)}`)
     }
+  }
+
+  /**
+   * R-W7-2: after a platform-team member pauses or activates a catalogue, or unpublishes or deletes a product, ask
+   * notify-business-owner to email the owner. Fire-and-forget: the action's result is already decided and is never
+   * changed; any failure (a business owner's own change, the function down, a 403) is dropped, without a retry.
+   */
+  const notifyOwner = (businessId: ID): void => {
+    void (async () => {
+      const access = await sb.rpc('my_platform_access')
+      if (access.error || !(access.data as { role?: string | null } | null)?.role) return
+      await sb.functions.invoke(NOTIFY_OWNER_FUNCTION, { body: { businessId } })
+    })().catch(() => undefined)
   }
 
   /** Calls an Edge Function; its JSON error body ({ error, fields }) becomes a service error. */
@@ -786,6 +803,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       guard(async () => {
         const { data, error } = await sb.from('businesses').update({ status }).eq('id', id).select('*').maybeSingle<BusinessRow>()
         if (error) return mapDbError(error)
+        if (data && (status === 'active' || status === 'inactive')) notifyOwner(id)
         return changed(data ? ok(toBusiness(data)) : await refusedOrMissing<Business>('businesses', { id }, 'Business not found.'))
       }),
     deleteBusiness: (id) =>
@@ -872,7 +890,10 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const { data, error } = await sb.from('products').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
         if (!data.length) return refusedOrMissing('products', { id }, 'Product not found.')
-        if (current.ok) await removeUnreferencedMedia(mediaPaths(current.data))
+        if (current.ok) {
+          notifyOwner(current.data.businessId)
+          await removeUnreferencedMedia(mediaPaths(current.data))
+        }
         return changed(ok(undefined))
       }),
     publishProduct: (id) =>
@@ -883,7 +904,12 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (Object.keys(errors).length) return fail('VALIDATION', 'This product is missing information required for publishing.', errors)
         return changed(await updateProductRow(id, { status: 'published', published_at: new Date().toISOString() }))
       }),
-    unpublishProduct: (id) => guard(async () => changed(await updateProductRow(id, { status: 'draft' }))),
+    unpublishProduct: (id) =>
+      guard(async () => {
+        const r = await updateProductRow(id, { status: 'draft' })
+        if (r.ok) notifyOwner(r.data.businessId)
+        return changed(r)
+      }),
 
     // ---------------- analytics ----------------
     getAnalytics: (opts) => guard(() => analytics(undefined, opts?.timeZone ?? deviceTimeZone())),
@@ -1035,7 +1061,38 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           const r = await sb.rpc('admin_user_emails', { p_ids: actorIds })
           for (const u of (r.data ?? []) as { id: string; email: string }[]) emails.set(u.id, u.email)
         }
-        return ok({ items: rows.map((r) => ({ ...toAuditEvent(r), actorEmail: r.actor_id ? emails.get(r.actor_id) : undefined })), total: count ?? 0 })
+        // R-W7-1: a business that was deleted has a business_deleted row with its id (history keeps the id).
+        const businessIds = [...new Set(rows.map((r) => r.business_id).filter((x): x is string => !!x))]
+        const deleted = new Set<string>()
+        if (businessIds.length) {
+          const d = await sb.from('audit_events').select('business_id').eq('event_type', 'business_deleted').in('business_id', businessIds).returns<{ business_id: string }[]>()
+          if (d.error) return mapDbError(d.error)
+          for (const x of d.data ?? []) deleted.add(x.business_id)
+        }
+        return ok({
+          items: rows.map((r) => ({
+            ...rowToAuditEntry(r),
+            actorEmail: r.actor_id ? emails.get(r.actor_id) : undefined,
+            ...(r.business_id ? { businessDeleted: deleted.has(r.business_id) } : {}),
+          })),
+          total: count ?? 0,
+        })
+      }),
+
+    getPlatformChanges: (businessId) =>
+      guard(async () => {
+        if (!UUID_PATTERN.test(businessId)) return fail('NOT_FOUND', 'Business not found.')
+        const { data, error } = await sb
+          .from('audit_events')
+          .select('*')
+          .eq('business_id', businessId)
+          .in('metadata->>actor_label', [...PLATFORM_ACTOR_LABELS])
+          .in('event_type', [...PLATFORM_CHANGE_EVENTS])
+          .order('created_at', { ascending: false })
+          .limit(20)
+          .returns<AuditRow[]>()
+        if (error) return mapDbError(error)
+        return ok((data ?? []).map(rowToAuditEntry))
       }),
 
     getEmailAttempts: (q) =>

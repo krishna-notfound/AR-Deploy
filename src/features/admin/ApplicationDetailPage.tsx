@@ -68,6 +68,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   // and the owner invitation is pointed to only for a role that can send it.
   const canOpenBusiness = can('businesses.view')
   const canInviteOwner = canOpenBusiness && can('owners.manage')
+  const canReadRecords = can('records.view')
   const businessId = canOpenBusiness ? app.businessId : undefined
   const business = useServiceQuery(() => (businessId ? service.getBusinessById(businessId) : Promise.resolve({ ok: true as const, data: null })), [businessId])
   // The owner invitation is the step after approval: it lives in the last card, so point to it at the top of the page.
@@ -311,8 +312,9 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
           )}
         </div>
         <div className="space-y-6">
-          <AuditTimeline applicationId={app.id} businessId={app.businessId} />
-          <EmailActivity applicationId={app.id} businessId={app.businessId} />
+          {/* R-W7-8: the business's own history and emails need records.view; without it, the application's only. */}
+          <AuditTimeline applicationId={app.id} businessId={canReadRecords ? app.businessId : undefined} note={canReadRecords ? undefined : 'Showing application events only.'} />
+          <EmailActivity applicationId={app.id} businessId={canReadRecords ? app.businessId : undefined} />
         </div>
       </div>
 

@@ -719,7 +719,7 @@ describe('security hardening (20261024065538_security_hardening)', () => {
       await as(ADMIN, (tx) => tx.query(`update public.businesses set slug = 'hardened-new', status = 'inactive' where id = $1`, [HB]))
       const ev = await slugEvents()
       expect(ev).toHaveLength(before + 1)
-      expect(ev.at(-1)).toEqual({ actor_id: ADMIN, metadata: { from: 'hardened', to: 'hardened-new' } })
+      expect(ev.at(-1)).toEqual({ actor_id: ADMIN, metadata: { from: 'hardened', to: 'hardened-new', actor_label: 'Owner', business_name: 'Hardened Co' } })
       const status = await db.query(`select 1 from public.audit_events where business_id = $1 and event_type = 'business_status_changed' and to_status = 'inactive'`, [HB])
       expect(status.rows.length).toBeGreaterThan(0)
       await as(ADMIN, (tx) => tx.query(`update public.businesses set slug = 'hardened', status = 'active' where id = $1`, [HB]))

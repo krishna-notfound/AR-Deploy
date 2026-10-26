@@ -1515,3 +1515,83 @@ create policy "Business owners read platform changes to their business" on publi
          and public.is_business_member(business_id));
 
 -- ---- end S1.5 Task 8 ----
+
+-- =============================================================================
+-- S1.5 Task 11: history that survives deletion, owner notices, history gating (R-W7-1, R-W7-2, R-W7-8)
+-- =============================================================================
+
+-- R-W7-1: every audit row is stamped at insert with what it needs to stay readable after a delete. The business's
+-- name (when the row names a business and does not carry the name already), and the actor's role as a label:
+-- Owner (platform_admins), Admin or Team (platform_members), Business owner (business_members), otherwise User.
+-- No email and no name of the actor is stored. The label is always computed from the actor's rows, so a caller
+-- cannot supply its own. A row without an actor (the system) gets no label.
+create function private.snapshot_audit_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_name text;
+begin
+  if new.business_id is not null and not (new.metadata ? 'business_name') then
+    select b.name into v_name from public.businesses b where b.id = new.business_id;
+    if v_name is not null then
+      new.metadata := new.metadata || jsonb_build_object('business_name', v_name);
+    end if;
+  end if;
+  if new.actor_id is not null then
+    new.metadata := new.metadata || jsonb_build_object('actor_label', case
+      when exists (select 1 from public.platform_admins a where a.user_id = new.actor_id) then 'Owner'
+      when exists (select 1 from public.platform_members m where m.user_id = new.actor_id and m.role = 'admin') then 'Admin'
+      when exists (select 1 from public.platform_members m where m.user_id = new.actor_id and m.role = 'team') then 'Team'
+      when exists (select 1 from public.business_members bm where bm.user_id = new.actor_id) then 'Business owner'
+      else 'User'
+    end);
+  end if;
+  return new;
+end;
+$$;
+revoke all on function private.snapshot_audit_event() from public, anon, authenticated;
+
+create trigger audit_events_snapshot
+  before insert on public.audit_events
+  for each row execute function private.snapshot_audit_event();
+
+-- R-W7-1: history keeps the business id after the business is deleted, so its rows still filter by it. actor_id keeps
+-- its on delete set null (the label above says who it was).
+alter table public.audit_events drop constraint audit_events_business_id_fkey;
+
+-- R-W7-1: business_deleted now carries the business id and its name as business_name (the row is gone by the time
+-- this AFTER trigger runs, so the snapshot cannot look it up). Body from 20261024065538_security_hardening; the
+-- update branch is unchanged, and the delete row keeps metadata business_id and name for existing readers.
+create or replace function private.audit_business_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op = 'UPDATE' then
+    if new.status is distinct from old.status then
+      insert into public.audit_events (event_type, actor_id, business_id, from_status, to_status)
+      values ('business_status_changed', auth.uid(), new.id, old.status, new.status);
+    end if;
+    if new.slug is distinct from old.slug then
+      insert into public.audit_events (event_type, actor_id, business_id, metadata)
+      values ('business_slug_changed', auth.uid(), new.id, jsonb_build_object('from', old.slug, 'to', new.slug));
+    end if;
+  elsif tg_op = 'DELETE' then
+    insert into public.audit_events (event_type, actor_id, business_id, metadata)
+    values ('business_deleted', auth.uid(), old.id,
+            jsonb_build_object('business_id', old.id, 'name', old.name, 'business_name', old.name));
+  end if;
+  return null;
+end;
+$$;
+revoke all on function private.audit_business_change() from public, anon, authenticated;
+
+-- R-W7-2: the owner-read policy "Business owners read platform changes to their business" is Task 8's; the owner
+-- dashboard reads it. R-W7-8 is UI only.
+
+-- ---- end S1.5 Task 11 ----

@@ -454,3 +454,49 @@ describe('owner invitations (S1.5 Task 17: the demo applies the reservation rule
     expect((await states()).get('biz_casa')!.emailFailed).toBe(true)
   })
 })
+
+describe('history and owner notices (S1.5 Task 11: R-W7-1, R-W7-2)', () => {
+  const asStaff = (platformRole: 'owner' | 'admin' | 'team') => localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole }))
+  const notices = () => (store.get().emails ?? []).filter((e) => e.kind === 'business_notice')
+  beforeEach(() => {
+    store.update((d) => {
+      ;(d.owners ??= {}).biz_casa = { email: 'owner@casa.example', invitedAt: '2026-10-01T10:00:00.000Z', acceptedAt: '2026-10-02T10:00:00.000Z' }
+    })
+  })
+
+  it('an Admin pause records one demo business_notice for the owner, labelled demo mode; the row is labelled Admin with the business name', async () => {
+    asStaff('admin')
+    unwrap(await svc.setBusinessStatus('biz_casa', 'inactive'))
+    const event = (store.get().audit ?? []).find((e) => e.eventType === 'business_status_changed')!
+    expect(event.metadata).toMatchObject({ actor_label: 'Admin', business_name: expect.any(String) })
+    expect(notices()).toEqual([
+      expect.objectContaining({ recipient: 'owner@casa.example', subject: 'Your Sanctus catalog has been paused', status: 'blocked', error: 'demo_mode', workflow: `business_notice:${event.id}` }),
+    ])
+    expect(unwrap(await svc.getPlatformChanges('biz_casa')).map((e) => [e.eventType, e.actorLabel])).toEqual([['business_status_changed', 'Admin']])
+  })
+
+  it("a business owner's own change records no notice and is not a platform change", async () => {
+    unwrap(await svc.setBusinessStatus('biz_casa', 'inactive'))
+    expect(notices()).toEqual([])
+    expect(unwrap(await svc.getPlatformChanges('biz_casa'))).toEqual([])
+  })
+
+  it('unpublish and delete by the Team record a notice each', async () => {
+    asStaff('team')
+    const p = unwrap(await svc.getProductsByBusiness('biz_casa')).find((x) => x.status === 'published')!
+    unwrap(await svc.unpublishProduct(p.id))
+    unwrap(await svc.deleteProduct(p.id))
+    expect(notices().map((e) => e.subject).sort()).toEqual(['A product was removed from your catalog', 'A product was unpublished from your catalog'])
+  })
+
+  it('after a business is deleted, its rows still filter by the business and read its name, marked deleted', async () => {
+    asStaff('owner')
+    unwrap(await svc.setBusinessStatus('biz_casa', 'inactive'))
+    const name = unwrap(await svc.getBusinessById('biz_casa')).name
+    unwrap(await svc.deleteBusiness('biz_casa'))
+    const rows = unwrap(await svc.getAuditEvents({ businessId: 'biz_casa' })).items
+    expect(rows.map((e) => e.eventType)).toEqual(expect.arrayContaining(['business_deleted', 'business_status_changed']))
+    for (const e of rows) expect(e).toMatchObject({ businessName: name, businessDeleted: true })
+    expect(rows.filter((e) => e.eventType.startsWith('business_') && e.eventType !== 'business_created').map((e) => e.actorLabel)).toEqual(['Owner', 'Owner'])
+  })
+})

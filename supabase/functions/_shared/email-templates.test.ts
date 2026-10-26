@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { applicationDecisionEmail, renderEmail } from './email-templates'
+import { applicationDecisionEmail, businessNoticeEmail, renderEmail } from './email-templates'
 
 describe('invitation email with a code (ADR-0027)', () => {
   it('shows the code in the HTML and text, in both languages, with a plain page link', () => {
@@ -89,5 +89,36 @@ describe('application emails (S1.5 Task 4, R-W2-1, §11.2)', () => {
   it('refuses a reason over 1000 characters', () => {
     expect(() => applicationDecisionEmail('en', 'Casa', 'x'.repeat(1001))).toThrow()
     expect(() => applicationDecisionEmail('en', 'Casa', 'x'.repeat(1000))).not.toThrow()
+  })
+})
+
+describe('business_notice (R-W7-2, §11.2)', () => {
+  const FOOTER = {
+    en: "You can see this change under 'Changes by the platform team' in your dashboard. Contact the Sanctus team if you have questions.",
+    pt: "Pode ver esta alteração em 'Alterações da equipa da plataforma' no seu painel. Contacte a equipa Sanctus se tiver dúvidas.",
+  }
+  const CASES = [
+    ['paused', 'en', 'Your Sanctus catalog has been paused', "The Sanctus team paused the public catalog of Casa. Customers who open its link or QR code can't see it for now. Your products and settings are kept."],
+    ['paused', 'pt', 'O seu catálogo Sanctus foi pausado', 'A equipa Sanctus pausou o catálogo público de Casa. Quem abrir o link ou o código QR não o consegue ver por agora. Os seus produtos e definições são mantidos.'],
+    ['live', 'en', 'Your Sanctus catalog is live', 'The Sanctus team made the catalog of Casa public. Customers can now open it from its link and QR code.'],
+    ['live', 'pt', 'O seu catálogo Sanctus está disponível', 'A equipa Sanctus tornou público o catálogo de Casa. Os clientes já o podem abrir pelo link e pelo código QR.'],
+    ['product_unpublished', 'en', 'A product was unpublished from your catalog', 'The Sanctus team unpublished Oslo sofa. It is kept as a draft in your dashboard.'],
+    ['product_unpublished', 'pt', 'Um produto foi retirado do seu catálogo', 'A equipa Sanctus retirou Oslo sofa do catálogo. Fica guardado como rascunho no seu painel.'],
+    ['product_deleted', 'en', 'A product was removed from your catalog', 'The Sanctus team deleted Oslo sofa, with its photos and 3D files.'],
+    ['product_deleted', 'pt', 'Um produto foi eliminado do seu catálogo', 'A equipa Sanctus eliminou Oslo sofa, com as suas fotos e ficheiros 3D.'],
+  ] as const
+
+  it.each(CASES)('%s (%s): subject, body and the footer', (event, lang, subject, body) => {
+    const e = businessNoticeEmail(lang, event, { businessName: 'Casa', productName: 'Oslo sofa' })
+    expect(e.subject).toBe(subject)
+    expect(e.text).toContain(body)
+    expect(e.text).toContain(FOOTER[lang])
+    expect(e.html).toContain(FOOTER[lang].replace(/'/g, '&#39;'))
+  })
+
+  it('escapes the business and product names in the HTML', () => {
+    const e = businessNoticeEmail('en', 'product_deleted', { businessName: 'Casa', productName: '<b>Sofa</b>' })
+    expect(e.html).not.toContain('<b>Sofa</b>')
+    expect(e.html).toContain('&lt;b&gt;Sofa&lt;/b&gt;')
   })
 })

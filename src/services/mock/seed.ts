@@ -650,8 +650,10 @@ export function createSeed(now: number = Date.now()): Db {
 /** The catalog history behind Recent activity, as the database's audit triggers would have written it (R-W5-5). */
 function seedActivity(businesses: Business[], products: Product[]): AuditEvent[] {
   const rows: AuditEvent[] = []
+  // business_name: the snapshot the database stamps on every row that names a business (R-W7-1).
+  const names = new Map(businesses.map((b) => [b.id, b.name]))
   const add = (createdAt: string, eventType: string, businessId: string, metadata: Record<string, unknown>) =>
-    rows.push({ id: `aud_seed_${rows.length + 1}`, createdAt, eventType, businessId, metadata })
+    rows.push({ id: `aud_seed_${rows.length + 1}`, createdAt, eventType, businessId, metadata: { ...metadata, business_name: names.get(businessId) } })
   for (const b of businesses) add(b.createdAt, 'business_created', b.id, {})
   for (const p of products) {
     add(p.createdAt, 'product_created', p.businessId, { product_id: p.id, name: p.name.en })
