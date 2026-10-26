@@ -40,6 +40,8 @@ export const MEDIA_BUCKET = 'product-media'
 export const LOGO_BUCKET = 'business-logos'
 export const TRACK_EVENT_FUNCTION = 'track-event'
 export const NOTIFY_OWNER_FUNCTION = 'notify-business-owner'
+/** Keeps the public ar-models copies of a product's GLB/USDZ in line with its status (owner decision 2026-10-26). */
+export const SYNC_AR_MODELS_FUNCTION = 'sync-ar-models'
 // 12 h: anonymous visitors can already sign any published product's media (storage policy), so a longer
 // lifetime only widens the window in which a just-unpublished file stays reachable by an old link.
 const SIGNED_URL_TTL_SECONDS = MEDIA_URL_TTL_SECONDS
@@ -79,6 +81,8 @@ export interface ModelRow {
   file_name: string
   size_bytes: number | null
   required_extensions: string[] | null
+  /** The public ar-models copy for phone AR (sync-ar-models); null until synced. */
+  public_url?: string | null
 }
 export interface VariantImageRow {
   id: string
@@ -93,6 +97,7 @@ export interface VariantModelRow {
   file_name: string
   size_bytes: number | null
   required_extensions: string[] | null
+  public_url?: string | null
 }
 export interface VariantRow {
   id: string
@@ -256,6 +261,7 @@ function toModels(rows: (ModelRow | VariantModelRow)[], resolve: Resolve): Produ
       validationMessage: url ? undefined : 'A download link for this file could not be created.',
       storagePath: m.storage_path ?? undefined,
       ...(m.required_extensions ? { requiredExtensions: m.required_extensions } : {}),
+      ...(m.public_url ? { publicUrl: m.public_url } : {}),
     }
   }
   return models
@@ -578,6 +584,18 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       if (access.error || !(access.data as { role?: string | null } | null)?.role) return
       await sb.functions.invoke(NOTIFY_OWNER_FUNCTION, { body: { businessId } })
     })().catch(() => undefined)
+  }
+
+  /**
+   * After a product is published, unpublished, edited while published, duplicated as published or deleted, ask
+   * sync-ar-models to refresh its public AR copies (ar-models). Fire-and-forget like notifyOwner: the action's result
+   * is already decided and never changes; a failure is dropped (phone AR then uses the signed URL). businessId names
+   * the folder of a product that no longer exists.
+   */
+  const syncArModels = (productId: ID, businessId?: ID): void => {
+    void Promise.resolve()
+      .then(() => sb.functions.invoke(SYNC_AR_MODELS_FUNCTION, { body: businessId ? { productId, businessId } : { productId } }))
+      .catch(() => undefined)
   }
 
   /** Calls an Edge Function; its JSON error body ({ error, fields }) becomes a service error. */
@@ -929,7 +947,11 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           if (Object.keys(pubErrors).length) return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
         }
         const saved = await saveProduct(id, next)
-        if (saved.ok) await removeUnreferencedMedia(mediaPaths(current.data))
+        if (saved.ok) {
+          // save_product rewrites the model rows (public_url back to null): the sync copies and links them again.
+          if (saved.data.status === 'published') syncArModels(id)
+          await removeUnreferencedMedia(mediaPaths(current.data))
+        }
         return changed(saved)
       }),
     duplicateProduct: (id) =>
@@ -941,7 +963,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const slug = uniqueSlug(`${src.data.slug}-copy`, siblings.data.map((s) => s.slug), PRODUCT_SLUG_MAX)
         const name = { en: `${src.data.name.en} (copy)`, ...(src.data.name.pt ? { pt: `${src.data.name.pt} (cópia)` } : {}) }
         // Copies reference the same stored files; nothing is re-uploaded.
-        return changed(await saveProduct(null, { ...src.data, slug, name }))
+        const copy = await saveProduct(null, { ...src.data, slug, name })
+        if (copy.ok && copy.data.status === 'published') syncArModels(copy.data.id)
+        return changed(copy)
       }),
     deleteProduct: (id) =>
       guard(async () => {
@@ -952,6 +976,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         let sweep: StorageSweep = { removedFiles: 0, failedFiles: 0 }
         if (current.ok) {
           notifyOwner(current.data.businessId)
+          syncArModels(id, current.data.businessId)
           const media = await removeUnreferencedMedia(mediaPaths(current.data))
           sweep = { removedFiles: media.removed, failedFiles: media.failed }
         }
@@ -963,12 +988,17 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (!current.ok) return current
         const errors = validateForPublish(current.data)
         if (Object.keys(errors).length) return fail('VALIDATION', 'This product is missing information required for publishing.', errors)
-        return changed(await updateProductRow(id, { status: 'published', published_at: new Date().toISOString() }))
+        const r = await updateProductRow(id, { status: 'published', published_at: new Date().toISOString() })
+        if (r.ok) syncArModels(id)
+        return changed(r)
       }),
     unpublishProduct: (id) =>
       guard(async () => {
         const r = await updateProductRow(id, { status: 'draft' })
-        if (r.ok) notifyOwner(r.data.businessId)
+        if (r.ok) {
+          notifyOwner(r.data.businessId)
+          syncArModels(id)
+        }
         return changed(r)
       }),
 

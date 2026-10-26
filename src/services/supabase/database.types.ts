@@ -540,6 +540,7 @@ export type Database = {
           file_name: string
           format: string
           product_id: string
+          public_url: string | null
           required_extensions: string[] | null
           size_bytes: number | null
           storage_path: string | null
@@ -550,6 +551,7 @@ export type Database = {
           file_name: string
           format: string
           product_id: string
+          public_url?: string | null
           required_extensions?: string[] | null
           size_bytes?: number | null
           storage_path?: string | null
@@ -560,6 +562,7 @@ export type Database = {
           file_name?: string
           format?: string
           product_id?: string
+          public_url?: string | null
           required_extensions?: string[] | null
           size_bytes?: number | null
           storage_path?: string | null
@@ -622,6 +625,7 @@ export type Database = {
           file_name: string
           format: string
           product_id: string
+          public_url: string | null
           required_extensions: string[] | null
           size_bytes: number | null
           storage_path: string
@@ -632,6 +636,7 @@ export type Database = {
           file_name: string
           format: string
           product_id: string
+          public_url?: string | null
           required_extensions?: string[] | null
           size_bytes?: number | null
           storage_path: string
@@ -642,6 +647,7 @@ export type Database = {
           file_name?: string
           format?: string
           product_id?: string
+          public_url?: string | null
           required_extensions?: string[] | null
           size_bytes?: number | null
           storage_path?: string

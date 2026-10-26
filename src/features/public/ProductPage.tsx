@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import type { ModelLoadInfo, ModelViewerHandle } from '@/components/three/ModelViewer'
 import type { Business, LengthUnit, Product } from '@/domain/types'
 import { nativeAr, nativeArRoute } from '@/features/ar/nativeAr'
-import { pickVariant, variantMedia } from '@/features/ar/variantMedia'
+import { arLaunchUrl, pickVariant, variantMedia } from '@/features/ar/variantMedia'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { sceneViewerUnsupported } from '@/lib/files'
@@ -237,7 +237,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
         document.removeEventListener('visibilitychange', onVisibility)
       }
       try {
-        nativeAr.navigate(sceneViewerIntentUrl({ file: media.models.glb.url, title: name, pageUrl, trueToSize }))
+        nativeAr.navigate(sceneViewerIntentUrl({ file: arLaunchUrl(media.models.glb), title: name, pageUrl, trueToSize }))
       } catch {
         toast.error(arFailedMessage())
         done()
@@ -246,7 +246,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     }
     if (route === 'quick-look' && media.models.usdz) {
       try {
-        nativeAr.openQuickLook(quickLookHref(media.models.usdz.url, { trueToSize, pageUrl }))
+        nativeAr.openQuickLook(quickLookHref(arLaunchUrl(media.models.usdz), { trueToSize, pageUrl }))
       } catch {
         toast.error(arFailedMessage())
       } finally {

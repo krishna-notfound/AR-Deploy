@@ -70,6 +70,11 @@ export interface ModelAsset {
   validationMessage?: string
   /** Object path in Supabase Storage (private bucket); `url` is then a short-lived signed URL. */
   storagePath?: string
+  /**
+   * A stable public URL of this file for the phone's AR viewer (Scene Viewer, Quick Look): the public ar-models copy
+   * of a published product (Supabase mode). Absent → AR uses `url` (demo sample URLs are already public).
+   */
+  publicUrl?: string
   /** GLB only: the file's glTF `extensionsRequired`, read when uploaded or loaded. Undefined = not checked yet. */
   requiredExtensions?: string[]
 }

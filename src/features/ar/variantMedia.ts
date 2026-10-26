@@ -41,3 +41,10 @@ export function pickVariant(variants: ProductVariant[], id: string | null | unde
 export function hasAny3d(product: Pick<Product, 'models'> & { variants?: ProductVariant[] }): boolean {
   return !!usableModel(product.models.glb) || (product.variants ?? []).some((v) => !!usableModel(v.models?.glb))
 }
+
+/**
+ * The file the phone's own AR viewer opens (Scene Viewer `file=`, the Quick Look href): the stable public copy when
+ * the product has one (published, Supabase mode: ar-models), else the URL the 3D view uses (demo sample URLs are
+ * public already; a signed URL is the last resort).
+ */
+export const arLaunchUrl = (a: ModelAsset): string => a.publicUrl || a.url

@@ -207,3 +207,62 @@ describe('product page: direct native AR launch on iPhone (Quick Look)', () => {
     expect(await screen.findByRole('button', { name: 'View in my home' })).toBeEnabled()
   })
 })
+
+describe('product page: native AR opens the public copy (ar-models) when the model has one', () => {
+  const PUBLIC = 'https://ref.supabase.co/storage/v1/object/public/ar-models/'
+  /** Gives every GLB (product and finishes) a publicUrl, and the product and finishes a USDZ with one, as sync-ar-models would. */
+  function withPublicCopies() {
+    const real = service.getPublicProduct.bind(service)
+    vi.spyOn(service, 'getPublicProduct').mockImplementation(async (...args) => {
+      const res = await real(...args)
+      if (!res.ok) return res
+      const p = res.data.product
+      const usdz = (key: string) => ({ format: 'usdz' as const, url: `https://cdn.test/sign/${key}.usdz?token=t3`, publicUrl: `${PUBLIC}${key}.usdz`, fileName: `${key}.usdz`, status: 'valid' as const })
+      const glb = <T extends { url: string }>(m: T | undefined, key: string) => (m ? { ...m, publicUrl: `${PUBLIC}${key}.glb` } : m)
+      const product = {
+        ...p,
+        models: { ...p.models, glb: glb(p.models.glb, 'base'), usdz: usdz('base') },
+        variants: p.variants.map((v) => (v.models?.glb ? { ...v, models: { ...v.models, glb: glb(v.models.glb, v.id), usdz: usdz(v.id) } } : v)),
+      }
+      return { ...res, data: { ...res.data, product } }
+    })
+  }
+  const firstFinish = async () => {
+    const res = await service.getProductById('prd_sheen_chair')
+    return res.ok ? res.data.variants[0]!.id : ''
+  }
+
+  it('Android: the Scene Viewer file= is the public URL; the 3D view keeps its own URL', async () => {
+    asUserAgent(ANDROID_CHROME)
+    withPublicCopies()
+    const navigate = mockNavigate()
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    fireEvent.click(arButton()!)
+    expect(navigate).toHaveBeenCalledTimes(1)
+    expect(intentParams(navigate.mock.calls[0]![0]).get('file')).toBe(`${PUBLIC}${await firstFinish()}.glb`)
+    expect(el.getAttribute('src')).toMatch(/SheenChair\.glb$/)
+  })
+
+  it('iPhone: the Quick Look href is the public USDZ URL', async () => {
+    asUserAgent(IPHONE_SAFARI)
+    withPublicCopies()
+    const arLinks = captureClicks()
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    loaded(await viewerFor(/SheenChair\.glb$/), true)
+    fireEvent.click(arButton()!)
+    expect(arLinks()).toHaveLength(1)
+    expect(arLinks()[0]!.getAttribute('href')).toBe(`${PUBLIC}${await firstFinish()}.usdz#allowsContentScaling=0`)
+  })
+
+  it('without a public copy (demo sample URLs): file= falls back to the model URL', async () => {
+    asUserAgent(ANDROID_CHROME)
+    const navigate = mockNavigate()
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    fireEvent.click(arButton()!)
+    expect(intentParams(navigate.mock.calls[0]![0]).get('file')).toBe(el.getAttribute('src'))
+  })
+})

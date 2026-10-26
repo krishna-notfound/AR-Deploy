@@ -22,9 +22,10 @@ afterAll(async () => {
 })
 
 describe('S2 scaffold and rollback', () => {
-  it('the S2 migration is the last migration and applies after every earlier one', async () => {
+  it('the S2 migration is the last S2 migration and applies after every earlier one', async () => {
     const all = readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()
-    expect(all.at(-1)).toBe(S2_MIGRATION)
+    // Later, separate migrations (S4 model requests, public AR model copies) sort after S2.
+    expect(all).toContain(S2_MIGRATION)
     const earlier = await freshDb(UP_TO_S15)
     try {
       await earlier.exec(readFileSync(join(MIGRATIONS, S2_MIGRATION), 'utf8'))

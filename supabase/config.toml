@@ -462,6 +462,11 @@ verify_jwt = false
 [functions.account-security]
 verify_jwt = true
 
+# Public AR model copies (owner decision 2026-10-26): business members and staff (can_sync_ar_models), the Owner alone
+# for the one-time backfill ({ all: true }); re-checked in the handler with the caller's own token.
+[functions.sync-ar-models]
+verify_jwt = true
+
 # Resend delivery events: authenticated by the svix signature (RESEND_WEBHOOK_SECRET), not a Supabase JWT.
 [functions.resend-webhook]
 verify_jwt = false
