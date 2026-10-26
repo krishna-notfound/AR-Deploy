@@ -1,0 +1,20 @@
+-- S2 business logic (spec: docs/superpowers/specs/2026-10-26-business-logic-fixes-design.md;
+-- plan: docs/superpowers/plans/2026-10-26-s2-business-logic.md).
+-- Rollback: supabase/rollback/20261026_s2_business_logic_rollback.sql (run before the S1.5 rollback).
+-- Tests: supabase/tests/s2BusinessLogic.test.ts (PGlite, one describe per task).
+--
+-- Scope: S2 Task 2 redefines admin_review_application (one description limit). No other S2 task has SQL.
+--
+-- This is the only S2 migration. Each task appends one section at the END of this file, in this format:
+--
+--   -- =============================================================================
+--   -- S2 Task N: <title> (R-Wn-k, ...)
+--   -- =============================================================================
+--   ...statements...
+--   -- ---- end S2 Task N ----
+--
+-- A task never edits another task's section. A function S1.5 already redefined is `create or replace`d starting
+-- from its latest body in 20261026041731_business_logic_fixes.sql, keeping its signature and grants.
+-- SQL rules: RLS on every new table (revoke all from public, anon, authenticated, then explicit grants); every new
+-- function security definer with `set search_path = ''`, execute revoked from public and granted explicitly.
+-- Access checks use only the S1 gated helpers (is_platform_admin, platform_can, is_business_member).
