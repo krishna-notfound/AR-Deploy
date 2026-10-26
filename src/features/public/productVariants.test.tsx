@@ -87,7 +87,7 @@ describe('product page: variants switch photos, 3D model and AR target', () => {
     expect(screen.getByRole('radio', { name: /Purple-Gold Damask/ })).toHaveAttribute('aria-checked', 'true')
   })
 
-  it('says honestly which model 3D and AR show when a variant has no model of its own', async () => {
+  it("says honestly which model 3D and AR show when a variant has no model of its own", async () => {
     openApp('/products/casa-lisboa/glam-velvet-sofa')
     await viewerFor(/GlamVelvetSofa\.glb$/)
     expect(screen.getByText('The 3D view and AR show the standard model. The Sapphire finish may look different.')).toBeInTheDocument()
@@ -129,19 +129,6 @@ describe('product page: AR fixes', () => {
     expect(screen.queryByRole('button', { name: 'View in 3D / AR' })).toBeNull()
   })
 
-  it('the "3D view" tile leads the thumbnails and switches the stage to the 3D model', async () => {
-    openApp('/products/nordhaus/sheen-lounge-chair')
-    const el = await viewerFor(/SheenChair\.glb$/)
-    loaded(el, false)
-    const tile = screen.getByRole('button', { name: '3D view' })
-    const [firstThumb] = within(tile.closest('ul') as HTMLElement).getAllByRole('button')
-    expect(firstThumb).toBe(tile)
-    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(tile)
-    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'true')
-    expect(tile).toHaveAttribute('aria-current', 'true')
-  })
-
   it('says "View in 3D" without "AR" where AR cannot open (AR-08)', async () => {
     openApp('/products/nordhaus/sheen-lounge-chair')
     loaded(await viewerFor(/SheenChair\.glb$/), false)
@@ -163,7 +150,8 @@ describe('product page: AR fixes', () => {
 describe('product page: the primary call to action opens AR where it can', () => {
   const primaryAr = (name = 'View in my home') => screen.queryAllByRole('button', { name })
   /** Controls that offer to start AR (the "AR tips" link opens the tips; the phone card's "Copy link" / "Show QR code" do not). */
-  const arLabelled = () => screen.queryAllByRole('button').filter((b) => b.textContent !== 'AR tips' && /\bAR\b|my home|minha casa/.test(b.textContent ?? ''))
+  const arLabelled = () =>
+    screen.queryAllByRole('button').filter((b) => b.textContent !== 'AR tips' && /\bAR\b|my home|minha casa/.test(b.textContent ?? ''))
   // jsdom has no scrollIntoView; the 3D action scrolls the stage into view.
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn()
@@ -204,13 +192,10 @@ describe('product page: the primary call to action opens AR where it can', () =>
     expect(arLabelled()).toHaveLength(0) // still checking: nothing offers AR yet
     loaded(el, false)
     expect(arLabelled()).toHaveLength(0)
-    // On a computer the phone hand-off sits behind "Open on your phone" (link and QR code).
-    fireEvent.click(screen.getByRole('button', { name: 'Open on your phone' }))
     expect(screen.getByText('View in your space on a phone')).toBeInTheDocument()
     const [primary] = screen.getAllByRole('button', { name: 'View in 3D' })
-    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(primary!)
-    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'true') // the stage shows the 3D model
+    expect(screen.getByText('Interactive 3D')).toBeInTheDocument()
     expect(el.activateAR).not.toHaveBeenCalled()
   })
 
@@ -233,29 +218,25 @@ describe('product page: AR audit quick wins', () => {
   const ANDROID_LINKEDIN = `${ANDROID_CHROME} [LinkedInApp]/4.1`
   const IPHONE_SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
   const asUserAgent = (ua: string) => vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua)
-  /** The price and size line under the product name. */
-  const meta = () => document.querySelector('[data-product-meta]') as HTMLElement
+  const cta = () => document.querySelector('[data-ar-cta]') as HTMLElement
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn()
   })
 
-  it('keeps the AR action reachable without scrolling on phones: a bar fixed to the bottom of the screen (AR-05)', async () => {
+  it('puts the AR action directly after the stage, before the title and the finish picker (AR-05)', async () => {
     openApp('/products/nordhaus/sheen-lounge-chair')
     const el = await viewerFor(/SheenChair\.glb$/)
     loaded(el, true)
     const button = arButton()!
-    const bar = button.closest('[data-ar-bar]') as HTMLElement
-    expect(bar.className).toMatch(/(^|\s)fixed(\s|$)/)
-    expect(bar.className).toMatch(/bottom-0/)
-    expect(bar.className).toMatch(/env\(safe-area-inset-bottom\)/)
-    // Desktop: the same single button sits in the right column, under the finish picker.
-    expect(bar.className).toMatch(/lg:static/)
+    const title = screen.getByRole('heading', { name: 'Sheen Lounge Chair', level: 1 })
     const firstSwatch = screen.getByRole('radio', { name: /Purple-Gold Damask/ })
-    expect(!!(firstSwatch.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
-    // The page keeps room under its last line for the bar while it shows.
-    expect(document.body.className).toMatch(/pb-\[calc/)
-    loaded(el, false)
-    expect(document.body.className).not.toMatch(/pb-\[calc/)
+    const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(el, button)).toBe(true)
+    expect(follows(button, title)).toBe(true)
+    expect(follows(button, firstSwatch)).toBe(true)
+    // Desktop keeps the old layout: the block is placed in the text column, under the finish picker.
+    expect(cta().className).toMatch(/lg:col-start-1/)
+    expect(cta().className).toMatch(/lg:row-start-2/)
   })
 
   it('shows "Preparing AR…" from the tap until the hand-off settles, and ignores taps meanwhile (AR-06)', async () => {
@@ -354,13 +335,13 @@ describe('product page: AR audit quick wins', () => {
     }
   })
 
-  it('shows the scale label on the size line, and flags a model that does not match (AR-09)', async () => {
+  it('shows the scale label next to the AR action, and flags a model that does not match (AR-09)', async () => {
     openApp('/products/nordhaus/sheen-lounge-chair')
     const el = await viewerFor(/SheenChair\.glb$/)
     loaded(el, true)
-    expect(within(meta()).getByText('True to size in AR')).toBeInTheDocument()
+    expect(within(cta()).getByText('True-to-size model')).toBeInTheDocument()
     loaded(el, true, { x: 2, y: 2, z: 2 })
-    expect(within(meta()).getByText('AR scale unverified')).toBeInTheDocument()
-    expect(within(meta()).queryByText('True to size in AR')).toBeNull()
+    expect(within(cta()).getByText('AR scale unverified')).toBeInTheDocument()
+    expect(within(cta()).queryByText('True-to-size model')).toBeNull()
   })
 })

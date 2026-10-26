@@ -1,5 +1,5 @@
 # ADR-0036: Soft, editorial catalog and product pages
-- **Status:** Accepted (owner decision, 2026-10-26)
+- **Status:** Superseded by ADR-0037 (owner, 2026-10-26: back to the original pages)
 - **Date:** 2026-10-26
 - **Affects:** ADR-0023 (amended for the public catalog and product pages), design/11-design-system.md, design/14-features-public.md, `src/index.css`, `src/features/public/*`
 

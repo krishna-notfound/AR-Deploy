@@ -1,13 +1,7 @@
 # 14 · Public catalog & product pages
 Read when: building `/catalog/*` or `/products/*`. Also read [09-3d-ar.md](09-3d-ar.md) and [10-i18n.md](10-i18n.md). Load the `frontend-design` skill.
 
-**Look (ADR-0036, 2026-10-26):** follow the approved Stitch designs in `design/stitch/public/` (catalog and product, desktop and phone).
-- Soft shapes: `rounded-soft` photos, stage and panels; pill buttons, chips, fields and switches.
-- The business name as a monument on its catalog; the first piece is featured.
-- The product name in `text-piece`.
-- On phones, a sticky "View in my home" bar.
-- No hairlines, eyebrows or tiny caps.
-- Never show content the platform does not store.
+**Look (ADR-0037, 2026-10-26):** the original catalog and product layout, with slightly soft corners on the public pages only (`.public-soft` in `src/index.css`: 6px controls, 10px cards, photos and panels). The product's own link is a real button. ADR-0036 (the Stitch redesign) is superseded.
 
 ## CatalogPage `/catalog/:businessSlug`
 - **Header:** logo, name, description. Branding comes from `--brand-accent`.

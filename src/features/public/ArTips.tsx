@@ -63,8 +63,8 @@ export function ArTips({ open, onClose, onStart }: { open: boolean; onClose: () 
     >
       <ol className="space-y-3">
         {(['ar.tip1', 'ar.tip2', 'ar.tip3', 'ar.tip4'] as const).map((k, i) => (
-          <li key={k} className="flex gap-3 text-[15px] leading-6 text-ink-body">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-subtle text-[13px] leading-none font-medium text-accent-ink tabular-nums">{i + 1}</span>
+          <li key={k} className="flex gap-3 text-sm leading-6">
+            <span className="grid size-6 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line font-display text-[15px] leading-none text-accent-ink tabular-nums">{String(i + 1).padStart(2, '0')}</span>
             {t(k)}
           </li>
         ))}

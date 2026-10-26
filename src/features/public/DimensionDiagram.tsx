@@ -5,7 +5,7 @@ import { convertLength } from '@/lib/format'
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
 
 /**
- * Isometric outline (ink, on the details panel's light card) of the product's bounding box with
+ * Architectural-style isometric outline of the product's bounding box with
  * W / H / D dimension lines, drawn to the product's real proportions.
  */
 export function DimensionDiagram({ dims, unit }: { dims: Dimensions; unit: LengthUnit }) {
@@ -72,7 +72,7 @@ export function DimensionDiagram({ dims, unit }: { dims: Dimensions; unit: Lengt
 
   return (
     <figure className="select-none">
-      <svg viewBox="0 0 320 230" className="mx-auto h-auto w-full max-w-[340px]" role="img" aria-label={`${t('product.width')} ${label(w)}, ${t('product.height')} ${label(h)}, ${t('product.depth')} ${label(d)}`}>
+      <svg viewBox="0 0 320 230" className="h-auto w-full max-w-[320px]" role="img" aria-label={`${t('product.width')} ${label(w)}, ${t('product.height')} ${label(h)}, ${t('product.depth')} ${label(d)}`}>
         <defs>
           <marker id="dim-tick" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
             <path d="M2 8 L8 2" stroke="currentColor" strokeWidth="1.4" />
@@ -83,21 +83,21 @@ export function DimensionDiagram({ dims, unit }: { dims: Dimensions; unit: Lengt
             <polygon
               key={i}
               points={f.map(pt).join(' ')}
-              style={{ fill: i === 1 ? 'var(--color-canvas)' : i === 2 ? 'var(--color-limestone)' : 'var(--color-subtle)', stroke: 'var(--color-ink)' }}
-              strokeWidth="1.1"
+              style={{ fill: i === 1 ? 'var(--color-canvas)' : i === 2 ? 'var(--color-subtle)' : 'var(--color-surface)', stroke: 'var(--color-line-strong)' }}
+              strokeWidth="0.9"
               strokeLinejoin="round"
             />
           ))}
           {/* hidden edges */}
-          <polyline points={[E, Hh].map(pt).join(' ')} fill="none" style={{ stroke: 'var(--color-line-strong)' }} strokeOpacity="0.5" strokeDasharray="3 3" />
-          <polyline points={[A, E, F].map(pt).join(' ')} fill="none" style={{ stroke: 'var(--color-line-strong)' }} strokeOpacity="0.5" strokeDasharray="3 3" />
+          <polyline points={[E, Hh].map(pt).join(' ')} fill="none" style={{ stroke: 'var(--color-line)' }} strokeDasharray="3 3" />
+          <polyline points={[A, E, F].map(pt).join(' ')} fill="none" style={{ stroke: 'var(--color-line)' }} strokeDasharray="3 3" />
         </g>
-        <g className="text-accent" stroke="currentColor" strokeWidth="1.1" strokeDasharray="3 2.5">
+        <g className="text-[var(--brand-accent)]" stroke="currentColor" strokeWidth="1.2">
           {[wLine, dLine, hLine].map((l, i) => (
             <line key={i} {...l} markerStart="url(#dim-tick)" markerEnd="url(#dim-tick)" />
           ))}
         </g>
-        <g fontSize="12" fontWeight="500" style={{ fill: 'var(--color-ink-body)' }} fontFamily="inherit">
+        <g fontSize="11" fontWeight="500" letterSpacing="0.04em" style={{ fill: 'var(--color-ink)' }} fontFamily="inherit">
           <text x={mid(wLine)[0] - 4} y={mid(wLine)[1] + 16} textAnchor="middle">
             {label(w)}
           </text>

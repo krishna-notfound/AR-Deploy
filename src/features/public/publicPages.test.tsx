@@ -40,18 +40,18 @@ afterEach(() => {
 describe('catalogue product count (COR-08)', () => {
   it('shows no "0 products" while the products load or after they fail', async () => {
     vi.spyOn(service, 'getProducts').mockResolvedValue(fail('UNKNOWN', 'offline'))
-    const watch = watchForText('0 pieces')
+    const watch = watchForText('0 products')
     openApp('/catalog/nordhaus')
     await screen.findByRole('heading', { name: 'Nordhaus Living', level: 1 })
     await screen.findByRole('button', { name: 'Try again' })
     watch.stop()
     expect(watch.seen()).toBe(false)
-    expect(screen.queryByText(/pieces?$/i)).toBeNull()
+    expect(screen.queryByText(/products?$/i)).toBeNull()
   })
 
   it('shows the count once the products have loaded', async () => {
     openApp('/catalog/nordhaus')
-    expect(await screen.findByText(/^\d+ pieces$/)).toBeInTheDocument()
+    expect(await screen.findByText(/^\d+ products$/)).toBeInTheDocument()
   })
 
   it('offers a way out of "Catalog not found"', async () => {
@@ -146,67 +146,28 @@ function smallSpacedClasses(root: HTMLElement) {
 describe('public catalogue clarity (D8)', () => {
   it('catalogue cards have no index numbering', async () => {
     openApp('/catalog/nordhaus')
-    await screen.findByText(/^\d+ pieces$/)
+    await screen.findByText(/^\d+ products$/)
     const chips = Array.from(document.body.querySelectorAll('span')).map((s) => s.textContent ?? '')
     expect(chips.filter((t) => /^\d{2} \/\//.test(t.trim()))).toEqual([])
     expect(document.body.textContent).not.toMatch(/\d{2} \/\//)
   })
 
-  it('card names and prices are sentence case, not uppercase', async () => {
+  it('"View piece" is sentence case, not uppercase', async () => {
     openApp('/catalog/nordhaus')
-    await screen.findByText(/^\d+ pieces$/)
-    const name = screen.getAllByRole('heading', { level: 2 })[0] ?? null
-    const card = name?.closest('a') ?? null
-    expect(card).not.toBeNull()
-    for (const el of [card!, ...Array.from(card!.querySelectorAll<HTMLElement>('*'))]) {
-      expect(el.getAttribute('class') ?? '').not.toMatch(/uppercase|text-label/)
+    await screen.findByText(/^\d+ products$/)
+    const label: HTMLElement | null = screen.getAllByText('View piece')[0] ?? null
+    for (let el = label; el && el.tagName !== 'A'; el = el.parentElement) {
+      expect(el.className).not.toMatch(/uppercase|text-label/)
     }
   })
 
   it('has no small widely spaced uppercase labels on the cards or the product page', async () => {
     const { unmount } = openApp('/catalog/nordhaus')
-    await screen.findByText(/^\d+ pieces$/)
+    await screen.findByText(/^\d+ products$/)
     expect(smallSpacedClasses(document.body)).toEqual([])
     unmount()
     openApp('/products/nordhaus/sheen-lounge-chair')
     await screen.findByRole('heading', { level: 1 })
     expect(smallSpacedClasses(document.body)).toEqual([])
-  })
-})
-
-describe('catalogue v2 sections (ADR-0036 v2)', { timeout: 20_000 }, () => {
-  it('counts pieces and pieces with 3D from the published products', async () => {
-    const real = await service.getProducts({ businessId: 'biz_nord', status: 'published' })
-    if (!real.ok) throw new Error('seed')
-    openApp('/catalog/nordhaus')
-    expect(await screen.findByText(`${real.data.length} pieces`)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All' })).toHaveTextContent(`All${real.data.length}`)
-  })
-
-  it('shows the contact panel with real links, and hides it when the business has no contact', async () => {
-    const { unmount } = openApp('/catalog/nordhaus')
-    await screen.findByRole('heading', { name: 'Visit or contact Nordhaus Living', level: 2 })
-    expect(screen.getByRole('link', { name: 'Email Nordhaus Living' })).toHaveAttribute('href', 'mailto:studio@nordhaus.example')
-    expect(screen.getByRole('link', { name: 'studio@nordhaus.example' })).toHaveAttribute('href', 'mailto:studio@nordhaus.example')
-    expect(screen.getByRole('link', { name: '+351 22 000 0000' })).toHaveAttribute('href', 'tel:+351220000000')
-    expect(screen.getByRole('link', { name: 'nordhaus.example' })).toHaveAttribute('href', 'https://nordhaus.example')
-    unmount()
-
-    const biz = await service.getBusinessBySlug('nordhaus')
-    if (!biz.ok) throw new Error('seed')
-    vi.spyOn(service, 'getBusinessBySlug').mockResolvedValue({ ...biz, data: { ...biz.data, contact: {} } })
-    openApp('/catalog/nordhaus')
-    await screen.findByText(/^\d+ pieces$/)
-    expect(screen.queryByRole('heading', { name: /Visit or contact/ })).toBeNull()
-  })
-
-  it('"Browse pieces in 3D" narrows the grid to the pieces with 3D', async () => {
-    openApp('/catalog/nordhaus')
-    await screen.findByText(/^\d+ pieces$/)
-    const before = screen.getAllByRole('heading', { level: 2 }).length
-    screen.getByRole('button', { name: 'Browse pieces in 3D' }).click()
-    await waitFor(() => expect(screen.getByRole('button', { name: '3D & AR' })).toHaveAttribute('aria-pressed', 'true'))
-    expect(window.location.search).toContain('3d=1')
-    expect(screen.getAllByRole('heading', { level: 2 }).length).toBeLessThan(before)
   })
 })
