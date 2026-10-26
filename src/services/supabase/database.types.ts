@@ -1,4 +1,4 @@
-// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-26 after migration 20261026041731
+// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-26 after migration 20261026120000
 // (Supabase type generator). Regenerate after any migration: npx supabase gen types typescript --project-id <ref>.
 export type Json =
   | string
@@ -411,7 +411,7 @@ export type Database = {
           file_name: string
           request_id: string
           size_bytes: number
-          sort_order?: number
+          sort_order: number
           storage_path: string
         }
         Update: {
@@ -1025,7 +1025,10 @@ export type Database = {
         Returns: Json
       }
       admin_deactivate_member: { Args: { p_member: string }; Returns: Json }
-      admin_deliver_model_request: { Args: { p_request: string }; Returns: Json }
+      admin_deliver_model_request: {
+        Args: { p_request: string }
+        Returns: Json
+      }
       admin_get_member: { Args: { p_member: string }; Returns: Json }
       admin_invite_member: {
         Args: {
@@ -1050,7 +1053,10 @@ export type Database = {
       admin_list_members: { Args: never; Returns: Json }
       admin_list_owner_states: { Args: never; Returns: Json }
       admin_reactivate_member: { Args: { p_member: string }; Returns: Json }
-      admin_reject_model_request: { Args: { p_reason: string; p_request: string }; Returns: Json }
+      admin_reject_model_request: {
+        Args: { p_reason: string; p_request: string }
+        Returns: Json
+      }
       admin_remove_member: { Args: { p_member: string }; Returns: Json }
       admin_review_application: {
         Args: { p_action: string; p_application_id: string; p_reason?: string }
@@ -1093,7 +1099,10 @@ export type Database = {
         }
         Returns: Json
       }
-      admin_set_own_models: { Args: { p_allow: boolean; p_business: string }; Returns: Json }
+      admin_set_own_models: {
+        Args: { p_allow: boolean; p_business: string }
+        Returns: Json
+      }
       admin_set_role_permissions: {
         Args: {
           p_permissions: string[]
@@ -1106,14 +1115,17 @@ export type Database = {
           p_file_name: string
           p_format: string
           p_request: string
-          p_required_extensions: string[] | null
+          p_required_extensions: string[]
           p_size_bytes: number
           p_storage_path: string
         }
         Returns: Json
       }
       admin_start_model_request: { Args: { p_request: string }; Returns: Json }
-      admin_unstage_model_file: { Args: { p_format: string; p_request: string }; Returns: Json }
+      admin_unstage_model_file: {
+        Args: { p_format: string; p_request: string }
+        Returns: Json
+      }
       admin_user_emails: {
         Args: { p_ids: string[] }
         Returns: {
@@ -1163,7 +1175,10 @@ export type Database = {
         }
       }
       log_account_event: { Args: { p_event: string }; Returns: undefined }
-      model_request_storage_paths: { Args: { p_product: string }; Returns: Json }
+      model_request_storage_paths: {
+        Args: { p_product: string }
+        Returns: Json
+      }
       my_platform_access: { Args: never; Returns: Json }
       my_recovery_codes_left: { Args: never; Returns: number }
       my_security_state: { Args: never; Returns: Json }
@@ -1181,14 +1196,15 @@ export type Database = {
       record_sign_in: { Args: { p_user_agent: string }; Returns: string }
       request_model: {
         Args: {
-          p_note: string | null
+          p_note: string
           p_photos: Json
           p_product: string
           p_request_id: string
-          p_variant: string | null
+          p_variant: string
         }
         Returns: Json
       }
+      request_photo_cleanable: { Args: { p_name: string }; Returns: boolean }
       save_product: {
         Args: {
           p_images: Json
