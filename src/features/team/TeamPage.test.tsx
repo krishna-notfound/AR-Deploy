@@ -120,3 +120,18 @@ describe('Team & Access page (ADR-0029)', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
   })
 })
+
+describe('Email failed invitations (R-W7-3)', () => {
+  it('an email_failed invite shows "Email failed" on the Team page', { timeout: 20_000 }, async () => {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' })) // the demo team is staff-only
+    const real = await service.listMembers()
+    if (!real.ok) throw new Error('demo team did not load')
+    vi.spyOn(service, 'listMembers').mockResolvedValue({
+      ok: true,
+      data: real.data.map((m) => (m.id === 'mem_marta' && m.invite ? { ...m, invite: { ...m.invite, status: 'email_failed' as const } } : m)),
+    })
+    open('/admin/team?tab=invitations')
+    const row = (await within(await screen.findByRole('table')).findByText('marta.lopes@sanctus.example')).closest('tr') as HTMLElement
+    expect(within(row).getByText('Email failed')).toBeInTheDocument()
+  })
+})

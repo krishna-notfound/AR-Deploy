@@ -281,3 +281,164 @@ create policy "Platform members delete logos" on storage.objects
   using (bucket_id = 'business-logos'
          and ((select public.platform_can('businesses.edit')) or (select public.platform_can('businesses.delete'))));
 -- ---- end S1.5 Task 5 ----
+
+-- =============================================================================
+-- S1.5 Task 12: email status integrity (R-W7-3, R-W7-4, R-W7-5)
+-- =============================================================================
+
+-- R-W7-4: a provider event whose email_log row does not exist yet is kept with applied = false and applied when
+-- the row's provider_message_id arrives. Rows stored before this release were applied (or had nothing to apply).
+-- error carries the reason an event brings (a suppressed address is a bounce with error 'suppressed').
+alter table private.email_provider_events
+  add column applied boolean not null default true,
+  add column error   text check (char_length(error) <= 200);
+
+-- The log status a Resend event type stands for; null for events that carry no delivery evidence
+-- (opened, clicked, scheduled, unknown). email.suppressed is a bounce.
+create function private.email_event_status(p_event_type text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_event_type
+    when 'email.sent' then 'sent'
+    when 'email.delivered' then 'delivered'
+    when 'email.delivery_delayed' then 'delayed'
+    when 'email.bounced' then 'bounced'
+    when 'email.suppressed' then 'bounced'
+    when 'email.complained' then 'complained'
+    when 'email.failed' then 'failed'
+  end;
+$$;
+revoke execute on function private.email_event_status(text) from public, anon, authenticated;
+
+-- The only place an email_log status changes from provider evidence. A status moves only to the same or a higher
+-- rank (blocked 0, failed 1, accepted 1, sent 2, delayed 3, delivered 4, bounced 5, complained 5) and only when it
+-- actually changes, so a duplicate or late event writes nothing. Returns true when it wrote.
+-- R-W7-3: a team_invitation row (workflow team_invite:<member>) that ends bounced, complained or failed moves the
+-- member's newest sent invite, created no later than the log row, to email_failed.
+create function private.apply_email_status(p_message_id text, p_status text, p_error text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_rank constant jsonb := '{"blocked":0,"failed":1,"accepted":1,"sent":2,"delayed":3,"delivered":4,"bounced":5,"complained":5}';
+  v_log  public.email_log;
+begin
+  if p_message_id is null or p_status is null or not (v_rank ? p_status) then
+    return false;
+  end if;
+  update public.email_log
+     set status = p_status,
+         updated_at = now(),
+         error = coalesce(left(p_error, 500), error)
+   where provider_message_id = p_message_id
+     and status <> p_status
+     and (v_rank ->> p_status)::int >= (v_rank ->> status)::int
+  returning * into v_log;
+  if not found then
+    return false;
+  end if;
+  if p_status in ('bounced', 'complained', 'failed')
+     and v_log.kind = 'team_invitation'
+     and v_log.workflow ~ '^team_invite:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
+    update private.platform_invites
+       set status = 'email_failed',
+           last_email_result = left(p_status || coalesce(': ' || p_error, ''), 220)
+     where id = (select i.id from private.platform_invites i
+                  where i.member_id = substr(v_log.workflow, 13)::uuid
+                    and i.status = 'sent'
+                    and i.created_at <= v_log.created_at
+                  order by i.created_at desc, i.id
+                  limit 1);
+  end if;
+  return true;
+end;
+$$;
+revoke execute on function private.apply_email_status(text, text, text) from public, anon, authenticated;
+
+-- Records one Resend webhook event exactly once. The status moves by the rank rule; an event for a message that has
+-- no log row yet is stored with applied = false. p_error is the reason the event brings (e.g. 'suppressed').
+-- The advisory lock serializes this with the log row's insert, so a pending event is never missed.
+drop function public.service_record_email_event(text, text, text);
+create function public.service_record_email_event(p_svix_id text, p_provider_message_id text, p_event_type text, p_error text default null)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_new     text := private.email_event_status(p_event_type);
+  v_error   text := case when p_event_type = 'email.suppressed' then 'suppressed' else left(p_error, 200) end;
+  v_applied boolean := true;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(coalesce(p_provider_message_id, ''), 0));
+  if v_new is not null then
+    v_applied := exists (select 1 from public.email_log where provider_message_id = p_provider_message_id);
+  end if;
+  insert into private.email_provider_events (svix_id, received_at, provider_message_id, event_type, applied, error)
+  values (p_svix_id, clock_timestamp(), p_provider_message_id, p_event_type, v_applied, v_error)
+  on conflict (svix_id) do nothing;
+  if not found then
+    return false;
+  end if;
+  if v_new is not null and v_applied then
+    perform private.apply_email_status(p_provider_message_id, v_new, v_error);
+  end if;
+  return true;
+end;
+$$;
+revoke execute on function public.service_record_email_event(text, text, text, text) from public, anon, authenticated;
+grant execute on function public.service_record_email_event(text, text, text, text) to service_role;
+
+-- R-W7-5: the status check (send-test-email) writes through the same rank rule. opened, clicked, scheduled and
+-- unknown statuses write nothing. Returns true when it wrote.
+create function public.service_apply_provider_status(p_message_id text, p_status text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform pg_advisory_xact_lock(hashtextextended(coalesce(p_message_id, ''), 0));
+  return private.apply_email_status(p_message_id, p_status, null);
+end;
+$$;
+revoke execute on function public.service_apply_provider_status(text, text) from public, anon, authenticated;
+grant execute on function public.service_apply_provider_status(text, text) to service_role;
+
+-- R-W7-4: when a log row gets its provider message id, the events that arrived first are applied, oldest first,
+-- each exactly once (applied = true afterwards).
+create function private.apply_pending_email_events()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_event record;
+begin
+  if new.provider_message_id is null then
+    return null;
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended(new.provider_message_id, 0));
+  for v_event in
+    select svix_id, event_type, error from private.email_provider_events
+     where provider_message_id = new.provider_message_id and not applied
+     order by received_at, svix_id
+       for update
+  loop
+    perform private.apply_email_status(new.provider_message_id, private.email_event_status(v_event.event_type), v_event.error);
+    update private.email_provider_events set applied = true where svix_id = v_event.svix_id;
+  end loop;
+  return null;
+end;
+$$;
+revoke execute on function private.apply_pending_email_events() from public, anon, authenticated;
+create trigger email_log_apply_pending_events
+  after insert or update of provider_message_id on public.email_log
+  for each row execute function private.apply_pending_email_events();
+-- ---- end S1.5 Task 12 ----

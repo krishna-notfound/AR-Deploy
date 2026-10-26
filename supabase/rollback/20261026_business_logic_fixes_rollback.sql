@@ -21,6 +21,57 @@
 begin;
 
 -- =============================================================================
+-- S1.5 Task 12 rollback: email status integrity (R-W7-3, R-W7-4, R-W7-5)
+-- =============================================================================
+
+-- Every email_log row and every stored provider event is kept; invites already moved to email_failed stay so.
+drop trigger email_log_apply_pending_events on public.email_log;
+drop function private.apply_pending_email_events();
+drop function public.service_apply_provider_status(text, text);
+drop function public.service_record_email_event(text, text, text, text);
+drop function private.apply_email_status(text, text, text);
+drop function private.email_event_status(text);
+alter table private.email_provider_events drop column error, drop column applied;
+
+-- service_record_email_event as in 20261020091428_applications_and_owner_access.
+create function public.service_record_email_event(p_svix_id text, p_provider_message_id text, p_event_type text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_new  text;
+  v_rank constant jsonb := '{"blocked":0,"failed":1,"accepted":1,"sent":2,"delayed":3,"delivered":4,"bounced":4,"complained":5}';
+begin
+  insert into private.email_provider_events (svix_id, provider_message_id, event_type)
+  values (p_svix_id, p_provider_message_id, p_event_type)
+  on conflict (svix_id) do nothing;
+  if not found then
+    return false;
+  end if;
+  v_new := case p_event_type
+    when 'email.sent' then 'sent'
+    when 'email.delivered' then 'delivered'
+    when 'email.delivery_delayed' then 'delayed'
+    when 'email.bounced' then 'bounced'
+    when 'email.complained' then 'complained'
+    when 'email.failed' then 'failed'
+  end;
+  if v_new is not null then
+    update public.email_log
+       set status = v_new, updated_at = now()
+     where provider_message_id = p_provider_message_id
+       and (v_rank ->> v_new)::int >= (v_rank ->> status)::int;
+  end if;
+  return true;
+end;
+$$;
+revoke execute on function public.service_record_email_event(text, text, text) from public, anon, authenticated;
+grant execute on function public.service_record_email_event(text, text, text) to service_role;
+-- ---- end S1.5 Task 12 rollback ----
+
+-- =============================================================================
 -- S1.5 Task 2 rollback: staff 2FA gate on Edge Functions, staff password length, owner email conflict (R-W1-1, R-W1-7, R-W1-8)
 -- =============================================================================
 

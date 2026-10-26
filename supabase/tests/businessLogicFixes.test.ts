@@ -423,3 +423,157 @@ describe('S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)', (
     }
   }, 120_000)
 })
+
+describe('S1.5 Task 12: email status integrity', () => {
+  const id = ids(12)
+  GONE_AFTER_ROLLBACK.push(
+    'public.service_apply_provider_status(text, text)',
+    'public.service_record_email_event(text, text, text, text)',
+    'private.apply_email_status(text, text, text)',
+    'private.apply_pending_email_events()',
+    'private.email_event_status(text)',
+  )
+  let n = 0
+  const msg = () => `t12-msg-${++n}-aaaaaaaa`
+  const svix = () => `t12-svix-${++n}`
+
+  const logRow = async (pmid: string | null, over: { kind?: string; workflow?: string | null; status?: string; createdAt?: string } = {}) =>
+    (await db.query<{ id: string }>(
+      `insert into public.email_log (kind, recipient, subject, status, provider_message_id, workflow, created_at)
+       values ($1, 'r@test', 'Subject', $2, $3, $4, coalesce($5::timestamptz, now())) returning id`,
+      [over.kind ?? 'test', over.status ?? 'accepted', pmid, over.workflow ?? null, over.createdAt ?? null])).rows[0]!.id
+  const statusOf = async (pmid: string) => (await db.query<{ status: string; error: string | null }>(`select status, error from public.email_log where provider_message_id = $1`, [pmid])).rows[0]!
+  const record = async (pmid: string, type: string, sv = svix(), error: string | null = null) =>
+    (await h.svc(`select to_jsonb(public.service_record_email_event($1, $2, $3, $4)) as r`, [sv, pmid, type, error])) as unknown as boolean
+  const apply = async (pmid: string, status: string) =>
+    (await h.svc(`select to_jsonb(public.service_apply_provider_status($1, $2)) as r`, [pmid, status])) as unknown as boolean
+
+  it('delivered after bounced stays bounced', async () => {
+    const m = msg()
+    await logRow(m)
+    expect(await record(m, 'email.bounced')).toBe(true)
+    expect(await record(m, 'email.delivered')).toBe(true) // a new event id, stored, but it changes nothing
+    expect((await statusOf(m)).status).toBe('bounced')
+    expect(await record(m, 'email.delivery_delayed')).toBe(true)
+    expect((await statusOf(m)).status).toBe('bounced')
+  })
+
+  it('email.suppressed is a bounce with error suppressed, whether the Edge Function maps it or not', async () => {
+    const a = msg()
+    const b = msg()
+    await logRow(a)
+    await logRow(b)
+    await record(a, 'email.bounced', svix(), 'suppressed')
+    await record(b, 'email.suppressed')
+    expect(await statusOf(a)).toEqual({ status: 'bounced', error: 'suppressed' })
+    expect(await statusOf(b)).toEqual({ status: 'bounced', error: 'suppressed' })
+  })
+
+  it("sent before the log row is stored applied=false and applied when the row's provider_message_id arrives", async () => {
+    const early = msg()
+    const late = msg()
+    const events = (m: string) => db.query<{ applied: boolean }>(`select applied from private.email_provider_events where provider_message_id = $1`, [m])
+    // Insert path: the event arrives first, then the log row is written with the message id.
+    await record(early, 'email.sent')
+    expect((await events(early)).rows).toEqual([{ applied: false }])
+    await logRow(early)
+    expect((await statusOf(early)).status).toBe('sent')
+    expect((await events(early)).rows).toEqual([{ applied: true }])
+    // Update path: the row exists without an id (send in flight), then the id is set.
+    await record(late, 'email.delivered')
+    const rowId = await logRow(null)
+    await db.query(`update public.email_log set provider_message_id = $1 where id = $2`, [late, rowId])
+    expect((await statusOf(late)).status).toBe('delivered')
+    // Events that carry no status (opened, clicked) have nothing to apply.
+    await record(msg(), 'email.opened')
+    expect((await db.query(`select 1 from private.email_provider_events where event_type = 'email.opened' and not applied`)).rows).toHaveLength(0)
+  })
+
+  it('a duplicate and a late event are idempotent; a pending event is applied exactly once', async () => {
+    const m = msg()
+    const dup = svix()
+    // Two pending events, delivered then bounced, arrive before the row.
+    expect(await record(m, 'email.delivered', dup)).toBe(true)
+    expect(await record(m, 'email.delivered', dup)).toBe(false) // the same svix id again
+    expect(await record(m, 'email.bounced')).toBe(true)
+    await logRow(m)
+    expect((await statusOf(m)).status).toBe('bounced')
+
+    // A duplicate or a late lower-ranked event changes nothing, not even updated_at.
+    const stamp = async () => (await db.query<{ u: string }>(`select updated_at::text as u from public.email_log where provider_message_id = $1`, [m])).rows[0]!.u
+    const before = await stamp()
+    await record(m, 'email.bounced')
+    await record(m, 'email.sent')
+    expect(await stamp()).toBe(before)
+    expect((await statusOf(m)).status).toBe('bounced')
+
+    // Applied exactly once: reset the status by hand, touch provider_message_id again, nothing is re-applied.
+    await db.query(`update public.email_log set status = 'accepted' where provider_message_id = $1`, [m])
+    await db.query(`update public.email_log set provider_message_id = provider_message_id where provider_message_id = $1`, [m])
+    expect((await statusOf(m)).status).toBe('accepted')
+    expect((await db.query(`select 1 from private.email_provider_events where provider_message_id = $1 and not applied`, [m])).rows).toHaveLength(0)
+  })
+
+  it('a bounce webhook for team_invite:<member> sets the newest sent invite to email_failed', async () => {
+    const MEMBER = id(1)
+    const hash = (k: number) => String(k).repeat(64).slice(0, 64)
+    await db.exec(`insert into public.platform_members (id, email, role, status) values ('${MEMBER}', 't12-invitee@test', 'team', 'invited')`)
+    const invite = async (k: number, status: string, createdAt: string) =>
+      (await db.query<{ id: string }>(
+        `insert into private.platform_invites (member_id, token_hash, status, expires_at, created_at)
+         values ($1, $2, $3::public.invite_status, now() + interval '7 days', $4::timestamptz) returning id`,
+        [MEMBER, hash(k), status, createdAt])).rows[0]!.id
+    const older = await invite(1, 'sent', new Date(Date.now() - 2 * 3600e3).toISOString())
+    const newest = await invite(2, 'sent', new Date(Date.now() - 3600e3).toISOString())
+    const after = await invite(3, 'sent', new Date(Date.now() + 3600e3).toISOString()) // created after the log row
+    const m = msg()
+    await logRow(m, { kind: 'team_invitation', workflow: `team_invite:${MEMBER}` })
+
+    await record(m, 'email.delivered')
+    const states = async () => (await db.query<{ id: string; status: string; r: string | null }>(`select id, status::text, last_email_result as r from private.platform_invites where member_id = $1`, [MEMBER])).rows
+    expect((await states()).map((r) => r.status)).toEqual(['sent', 'sent', 'sent']) // delivered does not fail an invite
+
+    await record(m, 'email.bounced')
+    const by = Object.fromEntries((await states()).map((r) => [r.id, r]))
+    expect(by[newest]).toMatchObject({ status: 'email_failed', r: 'bounced' })
+    expect(by[older]!.status).toBe('sent')
+    expect(by[after]!.status).toBe('sent')
+
+    // Unrelated kinds never touch invites; a failed event on a later invitation email does the same again.
+    const c = msg()
+    await logRow(c, { kind: 'test', workflow: `team_invite:${MEMBER}` })
+    await record(c, 'email.bounced')
+    expect((await states()).find((r) => r.id === older)!.status).toBe('sent')
+    const f = msg()
+    await logRow(f, { kind: 'team_invitation', workflow: `team_invite:${MEMBER}` })
+    await record(f, 'email.failed', svix(), 'provider down')
+    const next = Object.fromEntries((await states()).map((r) => [r.id, r]))
+    expect(next[older]).toMatchObject({ status: 'email_failed', r: 'failed: provider down' })
+    expect(next[after]!.status).toBe('sent')
+  })
+
+  it('service_apply_provider_status follows the ranks and ignores opened/clicked/scheduled/unknown', async () => {
+    const m = msg()
+    await logRow(m)
+    expect(await apply(m, 'sent')).toBe(true)
+    expect(await apply(m, 'accepted')).toBe(false) // lower rank
+    expect(await apply(m, 'sent')).toBe(false) // same status
+    expect(await apply(m, 'delivered')).toBe(true)
+    for (const s of ['opened', 'clicked', 'scheduled', 'queued', 'nonsense', '']) expect(await apply(m, s)).toBe(false)
+    expect((await statusOf(m)).status).toBe('delivered')
+    expect(await apply(m, 'bounced')).toBe(true)
+    expect(await apply(m, 'delivered')).toBe(false)
+    expect((await statusOf(m)).status).toBe('bounced')
+    expect(await apply('t12-no-such-message', 'delivered')).toBe(false)
+  })
+
+  it('the new functions are service-role only', async () => {
+    const { rows } = await db.query<{ fn: string; anon: boolean; authenticated: boolean; service: boolean }>(
+      `select f as fn, has_function_privilege('anon', f::regprocedure, 'execute') as anon,
+              has_function_privilege('authenticated', f::regprocedure, 'execute') as authenticated,
+              has_function_privilege('service_role', f::regprocedure, 'execute') as service
+         from unnest(array['public.service_apply_provider_status(text, text)', 'public.service_record_email_event(text, text, text, text)']) as f`)
+    expect(rows).toHaveLength(2)
+    expect(rows).toEqual(rows.map((r) => ({ fn: r.fn, anon: false, authenticated: false, service: true })))
+  })
+})
