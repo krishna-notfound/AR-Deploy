@@ -92,9 +92,9 @@ describe('LanguageSwitcher', () => {
         <Label />
       </LanguageProvider>,
     )
-    expect(screen.getByText('View in AR')).toBeInTheDocument()
+    expect(screen.getByText('View in my home')).toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: 'PT' }))
-    expect(screen.getByText('Ver em AR')).toBeInTheDocument()
+    expect(screen.getByText('Ver na minha casa')).toBeInTheDocument()
     expect(sessionStorage.getItem('arfurn:lang')).toBe('pt')
     expect(document.documentElement.lang).toBe('pt-PT')
   })

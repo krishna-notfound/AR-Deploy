@@ -32,7 +32,7 @@ function loaded(el: FakeViewer, canActivateAR: boolean, size = { x: 0.828, y: 0.
     el.dispatchEvent(new Event('load'))
   })
 }
-const arButton = () => screen.queryByRole('button', { name: 'View in AR' })
+const arButton = () => screen.queryByRole('button', { name: 'View in my home' })
 
 async function sheenChair(): Promise<Product> {
   const res = await service.getProductById('prd_sheen_chair')
@@ -141,5 +141,67 @@ describe('product page: AR fixes', () => {
     loaded(await viewerFor(/SheenWoodLeatherSofa\.glb$/), true)
     expect(arButton()).toBeNull()
     expect(screen.getByText('AR is not available for this model on Android. You can still explore it in 3D.')).toBeInTheDocument()
+  })
+})
+
+// Owner report 2026-10-26 "AR button missing": the obsidian call to action only opened the 3D view and the AR chip
+// looked like a button. As on main, the primary action launches AR wherever AR can open, and nothing else says "AR".
+describe('product page: the primary call to action opens AR where it can', () => {
+  const primaryAr = (name = 'View in my home') => screen.queryAllByRole('button', { name })
+  /** Controls that offer to start AR (the "AR tips" link opens the tips; the phone card's "Copy link" / "Show QR code" do not). */
+  const arLabelled = () =>
+    screen.queryAllByRole('button').filter((b) => b.textContent !== 'AR tips' && /\bAR\b|my home|minha casa/.test(b.textContent ?? ''))
+  // jsdom has no scrollIntoView; the 3D action scrolls the stage into view.
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn()
+  })
+
+  it('launches AR from "View in my home": one activateAR call and one AR event per tap', async () => {
+    const record = vi.spyOn(service, 'recordEvent')
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    expect(primaryAr()).toHaveLength(1) // exactly one AR entry point
+    expect(arLabelled()).toHaveLength(1)
+    fireEvent.click(primaryAr()[0]!)
+    fireEvent.click(primaryAr()[0]!) // impatient second tap: ignored
+    await waitFor(() => expect(el.activateAR).toHaveBeenCalledTimes(1))
+    expect(record.mock.calls.filter(([e]) => e.type === 'ar_activation')).toHaveLength(1)
+  })
+
+  it('goes through the AR tips first when they were not dismissed, then launches once', async () => {
+    localStorage.removeItem(AR_TIPS_KEY)
+    const record = vi.spyOn(service, 'recordEvent')
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    fireEvent.click(primaryAr()[0]!)
+    expect(el.activateAR).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole('button', { name: 'Start AR' }))
+    await waitFor(() => expect(el.activateAR).toHaveBeenCalledTimes(1))
+    expect(record.mock.calls.filter(([e]) => e.type === 'ar_activation')).toHaveLength(1)
+  })
+
+  it('where AR cannot open, offers a working 3D action and no AR-labelled control', async () => {
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    expect(arLabelled()).toHaveLength(0) // still checking: nothing offers AR yet
+    loaded(el, false)
+    expect(arLabelled()).toHaveLength(0)
+    expect(screen.getByText('View in your space on a phone')).toBeInTheDocument()
+    const [primary] = screen.getAllByRole('button', { name: 'View in 3D' })
+    fireEvent.click(primary!)
+    expect(screen.getByText('Interactive 3D')).toBeInTheDocument()
+    expect(el.activateAR).not.toHaveBeenCalled()
+  })
+
+  it('labels the AR and 3D actions in Portuguese', async () => {
+    openApp('/products/nordhaus/sheen-lounge-chair?lang=pt')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    expect(primaryAr('Ver na minha casa')).toHaveLength(1)
+    loaded(el, false)
+    expect(primaryAr('Ver na minha casa')).toHaveLength(0)
+    expect(screen.getAllByRole('button', { name: 'Visualizar em 3D' }).length).toBeGreaterThan(0)
   })
 })

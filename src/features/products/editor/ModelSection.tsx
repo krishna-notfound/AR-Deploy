@@ -273,7 +273,7 @@ export function ModelPreview({
         <p className="mt-1 max-w-md text-[13px] leading-[1.45] text-ink-muted">
           {context === 'variant'
             ? 'Customers who pick this option see the product’s main 3D model, with a note that this finish may look different. Upload a GLB (and a USDZ for iPhone) made for this option to show it in 3D and AR.'
-            : 'Add a GLB model to show the 3D viewer and the “View in AR” button. Without one, customers see the photo gallery only.'}
+            : 'Add a GLB model to show the 3D viewer and the “View in my home” AR button. Without one, customers see the photo gallery only.'}
         </p>
         {context === 'product' || usdz ? readiness : null}
       </div>

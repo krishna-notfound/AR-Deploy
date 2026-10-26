@@ -20,7 +20,7 @@ export function arAvailability(model: ModelState, canActivateAR: boolean, modelU
 }
 
 /**
- * AR status beside the product actions. The "View in AR" button itself lives in the product page's action rail and
+ * AR status beside the product actions. The AR button itself ("View in my home") is the product page's primary action and
  * is shown only when model-viewer reports canActivateAR (a real capability check). Here: the check in progress,
  * AR tips, or how to use AR on a phone. Never fakes AR.
  */

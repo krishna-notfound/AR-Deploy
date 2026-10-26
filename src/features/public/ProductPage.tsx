@@ -1,4 +1,4 @@
-import { ArrowLeft, Box, CheckCircle2, Eye, Globe, HelpCircle, Images, Mail, MapPin, PackageX, Phone } from 'lucide-react'
+import { ArrowLeft, Box, CheckCircle2, Eye, Globe, HelpCircle, Images, Mail, MapPin, PackageX, Phone, Smartphone } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
@@ -119,7 +119,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const modelKey = media.models.glb?.url ?? ''
   const [mode, setMode] = useState<MediaMode>(() => initialMediaMode(media))
   const [storedModel, setModel] = useState<ModelInfo>(() => freshModel(modelKey))
-  // A variant switch resets loading, AR and scale state, so "View in AR" never opens the previous file.
+  // A variant switch resets loading, AR and scale state, so "View in my home" never opens the previous file.
   const model = storedModel.key === modelKey ? storedModel : freshModel(modelKey)
   if (model !== storedModel) setModel(model)
   const { state: modelState, canAR, measured } = model
@@ -211,7 +211,8 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
 
   const { width: dw, height: dh, depth: dd } = product.dimensions
   const dimsLine = dw > 0 && dh > 0 && dd > 0 ? t('product.dimsLine', { w: fmtLen(dw), d: fmtLen(dd), h: fmtLen(dh), unit }) : ''
-  const stageChip = 'border border-line px-2 py-0.5 text-xs leading-4 font-medium tracking-[0.08em] text-ink'
+  // Status labels, not controls: no border, so they never read as buttons that do nothing.
+  const stageChip = 'px-1 text-xs leading-4 font-medium tracking-[0.08em] text-ink-muted'
 
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
   const textAction = cn(TAP_TARGET, 'inline-flex items-center border-b border-current pb-1 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink transition-colors hover:text-accent-ink')
@@ -281,23 +282,17 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                   </figcaption>
                 )}
               </figure>
-              {(has3d || availability === 'available') && (
+              {/* AR starts from the primary call to action only: one obvious AR entry point, as on main. */}
+              {has3d && (
                 <ul className="flex justify-center gap-10 lg:flex-col lg:justify-start lg:gap-7 lg:pt-14">
-                  {has3d && (
-                    <li>
-                      <RailAction
-                        mark={mode === '3d' ? <Images className="size-4" strokeWidth={1.4} aria-hidden /> : '3D'}
-                        label={mode === '3d' ? t('product.viewPhotos') : t('product.view3d')}
-                        pressed={mode === '3d'}
-                        onClick={() => (mode === '3d' ? setMode('photos') : open3d())}
-                      />
-                    </li>
-                  )}
-                  {availability === 'available' && (
-                    <li>
-                      <RailAction mark="AR" label={t('ar.button')} onClick={onActivate} />
-                    </li>
-                  )}
+                  <li>
+                    <RailAction
+                      mark={mode === '3d' ? <Images className="size-4" strokeWidth={1.4} aria-hidden /> : '3D'}
+                      label={mode === '3d' ? t('product.viewPhotos') : t('product.view3d')}
+                      pressed={mode === '3d'}
+                      onClick={() => (mode === '3d' ? setMode('photos') : open3d())}
+                    />
+                  </li>
                 </ul>
               )}
             </div>
@@ -312,11 +307,12 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
             <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="mt-8 border-t border-line pt-6" />
 
             <div className="mt-8 flex flex-col gap-5">
-              {/* Only for a model that loaded; "AR" only where AR can open (AR-08). */}
+              {/* Only for a model that loaded (AR-08). Where model-viewer can open AR, the primary action launches it
+                  ("View in my home", as on main); elsewhere it opens the 3D view and ArSection explains the phone hand-off. */}
               {modelState === 'loaded' && (
-                <button type="button" onClick={open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch rounded-[2px] bg-obsidian px-8 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-chalk transition-colors hover:bg-umber sm:self-start">
-                  {availability === 'available' ? t('product.view3dAr') : t('product.view3d')}
-                  <Box className="size-4" strokeWidth={1.4} aria-hidden />
+                <button type="button" onClick={availability === 'available' ? onActivate : open3d} className="inline-flex h-12 items-center justify-center gap-3 self-stretch rounded-[2px] bg-obsidian px-8 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-chalk transition-colors hover:bg-umber sm:self-start">
+                  {availability === 'available' ? t('ar.button') : t('product.view3d')}
+                  {availability === 'available' ? <Smartphone className="size-4" strokeWidth={1.4} aria-hidden /> : <Box className="size-4" strokeWidth={1.4} aria-hidden />}
                 </button>
               )}
               <ArSection availability={availability} onShowTips={() => setTipsOpen('info')} />
@@ -489,7 +485,7 @@ function ScaleNote({ verified, separateUsdz, measured, unit }: { verified: boole
   )
 }
 
-/** An action of the stage's rail ("3D · Visualizar em 3D", "AR · Ver em AR"): a hairline square, as the Sanctus chips. */
+/** An action of the stage's rail ("3D · Visualizar em 3D"): a hairline square, as the Sanctus chips. */
 function RailAction({ mark, label, onClick, pressed }: { mark: ReactNode; label: string; onClick: () => void; pressed?: boolean }) {
   return (
     <button type="button" onClick={onClick} className="group flex w-24 flex-col items-center gap-2.5 text-center">
