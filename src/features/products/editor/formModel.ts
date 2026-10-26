@@ -1,4 +1,4 @@
-import type { Business, Product } from '@/domain/types'
+import type { Business, Product, ProductModels } from '@/domain/types'
 import { minorToInput, parseMoneyInput } from '@/lib/format'
 import type { ProductInput } from '@/services/catalogService'
 
@@ -67,6 +67,32 @@ export function withStoredModels(form: EditorForm, stored: Product): EditorForm 
         const s = byId.get(v.id)
         return s ? { ...v, models: s.models } : v
       }),
+    },
+  }
+}
+
+/**
+ * The form with fresh signed URLs for its stored 3D files (they expire, MEDIA_URL_TTL_SECONDS). Only a file still
+ * in the form (same storagePath) takes the stored URL and status; unsaved replacements and every other field stay.
+ */
+export function withFreshModelUrls(form: EditorForm, stored: Product): EditorForm {
+  const fresh = (models: ProductModels | undefined, from: ProductModels | undefined): ProductModels | undefined => {
+    if (!models) return models
+    const out = { ...models }
+    for (const f of ['glb', 'usdz'] as const) {
+      const cur = models[f]
+      const s = from?.[f]
+      if (cur?.storagePath && s && s.storagePath === cur.storagePath) out[f] = { ...cur, url: s.url, status: s.status }
+    }
+    return out
+  }
+  const byId = new Map(stored.variants.map((v) => [v.id, v]))
+  return {
+    ...form,
+    input: {
+      ...form.input,
+      models: fresh(form.input.models, stored.models) ?? {},
+      variants: form.input.variants.map((v) => (v.models ? { ...v, models: fresh(v.models, byId.get(v.id)?.models) } : v)),
     },
   }
 }

@@ -1,6 +1,6 @@
 import { useCan } from '@/auth/usePermission'
 import { AlertCircle, ExternalLink, EyeOff, Trash2 } from 'lucide-react'
-import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useBlocker, useLocation, useNavigate } from 'react-router'
 import { type Crumb, PageHeader } from '@/components/layout/PageHeader'
 import { ProductStatusBadge } from '@/components/ui/Badge'
@@ -18,13 +18,15 @@ import { cn } from '@/lib/cn'
 import { PRODUCT_SLUG_MAX, slugInput, slugify } from '@/lib/slug'
 import { PUBLIC_URLS_ARE_LIVE, modelRequestAdminPath, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
+import { MEDIA_REFRESH_MS } from '@/services/catalogService'
+import { useRefreshWhenStale } from '@/services/hooks'
 import { validateForPublish } from '@/services/validation'
 import { primaryImage } from '@/lib/product'
 import { LOAD_ERROR } from '@/features/modelRequests/copy'
 import { useModelRequests } from '@/features/modelRequests/hooks'
 import { modelRequestStatusLabel } from '@/features/modelRequests/ModelRequestStatusBadge'
 import { type EditorScope, editPath, useProductActions } from '../useProductActions'
-import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput, withStoredModels } from './formModel'
+import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput, withFreshModelUrls, withStoredModels } from './formModel'
 import { LocalizedField } from './LocalizedField'
 import { ModelFilesReadOnly } from './ModelFilesReadOnly'
 import { ModelRequestPanel } from './ModelRequestPanel'
@@ -315,6 +317,21 @@ export function ProductEditorForm({
     setErrors({})
     setStaleModels(false)
   }
+
+  /**
+   * Fresh signed URLs for the stored 3D files (they expire after MEDIA_URL_TTL_SECONDS): taken into the form and its
+   * saved snapshot alike, so the form does not turn unsaved. `latest` is left alone: it carries modelsChangedAt (R-S4-17).
+   */
+  const latestId = latest?.id
+  const onRefreshUrls = useCallback(() => {
+    if (!latestId) return
+    void service.getProductById(latestId).then((res) => {
+      if (!res.ok) return
+      setForm((f) => withFreshModelUrls(f, res.data))
+      setSnapshot((s) => JSON.stringify(withFreshModelUrls(JSON.parse(s) as EditorForm, res.data)))
+    })
+  }, [latestId])
+  useRefreshWhenStale(onRefreshUrls, MEDIA_REFRESH_MS, latest)
 
   const goToEdit = (p: Product, state?: NavState) => {
     skipBlock.current = true
@@ -629,6 +646,7 @@ export function ProductEditorForm({
                 dimensions={toInput(form).input.dimensions}
                 poster={poster}
                 name={form.input.name.en || 'product'}
+                onRefreshUrls={latest ? onRefreshUrls : undefined}
               />
             )}
           </Section>
@@ -703,6 +721,7 @@ export function ProductEditorForm({
                 dimensions={toInput(form).input.dimensions}
                 poster={poster}
                 modelsReadOnly={ownerUploadsOff}
+                onRefreshUrls={latest ? onRefreshUrls : undefined}
               />
             </div>
           </Section>

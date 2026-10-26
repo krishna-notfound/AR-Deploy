@@ -5,8 +5,12 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import type { MeasuredSize } from '@/lib/scale'
 
 let loader: Promise<unknown> | null = null
-export function loadModelViewer(): Promise<unknown> {
-  loader ??= import('@google/model-viewer')
+/** Downloads model-viewer once. A failed download is forgotten, so "Try again" fetches it again (AR audit 2026-10-26). */
+export function loadModelViewer(importer: () => Promise<unknown> = () => import('@google/model-viewer')): Promise<unknown> {
+  loader ??= importer().catch((e: unknown) => {
+    loader = null
+    throw e
+  })
   return loader
 }
 
@@ -14,6 +18,8 @@ export type ArStatus = 'not-presenting' | 'session-started' | 'object-placed' | 
 
 /** A model that makes no download progress for this long is treated as failed (no endless spinner). */
 export const MODEL_STALL_TIMEOUT_MS = 45_000
+const AR_SETTLE_INTERVAL_MS = 250
+const AR_SETTLE_CHECKS = 12 // 3 s
 
 export interface ModelLoadInfo {
   canActivateAR: boolean
@@ -83,7 +89,21 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
   useEffect(() => {
     const el = elRef.current
     if (!ready || !el) return
-    const handleLoad = () => cbs.current.onLoad?.({ canActivateAR: !!el.canActivateAR, dimensions: readDims(el), requiredExtensions: readRequired(el) })
+    const report = () => cbs.current.onLoad?.({ canActivateAR: !!el.canActivateAR, dimensions: readDims(el), requiredExtensions: readRequired(el) })
+    // model-viewer settles AR support asynchronously (WebXR: navigator.xr.isSessionSupported), so a model that loads
+    // first can report "no AR" on a capable phone. Look again for a few seconds and report once it turns on.
+    let arWatch: ReturnType<typeof setInterval> | undefined
+    const handleLoad = () => {
+      report()
+      clearInterval(arWatch)
+      if (!ar || el.canActivateAR) return
+      let checks = 0
+      arWatch = setInterval(() => {
+        checks += 1
+        if (el.canActivateAR) report()
+        if (el.canActivateAR || checks >= AR_SETTLE_CHECKS) clearInterval(arWatch)
+      }, AR_SETTLE_INTERVAL_MS)
+    }
     const handleError = () => cbs.current.onError?.()
     const handleProgress = (e: Event) => {
       const p = (e as CustomEvent<{ totalProgress?: number }>).detail?.totalProgress
@@ -105,6 +125,7 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
     el.addEventListener('ar-status', handleAr)
     el.addEventListener('camera-change', handleCamera)
     return () => {
+      clearInterval(arWatch)
       el.removeEventListener('camera-change', handleCamera)
       el.removeEventListener('load', handleLoad)
       el.removeEventListener('error', handleError)
@@ -112,7 +133,7 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       el.removeEventListener('ar-status', handleAr)
     }
     // `src` too: the element below is keyed by src, so a new model URL (e.g. refreshed signed URL) is a new element.
-  }, [ready, src])
+  }, [ready, src, ar])
 
   if (!ready) return <div className={className} aria-hidden />
 
@@ -136,7 +157,7 @@ export const ModelViewer = forwardRef<ModelViewerHandle, ModelViewerProps>(funct
       auto-rotate={autoRotate || undefined}
       auto-rotate-delay={autoRotate ? '0' : undefined}
       rotation-per-second={autoRotate ? '14deg' : undefined}
-      // Native viewers only (owner decision 2026-10-13): Scene Viewer on Android, Quick Look on iOS.
+      // Android: AR inside Chrome first (WebXR), Scene Viewer as the fallback; iPhone: Quick Look (ADR-0035).
       ar-modes="webxr scene-viewer quick-look"
       ar-scale="fixed"
       ar-placement="floor"

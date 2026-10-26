@@ -23,18 +23,20 @@ import { PhotoThumb, PhotoViewer } from '@/features/modelRequests/PhotoViewer'
 import { ModelSection } from '@/features/products/editor/ModelSection'
 import { AR_READINESS_HINT, AR_READINESS_LABEL, productArReadiness } from '@/features/products/productReadiness'
 import { editPath } from '@/features/products/useProductActions'
-import type { Result } from '@/services/catalogService'
+import { MEDIA_REFRESH_MS, type Result } from '@/services/catalogService'
 import { formatDate, formatDateTime, formatFileSize } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath, modelRequestsAdminPath } from '@/lib/urls'
 import { service } from '@/services'
-import { useServiceMutation, useServiceQuery } from '@/services/hooks'
+import { useRefreshWhenStale, useServiceMutation, useServiceQuery } from '@/services/hooks'
 
 export const REQUEST_NOT_FOUND = "This request doesn't exist or was removed with its product."
 
 export default function ModelRequestDetailPage(): JSX.Element {
   const { requestId = '' } = useParams()
   const q = useServiceQuery(() => service.getModelRequest(requestId), [requestId])
+  // Staged files and photos use signed URLs that expire: refetch on return to the tab once they are getting old.
+  useRefreshWhenStale(q.refetch, MEDIA_REFRESH_MS, q.data)
 
   if (q.status === 'loading' && !q.data) return <FullPageSpinner label="Loading the request" />
   if (!q.data)
@@ -176,6 +178,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
                   dimensions={r.product.dimensions}
                   poster={r.product.images[0]?.url}
                   name={productName}
+                  onRefreshUrls={onChanged}
                 />
               ) : (
                 <p className="text-ui-body text-ink-muted">{r.status === 'delivered' ? 'The delivered files are now the product’s 3D files (see Product facts).' : 'No files were delivered.'}</p>

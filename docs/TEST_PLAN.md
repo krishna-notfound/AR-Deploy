@@ -8,7 +8,7 @@ Three kinds of evidence, never mixed: **automated** (local, demo mode or disposa
 |---|---|---|
 | `npm run typecheck`, `npm run lint`, `npm run build` | types, lint (0 errors), production bundle | pass |
 | `npm test` | unit + component + PGlite database tests (migrations, RLS, publish rules, registration, claim links, cross-business isolation, rollback script) | 121 passed, 15 skipped (live suite) |
-| `npm run test:e2e` | Playwright, demo mode, desktop + emulated Pixel 7: catalog, product page, 3D fallback, Scene Viewer intent on a **simulated** Android UA, no WebXR, one launch per double tap, PT/EN, in-app notice, admin CRUD, QR | 27/27 (one earlier run had a flaky demo-only failure, see PRODUCTION_READINESS 6c) |
+| `npm run test:e2e` | Playwright, demo mode, desktop + emulated Pixel 7: catalog, product page, 3D fallback, WebXR first (stubbed `navigator.xr`: one session request per tap, button never stuck), Scene Viewer fallback intent on a **simulated** Android UA without WebXR, one launch per double tap, PT/EN, in-app notice, admin CRUD, QR | 27/27 (one earlier run had a flaky demo-only failure, see PRODUCTION_READINESS 6c) |
 
 ## Live integration (real Supabase API)
 
@@ -24,7 +24,7 @@ Use a product with a GLB **and** a USDZ whose scale shows "True-to-size model", 
 
 ### Android (Chrome, ARCore phone)
 1. Open the product page; the model loads in 3D; "View in my home" is visible.
-2. Tap it → AR tips appear → "Start AR". **Expected:** the Google app's Scene Viewer opens (not AR inside Chrome). If Chrome shows AR itself, that is a FAIL (WebXR must not be used).
+2. Tap it → AR tips appear → "Start AR". **Expected (ADR-0035):** AR opens inside Chrome (WebXR): the camera shows the room and the piece appears on the floor. Move the phone around: the piece stays one object (no trail of copies; if it trails, also try https://modelviewer.dev/examples/augmentedreality/ on the same phone and note the Chrome and "Google Play Services for AR" versions). On a phone without WebXR, the Google app's Scene Viewer opens instead.
 3. Furniture appears on the floor at true size: measure one dimension with a tape measure, within 5% or 1 cm of the product page value. Pinch-to-resize is disabled (`resizable=false`).
 4. Back to the page: the page is usable, no stuck spinner.
 5. Tap "View in my home" twice quickly: only one Scene Viewer launch; in the dashboard the "AR launch attempts" count rises by 1, not 2 (check after ~1 minute).

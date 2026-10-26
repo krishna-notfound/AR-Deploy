@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { type Page, expect, test } from '@playwright/test'
 import { signInAsSuperAdmin } from './helpers'
 
 // §19.8–19.11 Public catalog, product detail, 3D fallback, AR button, PT/EN
@@ -52,39 +52,48 @@ test('model loads, scale is checked, and AR falls back honestly on desktop', asy
   await expect(page.getByText('AR scale unverified')).toBeVisible({ timeout: 60_000 })
 })
 
-// Native AR only (owner decision 2026-10-13): a browser that offers WebXR must NOT get in-browser AR.
-// Desktop Chromium with a stubbed navigator.xr: no AR button, no XR session requested.
-test('in-browser WebXR is never used, even when the browser offers it', async ({ page }) => {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __xrRequests: number }
-    w.__xrRequests = 0
-    Object.defineProperty(navigator, 'xr', {
-      value: {
-        isSessionSupported: async (mode: string) => mode === 'immersive-ar',
-        requestSession: async () => {
-          w.__xrRequests++
-          throw new DOMException('not expected', 'NotAllowedError')
-        },
-        addEventListener() {},
-        removeEventListener() {},
+/** Replaces navigator.xr (an init script): `offered` says whether immersive-ar is supported; every session request is counted and refused. */
+function stubWebXr(offered: boolean) {
+  const w = window as unknown as { __xrRequests: number }
+  w.__xrRequests = 0
+  Object.defineProperty(navigator, 'xr', {
+    value: {
+      isSessionSupported: async (mode: string) => offered && mode === 'immersive-ar',
+      requestSession: async () => {
+        w.__xrRequests++
+        throw new DOMException('refused in the test', 'NotAllowedError')
       },
-    })
+      addEventListener() {},
+      removeEventListener() {},
+    },
   })
+}
+const xrRequests = (page: Page) => page.evaluate(() => (window as unknown as { __xrRequests: number }).__xrRequests)
+
+// WebXR first (ADR-0035): a browser that offers immersive-ar gets AR inside the browser. Here the session is refused,
+// as when the visitor blocks the camera: one request per tap, and the button never stays busy.
+test('WebXR first: a browser that offers immersive-ar starts an in-browser AR session', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.addInitScript(stubWebXr, true)
   await page.goto('/products/nordhaus/sheen-lounge-chair')
-  await expect(page.getByText('True-to-size model')).toBeVisible({ timeout: 60_000 }) // model loaded and measured
-  await expect(page.getByRole('button', { name: 'View in my home' })).toHaveCount(0)
-  await expect(page.getByText('View in your space on a phone')).toBeVisible() // 3D + phone hand-off fallback
-  expect(await page.evaluate(() => (window as unknown as { __xrRequests: number }).__xrRequests)).toBe(0)
+  await expect(page.getByText('True-to-size model').first()).toBeVisible({ timeout: 60_000 }) // model loaded and measured
+  const button = page.getByRole('button', { name: 'View in my home' }).first()
+  await expect(button).toBeEnabled({ timeout: 10_000 })
+  await button.click()
+  await page.getByRole('checkbox').check() // "don't show again"
+  await page.getByRole('button', { name: 'Start AR' }).click()
+  await expect.poll(() => xrRequests(page)).toBe(1)
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 25_000 }) // never stuck on "Preparing AR"
 })
 
-// Android (simulated user agent, NOT a real phone): AR hands off to Google Scene Viewer at true size.
-// The intent link is captured instead of leaving the page. Real-device behaviour is tracked in the device matrix.
+// Android without WebXR (simulated user agent, NOT a real phone): model-viewer falls back to Google Scene Viewer at
+// true size. The intent navigation is captured instead of leaving the page. Real devices: docs/TEST_PLAN.md.
 test.describe('Android', () => {
   test.use({ userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36' })
 
-  test('AR opens Google Scene Viewer at fixed real-world scale, once per tap', async ({ page }) => {
-    // The page navigates straight to the Scene Viewer intent (owner 2026-10-26). The Navigation API sees the whole
-    // URL (with its #Intent part); the navigation is cancelled so the page stays put.
+  test('without WebXR, AR falls back to Google Scene Viewer at fixed real-world scale, once per tap', async ({ page }) => {
+    test.setTimeout(120_000)
+    await page.addInitScript(stubWebXr, false)
     await page.addInitScript(() => {
       const w = window as unknown as { __intents: string[]; navigation?: EventTarget }
       w.__intents = []
@@ -100,7 +109,7 @@ test.describe('Android', () => {
       if (r.url().endsWith('.glb')) glbFetches.push(r.url())
     })
     await page.goto('/products/nordhaus/sheen-lounge-chair')
-    const button = page.getByRole('button', { name: 'View in my home' })
+    const button = page.getByRole('button', { name: 'View in my home' }).first()
     await expect(button).toBeEnabled({ timeout: 60_000 })
     await button.click()
     await page.getByRole('checkbox').check() // "don't show again", so the next tap launches directly
@@ -110,11 +119,13 @@ test.describe('Android', () => {
     await expect.poll(intents).toHaveLength(1)
     await page.waitForTimeout(500)
     expect(await intents()).toHaveLength(1)
+    expect(await xrRequests(page)).toBe(0) // WebXR was not offered, so none was requested
     const intent = (await intents())[0]!
-    expect(intent).toMatch(/^intent:\/\/arvr\.google\.com\/scene-viewer\/1\.2\?file=/)
+    expect(intent).toMatch(/^intent:\/\/arvr\.google\.com\/scene-viewer\/1\.2\?/)
     expect(intent).toContain('#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=')
     expect(intent).toContain('mode=ar_preferred')
-    expect(intent).toContain('resizable=false') // verified true size: no pinch scaling
+    expect(intent).toContain('resizable=false') // ar-scale="fixed": no pinch scaling
+    expect(decodeURIComponent(intent)).toContain('#model-viewer-no-ar-fallback') // the page knows when Scene Viewer failed
     const file = new URLSearchParams(intent.slice(intent.indexOf('?') + 1, intent.indexOf('#Intent'))).get('file')
     expect(file).toBe(await page.locator('model-viewer').evaluate((el) => (el as HTMLElement & { src: string }).src)) // exactly the model the 3D view shows
     expect(glbFetches).toHaveLength(1) // the page's 3D view only; Scene Viewer downloads its own copy

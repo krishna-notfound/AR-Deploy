@@ -65,7 +65,7 @@ export function ProductMedia({
 }) {
   const { t } = useI18n()
   const { glb, usdz } = models
-  // A published product's public copy (site /ar/ path) when it has one: model-viewer's AR (WebXR, and its Scene Viewer
+  // A published product's public copy (direct storage URL) when it has one: model-viewer's AR (WebXR, and its Scene Viewer
   // fallback, which cannot open a private signed link) uses this same URL (ADR-0035).
   const glbUrl = glb ? arLaunchUrl(glb) : ''
 

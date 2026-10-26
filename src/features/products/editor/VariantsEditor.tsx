@@ -34,6 +34,7 @@ export function VariantsEditor({
   poster,
   error,
   modelsReadOnly = false,
+  onRefreshUrls,
 }: {
   variants: ProductVariant[]
   /** Receives an updater, so uploads that finish later never overwrite changes made meanwhile. */
@@ -46,6 +47,8 @@ export function VariantsEditor({
   error?: string
   /** S4 R-S4-4: an owner whose own uploads are off sees each option's 3D files read-only, with no upload controls. */
   modelsReadOnly?: boolean
+  /** Fetches fresh signed URLs for the stored option files (ModelSection "Try again"). */
+  onRefreshUrls?: () => void
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const set = (id: string, fn: (v: ProductVariant) => ProductVariant) => onChange((list) => list.map((v) => (v.id === id ? fn(v) : v)))
@@ -178,6 +181,7 @@ export function VariantsEditor({
                           dimensions={dimensions}
                           poster={v.images?.find((x) => x.isPrimary)?.url ?? v.images?.[0]?.url ?? poster}
                           name={`${label}`}
+                          onRefreshUrls={onRefreshUrls}
                         />
                       )}
                     </div>

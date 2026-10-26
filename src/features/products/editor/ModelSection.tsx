@@ -35,6 +35,7 @@ export function ModelSection({
   name,
   businessId,
   context = 'product',
+  onRefreshUrls,
 }: {
   models: ProductModels
   /** One format at a time, so the caller merges it into its latest state and parallel uploads both land. */
@@ -44,6 +45,8 @@ export function ModelSection({
   name: string
   businessId?: string
   context?: ModelContext
+  /** Fetches fresh signed URLs for the stored files (they expire); "Try again" in the preview calls it. */
+  onRefreshUrls?: () => void
 }) {
   return (
     <div className="space-y-5">
@@ -65,7 +68,7 @@ export function ModelSection({
         ))}
       </div>
       {/* Keyed by the GLB: a replaced file never shows the previous file's measurement or readiness (AR-07). */}
-      <ModelPreview key={models.glb?.url ?? 'none'} glb={models.glb} usdz={models.usdz} dimensions={dimensions} poster={poster} name={name} context={context} />
+      <ModelPreview key={models.glb?.url ?? 'none'} glb={models.glb} usdz={models.usdz} dimensions={dimensions} poster={poster} name={name} context={context} onRefreshUrls={onRefreshUrls} />
     </div>
   )
 }
@@ -252,6 +255,7 @@ export function ModelPreview({
   poster,
   name,
   context = 'product',
+  onRefreshUrls,
 }: {
   glb?: ModelAsset
   usdz?: ModelAsset
@@ -259,6 +263,7 @@ export function ModelPreview({
   poster?: string
   name: string
   context?: ModelContext
+  onRefreshUrls?: () => void
 }) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [progress, setProgress] = useState(0)
@@ -267,16 +272,42 @@ export function ModelPreview({
   const [detected, setDetected] = useState<string[] | undefined>(undefined)
   const [attempt, setAttempt] = useState(0)
   const stale = isStaleSessionAsset(glb)
+  /** No usable URL (e.g. signing the stored file failed): the viewer would only stall, so it is not shown. */
+  const unavailable = !!glb && !stale && (!glb.url || glb.status === 'invalid')
   // Recomputed live, so editing the dimensions updates the check immediately.
   const scale: ScaleCheck = checkScale(measured, dimensions)
   const readiness = <ArReadiness items={arReadiness({ glb, usdz, preview: state, scale, requiredExtensions: detected })} />
 
   // No progress for the whole window: treat it as failed rather than keep an endless "Checking" verdict.
   useEffect(() => {
-    if (state !== 'loading' || !glb || stale) return
+    if (state !== 'loading' || !glb || stale || unavailable) return
     const timer = setTimeout(() => setState('error'), MODEL_STALL_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [state, progress, attempt, glb, stale])
+  }, [state, progress, attempt, glb, stale, unavailable])
+
+  /** Gets fresh signed URLs when the caller can (a new URL remounts this preview), then loads again. */
+  const retry = () => {
+    onRefreshUrls?.()
+    setState('loading')
+    setProgress(0)
+    setAttempt((a) => a + 1)
+  }
+
+  if (unavailable) {
+    return (
+      <div className="flex flex-col items-center rounded-[var(--radius-card)] border border-line bg-subtle/50 px-4 py-10 text-center sm:px-6">
+        <AlertTriangle className="size-6 text-warning" aria-hidden />
+        <p className="mt-3 text-[14px] font-medium text-ink">This model file is unavailable. Upload it again.</p>
+        <p className="mt-1 max-w-md text-[13px] leading-[1.45] text-ink-muted">The stored GLB could not be opened for the preview. Use “Replace .glb file” above.</p>
+        {onRefreshUrls && (
+          <Button size="sm" className="mt-3" onClick={onRefreshUrls}>
+            Check again
+          </Button>
+        )}
+        {readiness}
+      </div>
+    )
+  }
 
   if (!glb || stale) {
     return (
@@ -322,17 +353,9 @@ export function ModelPreview({
           <div className="absolute inset-0 grid place-items-center bg-canvas/90 p-6 text-center" role="alert">
             <div>
               <AlertTriangle className="mx-auto size-6 text-danger" aria-hidden />
-              <p className="mt-2 text-[14px] font-medium text-ink">The model could not be loaded</p>
-              <p className="mt-1 text-[13px] text-ink-muted">Check that the URL is reachable and allows cross-origin requests (CORS), or upload the file again.</p>
-              <Button
-                size="sm"
-                className="mt-3"
-                onClick={() => {
-                  setState('loading')
-                  setProgress(0)
-                  setAttempt((a) => a + 1)
-                }}
-              >
+              <p className="mt-2 text-[14px] font-medium text-ink">The 3D preview could not load</p>
+              <p className="mt-1 text-[13px] text-ink-muted">The file may still be fine. Try again; if it keeps failing, upload the file again.</p>
+              <Button size="sm" className="mt-3" onClick={retry}>
                 Try again
               </Button>
             </div>

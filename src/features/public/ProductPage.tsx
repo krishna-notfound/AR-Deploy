@@ -18,7 +18,7 @@ import { cn } from '@/lib/cn'
 import { sceneViewerUnsupported } from '@/lib/files'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
-import { AR_FALLBACK_HASH, VARIANT_PARAM, catalogLocalPath, needsPreview, quickLookHref, sceneViewerIntentUrl, tenantCatalogPath, withVariantParam } from '@/lib/urls'
+import { AR_FALLBACK_HASH, MODEL_VIEWER_FALLBACK_HASH, VARIANT_PARAM, catalogLocalPath, needsPreview, quickLookHref, sceneViewerIntentUrl, tenantCatalogPath, withVariantParam } from '@/lib/urls'
 import { arBrowserName, detectInAppBrowser, isAndroid } from '@/lib/userAgent'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
@@ -128,7 +128,11 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   // A variant switch resets loading, AR and scale state, so "View in my home" never opens the previous file.
   const model = storedModel.key === modelKey ? storedModel : freshModel(modelKey)
   if (model !== storedModel) setModel(model)
-  const { state: modelState, canAR, measured } = model
+  // A Scene Viewer fallback that came back failed (the page reopened with its marker) means this phone cannot open
+  // the native viewer: keep AR off for the visit, even after the model loads again (AR audit 2026-10-26).
+  const [arHandOffFailed, setArHandOffFailed] = useState(false)
+  const { state: modelState, measured } = model
+  const canAR = model.canAR && !arHandOffFailed
   const [tipsOpen, setTipsOpen] = useState<null | 'before-ar' | 'info'>(null)
   const [unit, setUnit] = useState<LengthUnit>(product.dimensions.unit)
   const [contactOpen, setContactOpen] = useState(false)
@@ -263,16 +267,18 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     }
   }
 
-  // Scene Viewer could not start: Chrome opened the intent's fallback URL, this page with AR_FALLBACK_HASH (same
+  // Scene Viewer could not start: Chrome opened the intent's fallback URL, this page with AR_FALLBACK_HASH or, from
+  // model-viewer's own Scene Viewer fallback, MODEL_VIEWER_FALLBACK_HASH (same
   // document, or a fresh load). Say so honestly, drop the marker, and leave AR off for this model as after any failed
   // hand-off (AR-04).
   const onArFallback = useRef<() => void>(() => {})
   useEffect(() => {
     onArFallback.current = () => {
-      if (window.location.hash !== AR_FALLBACK_HASH) return
+      if (window.location.hash !== AR_FALLBACK_HASH && window.location.hash !== MODEL_VIEWER_FALLBACK_HASH) return
       window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
       settleLaunch.current()
       setCanAR(false)
+      setArHandOffFailed(true)
       toast.error(arFailedMessage())
     }
   })

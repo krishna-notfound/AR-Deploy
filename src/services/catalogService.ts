@@ -65,6 +65,8 @@ export interface ServiceError {
  * product-media bucket; demo: never expire). Pages refresh before expiry (useRefreshWhenStale).
  */
 export const MEDIA_URL_TTL_SECONDS = 12 * 60 * 60
+/** Dashboard screens holding signed media URLs refetch on return to the tab once half the TTL has passed. */
+export const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: ServiceError }
 

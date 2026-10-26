@@ -124,7 +124,7 @@ describe('sync-ar-models after product actions (Supabase service)', () => {
     expect(u.ok).toBe(true)
   })
 
-  it('reads public_url into the model as publicUrl; the 3D view keeps the signed URL', async () => {
+  it('reads public_url into the model as publicUrl; url stays the signed URL (the public page picks publicUrl, arLaunchUrl)', async () => {
     const { svc } = stub('published')
     const r = await svc.getProductById(PID)
     if (!r.ok) throw new Error(r.error.message)

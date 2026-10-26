@@ -7,7 +7,7 @@ This project is a multi-tenant 3D furniture catalog with AR. It has three surfac
 
 It runs in **demo mode** by default (a mock service layer, no setup). A **Supabase mode** is prepared behind the same service interface (`VITE_DATA_MODE=supabase`); its 7 migrations in `supabase/migrations/` and the `track-event` Edge Function are live on project `pmnjchhrgvajtjpadpqo` (2026-10-13). Never re-apply or roll back without the owner's approval. All architecture docs live in `System_arch/`.
 
-**Start here:** `System_arch/HANDOFF.md` (live state, AR, accounts, gotchas), then `docs/PRODUCTION_READINESS.md` (release gate). Live AR is **native only** (`scene-viewer quick-look`, ADR-0021, owner decision): never re-add WebXR or change AR modes without the owner's go-ahead and a device test.
+**Start here:** `System_arch/HANDOFF.md` (live state, AR, accounts, gotchas), then `docs/PRODUCTION_READINESS.md` (release gate). Live AR is **WebXR first on Android** (AR inside Chrome, Scene Viewer as the fallback) and Quick Look on iPhone (`webxr scene-viewer quick-look`, ADR-0035, owner decision 2026-10-26; replaces ADR-0021's native-only). Never change AR modes without the owner's go-ahead and a device test.
 
 **Status:** production is live from `main` (GitHub default branch). Do feature work on branches cut from `main`; pushing to `main` deploys production, so do it only when the owner asks. The phase table is in `System_arch/Task.md`. The release gate, open findings and next steps are in `docs/PRODUCTION_READINESS.md`.
 

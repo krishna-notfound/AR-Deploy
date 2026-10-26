@@ -116,6 +116,20 @@ describe('product page: AR on Android opens inside Chrome first (model-viewer We
   })
 })
 
+describe('product page: Scene Viewer could not start (model-viewer fallback)', () => {
+  // AR audit 2026-10-26: when WebXR falls back to Scene Viewer and that fails, Chrome reopens the page with
+  // model-viewer's own marker. The page must say so and not offer the same dead button again.
+  it('a page opened with #model-viewer-no-ar-fallback drops the marker, shows no AR button and says AR failed', async () => {
+    asUserAgent(ANDROID_CHROME)
+    openApp('/products/nordhaus/sheen-lounge-chair#model-viewer-no-ar-fallback')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    await waitFor(() => expect(window.location.hash).toBe(''))
+    expect(arButton()).toBeNull()
+    expect(await screen.findByText('AR could not start on this device. You can still explore the 3D model.')).toBeInTheDocument()
+  })
+})
+
 describe('nativeArRoute', () => {
   it('Android: model-viewer (WebXR first) by default; the direct Scene Viewer route only when WebXR first is off', () => {
     expect(nativeArRoute(false, ANDROID_CHROME)).toBe('model-viewer')

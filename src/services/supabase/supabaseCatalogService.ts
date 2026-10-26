@@ -650,8 +650,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     const signed = new Map<string, string>()
     if (paths.size) {
       // A signing failure leaves the URL empty; the UI then shows its missing-image / invalid-model state.
-      const { data } = await sb.storage.from(MEDIA_BUCKET).createSignedUrls([...paths], SIGNED_URL_TTL_SECONDS)
+      const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUrls([...paths], SIGNED_URL_TTL_SECONDS)
       for (const d of data ?? []) if (d.path && d.signedUrl) signed.set(d.path, d.signedUrl)
+      if (import.meta.env.DEV && (error || signed.size < paths.size)) console.warn('[media] signing product media failed', error ?? (data ?? []).filter((d) => !d.signedUrl))
     }
     return rows.map((r) => toProduct(r, signed))
   }

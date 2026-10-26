@@ -86,8 +86,9 @@ export function createSupabaseModelRequestsStaff(sb: SupabaseClient, notify: () 
     const out = new Map<string, string>()
     if (!paths.length) return out
     // A signing failure leaves the URL empty; the page then shows its "couldn't be loaded" state.
-    const { data } = await sb.storage.from(bucket).createSignedUrls(paths, ttl)
+    const { data, error } = await sb.storage.from(bucket).createSignedUrls(paths, ttl)
     for (const d of data ?? []) if (d.path && d.signedUrl) out.set(d.path, d.signedUrl)
+    if (import.meta.env.DEV && (error || out.size < new Set(paths).size)) console.warn(`[media] signing ${bucket} files failed`, error ?? (data ?? []).filter((d) => !d.signedUrl))
     return out
   }
 

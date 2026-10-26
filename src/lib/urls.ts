@@ -156,11 +156,15 @@ export function settingsPath(scope: 'admin' | 'business', section: SettingsSecti
 
 /** Hash on the Scene Viewer fallback URL: Chrome opens it when the native viewer could not start (ADR-0021). */
 export const AR_FALLBACK_HASH = '#ar-unavailable'
+/** The marker model-viewer puts on the page URL as its own Scene Viewer fallback (`features/ar.js`, noArViewerSigil). */
+export const MODEL_VIEWER_FALLBACK_HASH = '#model-viewer-no-ar-fallback'
 
 /**
  * Phone AR files are served from the site's own domain: vercel.json rewrites `/ar/*` to this public folder. Some
  * networks (several Indian ISPs, 2026) block supabase.co for apps such as Scene Viewer while the browser still gets
  * through, so the phone's viewer never has to reach Supabase. Keep in step with the `/ar/:path*` rewrite.
+ * Not used by the product page since the AR audit (2026-10-26): through the rewrite Vercel compresses the file and drops
+ * Content-Length, so the 3D view's progress froze and slow downloads timed out. `arLaunchUrl` uses the direct URL.
  */
 export const AR_PROXY_SOURCE = 'https://zggylkbgajamhriebdrg.supabase.co/storage/v1/object/public/ar-models/'
 export const AR_PROXY_PATH = '/ar/'
