@@ -8,7 +8,7 @@ import { MODEL_STALL_TIMEOUT_MS, ModelViewer } from '@/components/three/ModelVie
 import { type ReadinessItem, arReadiness, sceneViewerWarning } from '@/features/ar/readiness'
 import type { Dimensions, ModelAsset, ModelFormat, ProductModels } from '@/domain/types'
 import { service } from '@/services'
-import { MODEL_RULES, fetchRequiredExtensions, isHttpsUrl, isStaleSessionAsset, modelAssetFromUrl, readRequiredExtensions, sceneViewerUnsupported, validateModelFile } from '@/lib/files'
+import { MODEL_RULES, fetchRequiredExtensions, formatMb, isHttpsUrl, isStaleSessionAsset, modelAssetFromUrl, readRequiredExtensions, sceneViewerUnsupported, validateModelFile } from '@/lib/files'
 import { cn } from '@/lib/cn'
 import { formatFileSize } from '@/lib/format'
 import { type ScaleCheck, type ScaleMismatchReason, checkScale } from '@/lib/scale'
@@ -101,7 +101,11 @@ function ModelSlot({
           ? { text: `Optimized for faster loading: ${formatFileSize(r.originalBytes)} → ${formatFileSize(r.outputBytes)} (textures above 2048 px reduced, unused data removed; size and shape unchanged).`, original }
           : { text: r.reason ?? 'Kept the original file.' },
       )
-    } else setOptimizeNote(opts.keepOriginal ? { text: 'Original file uploaded, not optimized.' } : null)
+    } else {
+      // Large textures are accepted but flagged: they make AR slow on phones (AR audit AR-10).
+      const notes = [opts.keepOriginal ? 'Original file uploaded, not optimized.' : '', check.warning ?? ''].filter(Boolean)
+      setOptimizeNote(notes.length ? { text: notes.join(' ') } : null)
+    }
     const res = await service.uploadAsset({ kind: format, file, businessId })
     setChecking(false)
     if (!res.ok) return setError(res.error.message)
@@ -209,7 +213,7 @@ function ModelSlot({
           </Button>
         </div>
         )}
-        <p className="text-[13px] text-ink-muted">Max {formatFileSize(MODEL_RULES[format].maxBytes)}. The file structure is checked to confirm the format.</p>
+        <p className="text-[13px] text-ink-muted">Max {formatMb(MODEL_RULES[format].maxBytes)}. The file structure is checked to confirm the format.</p>
       </div>
       {optimizeNote && asset && (
         <p className="mt-2 text-[13px] text-ink-muted">
