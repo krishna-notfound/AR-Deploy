@@ -7,7 +7,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { callerRpc } from '../_shared/caller.ts'
 import { type LogEntry, logRow, readEmailConfig, sendAndLog } from '../_shared/email.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
-import { SWEEP_BUCKETS, aalFromJwt, handleAccountSecurity } from './handler.ts'
+import { SWEEP_BUCKETS, type SweepStorage, aalFromJwt, handleAccountSecurity, removeBusinessFolder } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
 const url = env('SUPABASE_URL') ?? ''
@@ -20,17 +20,17 @@ async function log(e: LogEntry): Promise<string> {
   return data.id as string
 }
 
-/** Removes every file in a business's folder (folder = business id), a page of 1000 at a time. */
-async function removeFolder(bucket: string, folder: string) {
-  for (let round = 0; round < 50; round++) {
-    const { data, error } = await admin.storage.from(bucket).list(folder, { limit: 1000 })
+/** The service-role client as the closure sweep's storage (handler.ts removeBusinessFolder does the walking). */
+const sweepStorage: SweepStorage = {
+  async list(bucket, folder, offset) {
+    const { data, error } = await admin.storage.from(bucket).list(folder, { limit: 1000, offset })
     if (error) throw new Error(`storage list failed: ${bucket}`)
-    const files = (data ?? []).filter((f) => f.id).map((f) => `${folder}/${f.name}`)
-    if (!files.length) return
-    const removed = await admin.storage.from(bucket).remove(files)
-    if (removed.error) throw new Error(`storage remove failed: ${bucket}`)
-    if (files.length < 1000) return
-  }
+    return (data ?? []).map((f) => ({ name: f.name, id: f.id ?? null }))
+  },
+  async remove(bucket, paths) {
+    const { error } = await admin.storage.from(bucket).remove(paths)
+    if (error) throw new Error(`storage remove failed: ${bucket}`)
+  },
 }
 
 Deno.serve((req) =>
@@ -68,7 +68,7 @@ Deno.serve((req) =>
       if (error) throw new Error(`business delete failed: ${error.code ?? 'unknown'}`)
     },
     async sweepBusinessStorage(businessId) {
-      const results = await Promise.allSettled(SWEEP_BUCKETS.map((bucket) => removeFolder(bucket, businessId)))
+      const results = await Promise.allSettled(SWEEP_BUCKETS.map((bucket) => removeBusinessFolder(sweepStorage, bucket, businessId)))
       if (results.some((r) => r.status === 'rejected')) throw new Error('storage sweep incomplete')
     },
     async userEmail(userId) {

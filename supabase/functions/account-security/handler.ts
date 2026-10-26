@@ -13,11 +13,49 @@ export type ActionPurpose = (typeof ACTION_PURPOSES)[number]
 /** Codes only the platform Owner may ask for (their actions refuse everyone else anyway). */
 const OWNER_PURPOSES: ReadonlySet<string> = new Set(['owner_reset_2fa', 'complete_closure'])
 
-/** Recovery-code alphabet: 31 characters (no I, L, O, 0 or 1, so a code read aloud or handwritten is unambiguous).
- * 10 characters give about 49.5 bits per code. */
 /** The buckets whose folder named after the business is removed when its closure completes (R-S4-18 adds the request photos). */
 export const SWEEP_BUCKETS = ['product-media', 'business-logos', 'model-request-photos'] as const
+/** Buckets whose objects sit one level down, in a subfolder per request: {business}/{request}/{file}. */
+const NESTED_SWEEP_BUCKETS: ReadonlySet<string> = new Set(['model-request-photos'])
 
+/** The storage calls the closure sweep needs (the wiring passes the service-role client). Both throw on an error. */
+export interface SweepStorage {
+  /** One page (up to 1000) of a folder from `offset`: files have an id, subfolders have none. */
+  list(bucket: string, folder: string, offset: number): Promise<{ name: string; id: string | null }[]>
+  remove(bucket: string, paths: string[]): Promise<void>
+}
+
+/**
+ * Removes every file in a business's folder (folder = business id) and, for the request-photo bucket, in each
+ * request subfolder below it. Never leaves the business's own folder. Keeps going after a failure and throws at the end.
+ */
+export async function removeBusinessFolder(storage: SweepStorage, bucket: string, folder: string): Promise<void> {
+  let failed = false
+  const clear = async (dir: string): Promise<string[]> => {
+    const entries: { name: string; id: string | null }[] = []
+    for (let page = 0; page < 50; page++) {
+      const batch = await storage.list(bucket, dir, page * 1000)
+      entries.push(...batch)
+      if (batch.length < 1000) break
+    }
+    const files = entries.filter((e) => e.id).map((e) => `${dir}/${e.name}`)
+    for (let i = 0; i < files.length; i += 1000) await storage.remove(bucket, files.slice(i, i + 1000))
+    return entries.filter((e) => !e.id).map((e) => `${dir}/${e.name}`)
+  }
+  const subfolders = await clear(folder)
+  if (!NESTED_SWEEP_BUCKETS.has(bucket)) return
+  for (const sub of subfolders) {
+    try {
+      await clear(sub)
+    } catch {
+      failed = true
+    }
+  }
+  if (failed) throw new Error(`storage sweep incomplete: ${bucket}`)
+}
+
+/** Recovery-code alphabet: 31 characters (no I, L, O, 0 or 1, so a code read aloud or handwritten is unambiguous).
+ * 10 characters give about 49.5 bits per code. */
 export const RECOVERY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 export const RECOVERY_CODES_PER_SET = 8
 const RECOVERY_LENGTH = 10

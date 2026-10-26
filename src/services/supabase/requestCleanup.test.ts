@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createSupabaseCatalogService } from './supabaseCatalogService'
 
 // S4 Task 8 (R-S4-18): request photos and staged files are cleaned up with their product, option and business.
@@ -17,7 +17,7 @@ const PATHS = [
   { bucket: 'product-media', path: 'b1/staged.glb', variant_id: 'v1' },
 ]
 
-type Opts = { variants?: string[]; variantsAfter?: string[]; paths?: unknown; pathsError?: boolean; saveError?: boolean; removeFail?: string[] }
+type Opts = { tree?: Record<string, { name: string; id: string | null }[]>; variants?: string[]; variantsAfter?: string[]; paths?: unknown; pathsError?: boolean; saveError?: boolean; removeFail?: string[] }
 
 function fake(o: Opts, log: string[]) {
   let saved = false
@@ -48,7 +48,9 @@ function fake(o: Opts, log: string[]) {
       from: (bucket: string) => ({
         list: (folder: string) => {
           log.push(`list ${bucket}/${folder}`)
-          return Promise.resolve({ data: [], error: null })
+          if (!o.tree) return Promise.resolve({ data: [], error: null })
+          const entry = o.tree[`${bucket}/${folder}`]
+          return Promise.resolve(entry ? { data: entry, error: null } : { data: null, error: { message: 'no' } })
         },
         remove: (paths: string[]) => {
           log.push(`remove ${bucket} ${[...paths].sort().join(',')}`)
@@ -85,6 +87,47 @@ describe('request clean-up (R-S4-18)', () => {
     const svc = createSupabaseCatalogService(fake({}, log))
     expect(await svc.deleteBusiness('b1')).toEqual({ ok: true, data: { removedFiles: 0, failedFiles: 0 } })
     expect(log.filter((l) => l.startsWith('list ')).sort()).toEqual(['list business-logos/b1', 'list model-request-photos/b1', 'list product-media/b1'])
+  })
+
+  it('deleteBusiness descends into the request subfolders of model-request-photos and counts their files', async () => {
+    const log: string[] = []
+    const tree = {
+      'product-media/b1': [], 'business-logos/b1': [],
+      'model-request-photos/b1': [{ name: 'r1', id: null }, { name: 'r2', id: null }],
+      'model-request-photos/b1/r1': [{ name: 'a.jpg', id: 'x' }, { name: 'b.jpg', id: 'y' }],
+      'model-request-photos/b1/r2': [{ name: 'c.jpg', id: 'z' }],
+    }
+    const svc = createSupabaseCatalogService(fake({ tree }, log))
+    expect(await svc.deleteBusiness('b1')).toEqual({ ok: true, data: { removedFiles: 3, failedFiles: 0 } })
+    expect(log).toContain('remove model-request-photos b1/r1/a.jpg,b1/r1/b.jpg')
+    expect(log).toContain('remove model-request-photos b1/r2/c.jpg')
+    expect(log.filter((l) => l.startsWith('list ')).every((l) => l.includes('/b1'))).toBe(true)
+  })
+
+  it('deleteBusiness counts a request subfolder it cannot list as one failed file', async () => {
+    const tree = {
+      'product-media/b1': [], 'business-logos/b1': [],
+      'model-request-photos/b1': [{ name: 'r1', id: null }, { name: 'r2', id: null }],
+      'model-request-photos/b1/r2': [{ name: 'c.jpg', id: 'z' }],
+    }
+    const svc = createSupabaseCatalogService(fake({ tree }, []))
+    expect(await svc.deleteBusiness('b1')).toEqual({ ok: true, data: { removedFiles: 1, failedFiles: 1 } })
+  })
+
+  it('updateProduct that drops an option while the paths cannot be read warns, and still saves', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const log: string[] = []
+      const svc = createSupabaseCatalogService(fake({ variants: ['v1', 'v2'], variantsAfter: ['v2'], pathsError: true }, log))
+      const current = await svc.getProductById('p1')
+      if (!current.ok) throw new Error('product')
+      const saved = await svc.updateProduct('p1', { variants: current.data.variants.filter((v) => v.id !== 'v1') })
+      expect(saved.ok).toBe(true)
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]![0])).toMatch(/could not be read/)
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   it('updateProduct that removes an option deletes that option request photos after the save succeeds', async () => {
