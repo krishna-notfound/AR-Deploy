@@ -15,8 +15,6 @@ Owner's words (2026-10-26): "i dont need mantainance part just make privacy poli
 **Keep**
 1. Privacy Policy and Terms: done (drafts for the client's lawyer; placeholders for company facts).
 2. "Working business logic": the audit fixes that were moved to S2 (see `docs/superpowers/plans/2026-10-26-business-logic-fixes.md`, "Moved out of S1.5"):
-   - old catalog and product addresses redirect to the new ones, so printed QR codes keep working (BIZ-04, PUB-03/PROD-06);
-   - "catalog unavailable" page instead of "not found" for a paused business (PUB-02/BIZ-03);
    - view-only staff see a read-only business form; field limits shown on the form (BIZ-05, BIZ-09);
    - logo uploaded before the business exists is moved; a partial file clean-up is reported (BIZ-06);
    - public-page fixes: stale product page after unpublish, image refresh, CTA label, address case, `noindex` for embed/preview, PT sort order (PUB-04, 05, 07, 08, 09 header, 10);
@@ -35,7 +33,7 @@ Owner's words (2026-10-26): "i dont need mantainance part just make privacy poli
   Without them the published text is not true.
 - The product-editor audit fixes that were moved to S4 (two people editing at once, unnamed finishes, remove-finish confirm, default finish label, address-change confirm, error copy).
 
-**Dropped**: maintenance mode, applications open/closed, email sender/reply-to and per-email switches, email log page, new-business defaults, product limit, CSV exports, Site & SEO settings.
+**Dropped**: maintenance mode, applications open/closed, email sender/reply-to and per-email switches, email log page, new-business defaults, product limit, CSV exports, Site & SEO settings, and (owner, 2026-10-26) the old-address redirect (BIZ-04, PUB-03/PROD-06) and the "catalog unavailable" page (PUB-02/BIZ-03).
 
 ## S4: 3D model requests
 
