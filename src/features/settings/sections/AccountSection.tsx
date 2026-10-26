@@ -17,6 +17,7 @@ import { EMAIL_PATTERN } from '@/services/accountService'
 import { type QueryResult, useServiceQuery } from '@/services/hooks'
 import { ActionCodeDialog } from '../ActionCodeDialog'
 import { useCancelClosure } from '../useCancelClosure'
+import { OWNER_CLOSURE_LINE } from '@/features/businesses/closure'
 import { SectionHeader, SettingsCard } from '../SettingsUi'
 
 type Security = QueryResult<SecurityState>
@@ -289,6 +290,7 @@ function ClosureCard({ security }: { security: Security }) {
 }
 
 function BusinessClosure({ security }: { security: Security }) {
+  const { business } = useAccount()
   const confirm = useConfirm()
   const toast = useToast()
   const [dialog, setDialog] = useState(false)
@@ -318,7 +320,7 @@ function BusinessClosure({ security }: { security: Security }) {
     body = (
       <div className="space-y-3">
         <div role="status" className="rounded-[var(--radius-control)] bg-warning-soft px-4 py-3 text-ui-body text-warning">
-          Closure requested on {formatDate(closure.requestedAt)} · Your catalog is offline.
+          Closure requested on {formatDate(closure.requestedAt)} · {OWNER_CLOSURE_LINE[business?.status ?? 'inactive']}
         </div>
         <p className="text-ui-small text-ink-muted">
           The platform completes the deletion within 30 days. Cancel before then to keep your account; your catalog returns to its previous status.

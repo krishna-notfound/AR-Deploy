@@ -17,6 +17,7 @@ import { myProductsPath } from '@/lib/urls'
 import { account, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useCancelClosure } from '../settings/useCancelClosure'
+import { OWNER_CLOSURE_LINE } from '../businesses/closure'
 import { SetupProgressCard } from '../settings/OnboardingChecklist'
 import { ActivityList } from '../shared/ActivityList'
 import { MostViewedList, formatArRate, mostViewed } from '../analytics/MostViewedList'
@@ -227,7 +228,7 @@ function StepsCard({ title, steps, ordered, className }: { title: string; steps:
  * the closure state is not this page's data, and My account shows its own error.
  */
 function ClosureBanner() {
-  const { retry } = useAccount()
+  const { retry, business } = useAccount()
   const security = useServiceQuery(() => account.getSecurityState(), [])
   const { refetch } = security
   // The business status comes back too: load the business again so the status badge follows.
@@ -242,7 +243,9 @@ function ClosureBanner() {
 
   return (
     <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] bg-warning-soft px-4 py-3 text-ui-body text-warning">
-      <p className="min-w-0">Closure requested on {formatDate(closure.requestedAt)} · Your catalog is offline.</p>
+      <p className="min-w-0">
+        Closure requested on {formatDate(closure.requestedAt)} · {OWNER_CLOSURE_LINE[business?.status ?? 'inactive']}
+      </p>
       <Button size="sm" onClick={() => void cancel()} loading={cancelling}>
         Cancel request
       </Button>

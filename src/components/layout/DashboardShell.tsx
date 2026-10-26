@@ -10,6 +10,8 @@ import { formatNumber } from '@/lib/format'
 import { catalogLocalPath, settingsPath } from '@/lib/urls'
 import { settingsReturnState } from '@/lib/settingsReturn'
 import { isDemoMode } from '@/services'
+import { account } from '@/services'
+import { useServiceQuery } from '@/services/hooks'
 import { useMyProfile } from '@/features/settings/useMyProfile'
 import { Avatar } from '../ui/Avatar'
 import { IconButton } from '../ui/Button'
@@ -135,7 +137,21 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
  */
 export function CatalogStatusNotice() {
   const { business } = useAccount()
+  // Read again when the business changes (a closure request or its cancellation changes the status).
+  const security = useServiceQuery(() => account.getSecurityState(), [business?.id, business?.status, business?.updatedAt])
   if (!business || business.status === 'active') return null
+  // Until the closure state is known, say nothing rather than a notice that may be the wrong one; on its error, the status notice.
+  if (security.status === 'loading' && !security.data) return null
+  if (security.data?.closure)
+    return (
+      <InlineNotice tone="warning" className="mb-6">
+        Your catalog is offline because you asked to close your account. To keep it, cancel the request in{' '}
+        <Link to={settingsPath('business', 'account')} className="font-medium underline underline-offset-2">
+          My account
+        </Link>
+        .
+      </InlineNotice>
+    )
   const preview = (
     <a href={catalogLocalPath(business, { preview: true })} target="_blank" rel="noopener" className="font-medium underline underline-offset-2">
       Preview your catalog

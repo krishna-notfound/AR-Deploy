@@ -473,3 +473,26 @@ describe('BusinessDetailPage: history gating (R-W7-8)', () => {
     expect(screen.queryByText("This business's history needs 'View the audit log and email log'.")).not.toBeInTheDocument()
   })
 })
+
+describe('S2 Task 2: the details tab follows businesses.edit (R-W3-5)', () => {
+  function renderAsTeam(permissions: Permission[]) {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    vi.spyOn(service, 'getMyAccess').mockResolvedValue(ok({ role: 'team', permissions, status: 'active' }))
+    renderPage('details')
+  }
+
+  it('a default Team member (businesses.view only) sees no editable inputs on the details tab', async () => {
+    renderAsTeam(['businesses.view'])
+    expect(await screen.findByText("You can view this business. Editing needs 'Create and edit businesses'.")).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByLabelText(/^Business name/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
+  })
+
+  it('an Admin with businesses.edit sees the form', async () => {
+    renderAsTeam(['businesses.view', 'businesses.edit'])
+    expect(await screen.findByLabelText(/^Business name/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
+    expect(screen.queryByText("You can view this business. Editing needs 'Create and edit businesses'.")).toBeNull()
+  })
+})

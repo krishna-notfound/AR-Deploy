@@ -22,6 +22,7 @@ import { CLOSURE_PENDING_ERROR, ok } from '@/services/catalogService'
 import { useNoticeToast } from '@/features/team/useMemberActions'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
+import { BusinessReadOnly } from '../businesses/BusinessReadOnly'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
@@ -166,7 +167,7 @@ export default function BusinessDetailPage() {
           { value: 'qr', label: 'Catalog & QR' },
         ]}
       />
-      {tab === 'details' && <BusinessForm business={b} mode="edit" />}
+      {tab === 'details' && (can('businesses.edit') ? <BusinessForm business={b} mode="edit" /> : <BusinessReadOnly business={b} />)}
       {tab === 'products' && (
         <Card>
           <div className="flex items-center justify-between gap-3 border-b border-line p-4">

@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MIGRATIONS, ROLLBACK_SQL, S15_MIGRATION, freshDb, ids, makeHelpers, type Helpers } from './harness'
+import { MIGRATIONS, ROLLBACK_SQL, S15_MIGRATION, UP_TO_S15, freshDb, ids, makeHelpers, type Helpers } from './harness'
 import { createHash } from 'node:crypto'
 
 /**
@@ -22,7 +22,7 @@ let db: PGlite
 let h: Helpers
 
 beforeAll(async () => {
-  db = await freshDb()
+  db = await freshDb(UP_TO_S15)
   h = makeHelpers(db)
 }, 60_000)
 afterAll(async () => {
@@ -174,7 +174,7 @@ describe('S1.5 rollback', () => {
 
   it('apply → rollback → re-apply succeeds; every GONE_AFTER_ROLLBACK name is null after rollback; the audit and profiles policies are back to their pre-S1.5 definitions', async () => {
     const before = await freshDb((n) => n < S15_MIGRATION)
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       const pre = await definitions(before)
       expect(pre.policies).toHaveLength(2)
@@ -201,7 +201,7 @@ describe('S1.5 rollback', () => {
       // Re-apply: the migration runs cleanly on the rolled-back database.
       await rolled.exec(readFileSync(join(MIGRATIONS, S15_MIGRATION), 'utf8'))
       const again = await definitions(rolled)
-      const applied = await freshDb()
+      const applied = await freshDb(UP_TO_S15)
       try {
         expect(again).toEqual(await definitions(applied))
       } finally {
@@ -274,7 +274,7 @@ describe('S1.5 Task 2: staff 2FA gate, team email cannot own a business', () => 
         `select obj_description('public.service_user_can(uuid, text)'::regprocedure, 'pg_proc') as c`)).rows[0]!.c,
     })
     const before = await freshDb((n) => n < S15_MIGRATION)
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       const pre = await defs(before)
       expect(pre.comment).toBeNull()
@@ -419,7 +419,7 @@ describe('S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)', (
         and policyname in ('Platform members delete media', 'Platform members delete logos') order by 1`)).rows,
     })
     const before = await freshDb((n) => n < S15_MIGRATION)
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       const pre = await definitions(before)
       expect(pre.policies).toHaveLength(2)
@@ -905,7 +905,7 @@ describe('S1.5 Task 3: closure integrity', () => {
       return { fns, triggers }
     }
     const before = await freshDb((n) => n < S15_MIGRATION)
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       expect((await defs(rolled)).triggers).toEqual(['business_members_void_closure', 'businesses_guard_activate_during_closure'])
       await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
@@ -1294,7 +1294,7 @@ describe('S1.5 Task 10: invitation note, exact access history, 2FA reset only wh
       }
     }
     const before = await freshDb((n) => n < S15_MIGRATION)
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       const pre = await defs(before)
       expect(pre.note).toBe(0)
@@ -1493,7 +1493,7 @@ describe('S1.5 Task 16: application review', () => {
       trigger: (await target.query(`select 1 from pg_trigger where tgname = 'businesses_mark_application_deleted'`)).rows.length,
     })
     const before = await freshDb((n) => n < S15_MIGRATION)
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       expect(await def(rolled)).not.toEqual(await def(before))
       expect(await has(rolled)).toEqual({ column: 1, trigger: 1 })
@@ -1804,7 +1804,7 @@ describe('S1.5 Task 17: owner invitations and onboarding', () => {
       attempt: (await target.query<{ d: string }>(`select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'email_log_attempt_check'`)).rows[0]!.d,
     })
     const before = await freshDb((n) => n < S15_MIGRATION)
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       const pre = await defs(before)
       expect((await defs(rolled)).signIn).not.toEqual(pre.signIn)
@@ -1931,7 +1931,7 @@ describe('S1.5 Task 8: catalogue activity from audit events', () => {
   })
 
   it('the rollback removes the products_audit trigger and both audit_events policies, and keeps the product_* rows', async () => {
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       const objects = async () => ({
         trigger: (await rolled.query(`select 1 from pg_trigger where tgname = 'products_audit' and tgrelid = 'public.products'::regclass`)).rows.length,
@@ -2036,7 +2036,7 @@ describe('S1.5 Task 11: history that survives deletion, owner notices', () => {
   })
 
   it('the rollback re-adds the business_id FK NOT VALID, keeps rows of deleted businesses, and business_deleted no longer sets business_id', async () => {
-    const rolled = await freshDb()
+    const rolled = await freshDb(UP_TO_S15)
     try {
       await rolled.exec(`insert into public.businesses (id, name, slug, status) values ('${id(30)}', 'T11 R', 't11-r', 'active'), ('${id(31)}', 'T11 R2', 't11-r2', 'active');
         delete from public.businesses where id = '${id(30)}';`)
