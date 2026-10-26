@@ -37,6 +37,10 @@ beforeAll(async () => {
     insert into public.platform_admins (user_id) values ('${OWNER}');
     insert into public.platform_members (user_id, email, role, status) values ('${TEAM}', 'ar-team@test', 'team', 'active');
     insert into public.businesses (id, name, slug, status) values ('${BIZ}', 'AR Co', 'ar-co', 'active'), ('${OTHER_BIZ}', 'Other Co', 'other-co', 'active');
+    -- S4: the member writes 3D rows themselves below, so their business may upload its own models.
+    select set_config('app.own_models', 'on', false);
+    update public.businesses set allow_own_models = true where id = '${BIZ}';
+    select set_config('app.own_models', '', false);
     insert into public.business_members (business_id, user_id) values ('${BIZ}', '${MEMBER}');
     insert into public.products (id, business_id, slug, name, category, price, currency, status, width, height, depth, dimension_unit) values
       ('${PRODUCT}', '${BIZ}', 'chair', '{"en":"Chair"}', 'sofa', 1000, 'EUR', 'draft', 10, 10, 10, 'cm'),

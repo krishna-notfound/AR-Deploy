@@ -156,10 +156,10 @@ describe('S4 Task 1: permission, switch, tables, bucket', () => {
     `insert into public.product_variant_models (variant_id, product_id, format, storage_path, file_name) values ('${variant}', '${product}', 'glb', '${path}', 'm.glb')`
   const setSwitch = (biz: string, on: boolean) => db.query('update public.businesses set allow_own_models = $2 where id = $1', [biz, on])
 
-  it('the S4 migration is the last migration and is dated after S2 (S2 is already applied live)', async () => {
+  it('the S4 migration is dated after S2 (S2 is already applied live) and before the later AR public-models migration', async () => {
     expect(S4_MIGRATION).toMatch(/^\d{14}_s4_model_requests\.sql$/)
     const all = readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()
-    expect(all.at(-1)).toBe(S4_MIGRATION)
+    expect(all.indexOf(S4_MIGRATION)).toBe(all.indexOf(S2_MIGRATION) + 1)
     expect(S4_MIGRATION > S2_MIGRATION).toBe(true)
     for (const t of ['public.model_requests', 'public.model_request_photos', 'public.model_request_files']) {
       expect((await db.query<{ o: string | null }>('select to_regclass($1)::text as o', [t])).rows[0]!.o).toBe(t.replace('public.', ''))
