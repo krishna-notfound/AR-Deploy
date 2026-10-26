@@ -11,13 +11,14 @@ import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { ModelLoadInfo, ModelViewerHandle } from '@/components/three/ModelViewer'
 import type { Business, LengthUnit, Product } from '@/domain/types'
+import { nativeAr, nativeArRoute } from '@/features/ar/nativeAr'
 import { pickVariant, variantMedia } from '@/features/ar/variantMedia'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { sceneViewerUnsupported } from '@/lib/files'
 import { convertLength, formatMoney } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
-import { VARIANT_PARAM, catalogLocalPath, needsPreview, tenantCatalogPath, withVariantParam } from '@/lib/urls'
+import { AR_FALLBACK_HASH, VARIANT_PARAM, catalogLocalPath, needsPreview, quickLookHref, sceneViewerIntentUrl, tenantCatalogPath, withVariantParam } from '@/lib/urls'
 import { arBrowserName, detectInAppBrowser, isAndroid } from '@/lib/userAgent'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
@@ -189,6 +190,8 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   // The event means "visitor tried to open AR", never "the piece was placed".
   const lastLaunch = useRef(-Infinity)
   const launchingRef = useRef(false)
+  /** Ends the pending launch ("Preparing AR…"); set by each launch. */
+  const settleLaunch = useRef<() => void>(() => {})
   const [launching, setLaunching] = useState(false)
   const startAR = async () => {
     setTipsOpen(null)
@@ -205,14 +208,52 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
     lastLaunch.current = now
     setMode('3d') // if AR cannot start, the visitor is left on the 3D model rather than a photo
     if (!isPreview) void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'ar_activation' })
+    let unlisten = () => {}
     const done = () => {
       clearTimeout(safety)
+      unlisten()
       if (!launchingRef.current) return
       launchingRef.current = false
       setLaunching(false)
       lastLaunch.current = performance.now()
     }
+    settleLaunch.current = done
     const safety = setTimeout(done, AR_PENDING_MAX_MS)
+    // The phone's own viewer, opened directly and synchronously inside the tap (owner 2026-10-26, ADR-0021). The
+    // file is the one the 3D view shows: the selected finish's own GLB/USDZ (variantMedia).
+    const trueToSize = scale.status === 'verified'
+    const pageUrl = window.location.href
+    const route = nativeArRoute(!!media.models.usdz)
+    if (route === 'scene-viewer' && media.models.glb) {
+      // The intent leaves the page: "Preparing AR…" ends when the page is hidden or shown again, on the fallback
+      // (AR_FALLBACK_HASH), or by the safety timeout.
+      const onVisibility = () => document.visibilityState === 'visible' && done()
+      window.addEventListener('pagehide', done)
+      window.addEventListener('pageshow', done)
+      document.addEventListener('visibilitychange', onVisibility)
+      unlisten = () => {
+        window.removeEventListener('pagehide', done)
+        window.removeEventListener('pageshow', done)
+        document.removeEventListener('visibilitychange', onVisibility)
+      }
+      try {
+        nativeAr.navigate(sceneViewerIntentUrl({ file: media.models.glb.url, title: name, pageUrl, trueToSize }))
+      } catch {
+        toast.error(arFailedMessage())
+        done()
+      }
+      return
+    }
+    if (route === 'quick-look' && media.models.usdz) {
+      try {
+        nativeAr.openQuickLook(quickLookHref(media.models.usdz.url, { trueToSize, pageUrl }))
+      } catch {
+        toast.error(arFailedMessage())
+      } finally {
+        done()
+      }
+      return
+    }
     try {
       await viewerRef.current?.activateAR()
     } catch {
@@ -221,6 +262,26 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
       done()
     }
   }
+
+  // Scene Viewer could not start: Chrome opened the intent's fallback URL, this page with AR_FALLBACK_HASH (same
+  // document, or a fresh load). Say so honestly, drop the marker, and leave AR off for this model as after any failed
+  // hand-off (AR-04).
+  const onArFallback = useRef<() => void>(() => {})
+  useEffect(() => {
+    onArFallback.current = () => {
+      if (window.location.hash !== AR_FALLBACK_HASH) return
+      window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
+      settleLaunch.current()
+      setCanAR(false)
+      toast.error(arFailedMessage())
+    }
+  })
+  useEffect(() => {
+    const check = () => onArFallback.current()
+    check()
+    window.addEventListener('hashchange', check)
+    return () => window.removeEventListener('hashchange', check)
+  }, [])
 
   const onActivate = () => {
     if (arTipsDismissed()) void startAR()
