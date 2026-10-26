@@ -135,7 +135,10 @@ const closureRequest = (d: TemplateData): Copy => ({
   cta: 'Open Sanctus',
 })
 
-const COPY: Record<EmailKind, Record<EmailLang, (d: TemplateData) => Copy>> = {
+/** Kinds rendered from COPY below. The S1.5 kinds (§10.4) have their own builders. */
+export type TemplateKind = Exclude<EmailKind, 'application_decision' | 'business_notice' | 'team_notice'>
+
+const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> = {
   team_invitation: { en: teamInvitation, pt: teamInvitation },
   security_code: { en: securityCode, pt: securityCode },
   security_notice: { en: securityNotice, pt: securityNotice },
@@ -216,7 +219,7 @@ const COPY: Record<EmailKind, Record<EmailLang, (d: TemplateData) => Copy>> = {
 
 const CODE_LABEL: Record<EmailLang, string> = { en: 'Your code', pt: 'Seu código' }
 
-export function renderEmail(kind: EmailKind, lang: EmailLang, data: TemplateData = {}): RenderedEmail {
+export function renderEmail(kind: TemplateKind, lang: EmailLang, data: TemplateData = {}): RenderedEmail {
   if (data.actionUrl && !/^https:\/\/[^\s]+$/.test(data.actionUrl)) throw new Error('actionUrl must be an absolute https:// URL')
   if (data.code !== undefined && !/^\d{6,10}$/.test(data.code)) throw new Error('code must be 6 to 10 digits')
   if (data.note !== undefined && data.note.length > 500) throw new Error('note must be at most 500 characters')

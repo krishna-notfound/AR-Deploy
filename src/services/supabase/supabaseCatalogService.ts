@@ -939,6 +939,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         query = scoped(query, q)
         const term = q.search?.trim().toLowerCase().replace(/[^a-z_ ]/g, '').replace(/\s+/g, '_')
         if (term) query = query.ilike('event_type', `%${term}%`)
+        if (q.includeSignIns !== true) query = query.neq('event_type', 'account_signed_in')
         const { data, error, count } = await query.range(from, from + size - 1).returns<AuditRow[]>()
         if (error) return mapDbError(error)
         const rows = data ?? []

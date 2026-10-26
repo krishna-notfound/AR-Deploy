@@ -257,6 +257,16 @@ describe('business applications and owner access (demo, ADR-0024)', () => {
     expect(events).toEqual(expect.arrayContaining(['application_submitted', 'application_status_changed', 'business_created']))
   })
 
+  it('leaves sign-in events out of the audit log unless includeSignIns is true (R-W1-4)', async () => {
+    store.update((d) => {
+      d.audit = [{ id: 'evt_signin', createdAt: new Date().toISOString(), eventType: 'account_signed_in', metadata: {} }, ...(d.audit ?? [])]
+    })
+    const types = async (includeSignIns?: boolean) => unwrap(await svc.getAuditEvents({ includeSignIns, pageSize: 500 })).items.map((e) => e.eventType)
+    expect(await types()).not.toContain('account_signed_in')
+    expect(await types(false)).not.toContain('account_signed_in')
+    expect(await types(true)).toContain('account_signed_in')
+  })
+
   it('keeps one owner per business with resend cooldown', async () => {
     unwrap(await svc.provisionOwner({ businessId: 'biz_casa', email: 'Owner@Casa.test', language: 'en' }))
     const other = await svc.provisionOwner({ businessId: 'biz_casa', email: 'someone@else.test', language: 'en' })

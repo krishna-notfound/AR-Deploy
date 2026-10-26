@@ -12,6 +12,10 @@ export type EmailKind =
   | 'security_code'
   | 'security_notice'
   | 'closure_request'
+  // S1.5 (spec §10.4): application decisions, notices to business owners and notices to the platform team.
+  | 'application_decision'
+  | 'business_notice'
+  | 'team_notice'
 
 /** Same values as the email_log.status check constraint. */
 export type EmailStatus = 'blocked' | 'failed' | 'accepted' | 'sent' | 'delivered' | 'delayed' | 'bounced' | 'complained'
