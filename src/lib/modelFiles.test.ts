@@ -124,3 +124,40 @@ describe('model links (AR-09)', () => {
     expect(isHttpsUrl('not a url')).toBe(false)
   })
 })
+
+/** A GLB whose BIN chunk holds one embedded PNG texture of the given size (only its header; enough for the check). */
+function glbWithPng(width: number, height: number): Uint8Array {
+  const png = new Uint8Array(33)
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52])
+  const pv = new DataView(png.buffer)
+  pv.setUint32(16, width)
+  pv.setUint32(20, height)
+  const json = { ...GLTF2, images: [{ bufferView: 0, mimeType: 'image/png' }], bufferViews: [{ buffer: 0, byteOffset: 4, byteLength: 33 }], buffers: [{ byteLength: 40 }] }
+  const bytes = glbBytes(json, { bin: 40 })
+  const binData = bytes.length - 40
+  bytes.set(png, binData + 4)
+  return bytes
+}
+
+describe('validateModelFile: sizes that Android AR handles (AR-10)', () => {
+  it('refuses a GLB above 15 MB with a clear reason', async () => {
+    const big = new File([new Uint8Array(16 * 1024 * 1024)], 'sofa.glb')
+    const r = await validateModelFile(big, 'glb')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.message).toMatch(/Maximum is 15 MB.*Android AR/)
+  })
+
+  it('refuses a USDZ above 25 MB', async () => {
+    const r = await validateModelFile(new File([new Uint8Array(26 * 1024 * 1024)], 'sofa.usdz'), 'usdz')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.message).toMatch(/Maximum is 25 MB/)
+  })
+
+  it('accepts textures up to 2048 px and warns (without refusing) above it', async () => {
+    const small = await validateModelFile(file(glbWithPng(2048, 1024), 'chair.glb'), 'glb')
+    expect(small).toEqual({ ok: true })
+    const large = await validateModelFile(file(glbWithPng(4096, 4096), 'chair.glb'), 'glb')
+    expect(large.ok).toBe(true)
+    if (large.ok) expect(large.warning).toMatch(/4096 × 4096 px.*2048 px/)
+  })
+})

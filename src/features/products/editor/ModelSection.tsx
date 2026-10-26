@@ -101,7 +101,11 @@ function ModelSlot({
           ? { text: `Optimized for faster loading: ${formatFileSize(r.originalBytes)} → ${formatFileSize(r.outputBytes)} (textures above 2048 px reduced, unused data removed; size and shape unchanged).`, original }
           : { text: r.reason ?? 'Kept the original file.' },
       )
-    } else setOptimizeNote(opts.keepOriginal ? { text: 'Original file uploaded, not optimized.' } : null)
+    } else {
+      // Large textures are accepted but flagged: they make AR slow on phones (AR audit AR-10).
+      const notes = [opts.keepOriginal ? 'Original file uploaded, not optimized.' : '', check.warning ?? ''].filter(Boolean)
+      setOptimizeNote(notes.length ? { text: notes.join(' ') } : null)
+    }
     const res = await service.uploadAsset({ kind: format, file, businessId })
     setChecking(false)
     if (!res.ok) return setError(res.error.message)

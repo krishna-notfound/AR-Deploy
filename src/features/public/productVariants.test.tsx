@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import type { Product } from '@/domain/types'
@@ -62,7 +62,7 @@ describe('product page: variants switch photos, 3D model and AR target', () => {
     expect(first.getAttribute('ios-src')).toBeNull() // no variant GLB is ever paired with another file's USDZ
     loaded(first, true)
     expect(arButton()).toBeInTheDocument()
-    expect(screen.getByText('True-to-size model')).toBeInTheDocument()
+    expect(screen.getAllByText('True-to-size model').length).toBeGreaterThan(0) // scale note, and the badge beside the AR action
 
     fireEvent.click(screen.getByRole('radio', { name: /Purple-Gold Damask/ }))
     const second = await viewerFor(/ChairDamaskPurplegold\.glb$/)
@@ -163,9 +163,12 @@ describe('product page: the primary call to action opens AR where it can', () =>
     loaded(el, true)
     expect(primaryAr()).toHaveLength(1) // exactly one AR entry point
     expect(arLabelled()).toHaveLength(1)
-    fireEvent.click(primaryAr()[0]!)
-    fireEvent.click(primaryAr()[0]!) // impatient second tap: ignored
+    const [button] = primaryAr()
+    fireEvent.click(button!)
+    fireEvent.click(button!) // impatient second tap while AR opens: ignored
     await waitFor(() => expect(el.activateAR).toHaveBeenCalledTimes(1))
+    fireEvent.click(await screen.findByRole('button', { name: 'View in my home' })) // right after it settles: still guarded
+    expect(el.activateAR).toHaveBeenCalledTimes(1)
     expect(record.mock.calls.filter(([e]) => e.type === 'ar_activation')).toHaveLength(1)
   })
 
@@ -203,5 +206,103 @@ describe('product page: the primary call to action opens AR where it can', () =>
     loaded(el, false)
     expect(primaryAr('Ver na minha casa')).toHaveLength(0)
     expect(screen.getAllByRole('button', { name: 'Visualizar em 3D' }).length).toBeGreaterThan(0)
+  })
+})
+
+// AR audit 2026-10-26 quick wins (docs/audits/2026-10-26-ar/AR-AUDIT.md). No AR-mode or model-viewer attribute change.
+describe('product page: AR audit quick wins', () => {
+  const ANDROID_CHROME = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36'
+  const ANDROID_FIREFOX = 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0'
+  const IPHONE_TIKTOK = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 musical_ly_33.0.0'
+  const ANDROID_LINKEDIN = `${ANDROID_CHROME} [LinkedInApp]/4.1`
+  const asUserAgent = (ua: string) => vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua)
+  const cta = () => document.querySelector('[data-ar-cta]') as HTMLElement
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn()
+  })
+
+  it('puts the AR action directly after the stage, before the title and the finish picker (AR-05)', async () => {
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    const button = arButton()!
+    const title = screen.getByRole('heading', { name: 'Sheen Lounge Chair', level: 1 })
+    const firstSwatch = screen.getByRole('radio', { name: /Purple-Gold Damask/ })
+    const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(el, button)).toBe(true)
+    expect(follows(button, title)).toBe(true)
+    expect(follows(button, firstSwatch)).toBe(true)
+    // Desktop keeps the old layout: the block is placed in the text column, under the finish picker.
+    expect(cta().className).toMatch(/lg:col-start-1/)
+    expect(cta().className).toMatch(/lg:row-start-2/)
+  })
+
+  it('shows "Preparing AR…" from the tap until the hand-off settles, and ignores taps meanwhile (AR-06)', async () => {
+    const record = vi.spyOn(service, 'recordEvent')
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    let settle: () => void = () => {}
+    el.activateAR = vi.fn(() => new Promise<void>((r) => (settle = r)))
+    fireEvent.click(arButton()!)
+    const busy = await screen.findByRole('button', { name: /Preparing AR/ })
+    expect(busy).toHaveAttribute('aria-busy', 'true')
+    expect(busy).toBeDisabled()
+    fireEvent.click(busy)
+    expect(el.activateAR).toHaveBeenCalledTimes(1)
+    await act(async () => settle())
+    expect(await screen.findByRole('button', { name: 'View in my home' })).toBeEnabled()
+    expect(record.mock.calls.filter(([e]) => e.type === 'ar_activation')).toHaveLength(1)
+  })
+
+  it('on a phone browser without AR, says which browser to use instead of "open this page on your mobile device" (AR-07)', async () => {
+    asUserAgent(ANDROID_FIREFOX)
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    loaded(await viewerFor(/SheenChair\.glb$/), false)
+    expect(screen.queryByText(/Open this page on your mobile device/)).toBeNull()
+    expect(screen.getByText("AR isn't available in this browser")).toBeInTheDocument()
+    expect(screen.getByText(/Open this page in Chrome to place the piece in your room/)).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Copy link/ }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: 'Show QR code' })).toBeNull()
+  })
+
+  it('in an in-app browser, says to open the page in Safari / Chrome, with a copy-link action (AR-08)', async () => {
+    asUserAgent(IPHONE_TIKTOK)
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    loaded(await viewerFor(/SheenChair\.glb$/), false)
+    expect(screen.getByText('Open this page in Safari to use AR')).toBeInTheDocument()
+    expect(screen.getByText(/TikTok opens links in its own browser/)).toBeInTheDocument()
+    expect(screen.queryByText(/Open this page on your mobile device/)).toBeNull()
+    expect(screen.getAllByRole('button', { name: /Copy link/ }).length).toBeGreaterThan(0)
+  })
+
+  it('after a failed hand-off in an in-app browser, the message points to Chrome, not the phone (AR-08)', async () => {
+    asUserAgent(ANDROID_LINKEDIN)
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    el.canActivateAR = false
+    act(() => {
+      el.dispatchEvent(new CustomEvent('ar-status', { detail: { status: 'failed' } }))
+    })
+    expect((await screen.findAllByText('Open this page in Chrome to use AR')).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/AR could not start on this device/)).toBeNull()
+  })
+
+  it('in Portuguese, the in-app message is translated (AR-08)', async () => {
+    asUserAgent(IPHONE_TIKTOK)
+    openApp('/products/nordhaus/sheen-lounge-chair?lang=pt')
+    loaded(await viewerFor(/SheenChair\.glb$/), false)
+    expect(screen.getByText('Abra esta página no Safari para usar a RA')).toBeInTheDocument()
+  })
+
+  it('shows the scale label next to the AR action, and flags a model that does not match (AR-09)', async () => {
+    openApp('/products/nordhaus/sheen-lounge-chair')
+    const el = await viewerFor(/SheenChair\.glb$/)
+    loaded(el, true)
+    expect(within(cta()).getByText('True-to-size model')).toBeInTheDocument()
+    loaded(el, true, { x: 2, y: 2, z: 2 })
+    expect(within(cta()).getByText('AR scale unverified')).toBeInTheDocument()
+    expect(within(cta()).queryByText('True-to-size model')).toBeNull()
   })
 })

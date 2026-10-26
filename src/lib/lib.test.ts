@@ -97,6 +97,18 @@ describe('detectInAppBrowser', () => {
     expect(detectInAppBrowser('Mozilla/5.0 (iPhone) WhatsApp/2.24.1')).toBe('whatsapp')
     expect(detectInAppBrowser('Mozilla/5.0 (iPhone) Version/17.0 Mobile Safari/604.1')).toBeNull()
   })
+
+  it('detects more in-app browsers that cannot hand off to AR (AR-08)', () => {
+    expect(detectInAppBrowser('Mozilla/5.0 (Linux; Android 14; Pixel 7) Chrome/129.0 Mobile Safari/537.36 trill_350 BytedanceWebview/d8a21c6')).toBe('tiktok')
+    expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 musical_ly_33.0.0')).toBe('tiktok')
+    expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 [LinkedInApp]/9.29')).toBe('linkedin')
+    expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Snapchat/12.80.0.38')).toBe('snapchat')
+    expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Safari Line/13.17.0')).toBe('line')
+    expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Twitter for iPhone/10.50')).toBe('x')
+    // The Google app on iPhone cannot open Quick Look (model-viewer excludes it); on Android it is not an in-app browser here.
+    expect(detectInAppBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 GSA/330.0.0 Mobile/15E148 Safari/604.1')).toBe('google')
+    expect(detectInAppBrowser('Mozilla/5.0 (Linux; Android 14) Chrome/129.0 Mobile Safari/537.36 GSA/15.0')).toBeNull()
+  })
 })
 
 describe('checkScale', () => {
