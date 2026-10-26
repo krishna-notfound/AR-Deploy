@@ -10,6 +10,9 @@ import { deletedToast } from '../shared/storageSweep'
 
 export type EditorScope = 'admin' | 'business'
 
+const hasAnyModel = (p: Pick<Product, 'models' | 'variants'>) =>
+  [p.models, ...(p.variants ?? []).map((v) => v.models)].some((m) => !!m?.glb || !!m?.usdz)
+
 export function editPath(scope: EditorScope, p: Pick<Product, 'id'>) {
   return scope === 'admin' ? `/admin/products/${p.id}/edit` : `/dashboard/products/${p.id}/edit`
 }
@@ -29,7 +32,12 @@ export function useProductActions(scope: EditorScope) {
     async duplicate(p: Product) {
       const r = await service.duplicateProduct(p.id)
       if (!r.ok) return toast.error('Could not duplicate product', r.error.message)
-      toast.success('Product duplicated', `“${r.data.name.en}” was created as a draft.`)
+      // S4 R-S4-3 (Review Focus 1): a business that can't write its own 3D files gets a photo-only copy.
+      const lostModels = hasAnyModel(p) && !hasAnyModel(r.data)
+      toast.success(
+        'Product duplicated',
+        lostModels ? `“${r.data.name.en}” was created as a draft, without its 3D files. Request a 3D model for it.` : `“${r.data.name.en}” was created as a draft.`,
+      )
       return r.data
     },
     async publish(p: Product, business?: Business) {

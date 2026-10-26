@@ -14,6 +14,7 @@ export function Segmented<T extends string>({
   label,
   kind,
   size = 'md',
+  fill = false,
 }: {
   value: T
   onChange: (v: T) => void
@@ -21,9 +22,11 @@ export function Segmented<T extends string>({
   label: string
   kind: 'radio' | 'toggle'
   size?: 'sm' | 'md'
+  /** Below sm: full width, equal segments, labels may wrap (long labels, e.g. the editor's 3D choice). */
+  fill?: boolean
 }) {
   return (
-    <div role={kind === 'radio' ? 'radiogroup' : 'group'} aria-label={label} className="inline-flex shrink-0 rounded-[var(--radius-control)] border border-line">
+    <div role={kind === 'radio' ? 'radiogroup' : 'group'} aria-label={label} className={cn('shrink-0 rounded-[var(--radius-control)] border border-line', fill ? 'flex w-full sm:inline-flex sm:w-auto' : 'inline-flex')}>
       {options.map((o, i) => {
         const on = value === o.value
         return (
@@ -38,6 +41,7 @@ export function Segmented<T extends string>({
               // the label row, so the area never covers it.
               'pointer-coarse:min-w-11 pointer-coarse:justify-center pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-top-3 pointer-coarse:after:-bottom-2',
               size === 'sm' ? 'h-6 px-2 text-[12px]' : 'h-8 px-3 text-[13px]',
+              fill && 'max-sm:h-auto max-sm:min-h-10 max-sm:flex-1 max-sm:justify-center max-sm:py-2 max-sm:text-center max-sm:leading-tight max-sm:whitespace-normal',
               i > 0 && 'border-l border-line',
               on ? 'bg-subtle text-ink' : 'bg-surface text-ink-muted hover:text-ink',
             )}

@@ -30,3 +30,22 @@ describe('product delete toast (R-W3-4)', () => {
     expect(toast.success).not.toHaveBeenCalled()
   })
 })
+
+describe('S4 Task 3: duplicate toast (Review Focus 1)', () => {
+  const glb = { format: 'glb' as const, url: 'https://x.test/m.glb', fileName: 'm.glb', status: 'valid' as const }
+  it('says the copy has no 3D files when the source had a model and the copy has none', async () => {
+    const src = { id: 'p1', name: { en: 'Oslo Sofa' }, models: { glb }, variants: [] } as unknown as Product
+    vi.spyOn(service, 'duplicateProduct').mockResolvedValue({ ok: true, data: { ...src, id: 'p2', name: { en: 'Oslo Sofa (copy)' }, models: {} } })
+    const { result } = renderHook(() => useProductActions('business'))
+    await result.current.duplicate(src)
+    expect(toast.success).toHaveBeenLastCalledWith('Product duplicated', '“Oslo Sofa (copy)” was created as a draft, without its 3D files. Request a 3D model for it.')
+  })
+
+  it('keeps the plain line when the copy has the model', async () => {
+    const src = { id: 'p1', name: { en: 'Oslo Sofa' }, models: { glb }, variants: [] } as unknown as Product
+    vi.spyOn(service, 'duplicateProduct').mockResolvedValue({ ok: true, data: { ...src, id: 'p2', name: { en: 'Oslo Sofa (copy)' } } })
+    const { result } = renderHook(() => useProductActions('business'))
+    await result.current.duplicate(src)
+    expect(toast.success).toHaveBeenLastCalledWith('Product duplicated', '“Oslo Sofa (copy)” was created as a draft.')
+  })
+})
