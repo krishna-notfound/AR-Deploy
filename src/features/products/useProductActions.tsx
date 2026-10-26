@@ -6,6 +6,7 @@ import { copyText } from '@/lib/clipboard'
 import { PUBLIC_URLS_ARE_LIVE, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import type { ServiceError } from '@/services/catalogService'
+import { deletedToast } from '../shared/storageSweep'
 
 export type EditorScope = 'admin' | 'business'
 
@@ -64,7 +65,8 @@ export function useProductActions(scope: EditorScope) {
         toast.error('Could not delete product', r.error.message)
         return false
       }
-      toast.success('Product deleted')
+      if (r.data.failedFiles > 0) toast.info(deletedToast('Product', r.data))
+      else toast.success(deletedToast('Product', r.data))
       if (opts?.after) navigate(opts.after)
       return true
     },

@@ -3,6 +3,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business } from '@/domain/types'
 import { service } from '@/services'
+import { deletedToast } from '../shared/storageSweep'
 
 export function useBusinessActions() {
   const confirm = useConfirm()
@@ -41,7 +42,8 @@ export function useBusinessActions() {
         toast.error('Could not delete business', r.error.message)
         return false
       }
-      toast.success('Business deleted')
+      if (r.data.failedFiles > 0) toast.info(deletedToast('Business', r.data))
+      else toast.success(deletedToast('Business', r.data))
       if (opts?.after) navigate(opts.after)
       return true
     },

@@ -86,6 +86,15 @@ export interface ProductQuery {
 
 export type UploadKind = 'logo' | 'image' | 'glb' | 'usdz'
 
+/** What a delete's file clean-up did: files storage could not list or remove are counted, never hidden (R-W3-4). */
+export interface StorageSweep {
+  removedFiles: number
+  failedFiles: number
+}
+
+/** `logoMoveFailed`: the business exists, but its staged logo could not be moved into its own folder. */
+export type CreatedBusiness = Business & { logoMoveFailed?: true }
+
 export interface UploadedAsset {
   url: string
   storagePath?: string
@@ -168,10 +177,10 @@ export interface CatalogService {
   getBusinesses(): Promise<Result<Business[]>>
   getBusinessById(id: ID): Promise<Result<Business>>
   getBusinessBySlug(slug: string): Promise<Result<Business>>
-  createBusiness(data: BusinessInput): Promise<Result<Business>>
+  createBusiness(data: BusinessInput): Promise<Result<CreatedBusiness>>
   updateBusiness(id: ID, data: Partial<BusinessInput>): Promise<Result<Business>>
   setBusinessStatus(id: ID, status: BusinessStatus): Promise<Result<Business>>
-  deleteBusiness(id: ID): Promise<Result<void>>
+  deleteBusiness(id: ID): Promise<Result<StorageSweep>>
   getCatalog(slug: string): Promise<Result<BusinessCatalog>>
   getCatalogs(): Promise<Result<BusinessCatalog[]>>
 
@@ -183,7 +192,7 @@ export interface CatalogService {
   createProduct(data: ProductInput): Promise<Result<Product>>
   updateProduct(id: ID, data: Partial<ProductInput>): Promise<Result<Product>>
   duplicateProduct(id: ID): Promise<Result<Product>>
-  deleteProduct(id: ID): Promise<Result<void>>
+  deleteProduct(id: ID): Promise<Result<StorageSweep>>
   publishProduct(id: ID): Promise<Result<Product>>
   unpublishProduct(id: ID): Promise<Result<Product>>
 
