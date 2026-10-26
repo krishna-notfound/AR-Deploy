@@ -90,8 +90,12 @@ export default function BusinessesListPage() {
   const menu = (b: Business, count: number): (MenuItem | 'separator')[] => [
     { label: can('businesses.edit') ? 'Edit details' : 'View details', icon: <Pencil />, onSelect: () => navigate(businessAdminPath(b.id)) },
     { label: b.status === 'active' ? 'Open catalog' : 'Preview catalog', icon: <ExternalLink />, onSelect: () => window.open(catalogLocalPath(b, { preview: b.status !== 'active' }), '_blank', 'noopener') },
-    { label: 'View products', icon: <Package />, onSelect: () => navigate(`/admin/products?business=${b.id}`) },
-    { label: 'View QR code', icon: <QrCode />, onSelect: () => navigate(`/admin/catalogs?business=${b.id}`) },
+    ...(can('products.view')
+      ? [
+          { label: 'View products', icon: <Package />, onSelect: () => navigate(`/admin/products?business=${b.id}`) },
+          { label: 'View QR code', icon: <QrCode />, onSelect: () => navigate(`/admin/catalogs?business=${b.id}`) },
+        ]
+      : []),
     ...(!can(['businesses.status']) || !can('businesses.edit')
       ? []
       : [

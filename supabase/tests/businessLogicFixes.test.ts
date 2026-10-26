@@ -271,6 +271,135 @@ describe('S1.5 Task 2: staff 2FA gate, team email cannot own a business', () => 
         `select pg_get_functiondef('public.service_link_owner(uuid, uuid, uuid, uuid)'::regprocedure) as d`)).rows[0]!.d.replace(/\r\n/g, '\n'),
       comment: (await target.query<{ c: string | null }>(
         `select obj_description('public.service_user_can(uuid, text)'::regprocedure, 'pg_proc') as c`)).rows[0]!.c,
+describe('S1.5 Task 5: permission prerequisites and storage deletes (R-W3-3)', () => {
+  GONE_AFTER_ROLLBACK.push('private.permission_prerequisites()', 'private.with_prerequisites(text[])')
+  // The TS map the SQL mirrors (imported here so this task's code stays inside its describe).
+  let P: typeof import('@/domain/permissions')
+
+  const id = ids(5)
+  const OWNER = id(1)
+  const TEAM = id(2)
+  const BIZ = id(10)
+
+  beforeAll(async () => {
+    P = await import('@/domain/permissions')
+    await db.exec(`
+      insert into auth.users (id, email, email_confirmed_at) values ('${OWNER}', 't5-owner@test', now()), ('${TEAM}', 't5-team@test', now());
+      insert into public.platform_admins (user_id) values ('${OWNER}');
+      insert into public.platform_members (user_id, email, role, status) values ('${TEAM}', 't5-team@test', 'team', 'active');
+      insert into public.businesses (id, name, slug, status) values ('${BIZ}', 'Task Five Co', 't5-co', 'active');
+    `)
+  })
+
+  const save = (perms: string[]) => h.call(OWNER, `select public.admin_set_role_permissions('team', $1::text[]) as r`, [perms])
+  const stored = async (role: 'admin' | 'team', target: PGlite = db) =>
+    (await target.query<{ p: string }>('select permission as p from public.platform_role_permissions where role = $1::public.platform_role order by 1', [role])).rows.map((r) => r.p)
+  const lastAudit = async () =>
+    (await db.query<{ metadata: Record<string, unknown> }>(
+      `select metadata from public.audit_events where event_type = 'access_permissions_changed' and actor_id = $1 order by created_at desc limit 1`, [OWNER])).rows[0]?.metadata
+
+  /** The read-only pre-flight query, as written in the migration's Task 5 comment (lines between the markers, `-- ` stripped). */
+  function preflightSql(): string {
+    const src = readFileSync(join(MIGRATIONS, S15_MIGRATION), 'utf8').split(/\r?\n/)
+    const from = src.findIndex((l) => l.includes('PRE-FLIGHT (R-W3-3) BEGIN'))
+    const to = src.findIndex((l) => l.includes('PRE-FLIGHT (R-W3-3) END'))
+    expect(from).toBeGreaterThan(-1)
+    expect(to).toBeGreaterThan(from)
+    return src.slice(from + 1, to).map((l) => l.replace(/^-- ?/, '')).join('\n')
+  }
+
+  it('saving Team = {products.publish} stores the three and returns added [products.view, products.edit]; the audit row lists them', async () => {
+    await withRolePermissions({ team: [] }, async () => {
+      expect(await save(['products.publish'])).toEqual({ ok: true, added: ['products.view', 'products.edit'] })
+      expect(await stored('team')).toEqual(['products.edit', 'products.publish', 'products.view'])
+      expect(await lastAudit()).toEqual({ role: 'team', added: ['products.edit', 'products.publish', 'products.view'], removed: [] })
+      // Saving the closed set again changes nothing and adds nothing.
+      expect(await save(['products.view', 'products.edit', 'products.publish'])).toEqual({ ok: true, added: [] })
+      // Unknown keys and non-Owners are still refused.
+      expect(await save(['products.view', 'x'])).toEqual({ error: 'unknown_permission' })
+      expect(await h.call(TEAM, `select public.admin_set_role_permissions('team', array['products.view']) as r`)).toEqual({ error: 'forbidden' })
+    })
+  })
+
+  it('the backfill normalises a pre-seeded {products.publish} set and audits reason prerequisites', async () => {
+    const pre = await freshDb((n) => n < S15_MIGRATION)
+    try {
+      await pre.query(`delete from public.platform_role_permissions where role = 'team'`)
+      await pre.query(`insert into public.platform_role_permissions (role, permission) values ('team', 'products.publish')`)
+      const admin = await stored('admin', pre)
+      // The pre-flight shows what the backfill will add, before the migration exists on the database.
+      expect((await pre.query(preflightSql())).rows).toEqual([{ role: 'team', will_add: ['products.edit', 'products.view'] }])
+
+      await pre.exec(readFileSync(join(MIGRATIONS, S15_MIGRATION), 'utf8'))
+      expect(await stored('team', pre)).toEqual(['products.edit', 'products.publish', 'products.view'])
+      expect(await stored('admin', pre)).toEqual(admin)
+      const rows = (await pre.query<{ actor_id: string | null; metadata: Record<string, unknown> }>(
+        `select actor_id, metadata from public.audit_events where event_type = 'access_permissions_changed'`)).rows
+      // One row per changed role (Admin already had every prerequisite), by the system.
+      expect(rows).toEqual([{ actor_id: null, metadata: { role: 'team', added: ['products.edit', 'products.view'], removed: [], reason: 'prerequisites' } }])
+      expect((await pre.query(preflightSql())).rows).toEqual([])
+    } finally {
+      await pre.close()
+    }
+  }, 60_000)
+
+  it('SQL closure equals withPrerequisites for every single permission', async () => {
+    const edges = (await db.query<{ permission: string; requires: string }>('select permission, requires from private.permission_prerequisites() order by 1, 2')).rows
+    const tsEdges = Object.entries(P.PERMISSION_PREREQUISITES).flatMap(([permission, reqs]) => reqs.map((requires) => ({ permission, requires })))
+    expect(edges).toEqual([...tsEdges].sort((a, b) => (a.permission < b.permission ? -1 : a.permission > b.permission ? 1 : a.requires < b.requires ? -1 : 1)))
+    await withRolePermissions({ team: [] }, async () => {
+      for (const p of P.ALL_PERMISSIONS) {
+        const closed = P.withPrerequisites([p])
+        const sql = (await db.query<{ r: string[] }>('select private.with_prerequisites(array[$1]) as r', [p])).rows[0]!.r
+        expect({ p, sql: [...sql].sort() }).toEqual({ p, sql: [...closed].sort() })
+        // The RPC answers the prerequisites it added, in the order of ALL_PERMISSIONS.
+        expect({ p, r: await save([p]) }).toEqual({ p, r: { ok: true, added: closed.filter((x) => x !== p) } })
+        expect({ p, stored: await stored('team') }).toEqual({ p, stored: [...closed].sort() })
+      }
+    })
+  })
+
+  it("a member whose role is {businesses.view, businesses.delete} saved through the RPC can delete storage objects in business-logos and product-media of that business; with only businesses.view they can't", async () => {
+    await db.exec(`
+      insert into storage.objects (bucket_id, name) values
+        ('business-logos', '${BIZ}/logo.png'), ('product-media', '${BIZ}/${id(20)}/photo.jpg'), ('product-media', '${BIZ}/${id(20)}/model.glb');
+    `)
+    const delLogos = `delete from storage.objects where bucket_id = 'business-logos' and name like $1`
+    const delMedia = `delete from storage.objects where bucket_id = 'product-media' and name like $1`
+    const delBiz = `delete from public.businesses where id = $1`
+    const prefix = [`${BIZ}/%`]
+    try {
+      await withRolePermissions({}, async () => {
+        expect(await save(['businesses.view', 'businesses.delete'])).toMatchObject({ ok: true })
+        expect(await h.affected(TEAM, delLogos, prefix)).toBe(1)
+        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
+        expect(await h.affected(TEAM, delBiz, [BIZ])).toBe(1)
+
+        expect(await save(['businesses.view'])).toEqual({ ok: true, added: [] })
+        expect(await h.affected(TEAM, delLogos, prefix)).toBe(0)
+        expect(await h.affected(TEAM, delMedia, prefix)).toBe(0)
+        expect(await h.affected(TEAM, delBiz, [BIZ])).toBe(0)
+      })
+      // Sets written straight to the table (not closed; deleting needs the read policies too, so the views stay):
+      // businesses.delete without any edit deletes logos and media, products.delete without products.edit media only.
+      await withRolePermissions({ team: ['businesses.view', 'products.view', 'businesses.delete'] }, async () => {
+        expect(await h.affected(TEAM, delLogos, prefix)).toBe(1)
+        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
+      })
+      await withRolePermissions({ team: ['businesses.view', 'products.view', 'products.delete'] }, async () => {
+        expect(await h.affected(TEAM, delLogos, prefix)).toBe(0)
+        expect(await h.affected(TEAM, delMedia, prefix)).toBe(2)
+      })
+    } finally {
+      await db.query(`delete from storage.objects where name like $1`, prefix)
+    }
+  })
+
+  it('the rollback restores admin_set_role_permissions and the two storage delete policies, and keeps the role sets', async () => {
+    const definitions = async (target: PGlite) => ({
+      fn: (await target.query<{ d: string }>(`select pg_get_functiondef('public.admin_set_role_permissions(public.platform_role, text[])'::regprocedure) as d`)).rows[0]!.d.replace(/\r\n/g, '\n'),
+      policies: (await target.query(`select policyname, qual from pg_policies where tablename = 'objects'
+        and policyname in ('Platform members delete media', 'Platform members delete logos') order by 1`)).rows,
     })
     const before = await freshDb((n) => n < S15_MIGRATION)
     const rolled = await freshDb()
@@ -280,6 +409,14 @@ describe('S1.5 Task 2: staff 2FA gate, team email cannot own a business', () => 
       expect((await defs(rolled)).linkOwner).not.toEqual(pre.linkOwner)
       await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
       expect(await defs(rolled)).toEqual(pre)
+      const pre = await definitions(before)
+      expect(pre.policies).toHaveLength(2)
+      expect(await definitions(rolled)).not.toEqual(pre)
+      await rolled.query(`insert into public.platform_role_permissions (role, permission) values ('team', 'businesses.status'), ('team', 'businesses.edit')`)
+      const sets = await stored('team', rolled)
+      await rolled.exec(readFileSync(ROLLBACK_SQL, 'utf8'))
+      expect(await definitions(rolled)).toEqual(pre)
+      expect(await stored('team', rolled)).toEqual(sets)
     } finally {
       await before.close()
       await rolled.close()

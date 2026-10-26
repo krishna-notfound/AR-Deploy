@@ -1,7 +1,7 @@
 // Demo implementation of the platform team methods (ADR-0029). The demo account picker is not authentication: the
 // "current role" is whatever was picked on /demo. Rules mirror the database so the demo behaves like the real thing.
 // No email is ever sent in demo mode; an invitation is recorded as sent with the sample label on the page.
-import { ALL_PERMISSIONS, isPermission } from '@/domain/permissions'
+import { ALL_PERMISSIONS, isPermission, withPrerequisites } from '@/domain/permissions'
 import type { AccessAction, AccessEvent, InviteInspection, InviteOutcome, MemberInvite, PlatformAccess, PlatformMember, PlatformRole } from '@/domain/types'
 import { newId } from '@/lib/id'
 import { PASSWORD_MIN } from '../accountService'
@@ -243,11 +243,14 @@ export function createMockTeam(run: Run): TeamMethods {
       run(() => {
         if (denied('change role permissions')) return teamFail('forbidden')
         if (!permissions.every(isPermission)) return teamFail('unknown_permission')
-        const next = [...new Set(permissions)].sort()
+        // As admin_set_role_permissions: the set is stored with its prerequisites (R-W3-3).
+        const closed = withPrerequisites(permissions)
+        const implied = closed.filter((p) => !permissions.includes(p))
+        const next = [...closed].sort()
         const prev = [...team(store.get()).rolePermissions[role]].sort()
         const added = next.filter((p) => !prev.includes(p))
         const removed = prev.filter((p) => !next.includes(p))
-        if (!added.length && !removed.length) return ok(undefined)
+        if (!added.length && !removed.length) return ok({ added: implied })
         store.update((d) => {
           team(d).rolePermissions[role] = next
           record(team(d), {
@@ -255,7 +258,7 @@ export function createMockTeam(run: Run): TeamMethods {
             details: `${role === 'admin' ? 'Admin' : 'Team'}: ${[...added.map((p) => `+${p}`), ...removed.map((p) => `-${p}`)].join(', ')}`,
           })
         })
-        return ok(undefined)
+        return ok({ added: implied })
       }),
 
     getAccessEvents: (query = {}) =>

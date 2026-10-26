@@ -30,6 +30,25 @@ comment on function public.service_user_can(uuid, text) is null;
 -- R-W1-8: service_link_owner as in 20261020091428_applications_and_owner_access (no team-email check).
 create or replace function public.service_link_owner(p_business_id uuid, p_user_id uuid, p_actor uuid, p_application_id uuid default null)
 returns text
+-- S1.5 Task 5 rollback: permission prerequisites and storage deletes (R-W3-3)
+-- =============================================================================
+
+-- The role sets keep the prerequisites the backfill and later saves added (they were audited); narrow them by hand
+-- on the role permissions page if needed. The audit rows stay.
+
+-- Storage deletes need products.edit / businesses.edit again (20261025070915_platform_team_roles).
+drop policy "Platform members delete logos" on storage.objects;
+create policy "Platform members delete logos" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'business-logos' and (select public.platform_can('businesses.edit')));
+drop policy "Platform members delete media" on storage.objects;
+create policy "Platform members delete media" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'product-media' and (select public.platform_can('products.edit')));
+
+-- admin_set_role_permissions stores exactly the set it is given and answers {ok} (20261025070915_platform_team_roles).
+create or replace function public.admin_set_role_permissions(p_role public.platform_role, p_permissions text[])
+returns jsonb
 language plpgsql
 security definer
 set search_path = ''
@@ -56,6 +75,42 @@ $$;
 revoke execute on function public.service_link_owner(uuid, uuid, uuid, uuid) from public, anon, authenticated;
 grant execute on function public.service_link_owner(uuid, uuid, uuid, uuid) to service_role;
 -- ---- end S1.5 Task 2 rollback ----
+  v_known constant text[] := array[
+    'businesses.view', 'businesses.edit', 'businesses.status', 'businesses.delete', 'owners.manage',
+    'applications.view', 'applications.approve', 'applications.reject',
+    'products.view', 'products.edit', 'products.publish', 'products.delete',
+    'analytics.view', 'records.view', 'access.view'];
+  v_new text[] := array(select distinct unnest(coalesce(p_permissions, '{}')) order by 1);
+  v_old text[];
+  v_added text[];
+  v_removed text[];
+begin
+  if not private.owner_or_deny('set_role_permissions') then
+    return jsonb_build_object('error', 'forbidden');
+  end if;
+  if not (v_new <@ v_known) then
+    return jsonb_build_object('error', 'unknown_permission');
+  end if;
+  v_old := array(select permission from public.platform_role_permissions where role = p_role order by 1);
+  v_added := array(select unnest(v_new) except select unnest(v_old) order by 1);
+  v_removed := array(select unnest(v_old) except select unnest(v_new) order by 1);
+  if cardinality(v_added) = 0 and cardinality(v_removed) = 0 then
+    return jsonb_build_object('ok', true);
+  end if;
+  delete from public.platform_role_permissions where role = p_role and permission = any (v_removed);
+  insert into public.platform_role_permissions (role, permission) select p_role, unnest(v_added);
+  insert into public.audit_events (event_type, actor_id, metadata)
+  values ('access_permissions_changed', (select auth.uid()),
+          jsonb_build_object('role', p_role::text, 'added', to_jsonb(v_added), 'removed', to_jsonb(v_removed)));
+  return jsonb_build_object('ok', true);
+end;
+$$;
+revoke execute on function public.admin_set_role_permissions(public.platform_role, text[]) from public, anon;
+grant execute on function public.admin_set_role_permissions(public.platform_role, text[]) to authenticated, service_role;
+
+drop function private.with_prerequisites(text[]);
+drop function private.permission_prerequisites();
+-- ---- end S1.5 Task 5 rollback ----
 
 -- =============================================================================
 -- S1.5 Task 1 rollback: security-activity privacy, profile visibility and Owner permissions; email kinds (R-W1-4, R-W1-5, R-W1-6, §10.4)

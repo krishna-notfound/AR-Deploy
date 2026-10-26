@@ -4,6 +4,7 @@
 // /join page go through the invite-member, manage-member and accept-member-invite Edge Functions.
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AccessAction, AccessEvent, InviteInspection, InviteOutcome, MemberInvite, PlatformAccess, PlatformMember, RolePermissions } from '@/domain/types'
+import { isPermission } from '@/domain/permissions'
 import { type CatalogService, type Result, fail, ok, teamFail } from '../catalogService'
 
 type TeamMethods = Pick<
@@ -186,7 +187,12 @@ export function createSupabaseTeam(sb: SupabaseClient, notify: () => void = () =
         return UNREACHABLE()
       }
     },
-    setRolePermissions: async (role, permissions) => done(await call('admin_set_role_permissions', { p_role: role, p_permissions: permissions })),
+    async setRolePermissions(role, permissions) {
+      const r = await call('admin_set_role_permissions', { p_role: role, p_permissions: permissions })
+      if (!r.ok) return r
+      notify()
+      return ok({ added: (Array.isArray(r.data.added) ? r.data.added : []).filter(isPermission) })
+    },
 
     async getAccessEvents(query = {}) {
       try {

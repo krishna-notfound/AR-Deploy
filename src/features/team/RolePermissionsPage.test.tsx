@@ -148,4 +148,62 @@ describe('Role permissions (ADR-0029)', () => {
     await user.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: /Overview/ }))
     expect(await screen.findByRole('dialog', { name: 'Leave without saving?' })).toBeInTheDocument()
   })
+
+  describe('a permission includes the permissions it needs (R-W3-3)', () => {
+    /** The demo Team set, saved as the Owner before the page opens. */
+    async function openWithTeam(perms: Parameters<typeof service.setRolePermissions>[1]) {
+      localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
+      expect((await service.setRolePermissions('team', perms)).ok).toBe(true)
+      open()
+      await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+    }
+
+    it("shows 'Includes: {labels}' under each permission", async () => {
+      open()
+      await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(30))
+      // The 9 permissions that need others, once each.
+      expect(screen.getAllByText(/^Includes: /)).toHaveLength(9)
+      // Publish and Delete products both need editing (and so viewing).
+      expect(screen.getAllByText('Includes: View products and catalogues, Create and edit products')).toHaveLength(2)
+      expect(screen.getByText('Includes: View businesses, Create and edit businesses, View products and catalogues, Create and edit products, Delete products')).toBeInTheDocument()
+      // Approve and Reject both need View applications.
+      expect(screen.getAllByText('Includes: View applications')).toHaveLength(2)
+    })
+
+    it('ticking products.publish ticks and locks products.edit and products.view', async () => {
+      const user = userEvent.setup()
+      await openWithTeam(['businesses.view'])
+      expect(box('Team', 'Create and edit products')).not.toBeChecked()
+      await user.click(box('Team', 'Publish and unpublish'))
+      for (const label of ['Create and edit products', 'View products and catalogues']) {
+        expect(box('Team', label)).toBeChecked()
+        expect(box('Team', label)).toBeDisabled()
+      }
+      // Unticking it frees them again.
+      await user.click(box('Team', 'Publish and unpublish'))
+      expect(box('Team', 'Create and edit products')).not.toBeChecked()
+      expect(box('Team', 'Create and edit products')).toBeEnabled()
+      expect(screen.queryByText(/unsaved change/)).toBeNull()
+    })
+
+    it("toast 'Saved. Also added: View products and catalogues, which it needs.'", async () => {
+      const user = userEvent.setup()
+      await openWithTeam([])
+      await user.click(box('Team', 'Create and edit products'))
+      expect(screen.getAllByText('2 unsaved changes').length).toBeGreaterThan(0)
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+      expect(await screen.findByText('Saved. Also added: View products and catalogues, which it needs.')).toBeInTheDocument()
+      const saved = await service.getRolePermissions()
+      expect(saved.ok && [...saved.data.team].sort()).toEqual(['products.edit', 'products.view'])
+    })
+
+    it("says 'they need' when more than one newly ticked permission caused the additions", async () => {
+      const user = userEvent.setup()
+      await openWithTeam([])
+      await user.click(box('Team', 'Approve applications'))
+      await user.click(box('Team', 'Reject applications'))
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+      expect(await screen.findByText('Saved. Also added: View applications, which they need.')).toBeInTheDocument()
+    })
+  })
 })

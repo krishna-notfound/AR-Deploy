@@ -201,7 +201,8 @@ export interface CatalogService {
   deactivateMember(id: ID): Promise<Result<{ signOut?: 'failed' }>>
   reactivateMember(id: ID): Promise<Result<void>>
   getRolePermissions(): Promise<Result<RolePermissions>>
-  setRolePermissions(role: MemberRole, permissions: Permission[]): Promise<Result<void>>
+  /** Stores the set with its prerequisites (R-W3-3); `added` lists the prerequisites that were not in `permissions`. */
+  setRolePermissions(role: MemberRole, permissions: Permission[]): Promise<Result<{ added: Permission[] }>>
   getAccessEvents(query?: AccessQuery): Promise<Result<Page<AccessEvent>>>
   inspectInvite(token: string): Promise<Result<InviteInspection>>
   acceptInviteCreate(input: { token: string; fullName: string; password: string }): Promise<Result<{ email: string }>>
