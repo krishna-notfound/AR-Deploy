@@ -16,6 +16,14 @@ It runs in **demo mode** by default (a mock service layer, no setup). **Supabase
 - Read-only checks you can run: migrations `npx supabase migration list --linked`; functions `npx supabase functions list --project-ref zggylkbgajamhriebdrg`; secret names `npx supabase secrets list --project-ref zggylkbgajamhriebdrg -o json` (names only, never print values); deploy status `gh api repos/{owner}/{repo}/commits/<sha>/statuses`; the live site with curl or Playwright.
 - Cannot be checked from here, so ask the owner: Supabase Auth settings (Site URL, redirect URLs, security switches; the owner's role is below Admin), secret values, Vercel env vars and domains (the Vercel MCP gets 403 on team track0), and AR on a real phone.
 
+## Recording decisions (owner, 2026-10-27: "every decision should be stored")
+- Record each decision in the same change that carries it out, never later:
+  - design, architecture, AR, hosting or data rules → a new ADR in `System_arch/decisions/` (from `_template.md`) plus its row in `System_arch/decisions/README.md`;
+  - every owner decision, including scope, settings, deploys and "don't do X" → a row in `docs/DECISIONS.md` (date, decision, who, record).
+- A decision that replaces an earlier one marks the old record "Superseded by ADR-XXXX" instead of deleting it.
+- Live-state facts (what is deployed, which database, which domain) go in `System_arch/HANDOFF.md` "Live state" with the date checked.
+- Before saying a decision is open, search `docs/DECISIONS.md` and the ADR index first.
+
 ## Where to look (open only what the task needs)
 | Topic | File |
 |---|---|

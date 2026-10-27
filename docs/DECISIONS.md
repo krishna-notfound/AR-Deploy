@@ -17,3 +17,21 @@ Architecture decision records live in `System_arch/decisions/` (index: `System_a
 | 2026-10-13 | Variant price differences must be whole, non-negative amounts (parser and "+" display already assume this; 0 of 10 live variants negative) | Engineering | src/services/validation.ts |
 | 2026-10-20 | Access model: Sanctus admins create owner accounts; no public self-registration or self-claim; exactly one owner per business; manual approval before listing. Supersedes ADR-0022 (to be recorded as ADR-0024 with the Phase 2 migration) | Owner | docs/PRODUCTION_AUDIT_AND_PLAN.md (C1) |
 | 2026-10-20 | The client Supabase project `zggylkbgajamhriebdrg` (Sanctus AR, org `vxoqgtqqvgqlmfggxhdu`) is the development and integration target; no separate staging project for now (2026-10-20; as of 2026-10-27 it is the project the live site uses, see HANDOFF Live state). The old project `pmnjchhrgvajtjpadpqo` stays untouched (not used) | Owner | docs/PRODUCTION_AUDIT_AND_PLAN.md (C14) |
+| 2026-10-24 | Invitations and password reset use emailed one-time codes instead of links | Accepted, see ADR | ADR-0027 |
+| 2026-10-25 | Dashboards redesigned from the owner's Stitch screens | Accepted, see ADR | ADR-0028 |
+| 2026-10-25 | Platform team roles: Owner, Admin and Team, with per-role permissions enforced in the database | Accepted, see ADR | ADR-0029 |
+| 2026-10-25 | Platform team members are invited by link (`/join`); only a hash of the secret is stored | Accepted, see ADR | ADR-0030 |
+| 2026-10-25 | Dashboard type and density (Inter, `--text-ui-*`, inside the dashboard shell only) | Accepted, see ADR | ADR-0031 |
+| 2026-10-26 | Account settings hub and authenticator-app 2FA, enforced in the database helpers | Accepted, see ADR | ADR-0032 |
+| 2026-10-26 | Business-logic fixes (S1.5) from the 2026-10-26 audit | Accepted, see ADR | ADR-0033 |
+| 2026-10-26 | 3D model requests (S4): `models.manage` permission, per-business own-upload switch | Accepted, see ADR | ADR-0034 |
+| 2026-10-26 | Android AR opens inside Chrome first (WebXR), Scene Viewer only as fallback; iPhone uses Quick Look. Replaces the native-only rule of 2026-10-13 | Owner | ADR-0035 |
+| 2026-10-26 | Nothing on the live site says demo or sample (catalog footer label, sample credits, Settings General, `/demo`, upload hint removed or hidden) | Owner | commit 38bed33 |
+| 2026-10-26 | Model upload limits: GLB 30 MB, USDZ 40 MB | Owner | commit 0add24e; ADR-0037 |
+| 2026-10-26 | Public catalog and product pages: the Stitch redesign (ADR-0036) is dropped; back to the original look with slightly soft corners; the product's own link is a real button | Owner | ADR-0037 |
+| 2026-10-26 | AR audit fixes: model files load straight from storage, the viewer retries, AR is re-checked after load, failed hand-offs say so | Owner | ADR-0041 |
+| 2026-10-26 | Automatic model lightening on upload is on (client question A-2 answered): about 100,000 triangles and 2048 px textures, no compression, true size checked | Owner | ADR-0038 |
+| 2026-10-27 | The editor may build the iPhone USDZ from the GLB ("Build from GLB", in the browser); replaces the "never convert GLB to USDZ" rule | Owner | ADR-0039 |
+| 2026-10-27 | `main` is the live branch; `sanctus.warpkit.online` serves Production; Production uses the client database, which holds real client data (no writes without the owner's OK) | Owner | ADR-0040 |
+| 2026-10-27 | `invite-member` redeployed on the client project so team invitation emails list "Handle 3D model requests" | Owner | System_arch/HANDOFF.md |
+| 2026-10-27 | Every decision is recorded when it is taken: an ADR for design or architecture, a row here for every owner decision (CLAUDE.md "Recording decisions") | Owner | CLAUDE.md |
