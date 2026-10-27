@@ -1,4 +1,6 @@
 # 20 · Deployment: Vercel + Supabase
+
+> **Live setup (ADR-0040, 2026-10-27):** `main` is the live branch; Vercel Production serves `sanctus.warpkit.online`, `builtbykrishna.dev` and `ar-deploy-sage.vercel.app` on the client database `zggylkbgajamhriebdrg` (real client data). Sections below that describe a different split are history.
 Architecture: static Vite SPA on Vercel, with Supabase Postgres, Auth and Storage (with RLS). No custom server. Database setup is in design/19.
 
 ## Vercel project settings

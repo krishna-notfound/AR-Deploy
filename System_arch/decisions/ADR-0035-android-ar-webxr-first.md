@@ -18,7 +18,7 @@ So Scene Viewer itself fails on these phones. The flow that worked for the owner
 
 ## Consequences
 - Good: the AR the owner tested and showed works again on their phones.
-- Good: the public copies (`/ar/` path) still serve iPhone Quick Look.
+- Good: the public copies (`/ar/` path) still serve iPhone Quick Look. (Amended by ADR-0041, 2026-10-26: the product page now uses the public copies' direct storage URLs, not the `/ar/` path.)
 - Trade-off: this is not the contract's "Google Scene Viewer first". WebXR AR shows model-viewer's in-browser placement instead of Google's viewer, and it still needs Google Play Services for AR.
 - To check on real devices: Android Chrome (WebXR), an Android phone without WebXR (Scene Viewer fallback), and iPhone Safari (Quick Look).
 
