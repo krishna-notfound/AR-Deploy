@@ -5,6 +5,8 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { DateFormatPref, Profile } from '@/domain/types'
+import { accountErrorText } from '../accountError'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { type DatePrefs, formatDate, formatDateTime, formatTime } from '@/lib/format'
 import { browserTimeZone, timeZoneList, useProfileSettings } from '@/lib/preferences'
@@ -18,21 +20,22 @@ const sample = (p: Partial<DatePrefs>) => ({ timezone: 'UTC', dateFormat: 'd MMM
 type Draft = Pick<Profile, 'timezone' | 'dateFormat' | 'clock'>
 
 export default function PreferencesSection() {
+  const { t } = useI18n()
   const { state, reload } = useProfileSettings()
   return (
     <>
-      <SectionHeader title="Preferences" description="Your time zone and how dates and times are shown in the dashboard." />
+      <SectionHeader title={t('settings.section.preferences')} description={t('settings.prefs.description')} />
       {state.status === 'loading' ? (
-        <SettingsCard title="Time zone and format">
-          <div className="space-y-3" aria-busy="true" aria-label="Loading preferences">
+        <SettingsCard title={t('settings.prefs.zoneAndFormat')}>
+          <div className="space-y-3" aria-busy="true" aria-label={t('settings.prefs.loading')}>
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-10 w-full max-w-md" />
             <Skeleton className="h-4 w-56" />
           </div>
         </SettingsCard>
       ) : state.status === 'error' ? (
-        <SettingsCard title="Time zone and format">
-          <ErrorState message={`Could not load your preferences. ${state.message}`} onRetry={reload} className="py-4" />
+        <SettingsCard title={t('settings.prefs.zoneAndFormat')}>
+          <ErrorState message={t('settings.prefs.loadFailed')} onRetry={reload} className="py-4" />
         </SettingsCard>
       ) : (
         <PreferencesForm key={state.profile.userId} profile={state.profile} />
@@ -42,6 +45,7 @@ export default function PreferencesSection() {
 }
 
 function PreferencesForm({ profile }: { profile: Profile }) {
+  const { t, lang } = useI18n()
   const { save } = useProfileSettings()
   const toast = useToast()
   const [draft, setDraft] = useState<Draft>({ timezone: profile.timezone, dateFormat: profile.dateFormat, clock: profile.clock })
@@ -49,8 +53,8 @@ function PreferencesForm({ profile }: { profile: Profile }) {
   // The preview clock, refreshed every 30 seconds.
   const [nowIso, setNowIso] = useState(() => new Date().toISOString())
   useEffect(() => {
-    const t = setInterval(() => setNowIso(new Date().toISOString()), 30_000)
-    return () => clearInterval(t)
+    const timer = setInterval(() => setNowIso(new Date().toISOString()), 30_000)
+    return () => clearInterval(timer)
   }, [])
   const device = useMemo(() => browserTimeZone(), [])
   const zones = useMemo(() => timeZoneList([profile.timezone, device]), [profile.timezone, device])
@@ -62,61 +66,61 @@ function PreferencesForm({ profile }: { profile: Profile }) {
     setSaving(true)
     const r = await save(draft)
     setSaving(false)
-    if (r.ok) toast.success('Preferences saved', 'Dates across the dashboard now use these settings.')
+    if (r.ok) toast.success(t('settings.prefs.saved'), t('settings.prefs.savedBody'))
     // The database checks the zone against its own list, which can lag behind this browser's (spec 6).
-    else if (r.error.reason === 'invalid_request' && draft.timezone !== profile.timezone) toast.error("That time zone isn't supported. Choose a nearby one.")
-    else toast.error('Could not save your preferences', r.error.message)
+    else if (r.error.reason === 'invalid_request' && draft.timezone !== profile.timezone) toast.error(t('settings.prefs.zoneUnsupported'))
+    else toast.error(t('settings.prefs.saveFailed'), accountErrorText(r.error, t))
   }
 
-  const now = formatDateTime(nowIso, 'en', draft)
+  const now = formatDateTime(nowIso, lang, draft)
 
   return (
     <form onSubmit={submit} className="space-y-6">
-      <SettingsCard title="Time zone" description="Dates and times in the dashboard are shown in this zone.">
-        <FormField label="Time zone" hint={device && device !== draft.timezone ? `This device is set to ${device}.` : undefined}>
+      <SettingsCard title={t('settings.prefs.zone')} description={t('settings.prefs.zoneDescription')}>
+        <FormField label={t('settings.prefs.zone')} hint={device && device !== draft.timezone ? t('settings.prefs.deviceZone', { zone: device }) : undefined}>
           <Select className="max-w-md" value={draft.timezone} onChange={(e) => setDraft((d) => ({ ...d, timezone: e.target.value }))}>
             {zones.map((z) => (
               <option key={z} value={z}>
-                {z === device ? `${z} (this device)` : z}
+                {z === device ? `${z} (${t('settings.prefs.thisDevice')})` : z}
               </option>
             ))}
           </Select>
         </FormField>
         {device && device !== draft.timezone && (
           <Button type="button" size="sm" className="mt-3" onClick={() => setDraft((d) => ({ ...d, timezone: device }))}>
-            Use {device}
+            {t('settings.prefs.useZone', { zone: device })}
           </Button>
         )}
       </SettingsCard>
 
-      <SettingsCard title="Date and time format">
+      <SettingsCard title={t('settings.prefs.formatTitle')}>
         <div className="space-y-6">
           <RadioGroup
-            legend="Date format"
+            legend={t('settings.prefs.dateFormat')}
             name="date-format"
             value={draft.dateFormat}
             onChange={(v) => setDraft((d) => ({ ...d, dateFormat: v }))}
-            options={DATE_FORMATS.map((f) => ({ value: f, label: formatDate(SAMPLE, 'en', sample({ dateFormat: f })) }))}
+            options={DATE_FORMATS.map((f) => ({ value: f, label: formatDate(SAMPLE, lang, sample({ dateFormat: f })) }))}
           />
           <RadioGroup
-            legend="Clock"
+            legend={t('settings.prefs.clock')}
             name="clock"
             value={draft.clock}
             onChange={(v) => setDraft((d) => ({ ...d, clock: v }))}
             options={[
-              { value: '24h' as const, label: formatTime(SAMPLE, sample({ clock: '24h' })), hint: '24-hour' },
-              { value: '12h' as const, label: formatTime(SAMPLE, sample({ clock: '12h' })), hint: '12-hour' },
+              { value: '24h' as const, label: formatTime(SAMPLE, sample({ clock: '24h' })), hint: t('settings.prefs.hour24') },
+              { value: '12h' as const, label: formatTime(SAMPLE, sample({ clock: '12h' })), hint: t('settings.prefs.hour12') },
             ]}
           />
           <p className="text-ui-small text-ink-muted">
-            Now in your time zone: <span className="font-medium text-ink tabular-nums">{now}</span>
+            {t('settings.prefs.now')} <span className="font-medium text-ink tabular-nums">{now}</span>
           </p>
         </div>
       </SettingsCard>
 
       <div className="flex justify-end">
         <Button type="submit" variant="primary" disabled={!dirty} loading={saving}>
-          Save preferences
+          {t('settings.prefs.save')}
         </Button>
       </div>
     </form>

@@ -3,14 +3,22 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { CopyButton } from '@/components/ui/CopyButton'
 import { Checkbox } from '@/components/ui/Form'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { type Vars, translate } from '@/i18n/translate'
 
 /** The plain-text form of a set of recovery codes, for Copy and the downloaded .txt file. */
-export function recoveryCodesText(codes: string[], account?: string | null, created: Date = new Date()): string {
+export function recoveryCodesText(
+  codes: string[],
+  account?: string | null,
+  created: Date = new Date(),
+  t: (key: TranslationKey, vars?: Vars) => string = (key, vars) => translate('en', key, vars),
+): string {
   return [
-    'Sanctus recovery codes',
-    ...(account ? [`Account: ${account}`] : []),
-    `Created: ${created.toISOString().slice(0, 10)}`,
-    'Each code works once. Keep them somewhere safe.',
+    t('settings.recovery.fileTitle'),
+    ...(account ? [t('settings.recovery.fileAccount', { account })] : []),
+    t('settings.recovery.fileCreated', { date: created.toISOString().slice(0, 10) }),
+    t('settings.recovery.fileNote'),
     '',
     ...codes,
     '',
@@ -34,7 +42,8 @@ function download(text: string) {
  * that unlocks Done. Its heading takes focus when it appears. `account` (the email) is written into the copied text and
  * the file, so a saved file says which account it belongs to. Self-contained: TotpSetup and Security settings use it.
  */
-export function RecoveryCodes({ codes, onDone, doneLabel = 'Done', account }: { codes: string[]; onDone: () => void; doneLabel?: string; account?: string | null }) {
+export function RecoveryCodes({ codes, onDone, doneLabel, account }: { codes: string[]; onDone: () => void; doneLabel?: string; account?: string | null }) {
+  const { t } = useI18n()
   const [saved, setSaved] = useState(false)
   // One timestamp per set, so Copy and Download carry the same date.
   const [created] = useState(() => new Date())
@@ -42,18 +51,18 @@ export function RecoveryCodes({ codes, onDone, doneLabel = 'Done', account }: { 
   useEffect(() => {
     heading.current?.focus()
   }, [])
-  const text = recoveryCodesText(codes, account, created)
+  const text = recoveryCodesText(codes, account, created, t)
   return (
     <div className="space-y-4">
       <div>
         <h3 ref={heading} tabIndex={-1} className="text-ui-body font-semibold text-ink outline-none">
-          Save your recovery codes
+          {t('settings.recovery.title')}
         </h3>
         <p className="mt-1 text-ui-small text-ink-muted">
-          If you lose your phone, a recovery code lets you sign in. Each code works once. They are shown only now.
+          {t('settings.recovery.body')}
         </p>
       </div>
-      <ul aria-label="Recovery codes" className="grid max-w-md grid-cols-1 gap-x-6 gap-y-1.5 rounded-[var(--radius-control)] bg-subtle px-4 py-3 font-mono text-ui-body text-ink min-[360px]:grid-cols-2">
+      <ul aria-label={t('settings.recovery.listLabel')} className="grid max-w-md grid-cols-1 gap-x-6 gap-y-1.5 rounded-[var(--radius-control)] bg-subtle px-4 py-3 font-mono text-ui-body text-ink min-[360px]:grid-cols-2">
         {codes.map((c) => (
           <li key={c} className="tracking-[0.04em] break-all">
             {c}
@@ -61,15 +70,15 @@ export function RecoveryCodes({ codes, onDone, doneLabel = 'Done', account }: { 
         ))}
       </ul>
       <div className="flex flex-wrap gap-2">
-        <CopyButton text={text} label="Copy codes" toastTitle="Recovery codes copied" />
+        <CopyButton text={text} label={t('settings.recovery.copy')} toastTitle={t('settings.recovery.copied')} />
         <Button size="sm" icon={<Download className="size-4" aria-hidden />} onClick={() => download(text)}>
-          Download .txt
+          {t('settings.recovery.download')}
         </Button>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-        <Checkbox label="I saved these codes" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
+        <Checkbox label={t('settings.recovery.saved')} checked={saved} onChange={(e) => setSaved(e.target.checked)} />
         <Button variant="primary" disabled={!saved} onClick={onDone}>
-          {doneLabel}
+          {doneLabel ?? t('settings.recovery.done')}
         </Button>
       </div>
     </div>
