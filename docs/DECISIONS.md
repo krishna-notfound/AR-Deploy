@@ -51,3 +51,4 @@ Architecture decision records live in `System_arch/decisions/` (index: `System_a
 | 2026-10-29 | Make it live: merge the Content Editor and bilingual dashboards to `main` (`179b4c3`) and redeploy `invite-member` (done and checked the same day) | Owner ("make it live and do it") | System_arch/HANDOFF.md |
 | 2026-10-29 | Fix the 7-8 s Editor open delay: draft request and chunks start together and on menu hover/touch, skeletons replace the spinner in the dashboards; pushed live (`main` f71f141). Next: split the dictionaries so each page loads only the text it needs | Owner | commit f71f141 |
 | 2026-10-29 | Split the dictionaries: dashboard text loads with the dashboard, public pages load only their own text (no change to wording or behaviour) | Owner | ADR-0045 |
+| 2026-10-29 | Make the dictionary split live (`main` 7ba0c0d); undo by Vercel Instant Rollback or `git revert 7ba0c0d` | Owner | ADR-0045 |
