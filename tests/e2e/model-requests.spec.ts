@@ -277,7 +277,7 @@ test.describe('a delivery is never undone by an editor opened before it (demo)',
       await owner.locator('input[type="file"][accept=".glb"]').setInputFiles({ name: 'owner-version.glb', mimeType: 'model/gltf-binary', buffer: await glb() })
       await expect(owner.getByText('owner-version.glb')).toBeVisible({ timeout: 30_000 })
       await owner.getByRole('button', { name: 'Save changes' }).click()
-      await expect(owner.getByRole('alert').filter({ hasText: 'The Sanctus team delivered a 3D model while you were editing. Reload to see it.' }).first()).toBeVisible()
+      await expect(owner.getByRole('alert').filter({ hasText: 'The 3D files were changed somewhere else. Reload the page and try again.' }).first()).toBeVisible()
 
       // Reload shows the delivered files, not the owner's file.
       await owner.getByRole('button', { name: 'Reload' }).first().click()

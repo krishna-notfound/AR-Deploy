@@ -169,7 +169,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
                         {t('settings.title')}
                       </Link>
                       <div className="flex items-center gap-4">
-                        <LanguageSwitcher className="text-ink" />
+                        <LanguageSwitcher className="text-ink text-[12px]!" />
                         {closeButton}
                       </div>
                     </div>
@@ -242,7 +242,7 @@ function SectionList({
           <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
             <h1 id={titleId} className="font-display text-[1.75rem] leading-[1.15] font-medium tracking-[-0.01em] text-ink">{t('settings.title')}</h1>
             <div className="flex items-center gap-4">
-              <LanguageSwitcher className="text-ink" />
+              <LanguageSwitcher className="text-ink text-[12px]!" />
               {closeButton}
             </div>
           </div>

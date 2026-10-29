@@ -78,7 +78,7 @@ test('a business applies, is reviewed, approved as a draft and its owner invited
   // Reject needs a reason; cancel instead, then approve.
   await page.getByRole('button', { name: 'Reject', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Reject application' }).click()
-  await expect(page.getByText('Give a reason for the rejection.')).toBeVisible()
+  await expect(page.getByText('Give a reason first.')).toBeVisible()
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
 
   await page.getByRole('button', { name: 'Start review' }).click()
@@ -153,7 +153,7 @@ test('a rejection with the box ticked still needs the reason and records it', as
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('checkbox', { name: 'Include the reason in the email' }).check()
   await dialog.getByRole('button', { name: 'Reject application' }).click()
-  await expect(dialog.getByText('Give a reason for the rejection.')).toBeVisible()
+  await expect(dialog.getByText('Give a reason first.')).toBeVisible()
   await dialog.getByRole('textbox', { name: 'Reason' }).fill('Catalogue too small for now')
   await expect(dialog.getByRole('checkbox', { name: 'Include the reason in the email' })).toBeChecked()
   await dialog.getByRole('button', { name: 'Reject application' }).click()
