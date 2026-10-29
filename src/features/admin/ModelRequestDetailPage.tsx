@@ -75,7 +75,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
       return
     }
     setDialog(null)
-    const outcome = reviewToast(action, res.data)
+    const outcome = reviewToast(action, res.data, t)
     if (outcome.tone === 'error') toast.error(outcome.title)
     else toast.success(outcome.title)
     onChanged()

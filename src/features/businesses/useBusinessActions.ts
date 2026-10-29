@@ -4,12 +4,11 @@ import { useToast } from '@/components/ui/ToastProvider'
 import type { Business } from '@/domain/types'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
-import { useFormat } from '@/lib/useFormat'
+import { deletedToast } from '../shared/storageSweep'
 import { service } from '@/services'
 
 export function useBusinessActions() {
   const { t, tn } = useI18n()
-  const f = useFormat()
   const confirm = useConfirm()
   const toast = useToast()
   const navigate = useNavigate()
@@ -46,8 +45,8 @@ export function useBusinessActions() {
         toast.error(t('admin.businesses.actions.deleteFailed'), errorText(r.error, t))
         return false
       }
-      if (r.data.failedFiles > 0) toast.info(tn('admin.businesses.actions.deletedFilesFailed', r.data.failedFiles, { n: f.number(r.data.failedFiles) }))
-      else toast.success(t('admin.businesses.actions.deleted'))
+      if (r.data.failedFiles > 0) toast.info(deletedToast('Business', r.data, { t, tn }))
+      else toast.success(deletedToast('Business', r.data, { t, tn }))
       if (opts?.after) navigate(opts.after)
       return true
     },
