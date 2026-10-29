@@ -8,6 +8,7 @@ import { content } from '@/services'
 import type { Result, ServiceError } from '@/services/catalogService'
 import type { ContentDraftState } from '@/services/contentService'
 import { useServiceMutation } from '@/services/hooks'
+import { clearPrefetchedDraft, loadFirstDraft } from './draftPrefetch'
 
 export const AUTOSAVE_MS = 2000
 
@@ -38,7 +39,9 @@ export function useDraftEditor(options: { autosaveMs?: number } = {}) {
   const inflight = useRef<Promise<boolean> | null>(null)
   const conflict = useRef(false)
 
-  const loadCall = useServiceMutation(() => content.getContentDraft())
+  // Only the very first load may reuse the request the Editor started early (draftPrefetch); every later load is fresh.
+  const firstLoad = useRef(true)
+  const loadCall = useServiceMutation((first: boolean) => (first ? loadFirstDraft() : content.getContentDraft()))
   const saveCall = useServiceMutation((doc: SiteContent, base: ISODate) => content.saveContentDraft(doc, base))
   const publishCall = useServiceMutation((base: ISODate) => content.publishContent(base))
   const restoreCall = useServiceMutation((version: number, base: ISODate) => content.restoreContentVersion(version, base))
@@ -57,7 +60,9 @@ export function useDraftEditor(options: { autosaveMs?: number } = {}) {
   /** (Re)loads everything from the server and replaces the local state: the first load, and "Reload" after a conflict. */
   const reload = useCallback(async (): Promise<Result<ContentDraftState>> => {
     setLoad((l) => (l.status === 'ready' ? l : { status: 'loading' }))
-    const r = await loadCall.mutate()
+    const first = firstLoad.current
+    firstLoad.current = false
+    const r = await loadCall.mutate(first)
     if (r.ok) {
       apply(r.data)
       setLoad({ status: 'ready' })
@@ -67,7 +72,10 @@ export function useDraftEditor(options: { autosaveMs?: number } = {}) {
 
   useEffect(() => {
     void reload()
-    return () => clearTimeout(timer.current)
+    return () => {
+      clearTimeout(timer.current)
+      clearPrefetchedDraft()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -86,6 +94,7 @@ export function useDraftEditor(options: { autosaveMs?: number } = {}) {
       setSave((s) => ({ state: 'saving', savedAt: s.savedAt }))
       const p = (async () => {
         try {
+          clearPrefetchedDraft()
           const r = await saveCall.mutate(doc, baseRef.current)
           if (r.ok) {
             baseRef.current = r.data.draftUpdatedAt
@@ -124,6 +133,7 @@ export function useDraftEditor(options: { autosaveMs?: number } = {}) {
   /** Saves, publishes the saved draft, and refreshes the published copy and version. */
   const publish = useCallback(async () => {
     if (!(await flush())) return { ok: false, error: { code: 'UNKNOWN', message: 'The draft could not be saved.', reason: conflict.current ? 'draft_conflict' : undefined } } as Result<{ version: number; publishedAt: ISODate }>
+    clearPrefetchedDraft()
     const r = await publishCall.mutate(baseRef.current)
     if (r.ok) {
       // Keep the local text; only the published side changes (and who published it).
@@ -145,6 +155,7 @@ export function useDraftEditor(options: { autosaveMs?: number } = {}) {
     async (version: number) => {
       clearTimeout(timer.current)
       if (inflight.current) await inflight.current
+      clearPrefetchedDraft()
       const r = await restoreCall.mutate(version, baseRef.current)
       if (r.ok) await reload()
       else if (r.error.code === 'CONFLICT') {

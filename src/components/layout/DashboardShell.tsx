@@ -15,6 +15,7 @@ import { useServiceQuery } from '@/services/hooks'
 import { useMyProfile } from '@/features/settings/useMyProfile'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { Avatar } from '../ui/Avatar'
+import { PageSkeleton } from '../ui/PageSkeleton'
 import { IconButton } from '../ui/Button'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { DropdownMenu } from '../ui/Menu'
@@ -22,7 +23,6 @@ import { useFocusTrap } from '../ui/Modal'
 import { BrandMark, Wordmark } from '../ui/BrandMark'
 import { InlineNotice } from '../ui/States'
 import { DashboardContext, type DashboardContextValue, useDashboard, usePendingApplications, useRequestedModelRequests } from './dashboardContext'
-import { FullPageSpinner } from './FullPageSpinner'
 import { BreadcrumbSlotContext, type BreadcrumbSlot } from './PageHeader'
 import type { NavItem } from './nav'
 
@@ -122,7 +122,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
           <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1320px] px-4 pt-6 pb-16 outline-none sm:px-6 lg:px-10 lg:pt-10">
             <SecurityNoticeSlot />
             {variant === 'business' && <CatalogStatusNotice />}
-            <Suspense fallback={<FullPageSpinner />}>
+            <Suspense fallback={<PageSkeleton />}>
               <Outlet />
             </Suspense>
           </main>
@@ -198,6 +198,20 @@ function Brand({ collapsed, variant }: { collapsed?: boolean; variant: Variant }
   )
 }
 
+/** Repeated intent signals (pointer enter, then focus, then touch) start a preload once; a later visit after a pause starts it again. */
+const INTENT_REPEAT_MS = 5000
+const lastIntent = new WeakMap<() => void, number>()
+function intentProps(preload: (() => void) | undefined) {
+  if (!preload) return {}
+  const fire = () => {
+    const now = Date.now()
+    if (now - (lastIntent.get(preload) ?? -Infinity) < INTENT_REPEAT_MS) return
+    lastIntent.set(preload, now)
+    preload()
+  }
+  return { onPointerEnter: fire, onFocus: fire, onTouchStart: fire }
+}
+
 function NavBadge({ kind, collapsed }: { kind: NonNullable<NavItem['badge']>; collapsed?: boolean }) {
   const { t } = useI18n()
   const { number: formatNumber } = useFormat()
@@ -252,6 +266,7 @@ function SidebarContent({
                 end={item.end}
                 state={item.returnsHere ? settingsReturnState(pathname + search) : undefined}
                 onClick={onNavigate}
+                {...intentProps(item.preload)}
                 title={collapsed ? t(item.labelKey) : undefined}
                 className={({ isActive }) =>
                   cn(

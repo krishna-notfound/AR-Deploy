@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import type { Need } from '@/auth/usePermission'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { preloadEditor } from '@/features/editor/preload'
 import { settingsPath } from '@/lib/urls'
 
 export interface NavItem {
@@ -30,6 +31,8 @@ export interface NavItem {
   requires?: Need | Need[]
   /** Opens a full-screen view (the settings hub) whose close button returns to the page it was opened from. */
   returnsHere?: boolean
+  /** Warms this place's code (and first request) when the pointer, focus or a touch shows intent to open it. Harmless if repeated. */
+  preload?: () => void
 }
 
 export const adminNav: NavItem[] = [
@@ -40,7 +43,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/model-requests', labelKey: 'nav.modelRequests', icon: Box, badge: 'requestedModelRequests', requires: 'models.manage' },
   { to: '/admin/analytics', labelKey: 'nav.analytics', icon: BarChart3, requires: 'analytics.view' },
   { to: '/admin/catalogs', labelKey: 'nav.catalogsQr', icon: QrCode, requires: 'products.view' },
-  { to: '/admin/editor', labelKey: 'editor.nav', icon: FilePenLine, requires: 'content.manage' },
+  { to: '/admin/editor', labelKey: 'editor.nav', icon: FilePenLine, requires: 'content.manage', preload: preloadEditor },
   { to: '/admin/team', labelKey: 'nav.team', icon: Users, requires: 'owner' },
   { to: '/admin/activity', labelKey: 'nav.auditLog', icon: History, requires: ['records.view', 'access.view'] },
   // Every platform role has account settings; the Owner-only sections are hidden inside the hub.

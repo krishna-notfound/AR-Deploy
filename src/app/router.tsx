@@ -8,6 +8,7 @@ import { SecurityGate } from '@/auth/SecurityGate'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { adminNav, businessNav } from '@/components/layout/nav'
+import { loadApplyScreen, loadEditorLayout, loadPageEditorScreen, loadPagesScreen, loadSocialScreen } from '@/features/editor/preload'
 import { SiteContentProvider } from '@/features/marketing/SiteContentProvider'
 import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
 import { type Tenant, resolveTenant } from '@/tenant/resolveTenant'
@@ -27,11 +28,12 @@ const LegalPage = lazy(() => import('@/features/legal/LegalPage'))
 const CustomPage = lazy(() => import('@/features/legal/CustomPage'))
 
 // The website Editor (ADR-0043): one layout that owns the working copy, and a screen per section.
-const EditorLayout = lazy(() => import('@/features/editor/EditorLayout'))
-const EditorPagesScreen = lazy(() => import('@/features/editor/PagesScreen'))
-const EditorPageScreen = lazy(() => import('@/features/editor/PageEditorScreen'))
-const EditorApplyScreen = lazy(() => import('@/features/editor/ApplyScreen'))
-const EditorSocialScreen = lazy(() => import('@/features/editor/SocialScreen'))
+// The loaders are shared with the nav's "preload on intent"; loading the layout also starts the draft request.
+const EditorLayout = lazy(loadEditorLayout)
+const EditorPagesScreen = lazy(loadPagesScreen)
+const EditorPageScreen = lazy(loadPageEditorScreen)
+const EditorApplyScreen = lazy(loadApplyScreen)
+const EditorSocialScreen = lazy(loadSocialScreen)
 const EditorPreview = lazy(() => import('@/features/editor/EditorPreview'))
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/AdminOverviewPage'))

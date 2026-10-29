@@ -4,7 +4,6 @@ import { Link, NavLink, Outlet, useBlocker, useLocation, useNavigate } from 'rea
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
@@ -14,10 +13,15 @@ import { cn } from '@/lib/cn'
 import { EDITOR_PATH, editorApplyPath, editorPagesPath, editorPreviewPath, editorSocialPath } from '@/lib/urls'
 import { useFormat } from '@/lib/useFormat'
 import { EditorContext } from './EditorContext'
+import { EditorAreaSkeleton, EditorSkeleton } from './EditorSkeleton'
 import { HistoryDialog } from './HistoryDialog'
 import { PublishDialog } from './PublishDialog'
 import { describeProblems } from './problems'
+import { preloadEditorScreens } from './preload'
 import { type DraftEditor, useDraftEditor } from './useDraftEditor'
+
+// The layout's chunk has just run: fetch the screens it renders in parallel instead of after the draft arrives.
+preloadEditorScreens()
 
 const MENU: { to: string; key: TranslationKey }[] = [
   { to: editorPagesPath(), key: 'editor.menu.pages' },
@@ -40,16 +44,7 @@ function previewTarget(pathname: string): string {
 export default function EditorLayout() {
   const editor = useDraftEditor()
   const { t } = useI18n()
-  if (editor.load.status === 'loading')
-    return (
-      <>
-        <PageHeader title={t('editor.title')} description={t('editor.description')} />
-        <div role="status" aria-label={t('common.loading')} className="space-y-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
-      </>
-    )
+  if (editor.load.status === 'loading') return <EditorSkeleton />
   if (editor.load.status === 'error')
     return (
       <>
@@ -180,7 +175,13 @@ function EditorFrame({ editor }: { editor: DraftEditor }) {
           ))}
         </nav>
         <div className="min-w-0">
-          <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <Suspense
+            fallback={
+              <div role="status" aria-label={t('common.loading')}>
+                <EditorAreaSkeleton />
+              </div>
+            }
+          >
             <Outlet />
           </Suspense>
         </div>
