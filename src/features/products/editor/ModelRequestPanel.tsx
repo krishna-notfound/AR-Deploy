@@ -283,7 +283,7 @@ function RequestForm({
         message = t('products.requestPanel.maxPhotos')
         break
       }
-      const check = validateImageFile(file, REQUEST_PHOTO_RULES)
+      const check = validateImageFile(file, REQUEST_PHOTO_RULES, t)
       if (!check.ok) {
         message = check.message
         continue

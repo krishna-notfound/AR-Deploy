@@ -111,7 +111,7 @@ function ModelSlot({
   const onFile = async (original: File, opts: { keepOriginal?: boolean; built?: boolean } = {}) => {
     if (checking) return
     setChecking('checking')
-    const check = await validateModelFile(original, format)
+    const check = await validateModelFile(original, format, t)
     if (!check.ok) {
       setChecking(false)
       return setError(check.message)

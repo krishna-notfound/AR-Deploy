@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchRequiredExtensions, isHttpsUrl, readRequiredExtensions, sceneViewerUnsupported, validateModelFile } from './files'
+import { translate } from '@/i18n/translate'
+import { fetchRequiredExtensions, isHttpsUrl, readRequiredExtensions, sceneViewerUnsupported, validateImageFile, validateModelFile } from './files'
 
 /** A GLB built the way exporters write it: 12-byte header, JSON chunk, optional BIN chunk. */
 function glbBytes(json: object, opts: { version?: number; declared?: number; bin?: number; binDeclared?: number } = {}): Uint8Array {
@@ -163,5 +164,17 @@ describe('validateModelFile: sizes that Android AR handles (AR-10)', () => {
     const large = await validateModelFile(file(glbWithPng(4096, 4096), 'chair.glb'), 'glb')
     expect(large.ok).toBe(true)
     if (large.ok) expect(large.warning).toMatch(/4096 × 4096 px.*2048 px/)
+  })
+})
+
+describe('file messages in Portuguese', () => {
+  const pt = (key: Parameters<typeof translate>[1], vars?: Parameters<typeof translate>[2]) => translate('pt', key, vars)
+  it('words image and model refusals in pt-PT', async () => {
+    const gif = validateImageFile(new File(['x'], 'a.gif', { type: 'image/gif' }), undefined, pt)
+    expect(gif.ok === false && gif.message).toBe('a.gif: tipo de ficheiro não suportado. Use .jpg, .jpeg, .png, .webp.')
+    const wrong = await validateModelFile(new File(['x'], 'sofa.obj'), 'glb', pt)
+    expect(wrong.ok === false && wrong.message).toBe('sofa.obj: era esperado um ficheiro .glb.')
+    const damaged = await validateModelFile(new File([new Uint8Array(30)], 'sofa.glb'), 'glb', pt)
+    expect(damaged.ok === false && damaged.message).toBe('sofa.glb não parece ser um ficheiro GLB válido: a verificação do cabeçalho falhou. Exporte-o novamente.')
   })
 })

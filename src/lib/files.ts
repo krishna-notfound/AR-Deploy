@@ -1,6 +1,11 @@
 // Client-side file validation. Real checks only: MIME/extension, size, and file structure.
 import type { ModelAsset, ModelFormat } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { type TFn, type Vars, tEn } from '@/i18n/translate'
 import { formatFileSize } from './format'
+
+/** Why a file is not a well-formed model: a dictionary key (ui.file.problem.*) and its variables. */
+type Problem = { key: TranslationKey; vars?: Vars }
 
 export const MB = 1024 * 1024
 
@@ -57,11 +62,11 @@ function extOf(name: string): string {
   return i >= 0 ? name.slice(i).toLowerCase() : ''
 }
 
-export function validateImageFile(file: File, rules: { accept: string[]; extensions: string[]; maxBytes: number } = IMAGE_RULES): FileCheck {
+export function validateImageFile(file: File, rules: { accept: string[]; extensions: string[]; maxBytes: number } = IMAGE_RULES, t: TFn = tEn): FileCheck {
   const typeOk = rules.accept.includes(file.type) || rules.extensions.includes(extOf(file.name))
-  if (!typeOk) return { ok: false, message: `${file.name}: unsupported file type. Use ${rules.extensions.join(', ')}.` }
+  if (!typeOk) return { ok: false, message: t('ui.file.badType', { name: file.name, types: rules.extensions.join(', ') }) }
   if (file.size > rules.maxBytes)
-    return { ok: false, message: `${file.name} is ${formatFileSize(file.size)}. Maximum is ${formatFileSize(rules.maxBytes)}.` }
+    return { ok: false, message: t('ui.file.tooBig', { name: file.name, size: formatFileSize(file.size), max: formatFileSize(rules.maxBytes) }) }
   return { ok: true }
 }
 
@@ -85,28 +90,28 @@ const ZIP_LOCAL = 0x04034b50
 const ZIP_END = 0x06054b50
 
 /** The GLB's JSON chunk, or a reason it is not a well-formed glTF 2.0 binary. Reads the header and JSON only. */
-async function readGlb(file: Blob): Promise<{ ok: true; json: Record<string, unknown>; binStart: number } | { ok: false; problem: string }> {
-  if (file.size < 20) return { ok: false, problem: 'header check failed' }
+async function readGlb(file: Blob): Promise<{ ok: true; json: Record<string, unknown>; binStart: number } | { ok: false; problem: Problem }> {
+  if (file.size < 20) return { ok: false, problem: { key: 'ui.file.problem.header' } }
   const head = new DataView((await readHeader(file, 20)).buffer)
-  if (head.getUint32(0, true) !== GLB_MAGIC) return { ok: false, problem: 'header check failed' }
-  if (head.getUint32(4, true) !== 2) return { ok: false, problem: 'it is not glTF 2.0' }
+  if (head.getUint32(0, true) !== GLB_MAGIC) return { ok: false, problem: { key: 'ui.file.problem.header' } }
+  if (head.getUint32(4, true) !== 2) return { ok: false, problem: { key: 'ui.file.problem.notGltf2' } }
   const declared = head.getUint32(8, true)
-  if (declared !== file.size) return { ok: false, problem: `it declares ${formatFileSize(declared)} but the file is ${formatFileSize(file.size)}, so it is cut off or damaged` }
+  if (declared !== file.size) return { ok: false, problem: { key: 'ui.file.problem.declared', vars: { declared: formatFileSize(declared), actual: formatFileSize(file.size) } } }
   const jsonLength = head.getUint32(12, true)
-  if (head.getUint32(16, true) !== CHUNK_JSON || jsonLength === 0 || 20 + jsonLength > file.size) return { ok: false, problem: 'its JSON chunk is missing or damaged' }
+  if (head.getUint32(16, true) !== CHUNK_JSON || jsonLength === 0 || 20 + jsonLength > file.size) return { ok: false, problem: { key: 'ui.file.problem.json' } }
   let json: Record<string, unknown>
   try {
     json = JSON.parse(new TextDecoder().decode(await readHeader(file.slice(20, 20 + jsonLength), jsonLength))) as Record<string, unknown>
   } catch {
-    return { ok: false, problem: 'its JSON chunk cannot be read' }
+    return { ok: false, problem: { key: 'ui.file.problem.jsonRead' } }
   }
   const version = (json.asset as { version?: unknown } | undefined)?.version
-  if (typeof version !== 'string' || !version.startsWith('2.')) return { ok: false, problem: 'it is not glTF 2.0' }
+  if (typeof version !== 'string' || !version.startsWith('2.')) return { ok: false, problem: { key: 'ui.file.problem.notGltf2' } }
   const next = 20 + jsonLength
   if (next < file.size) {
-    if (next + 8 > file.size) return { ok: false, problem: 'its binary chunk is damaged' }
+    if (next + 8 > file.size) return { ok: false, problem: { key: 'ui.file.problem.bin' } }
     const bin = new DataView((await readHeader(file.slice(next, next + 8), 8)).buffer)
-    if (bin.getUint32(4, true) !== CHUNK_BIN || next + 8 + bin.getUint32(0, true) > file.size) return { ok: false, problem: 'its binary chunk is damaged' }
+    if (bin.getUint32(4, true) !== CHUNK_BIN || next + 8 + bin.getUint32(0, true) > file.size) return { ok: false, problem: { key: 'ui.file.problem.bin' } }
   }
   return { ok: true, json, binStart: next + 8 }
 }
@@ -144,19 +149,19 @@ async function largestTexture(file: Blob, json: Record<string, unknown>, binStar
 }
 
 /** USDZ = an uncompressed zip whose first file is the USD scene (Apple's USDZ rules). Reads two small slices. */
-async function usdzProblem(file: Blob): Promise<string | null> {
-  if (file.size < 52) return 'header check failed'
+async function usdzProblem(file: Blob): Promise<Problem | null> {
+  if (file.size < 52) return { key: 'ui.file.problem.header' }
   const head = new DataView((await readHeader(file, 30)).buffer)
-  if (head.getUint32(0, true) !== ZIP_LOCAL) return 'header check failed'
+  if (head.getUint32(0, true) !== ZIP_LOCAL) return { key: 'ui.file.problem.header' }
   const nameLength = head.getUint16(26, true)
   const name = new TextDecoder().decode(await readHeader(file.slice(30, 30 + nameLength), nameLength)).toLowerCase()
-  if (!/\.usd[ac]?$/.test(name)) return 'it does not start with a USD scene (.usdc or .usda file)'
-  if (head.getUint16(8, true) !== 0) return 'its contents are compressed (USDZ must store files uncompressed)'
+  if (!/\.usd[ac]?$/.test(name)) return { key: 'ui.file.problem.usdScene' }
+  if (head.getUint16(8, true) !== 0) return { key: 'ui.file.problem.compressed' }
   const tailStart = Math.max(0, file.size - (22 + 0xffff))
   const tail = await readHeader(file.slice(tailStart), file.size - tailStart)
   const view = new DataView(tail.buffer)
   for (let i = tail.length - 22; i >= 0; i--) if (view.getUint32(i, true) === ZIP_END) return null
-  return 'the end of the archive is missing, so it is cut off or damaged'
+  return { key: 'ui.file.problem.truncated' }
 }
 
 /**
@@ -164,18 +169,18 @@ async function usdzProblem(file: Blob): Promise<string | null> {
  * GLB: glTF 2.0 header, declared length = file size, JSON chunk (asset.version 2.x) and binary chunk inside the file.
  * USDZ: zip whose first entry is a .usdc/.usda scene, stored uncompressed, with an end-of-archive record.
  */
-export async function validateModelFile(file: File, format: ModelFormat): Promise<FileCheck> {
+export async function validateModelFile(file: File, format: ModelFormat, t: TFn = tEn): Promise<FileCheck> {
   const rule = MODEL_RULES[format]
   if (extOf(file.name) !== rule.extension)
-    return { ok: false, message: `${file.name}: expected a ${rule.extension} file.` }
+    return { ok: false, message: t('ui.file.wrongExt', { name: file.name, ext: rule.extension }) }
   if (file.size > rule.maxBytes)
-    return { ok: false, message: `${file.name} is ${formatMb(file.size)}. Maximum is ${formatMb(rule.maxBytes)}. ${rule.why}` }
+    return { ok: false, message: t('ui.file.tooBigWhy', { name: file.name, size: formatMb(file.size), max: formatMb(rule.maxBytes), why: t(`ui.file.why.${format}`) }) }
   const glb = format === 'glb' ? await readGlb(file) : null
   const problem = glb ? (glb.ok ? null : glb.problem) : await usdzProblem(file)
-  if (problem) return { ok: false, message: `${file.name} does not look like a valid ${format.toUpperCase()} file: ${problem}. Export it again.` }
+  if (problem) return { ok: false, message: t('ui.file.invalid', { name: file.name, format: format.toUpperCase(), problem: t(problem.key, problem.vars) }) }
   const texture = glb?.ok ? await largestTexture(file, glb.json, glb.binStart).catch(() => null) : null
   if (texture && Math.max(texture.w, texture.h) > MAX_TEXTURE_PX)
-    return { ok: true, warning: `${file.name} has a ${texture.w} × ${texture.h} px texture. Textures above ${MAX_TEXTURE_PX} px make AR slow and can fail on phones; export with textures of ${MAX_TEXTURE_PX} px or less.` }
+    return { ok: true, warning: t('ui.file.bigTexture', { name: file.name, w: texture.w, h: texture.h, max: MAX_TEXTURE_PX }) }
   return { ok: true }
 }
 
@@ -264,7 +269,7 @@ export function readAsDataUrl(file: Blob): Promise<string> {
  * Converts an image to a data URL small enough to persist. Large photos are downscaled
  * on a canvas; if the result is still too big the caller gets an error message.
  */
-export async function imageToPersistableDataUrl(file: File, maxDim = 1600): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+export async function imageToPersistableDataUrl(file: File, maxDim = 1600, t: TFn = tEn): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
   try {
     const original = await readAsDataUrl(file)
     if (original.length <= IMAGE_RULES.maxPersistBytes && file.size < 400 * 1024) return { ok: true, url: original }
@@ -280,9 +285,9 @@ export async function imageToPersistableDataUrl(file: File, maxDim = 1600): Prom
       const url = canvas.toDataURL('image/jpeg', q)
       if (url.length <= IMAGE_RULES.maxPersistBytes) return { ok: true, url }
     }
-    return { ok: false, message: `${file.name} is too large to store in this demo even after resizing.` }
+    return { ok: false, message: t('ui.file.demoTooLarge', { name: file.name }) }
   } catch {
-    return { ok: false, message: `${file.name} could not be read as an image.` }
+    return { ok: false, message: t('ui.file.unreadableImage', { name: file.name }) }
   }
 }
 
