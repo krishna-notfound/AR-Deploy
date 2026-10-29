@@ -166,6 +166,35 @@ export const normalizeSocialUrl = (network: SocialNetwork, input: string): strin
   return c.ok ? c.url : null
 }
 
+// ---- shape (what every save is held to) ------------------------------------------------------------------------------
+export const MAX_CONTENT_BYTES = 524_288
+
+/**
+ * The twin of private.check_site_content_shape: an object, schema 1, at most 512 KB, and the array caps. This, not
+ * validateSiteContent, is what a draft save must pass (a draft may be incomplete); publishing needs validateSiteContent.
+ * Paths: `document`, `schema`, `customPages`, `applyForm`, `applyForm.steps|customQuestions|fields`.
+ */
+export function validateContentShape(doc: unknown): ContentErrors {
+  const e: ContentErrors = {}
+  if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) return { document: 'invalid_value' }
+  const d = doc as Record<string, unknown>
+  if (d.schema !== SITE_CONTENT_SCHEMA) return { schema: 'invalid_value' }
+  if (new TextEncoder().encode(JSON.stringify(doc)).length > MAX_CONTENT_BYTES) return { document: 'too_long' }
+  if ('customPages' in d) {
+    if (!Array.isArray(d.customPages)) return { customPages: 'invalid_value' }
+    if (d.customPages.length > MAX_CUSTOM_PAGES) return { customPages: 'too_many' }
+  }
+  if ('applyForm' in d) {
+    const f = d.applyForm
+    if (typeof f !== 'object' || f === null || Array.isArray(f)) return { applyForm: 'invalid_value' }
+    const af = f as Record<string, unknown>
+    if (Array.isArray(af.steps) && af.steps.length > 8) e['applyForm.steps'] = 'too_many'
+    else if (Array.isArray(af.customQuestions) && af.customQuestions.length > 10) e['applyForm.customQuestions'] = 'too_many'
+    else if (Array.isArray(af.fields) && af.fields.length > 40) e['applyForm.fields'] = 'too_many'
+  }
+  return e
+}
+
 // ---- validate --------------------------------------------------------------------------------------------------------
 /**
  * Validates the whole document (the editor runs it on every change; publish is disabled while it returns anything).

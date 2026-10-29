@@ -2,6 +2,7 @@ import type { AnalyticsEvent, AuditEvent, Business, BusinessApplication, EmailAt
 import type { DailyStat } from '../analytics'
 import type { DemoTeam } from './teamSeed'
 import type { ModelRequest, ModelRequestPhoto } from '@/domain/modelRequests'
+import type { SiteContent } from '@/domain/siteContent'
 
 export type { DailyStat }
 
@@ -25,6 +26,21 @@ export type DemoModelRequest = Omit<ModelRequest, 'photoCount' | 'productName' |
   photos: ModelRequestPhoto[]
 }
 
+/**
+ * The demo Content Editor document (ADR-0043): the draft, the published copy and the version history. Absent until the
+ * Editor first writes (and after "Reset demo data"): nothing published (version 0), an empty draft.
+ */
+export interface DemoContent {
+  draft: SiteContent
+  draftUpdatedAt: string
+  published: SiteContent | null
+  version: number
+  publishedAt: string | null
+  publishedByName: string | null
+  /** Oldest first. */
+  versions: { version: number; content: SiteContent; publishedAt: string; publishedByName: string }[]
+}
+
 export interface Db {
   schemaVersion: typeof SCHEMA_VERSION
   businesses: Business[]
@@ -45,6 +61,8 @@ export interface Db {
   team?: DemoTeam
   /** 3D model requests (S4). Optional so demo data saved earlier stays valid. */
   modelRequests?: DemoModelRequest[]
+  /** Content Editor draft, published copy and history (ADR-0043). Optional so demo data saved earlier stays valid. */
+  content?: DemoContent
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)

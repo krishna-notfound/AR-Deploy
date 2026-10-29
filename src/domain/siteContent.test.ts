@@ -7,6 +7,7 @@ import {
   normalizeSiteContent,
   normalizeSocialUrl,
   summarizeChanges,
+  validateContentShape,
   validateSiteContent,
   type CustomPage,
   type SiteContent,
@@ -184,5 +185,29 @@ describe('summarizeChanges', () => {
     before.applyForm.fields.push({ key: 'custom:q1', stepId: 'business' })
     const after = emptySiteContent()
     expect(summarizeChanges(before, after)).toMatchObject({ pages: 1, questions: 1 })
+  })
+})
+
+describe('validateContentShape (what a draft save must pass)', () => {
+  const withForm = (mutate: (f: SiteContent['applyForm']) => void) => {
+    const c = emptySiteContent()
+    mutate(c.applyForm)
+    return c
+  }
+  it('accepts an incomplete draft that publishing would refuse', () => {
+    const c = doc({ customPages: [page({ slug: 'terms' }), page({ slug: '' })] })
+    expect(validateContentShape(c)).toEqual({})
+    expect(Object.keys(validateSiteContent(c))).toContain('customPages.0.slug')
+  })
+
+  it('refuses a non-object, a wrong schema, over 512 KB and the array caps', () => {
+    expect(validateContentShape([])).toEqual({ document: 'invalid_value' })
+    expect(validateContentShape(null)).toEqual({ document: 'invalid_value' })
+    expect(validateContentShape({ schema: 2 })).toEqual({ schema: 'invalid_value' })
+    expect(validateContentShape(doc({ builtinPages: { terms: { en: 'x'.repeat(524_288) } } }))).toEqual({ document: 'too_long' })
+    expect(validateContentShape(doc({ customPages: Array.from({ length: 21 }, (_, i) => page({ slug: `p-${i}` })) }))).toEqual({ customPages: 'too_many' })
+    expect(validateContentShape({ schema: 1, customPages: {} })).toEqual({ customPages: 'invalid_value' })
+    expect(validateContentShape(withForm((f) => f.customQuestions.push(...Array.from({ length: 11 }, (_, i) => ({ id: `q${i}`, type: 'short_text' as const, label: { en: 'q' } })))))).toEqual({ 'applyForm.customQuestions': 'too_many' })
+    expect(validateContentShape(withForm((f) => f.steps.push(...Array.from({ length: 8 }, (_, i) => ({ id: `s${i}` })))))).toEqual({ 'applyForm.steps': 'too_many' })
   })
 })
