@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { ModelRequestPhoto } from '@/domain/modelRequests'
+import { en } from '@/i18n/dictionaries/en'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { downloadUrl } from '@/lib/download'
 import { formatFileSize } from '@/lib/format'
 
-export const PHOTO_FAILED = "This photo couldn't be loaded."
+export const PHOTO_FAILED = en['business.modelRequests.photo.failed']
 
 /**
  * Load state of one photo; `retry` asks the page for fresh links (its refetch signs them again, so an expired
@@ -29,12 +31,13 @@ function usePhotoLoad(photo: ModelRequestPhoto, onReload?: () => void) {
 }
 
 function PhotoFailed({ onRetry, compact }: { onRetry: () => void; compact?: boolean }) {
+  const { t } = useI18n()
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center">
       <ImageOff className="size-5 text-ink-muted" aria-hidden />
-      <p className={compact ? 'text-[12px] leading-4 text-ink-muted' : 'text-[14px] text-ink-muted'}>{PHOTO_FAILED}</p>
+      <p className={compact ? 'text-[12px] leading-4 text-ink-muted' : 'text-[14px] text-ink-muted'}>{t('business.modelRequests.photo.failed')}</p>
       <Button size="sm" onClick={onRetry}>
-        Retry
+        {t('business.modelRequests.photo.retry')}
       </Button>
     </div>
   )
@@ -42,13 +45,14 @@ function PhotoFailed({ onRetry, compact }: { onRetry: () => void; compact?: bool
 
 /** One thumbnail: a button that opens the viewer, or the failed state with Retry. */
 export function PhotoThumb({ photo, index, onOpen, onReload }: { photo: ModelRequestPhoto; index: number; onOpen: () => void; onReload?: () => void }) {
+  const { t } = useI18n()
   const load = usePhotoLoad(photo, onReload)
   return (
     <div className="aspect-square overflow-hidden rounded-[var(--radius-control)] border border-line bg-subtle">
       {load.failed ? (
         <PhotoFailed compact onRetry={load.retry} />
       ) : (
-        <button type="button" onClick={onOpen} aria-label={`Open photo ${index + 1}: ${photo.fileName}`} className="block size-full cursor-zoom-in focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
+        <button type="button" onClick={onOpen} aria-label={t('business.modelRequests.photo.open', { n: index + 1, name: photo.fileName })} className="block size-full cursor-zoom-in focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
           <img key={load.attempt} src={photo.url} alt="" onError={load.fail} className="size-full object-cover" />
         </button>
       )}
@@ -57,6 +61,7 @@ export function PhotoThumb({ photo, index, onOpen, onReload }: { photo: ModelReq
 }
 
 export function PhotoViewer({ photos, index, onIndex, onClose, onReload }: { photos: ModelRequestPhoto[]; index: number; onIndex: (i: number) => void; onClose: () => void; onReload?: () => void }) {
+  const { t } = useI18n()
   const toast = useToast()
   const [downloading, setDownloading] = useState(false)
   const photo = photos[index]
@@ -87,7 +92,7 @@ export function PhotoViewer({ photos, index, onIndex, onClose, onReload }: { pho
     } catch {
       // The link may have expired: fetch fresh ones so the next try uses a newly signed link.
       onReload?.()
-      toast.error("The photo couldn't be downloaded.", 'Try again.')
+      toast.error(t('business.modelRequests.photo.downloadFailed'), t('business.modelRequests.photo.tryAgain'))
     } finally {
       setDownloading(false)
     }
@@ -98,8 +103,8 @@ export function PhotoViewer({ photos, index, onIndex, onClose, onReload }: { pho
       open
       size="lg"
       onClose={onClose}
-      closeLabel="Close photo"
-      title={`Photo ${index + 1} of ${count}`}
+      closeLabel={t('business.modelRequests.photo.close')}
+      title={t('business.modelRequests.photo.title', { n: index + 1, count })}
       description={
         <span className="flex flex-wrap gap-x-2">
           <span className="min-w-0 break-all">{photo.fileName}</span>
@@ -111,16 +116,16 @@ export function PhotoViewer({ photos, index, onIndex, onClose, onReload }: { pho
           {count > 1 && (
             <>
               <Button icon={<ChevronLeft className="size-4" aria-hidden />} onClick={prev}>
-                Previous
+                {t('business.modelRequests.photo.previous')}
               </Button>
               <Button icon={<ChevronRight className="size-4" aria-hidden />} onClick={next}>
-                Next
+                {t('business.modelRequests.photo.next')}
               </Button>
             </>
           )}
           {photo.url && (
             <Button variant="primary" icon={<Download className="size-4" aria-hidden />} loading={downloading} onClick={() => void download()}>
-              Download original
+              {t('business.modelRequests.photo.download')}
             </Button>
           )}
         </>

@@ -78,7 +78,7 @@ describe('ApplicationDetailPage', () => {
   it('shows an error with retry when the application fails to load', async () => {
     vi.spyOn(service, 'getApplication').mockResolvedValue(fail('UNKNOWN', 'Network down.'))
     renderPage('app_x')
-    expect(await screen.findByText('Network down.')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong. Try again in a moment.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
   })
 

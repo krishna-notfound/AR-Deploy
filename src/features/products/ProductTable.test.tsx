@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
 import type { ProductRequestState } from '@/domain/modelRequests'
 import type { Business, Product } from '@/domain/types'
 import { service } from '@/services'
@@ -129,5 +130,34 @@ describe('ProductTable: 3D request badges and filter (S4 R-S4-9)', () => {
     )
     await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by 3D requests' }), '3D requests: open')
     expect(screen.getByTestId('model')).toHaveTextContent('open')
+  })
+})
+
+describe('T6: product table in Portuguese', () => {
+  afterEach(() => localStorage.removeItem(LANG_KEY))
+
+  it('shows Portuguese column headers and the row menu', async () => {
+    localStorage.setItem(LANG_KEY, 'pt')
+    const { business, published } = await load()
+    const user = userEvent.setup()
+    render(
+      <LanguageProvider>
+        <MemoryRouter>
+          <AccountProvider>
+            <ToastProvider>
+              <ConfirmProvider>
+                <ProductTable products={[published]} businesses={new Map([[business.id, business]])} stats={new Map()} scope="business" empty={<p>None</p>} />
+              </ConfirmProvider>
+            </ToastProvider>
+          </AccountProvider>
+        </MemoryRouter>
+      </LanguageProvider>,
+    )
+    const table = await screen.findByRole('table')
+    expect(within(table).getByRole('columnheader', { name: /Produto/ })).toBeInTheDocument()
+    expect(within(table).getByRole('columnheader', { name: /Preço/ })).toBeInTheDocument()
+    await user.click((await screen.findAllByRole('button', { name: `Ações para ${published.name.en}` }))[0]!)
+    expect(await screen.findByRole('menuitem', { name: 'Abrir página do produto' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Anular publicação' })).toBeInTheDocument()
   })
 })

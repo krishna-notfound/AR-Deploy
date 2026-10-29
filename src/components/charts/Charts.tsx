@@ -5,14 +5,15 @@
 // them as two small multiples, and the overview's combined chart lets people hide a series so the other rescales.
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { DailyPoint, Lang } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { localeOf } from '@/i18n/locale'
 import { type DatePrefs, formatDate } from '@/lib/format'
 import { useFormat } from '@/lib/useFormat'
 
 export const SERIES = {
   // The views series counts product page views plus embed views (R-W5-3): its label says so.
-  views: { color: '#1D1C1A', label: 'Page and embed views' },
-  ar: { color: '#8A765C', label: 'AR launch attempts' },
+  views: { color: '#1D1C1A', label: 'Page and embed views', labelKey: 'ui.chart.views' },
+  ar: { color: '#8A765C', label: 'AR launch attempts', labelKey: 'ui.chart.ar' },
 } as const
 
 // Axis ticks follow the dashboard floor: 12px in the muted ink (#5A5148), never smaller.
@@ -52,9 +53,10 @@ export function TrendTooltip({ active, payload, label, seriesLabel, prefs }: { a
 export function TrendChart({ data, series, height = 160, prefs }: { data: DailyPoint[]; series: keyof typeof SERIES; height?: number; prefs?: DatePrefs }) {
   const s = SERIES[series]
   const f = useFormat()
+  const { t } = useI18n()
   const key = series === 'views' ? 'views' : 'arActivations'
   return (
-    <div style={{ height }} role="img" aria-label={`${s.label}, last 30 days`}>
+    <div style={{ height }} role="img" aria-label={t('ui.chart.last30', { label: t(s.labelKey) })}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} stroke="#ece7dd" strokeDasharray="2 4" />
@@ -86,9 +88,10 @@ export type SeriesKey = keyof typeof SERIES
 /** Both series on one axis, as on the overview screens. `show` hides a series so the other rescales to fill the chart. */
 export function CombinedTrendChart({ data, show, height = 220, prefs }: { data: DailyPoint[]; show: Record<SeriesKey, boolean>; height?: number; prefs?: DatePrefs }) {
   const f = useFormat()
+  const { t } = useI18n()
   const shown = (Object.keys(SERIES) as SeriesKey[]).filter((k) => show[k])
   return (
-    <div style={{ height }} role="img" aria-label={`${shown.map((k) => SERIES[k].label).join(' and ')}, last 30 days`}>
+    <div style={{ height }} role="img" aria-label={t('ui.chart.last30', { label: shown.map((k) => t(SERIES[k].labelKey)).join(t('ui.chart.and')) })}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} stroke="#ece7dd" />
@@ -104,7 +107,7 @@ export function CombinedTrendChart({ data, show, height = 220, prefs }: { data: 
                   <p className="text-ink-muted">{dayLabel(point.date, prefs, f.lang)}</p>
                   {shown.map((k) => (
                     <p key={k} className="mt-0.5 font-medium text-ink tabular-nums">
-                      {f.number(k === 'views' ? point.views : point.arActivations)} {SERIES[k].label.toLowerCase()}
+                      {f.number(k === 'views' ? point.views : point.arActivations)} {t(SERIES[k].labelKey).toLowerCase()}
                     </p>
                   ))}
                 </div>
@@ -116,7 +119,7 @@ export function CombinedTrendChart({ data, show, height = 220, prefs }: { data: 
               key={k}
               type="linear"
               dataKey={k === 'views' ? 'views' : 'arActivations'}
-              name={SERIES[k].label}
+              name={t(SERIES[k].labelKey)}
               hide={!show[k]}
               stroke={SERIES[k].color}
               strokeWidth={2}
@@ -140,9 +143,10 @@ export interface BarDatum {
 export function HorizontalBars({ data, series, valueLabel }: { data: BarDatum[]; series: keyof typeof SERIES; valueLabel: string }) {
   const s = SERIES[series]
   const f = useFormat()
+  const { t } = useI18n()
   const height = Math.max(120, data.length * 44 + 24)
   return (
-    <div style={{ height }} role="img" aria-label={`${valueLabel} by business`}>
+    <div style={{ height }} role="img" aria-label={t('ui.chart.byBusiness', { label: valueLabel })}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 48, bottom: 0, left: 0 }} barCategoryGap={10}>
           <XAxis type="number" hide />
@@ -179,20 +183,21 @@ export function HorizontalBars({ data, series, valueLabel }: { data: BarDatum[];
 /** Accessible table alternative for a daily series. */
 export function SeriesTable({ data, prefs }: { data: DailyPoint[]; prefs?: DatePrefs }) {
   const f = useFormat()
+  const { t } = useI18n()
   return (
     <div className="max-h-64 overflow-auto rounded-[var(--radius-control)] border border-line">
       <table className="w-full text-[length:var(--text-ui-small)]">
-        <caption className="sr-only">Daily page and embed views and AR launch attempts</caption>
+        <caption className="sr-only">{t('ui.chart.tableCaption')}</caption>
         <thead className="sticky top-0 bg-surface">
           <tr className="text-left text-ink-muted">
             <th scope="col" className="px-3 py-2 font-medium">
-              Date
+              {t('ui.chart.date')}
             </th>
             <th scope="col" className="px-3 py-2 text-right font-medium">
-              {SERIES.views.label}
+              {t(SERIES.views.labelKey)}
             </th>
             <th scope="col" className="px-3 py-2 text-right font-medium">
-              AR launch attempts
+              {t(SERIES.ar.labelKey)}
             </th>
           </tr>
         </thead>

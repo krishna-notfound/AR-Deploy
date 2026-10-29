@@ -2,17 +2,16 @@ import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { translate } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
-import { account, isDemoMode } from '@/services'
+import { type ServiceError, account, isDemoMode } from '@/services'
 
-export const CODE_PROMPT = 'Enter the 6-digit code from your authenticator app'
+/** English forms of two sentences, for callers outside the language context (tests, the 2FA gate); screens use t('auth.twoFactor.codePrompt') and t('auth.twoFactor.recovered'). */
+export const CODE_PROMPT = translate('en', 'auth.twoFactor.codePrompt')
 /** Shown after a recovery-code sign-in: the server removed the authenticator, so 2FA has to be set up again. */
-export const RECOVERED_NOTICE = 'Your authenticator was removed. Set it up again.'
-
-const WRONG_CODE = "That code didn't match. Check the time on your phone and enter the newest code."
-const NOT_SIX_DIGITS = 'Enter all 6 digits of the code.'
-const WRONG_RECOVERY = "That recovery code didn't work. Check it, or try another of your codes."
-const NO_RECOVERY = 'Enter one of your recovery codes.'
+export const RECOVERED_NOTICE = translate('en', 'auth.twoFactor.recovered')
 
 const linkClass = 'inline-flex min-h-11 items-center text-ui-small font-medium text-accent-ink hover:underline disabled:opacity-60'
 
@@ -33,6 +32,9 @@ export function TwoFactorStep({
   onSignOut?: () => void
   className?: string
 }) {
+  const { t } = useI18n()
+  // An account-level rate limit is not the invitation limit that common.error.reason.rate_limited words.
+  const failText = (e: ServiceError) => (e.reason === 'rate_limited' ? t('common.error.RATE_LIMITED') : errorText(e, t))
   const [mode, setMode] = useState<'totp' | 'recovery'>('totp')
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -61,14 +63,14 @@ export function TwoFactorStep({
 
   const verify = async (digits: string) => {
     if (busy) return
-    if (!/^\d{6}$/.test(digits)) return refuse(NOT_SIX_DIGITS)
+    if (!/^\d{6}$/.test(digits)) return refuse(t('auth.twoFactor.notSixDigits'))
     setError(null)
     setBusy(true)
     const r = await account.verifyTotpForSignIn(digits)
     if (!mounted.current) return
     if (!r.ok) {
       setCode('')
-      return refuse(r.error.reason === 'invalid_code' ? WRONG_CODE : r.error.message)
+      return refuse(r.error.reason === 'invalid_code' ? t('auth.twoFactor.wrongCode') : failText(r.error))
     }
     // The button spins while the caller moves on; if this step is still shown afterwards, it is usable again.
     await onVerified()
@@ -78,12 +80,12 @@ export function TwoFactorStep({
   const redeem = async () => {
     if (busy) return
     const value = code.trim()
-    if (!value) return refuse(NO_RECOVERY)
+    if (!value) return refuse(t('auth.twoFactor.noRecovery'))
     setError(null)
     setBusy(true)
     const r = await account.redeemRecoveryCode(value)
     if (!mounted.current) return
-    if (!r.ok) return refuse(r.error.reason === 'invalid_code' ? WRONG_RECOVERY : r.error.message)
+    if (!r.ok) return refuse(r.error.reason === 'invalid_code' ? t('auth.twoFactor.wrongRecovery') : failText(r.error))
     await onRecovered()
     if (mounted.current) setBusy(false)
   }
@@ -103,14 +105,14 @@ export function TwoFactorStep({
     <form noValidate onSubmit={submit} className={cn('space-y-5', className)}>
       {isDemoMode && (
         <InlineNotice tone="neutral">
-          <strong className="font-medium text-ink">Demo.</strong> No authenticator app is checked: the code is 123456.
+          <strong className="font-medium text-ink">{t('auth.twoFactor.demoLabel')}</strong> {t('auth.twoFactor.demoNote')}
         </InlineNotice>
       )}
       {mode === 'totp' ? (
         <>
-          <p className="text-ui-body text-ink">{CODE_PROMPT}</p>
+          <p className="text-ui-body text-ink">{t('auth.twoFactor.codePrompt')}</p>
           <div ref={field}>
-            <FormField label="6-digit code" error={error ?? undefined} className="max-w-60">
+            <FormField label={t('auth.twoFactor.codeLabel')} error={error ?? undefined} className="max-w-60">
               <Input
                 inputMode="numeric"
                 autoComplete="one-time-code"
@@ -129,9 +131,9 @@ export function TwoFactorStep({
         </>
       ) : (
         <>
-          <p className="text-ui-body text-ink">Enter one of the recovery codes you saved when you set up 2FA. Each code works once.</p>
+          <p className="text-ui-body text-ink">{t('auth.twoFactor.recoveryPrompt')}</p>
           <div ref={field}>
-            <FormField label="Recovery code" error={error ?? undefined} className="max-w-72">
+            <FormField label={t('auth.twoFactor.recoveryLabel')} error={error ?? undefined} className="max-w-72">
               <Input
                 autoComplete="off"
                 autoCapitalize="characters"
@@ -155,15 +157,15 @@ export function TwoFactorStep({
         </p>
       )}
       <Button type="submit" variant="primary" size="lg" className="w-full" loading={busy}>
-        {mode === 'totp' ? 'Verify' : 'Sign in with recovery code'}
+        {mode === 'totp' ? t('auth.twoFactor.verify') : t('auth.twoFactor.signInRecovery')}
       </Button>
       <div className="flex flex-wrap items-center justify-between gap-x-4">
         <button type="button" className={linkClass} disabled={busy} onClick={switchMode}>
-          {mode === 'totp' ? 'Use a recovery code' : 'Use your authenticator app'}
+          {mode === 'totp' ? t('auth.twoFactor.useRecovery') : t('auth.twoFactor.useApp')}
         </button>
         {onSignOut && (
           <button type="button" className={linkClass} disabled={busy} onClick={onSignOut}>
-            Sign out
+            {t('auth.signOut')}
           </button>
         )}
       </div>

@@ -13,6 +13,7 @@ import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
 import { IconButton } from '@/components/ui/Button'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { readReturnState, settingsReturnState } from '@/lib/settingsReturn'
 import { settingsPath } from '@/lib/urls'
@@ -21,6 +22,7 @@ import { SettingsSectionPage } from './SettingsSectionPage'
 import { TitleFocusContext } from './SettingsUi'
 import { useMyProfile } from './useMyProfile'
 import {
+  GROUP_LABEL_KEY,
   SETTINGS_GROUPS,
   type SettingsScope,
   SettingsScopeContext,
@@ -41,6 +43,7 @@ const isWide = () => typeof window.matchMedia !== 'function' || window.matchMedi
 
 export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
   const can = useCan()
+  const { t } = useI18n()
   const { user, business } = useAccount()
   const leave = useLeaveAccount()
   const navigate = useNavigate()
@@ -110,9 +113,9 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
   const dashboard = useMemo<DashboardContextValue>(
     () =>
       scope === 'admin'
-        ? { variant: 'admin', home: 'Sanctus Admin', homeTo: '/admin', eyebrow: 'Settings' }
-        : { variant: 'business', home: business?.name ?? 'My business', homeTo: '/dashboard', eyebrow: 'Settings' },
-    [scope, business?.name],
+        ? { variant: 'admin', home: 'Sanctus Admin', homeTo: '/admin', eyebrow: t('settings.title') }
+        : { variant: 'business', home: business?.name ?? t('settings.layout.myBusiness'), homeTo: '/dashboard', eyebrow: t('settings.title') },
+    [scope, business?.name, t],
   )
 
   // Unknown sections and sections this role can't see go to My account, with no error flash (spec 5).
@@ -121,7 +124,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
   if (section === undefined && wide) return <Navigate to={settingsPath(scope, 'account')} replace state={returnState} />
 
   const closeButton = (
-    <IconButton aria-label="Close settings" variant="secondary" onClick={close} className="rounded-full! pointer-coarse:size-11">
+    <IconButton aria-label={t('settings.layout.close')} variant="secondary" onClick={close} className="rounded-full! pointer-coarse:size-11">
       <X className="size-5" aria-hidden />
     </IconButton>
   )
@@ -149,7 +152,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
                 ref={mainRef}
                 id="main"
                 tabIndex={-1}
-                aria-label={current.label}
+                aria-label={t(current.labelKey)}
                 className={cn('min-w-0 flex-1 outline-none', wide ? 'px-8 py-8 lg:px-10 lg:py-14' : 'px-4 pt-3 pb-12')}
               >
                 <div className="w-full max-w-[720px]">
@@ -163,7 +166,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
                         className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] px-2 text-ui-body font-medium text-ink hover:bg-subtle"
                       >
                         <ChevronLeft className="size-4" aria-hidden />
-                        Settings
+                        {t('settings.title')}
                       </Link>
                       <div className="flex items-center gap-4">
                         <LanguageSwitcher className="text-ink" />
@@ -213,7 +216,8 @@ function SectionList({
   onSignOut: () => void
 }) {
   // Below 640px the list is a screen of its own, so it carries the page title; on wide screens the section's title is it.
-  useDocumentTitle(wide ? undefined : 'Settings')
+  const { t } = useI18n()
+  useDocumentTitle(wide ? undefined : t('settings.title'))
   const titleId = useId()
   // The name and photo set in Profile settings (shared with the sidebar); the account's own name until they load.
   const { profile } = useMyProfile()
@@ -231,12 +235,12 @@ function SectionList({
       <div className={cn('flex w-full flex-col', wide ? 'max-w-[272px] px-4 py-8 lg:py-14' : 'px-4 pt-3 pb-10')}>
         {wide ? (
           <div className="flex items-center justify-between gap-3 px-3 pb-4">
-            <p className="text-ui-small text-ink-muted">Settings</p>
+            <p className="text-ui-small text-ink-muted">{t('settings.title')}</p>
             <LanguageSwitcher className="text-ink" />
           </div>
         ) : (
           <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
-            <h1 id={titleId} className="font-display text-[1.75rem] leading-[1.15] font-medium tracking-[-0.01em] text-ink">Settings</h1>
+            <h1 id={titleId} className="font-display text-[1.75rem] leading-[1.15] font-medium tracking-[-0.01em] text-ink">{t('settings.title')}</h1>
             <div className="flex items-center gap-4">
               <LanguageSwitcher className="text-ink" />
               {closeButton}
@@ -250,15 +254,15 @@ function SectionList({
               <p className="truncate text-ui-body font-medium text-ink">{profile?.displayName || user.name}</p>
               <p className="truncate text-ui-small text-ink-muted">
                 {user.email}
-                {isDemoMode && ' · demo'}
+                {isDemoMode && ` · ${t('settings.layout.demo')}`}
               </p>
             </div>
           </div>
         )}
-        <nav aria-label="Settings sections" className="space-y-5">
+        <nav aria-label={t('settings.layout.sections')} className="space-y-5">
           {groups.map(({ group, items }) => (
             <div key={group}>
-              <h2 className="px-3 pb-1 text-ui-small font-medium text-ink-muted">{group}</h2>
+              <h2 className="px-3 pb-1 text-ui-small font-medium text-ink-muted">{t(GROUP_LABEL_KEY[group])}</h2>
               <ul className="space-y-0.5">
                 {items.map((s) => {
                   const active = s.id === current?.id
@@ -275,7 +279,7 @@ function SectionList({
                           active ? 'bg-subtle font-medium text-ink' : wide ? 'text-ink-muted hover:bg-subtle hover:text-ink' : 'text-ink hover:bg-subtle',
                         )}
                       >
-                        <span className="truncate">{s.label}</span>
+                        <span className="truncate">{t(s.labelKey)}</span>
                         {!wide && <ChevronRight className="size-4 shrink-0 text-ink-muted" aria-hidden />}
                       </Link>
                     </li>
@@ -295,7 +299,7 @@ function SectionList({
             )}
           >
             <LogOut className="size-4 shrink-0" aria-hidden />
-            Sign out
+            {t('settings.layout.signOut')}
           </button>
         </div>
       </div>

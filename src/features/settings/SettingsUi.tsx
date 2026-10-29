@@ -1,6 +1,7 @@
 import { type ReactNode, createContext, useContext, useEffect, useId, useRef } from 'react'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 
 /**
@@ -11,7 +12,8 @@ export const TitleFocusContext = createContext<{ take: () => boolean } | null>(n
 
 /** A settings section's title (the page's h1) and one muted line under it. */
 export function SectionHeader({ title, description }: { title: string; description?: ReactNode }) {
-  useDocumentTitle(`${title} · Settings`)
+  const { t } = useI18n()
+  useDocumentTitle(`${title} · ${t('settings.title')}`)
   const pending = useContext(TitleFocusContext)
   const ref = useRef<HTMLHeadingElement>(null)
   useEffect(() => {

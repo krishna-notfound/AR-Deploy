@@ -2,10 +2,11 @@
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import type { ModelRequestOutcome } from '@/domain/modelRequests'
-import { knownEmailReason } from '@/features/applications/labels'
-import { DEMO_NO_EMAIL } from './copy'
+import { type TranslationKey, en } from '@/i18n/dictionaries/en'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { type T, tEn } from './copy'
 
-export const NO_USDZ_WARNING = "There's no USDZ file. iPhone AR then depends on the phone converting the GLB, which isn't guaranteed."
+export const NO_USDZ_WARNING = en['business.modelRequests.deliver.noUsdz']
 
 export function DeliverDialog({
   open,
@@ -25,47 +26,55 @@ export function DeliverDialog({
   optionName?: string
   hasUsdz: boolean
 }) {
+  const { t } = useI18n()
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={`Deliver the 3D model for ${productName}?`}
+      title={t('business.modelRequests.deliver.title', { name: productName })}
       footer={
         <>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" loading={pending} onClick={onConfirm}>
-            Deliver model
+            {t('business.modelRequests.deliver.confirm')}
           </Button>
         </>
       }
     >
-      <p>
-        These files replace the current 3D files of {optionName ? `the option ${optionName}` : 'the product'}. If the product is published, customers see the 3D view and AR right away. The business owner is emailed.
-      </p>
-      {!hasUsdz && <p className="mt-3 text-warning">{NO_USDZ_WARNING}</p>}
+      <p>{optionName ? t('business.modelRequests.deliver.bodyOption', { name: optionName }) : t('business.modelRequests.deliver.bodyProduct')}</p>
+      {!hasUsdz && <p className="mt-3 text-warning">{t('business.modelRequests.deliver.noUsdz')}</p>}
     </Modal>
   )
 }
 
-/** The toast for a start, delivery or decline outcome (§9.1); the tone is an error only when the email failed. */
-export function reviewToast(action: 'start' | 'deliver' | 'decline', o: ModelRequestOutcome): { tone: 'success' | 'error'; title: string } {
-  const cleanup = o.cleanup === 'partial' ? " Some old files couldn't be removed." : ''
-  if (action === 'start') return { tone: 'success', title: `Work started.${cleanup}` }
-  const done = action === 'deliver' ? 'Model delivered' : 'Request declined'
+/** Fixed copy for the email reason codes we know; unknown (provider) text is never shown. */
+function knownReason(code: string | undefined, t: T): string | undefined {
+  if (!code) return undefined
+  const key = `business.modelRequests.emailReason.${code}`
+  return Object.hasOwn(en, key) ? t(key as TranslationKey) : undefined
+}
+
+/**
+ * The toast for a start, delivery or decline outcome (§9.1); the tone is an error only when the email failed.
+ * Pass `t` from `useI18n()`; without it the title is English.
+ */
+export function reviewToast(action: 'start' | 'deliver' | 'decline', o: ModelRequestOutcome, t: T = tEn): { tone: 'success' | 'error'; title: string } {
+  const cleanup = o.cleanup === 'partial' ? ` ${t('business.modelRequests.toast.cleanupPartial')}` : ''
+  if (action === 'start') return { tone: 'success', title: `${t('business.modelRequests.toast.started')}${cleanup}` }
+  const done = t(action === 'deliver' ? 'business.modelRequests.toast.delivered' : 'business.modelRequests.toast.declined')
   const email = o.email
-  if (!email) return { tone: 'success', title: `${done}.${cleanup}` }
+  if (!email) return { tone: 'success', title: `${t('business.modelRequests.toast.plain', { done })}${cleanup}` }
   switch (email.status) {
     case 'accepted':
-      return { tone: 'success', title: `${done}. The business owner was emailed.${cleanup}` }
+      return { tone: 'success', title: `${t('business.modelRequests.toast.emailAccepted', { done })}${cleanup}` }
     case 'skipped':
-      return { tone: 'success', title: `${done}. The business has no owner, so no email was sent.${cleanup}` }
+      return { tone: 'success', title: `${t('business.modelRequests.toast.emailSkipped', { done })}${cleanup}` }
     case 'demo':
-      return { tone: 'success', title: `${done}. ${DEMO_NO_EMAIL}${cleanup}` }
+      return { tone: 'success', title: `${t('business.modelRequests.toast.emailDemo', { done })}${cleanup}` }
     case 'failed':
     case 'blocked': {
-      // Fixed copy for known codes only: unknown (provider) text is never shown.
-      const why = (knownEmailReason(email.error) ?? 'the email service did not take it').replace(/\.$/, '')
-      return { tone: 'error', title: `${done}, but the email was not sent: ${why}.${cleanup}` }
+      const why = (knownReason(email.error, t) ?? t('business.modelRequests.emailReason.unknown')).replace(/\.$/, '')
+      return { tone: 'error', title: `${t('business.modelRequests.toast.emailFailed', { done, why })}${cleanup}` }
     }
   }
 }

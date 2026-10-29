@@ -129,7 +129,7 @@ describe('ModelRequestsPage', () => {
     await user.click(screen.getByRole('tab', { name: 'Delivered' }))
     expect(await screen.findByText("Couldn't load 3D model requests.")).toBeInTheDocument()
     spy.mockResolvedValue(ok({ items: [], total: 0 }))
-    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('No delivered requests.')).toBeInTheDocument()
   })
 

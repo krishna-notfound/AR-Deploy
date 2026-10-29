@@ -1,19 +1,24 @@
 import { useId } from 'react'
 import { Link } from 'react-router'
 import { Checkbox } from '@/components/ui/Form'
-import { useI18n, useMaybeI18n } from '@/i18n/LanguageProvider'
-import { translate } from '@/i18n/translate'
-import { PRIVACY_PATH, TERMS_PATH } from '@/lib/urls'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { PRIVACY_PATH, TERMS_PATH, customPagePath } from '@/lib/urls'
+import { useSiteContent } from '../marketing/SiteContentProvider'
+import { SocialLinks } from '../marketing/SocialLinks'
 
 /**
- * "Privacy" and "Terms" footer links of the public pages (catalog, product, apply, platform footer). English outside
- * a LanguageProvider (the platform footer also sits on English-only pages).
+ * "Privacy" and "Terms" footer links of the public pages (catalog, product, apply, platform footer), then the custom pages
+ * the client published with "In footer" on, in the client's order. While the footer content loads, when it failed, and
+ * before anything is published, only Privacy and Terms show. One component serves every public footer.
+ * `social` adds the social media icons under the links; only the footer that has no SiteFooter of its own (the Apply page's
+ * AuthLayout footer) asks for it. Business catalogue footers never do.
  */
-export function LegalLinks({ className, linkClassName }: { className?: string; linkClassName?: string }) {
-  const i18n = useMaybeI18n()
-  const t = i18n ? i18n.t : (key: 'legal.nav' | 'legal.privacy.link' | 'legal.terms.link') => translate('en', key)
+export function LegalLinks({ className, linkClassName, social }: { className?: string; linkClassName?: string; social?: boolean }) {
+  const { t, localized, lang } = useI18n()
+  const { chrome } = useSiteContent()
   return (
-    <nav aria-label={t('legal.nav')} className={className}>
+    <>
+      <nav aria-label={t('legal.nav')} className={className}>
       <ul className="flex flex-wrap items-center gap-x-5 gap-y-1">
         <li>
           <Link to={PRIVACY_PATH} className={linkClassName}>
@@ -25,8 +30,17 @@ export function LegalLinks({ className, linkClassName }: { className?: string; l
             {t('legal.terms.link')}
           </Link>
         </li>
+        {chrome?.footerPages.map((p) => (
+          <li key={p.slug}>
+            <Link to={customPagePath(p.slug)} className={linkClassName} lang={p.title[lang] ? undefined : 'en'}>
+              {localized(p.title)}
+            </Link>
+          </li>
+        ))}
       </ul>
     </nav>
+    {social && <SocialLinks className="mt-2 -ml-3" />}
+    </>
   )
 }
 

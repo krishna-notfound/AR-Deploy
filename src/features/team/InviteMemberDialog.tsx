@@ -8,13 +8,14 @@ import { FormField, Input, Textarea } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
 import type { InviteOutcome, MemberRole, PlatformMember } from '@/domain/types'
-import { knownEmailReason } from '@/features/applications/labels'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { formatDate, formatDateTime } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { useFormat } from '@/lib/useFormat'
 import { isDemoMode, service } from '@/services'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
-import { PERMISSION_GROUPS, ROLE_DESCRIPTION, ROLE_LABEL } from './permissions'
+import { PERMISSION_GROUPS } from './permissions'
+import { ROLE_DESC_KEY, emailReasonKey, useTeamText } from './teamLabels'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const NOTE_MAX = 500
@@ -23,9 +24,9 @@ const ORDER = PERMISSION_GROUPS.flatMap((g) => g.items)
 type Step = { kind: 'form' } | { kind: 'review' } | { kind: 'done'; outcome: InviteOutcome }
 
 /** R-W6-9: what to do when the email is already on the team, by that member's status in the loaded list. */
-const ALREADY_MEMBER: Partial<Record<PlatformMember['status'], string>> = {
-  invited: 'This person already has an invitation. Use Resend on their row.',
-  deactivated: 'This person was deactivated. Reactivate them, or remove them to start over.',
+const ALREADY_MEMBER: Partial<Record<PlatformMember['status'], 'team.invite.already.invited' | 'team.invite.already.deactivated'>> = {
+  invited: 'team.invite.already.invited',
+  deactivated: 'team.invite.already.deactivated',
 }
 
 export function InviteMemberDialog({
@@ -40,7 +41,9 @@ export function InviteMemberDialog({
   /** The team list already loaded on the page, to explain an already_member refusal. */
   members?: PlatformMember[]
 }) {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const fmt = useFormat()
+  const words = useTeamText()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<MemberRole>('team')
   const [note, setNote] = useState('')
@@ -64,7 +67,7 @@ export function InviteMemberDialog({
 
   const review = (e: FormEvent) => {
     e.preventDefault()
-    if (!EMAIL.test(clean)) return setError('Enter a valid email address.')
+    if (!EMAIL.test(clean)) return setError(t('common.validation.emailInvalid'))
     setError(null)
     setStep({ kind: 'review' })
   }
@@ -73,7 +76,8 @@ export function InviteMemberDialog({
     const r = await invite.mutate()
     if (!r.ok) {
       const existing = r.error.reason === 'already_member' ? members.find((m) => m.email.toLowerCase() === clean) : undefined
-      setError((existing && ALREADY_MEMBER[existing.status]) ?? r.error.message)
+      const known = existing && ALREADY_MEMBER[existing.status]
+      setError(known ? t(known) : errorText(r.error, t))
       setStep({ kind: 'form' })
       return
     }
@@ -84,19 +88,21 @@ export function InviteMemberDialog({
   const retry = async (memberId: string) => {
     const r = await resend.mutate(memberId)
     if (r.ok) setStep({ kind: 'done', outcome: r.data })
-    else setError(r.error.message)
+    else setError(errorText(r.error, t))
   }
 
+  const reasonKey = step.kind === 'done' && step.outcome.status === 'email_failed' ? emailReasonKey(step.outcome.error) : undefined
+
   return (
-    <Modal open={open} onClose={close} title="Invite member" description="They get an email with a link to create their account." size="lg">
+    <Modal open={open} onClose={close} title={t('team.page.invite')} description={t('team.invite.description')} size="lg">
       {step.kind === 'form' && (
         <form onSubmit={review} className="space-y-5" noValidate>
-          <FormField label="Email address" required error={error ?? undefined}>
+          <FormField label={t('team.invite.email')} required error={error ?? undefined}>
             <Input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
           </FormField>
 
           <fieldset>
-            <legend className="mb-2 text-ui-body font-medium text-ink">Role</legend>
+            <legend className="mb-2 text-ui-body font-medium text-ink">{t('team.col.role')}</legend>
             <div className="grid gap-3 sm:grid-cols-2">
               {(['admin', 'team'] as const).map((r) => (
                 <label
@@ -108,8 +114,8 @@ export function InviteMemberDialog({
                 >
                   <input type="radio" name="role" value={r} checked={role === r} onChange={() => setRole(r)} className="mt-1 self-start accent-[var(--color-ink)]" />
                   <span>
-                    <span className="block text-ui-body font-medium text-ink">{ROLE_LABEL[r]}</span>
-                    <span className="mt-0.5 block text-ui-small text-ink-muted">{ROLE_DESCRIPTION[r]}</span>
+                    <span className="block text-ui-body font-medium text-ink">{words.role(r)}</span>
+                    <span className="mt-0.5 block text-ui-small text-ink-muted">{t(ROLE_DESC_KEY[r])}</span>
                   </span>
                 </label>
               ))}
@@ -117,39 +123,39 @@ export function InviteMemberDialog({
           </fieldset>
 
           <section aria-live="polite" className="rounded-[var(--radius-card)] border border-line bg-canvas p-4">
-            <h3 className="text-ui-body font-semibold text-ink">What {ROLE_LABEL[role]} can do</h3>
+            <h3 className="text-ui-body font-semibold text-ink">{t('team.whatCanDo', { role: words.role(role) })}</h3>
             {perms.data ? (
               granted.length ? (
-                <ul aria-label={`${ROLE_LABEL[role]} permissions`} className="mt-3 grid gap-x-6 gap-y-1.5 text-ui-body text-ink-body sm:grid-cols-2">
+                <ul aria-label={t('team.permissionsOf', { role: words.role(role) })} className="mt-3 grid gap-x-6 gap-y-1.5 text-ui-body text-ink-body sm:grid-cols-2">
                   {granted.map((i) => (
                     <li key={i.key} className="flex items-start gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-ink-muted" aria-hidden />
-                      {i.label}
+                      {words.perm(i.key, i.label)}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-ui-body text-ink-muted">Nothing yet. They could sign in but see no data.</p>
+                <p className="mt-2 text-ui-body text-ink-muted">{t('team.invite.nothingYet')}</p>
               )
             ) : (
-              <p className="mt-2 text-ui-body text-ink-muted">Loading…</p>
+              <p className="mt-2 text-ui-body text-ink-muted">{t('common.loading')}</p>
             )}
             <p className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line pt-3 text-ui-small text-ink-muted">
-              <span>Permissions belong to the role.</span>
+              <span>{t('team.invite.belongToRole')}</span>
               <Link to="/admin/team/permissions" className="font-medium text-ink hover:underline" onClick={close}>
-                Edit role permissions →
+                {t('team.invite.editPerms')}
               </Link>
             </p>
           </section>
 
-          <FormField label="Note" optional hint={`Added to the email. ${note.length}/${NOTE_MAX}`}>
+          <FormField label={t('team.invite.note')} optional hint={t('team.invite.noteHint', { n: note.length, max: NOTE_MAX })}>
             <Textarea rows={3} maxLength={NOTE_MAX} value={note} onChange={(e) => setNote(e.target.value)} />
           </FormField>
 
           <div className="flex justify-end gap-2 border-t border-line pt-4">
-            <Button onClick={close}>Cancel</Button>
+            <Button onClick={close}>{t('common.cancel')}</Button>
             <Button type="submit" variant="primary">
-              Review invitation <ArrowRight className="size-4" aria-hidden />
+              {t('team.invite.review')} <ArrowRight className="size-4" aria-hidden />
             </Button>
           </div>
         </form>
@@ -157,31 +163,31 @@ export function InviteMemberDialog({
 
       {step.kind === 'review' && (
         <div className="space-y-5">
-          <h3 className="text-ui-card font-semibold text-ink">Check the invitation</h3>
+          <h3 className="text-ui-card font-semibold text-ink">{t('team.invite.check')}</h3>
           <dl className="grid gap-x-4 gap-y-3 border-t border-line pt-3 text-ui-body sm:grid-cols-[8rem_1fr]">
-            <dt className="text-ink-muted">To</dt>
+            <dt className="text-ink-muted">{t('team.invite.to')}</dt>
             <dd className="font-medium text-ink">{clean}</dd>
-            <dt className="text-ink-muted">Role</dt>
-            <dd className="text-ink">{ROLE_LABEL[role]}</dd>
-            <dt className="text-ink-muted">Can</dt>
-            <dd className="text-ink-body">{granted.map((i) => i.label).join(' · ') || 'Nothing yet'}</dd>
+            <dt className="text-ink-muted">{t('team.col.role')}</dt>
+            <dd className="text-ink">{words.role(role)}</dd>
+            <dt className="text-ink-muted">{t('team.invite.can')}</dt>
+            <dd className="text-ink-body">{granted.map((i) => words.perm(i.key, i.label)).join(' · ') || t('team.nothingYet')}</dd>
             {note.trim() && (
               <>
-                <dt className="text-ink-muted">Note</dt>
+                <dt className="text-ink-muted">{t('team.invite.note')}</dt>
                 <dd className="whitespace-pre-line text-ink-body">{note.trim()}</dd>
               </>
             )}
           </dl>
           <p className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-ui-body text-ink-muted">
             <Clock className="size-4 shrink-0" aria-hidden />
-            The link works once and expires after 7 days.
+            {t('team.invite.linkOnce')}
           </p>
           <div className="flex justify-between gap-2 border-t border-line pt-4">
             <Button icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => setStep({ kind: 'form' })} disabled={invite.pending}>
-              Back
+              {t('common.back')}
             </Button>
             <Button variant="primary" icon={<Send className="size-4" aria-hidden />} loading={invite.pending} onClick={() => void send()}>
-              Send invitation
+              {t('team.invite.send')}
             </Button>
           </div>
         </div>
@@ -191,24 +197,23 @@ export function InviteMemberDialog({
         <div className="space-y-5">
           {step.outcome.status === 'sent' ? (
             <InlineNotice tone="info">
-              <strong className="font-medium">Invitation sent to {clean}</strong> at {formatDateTime(step.outcome.sentAt, 'en', prefs)}. The link expires on{' '}
-              {formatDate(step.outcome.expiresAt, 'en', prefs)}.{isDemoMode && ' Demo: no email is actually sent.'}
+              <strong className="font-medium">{t('team.invite.sentTo', { email: clean })}</strong> {t('team.invite.sentAt', { time: fmt.dateTime(step.outcome.sentAt), date: fmt.date(step.outcome.expiresAt) })}
+              {isDemoMode && ` ${t('team.invite.demoNoEmail')}`}
             </InlineNotice>
           ) : (
             <InlineNotice tone="warning">
-              <strong className="font-medium">Invitation saved, but the email wasn't delivered.</strong> {knownEmailReason(step.outcome.error) ?? ''} You can try again
-              now or later from the Invitations tab.
+              <strong className="font-medium">{t('team.invite.savedNotDelivered')}</strong> {reasonKey ? t(reasonKey) : ''} {t('team.invite.tryAgain')}
             </InlineNotice>
           )}
           {error && <p className="text-ui-body text-danger">{error}</p>}
           <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
             {step.outcome.status === 'email_failed' && (
               <Button loading={resend.pending} onClick={() => void retry(step.outcome.memberId)}>
-                Try sending again
+                {t('team.invite.retry')}
               </Button>
             )}
             <Button variant="primary" onClick={close}>
-              Done
+              {t('team.invite.done')}
             </Button>
           </div>
         </div>

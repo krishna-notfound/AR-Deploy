@@ -14,11 +14,13 @@ import { Tabs } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/ToastProvider'
 import { Package } from 'lucide-react'
 import type { Business, BusinessStatus, ClosureRequest } from '@/domain/types'
-import { formatDate } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { errorText } from '@/i18n/errorText'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { catalogLocalPath } from '@/lib/urls'
 import { account, service } from '@/services'
-import { CLOSURE_PENDING_ERROR, ok } from '@/services/catalogService'
+import { ok } from '@/services/catalogService'
 import { useNoticeToast } from '@/features/team/useMemberActions'
 import { useServiceQuery } from '@/services/hooks'
 import { BusinessForm } from '../businesses/BusinessForm'
@@ -37,11 +39,13 @@ import { ActionCodeDialog } from '../settings/ActionCodeDialog'
 type Tab = 'details' | 'products' | 'owners' | 'qr'
 
 export default function BusinessDetailPage() {
+  const { t } = useI18n()
+  const f = useFormat()
   const can = useCan()
   const { businessId = '' } = useParams()
   const [params, setParams] = useSearchParams()
   const tab = (['details', 'products', 'owners', 'qr'].includes(params.get('tab') ?? '') ? params.get('tab') : 'details') as Tab
-  const setTab = (t: Tab) => setParams(t === 'details' ? {} : { tab: t }, { replace: true })
+  const setTab = (next: Tab) => setParams(next === 'details' ? {} : { tab: next }, { replace: true })
 
   const business = useServiceQuery(() => service.getBusinessById(businessId), [businessId])
   const b = business.data
@@ -59,19 +63,18 @@ export default function BusinessDetailPage() {
     () => (canViewClosures ? account.listClosureRequests() : Promise.resolve(ok(null))),
     [canViewClosures],
   )
-  const prefs = usePreferences()
 
   if (business.status === 'loading' && !b) return <FullPageSpinner />
   if (!b) {
     const notFound = business.status === 'error' && business.error.code === 'NOT_FOUND'
     return (
       <>
-        <PageHeader title={notFound ? 'Business not found' : 'Could not load business'} breadcrumbs={[{ label: 'Businesses', to: '/admin/businesses' }]} />
+        <PageHeader title={t(notFound ? 'admin.businesses.detail.notFound' : 'admin.businesses.detail.loadFailed')} breadcrumbs={[{ label: t('nav.businesses'), to: '/admin/businesses' }]} />
         <Card>
           {notFound ? (
-            <EmptyState title="This business does not exist" body="It may have been deleted." action={<ButtonLink to="/admin/businesses">Back to businesses</ButtonLink>} />
+            <EmptyState title={t('admin.businesses.detail.notExistTitle')} body={t('admin.businesses.detail.notExistBody')} action={<ButtonLink to="/admin/businesses">{t('admin.businesses.detail.backToList')}</ButtonLink>} />
           ) : (
-            <ErrorState message={business.status === 'error' ? business.error.message : 'Unknown error'} onRetry={business.refetch} />
+            <ErrorState message={business.status === 'error' ? errorText(business.error, t) : t('common.error.generic')} onRetry={business.refetch} />
           )}
         </Card>
       </>
@@ -96,21 +99,21 @@ export default function BusinessDetailPage() {
     if (!ok) setDeleting(false)
   }
   const more: MenuItem[] = [
-    ...(canToggle ? [{ label: b.status === 'active' ? 'Deactivate' : 'Activate', onSelect: toggleActive }] : []),
-    ...(canDelete ? [{ label: 'Delete', icon: <Trash2 aria-hidden />, destructive: true, disabled: deleting, onSelect: () => void onDelete() }] : []),
+    ...(canToggle ? [{ label: t(b.status === 'active' ? 'admin.businesses.detail.deactivate' : 'admin.businesses.detail.activate'), onSelect: toggleActive }] : []),
+    ...(canDelete ? [{ label: t('common.delete'), icon: <Trash2 aria-hidden />, destructive: true, disabled: deleting, onSelect: () => void onDelete() }] : []),
   ]
 
   return (
     <>
       <PageHeader
         title={b.name}
-        breadcrumbs={[{ label: 'Businesses', to: '/admin/businesses' }, { label: b.name }]}
+        breadcrumbs={[{ label: t('nav.businesses'), to: '/admin/businesses' }, { label: b.name }]}
         meta={
           <>
             <BusinessStatusBadge status={b.status} />
             {closure && (
-              <span title={CLOSURE_PENDING_ERROR.message}>
-                <Badge tone="warning">Closure requested on {formatDate(closure.requestedAt, 'en', prefs)}</Badge>
+              <span title={t('common.error.reason.closure_pending')}>
+                <Badge tone="warning">{t('admin.businesses.list.closureOn', { date: f.date(closure.requestedAt) })}</Badge>
               </span>
             )}
             <span className="min-w-0 truncate text-ui-small text-ink-muted">/catalog/{b.slug}</span>
@@ -120,11 +123,11 @@ export default function BusinessDetailPage() {
         actions={
           <>
             <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b, { preview: b.status !== 'active' }), '_blank', 'noopener')}>
-              {b.status === 'active' ? 'Open catalog' : 'Preview catalog'}
+              {t(b.status === 'active' ? 'admin.catalogs.open' : 'admin.businesses.list.previewCatalog')}
             </Button>
             {canToggle && (
               <Button className="max-sm:hidden" onClick={toggleActive}>
-                {b.status === 'active' ? 'Deactivate' : 'Activate'}
+                {t(b.status === 'active' ? 'admin.businesses.detail.deactivate' : 'admin.businesses.detail.activate')}
               </Button>
             )}
             {canDelete && (
@@ -135,7 +138,7 @@ export default function BusinessDetailPage() {
                 loading={deleting}
                 onClick={onDelete}
               >
-                Delete
+                {t('common.delete')}
               </Button>
             )}
           </>
@@ -143,7 +146,7 @@ export default function BusinessDetailPage() {
       />
       {canViewClosures && closures.status === 'error' && !closures.data && (
         <Card className="mb-6">
-          <ErrorState message={`Could not check for a closure request. ${closures.error.message}`} onRetry={closures.refetch} />
+          <ErrorState message={`${t('admin.businesses.detail.closureCheckFailed')} ${errorText(closures.error, t)}`} onRetry={closures.refetch} />
         </Card>
       )}
       {isPlatformOwner && closure && (
@@ -157,15 +160,15 @@ export default function BusinessDetailPage() {
         />
       )}
       <Tabs
-        label="Business sections"
+        label={t('admin.businesses.detail.sections')}
         value={tab}
         onChange={setTab}
         className="mb-6"
         tabs={[
-          { value: 'details', label: 'Details' },
-          { value: 'products', label: 'Products', badge: productCount === undefined ? undefined : <span className="text-ink-muted">{productCount}</span> },
-          { value: 'owners', label: 'Owner & history' },
-          { value: 'qr', label: 'Catalog & QR' },
+          { value: 'details', label: t('admin.businesses.detail.tabDetails') },
+          { value: 'products', label: t('admin.overview.products'), badge: productCount === undefined ? undefined : <span className="text-ink-muted">{productCount}</span> },
+          { value: 'owners', label: t('admin.businesses.detail.tabOwner') },
+          { value: 'qr', label: t('admin.businesses.detail.tabQr') },
         ]}
       />
       {tab === 'details' && (
@@ -177,13 +180,13 @@ export default function BusinessDetailPage() {
       {tab === 'products' && (
         <Card>
           <div className="flex items-center justify-between gap-3 border-b border-line p-4">
-            <p className="text-ui-body text-ink-muted">Products</p>
+            <p className="text-ui-body text-ink-muted">{t('admin.overview.products')}</p>
             <ButtonLink to={`/admin/products/new?business=${b.id}`} size="sm" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
-              Add product
+              {t('admin.products.add')}
             </ButtonLink>
           </div>
           {products.status === 'error' && !products.data ? (
-            <ErrorState message={`Could not load this catalog’s products. ${products.error.message}`} onRetry={products.refetch} />
+            <ErrorState message={`${t('admin.businesses.detail.productsFailed')} ${errorText(products.error, t)}`} onRetry={products.refetch} />
           ) : (
             <ProductTable
               scope="admin"
@@ -195,11 +198,11 @@ export default function BusinessDetailPage() {
               empty={
                 <EmptyState
                   icon={Package}
-                  title="No products yet"
-                  body="Add the first product to this catalog."
+                  title={t('admin.products.emptyTitle')}
+                  body={t('admin.businesses.detail.productsEmptyBody')}
                   action={
                     <ButtonLink to={`/admin/products/new?business=${b.id}`} variant="primary">
-                      Add product
+                      {t('admin.products.add')}
                     </ButtonLink>
                   }
                 />
@@ -219,9 +222,9 @@ export default function BusinessDetailPage() {
             </div>
           ) : (
             <Card>
-              <PanelHeader title="History" />
+              <PanelHeader title={t('admin.businesses.detail.history')} />
               <CardBody>
-                <p className="text-ui-body text-ink-muted">{RECORDS_NEEDED}</p>
+                <p className="text-ui-body text-ink-muted">{t('admin.businesses.detail.recordsNeeded')}</p>
               </CardBody>
             </Card>
           )}
@@ -232,7 +235,7 @@ export default function BusinessDetailPage() {
           <CatalogQrPanel catalog={catalog.data} productsLink={`/admin/products?business=${b.id}`} />
         ) : catalog.status === 'error' ? (
           <Card>
-            <ErrorState message={`Could not load the catalog. ${catalog.error.message}`} onRetry={catalog.refetch} />
+            <ErrorState message={`${t('admin.businesses.detail.catalogFailed')} ${errorText(catalog.error, t)}`} onRetry={catalog.refetch} />
           </Card>
         ) : (
           <FullPageSpinner />
@@ -241,20 +244,17 @@ export default function BusinessDetailPage() {
   )
 }
 
-const ALREADY_HANDLED = 'This closure was already handled.'
-/** R-W7-8: shown in place of History and Email activity without records.view. */
-const RECORDS_NEEDED = "This business's history needs 'View the audit log and email log'."
-
 /** What the closure means for the catalog now, from its real status (R-W3-6): never "offline" for a live catalog. */
-const CLOSURE_STATUS_SENTENCE: Record<BusinessStatus, string> = {
-  inactive: 'The catalog is inactive and offline until you complete the closure, which deletes the business and their account, or restore it.',
-  draft: 'The catalog is a draft and offline until you complete the closure, which deletes the business and their account, or restore it, which keeps it as a draft.',
-  active: 'The catalog is still live. Complete the closure, which deletes the business and their account, or restore it.',
+const CLOSURE_STATUS_SENTENCE: Record<BusinessStatus, TranslationKey> = {
+  inactive: 'admin.businesses.detail.closureInactive',
+  draft: 'admin.businesses.detail.closureDraft',
+  active: 'admin.businesses.detail.closureActive',
 }
 
 /** A business owner asked to close their account (spec 8): the Owner completes or restores it. */
 function ClosureBanner({ business, request, onRestored }: { business: Business; request: ClosureRequest; onRestored: () => void }) {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const f = useFormat()
   const confirm = useConfirm()
   const toast = useToast()
   const noticeToast = useNoticeToast()
@@ -265,26 +265,26 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
 
   // Completed or restored elsewhere (another tab or Owner session) since this page loaded: say so and reload.
   const alreadyHandled = () => {
-    toast.info(ALREADY_HANDLED)
+    toast.info(t('admin.businesses.list.alreadyHandled'))
     onRestored()
   }
 
   const restore = async () => {
     if (restoring) return
     const ok = await confirm({
-      title: `Restore ${business.name}?`,
-      body: 'The closure request is removed and the catalog goes back to the status it had before. We email the owner.',
-      confirmLabel: 'Restore',
+      title: t('admin.businesses.detail.restoreTitle', { name: business.name }),
+      body: t('admin.businesses.detail.restoreBody'),
+      confirmLabel: t('admin.businesses.detail.restore'),
     })
     if (!ok) return
     setRestoring(true)
     const r = await account.restoreClosure(request.userId)
     setRestoring(false)
     if (r.ok) {
-      noticeToast('Business restored', r.data.notice, 'The catalog is back at its previous status.')
+      noticeToast(t('admin.businesses.detail.restored'), r.data.notice, t('admin.businesses.detail.restoredBody'))
       onRestored()
     } else if (r.error.reason === 'not_found') alreadyHandled()
-    else toast.error('Could not restore the business', r.error.message)
+    else toast.error(t('admin.businesses.detail.restoreFailed'), errorText(r.error, t))
   }
 
   return (
@@ -292,33 +292,33 @@ function ClosureBanner({ business, request, onRestored }: { business: Business; 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-2xl">
           <h2 id={titleId} className="text-ui-card font-semibold text-ink">
-            Closure requested
+            {t('admin.businesses.list.closureRequested')}
           </h2>
           <p className="mt-1 text-ui-body break-words text-ink-body">
-            {request.email} asked to close their account on {formatDate(request.requestedAt, 'en', prefs)}. {CLOSURE_STATUS_SENTENCE[business.status]}
+            {t('admin.businesses.detail.askedToClose', { email: request.email, date: f.date(request.requestedAt) })} {t(CLOSURE_STATUS_SENTENCE[business.status])}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => void restore()} loading={restoring} disabled={completing}>
-            Restore
+            {t('admin.businesses.detail.restore')}
           </Button>
           <Button variant="danger" onClick={() => setCompleting(true)} disabled={restoring}>
-            Complete closure
+            {t('admin.businesses.list.completeClosure')}
           </Button>
         </div>
       </div>
       <ActionCodeDialog
         open={completing}
         purpose="complete_closure"
-        title={`Complete closure of ${business.name}?`}
-        description="This deletes the business with its products, photos and models, and the owner's account. It can't be undone. We email the owner a final notice."
-        confirmLabel="Complete closure"
+        title={t('admin.businesses.detail.completeTitle', { name: business.name })}
+        description={t('admin.businesses.detail.completeBody')}
+        confirmLabel={t('admin.businesses.list.completeClosure')}
         destructive
         onClose={() => setCompleting(false)}
         onConfirm={async (code) => {
           const r = await account.completeClosure(request.userId, code)
           if (r.ok) {
-            noticeToast('Closure completed', r.data.notice, `${business.name} and its owner's account were deleted.`)
+            noticeToast(t('admin.businesses.list.closureDone'), r.data.notice, t('admin.businesses.detail.completedBody', { name: business.name }))
             navigate('/admin/businesses')
           } else if (r.error.reason === 'not_found') {
             // Nothing left to complete: close the dialog (an ok answer closes it) and show the current state.

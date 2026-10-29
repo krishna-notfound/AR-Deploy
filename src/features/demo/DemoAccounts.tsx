@@ -8,6 +8,8 @@ import { FormField, Select } from '@/components/ui/Form'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 
@@ -17,6 +19,7 @@ import { useServiceQuery } from '@/services/hooks'
  */
 export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h3' }) {
   const H = headingLevel
+  const { t, tn } = useI18n()
   const { signInAs, user } = useAccount()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -42,7 +45,7 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
     <div>
       {user && isDemoMode && (
         <p className="mb-5 text-sm text-ink-muted">
-          You are using the demo as <strong className="font-medium text-ink">{user.name}</strong>. Choosing another account switches it.
+          {t('demo.usingAs')} <strong className="font-medium text-ink">{user.name}</strong>. {t('demo.usingAsNote')}
         </p>
       )}
 
@@ -51,21 +54,21 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
           <section className="flex flex-col py-8 md:pr-10" aria-labelledby="sa-title">
             <ShieldCheck className="size-5 text-accent" aria-hidden />
             <H id="sa-title" className="mt-4 text-lg font-medium tracking-tight">
-              Super Admin
+              {t('demo.superAdmin.title')}
             </H>
             <p className="mt-1.5 flex-1 text-sm leading-6 text-ink-muted">
-              For the platform team. Manage every business, product, catalog and QR code, and see platform-wide analytics.
+              {t('demo.superAdmin.body')}
             </p>
             <Button variant="primary" className="mt-6 self-start" onClick={() => enterAdmin()}>
-              Continue as Super Admin
+              {t('demo.superAdmin.continue')}
             </Button>
             {/* Sample platform staff with the role permissions set on Team & Access (ADR-0029). */}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" onClick={() => enterAdmin('admin')}>
-                Continue as Admin (sample)
+                {t('demo.admin.continue')}
               </Button>
               <Button size="sm" onClick={() => enterAdmin('team')}>
-                Continue as Team (sample)
+                {t('demo.team.continue')}
               </Button>
             </div>
           </section>
@@ -73,14 +76,14 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
           <section className="flex flex-col border-t border-line py-8 md:border-t-0 md:pl-10" aria-labelledby="ba-title">
             <div className="flex items-start justify-between gap-3">
               <Building2 className="size-5 text-accent" aria-hidden />
-              <Badge tone="warning">Scope pending confirmation</Badge>
+              <Badge tone="warning">{t('demo.scopePending')}</Badge>
             </div>
             <H id="ba-title" className="mt-4 text-lg font-medium tracking-tight">
-              Business Admin
+              {t('demo.businessAdmin.title')}
             </H>
-            <p className="mt-1.5 text-sm leading-6 text-ink-muted">For a single furniture business. Manage its own products, catalog, QR code and analytics.</p>
+            <p className="mt-1.5 text-sm leading-6 text-ink-muted">{t('demo.businessAdmin.body')}</p>
             <div className="mt-5 flex flex-1 flex-col justify-end gap-3 sm:flex-row sm:items-end">
-              <FormField label="Business" className="flex-1">
+              <FormField label={t('demo.business')} className="flex-1">
                 {catalogs.status === 'loading' && !catalogs.data ? (
                   <Skeleton className="h-10 w-full" />
                 ) : (
@@ -94,7 +97,7 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
                 )}
               </FormField>
               <Button variant="primary" onClick={enterBusiness} disabled={!businessId}>
-                Continue
+                {t('common.continue')}
               </Button>
             </div>
           </section>
@@ -102,24 +105,23 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
       ) : (
         <div className="border-y border-line py-8">
           <LogIn className="size-5 text-accent" aria-hidden />
-          <H className="mt-4 text-lg font-medium tracking-tight">Sign in to the dashboards</H>
+          <H className="mt-4 text-lg font-medium tracking-tight">{t('demo.live.title')}</H>
           <p className="mt-1.5 max-w-xl text-sm leading-6 text-ink-muted">
-            This build uses a real Supabase backend, so the demo account picker is turned off. Sign in with an account that a platform admin has
-            linked to the platform team or to a business.
+            {t('demo.live.body')}
           </p>
           <ButtonLink to={next ? `/login?next=${encodeURIComponent(next)}` : '/login'} variant="primary" className="mt-6">
-            Sign in
+            {t('auth.login.title')}
           </ButtonLink>
         </div>
       )}
 
       <section className="mt-12" aria-labelledby="cat-title">
         <H id="cat-title" className="text-lg font-medium tracking-tight">
-          Public catalogs
+          {t('demo.catalogs.title')}
         </H>
-        <p className="mt-1.5 text-sm text-ink-muted">What customers see after scanning a store’s QR code. Available in English and Portuguese.</p>
+        <p className="mt-1.5 text-sm text-ink-muted">{t('demo.catalogs.body')}</p>
         {catalogs.status === 'error' ? (
-          <ErrorState className="mt-5" message={catalogs.error.message} onRetry={catalogs.refetch} />
+          <ErrorState className="mt-5" message={errorText(catalogs.error, t)} onRetry={catalogs.refetch} />
         ) : (
           <ul className="mt-5 divide-y divide-line border-y border-line">
             {(catalogs.data ?? []).map((c) => (
@@ -129,7 +131,7 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-ink">{c.business.name}</span>
                     <span className="block text-xs text-ink-muted">
-                      {c.publishedProductCount} published {c.publishedProductCount === 1 ? 'product' : 'products'}
+                      {tn('demo.publishedProducts', c.publishedProductCount)}
                     </span>
                   </span>
                   {c.business.status !== 'active' && <BusinessStatusBadge status={c.business.status} />}
@@ -137,7 +139,7 @@ export function DemoAccounts({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h
                 </Link>
               </li>
             ))}
-            {catalogs.status === 'success' && catalogs.data.length === 0 && <li className="py-6 text-sm text-ink-muted">No catalogs yet.</li>}
+            {catalogs.status === 'success' && catalogs.data.length === 0 && <li className="py-6 text-sm text-ink-muted">{t('demo.catalogs.empty')}</li>}
             {catalogs.status === 'loading' && !catalogs.data && (
               <li className="space-y-3 py-5">
                 <Skeleton className="h-10 w-full" />

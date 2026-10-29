@@ -8,8 +8,9 @@ import { Pagination } from '@/components/ui/Pagination'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
-import { formatDateTime } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { applicationAdminPath, businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import type { AuditEntry } from '@/services/catalogService'
@@ -24,7 +25,8 @@ const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** Administrative audit trail (append-only, written on the server). */
 export default function AuditLogPage() {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const f = useFormat()
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
   const page = Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1)
@@ -59,18 +61,22 @@ export default function AuditLogPage() {
   const subjectLine = (e: AuditEntry): ReactNode[] | null => {
     const parts: ReactNode[] = []
     // R-W7-1: a deleted business keeps its recorded name, without a link to a page that no longer exists.
-    if (e.businessId && e.businessDeleted) parts.push(<span key="business">{`${e.businessName ?? 'Business'} (deleted)`}</span>)
+    if (e.businessId && e.businessDeleted) parts.push(<span key="business">{t('admin.audit.deletedBusiness', { name: e.businessName ?? t('admin.audit.business') })}</span>)
     else if (e.businessId) {
       parts.push(
         <Link key="business" to={businessAdminPath(e.businessId)} className="text-accent-ink hover:underline">
-          {bizName(e.businessId) ?? e.businessName ?? 'Business'}
+          {bizName(e.businessId) ?? e.businessName ?? t('admin.audit.business')}
         </Link>,
       )
     }
     if (e.applicationId) {
       const a = app(e.applicationId)
       // The business link already names it once it exists; otherwise name the applicant business here.
-      const text = !a ? 'Application' : e.businessId && bizName(e.businessId) ? `Application #${a.reference}` : `${a.businessName} · application #${a.reference}`
+      const text = !a
+        ? t('admin.audit.application')
+        : e.businessId && bizName(e.businessId)
+          ? t('admin.audit.applicationRef', { ref: a.reference })
+          : t('admin.audit.nameApplicationRef', { name: a.businessName, ref: a.reference })
       parts.push(
         <Link key="application" to={applicationAdminPath(e.applicationId)} className="text-accent-ink hover:underline">
           {text}
@@ -84,24 +90,24 @@ export default function AuditLogPage() {
 
   return (
     <>
-      <PageHeader title="Audit log" description="Who did what, recorded by the server. Entries cannot be edited or deleted." />
+      <PageHeader title={t('nav.auditLog')} description={t('admin.audit.description')} />
       <Card>
         <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:items-end sm:gap-6 sm:p-6">
           <label className="flex flex-col gap-2 sm:w-[420px]">
-            <span className="text-[length:var(--text-ui-body)] leading-5 font-medium text-ink">Search events</span>
-            <SearchInput value={search} onChange={(v) => set('q', v)} label="Search events" placeholder="Event, e.g. status, invitation, owner" className="w-full" />
+            <span className="text-[length:var(--text-ui-body)] leading-5 font-medium text-ink">{t('admin.audit.search')}</span>
+            <SearchInput value={search} onChange={(v) => set('q', v)} label={t('admin.audit.search')} placeholder={t('admin.audit.searchPlaceholder')} className="w-full" />
           </label>
-          {isOwner && <Checkbox label="Show sign-ins" className="min-h-11" checked={includeSignIns} onChange={(e) => set('signins', e.target.checked ? '1' : '')} />}
+          {isOwner && <Checkbox label={t('admin.audit.showSignIns')} className="min-h-11" checked={includeSignIns} onChange={(e) => set('signins', e.target.checked ? '1' : '')} />}
         </div>
-        <h2 className="sr-only">Events</h2>
+        <h2 className="sr-only">{t('admin.audit.events')}</h2>
         {q.status === 'loading' && !q.data ? (
           <div className="p-5 sm:px-6">
             <SkeletonRows rows={6} />
           </div>
         ) : q.status === 'error' && !q.data ? (
-          <ErrorState message={q.error.message} onRetry={q.refetch} className="py-16" />
+          <ErrorState message={errorText(q.error, t)} onRetry={q.refetch} className="py-16" />
         ) : !q.data?.items.length ? (
-          <EmptyState title={search ? 'No events match this search' : 'No events yet'} className="py-16" />
+          <EmptyState title={t(search ? 'admin.audit.noMatch' : 'admin.audit.empty')} className="py-16" />
         ) : (
           <>
             <ul className="divide-y divide-subtle">
@@ -113,7 +119,7 @@ export default function AuditLogPage() {
                       dateTime={e.createdAt}
                       className="text-[length:var(--text-ui-small)] text-ink-muted tabular-nums max-md:order-2 md:text-[length:var(--text-ui-body)] md:text-ink"
                     >
-                      {formatDateTime(e.createdAt, 'en', prefs)}
+                      {f.dateTime(e.createdAt)}
                     </time>
                     <div className="min-w-0 max-md:order-1 max-md:col-span-2">
                       <p className="text-[length:var(--text-ui-body)] leading-5 text-ink">
@@ -135,7 +141,7 @@ export default function AuditLogPage() {
                 )
               })}
             </ul>
-            <Pagination page={page} pageSize={PAGE_SIZE} total={q.data.total} onPage={(p) => set('page', String(p))} noun="events" />
+            <Pagination page={page} pageSize={PAGE_SIZE} total={q.data.total} onPage={(p) => set('page', String(p))} noun={t('admin.audit.noun')} />
           </>
         )}
       </Card>

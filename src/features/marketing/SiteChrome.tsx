@@ -12,6 +12,7 @@ import { LegalLinks } from '../legal/LegalLinks'
 import { isDemoMode } from '@/services'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { TAP_TARGET } from '../public/tapTarget'
+import { SocialLinks } from './SocialLinks'
 
 type NavItem = { key: TranslationKey; href: string }
 
@@ -204,8 +205,9 @@ const footerLink = cn(TAP_TARGET, 'transition-colors hover:text-ink')
 
 /**
  * Wordmark and one line, three columns of real links (landing sections, apply, account), rights line and the
- * honest-labelling notes the platform owes its visitors. No social links or contact details until the client
- * supplies real ones (no placeholder addresses in production).
+ * honest-labelling notes the platform owes its visitors. Social icons appear only for the networks the client has
+ * published in the Editor (none before that); no contact details until the client supplies real ones (no placeholder
+ * addresses in production).
  */
 export function SiteFooter() {
   const { t } = useSiteText()
@@ -226,6 +228,7 @@ export function SiteFooter() {
             <Wordmark size={14} />
           </Link>
           <p className="mt-4 max-w-xs text-[13px] leading-6 text-ink-muted">{t('site.footer.about')}</p>
+          <SocialLinks className="mt-3 -ml-3" />
         </div>
         <nav aria-label={t('site.footer.nav')} className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3">
           <FooterColumn title={t('site.footer.explore')}>{sections(FOOTER_EXPLORE)}</FooterColumn>

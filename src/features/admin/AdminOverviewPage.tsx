@@ -10,8 +10,10 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { type Stat, StatGroup } from '@/components/ui/StatGroup'
 import { SkeletonRows, Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
-import { formatNumber } from '@/lib/format'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { usePreferences } from '@/lib/preferences'
+import { useFormat } from '@/lib/useFormat'
 import { service } from '@/services'
 import { ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
@@ -23,6 +25,8 @@ import { useBusinesses } from '../products/useCatalogData'
 import { SetupProgressCard } from '../settings/OnboardingChecklist'
 
 export default function AdminOverviewPage() {
+  const { t, lang } = useI18n()
+  const f = useFormat()
   const can = useCan()
   const navigate = useNavigate()
   const prefs = usePreferences()
@@ -49,30 +53,30 @@ export default function AdminOverviewPage() {
   const withModel = products.data?.filter(hasArModel).length
   const stats: Stat[] = [
     ...(canBusinesses
-      ? [{ label: 'Businesses', value: formatNumber(s?.totals.businesses ?? 0), hint: bizQuery.data ? `${formatNumber(activeBusinesses)} active` : undefined }]
+      ? [{ label: t('nav.businesses'), value: f.number(s?.totals.businesses ?? 0), hint: bizQuery.data ? t('admin.overview.activeCount', { n: f.number(activeBusinesses) }) : undefined }]
       : []),
     ...(canProducts
       ? [
-          { label: 'Products', value: formatNumber(s?.totals.products ?? 0), hint: withModel !== undefined ? `${formatNumber(withModel)} with a 3D model` : undefined },
-          { label: 'Published', value: formatNumber(s?.totals.published ?? 0), hint: s ? `of ${formatNumber(s.totals.products)} products` : undefined },
-          { label: 'Drafts', value: formatNumber(s?.totals.drafts ?? 0), hint: 'Not published yet' },
+          { label: t('admin.overview.products'), value: f.number(s?.totals.products ?? 0), hint: withModel !== undefined ? t('admin.overview.withModel', { n: f.number(withModel) }) : undefined },
+          { label: t('admin.overview.published'), value: f.number(s?.totals.published ?? 0), hint: s ? t('admin.overview.ofProducts', { n: f.number(s.totals.products) }) : undefined },
+          { label: t('admin.overview.drafts'), value: f.number(s?.totals.drafts ?? 0), hint: t('admin.overview.notPublished') },
         ]
       : []),
     ...(canAnalytics
       ? [
-          { label: 'Product page views', value: formatNumber(s?.totals.views ?? 0), hint: 'Last 30 days' },
+          { label: t('admin.analytics.col.views'), value: f.number(s?.totals.views ?? 0), hint: t('admin.analytics.last30') },
           {
-            label: 'AR launch attempts',
-            value: formatNumber(s?.totals.arActivations ?? 0),
-            hint: s && s.totals.views + s.totals.embedViews ? `Last 30 days · ${formatArRate(s.totals.arActivations / (s.totals.views + s.totals.embedViews))}` : 'Last 30 days',
+            label: t('admin.analytics.col.arAttempts'),
+            value: f.number(s?.totals.arActivations ?? 0),
+            hint: s && s.totals.views + s.totals.embedViews ? `${t('admin.analytics.last30')} · ${formatArRate(s.totals.arActivations / (s.totals.views + s.totals.embedViews), lang)}` : t('admin.analytics.last30'),
           },
         ]
       : []),
   ]
 
   const recentActivity = (
-    <Card role="region" aria-label="Recent activity" className={canAnalytics ? 'lg:col-span-5' : 'lg:col-span-12'}>
-      <PanelHeader title="Recent activity" description="Businesses and products" />
+    <Card role="region" aria-label={t('admin.overview.recent')} className={canAnalytics ? 'lg:col-span-5' : 'lg:col-span-12'}>
+      <PanelHeader title={t('admin.overview.recent')} description={t('admin.overview.recentDesc')} />
       <CardBody className="sm:px-6">
         <ActivityList query={activity} />
       </CardBody>
@@ -82,27 +86,27 @@ export default function AdminOverviewPage() {
   return (
     <>
       <PageHeader
-        title="Overview"
-        description="Applications, businesses, products and catalog activity across Sanctus."
+        title={t('nav.overview')}
+        description={t('admin.overview.description')}
         more={[
-          ...(can('products.view') ? [{ label: 'View catalogs', icon: <QrCode aria-hidden />, onSelect: () => void navigate('/admin/catalogs') }] : []),
-          ...(can('products.edit') ? [{ label: 'Add product', icon: <PackagePlus aria-hidden />, onSelect: () => void navigate('/admin/products/new') }] : []),
+          ...(can('products.view') ? [{ label: t('admin.overview.viewCatalogs'), icon: <QrCode aria-hidden />, onSelect: () => void navigate('/admin/catalogs') }] : []),
+          ...(can('products.edit') ? [{ label: t('admin.products.add'), icon: <PackagePlus aria-hidden />, onSelect: () => void navigate('/admin/products/new') }] : []),
         ]}
         actions={
           <>
             {can('products.view') && (
               <ButtonLink to="/admin/catalogs" variant="ghost" className="max-sm:hidden" icon={<QrCode className="size-4" aria-hidden />}>
-                View catalogs
+                {t('admin.overview.viewCatalogs')}
               </ButtonLink>
             )}
             {can('products.edit') && (
               <ButtonLink to="/admin/products/new" variant="secondary" className="max-sm:hidden" icon={<PackagePlus className="size-4" aria-hidden />}>
-                Add product
+                {t('admin.products.add')}
               </ButtonLink>
             )}
             {can('businesses.edit') && (
               <ButtonLink to="/admin/businesses/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                Create business
+                {t('admin.catalogs.createBusiness')}
               </ButtonLink>
             )}
           </>
@@ -114,7 +118,7 @@ export default function AdminOverviewPage() {
 
       {summary.status === 'error' && !s ? (
         <Card>
-          <ErrorState message={summary.error.message} onRetry={summary.refetch} />
+          <ErrorState message={errorText(summary.error, t)} onRetry={summary.refetch} />
         </Card>
       ) : (
         <div className="space-y-6">
@@ -125,7 +129,7 @@ export default function AdminOverviewPage() {
               footer={
                 canAnalytics && s?.isSample ? (
                   <span className="flex flex-wrap items-center gap-2">
-                    <SampleDataTag /> Views and AR figures are seeded sample data plus visits made in this demo, not live production analytics.
+                    <SampleDataTag /> {t('admin.overview.sampleFooter')}
                   </span>
                 ) : undefined
               }
@@ -135,18 +139,18 @@ export default function AdminOverviewPage() {
           {canAnalytics ? (
             <Card>
               <PanelHeader
-                title="Views and AR launch attempts"
-                description="Page and embed views, all businesses, last 30 days"
+                title={t('admin.analytics.trendTitle')}
+                description={t('admin.overview.trendDesc')}
                 actions={
                   <Link to="/admin/analytics" className={panelLinkClass}>
-                    Open analytics <ArrowRight className="size-3.5" aria-hidden />
+                    {t('admin.overview.openAnalytics')} <ArrowRight className="size-3.5" aria-hidden />
                   </Link>
                 }
               />
-              <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact prefs={prefs} emptyBody="Views and AR opens will appear here once people visit published catalogs." /> : <Skeleton className="h-32 w-full" />}</CardBody>
+              <CardBody className="sm:px-6 sm:pb-6">{s ? <ActivityTrend data={s.series} compact prefs={prefs} emptyBody={t('admin.analytics.trendEmptyPlatform')} /> : <Skeleton className="h-32 w-full" />}</CardBody>
             </Card>
           ) : (
-            <p className="rounded-[var(--radius-card)] border border-line px-4 py-4 text-[length:var(--text-ui-body)] text-ink-muted sm:px-6">You don't have access to analytics.</p>
+            <p className="rounded-[var(--radius-card)] border border-line px-4 py-4 text-[length:var(--text-ui-body)] text-ink-muted sm:px-6">{t('admin.overview.noAnalyticsAccess')}</p>
           )}
 
           {/* Grid items default to min-width: auto, so a long product name would widen the card past a phone screen. */}
@@ -154,25 +158,25 @@ export default function AdminOverviewPage() {
             {canAnalytics && (
               <Card className="lg:col-span-7">
                 <PanelHeader
-                  title="Most viewed products"
-                  description="Page and embed views, last 30 days"
+                  title={t('admin.analytics.mostViewedTitle')}
+                  description={t('admin.analytics.pageEmbedDesc')}
                   actions={
                     <Link to="/admin/analytics" className={panelLinkClass}>
-                      Full ranking <ArrowRight className="size-3.5" aria-hidden />
+                      {t('admin.overview.fullRanking')} <ArrowRight className="size-3.5" aria-hidden />
                     </Link>
                   }
                 />
                 <CardBody className="sm:px-6">
                   {products.status === 'error' && !products.data ? (
-                    <ErrorState message={products.error.message} onRetry={products.refetch} />
+                    <ErrorState message={errorText(products.error, t)} onRetry={products.refetch} />
                   ) : !s || products.status === 'loading' ? (
                     <SkeletonRows rows={4} />
                   ) : top.length === 0 && !unnamedViews ? (
-                    <EmptyState title="No product activity yet" />
+                    <EmptyState title={t('admin.analytics.noActivityTitle')} />
                   ) : (
                     <>
                       {top.length > 0 && <MostViewedList rows={top} products={productMap} businesses={bizMap} editBase={can('products.edit') ? '/admin/products' : undefined} />}
-                      {unnamedViews && <p className="py-3 text-[length:var(--text-ui-small)] text-ink-muted">Product names need the 'View products' permission.</p>}
+                      {unnamedViews && <p className="py-3 text-[length:var(--text-ui-small)] text-ink-muted">{t('admin.overview.namesNeedPermission')}</p>}
                     </>
                   )}
                 </CardBody>
@@ -188,27 +192,29 @@ export default function AdminOverviewPage() {
 
 /** Applications waiting for a decision (submitted or under review), so new submissions are seen without opening Applications. */
 function PendingApplications() {
+  const { t, tn } = useI18n()
+  const f = useFormat()
   const q = usePendingApplications()
   const d = q.data
   const total = d?.total ?? 0
   if (q.status === 'loading' && !d)
     return (
-      <div className="mb-6 rounded-[var(--radius-card)] border border-line px-4 py-4 sm:px-6" role="status" aria-label="Loading applications">
+      <div className="mb-6 rounded-[var(--radius-card)] border border-line px-4 py-4 sm:px-6" role="status" aria-label={t('admin.overview.loadingApplications')}>
         <Skeleton className="h-4 w-1/3" />
       </div>
     )
   if (q.status === 'error' && !d)
     return (
       <Card className="mb-6">
-        <ErrorState message={`Could not load applications. ${q.error.message}`} onRetry={q.refetch} className="py-6" />
+        <ErrorState message={`${t('admin.overview.loadApplicationsFailed')} ${errorText(q.error, t)}`} onRetry={q.refetch} className="py-6" />
       </Card>
     )
   if (!d || total === 0)
     return (
       <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[var(--radius-card)] border border-line px-4 py-4 sm:px-6">
-        <h2 className="min-w-0 flex-1 text-[length:var(--text-ui-body)] text-ink-muted">No applications awaiting review</h2>
+        <h2 className="min-w-0 flex-1 text-[length:var(--text-ui-body)] text-ink-muted">{t('admin.overview.noPending')}</h2>
         <Link to={applicationsAdminPath()} className={panelLinkClass}>
-          View applications <ArrowRight className="size-3.5" aria-hidden />
+          {t('admin.overview.viewApplications')} <ArrowRight className="size-3.5" aria-hidden />
         </Link>
       </div>
     )
@@ -216,17 +222,17 @@ function PendingApplications() {
     <section className="mb-6 flex flex-wrap items-center justify-between gap-x-5 gap-y-1 rounded-[var(--radius-card)] border border-line bg-accent-soft px-4 py-4 sm:px-6" aria-labelledby="pending-apps">
       <div className="min-w-[10rem]">
         <h2 id="pending-apps" className="text-[15px] leading-tight font-medium text-ink">
-          {`${formatNumber(total)} application${total === 1 ? '' : 's'} awaiting review`}
+          {tn('admin.overview.awaiting', total, { n: f.number(total) })}
         </h2>
         <p className="mt-0.5 text-[length:var(--text-ui-small)] leading-tight text-ink-muted">
-          {formatNumber(d.submitted)} new · {formatNumber(d.underReview)} under review
+          {t('admin.overview.newUnderReview', { new: f.number(d.submitted), review: f.number(d.underReview) })}
         </p>
       </div>
       <Link
         to={applicationsAdminPath(d.submitted > 0 ? 'submitted' : 'under_review')}
         className="inline-flex min-h-11 items-center gap-1.5 text-[length:var(--text-ui-body)] font-medium text-accent-ink hover:underline"
       >
-        Review applications <ArrowRight className="size-4" aria-hidden />
+        {t('admin.overview.reviewApplications')} <ArrowRight className="size-4" aria-hidden />
       </Link>
     </section>
   )

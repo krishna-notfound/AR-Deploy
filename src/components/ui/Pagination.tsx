@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { formatNumber } from '@/lib/format'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { useInDashboard } from '@/components/layout/dashboardContext'
 
 /** Page numbers to show: the first, the last and the current page with its neighbours; gaps become ellipses. */
@@ -26,7 +27,7 @@ export function Pagination({
   pageSize,
   total,
   onPage,
-  noun = 'items',
+  noun,
 }: {
   page: number
   pageSize: number
@@ -34,6 +35,8 @@ export function Pagination({
   onPage: (p: number) => void
   noun?: string
 }) {
+  const { t } = useI18n()
+  const { number: formatNumber } = useFormat()
   const dash = useInDashboard()
   const stepClass = dash ? stepClassDash : stepClassBase
   const pages = Math.max(1, Math.ceil(total / pageSize))
@@ -41,21 +44,21 @@ export function Pagination({
   const from = (page - 1) * pageSize + 1
   const to = Math.min(total, page * pageSize)
   return (
-    <nav aria-label="Pagination" className={
+    <nav aria-label={t('ui.pagination.label')} className={
         dash
           ? 'flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm text-ink-muted sm:px-6'
           : 'flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-[13px] text-ink-muted sm:px-6'
       }
     >
       <p>
-        Showing <span className="font-medium text-ink tabular-nums">{formatNumber(from)}–{formatNumber(to)}</span> of{' '}
-        <span className="font-medium text-ink tabular-nums">{formatNumber(total)}</span> {noun}
+        {t('ui.pagination.showing')} <span className="font-medium text-ink tabular-nums">{formatNumber(from)}–{formatNumber(to)}</span> {t('ui.pagination.of')}{' '}
+        <span className="font-medium text-ink tabular-nums">{formatNumber(total)}</span> {noun ?? t('ui.pagination.items')}
       </p>
       {pages > 1 && (
         <div className="flex items-center gap-1">
-          <button type="button" aria-label="Previous page" className={stepClass} disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          <button type="button" aria-label={t('ui.pagination.previousPage')} className={stepClass} disabled={page <= 1} onClick={() => onPage(page - 1)}>
             <ChevronLeft className="size-3.5" aria-hidden />
-            <span className="hidden sm:inline">Prev</span>
+            <span className="hidden sm:inline">{t('ui.pagination.prev')}</span>
           </button>
           <ul className="hidden items-center gap-1 sm:flex">
             {pageList(page, pages).map((p, i) =>
@@ -68,7 +71,7 @@ export function Pagination({
                   <button
                     type="button"
                     onClick={() => onPage(p)}
-                    aria-label={`Page ${p}`}
+                    aria-label={t('ui.pagination.page', { n: p })}
                     aria-current={p === page ? 'page' : undefined}
                     className={cn(
                       dash
@@ -86,8 +89,8 @@ export function Pagination({
           <span className="px-2 tabular-nums sm:hidden" aria-current="page">
             {page} / {pages}
           </span>
-          <button type="button" aria-label="Next page" className={stepClass} disabled={page >= pages} onClick={() => onPage(page + 1)}>
-            <span className="hidden sm:inline">Next</span>
+          <button type="button" aria-label={t('ui.pagination.nextPage')} className={stepClass} disabled={page >= pages} onClick={() => onPage(page + 1)}>
+            <span className="hidden sm:inline">{t('ui.pagination.next')}</span>
             <ChevronRight className="size-3.5" aria-hidden />
           </button>
         </div>

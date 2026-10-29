@@ -12,6 +12,8 @@ import { StatGroup } from '@/components/ui/StatGroup'
 import { ErrorState } from '@/components/ui/States'
 import { Tabs } from '@/components/ui/Tabs'
 import type { PlatformMember } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { errorText } from '@/i18n/errorText'
 import { isDemoMode, service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { AccessHistory } from './AccessHistory'
@@ -28,6 +30,7 @@ const liveLink = (m: PlatformMember) =>
   !!m.invite && (m.invite.status === 'sent' || m.invite.status === 'pending') && Date.parse(m.invite.expiresAt) > Date.now()
 
 export default function TeamPage() {
+  const { t } = useI18n()
   const [params, setParams] = useSearchParams()
   const tab = (TABS as string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'members'
   const members = useServiceQuery(() => service.listMembers(), [])
@@ -62,15 +65,15 @@ export default function TeamPage() {
   return (
     <>
       <PageHeader
-        title="Team & Access"
-        description="Who can use the platform console, and what each role can do."
+        title={t('nav.team')}
+        description={t('team.page.description')}
         actions={
           <>
             <ButtonLink to="/admin/team/permissions" icon={<KeyRound className="size-4" aria-hidden />}>
-              Role permissions
+              {t('team.page.rolePermissions')}
             </ButtonLink>
             <Button variant="primary" icon={<MailPlus className="size-4" aria-hidden />} onClick={startInvite}>
-              Invite member
+              {t('team.page.invite')}
             </Button>
           </>
         }
@@ -80,10 +83,10 @@ export default function TeamPage() {
         className="mb-6"
         loading={members.status === 'loading' && !members.data}
         stats={[
-          { label: 'Active members', value: counts.active, hint: 'Owner included' },
-          { label: 'Pending invitations', value: counts.pending },
-          { label: 'Admins', value: counts.admins },
-          { label: 'Team', value: counts.team },
+          { label: t('team.page.stat.active'), value: counts.active, hint: t('team.page.stat.activeHint') },
+          { label: t('team.page.stat.pending'), value: counts.pending },
+          { label: t('team.page.stat.admins'), value: counts.admins },
+          { label: t('team.page.stat.team'), value: counts.team },
         ]}
         footer={isDemoMode ? <SampleDataTag /> : undefined}
       />
@@ -91,13 +94,13 @@ export default function TeamPage() {
       <Tabs
         className="mb-4"
         variant="pill"
-        label="Team sections"
+        label={t('team.page.tabs')}
         value={tab}
         onChange={(v) => setParam('tab', v === 'members' ? null : v)}
         tabs={[
-          { value: 'members', label: 'Members', badge: members.data ? list.length : undefined },
-          { value: 'invitations', label: 'Invitations', badge: members.data ? counts.invited : undefined },
-          { value: 'history', label: (<span className="inline-flex items-center gap-1.5"><History className="size-3.5" aria-hidden />Access history</span>) },
+          { value: 'members', label: t('team.page.tab.members'), badge: members.data ? list.length : undefined },
+          { value: 'invitations', label: t('team.page.tab.invitations'), badge: members.data ? counts.invited : undefined },
+          { value: 'history', label: (<span className="inline-flex items-center gap-1.5"><History className="size-3.5" aria-hidden />{t('team.page.tab.history')}</span>) },
         ]}
       />
 
@@ -107,7 +110,7 @@ export default function TeamPage() {
         ) : members.status === 'loading' && !members.data ? (
           <SkeletonRows rows={5} />
         ) : members.status === 'error' ? (
-          <ErrorState message={`Could not load the team. ${members.error.message}`} onRetry={members.refetch} className="m-6" />
+          <ErrorState message={`${t('team.page.loadFailed')} ${errorText(members.error, t)}`} onRetry={members.refetch} className="m-6" />
         ) : tab === 'invitations' ? (
           <InvitationsTable members={list} onOpen={openInvite} />
         ) : (

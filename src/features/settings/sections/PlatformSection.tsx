@@ -6,23 +6,16 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Switch } from '@/components/ui/Form'
 import { useToast } from '@/components/ui/ToastProvider'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { accountErrorText } from '../accountError'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { SectionHeader } from '../SettingsUi'
 import { FAIL_RATE_KEY, MODEL_CREDITS, PHOTO_CREDIT, backend, isDemoMode, service } from '@/services'
 
-const CAPABILITIES: [string, string, string][] = [
-  ['Login and accounts', 'Mock account selector, stored in this browser', 'Auth provider, sessions, server-side authorization'],
-  ['Business and product changes', 'Mock service with localStorage', 'API and database'],
-  ['Image upload', 'Resized and stored in this browser (max 1.5 MB each)', 'Object storage, CDN and image resizing'],
-  ['3D model upload', 'Available in this browser session only', 'Object storage and CDN'],
-  ['Model checks', 'File type and header checks, scale check in the viewer', 'Server-side validation'],
-  ['GLB to USDZ conversion', 'Not provided', 'Out of scope'],
-  ['Product and catalog URLs', 'Demo URLs plus local preview routes', 'Real domain, DNS and SSL'],
-  ['QR codes', 'Real QR codes of the catalog URL', 'Nothing extra once real URLs exist'],
-  ['Analytics', 'Sample data plus visits made in this demo', 'Event collection and storage'],
-  ['AR', 'Real model-viewer AR on supported phones', 'Hosted model files with correct CORS headers'],
-]
+const CAPABILITIES = ['accounts', 'changes', 'images', 'models', 'checks', 'usdz', 'urls', 'qr', 'analytics', 'ar'] as const
 
 export default function PlatformSection() {
+  const { t } = useI18n()
   const confirm = useConfirm()
   const toast = useToast()
   const [failOn, setFailOn] = useState(() => parseFloat(localStorage.getItem(FAIL_RATE_KEY) ?? '0') > 0)
@@ -30,35 +23,33 @@ export default function PlatformSection() {
 
   const reset = async () => {
     const ok = await confirm({
-      title: 'Reset demo data?',
-      body: 'All businesses, products and analytics return to the original sample data. Your changes in this browser are lost.',
-      confirmLabel: 'Reset demo data',
+      title: t('settings.platform.resetTitle'),
+      body: t('settings.platform.resetBody'),
+      confirmLabel: t('settings.platform.reset'),
       destructive: true,
     })
     if (!ok) return
     setResetting(true)
     const r = await service.resetDemoData()
     setResetting(false)
-    if (r.ok) toast.success('Demo data reset')
-    else toast.error('Could not reset demo data', r.error.message)
+    if (r.ok) toast.success(t('settings.platform.resetDone'))
+    else toast.error(t('settings.platform.resetFailed'), accountErrorText(r.error, t))
   }
 
   return (
     <>
-      <SectionHeader title="General" description={isDemoMode ? 'Where this platform keeps its data, the demo tools and the sample asset credits.' : 'Where this platform keeps its data, and the sample asset credits.'} />
+      <SectionHeader title={t('settings.section.platform')} description={isDemoMode ? t('settings.platform.descriptionDemo') : t('settings.platform.description')} />
       <div className="space-y-6">
         <Card>
-          <PanelHeader title="Data backend" />
+          <PanelHeader title={t('settings.platform.backend')} />
           <CardBody className="sm:px-6">
             {isDemoMode ? (
               <p className="text-[length:var(--text-ui-body)] leading-5 text-ink-muted">
-                <strong className="font-medium text-ink">Demo mode.</strong> Sample data stored in this browser. To use Supabase, set <code className="rounded-[2px] bg-subtle px-1.5 py-0.5 font-mono text-[length:var(--text-ui-small)] text-ink">VITE_DATA_MODE=supabase</code> with the
-                project URL and publishable key (design/19-supabase.md).
+                <strong className="font-medium text-ink">{t('settings.platform.demoMode')}</strong> {t('settings.platform.demoModeBody1')} <code className="rounded-[2px] bg-subtle px-1.5 py-0.5 font-mono text-[length:var(--text-ui-small)] text-ink">VITE_DATA_MODE=supabase</code> {t('settings.platform.demoModeBody2')}
               </p>
             ) : (
               <p className="text-[length:var(--text-ui-body)] leading-5 text-ink-muted">
-                <strong className="font-medium text-ink">Supabase mode.</strong> Data, files and sign-in come from {backend.mode === 'supabase' ? new URL(backend.url).host : 'Supabase'}.
-                Access is enforced by the database policies, not by this screen.
+                <strong className="font-medium text-ink">{t('settings.platform.liveMode')}</strong> {t('settings.platform.liveModeBody', { host: backend.mode === 'supabase' ? new URL(backend.url).host : 'Supabase' })}
               </p>
             )}
           </CardBody>
@@ -66,12 +57,12 @@ export default function PlatformSection() {
 
         {isDemoMode && (
         <Card>
-          <PanelHeader title="Demo data" description="Changes are saved in this browser only." />
+          <PanelHeader title={t('settings.platform.demoData')} description={t('settings.platform.demoDataBody')} />
           <CardBody className="space-y-5 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="max-w-md text-[length:var(--text-ui-body)] leading-5 text-ink-muted">Restore the original sample businesses, products and analytics.</p>
+              <p className="max-w-md text-[length:var(--text-ui-body)] leading-5 text-ink-muted">{t('settings.platform.restore')}</p>
               <Button onClick={reset} loading={resetting} icon={<RotateCcw className="size-4" aria-hidden />}>
-                Reset demo data
+                {t('settings.platform.reset')}
               </Button>
             </div>
             <div className="border-t border-line pt-5">
@@ -81,10 +72,10 @@ export default function PlatformSection() {
                   setFailOn(v)
                   if (v) localStorage.setItem(FAIL_RATE_KEY, '0.25')
                   else localStorage.removeItem(FAIL_RATE_KEY)
-                  toast.info(v ? 'Simulated errors on' : 'Simulated errors off', v ? 'About 1 in 4 requests will fail so you can review error states.' : undefined)
+                  toast.info(v ? t('settings.platform.errorsOn') : t('settings.platform.errorsOff'), v ? t('settings.platform.errorsOnBody') : undefined)
                 }}
-                label="Simulate network errors"
-                description="Developer option. Makes about 25% of mock requests fail to test error states."
+                label={t('settings.platform.simulate')}
+                description={t('settings.platform.simulateBody')}
               />
             </div>
           </CardBody>
@@ -93,30 +84,30 @@ export default function PlatformSection() {
 
         {isDemoMode && (
         <Card>
-          <PanelHeader title="What this demo does and does not do" description="Frontend behaviour versus functionality that needs the backend phase." />
+          <PanelHeader title={t('settings.platform.matrixTitle')} description={t('settings.platform.matrixBody')} />
           <div className="overflow-x-auto">
             <table className="w-full text-[length:var(--text-ui-body)] leading-5">
               <thead>
                 <tr className="border-y border-line text-left text-[length:var(--text-ui-small)] text-ink-muted">
                   <th scope="col" className="px-5 py-2 font-medium sm:px-6">
-                    Capability
+                    {t('settings.platform.colCapability')}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    In this demo
+                    {t('settings.platform.colDemo')}
                   </th>
                   <th scope="col" className="px-5 py-2 font-medium sm:px-6">
-                    Needs backend
+                    {t('settings.platform.colBackend')}
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-subtle">
-                {CAPABILITIES.map(([a, b, c]) => (
-                  <tr key={a}>
+                {CAPABILITIES.map((c) => (
+                  <tr key={c}>
                     <th scope="row" className="px-5 py-3 text-left align-top font-medium sm:px-6">
-                      {a}
+                      {t(`settings.platform.cap.${c}` as TranslationKey)}
                     </th>
-                    <td className="px-3 py-3 align-top text-ink-muted">{b}</td>
-                    <td className="px-5 py-3 align-top text-ink-muted sm:px-6">{c}</td>
+                    <td className="px-3 py-3 align-top text-ink-muted">{t(`settings.platform.cap.${c}.demo` as TranslationKey)}</td>
+                    <td className="px-5 py-3 align-top text-ink-muted sm:px-6">{t(`settings.platform.cap.${c}.backend` as TranslationKey)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -126,19 +117,19 @@ export default function PlatformSection() {
         )}
 
         <Card>
-          <PanelHeader title="Sample asset credits" />
+          <PanelHeader title={t('settings.platform.credits')} />
           <CardBody className="sm:px-6">
             <ul className="space-y-1.5 text-[length:var(--text-ui-small)] leading-[1.45] text-ink-muted">
               {MODEL_CREDITS.map((m) => (
                 <li key={m.name}>
-                  3D model “{m.name}”, {m.source},{' '}
+                  {t('settings.platform.creditModel', { name: m.name, source: m.source })}{' '}
                   <a href={m.licenseUrl} target="_blank" rel="noreferrer" className="text-accent-ink underline">
                     {m.license}
                   </a>
                 </li>
               ))}
               <li className="border-t border-subtle pt-2">
-                Photos from {PHOTO_CREDIT.source},{' '}
+                {t('settings.platform.creditPhotos', { source: PHOTO_CREDIT.source })}{' '}
                 <a href={PHOTO_CREDIT.url} target="_blank" rel="noreferrer" className="text-accent-ink underline">
                   {PHOTO_CREDIT.license}
                 </a>

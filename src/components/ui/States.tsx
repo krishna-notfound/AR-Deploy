@@ -1,6 +1,7 @@
 import { AlertCircle, AlertTriangle, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useInDashboard } from '@/components/layout/dashboardContext'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { Button } from './Button'
 
@@ -41,7 +42,9 @@ export function EmptyState({
   )
 }
 
-export function ErrorState({ message, onRetry, retryLabel = 'Try again', className }: { message: string; onRetry?: () => void; retryLabel?: string; className?: string }) {
+export function ErrorState({ message, onRetry, retryLabel, className }: { message: string; onRetry?: () => void; retryLabel?: string; className?: string }) {
+  const { t } = useI18n()
+  const retry = retryLabel ?? t('common.retry')
   // Dashboard: the failure stays inside its block; danger colour on the 16px icon only, the retry is a quiet text button.
   if (useInDashboard()) {
     return (
@@ -50,7 +53,7 @@ export function ErrorState({ message, onRetry, retryLabel = 'Try again', classNa
         <p className="max-w-sm text-ui-body text-ink">{message}</p>
         {onRetry && (
           <Button className="mt-2 underline underline-offset-2" variant="ghost" size="sm" onClick={onRetry}>
-            {retryLabel}
+            {retry}
           </Button>
         )}
       </div>
@@ -62,7 +65,7 @@ export function ErrorState({ message, onRetry, retryLabel = 'Try again', classNa
       <p className="max-w-sm text-sm text-ink">{message}</p>
       {onRetry && (
         <Button className="mt-4" size="sm" onClick={onRetry}>
-          {retryLabel}
+          {retry}
         </Button>
       )}
     </div>

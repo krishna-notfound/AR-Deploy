@@ -15,7 +15,6 @@ import { useToast } from '@/components/ui/ToastProvider'
 import type { ModelRequestDetail, ModelRequestOutcome } from '@/domain/modelRequests'
 import type { ModelAsset, ModelFormat, ProductModels } from '@/domain/types'
 import { eventLabel } from '@/features/applications/labels'
-import { DEMO_SESSION_PHOTOS, SAMPLE_PHOTOS } from '@/features/modelRequests/copy'
 import { DeclineDialog } from '@/features/modelRequests/DeclineDialog'
 import { DeliverDialog, reviewToast } from '@/features/modelRequests/DeliverDialog'
 import { ModelRequestStatusBadge } from '@/features/modelRequests/ModelRequestStatusBadge'
@@ -24,26 +23,27 @@ import { ModelSection } from '@/features/products/editor/ModelSection'
 import { AR_READINESS_HINT, AR_READINESS_LABEL, productArReadiness } from '@/features/products/productReadiness'
 import { editPath } from '@/features/products/useProductActions'
 import { MEDIA_REFRESH_MS, type Result } from '@/services/catalogService'
-import { formatDate, formatDateTime, formatFileSize } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { formatFileSize } from '@/lib/format'
+import { useFormat } from '@/lib/useFormat'
 import { businessAdminPath, modelRequestsAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useRefreshWhenStale, useServiceMutation, useServiceQuery } from '@/services/hooks'
 
-export const REQUEST_NOT_FOUND = "This request doesn't exist or was removed with its product."
-
 export default function ModelRequestDetailPage(): JSX.Element {
+  const { t } = useI18n()
   const { requestId = '' } = useParams()
   const q = useServiceQuery(() => service.getModelRequest(requestId), [requestId])
   // Staged files and photos use signed URLs that expire: refetch on return to the tab once they are getting old.
   useRefreshWhenStale(q.refetch, MEDIA_REFRESH_MS, q.data)
 
-  if (q.status === 'loading' && !q.data) return <FullPageSpinner label="Loading the request" />
+  if (q.status === 'loading' && !q.data) return <FullPageSpinner label={t('admin.modelRequests.detail.loading')} />
   if (!q.data)
     return q.status === 'error' && q.error.code !== 'NOT_FOUND' ? (
-      <ErrorState message="Couldn't load this 3D model request." onRetry={q.refetch} className="py-24" />
+      <ErrorState message={t('admin.modelRequests.detail.loadFailed')} onRetry={q.refetch} className="py-24" />
     ) : (
-      <EmptyState icon={FileX} title="Request not found" body={REQUEST_NOT_FOUND} action={<ButtonLink to={modelRequestsAdminPath()}>Back to 3D requests</ButtonLink>} className="py-24" />
+      <EmptyState icon={FileX} title={t('admin.modelRequests.detail.notFoundTitle')} body={t('admin.modelRequests.detail.notFoundBody')} action={<ButtonLink to={modelRequestsAdminPath()}>{t('admin.modelRequests.detail.back')}</ButtonLink>} className="py-24" />
     )
   return <RequestView r={q.data} onChanged={q.refetch} />
 }
@@ -51,7 +51,8 @@ export default function ModelRequestDetailPage(): JSX.Element {
 const OPEN = new Set(['requested', 'in_progress'])
 
 function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () => void }) {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const f = useFormat()
   const toast = useToast()
   const can = useCan()
   const [viewer, setViewer] = useState<number | null>(null)
@@ -69,21 +70,21 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
 
   const report = (action: 'start' | 'deliver' | 'decline', res: Result<ModelRequestOutcome>) => {
     if (!res.ok) {
-      toast.error(action === 'start' ? 'Work was not started' : action === 'deliver' ? 'The model was not delivered' : 'The request was not declined', res.error.message)
+      toast.error(t(action === 'start' ? 'admin.modelRequests.detail.notStarted' : action === 'deliver' ? 'admin.modelRequests.detail.notDelivered' : 'admin.modelRequests.detail.notDeclined'), errorText(res.error, t))
       onChanged()
       return
     }
     setDialog(null)
-    const t = reviewToast(action, res.data)
-    if (t.tone === 'error') toast.error(t.title)
-    else toast.success(t.title)
+    const outcome = reviewToast(action, res.data, t)
+    if (outcome.tone === 'error') toast.error(outcome.title)
+    else toast.success(outcome.title)
     onChanged()
   }
 
   const onModel = async (format: ModelFormat, asset: ModelAsset | undefined) => {
     const res = asset ? await service.stageModelFile(r.id, format, asset) : await service.unstageModelFile(r.id, format)
-    if (!res.ok) toast.error(asset ? 'The file was not added to the request' : 'The file was not removed', res.error.message)
-    else if (res.data.cleanup === 'partial') toast.info("Some old files couldn't be removed.")
+    if (!res.ok) toast.error(t(asset ? 'admin.modelRequests.detail.fileNotAdded' : 'admin.modelRequests.detail.fileNotRemoved'), errorText(res.error, t))
+    else if (res.data.cleanup === 'partial') toast.info(t('admin.modelRequests.detail.cleanupPartial'))
     onChanged()
   }
 
@@ -101,16 +102,16 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
     <>
       <PageHeader
         title={product}
-        breadcrumbs={[{ label: '3D requests', to: modelRequestsAdminPath() }, { label: productName }]}
+        breadcrumbs={[{ label: t('nav.modelRequests'), to: modelRequestsAdminPath() }, { label: productName }]}
         meta={
           <>
             <ModelRequestStatusBadge status={r.status} />
             <Link to={businessAdminPath(r.businessId)} className="text-[length:var(--text-ui-small)] font-medium text-ink hover:underline">
               {r.businessName}
             </Link>
-            <span className="text-[length:var(--text-ui-small)] text-ink-muted">Target: {optionName ? `Option ${optionName}` : 'Product'}</span>
+            <span className="text-[length:var(--text-ui-small)] text-ink-muted">{t('admin.modelRequests.detail.target', { target: optionName ? t('admin.modelRequests.detail.option', { name: optionName }) : t('admin.modelRequests.product') })}</span>
             <span className="text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
-              Requested by {r.requestedByLabel ?? 'the business'} on {formatDate(r.createdAt, 'en', prefs)}
+              {t('admin.modelRequests.detail.requestedBy', { who: r.requestedByLabel ?? t('admin.modelRequests.detail.theBusiness'), date: f.date(r.createdAt) })}
             </span>
           </>
         }
@@ -119,15 +120,15 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
             <div className="flex flex-wrap gap-2">
               {r.status === 'requested' && (
                 <Button icon={<Play className="size-4" aria-hidden />} loading={start.pending} onClick={async () => report('start', await start.mutate())}>
-                  Start work
+                  {t('admin.modelRequests.detail.start')}
                 </Button>
               )}
               <Button variant="secondary" className="border-danger! text-danger! hover:bg-danger-soft!" icon={<X className="size-4" aria-hidden />} onClick={() => setDialog('decline')}>
-                Decline
+                {t('admin.modelRequests.detail.decline')}
               </Button>
               {r.status === 'in_progress' && r.staged.glb && (
                 <Button variant="primary" icon={<Check className="size-4" aria-hidden />} onClick={() => setDialog('deliver')}>
-                  Deliver model
+                  {t('admin.modelRequests.detail.deliver')}
                 </Button>
               )}
             </div>
@@ -137,23 +138,23 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
 
       {r.status === 'rejected' && r.reason && (
         <InlineNotice tone="warning" className="mb-6">
-          <strong className="font-medium">Declined</strong>
-          {r.closedAt ? ` on ${formatDate(r.closedAt, 'en', prefs)}` : ''}. Reason: {r.reason}
+          <strong className="font-medium">{t('admin.modelRequests.tab.rejected')}</strong>
+          {r.closedAt ? ` ${t('admin.applications.detail.onDate', { date: f.date(r.closedAt) })}` : ''}. {t('admin.modelRequests.detail.reason', { reason: r.reason })}
         </InlineNotice>
       )}
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           <Card>
-            <PanelHeader title={`Photos (${r.photos.length})`} actions={sample ? <Badge tone="neutral">{SAMPLE_PHOTOS}</Badge> : undefined} />
+            <PanelHeader title={t('admin.modelRequests.detail.photos', { n: r.photos.length })} actions={sample ? <Badge tone="neutral">{t('admin.modelRequests.detail.samplePhotos')}</Badge> : undefined} />
             <CardBody className="pt-0">
               {sessionOnly && (
                 <InlineNotice tone="info" className="mb-4">
-                  {DEMO_SESSION_PHOTOS}
+                  {t('admin.modelRequests.detail.demoPhotos')}
                 </InlineNotice>
               )}
               {r.photos.length === 0 ? (
-                <p className="text-ui-body text-ink-muted">This request has no photos.</p>
+                <p className="text-ui-body text-ink-muted">{t('admin.modelRequests.detail.noPhotos')}</p>
               ) : (
                 <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
                   {r.photos.map((p, i) => (
@@ -167,7 +168,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
           </Card>
 
           <Card>
-            <PanelHeader title="Model files" description={open ? undefined : 'Files can be added only while the request is open.'} />
+            <PanelHeader title={t('admin.modelRequests.detail.files')} description={open ? undefined : t('admin.modelRequests.detail.filesClosed')} />
             <CardBody className="pt-0">
               {open ? (
                 <ModelSection
@@ -181,7 +182,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
                   onRefreshUrls={onChanged}
                 />
               ) : (
-                <p className="text-ui-body text-ink-muted">{r.status === 'delivered' ? 'The delivered files are now the product’s 3D files (see Product facts).' : 'No files were delivered.'}</p>
+                <p className="text-ui-body text-ink-muted">{t(r.status === 'delivered' ? 'admin.modelRequests.detail.delivered' : 'admin.modelRequests.detail.noneDelivered')}</p>
               )}
             </CardBody>
           </Card>
@@ -189,29 +190,29 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
 
         <div className="space-y-6">
           <Card>
-            <section aria-label="Product facts">
-              <PanelHeader title="Product facts" />
+            <section aria-label={t('admin.modelRequests.detail.facts')}>
+              <PanelHeader title={t('admin.modelRequests.detail.facts')} />
               <CardBody className="pt-0">
                 <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-ui-body">
-                  <Fact label="Width">{`${r.product.dimensions.width} ${r.product.dimensions.unit}`}</Fact>
-                  <Fact label="Height">{`${r.product.dimensions.height} ${r.product.dimensions.unit}`}</Fact>
-                  <Fact label="Depth">{`${r.product.dimensions.depth} ${r.product.dimensions.unit}`}</Fact>
-                  <Fact label="Material">{r.product.material.en || '—'}</Fact>
-                  <Fact label="Category">{r.product.category.charAt(0).toUpperCase() + r.product.category.slice(1)}</Fact>
-                  <Fact label="Note from the business">{r.note || 'No note.'}</Fact>
-                  <Fact label={optionName ? `Current 3D files (${optionName})` : 'Current 3D files'}>
+                  <Fact label={t('product.width')}>{`${r.product.dimensions.width} ${r.product.dimensions.unit}`}</Fact>
+                  <Fact label={t('product.height')}>{`${r.product.dimensions.height} ${r.product.dimensions.unit}`}</Fact>
+                  <Fact label={t('product.depth')}>{`${r.product.dimensions.depth} ${r.product.dimensions.unit}`}</Fact>
+                  <Fact label={t('product.material')}>{r.product.material.en || '—'}</Fact>
+                  <Fact label={t('admin.applications.detail.category')}>{t(`category.${r.product.category}`)}</Fact>
+                  <Fact label={t('admin.modelRequests.detail.note')}>{r.note || t('admin.modelRequests.detail.noNote')}</Fact>
+                  <Fact label={optionName ? t('admin.modelRequests.detail.currentFilesFor', { name: optionName }) : t('admin.modelRequests.detail.currentFiles')}>
                     {targetModels.glb || targetModels.usdz ? (
                       <ul>
-                        {(['glb', 'usdz'] as const).flatMap((f) => {
-                          const m = targetModels[f]
-                          return m ? [<li key={f} className="break-all">{m.fileName}{m.sizeBytes ? ` · ${formatFileSize(m.sizeBytes)}` : ''}</li>] : []
+                        {(['glb', 'usdz'] as const).flatMap((fmt) => {
+                          const m = targetModels[fmt]
+                          return m ? [<li key={fmt} className="break-all">{m.fileName}{m.sizeBytes ? ` · ${formatFileSize(m.sizeBytes)}` : ''}</li>] : []
                         })}
                       </ul>
                     ) : (
-                      'No 3D files yet'
+                      t('admin.modelRequests.detail.noFiles')
                     )}
                   </Fact>
-                  <Fact label="Readiness">
+                  <Fact label={t('admin.modelRequests.detail.readiness')}>
                     <span title={AR_READINESS_HINT[readiness]}>{AR_READINESS_LABEL[readiness]}</span>
                   </Fact>
                 </dl>
@@ -220,18 +221,18 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
           </Card>
 
           <Card>
-            <section aria-label="History">
-              <PanelHeader title="History" />
+            <section aria-label={t('admin.businesses.detail.history')}>
+              <PanelHeader title={t('admin.businesses.detail.history')} />
               <CardBody className="pt-0">
                 {r.history.length === 0 ? (
-                  <p className="text-ui-body text-ink-muted">No events yet.</p>
+                  <p className="text-ui-body text-ink-muted">{t('admin.audit.empty')}</p>
                 ) : (
                   <ol className="space-y-3">
                     {r.history.map((e, i) => (
                       <li key={`${e.type}-${e.at}-${i}`} className="text-ui-body">
                         <p className="font-medium text-ink">{eventLabel(e.type)}</p>
                         <p className="text-ui-small text-ink-muted tabular-nums">
-                          {formatDateTime(e.at, 'en', prefs)}
+                          {f.dateTime(e.at)}
                           {e.actorLabel ? ` · ${e.actorLabel}` : ''}
                         </p>
                       </li>

@@ -9,6 +9,7 @@ import {
   useId,
 } from 'react'
 import { useInDashboard } from '@/components/layout/dashboardContext'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 
 interface FieldCtx {
@@ -48,6 +49,7 @@ export function FormField({
   aside?: ReactNode
 }) {
   const auto = useId()
+  const { t } = useI18n()
   const dash = useInDashboard()
   const id = idProp ?? `f${auto}`
   // The error replaces the hint, so only a rendered paragraph may be referenced.
@@ -61,8 +63,8 @@ export function FormField({
           {dash ? (
             <label htmlFor={id} className="text-ui-body font-medium text-ink">
               {label}
-              {required && <span className="font-normal text-ink-muted"> Required</span>}
-              {optional && <span className="font-normal text-ink-muted"> {typeof optional === 'string' ? optional : 'Optional'}</span>}
+              {required && <span className="font-normal text-ink-muted"> {t('common.required')}</span>}
+              {optional && <span className="font-normal text-ink-muted"> {typeof optional === 'string' ? optional : t('common.optional')}</span>}
             </label>
           ) : (
             <label htmlFor={id} className="text-[13px] font-medium text-ink">

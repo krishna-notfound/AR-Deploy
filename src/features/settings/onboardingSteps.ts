@@ -1,6 +1,7 @@
 // The "Complete your setup" steps (spec 8, Onboarding), as a pure function of real data: nothing is marked done that
 // the data does not show. The checklist (full screen on the first visit) and the Overview card both use it.
 import type { Business, Profile, SecurityState } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { settingsPath } from '@/lib/urls'
 
 export type OnboardingScope = 'admin' | 'business'
@@ -10,9 +11,9 @@ export type StepLevel = 'required' | 'recommended' | 'optional'
 
 export interface Step {
   id: StepId
-  label: string
+  labelKey: TranslationKey
   /** One line under the label: why the step matters. */
-  hint: string
+  hintKey: TranslationKey
   done: boolean
   required: boolean
   level: StepLevel
@@ -38,8 +39,8 @@ export function onboardingSteps(ctx: OnboardingContext): Step[] {
   const steps: Step[] = [
     {
       id: 'name',
-      label: 'Add your name',
-      hint: 'People you work with see who made a change.',
+      labelKey: 'settings.onboarding.name',
+      hintKey: 'settings.onboarding.nameHint',
       done: filled(profile.displayName),
       required: true,
       level: 'required',
@@ -47,8 +48,8 @@ export function onboardingSteps(ctx: OnboardingContext): Step[] {
     },
     {
       id: 'photo',
-      label: 'Add a profile photo',
-      hint: 'Your initials show until you add one.',
+      labelKey: 'settings.onboarding.photo',
+      hintKey: 'settings.onboarding.photoHint',
       done: filled(profile.avatarUrl),
       required: false,
       level: 'optional',
@@ -56,8 +57,8 @@ export function onboardingSteps(ctx: OnboardingContext): Step[] {
     },
     {
       id: '2fa',
-      label: 'Turn on two-step verification (2FA)',
-      hint: twoFactorRequired ? 'Your account must use an authenticator app.' : 'An authenticator app keeps your account safe if your password leaks.',
+      labelKey: 'settings.onboarding.twoFactor',
+      hintKey: twoFactorRequired ? 'settings.onboarding.twoFactorHintRequired' : 'settings.onboarding.twoFactorHint',
       done: security.hasVerifiedFactor,
       required: twoFactorRequired,
       level: twoFactorRequired ? 'required' : 'recommended',
@@ -69,8 +70,8 @@ export function onboardingSteps(ctx: OnboardingContext): Step[] {
     steps.push(
       {
         id: 'business',
-        label: 'Add your logo and contact email',
-        hint: 'Customers see them on your catalog.',
+        labelKey: 'settings.onboarding.business',
+        hintKey: 'settings.onboarding.businessHint',
         done: !!b && filled(b.logoUrl) && filled(b.contact.email),
         required: false,
         level: 'optional',
@@ -78,8 +79,8 @@ export function onboardingSteps(ctx: OnboardingContext): Step[] {
       },
       {
         id: 'product',
-        label: 'Add your first product',
-        hint: 'Photos, price and dimensions. A 3D model adds AR.',
+        labelKey: 'settings.onboarding.product',
+        hintKey: 'settings.onboarding.productHint',
         done: (ctx.productCount ?? 0) >= 1,
         required: false,
         level: 'optional',

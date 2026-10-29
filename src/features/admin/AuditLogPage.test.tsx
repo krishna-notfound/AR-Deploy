@@ -121,7 +121,7 @@ describe('AuditLogPage', () => {
   it('shows an error state with a retry when the events fail to load', async () => {
     const spy = vi.spyOn(service, 'getAuditEvents').mockResolvedValue({ ok: false, error: { code: 'UNKNOWN', message: 'Could not load the audit log.' } })
     renderAt()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the audit log.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong. Try again in a moment.')
     spy.mockResolvedValue({ ok: true, data: { items: entries, total: entries.length } })
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('Application submitted')).toBeInTheDocument()

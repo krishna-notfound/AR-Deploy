@@ -5,12 +5,10 @@ import { FormField, Input } from '@/components/ui/Form'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import type { TotpEnrollment } from '@/domain/types'
-import { account, isDemoMode } from '@/services'
+import { accountErrorText } from './accountError'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { type ServiceError, account, isDemoMode } from '@/services'
 import { RecoveryCodes } from './RecoveryCodes'
-
-const NOT_AVAILABLE = '2FA is not available yet: an administrator must enable it.'
-const WRONG_CODE = "That code didn't match. Check the time on your phone and enter the newest code."
-const NOT_SIX_DIGITS = 'Enter the 6-digit code from your authenticator app.'
 
 /**
  * The image source for the enrolment QR code. The contract gives the SVG markup; supabase-js already hands back a
@@ -37,10 +35,10 @@ const cleanCode = (code: string) => code.replace(/[\s-]/g, '')
 
 type Stage =
   | { kind: 'loading' }
-  | { kind: 'failed'; message: string; unavailable: boolean }
+  | { kind: 'failed'; error: ServiceError | null; unavailable: boolean }
   | { kind: 'scan'; enrollment: TotpEnrollment }
   | { kind: 'codes'; codes: string[] }
-  | { kind: 'codesFailed'; message: string }
+  | { kind: 'codesFailed'; error: ServiceError }
   | { kind: 'done' }
 
 /** A stage's heading: a programmatic focus target (tabIndex -1), so focus never falls back to the page. */
@@ -62,6 +60,7 @@ function StageHeading({ headingRef, children }: { headingRef: RefObject<HTMLHead
  * codes focus their own heading).
  */
 export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () => void; onCancel?: () => void; onEnabled?: () => void; email?: string | null }) {
+  const { t } = useI18n()
   const [stage, setStage] = useState<Stage>({ kind: 'loading' })
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState<string | null>(null)
@@ -80,8 +79,8 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
     const r = await account.startTotpEnrollment()
     if (!mounted.current) return
     if (r.ok) setStage({ kind: 'scan', enrollment: r.data })
-    else if (r.error.reason === 'mfa_not_enabled') setStage({ kind: 'failed', message: NOT_AVAILABLE, unavailable: true })
-    else setStage({ kind: 'failed', message: r.error.message, unavailable: false })
+    else if (r.error.reason === 'mfa_not_enabled') setStage({ kind: 'failed', error: null, unavailable: true })
+    else setStage({ kind: 'failed', error: r.error, unavailable: false })
   }, [])
 
   useEffect(() => {
@@ -107,7 +106,7 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
     const r = await account.generateRecoveryCodes()
     if (!mounted.current) return
     setGenerating(false)
-    setStage(r.ok ? { kind: 'codes', codes: r.data } : { kind: 'codesFailed', message: r.error.message })
+    setStage(r.ok ? { kind: 'codes', codes: r.data } : { kind: 'codesFailed', error: r.error })
   }
 
   const refuse = (message: string) => {
@@ -119,7 +118,7 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
     e.preventDefault()
     const clean = cleanCode(code)
     if (!/^\d{6}$/.test(clean)) {
-      refuse(NOT_SIX_DIGITS)
+      refuse(t('settings.totp.notSixDigits'))
       return
     }
     setCodeError(null)
@@ -128,7 +127,7 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
     if (!mounted.current) return
     if (!r.ok) {
       setVerifying(false)
-      refuse(r.error.reason === 'invalid_code' ? WRONG_CODE : r.error.reason === 'mfa_not_enabled' ? NOT_AVAILABLE : r.error.message)
+      refuse(r.error.reason === 'invalid_code' ? t('settings.totp.wrongCode') : r.error.reason === 'mfa_not_enabled' ? t('settings.totp.notAvailable') : accountErrorText(r.error, t))
       return
     }
     onEnabled?.()
@@ -145,8 +144,8 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
 
   if (stage.kind === 'loading') {
     return (
-      <div role="status" aria-label="Preparing 2FA setup" className="space-y-4">
-        <StageHeading headingRef={heading}>Preparing your 2FA setup</StageHeading>
+      <div role="status" aria-label={t('settings.totp.preparingLabel')} className="space-y-4">
+        <StageHeading headingRef={heading}>{t('settings.totp.preparing')}</StageHeading>
         <div className="flex flex-col gap-4 sm:flex-row">
           <Skeleton className="size-44 shrink-0" />
           <div className="flex-1 space-y-2">
@@ -162,15 +161,15 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
   if (stage.kind === 'failed') {
     return (
       <div className="space-y-3">
-        <StageHeading headingRef={heading}>{stage.unavailable ? "2FA isn't available yet" : "2FA setup couldn't start"}</StageHeading>
+        <StageHeading headingRef={heading}>{stage.unavailable ? t('settings.totp.unavailableTitle') : t('settings.totp.failedTitle')}</StageHeading>
         {stage.unavailable ? (
-          <InlineNotice tone="warning">{stage.message}</InlineNotice>
+          <InlineNotice tone="warning">{t('settings.totp.notAvailable')}</InlineNotice>
         ) : (
-          <ErrorState message={stage.message} onRetry={() => void start()} />
+          <ErrorState message={stage.error ? accountErrorText(stage.error, t) : t('common.error.generic')} onRetry={() => void start()} />
         )}
         {onCancel && (
           <div className="flex justify-end">
-            <Button onClick={onCancel}>{stage.unavailable ? 'Close' : 'Cancel'}</Button>
+            <Button onClick={onCancel}>{stage.unavailable ? t('common.close') : t('common.cancel')}</Button>
           </div>
         )}
       </div>
@@ -182,8 +181,8 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
   if (stage.kind === 'done') {
     return (
       <div className="space-y-1">
-        <StageHeading headingRef={heading}>2FA is on</StageHeading>
-        <p className="text-ui-small text-ink-muted">You will be asked for a code from your authenticator app when you sign in.</p>
+        <StageHeading headingRef={heading}>{t('settings.totp.on')}</StageHeading>
+        <p className="text-ui-small text-ink-muted">{t('settings.totp.onBody')}</p>
       </div>
     )
   }
@@ -191,15 +190,15 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
   if (stage.kind === 'codesFailed') {
     return (
       <div className="space-y-3">
-        <StageHeading headingRef={heading}>Recovery codes not created</StageHeading>
+        <StageHeading headingRef={heading}>{t('settings.totp.codesFailedTitle')}</StageHeading>
         <div role="alert" className="space-y-1">
-          <p className="text-ui-body text-ink">2FA is on, but we couldn't create your recovery codes.</p>
-          <p className="text-ui-small text-ink-muted">{stage.message} You can also create them later in Security settings.</p>
+          <p className="text-ui-body text-ink">{t('settings.totp.codesFailed')}</p>
+          <p className="text-ui-small text-ink-muted">{accountErrorText(stage.error, t)} {t('settings.totp.codesLater')}</p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          <Button onClick={finish}>Finish without codes</Button>
+          <Button onClick={finish}>{t('settings.totp.finishWithout')}</Button>
           <Button variant="primary" loading={generating} onClick={() => void generate()}>
-            Try again
+            {t('common.retry')}
           </Button>
         </div>
       </div>
@@ -209,37 +208,37 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
   const { enrollment } = stage
   return (
     <form noValidate onSubmit={(e) => void verify(e, enrollment)} className="space-y-5">
-      <StageHeading headingRef={heading}>Connect your authenticator app</StageHeading>
+      <StageHeading headingRef={heading}>{t('settings.totp.connect')}</StageHeading>
       {isDemoMode && (
         <InlineNotice tone="neutral">
-          <strong className="font-medium text-ink">Demo.</strong> The QR code is a placeholder and no authenticator app is checked: use the code it shows.
+          <strong className="font-medium text-ink">{t('settings.totp.demoLabel')}</strong> {t('settings.totp.demoBody')}
         </InlineNotice>
       )}
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
         <img
           src={qrImageSrc(enrollment.qrSvg)}
-          alt="QR code for your authenticator app"
+          alt={t('settings.totp.qrAlt')}
           width={176}
           height={176}
           className="size-44 shrink-0 rounded-[var(--radius-control)] border border-line bg-white p-2"
         />
         <div className="min-w-0 space-y-3">
           <ol className="list-decimal space-y-1 pl-5 text-ui-body text-ink">
-            <li>Open an authenticator app on your phone, such as Google Authenticator, Microsoft Authenticator or 1Password.</li>
-            <li>Scan the QR code, or enter the setup key below.</li>
-            <li>Enter the 6-digit code the app shows.</li>
+            <li>{t('settings.totp.step1')}</li>
+            <li>{t('settings.totp.step2')}</li>
+            <li>{t('settings.totp.step3')}</li>
           </ol>
           <div>
-            <p className="text-ui-small text-ink-muted">Setup key</p>
+            <p className="text-ui-small text-ink-muted">{t('settings.totp.setupKey')}</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <code className="rounded-[2px] bg-subtle px-2 py-1 font-mono text-ui-body break-all text-ink">{groupKey(enrollment.secret)}</code>
-              <CopyButton text={enrollment.secret.replace(/\s/g, '')} label="Copy key" toastTitle="Setup key copied" />
+              <CopyButton text={enrollment.secret.replace(/\s/g, '')} label={t('settings.totp.copyKey')} toastTitle={t('settings.totp.keyCopied')} />
             </div>
           </div>
         </div>
       </div>
       <div ref={codeField}>
-      <FormField label="6-digit code" error={codeError ?? undefined} className="max-w-60">
+      <FormField label={t('settings.code.label')} error={codeError ?? undefined} className="max-w-60">
         <Input
           inputMode="numeric"
           autoComplete="one-time-code"
@@ -259,9 +258,9 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
         </p>
       )}
       <div className="flex flex-wrap justify-end gap-2">
-        {onCancel && <Button onClick={onCancel}>Cancel</Button>}
+        {onCancel && <Button onClick={onCancel}>{t('common.cancel')}</Button>}
         <Button type="submit" variant="primary" loading={verifying}>
-          Verify and turn on
+          {t('settings.totp.verify')}
         </Button>
       </div>
     </form>

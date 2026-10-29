@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessCatalog } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { downloadDataUrl } from '@/lib/download'
 import { PUBLIC_URL_MODE, PUBLIC_URLS_ARE_LIVE, PUBLIC_URLS_ARE_TEMPORARY, absoluteLocalUrl, catalogLocalPath } from '@/lib/urls'
 import { useQrCode } from '@/lib/useQrCode'
@@ -21,6 +22,7 @@ export const LOCAL_QR_SWITCH = PUBLIC_URL_MODE === 'demo' || PUBLIC_URLS_ARE_TEM
  * stays valid as products are added or removed (ADR-0005). Per-product QR codes are separate (ADR-0025).
  */
 export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCatalog; productsLink: string }) {
+  const { t } = useI18n()
   const toast = useToast()
   const [localSwitch, setUseLocal] = useState(false)
   const useLocal = LOCAL_QR_SWITCH && localSwitch
@@ -32,7 +34,7 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
   const download = () => {
     if (!qr.url) return
     downloadDataUrl(qr.url, `${b.slug}-catalog-qr.png`)
-    toast.success('QR code downloaded', `${b.slug}-catalog-qr.png (about 1000 px, print quality)`)
+    toast.success(t('admin.catalogs.qr.downloaded'), t('admin.catalogs.qr.downloadedDetail', { file: `${b.slug}-catalog-qr.png` }))
   }
 
   return (
@@ -46,45 +48,44 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
           </div>
 
           <div>
-            <p className="text-ui-small font-medium text-ink-muted">Catalog URL</p>
+            <p className="text-ui-small font-medium text-ink-muted">{t('admin.catalogs.url')}</p>
             <div className="mt-1.5 flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas py-1.5 pr-1.5 pl-3.5">
               <code className="min-w-0 flex-1 truncate font-[family-name:var(--font-ui)] text-ui-body">{catalog.catalogUrl}</code>
-              <CopyButton text={catalog.catalogUrl} label="Copy URL" toastTitle="Catalog URL copied" />
+              <CopyButton text={catalog.catalogUrl} label={t('admin.catalogs.copyUrl')} toastTitle={t('admin.catalogs.urlCopied')} />
             </div>
             {!PUBLIC_URLS_ARE_LIVE && (
-              <p className="mt-2 text-ui-small text-ink-muted">Example address for this demo. Your real address is set up by the platform team.</p>
+              <p className="mt-2 text-ui-small text-ink-muted">{t('admin.catalogs.exampleAddress')}</p>
             )}
             {PUBLIC_URLS_ARE_TEMPORARY && (
               <p className="mt-2 text-ui-small font-medium text-warning">
-                This is a preview or local address. QR codes and links made here point to it: download QR codes for print from the production site.
+                {t('admin.catalogs.tempAddress')}
               </p>
             )}
           </div>
 
           <div className="flex flex-wrap gap-3">
             <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(catalogLocalPath(b, { preview: !isPublic }), '_blank', 'noopener')}>
-              {isPublic ? 'Open catalog' : 'Preview catalog (not public yet)'}
+              {isPublic ? t('admin.catalogs.open') : t('admin.catalogs.preview')}
             </Button>
             <ButtonLink to={productsLink} icon={<Package className="size-4" aria-hidden />}>
-              View products
+              {t('admin.catalogs.viewProducts')}
             </ButtonLink>
           </div>
 
           <dl className="grid grid-cols-2 gap-8 border-t border-line pt-6">
             <div>
-              <dt className="text-ui-small font-medium text-ink-muted">Published products</dt>
+              <dt className="text-ui-small font-medium text-ink-muted">{t('admin.catalogs.published')}</dt>
               <dd className="mt-1 text-ui-kpi font-medium text-ink tabular-nums">{catalog.publishedProductCount}</dd>
             </div>
             <div>
-              <dt className="text-ui-small font-medium text-ink-muted">All products</dt>
+              <dt className="text-ui-small font-medium text-ink-muted">{t('admin.catalogs.allProducts')}</dt>
               <dd className="mt-1 text-ui-kpi font-medium text-ink tabular-nums">{catalog.totalProductCount}</dd>
             </div>
           </dl>
 
           {!isPublic && (
             <InlineNotice tone="warning" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
-              This catalog is {b.status === 'draft' ? 'not public yet' : 'paused'}. Customers who scan the QR code will see “catalog unavailable” until it
-              is activated.
+              {t(b.status === 'draft' ? 'admin.catalogs.notPublicNotice' : 'admin.catalogs.pausedNotice')}
             </InlineNotice>
           )}
         </div>
@@ -92,23 +93,23 @@ export function CatalogQrPanel({ catalog, productsLink }: { catalog: BusinessCat
         <div className="flex min-w-0 flex-col items-center border-t border-line bg-canvas p-8 md:border-t-0 md:border-l">
           <div className="w-full max-w-[240px] border border-line bg-white p-3">
             {qr.url ? (
-              <img src={qr.url} alt={`QR code linking to ${target}`} className="aspect-square w-full" />
+              <img src={qr.url} alt={t('admin.catalogs.qr.alt', { url: target })} className="aspect-square w-full" />
             ) : qr.error ? (
-              <div className="grid aspect-square place-items-center text-center text-ui-small text-danger">QR code could not be generated.</div>
+              <div className="grid aspect-square place-items-center text-center text-ui-small text-danger">{t('admin.catalogs.qr.failed')}</div>
             ) : (
               <Skeleton className="aspect-square w-full" />
             )}
           </div>
           <p className="mt-4 max-w-[240px] text-center text-ui-small text-ink-muted">
             <QrCode className="mr-1 inline size-3.5 align-[-2px]" aria-hidden />
-            Points to the catalog, so it stays valid when products change.
+            {t('admin.catalogs.qr.hint')}
           </p>
           <Button variant="primary" className="mt-4" onClick={download} disabled={!qr.url} icon={<Download className="size-4" aria-hidden />}>
-            Download PNG
+            {t('admin.catalogs.qr.download')}
           </Button>
           {LOCAL_QR_SWITCH && (
             <div className="mt-5 w-full border-t border-line pt-4">
-              <Switch checked={localSwitch} onChange={setUseLocal} label="Encode local preview URL" description="For testing on a phone on this network. Leave off for print." />
+              <Switch checked={localSwitch} onChange={setUseLocal} label={t('admin.catalogs.localSwitch')} description={t('admin.catalogs.localSwitchHint')} />
             </div>
           )}
         </div>

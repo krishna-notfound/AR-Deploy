@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
+import { translate } from '@/i18n/translate'
 import { DECLINE_HINT, DeclineDialog } from './DeclineDialog'
 import { DeliverDialog, NO_USDZ_WARNING, reviewToast } from './DeliverDialog'
 
@@ -50,5 +52,26 @@ describe('S4 Task 6: deliver and decline dialogs', () => {
     expect(reviewToast('decline', { status: 'rejected', email: { status: 'demo' } }).title).toBe('Request declined. Demo: no email was sent.')
     expect(reviewToast('start', { status: 'in_progress' }).title).toBe('Work started.')
     expect(reviewToast('deliver', { status: 'delivered', email: { status: 'accepted' }, cleanup: 'partial' }).title).toBe("Model delivered. The business owner was emailed. Some old files couldn't be removed.")
+  })
+})
+
+describe('T6: model request dialogs in Portuguese', () => {
+  it('the decline dialog shows the Portuguese title, hint and buttons', () => {
+    localStorage.setItem(LANG_KEY, 'pt')
+    render(
+      <LanguageProvider>
+        <DeclineDialog open onClose={() => {}} onConfirm={() => {}} />
+      </LanguageProvider>,
+    )
+    expect(screen.getByRole('dialog', { name: 'Recusar este pedido?' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Recusar pedido' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+    localStorage.clear()
+  })
+
+  it('the deliver toast is built from the Portuguese keys', () => {
+    const tPt = (key: Parameters<typeof translate>[1], vars?: Parameters<typeof translate>[2]) => translate('pt', key, vars)
+    expect(reviewToast('deliver', { status: 'delivered', email: { status: 'accepted' } }, tPt).title).toBe('Modelo entregue. O proprietário da empresa recebeu um email.')
+    expect(reviewToast('start', { status: 'in_progress' }, tPt).title).toBe('Trabalho iniciado.')
   })
 })

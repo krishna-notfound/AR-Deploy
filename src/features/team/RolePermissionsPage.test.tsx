@@ -74,7 +74,7 @@ describe('Role permissions (ADR-0029)', () => {
     await user.click(box('Team', 'Publish and unpublish'))
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     expect(await screen.findByText('Permissions not saved')).toBeInTheDocument()
-    expect(screen.getByText('Network down.')).toBeInTheDocument()
+    expect(screen.getByText('Something went wrong. Try again in a moment.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   })

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { MoreHorizontal } from 'lucide-react'
 import { Link } from 'react-router'
 import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { useDashboard, useInDashboard } from './dashboardContext'
 
@@ -34,8 +35,9 @@ function PageCrumbs({ crumbs }: { crumbs: Crumb[] }) {
 }
 
 function CrumbTrail({ trail, className, textClass }: { trail: Crumb[]; className: string; textClass: string }) {
+  const { t } = useI18n()
   return (
-    <nav aria-label="Breadcrumb" className={className}>
+    <nav aria-label={t('ui.header.breadcrumb')} className={className}>
       <ol className={cn('flex min-w-0 items-center gap-x-1.5 text-ink-muted', textClass)}>
         {trail.map((c, i) => {
           // The current page is the last crumb without a link; a trailing linked crumb (error and loading states pass only the
@@ -102,6 +104,7 @@ export function PageHeader({
   more?: (MenuItem | 'separator')[]
 }) {
   useDocumentTitle(typeof title === 'string' ? title : undefined)
+  const { t } = useI18n()
   const inDashboard = useInDashboard()
   const slot = useContext(BreadcrumbSlotContext)
   const crumbs = breadcrumbs && breadcrumbs.length > 0 ? breadcrumbs : null
@@ -110,7 +113,7 @@ export function PageHeader({
   const moreMenu = hasMore && (
     <div className="-my-0.5 shrink-0 sm:hidden">
       <DropdownMenu
-        label="More actions"
+        label={t('ui.header.moreActions')}
         items={more}
         trigger={<MoreHorizontal className="size-5" aria-hidden />}
         triggerClassName="size-11! border border-line-strong bg-surface text-ink!"
@@ -158,7 +161,7 @@ export function PageHeader({
   return (
     <div className="mb-8 border-b border-line pb-6">
       {crumbs ? (
-        <nav aria-label="Breadcrumb" className="mb-3">
+        <nav aria-label={t('ui.header.breadcrumb')} className="mb-3">
           <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 font-medium tracking-[0.18em] text-ink-muted uppercase">
             {crumbs.map((c, i) => (
               <li key={`${c.label}-${i}`} className="flex min-w-0 items-center gap-2">

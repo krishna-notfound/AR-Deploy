@@ -34,7 +34,9 @@ describe('Changes by the platform team (R-W7-2)', () => {
   it('error with retry', async () => {
     vi.spyOn(service, 'getPlatformChanges').mockResolvedValue(fail('UNKNOWN', 'Network down.'))
     render(<PlatformChangesCard businessId="b1" />)
-    expect(await screen.findByText('Network down.')).toBeInTheDocument()
+    // The service message stays English for logs; the card shows the translated generic sentence.
+    expect(await screen.findByText('Something went wrong. Try again in a moment.')).toBeInTheDocument()
+    expect(screen.queryByText('Network down.')).toBeNull()
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
   })
 })
