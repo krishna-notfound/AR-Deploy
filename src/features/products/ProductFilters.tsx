@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { type Business, CATEGORIES, type Category, type Product, type ProductStatus } from '@/domain/types'
 import type { ProductRequestState } from '@/domain/modelRequests'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { type ProductArReadiness, productArReadiness } from './productReadiness'
 
 const AR_FILTERS: readonly ProductArReadiness[] = ['ready', 'android-only', 'android-blocked', 'photos-only']
@@ -104,15 +105,16 @@ export function ProductFilterBar({
   /** Offer the '3D requests: open' filter (the business list, where request states are read). */
   requestFilter?: boolean
 }) {
+  const { t } = useI18n()
   return (
     <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-6">
-      <FilterField label="Search" className="sm:w-[260px]">
-        <SearchInput value={state.q} onChange={(q) => update({ q })} label="Search products by name" placeholder="Search by product name" className="w-full" />
+      <FilterField label={t('common.search')} className="sm:w-[260px]">
+        <SearchInput value={state.q} onChange={(q) => update({ q })} label={t('products.filters.searchLabel')} placeholder={t('products.filters.searchPlaceholder')} className="w-full" />
       </FilterField>
       {businesses && (
-        <FilterField label="Business" className="sm:w-[190px]">
-          <Select aria-label="Filter by business" value={state.business} onChange={(e) => update({ business: e.target.value })}>
-            <option value="">All businesses</option>
+        <FilterField label={t('products.table.business')} className="sm:w-[190px]">
+          <Select aria-label={t('products.filters.byBusiness')} value={state.business} onChange={(e) => update({ business: e.target.value })}>
+            <option value="">{t('products.filters.allBusinesses')}</option>
             {businesses.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
@@ -122,45 +124,44 @@ export function ProductFilterBar({
         </FilterField>
       )}
       <div className="grid grid-cols-2 gap-4 sm:contents">
-      <FilterField label="Status" className="sm:w-[150px]">
-        <Select aria-label="Filter by status" value={state.status} onChange={(e) => update({ status: e.target.value as ProductFilterState['status'] })}>
-          <option value="">All statuses</option>
-          <option value="published">Published</option>
-          <option value="draft">Draft</option>
+      <FilterField label={t('common.status')} className="sm:w-[150px]">
+        <Select aria-label={t('products.filters.byStatus')} value={state.status} onChange={(e) => update({ status: e.target.value as ProductFilterState['status'] })}>
+          <option value="">{t('products.filters.allStatuses')}</option>
+          <option value="published">{t('products.status.published')}</option>
+          <option value="draft">{t('products.status.draft')}</option>
         </Select>
       </FilterField>
-      <FilterField label="Category" className="sm:w-[170px]">
-        <Select aria-label="Filter by category" value={state.category} onChange={(e) => update({ category: e.target.value as ProductFilterState['category'] })}>
-          <option value="">All categories</option>
+      <FilterField label={t('products.filters.category')} className="sm:w-[170px]">
+        <Select aria-label={t('products.filters.byCategory')} value={state.category} onChange={(e) => update({ category: e.target.value as ProductFilterState['category'] })}>
+          <option value="">{t('products.filters.allCategories')}</option>
           {CATEGORIES.map((c) => (
-            <option key={c} value={c} className="capitalize">
-              {c[0]?.toUpperCase()}
-              {c.slice(1)}
+            <option key={c} value={c}>
+              {t(`products.category.${c}`)}
             </option>
           ))}
         </Select>
       </FilterField>
-      <FilterField label="3D / AR" className="sm:w-[180px]">
-        <Select aria-label="Filter by 3D and AR" value={state.ar} onChange={(e) => update({ ar: e.target.value as ProductFilterState['ar'] })}>
-          <option value="">All 3D / AR</option>
-          <option value="ready">AR ready</option>
-          <option value="android-only">Needs iPhone file (USDZ)</option>
-          <option value="android-blocked">Android AR blocked</option>
-          <option value="photos-only">No 3D model</option>
+      <FilterField label={t('products.filters.ar')} className="sm:w-[180px]">
+        <Select aria-label={t('products.filters.byAr')} value={state.ar} onChange={(e) => update({ ar: e.target.value as ProductFilterState['ar'] })}>
+          <option value="">{t('products.filters.allAr')}</option>
+          <option value="ready">{t('products.readiness.ready')}</option>
+          <option value="android-only">{t('products.filters.needsUsdz')}</option>
+          <option value="android-blocked">{t('products.readiness.androidBlocked')}</option>
+          <option value="photos-only">{t('products.filters.noModel')}</option>
         </Select>
       </FilterField>
       {requestFilter && (
-        <FilterField label="3D requests" className="sm:w-[180px]">
-          <Select aria-label="Filter by 3D requests" value={state.model} onChange={(e) => update({ model: e.target.value as ProductFilterState['model'] })}>
-            <option value="">All products</option>
-            <option value="open">3D requests: open</option>
+        <FilterField label={t('products.filters.requests')} className="sm:w-[180px]">
+          <Select aria-label={t('products.filters.byRequests')} value={state.model} onChange={(e) => update({ model: e.target.value as ProductFilterState['model'] })}>
+            <option value="">{t('products.filters.allProducts')}</option>
+            <option value="open">{t('products.filters.requestsOpen')}</option>
           </Select>
         </FilterField>
       )}
       </div>
       {hasProductFilters(state) && (
         <button type="button" onClick={() => update(CLEARED_PRODUCT_FILTERS)} className="min-h-10 text-[length:var(--text-ui-small)] font-medium text-accent-ink hover:underline sm:ml-1">
-          Clear filters
+          {t('business.products.clearFilters')}
         </button>
       )}
     </div>

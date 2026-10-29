@@ -15,7 +15,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { OPEN_REQUEST_STATUSES } from '@/domain/modelRequests'
 import { type Business, CATEGORIES, CURRENCIES, type Category, type Currency, type Product, type ProductStatus } from '@/domain/types'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
-import { fieldTexts } from '@/i18n/errorText'
+import { errorText, fieldTexts } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import type { Vars } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
@@ -26,7 +26,6 @@ import { MEDIA_REFRESH_MS, type ServiceError } from '@/services/catalogService'
 import { useRefreshWhenStale } from '@/services/hooks'
 import { validateForPublish } from '@/services/validation'
 import { primaryImage } from '@/lib/product'
-import { LOAD_ERROR } from '@/features/modelRequests/copy'
 import { useModelRequests } from '@/features/modelRequests/hooks'
 import { modelRequestStatusLabel } from '@/features/modelRequests/ModelRequestStatusBadge'
 import { type EditorScope, editPath, useProductActions } from '../useProductActions'
@@ -39,12 +38,12 @@ import { Segmented } from './Segmented'
 import { VariantsEditor } from './VariantsEditor'
 
 const SECTIONS = [
-  { id: 'basics', label: 'Basic information' },
-  { id: 'images', label: 'Images' },
-  { id: 'models', label: '3D models' },
-  { id: 'specs', label: 'Dimensions & specs' },
-  { id: 'cta', label: 'Call to action' },
-] as const
+  { id: 'basics', labelKey: 'products.editor.sections.basics' },
+  { id: 'images', labelKey: 'products.editor.sections.images' },
+  { id: 'models', labelKey: 'products.editor.sections.models' },
+  { id: 'specs', labelKey: 'products.editor.sections.specs' },
+  { id: 'cta', labelKey: 'products.editor.sections.cta' },
+] as const satisfies readonly { id: string; labelKey: TranslationKey }[]
 
 const FIELD_SECTION: Record<string, (typeof SECTIONS)[number]['id']> = {
   businessId: 'basics',
@@ -84,7 +83,7 @@ function fieldValue(f: EditorForm, key: string): string {
 
 /** Every client-side rule in one pass: `errors` block saving, `publish` only block publishing. */
 function checkForm(f: EditorForm, t: T) {
-  const { input, errors } = toInput(f)
+  const { input, errors } = toInput(f, t)
   if (!input.businessId) errors.businessId = t('common.validation.product.businessRequired')
   if (!input.name.en) errors['name.en'] = t('common.validation.product.nameRequired')
   if (!input.slug) errors.slug = t('common.validation.product.slugRequired')
@@ -173,9 +172,9 @@ export function ProductEditorForm({
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
-  const { t } = useI18n()
-  /** A refused save or publish as text next to the fields; without field errors, the service sentence (product copy for it: T6 moves these to keys). */
-  const failureErrors = (error: ServiceError): Errors => (error.fieldErrors ? fieldTexts(error.fieldErrors, t) : { _: error.message })
+  const { t, tn } = useI18n()
+  /** A refused save or publish as text next to the fields; without field errors, the translated sentence for the error (never the service's English message). */
+  const failureErrors = (error: ServiceError): Errors => (error.fieldErrors ? fieldTexts(error.fieldErrors, t) : { _: errorText(error, t) })
   const actions = useProductActions(scope)
   // Business owners manage their own products; platform users see what their role allows (ADR-0029).
   const can = useCan()
@@ -298,7 +297,7 @@ export function ProductEditorForm({
     if (!res.ok) {
       setStaleModels(res.error.reason === 'models_changed_elsewhere')
       showErrors(failureErrors(res.error))
-      toast.error('Could not save product', res.error.message)
+      toast.error(t('products.editor.saveFailed'), errorText(res.error, t))
       return null
     }
     setErrors({})
@@ -317,7 +316,7 @@ export function ProductEditorForm({
     setReloading(true)
     const res = await service.getProductById(latest.id)
     setReloading(false)
-    if (!res.ok) return toast.error('Could not reload the product', res.error.message)
+    if (!res.ok) return toast.error(t('products.editor.reloadFailed'), errorText(res.error, t))
     const stored = formFromProduct(res.data)
     setForm((current) => (JSON.stringify(current) !== snapshot ? withStoredModels(current, res.data) : stored))
     setSnapshot(JSON.stringify(stored))
@@ -351,7 +350,7 @@ export function ProductEditorForm({
     const saved = await save()
     setBusy(null)
     if (!saved) return
-    toast.success(isNew ? 'Draft saved' : 'Changes saved', isNew ? 'You can keep editing or publish when ready.' : undefined)
+    toast.success(t(isNew ? 'products.editor.draftSaved' : 'products.editor.changesSaved'), isNew ? t('products.editor.draftSavedBody') : undefined)
     if (isNew) goToEdit(saved)
   }
 
@@ -359,7 +358,7 @@ export function ProductEditorForm({
   const publishBlocked = (e: Errors, saved?: Product) => {
     showErrors(e)
     const n = issueCount(e)
-    toast.error('Cannot publish yet', n === 1 ? 'Fix the issue listed at the top of the form.' : `Fix the ${n} issues listed at the top of the form.`)
+    toast.error(t('products.actions.publishFailed'), tn('products.editor.errors.toast', n))
     if (isNew && saved) goToEdit(saved, { publishErrors: e })
   }
 
@@ -395,7 +394,7 @@ export function ProductEditorForm({
       target = await save()
       setBusy(null)
       if (!target) return
-      toast.info('Saved before previewing')
+      toast.info(t('products.editor.savedBeforePreview'))
     }
     if (!target || !business) return
     window.open(productLocalPath(business, target, { preview: needsPreview({ status: currentStatus }, business) }), '_blank', 'noopener')
@@ -442,13 +441,13 @@ export function ProductEditorForm({
 
   // Inline from sm; below sm the header's More menu holds it (same handler and gate).
   const canDelete = !isNew && allowed('products.delete')
-  const statusText = dirty ? 'Unsaved changes' : isNew ? 'Not saved yet' : 'All changes saved'
+  const statusText = t(dirty ? 'products.editor.unsaved' : isNew ? 'products.editor.notSavedYet' : 'products.editor.allSaved')
 
   return (
     // The form column stops at 792px (BRIEF section 6: a 200px index, a 32px gap, then the cards).
     <div className="lg:max-w-[1024px]">
       <PageHeader
-        title={isNew ? 'Add product' : form.input.name.en || 'Untitled product'}
+        title={isNew ? t('business.products.add') : form.input.name.en || t('products.editor.untitled')}
         breadcrumbs={breadcrumbs}
         meta={
           <>
@@ -459,16 +458,16 @@ export function ProductEditorForm({
                 <span aria-hidden className="text-[13px] text-line-strong">
                   ·
                 </span>
-                <span className="text-[13px] font-medium text-warning">Unsaved changes</span>
+                <span className="text-[13px] font-medium text-warning">{t('products.editor.unsaved')}</span>
               </>
             )}
           </>
         }
-        more={canDelete ? [{ label: 'Delete', icon: <Trash2 aria-hidden />, destructive: true, disabled: !!busy, onSelect: () => void onDelete() }] : undefined}
+        more={canDelete ? [{ label: t('common.delete'), icon: <Trash2 aria-hidden />, destructive: true, disabled: !!busy, onSelect: () => void onDelete() }] : undefined}
         actions={
           canDelete && (
             <Button variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} onClick={onDelete} loading={busy === 'delete'} disabled={!!busy} className="text-danger! hover:bg-danger-soft max-sm:hidden">
-              Delete
+              {t('common.delete')}
             </Button>
           )
         }
@@ -476,7 +475,7 @@ export function ProductEditorForm({
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
         {/* Under lg a scrolling row of chips; from lg a 200px sticky list with a 2px ink bar on the active item. */}
-        <nav aria-label="Editor sections" className="-mx-4 min-w-0 sm:-mx-6 lg:mx-0">
+        <nav aria-label={t('products.editor.sectionsNav')} className="-mx-4 min-w-0 sm:-mx-6 lg:mx-0">
           <ul ref={chipsRef} className="-my-1 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:px-6 lg:sticky lg:my-0 lg:py-0 lg:top-20 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0">
             {SECTIONS.map((s) => {
               const hasError = errorList.some(([k]) => FIELD_SECTION[k] === s.id)
@@ -487,7 +486,7 @@ export function ProductEditorForm({
                     href={`#${s.id}`}
                     onClick={() => pickSection(s.id)}
                     aria-current={active ? 'location' : undefined}
-                    aria-label={hasError ? `${s.label} (has errors)` : undefined}
+                    aria-label={hasError ? t('products.editor.sectionHasErrors', { label: t(s.labelKey) }) : undefined}
                     className={cn(
                       'flex h-10 items-center gap-2 rounded-[var(--radius-control)] border px-4 text-[14px] whitespace-nowrap transition-colors max-lg:pointer-coarse:h-11',
                       'lg:h-9 lg:justify-between lg:rounded-none lg:border-0 lg:border-l-2 lg:bg-transparent lg:px-3',
@@ -498,7 +497,7 @@ export function ProductEditorForm({
                           : 'border-line bg-surface text-ink-muted hover:text-ink lg:border-transparent',
                     )}
                   >
-                    {s.label}
+                    {t(s.labelKey)}
                     {hasError && <AlertCircle className="size-4 shrink-0" aria-hidden />}
                   </a>
                 </li>
@@ -512,7 +511,7 @@ export function ProductEditorForm({
             <div ref={summaryRef} tabIndex={-1} role="alert" className="flex gap-3 rounded-[var(--radius-card)] border border-danger/40 bg-danger-soft p-4 outline-none focus-visible:outline-2 focus-visible:outline-danger sm:px-6">
               <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
               <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-danger">Fix {issues.length === 1 ? 'this issue' : `these ${issues.length} issues`} to continue</p>
+                <p className="text-[14px] font-semibold text-danger">{tn('products.editor.errors.title', issues.length)}</p>
                 <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[13px] leading-[1.45] text-danger">
                   {issues.map(([msg, k]) => (
                     <li key={k}>{FIELD_SECTION[k] ? <a href={`#${FIELD_SECTION[k]}`} className="underline underline-offset-2">{msg}</a> : msg}</li>
@@ -520,25 +519,25 @@ export function ProductEditorForm({
                 </ul>
                 {staleModels && latest && (
                   <Button size="sm" className="mt-3" onClick={onReload} loading={reloading}>
-                    Reload
+                    {t('products.editor.reload')}
                   </Button>
                 )}
               </div>
             </div>
           )}
 
-          <Section id="basics" title="Basic information">
+          <Section id="basics" title={t('products.editor.sections.basics')}>
             {scope === 'admin' && (
               <FormField
-                label="Business"
+                label={t('products.table.business')}
                 required
                 error={err('businessId')}
                 hint={
                   !isNew
-                    ? 'A product stays in the catalog it was created in.'
+                    ? t('products.editor.businessHintExisting')
                     : hasStoredUploads
-                      ? 'Uploaded files are stored in this business’s folder. Remove them to choose another business.'
-                      : 'The product is published in this business’s catalog.'
+                      ? t('products.editor.businessHintUploads')
+                      : t('products.editor.businessHintNew')
                 }
               >
                 <Select
@@ -549,7 +548,7 @@ export function ProductEditorForm({
                     setInput({ businessId: e.target.value, currency: b?.defaultCurrency ?? form.input.currency })
                   }}
                 >
-                  <option value="">Choose a business…</option>
+                  <option value="">{t('products.editor.chooseBusiness')}</option>
                   {businesses.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
@@ -559,7 +558,7 @@ export function ProductEditorForm({
               </FormField>
             )}
             <LocalizedField
-              label="Product name"
+              label={t('products.editor.name')}
               required
               maxLength={100}
               value={form.input.name}
@@ -569,33 +568,36 @@ export function ProductEditorForm({
               }
             />
             <FormField
-              label="Product URL"
+              label={t('products.editor.url')}
               required
               error={err('slug')}
-              hint={business ? `${PUBLIC_URLS_ARE_LIVE ? 'URL' : 'Demo URL'}: ${productPublicUrl(business, { slug: form.input.slug || 'product-name' })}` : 'Lowercase letters, numbers and hyphens.'}
+              hint={
+                business
+                  ? t(PUBLIC_URLS_ARE_LIVE ? 'products.editor.urlHint' : 'products.editor.urlHintDemo', { url: productPublicUrl(business, { slug: form.input.slug || 'product-name' }) })
+                  : t('products.editor.urlHintNoBusiness')
+              }
             >
               <InputAddon addon="/products/">
                 <Input maxLength={PRODUCT_SLUG_MAX} value={form.input.slug} onChange={(e) => setForm((f) => ({ ...f, slugTouched: true, input: { ...f.input, slug: slugInput(e.target.value) } }))} />
               </InputAddon>
             </FormField>
-            <LocalizedField label="Short description" value={form.input.shortDescription} onChange={(shortDescription) => setInput({ shortDescription })} maxLength={160} hint="One sentence shown under the price." />
-            <LocalizedField label="Full description" multiline rows={5} value={form.input.description} onChange={(description) => setInput({ description })} />
+            <LocalizedField label={t('products.editor.shortDescription')} value={form.input.shortDescription} onChange={(shortDescription) => setInput({ shortDescription })} maxLength={160} hint={t('products.editor.shortDescriptionHint')} />
+            <LocalizedField label={t('products.editor.fullDescription')} multiline rows={5} value={form.input.description} onChange={(description) => setInput({ description })} />
             {/* Below sm: Category on its own row, then Price and a 96px Currency side by side. */}
             <div className="grid grid-cols-[1fr_96px] gap-4 sm:grid-cols-[2fr_1fr_1fr] [&>*:first-child]:max-sm:col-span-2">
-              <FormField label="Category">
+              <FormField label={t('products.filters.category')}>
                 <Select value={form.input.category} onChange={(e) => setInput({ category: e.target.value as Category })}>
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>
-                      {c[0]?.toUpperCase()}
-                      {c.slice(1)}
+                      {t(`products.category.${c}`)}
                     </option>
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Price" error={err('price')} hint="Required to publish.">
+              <FormField label={t('products.table.price')} error={err('price')} hint={t('products.editor.priceHint')}>
                 <Input inputMode="decimal" placeholder="0.00" className="tabular-nums" value={form.priceText} onChange={(e) => setForm((f) => ({ ...f, priceText: e.target.value }))} />
               </FormField>
-              <FormField label="Currency">
+              <FormField label={t('products.editor.currency')}>
                 <Select value={form.input.currency} onChange={(e) => setInput({ currency: e.target.value as Currency })}>
                   {CURRENCIES.map((c) => (
                     <option key={c} value={c}>
@@ -607,35 +609,35 @@ export function ProductEditorForm({
             </div>
           </Section>
 
-          <Section id="images" title="Images" description="Product photos for the gallery. At least one is required to publish." error={err('images')}>
-            <ImageUpload label="Upload product images" kind="gallery" businessId={form.input.businessId} images={form.input.images} onChange={updateImages} />
+          <Section id="images" title={t('products.editor.sections.images')} description={t('products.editor.imagesDescription')} error={err('images')}>
+            <ImageUpload label={t('products.editor.uploadImages')} kind="gallery" businessId={form.input.businessId} images={form.input.images} onChange={updateImages} />
             <div className="border-t border-line pt-6">
-              <h3 className="text-[14px] leading-5 font-semibold text-ink">Additional photos</h3>
-              <p className="mt-0.5 mb-3 text-[13px] leading-[1.45] text-ink-muted">Room shots, details and close-ups shown lower on the product page.</p>
-              <ImageUpload label="Upload additional photos" kind="additional" businessId={form.input.businessId} allowPrimary={false} images={form.input.images} onChange={updateImages} />
+              <h3 className="text-[14px] leading-5 font-semibold text-ink">{t('products.editor.additionalPhotos')}</h3>
+              <p className="mt-0.5 mb-3 text-[13px] leading-[1.45] text-ink-muted">{t('products.editor.additionalPhotosHint')}</p>
+              <ImageUpload label={t('products.editor.uploadAdditional')} kind="additional" businessId={form.input.businessId} allowPrimary={false} images={form.input.images} onChange={updateImages} />
             </div>
           </Section>
 
-          <Section id="models" title="3D models" description="Optional. Products without a model show photos only. Colours and options can have their own photos and models (under Colours and variants).">
+          <Section id="models" title={t('products.editor.sections.models')} description={t('products.editor.modelsDescription')}>
             {scope === 'admin' && latest && can('models.manage') && <OpenModelRequests productId={latest.id} />}
             {ownerChoice && (
               <Segmented
                 kind="radio"
                 fill
-                label="How to get the 3D model"
+                label={t('products.editor.modelChoice')}
                 value={modelChoice}
                 onChange={setModelChoice}
                 options={[
-                  { value: 'request', label: 'Request from Sanctus (recommended)' },
-                  { value: 'upload', label: 'Upload your own' },
+                  { value: 'request', label: t('products.editor.modelChoiceRequest') },
+                  { value: 'upload', label: t('products.editor.modelChoiceUpload') },
                 ]}
               />
             )}
             {ownerUploadsOff &&
               (hasModels(form.input.models) ? (
-                <ModelFilesReadOnly models={form.input.models} label="the product" />
+                <ModelFilesReadOnly models={form.input.models} label={t('products.editor.theProduct')} />
               ) : (
-                <p className="text-[13px] leading-[1.45] text-ink-body">3D models for your products are made by the Sanctus team. Request one below.</p>
+                <p className="text-[13px] leading-[1.45] text-ink-body">{t('products.editor.modelsByTeam')}</p>
               ))}
             {(ownerUploadsOff || (ownerChoice && modelChoice === 'request')) && (
               <ModelRequestPanel
@@ -659,17 +661,17 @@ export function ProductEditorForm({
             )}
           </Section>
 
-          <Section id="specs" title="Dimensions & specifications" description="Use the real outer dimensions. They are shown to customers and used to check the 3D model’s scale.">
+          <Section id="specs" title={t('products.editor.specsTitle')} description={t('products.editor.specsDescription')}>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-[14px] font-medium text-ink">Measured in</span>
+              <span className="text-[14px] font-medium text-ink">{t('products.editor.measuredIn')}</span>
               <Segmented
                 kind="radio"
-                label="Dimension unit"
+                label={t('products.editor.dimensionUnit')}
                 value={unit}
                 onChange={onUnit}
                 options={[
-                  { value: 'cm', label: 'Centimetres' },
-                  { value: 'in', label: 'Inches' },
+                  { value: 'cm', label: t('products.editor.centimetres') },
+                  { value: 'in', label: t('products.editor.inches') },
                 ]}
               />
             </div>
@@ -680,7 +682,7 @@ export function ProductEditorForm({
                   const e = err(`dimensions.${k}`)
                   const shared = !!e && e === dimError
                   return (
-                    <FormField key={k} label={k[0]!.toUpperCase() + k.slice(1)} error={shared ? undefined : e} className="w-[calc(50%-0.5rem)] sm:w-32">
+                    <FormField key={k} label={t(`products.editor.dim.${k}`)} error={shared ? undefined : e} className="w-[calc(50%-0.5rem)] sm:w-32">
                       <InputAddon side="right" addon={unit}>
                         <Input
                           inputMode="decimal"
@@ -703,12 +705,12 @@ export function ProductEditorForm({
             </div>
             {/* The weight label row has no EN/PT switch, so it drops 4px to line its input up with the material's. */}
             <div className="grid items-start gap-4 sm:grid-cols-[2fr_1fr] [&>*:last-child]:sm:pt-1">
-              <LocalizedField label="Material" value={form.input.material} onChange={(material) => setInput({ material })} placeholder="e.g. Solid oak, linen upholstery" />
-              <FormField label="Weight" optional error={err('weight')}>
+              <LocalizedField label={t('products.editor.material')} value={form.input.material} onChange={(material) => setInput({ material })} placeholder={t('products.editor.materialPlaceholder')} />
+              <FormField label={t('products.editor.weight')} optional error={err('weight')}>
                 <div className="flex gap-2">
                   <Input inputMode="decimal" className="tabular-nums" value={form.weightText} onChange={(e) => setForm((f) => ({ ...f, weightText: e.target.value }))} />
                   <Select
-                    aria-label="Weight unit"
+                    aria-label={t('products.editor.weightUnit')}
                     className="w-20 shrink-0"
                     value={form.input.weight?.unit ?? 'kg'}
                     onChange={(e) => setInput({ weight: { value: form.input.weight?.value ?? 0, unit: e.target.value as 'kg' | 'lb' } })}
@@ -734,10 +736,10 @@ export function ProductEditorForm({
             </div>
           </Section>
 
-          <Section id="cta" title="Call to action" description="The main button on the product page, for example a contact form or WhatsApp link.">
+          <Section id="cta" title={t('products.editor.sections.cta')} description={t('products.editor.ctaDescription')}>
             <div className="grid items-start gap-x-6 gap-y-5 sm:grid-cols-2 [&>*:last-child]:sm:pt-1">
-              <LocalizedField label="Button label" value={form.input.cta.label} onChange={(label) => setInput({ cta: { ...form.input.cta, label } })} maxLength={40} error={err('cta.label')} />
-              <FormField label="Button link" optional error={err('cta.url')} hint="If empty, the button shows the store’s contact details.">
+              <LocalizedField label={t('products.editor.ctaLabel')} value={form.input.cta.label} onChange={(label) => setInput({ cta: { ...form.input.cta, label } })} maxLength={40} error={err('cta.label')} />
+              <FormField label={t('products.editor.ctaLink')} optional error={err('cta.url')} hint={t('products.editor.ctaLinkHint')}>
                 <Input type="url" placeholder="https://" value={form.input.cta.url ?? ''} onChange={(e) => setInput({ cta: { ...form.input.cta, url: e.target.value } })} />
               </FormField>
             </div>
@@ -746,7 +748,7 @@ export function ProductEditorForm({
       </div>
 
       {/* Sticky publishing bar (BRIEF section 6): 64px from sm; on phones the status sits above three equal buttons. */}
-      <section aria-label="Save and publish" className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w,0)]">
+      <section aria-label={t('products.editor.saveBar')} className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface lg:left-[var(--sidebar-w,0)]">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-2.5 px-4 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-0 lg:px-10">
           <p className="flex min-w-0 items-center gap-2.5 text-[13px] text-ink-muted">
             <ProductStatusBadge status={isNew ? 'draft' : currentStatus} />
@@ -756,19 +758,19 @@ export function ProductEditorForm({
           </p>
           <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:items-center sm:gap-3">
             <Button onClick={onPreview} loading={busy === 'preview'} disabled={!!busy || !business} className="max-sm:px-2">
-              Preview
+              {t('products.editor.preview')}
               {busy !== 'preview' && <ExternalLink className="size-4" aria-hidden />}
             </Button>
             <Button onClick={onSaveDraft} loading={busy === 'save'} disabled={!!busy || (!dirty && !isNew)} className="max-sm:px-2">
-              {currentStatus === 'published' && !isNew ? 'Save changes' : 'Save draft'}
+              {t(currentStatus === 'published' && !isNew ? 'products.editor.saveChanges' : 'products.editor.saveDraft')}
             </Button>
             {!allowed('products.publish') ? null : currentStatus === 'published' && !isNew ? (
               <Button variant="secondary" onClick={onUnpublish} loading={busy === 'unpublish'} disabled={!!busy} icon={<EyeOff className="size-4" aria-hidden />} className="max-sm:px-2">
-                Unpublish
+                {t('products.actions.unpublish')}
               </Button>
             ) : (
               <Button variant="primary" onClick={onPublish} loading={busy === 'publish'} disabled={!!busy} className="max-sm:px-2 sm:px-5">
-                Publish
+                {t('products.menu.publish')}
               </Button>
             )}
           </div>
@@ -778,18 +780,14 @@ export function ProductEditorForm({
       <Modal
         open={publishedOpen && !!latest && !!business}
         onClose={() => setPublishedOpen(false)}
-        title="Product published"
-        description={
-          business?.status === 'active'
-            ? 'It now appears in the business catalog.'
-            : 'The catalog is not active yet: customers will see this product once the business is activated.'
-        }
+        title={t('products.editor.publishedTitle')}
+        description={t(business?.status === 'active' ? 'products.editor.publishedActive' : 'products.actions.publishedInactive')}
         footer={
           <>
-            <Button onClick={() => setPublishedOpen(false)}>Keep editing</Button>
+            <Button onClick={() => setPublishedOpen(false)}>{t('products.editor.keepEditing')}</Button>
             {latest && business && (
               <Button variant="primary" icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => window.open(productLocalPath(business, latest, { preview: needsPreview(latest, business) }), '_blank', 'noopener')}>
-                Open product page
+                {t('products.menu.open')}
               </Button>
             )}
           </>
@@ -797,14 +795,14 @@ export function ProductEditorForm({
       >
         {latest && business && (
           <div>
-            <p className="text-[13px] font-medium">Product URL</p>
+            <p className="text-[13px] font-medium">{t('products.qr.url')}</p>
             <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
               <code className="min-w-0 flex-1 truncate text-[13px]">{productPublicUrl(business, latest)}</code>
-              <CopyButton text={productPublicUrl(business, latest)} label="Copy" toastTitle="Product URL copied" />
+              <CopyButton text={productPublicUrl(business, latest)} label={t('products.editor.copy')} toastTitle={t('products.actions.urlCopied')} />
             </div>
             {!PUBLIC_URLS_ARE_LIVE && (
               <p className="mt-2 text-xs text-ink-muted">
-                Demo URL built from the business and product slugs. The domain itself is not configured yet. In this demo the page opens at {productLocalPath(business, latest)}.
+                {t('products.editor.demoUrlNote', { path: productLocalPath(business, latest) })}
               </p>
             )}
           </div>
@@ -814,14 +812,14 @@ export function ProductEditorForm({
       <Modal
         open={!!pendingUnit}
         onClose={() => setPendingUnit(null)}
-        title={`Switch to ${pendingUnit === 'in' ? 'inches' : 'centimetres'}?`}
-        description={`The dimensions are ${dimsText(form.dims, unit)}. Convert them, or keep the numbers if they were already measured in ${pendingUnit === 'in' ? 'inches' : 'centimetres'}.`}
+        title={t(pendingUnit === 'in' ? 'products.editor.switchToInches' : 'products.editor.switchToCm')}
+        description={t(pendingUnit === 'in' ? 'products.editor.switchBodyInches' : 'products.editor.switchBodyCm', { dims: dimsText(form.dims, unit) })}
         size="sm"
         footer={
           <>
-            <Button onClick={() => applyUnit(false)}>Keep the numbers</Button>
+            <Button onClick={() => applyUnit(false)}>{t('products.editor.keepNumbers')}</Button>
             <Button variant="primary" onClick={() => applyUnit(true)} data-autofocus>
-              Convert to {pendingUnit ? dimsText(convertDims(form.dims, unit, pendingUnit, dimsBefore), pendingUnit) : ''}
+              {t('products.editor.convertTo')} {pendingUnit ? dimsText(convertDims(form.dims, unit, pendingUnit, dimsBefore), pendingUnit) : ''}
             </Button>
           </>
         }
@@ -830,16 +828,16 @@ export function ProductEditorForm({
       <Modal
         open={blocker.state === 'blocked'}
         onClose={() => blocker.reset?.()}
-        title="Leave without saving?"
-        description="You have unsaved changes to this product. They will be lost if you leave."
+        title={t('products.editor.leaveTitle')}
+        description={t('products.editor.leaveBody')}
         size="sm"
         footer={
           <>
             <Button onClick={() => blocker.reset?.()} data-autofocus>
-              Stay on page
+              {t('products.editor.stay')}
             </Button>
             <Button variant="danger" onClick={() => blocker.proceed?.()}>
-              Leave page
+              {t('products.editor.leave')}
             </Button>
           </>
         }
@@ -850,14 +848,15 @@ export function ProductEditorForm({
 
 /** Staff: the product's open 3D model requests, each linked to its page (S4 R-S4-4, with models.manage). */
 function OpenModelRequests({ productId }: { productId: string }) {
+  const { t } = useI18n()
   const q = useModelRequests({ productId, status: [...OPEN_REQUEST_STATUSES] })
   if (q.status === 'loading') return <Skeleton className="h-5 w-56" />
   if (q.status === 'error')
     return (
       <p className="flex flex-wrap items-center gap-2 text-[13px] leading-[1.45] text-danger">
-        {LOAD_ERROR}
+        {t('business.modelRequests.loadError')}
         <Button size="sm" variant="ghost" onClick={q.refetch}>
-          Retry
+          {t('business.modelRequests.photo.retry')}
         </Button>
       </p>
     )
@@ -867,7 +866,7 @@ function OpenModelRequests({ productId }: { productId: string }) {
       {q.data.items.map((r) => (
         <li key={r.id} className="text-[13px] leading-[1.45] text-ink-body">
           <Link to={modelRequestAdminPath(r.id)} className="font-medium text-ink underline underline-offset-2">
-            Open 3D request: {modelRequestStatusLabel(r.status)}
+            {t('products.editor.openRequest', { status: modelRequestStatusLabel(r.status, t) })}
           </Link>
           {r.variantName && <span className="text-ink-muted"> · {r.variantName.en}</span>}
         </li>

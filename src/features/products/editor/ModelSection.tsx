@@ -7,19 +7,26 @@ import { InlineNotice } from '@/components/ui/States'
 import { MODEL_STALL_TIMEOUT_MS, ModelViewer } from '@/components/three/ModelViewer'
 import { type ReadinessItem, arReadiness, sceneViewerWarning } from '@/features/ar/readiness'
 import type { Dimensions, ModelAsset, ModelFormat, ProductModels } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import type { Vars } from '@/i18n/translate'
 import { service } from '@/services'
 import { MODEL_RULES, fetchRequiredExtensions, formatMb, isHttpsUrl, isStaleSessionAsset, modelAssetFromUrl, readRequiredExtensions, sceneViewerUnsupported, validateModelFile } from '@/lib/files'
 import { cn } from '@/lib/cn'
 import { formatFileSize } from '@/lib/format'
+import { useFormat } from '@/lib/useFormat'
 import { type ScaleCheck, type ScaleMismatchReason, checkScale } from '@/lib/scale'
-import { MODEL_OPTIMIZATION_ENABLED, optimizeModel, optimizedNote } from './modelOptimizeClient'
+import { MODEL_OPTIMIZATION_ENABLED, optimizeModel, optimizeReasonText, optimizedNote } from './modelOptimizeClient'
 
 type ModelContext = 'product' | 'variant' | 'request'
 
-const FORMAT_INFO: Record<ModelFormat, { title: string; use: string }> = {
-  glb: { title: 'GLB model', use: 'Used for the interactive 3D viewer on every device and for AR on Android (Scene Viewer).' },
-  usdz: { title: 'USDZ model', use: 'Used for AR on iPhone and iPad (AR Quick Look).' },
+const FORMAT_INFO: Record<ModelFormat, { title: TranslationKey; use: TranslationKey }> = {
+  glb: { title: 'products.model.glbTitle', use: 'products.model.glbUse' },
+  usdz: { title: 'products.model.usdzTitle', use: 'products.model.usdzUse' },
 }
+
+type T = (key: TranslationKey, vars?: Vars) => string
 
 /**
  * GLB + USDZ slots with the 3D preview, scale check and AR readiness. Used for the product and, with
@@ -48,17 +55,18 @@ export function ModelSection({
   /** Fetches fresh signed URLs for the stored files (they expire); "Try again" in the preview calls it. */
   onRefreshUrls?: () => void
 }) {
+  const { t } = useI18n()
   return (
     <div className="space-y-5">
       {context === 'product' && (
         <InlineNotice tone="neutral" className="border border-line text-ink-body" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
-          Upload the files your 3D artist delivered. <strong className="font-medium">GLB</strong> powers the 3D viewer and Android AR.{' '}
-          <strong className="font-medium">USDZ</strong> is used by iPhone and iPad AR. {MODEL_OPTIMIZATION_ENABLED ? 'GLB files are made lighter before upload (smaller textures, fewer triangles; no compression, so Android AR still opens them); USDZ files are stored as uploaded, or built from the GLB with "Build from GLB".' : 'Files are stored as uploaded: they are not converted or compressed.'}
+          {t('products.model.intro')} <strong className="font-medium">GLB</strong> {t('products.model.introGlb')}{' '}
+          <strong className="font-medium">USDZ</strong> {t('products.model.introUsdz')} {t(MODEL_OPTIMIZATION_ENABLED ? 'products.model.introOptOn' : 'products.model.introOptOff')}
         </InlineNotice>
       )}
       {context === 'request' && (
         <InlineNotice tone="neutral" className="border border-line text-ink-body" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
-          Upload the GLB and USDZ made for this request. Each file gets the same checks as in the product editor. Files stay with the request, not the product, until you deliver it.
+          {t('products.model.requestIntro')}
         </InlineNotice>
       )}
       {/* GLB and USDZ side by side, stacked on phones (BRIEF section 6). */}
@@ -89,6 +97,8 @@ function ModelSlot({
   /** The USDZ slot: the GLB an iPhone file can be built from (ADR-0039). */
   buildFrom?: ModelAsset
 }) {
+  const { t } = useI18n()
+  const fmt = useFormat()
   const id = useId()
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState<false | 'checking' | 'optimizing' | 'building'>(false)
@@ -113,17 +123,17 @@ function ModelSlot({
       file = r.file
       setOptimizeNote(
         r.optimized
-          ? { text: optimizedNote(r), original }
-          : { text: r.reason ?? 'Kept the original file.' },
+          ? { text: optimizedNote(r, t), original }
+          : { text: optimizeReasonText(r.reason, t) },
       )
     } else {
       // Large textures are accepted but flagged: they make AR slow on phones (AR audit AR-10).
-      const notes = [opts.keepOriginal ? 'Original file uploaded, not optimized.' : '', opts.built ? `Built from the GLB on ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. Check it on an iPhone before publishing.` : '', check.warning ?? ''].filter(Boolean)
+      const notes = [opts.keepOriginal ? t('products.model.originalUploaded') : '', opts.built ? t('products.model.builtNote', { date: fmt.date(new Date().toISOString()) }) : '', check.warning ?? ''].filter(Boolean)
       setOptimizeNote(notes.length ? { text: notes.join(' ') } : null)
     }
     const res = await service.uploadAsset({ kind: format, file, businessId })
     setChecking(false)
-    if (!res.ok) return setError(res.error.message)
+    if (!res.ok) return setError(errorText(res.error, t))
     setError(null)
     // Stored with the asset so the Android AR warning and readiness survive a reload (AR-01/02).
     const requiredExtensions = format === 'glb' ? await readRequiredExtensions(file) : undefined
@@ -147,15 +157,15 @@ function ModelSlot({
       await onFile(new File([usdz as BlobPart], usdzNameFor(buildFrom.fileName), { type: 'model/vnd.usdz+zip' }), { built: true })
     } catch {
       setChecking(false)
-      setError('We could not build the iPhone file from this GLB. Upload a USDZ made by your 3D artist instead.')
+      setError(t('products.model.buildFailed'))
     }
   }
 
   const onUrl = async () => {
     const url = urlDraft.trim()
     if (checking) return
-    if (!isHttpsUrl(url)) return setError('Enter a full URL starting with https://')
-    if (!url.toLowerCase().split('?')[0]?.endsWith(`.${format}`)) return setError(`The URL should point to a .${format} file.`)
+    if (!isHttpsUrl(url)) return setError(t('common.validation.urlInvalid'))
+    if (!url.toLowerCase().split('?')[0]?.endsWith(`.${format}`)) return setError(t('products.model.urlExtension', { format }))
     setError(null)
     setChecking('checking')
     // Reads only the header of a linked GLB; when the host does not allow it, the 3D preview checks it on load.
@@ -172,8 +182,8 @@ function ModelSlot({
     <div className="min-w-0 rounded-[var(--radius-card)] border border-line bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="text-[14px] leading-5 font-semibold text-ink">{info.title}</h4>
-          <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">{info.use}</p>
+          <h4 className="text-[14px] leading-5 font-semibold text-ink">{t(info.title)}</h4>
+          <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">{t(info.use)}</p>
         </div>
         <Badge tone="neutral">.{format}</Badge>
       </div>
@@ -186,31 +196,31 @@ function ModelSlot({
               {asset.fileName}
             </p>
             <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-ink-muted tabular-nums">
-              {asset.sizeBytes ? formatFileSize(asset.sizeBytes) : asset.url.startsWith('blob:') ? 'Uploaded file' : 'Remote URL'}
+              {asset.sizeBytes ? formatFileSize(asset.sizeBytes) : asset.url.startsWith('blob:') ? t('products.model.uploadedFile') : t('products.model.remoteUrl')}
               <AssetStatusBadge status={stale ? 'missing' : asset.status} />
             </p>
           </div>
-          <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} disabled={!!checking} onClick={() => onChange(undefined)} aria-label={`Remove ${format.toUpperCase()} file`} className="shrink-0 text-danger! hover:bg-danger-soft">
-            Remove
+          <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" aria-hidden />} disabled={!!checking} onClick={() => onChange(undefined)} aria-label={t('products.model.removeFile', { format: format.toUpperCase() })} className="shrink-0 text-danger! hover:bg-danger-soft">
+            {t('products.model.remove')}
           </Button>
         </div>
       ) : (
         <div className="mt-3 rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-5 text-center text-[13px] text-ink-muted">
-          No {format.toUpperCase()} file yet.
+          {t('products.model.noFile', { format: format.toUpperCase() })}
           {canBuild && (
             <div className="mt-3 flex flex-col items-center gap-2">
               <Button size="sm" disabled={!!checking} onClick={() => void onBuild()} icon={checking === 'building' ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Wand2 className="size-4" aria-hidden />}>
-                {checking === 'building' ? 'Building from GLB…' : 'Build from GLB'}
+                {t(checking === 'building' ? 'products.model.building' : 'products.model.build')}
               </Button>
-              <span className="max-w-xs text-[12px] leading-4">Makes the iPhone file from your GLB, at the same size. Or upload your own below.</span>
+              <span className="max-w-xs text-[12px] leading-4">{t('products.model.buildHint')}</span>
             </div>
           )}
         </div>
       )}
       {asset?.status === 'session-only' && !stale && (
-        <p className="mt-2 text-[13px] text-info">Stored in this browser session only. Real hosting needs backend storage.</p>
+        <p className="mt-2 text-[13px] text-info">{t('products.model.sessionOnly')}</p>
       )}
-      {stale && <p className="mt-2 text-[13px] text-warning">This uploaded file is no longer available after reloading. Upload it again (backend storage needed).</p>}
+      {stale && <p className="mt-2 text-[13px] text-warning">{t('products.model.staleFile')}</p>}
 
       <div className="mt-3 flex flex-col gap-2">
         <label
@@ -221,7 +231,11 @@ function ModelSlot({
           )}
         >
           {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Upload className="size-4" aria-hidden />}
-          {checking === 'optimizing' ? 'Optimizing model…' : checking ? 'Checking file…' : asset ? `Replace .${format} file` : `Upload .${format} file`}
+          {checking === 'optimizing'
+            ? t('products.model.optimizing')
+            : checking
+              ? t('products.model.checking')
+              : t(asset ? 'products.model.replaceFile' : 'products.model.uploadFile', { format })}
           <input
             id={id}
             type="file"
@@ -238,8 +252,8 @@ function ModelSlot({
         {allowLink && (
         <div className="flex gap-2">
           <Input
-            aria-label={`${format.toUpperCase()} model URL`}
-            placeholder={`Or paste a .${format} URL`}
+            aria-label={t('products.model.urlLabel', { format: format.toUpperCase() })}
+            placeholder={t('products.model.urlPlaceholder', { format })}
             value={urlDraft}
             disabled={!!checking}
             onChange={(e) => setUrlDraft(e.target.value)}
@@ -252,18 +266,18 @@ function ModelSlot({
             className="h-9 max-sm:h-11"
           />
           <Button size="sm" onClick={() => void onUrl()} disabled={!!checking || !urlDraft.trim()} icon={<Link2 className="size-4" aria-hidden />}>
-            Link
+            {t('products.model.link')}
           </Button>
         </div>
         )}
-        <p className="text-[13px] text-ink-muted">Max {formatMb(MODEL_RULES[format].maxBytes)}. The file structure is checked to confirm the format.</p>
+        <p className="text-[13px] text-ink-muted">{t('products.model.maxSize', { size: formatMb(MODEL_RULES[format].maxBytes) })}</p>
       </div>
       {optimizeNote && asset && (
         <p className="mt-2 text-[13px] text-ink-muted">
           {optimizeNote.text}{' '}
           {optimizeNote.original && (
             <button type="button" disabled={!!checking} className="font-medium text-ink underline underline-offset-2" onClick={() => void onFile(optimizeNote.original!, { keepOriginal: true })}>
-              Upload the original instead
+              {t('products.model.uploadOriginal')}
             </button>
           )}
         </p>
@@ -296,6 +310,7 @@ export function ModelPreview({
   context?: ModelContext
   onRefreshUrls?: () => void
 }) {
+  const { t } = useI18n()
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [progress, setProgress] = useState(0)
   const [measured, setMeasured] = useState<{ x: number; y: number; z: number } | null>(null)
@@ -328,11 +343,11 @@ export function ModelPreview({
     return (
       <div className="flex flex-col items-center rounded-[var(--radius-card)] border border-line bg-subtle/50 px-4 py-10 text-center sm:px-6">
         <AlertTriangle className="size-6 text-warning" aria-hidden />
-        <p className="mt-3 text-[14px] font-medium text-ink">This model file is unavailable. Upload it again.</p>
-        <p className="mt-1 max-w-md text-[13px] leading-[1.45] text-ink-muted">The stored GLB could not be opened for the preview. Use “Replace .glb file” above.</p>
+        <p className="mt-3 text-[14px] font-medium text-ink">{t('products.model.unavailable')}</p>
+        <p className="mt-1 max-w-md text-[13px] leading-[1.45] text-ink-muted">{t('products.model.unavailableBody')}</p>
         {onRefreshUrls && (
           <Button size="sm" className="mt-3" onClick={onRefreshUrls}>
-            Check again
+            {t('products.model.checkAgain')}
           </Button>
         )}
         {readiness}
@@ -344,13 +359,9 @@ export function ModelPreview({
     return (
       <div className="flex flex-col items-center rounded-[var(--radius-card)] border border-line bg-subtle/50 px-4 py-10 text-center sm:px-6">
         <Box className="size-6 text-ink-muted" aria-hidden />
-        <p className="mt-3 text-[14px] font-medium text-ink">{context === 'variant' ? 'No 3D model for this option' : 'No 3D preview yet'}</p>
+        <p className="mt-3 text-[14px] font-medium text-ink">{t(context === 'variant' ? 'products.model.noModelOption' : 'products.model.noPreview')}</p>
         <p className="mt-1 max-w-md text-[13px] leading-[1.45] text-ink-muted">
-          {context === 'variant'
-            ? 'Customers who pick this option see the product’s main 3D model, with a note that this finish may look different. Upload a GLB (and a USDZ for iPhone) made for this option to show it in 3D and AR.'
-            : context === 'request'
-              ? 'Upload a GLB to preview the model and check its size against the product’s dimensions.'
-              : 'Add a GLB model to show the 3D viewer and the “View in my home” AR button. Without one, customers see the photo gallery only.'}
+          {t(context === 'variant' ? 'products.model.emptyVariant' : context === 'request' ? 'products.model.emptyRequest' : 'products.model.emptyProduct')}
         </p>
         {context !== 'variant' || usdz ? readiness : null}
       </div>
@@ -365,7 +376,7 @@ export function ModelPreview({
           src={glb.url}
           iosSrc={usdz?.url}
           poster={poster}
-          alt={`3D model of ${name}`}
+          alt={t('products.model.alt', { name })}
           className="absolute inset-0"
           onProgress={setProgress}
           onLoad={({ dimensions: d, requiredExtensions }) => {
@@ -384,10 +395,10 @@ export function ModelPreview({
           <div className="absolute inset-0 grid place-items-center bg-canvas/90 p-6 text-center" role="alert">
             <div>
               <AlertTriangle className="mx-auto size-6 text-danger" aria-hidden />
-              <p className="mt-2 text-[14px] font-medium text-ink">The 3D preview could not load</p>
-              <p className="mt-1 text-[13px] text-ink-muted">The file may still be fine. Try again; if it keeps failing, upload the file again.</p>
+              <p className="mt-2 text-[14px] font-medium text-ink">{t('products.model.previewFailed')}</p>
+              <p className="mt-1 text-[13px] text-ink-muted">{t('products.model.previewFailedBody')}</p>
               <Button size="sm" className="mt-3" onClick={retry}>
-                Try again
+                {t('common.retry')}
               </Button>
             </div>
           </div>
@@ -404,14 +415,15 @@ const LEVEL_ICON = {
   warning: <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />,
   missing: <CircleSlash className="mt-0.5 size-4 shrink-0 text-ink-faint" aria-hidden />,
 }
-const LEVEL_TEXT = { ready: 'Ready', warning: 'Needs attention', missing: 'Not available' }
+const LEVEL_TEXT = { ready: 'products.model.levelReady', warning: 'products.model.levelWarning', missing: 'products.model.levelMissing' } as const
 const LEVEL_TONE = { ready: 'success', warning: 'warning', missing: 'neutral' } as const
 
 /** What customers get on each platform, so the admin knows before publishing (ADR-0018). */
 function ArReadiness({ items }: { items: ReadinessItem[] }) {
+  const { t } = useI18n()
   return (
-    <section aria-label="AR readiness" className="mt-4 w-full rounded-[var(--radius-card)] border border-line bg-surface p-4 text-left">
-      <h4 className="text-[14px] font-semibold text-ink">AR readiness</h4>
+    <section aria-label={t('products.model.readiness')} className="mt-4 w-full rounded-[var(--radius-card)] border border-line bg-surface p-4 text-left">
+      <h4 className="text-[14px] font-semibold text-ink">{t('products.model.readiness')}</h4>
       <ul className="mt-3 space-y-3">
         {items.map((i) => (
           <li key={i.key} className="flex items-start gap-2.5 text-[13px] leading-[1.45]">
@@ -421,7 +433,7 @@ function ArReadiness({ items }: { items: ReadinessItem[] }) {
               <p className="mt-0.5 text-ink-muted">{i.detail}</p>
             </div>
             <Badge tone={LEVEL_TONE[i.level]} className="shrink-0">
-              {LEVEL_TEXT[i.level]}
+              {t(LEVEL_TEXT[i.level])}
             </Badge>
           </li>
         ))}
@@ -430,17 +442,19 @@ function ArReadiness({ items }: { items: ReadinessItem[] }) {
   )
 }
 
-const MISMATCH_HINT: Record<ScaleMismatchReason, (k?: number) => string> = {
-  'axis-swap': () => 'Likely cause: width and depth are swapped. The model is turned 90°; re-export it with its front facing forward (+Z).',
-  'wrong-unit': () => 'Likely cause: the numbers are in the other unit. Check the centimetres / inches switch.',
-  'model-units': (k) => `Likely cause: the file is not in metres (about ${k && k >= 1 ? Math.round(k) : `1/${Math.round(1 / (k ?? 1))}`}× too ${k && k >= 1 ? 'large' : 'small'}). Re-export it in metres.`,
-  uniform: (k) => `The model is about ${k?.toFixed(2)}× the entered size on every axis. Check the file's export scale or the dimensions.`,
+const MISMATCH_HINT: Record<ScaleMismatchReason, (t: T, k?: number) => string> = {
+  'axis-swap': (t) => t('products.model.hint.axisSwap'),
+  'wrong-unit': (t) => t('products.model.hint.wrongUnit'),
+  'model-units': (t, k) =>
+    k && k >= 1 ? t('products.model.hint.modelUnitsLarge', { k: Math.round(k) }) : t('products.model.hint.modelUnitsSmall', { k: Math.round(1 / (k ?? 1)) }),
+  uniform: (t, k) => t('products.model.hint.uniform', { k: k?.toFixed(2) ?? '' }),
 }
 
 function ScaleReport({ scale }: { scale: ScaleCheck }) {
+  const { t } = useI18n()
   const m = (v: number) => `${Math.round(v * 100)} cm`
   if (scale.status === 'unknown')
-    return <p className="mt-3 text-[13px] text-ink-muted">Enter width, height and depth to compare them with the model’s real size.</p>
+    return <p className="mt-3 text-[13px] text-ink-muted">{t('products.model.scaleUnknown')}</p>
   const sizes = (s: { x: number; y: number; z: number }) => `${m(s.x)} × ${m(s.y)} × ${m(s.z)}`
   return (
     <div className="mt-3 flex items-start gap-2.5 text-[13px] leading-[1.45]">
@@ -450,12 +464,12 @@ function ScaleReport({ scale }: { scale: ScaleCheck }) {
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
       )}
       <div>
-        <p className="font-medium text-ink">{scale.status === 'verified' ? 'Scale verified: the model matches the entered dimensions (within 5%, or 1 cm for small pieces).' : 'AR scale unverified: the model does not match the entered dimensions.'}</p>
+        <p className="font-medium text-ink">{t(scale.status === 'verified' ? 'products.model.scaleVerified' : 'products.model.scaleUnverified')}</p>
         <p className="mt-0.5 text-ink-muted">
-          Model measures W × H × D {sizes(scale.measured)}. Entered {sizes(scale.expected)}.
-          {scale.status === 'mismatch' && ' The model is never rescaled automatically. Fix the model file or the dimensions.'}
+          {t('products.model.scaleMeasures', { measured: sizes(scale.measured), entered: sizes(scale.expected) })}
+          {scale.status === 'mismatch' && ` ${t('products.model.scaleNever')}`}
         </p>
-        {scale.status === 'mismatch' && scale.reason && <p className="mt-0.5 text-ink">{MISMATCH_HINT[scale.reason](scale.factor)}</p>}
+        {scale.status === 'mismatch' && scale.reason && <p className="mt-0.5 text-ink">{MISMATCH_HINT[scale.reason](t, scale.factor)}</p>}
       </div>
     </div>
   )

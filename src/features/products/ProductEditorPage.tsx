@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState, ErrorState } from '@/components/ui/States'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ProductEditorForm } from './editor/ProductEditorForm'
@@ -15,6 +17,7 @@ import type { EditorScope } from './useProductActions'
 
 /** Shared editor route for both dashboards (design/15). */
 export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
+  const { t } = useI18n()
   const { productId } = useParams()
   const [params] = useSearchParams()
   const { business: ownBusiness } = useAccount()
@@ -23,8 +26,8 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
 
   const base = scope === 'admin' ? '/admin/products' : '/dashboard/products'
   const crumbs = [
-    { label: scope === 'admin' ? 'All Products' : 'My Products', to: base },
-    { label: productId ? 'Edit product' : 'Add product' },
+    { label: t(scope === 'admin' ? 'nav.allProducts' : 'nav.myProducts'), to: base },
+    { label: t(productId ? 'products.editor.editTitle' : 'business.products.add') },
   ]
 
   // Keep the initially loaded product stable while the user edits (store refetches are ignored).
@@ -34,15 +37,15 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
   const stale = productId && product.status === 'success' && product.data?.id !== productId
   if ((product.status === 'loading' && !product.data) || stale) return <FullPageSpinner />
   // A failed background refresh keeps the loaded product, so the form (and unsaved edits) stays mounted.
-  if (product.status === 'error' && product.error.code !== 'NOT_FOUND' && !product.data) return <ErrorState message={product.error.message} onRetry={product.refetch} />
+  if (product.status === 'error' && product.error.code !== 'NOT_FOUND' && !product.data) return <ErrorState message={errorText(product.error, t)} onRetry={product.refetch} retryLabel={t('common.retry')} />
 
   const notFound = (productId && !product.data) || (scope === 'business' && product.data && product.data.businessId !== ownBusiness?.id)
   if (notFound) {
     return (
       <>
-        <PageHeader title="Product not found" breadcrumbs={crumbs} />
+        <PageHeader title={t('products.editor.notFoundTitle')} breadcrumbs={crumbs} />
         <Card>
-          <EmptyState title="This product does not exist" body="It may have been deleted, or it belongs to another business." action={<ButtonLink to={base}>Back to products</ButtonLink>} />
+          <EmptyState title={t('products.editor.notFoundEmptyTitle')} body={t('products.editor.notFoundEmptyBody')} action={<ButtonLink to={base}>{t('products.editor.backToProducts')}</ButtonLink>} />
         </Card>
       </>
     )
@@ -51,15 +54,15 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
   if (scope === 'admin' && businesses.list.length === 0 && businesses.query.status === 'success') {
     return (
       <>
-        <PageHeader title="Add product" breadcrumbs={crumbs} />
+        <PageHeader title={t('business.products.add')} breadcrumbs={crumbs} />
         <Card>
           <EmptyState
             icon={Building2}
-            title="Create a business first"
-            body="Every product belongs to a business catalog."
+            title={t('products.editor.needBusinessTitle')}
+            body={t('products.editor.needBusinessBody')}
             action={
               <ButtonLink to="/admin/businesses/new" variant="primary">
-                Create business
+                {t('products.editor.createBusiness')}
               </ButtonLink>
             }
           />
@@ -70,7 +73,7 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
 
   if (scope === 'admin' && businesses.query.status === 'loading' && !businesses.query.data) return <FullPageSpinner />
   if (scope === 'admin' && businesses.query.status === 'error' && !businesses.query.data)
-    return <ErrorState message={`The businesses could not be loaded. ${businesses.query.error.message}`} onRetry={businesses.query.refetch} />
+    return <ErrorState message={`${t('products.editor.businessesFailed')} ${errorText(businesses.query.error, t)}`} onRetry={businesses.query.refetch} retryLabel={t('common.retry')} />
 
   return (
     <ProductEditorForm

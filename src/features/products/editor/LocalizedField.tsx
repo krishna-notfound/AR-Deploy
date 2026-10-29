@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FormField, Input, Textarea } from '@/components/ui/Form'
 import type { Lang, LocalizedText } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { Segmented } from './Segmented'
 
 /** One customer-facing text field with EN (required) and PT (optional) versions. */
@@ -27,6 +28,7 @@ export function LocalizedField({
   maxLength?: number
   placeholder?: string
 }) {
+  const { t } = useI18n()
   const [lang, setLang] = useState<Lang>('en')
   const current = lang === 'en' ? value.en : (value.pt ?? '')
   const set = (text: string) => onChange(lang === 'en' ? { ...value, en: text } : { ...value, pt: text || undefined })
@@ -40,7 +42,7 @@ export function LocalizedField({
         <Segmented
           kind="toggle"
           size="sm"
-          label={`${label} language`}
+          label={t('products.editor.fieldLanguage', { label })}
           value={lang}
           onChange={setLang}
           options={[
@@ -48,9 +50,9 @@ export function LocalizedField({
             {
               value: 'pt',
               label: ptMissing ? (
-                <span title="Portuguese translation missing">
+                <span title={t('products.editor.ptMissing')}>
                   PT <span className="text-warning">·</span>
-                  <span className="sr-only">(translation missing)</span>
+                  <span className="sr-only">{t('products.editor.ptMissingShort')}</span>
                 </span>
               ) : (
                 'PT'
@@ -63,7 +65,7 @@ export function LocalizedField({
         <>
           {label}{' '}
           <span className="ml-1 text-[13px] font-normal text-ink-muted">
-            {lang === 'en' ? 'English' : 'Portuguese'}
+            {t(lang === 'en' ? 'products.editor.langEnglish' : 'products.editor.langPortuguese')}
             {marked && <span aria-hidden> ·</span>}
           </span>
         </>
@@ -71,7 +73,7 @@ export function LocalizedField({
       required={required && lang === 'en'}
       optional={lang === 'pt'}
       error={lang === 'en' ? error : undefined}
-      hint={lang === 'pt' ? (hint ? `${hint} ` : '') + 'If left empty, customers see the English text.' : hint}
+      hint={lang === 'pt' ? (hint ? `${hint} ` : '') + t('products.editor.ptFallback') : hint}
     >
       <Control
         value={current}
