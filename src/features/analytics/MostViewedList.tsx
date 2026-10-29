@@ -1,7 +1,11 @@
 import { Link } from 'react-router'
 import { SmartImage } from '@/components/ui/SmartImage'
 import type { Business, Product, ProductAnalytics } from '@/domain/types'
-import { formatMoney, formatNumber } from '@/lib/format'
+import type { Lang } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { localeOf } from '@/i18n/locale'
+import { translate } from '@/i18n/translate'
+import { useFormat } from '@/lib/useFormat'
 import { primaryImage } from '@/lib/product'
 import { hasArModel } from '../products/productReadiness'
 
@@ -14,8 +18,13 @@ export function arAttempts(p: Product | undefined, r: ProductAnalytics): number 
 export const allViews = (r: Pick<ProductAnalytics, 'views' | 'embedViews'>) => r.views + r.embedViews
 
 /** The AR rate as dashboards show it (R-W5-3): "0.12 AR launches per view". Never a percentage. */
-export function formatArRate(rate: number): string {
-  return `${rate.toFixed(2)} AR launches per view`
+export function formatArRate(rate: number, lang: Lang = 'en'): string {
+  return translate(lang, 'admin.analytics.arRatePerView', { rate: formatRateNumber(rate, lang) })
+}
+
+/** A launches-per-view figure with two decimals in the language's number style (0.12 / 0,12). */
+export function formatRateNumber(rate: number, lang: Lang = 'en'): string {
+  return new Intl.NumberFormat(localeOf(lang), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(rate)
 }
 
 /** The rows "Most viewed" shows: existing products with at least one page or embed view, most viewed first (R-W5-7). */
@@ -43,6 +52,8 @@ export function MostViewedList({
   /** Where the name links to edit the product; without it the name is plain text (no products.edit, R-W5-1). */
   editBase?: string
 }) {
+  const { t, tn } = useI18n()
+  const f = useFormat()
   return (
     <ol className="divide-y divide-line">
       {rows
@@ -52,7 +63,7 @@ export function MostViewedList({
           if (!p) return null
           const attempts = arAttempts(p, r)
           const businessName = businesses?.get(p.businessId)?.name
-          const price = Number.isFinite(p.price) ? formatMoney(p.price, p.currency) : null
+          const price = Number.isFinite(p.price) ? f.money(p.price, p.currency) : null
           return (
             <li key={r.productId} className="grid grid-cols-[1.25rem_auto_minmax(0,1fr)_auto] items-center gap-3 py-3">
               <span className="text-ui-body text-ink-muted tabular-nums" aria-hidden>
@@ -78,8 +89,8 @@ export function MostViewedList({
                 </p>
               </div>
               <p className="text-right text-ui-small text-ink-muted tabular-nums">
-                <span className="block text-ui-body font-medium text-ink">{formatNumber(allViews(r))} views</span>
-                {attempts === null ? 'No 3D model' : `${formatNumber(attempts)} AR attempts`}
+                <span className="block text-ui-body font-medium text-ink">{tn('admin.analytics.views', allViews(r), { n: f.number(allViews(r)) })}</span>
+                {attempts === null ? t('admin.analytics.no3dModel') : tn('admin.analytics.arAttempts', attempts, { n: f.number(attempts) })}
               </p>
             </li>
           )

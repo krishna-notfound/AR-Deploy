@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SERIES, TrendTooltip, dayLabel } from '@/components/charts/Charts'
+import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
 import type { AnalyticsSummary, Product, ProductAnalytics } from '@/domain/types'
 import { type DatePrefs, formatDate } from '@/lib/format'
 import { service } from '@/services'
@@ -189,7 +190,7 @@ describe('AnalyticsView (S1.5 Task 7)', () => {
     expect(screen.getByText('No activity in the last 30 days')).toBeInTheDocument()
     cleanup()
     renderView(Promise.resolve({ ok: false, error: { code: 'VALIDATION', message: "Your time zone setting isn't recognised. Choose it again in Preferences." } }))
-    expect(await screen.findByText("Your time zone setting isn't recognised. Choose it again in Preferences.")).toBeInTheDocument()
+    expect(await screen.findByText('Some details need fixing. Check the highlighted fields.')).toBeInTheDocument()
   })
 })
 
@@ -208,5 +209,33 @@ describe('MostViewedList (R-W5-7)', () => {
     expect(items[0]).toHaveTextContent(P1.name.en)
     expect(items[0]).toHaveTextContent('3 views')
     expect(screen.queryByText(P2.name.en)).toBeNull()
+  })
+})
+
+describe('AnalyticsView in Portuguese', () => {
+  beforeEach(() => {
+    prefsNow.current = { timezone: 'Europe/Lisbon', dateFormat: 'dd/MM/yyyy', clock: '24h' }
+    localStorage.setItem(LANG_KEY, 'pt')
+  })
+  afterEach(() => {
+    localStorage.removeItem(LANG_KEY)
+    vi.restoreAllMocks()
+  })
+
+  it('renders the titles, figures and table headers in pt-PT', async () => {
+    vi.spyOn(service, 'getBusinessAnalytics').mockResolvedValue({ ok: true, data: summaryOf() })
+    vi.spyOn(service, 'getProducts').mockResolvedValue({ ok: true, data: seedProducts })
+    render(
+      <LanguageProvider>
+        <MemoryRouter>
+          <AnalyticsView businessId={P1.businessId} editBase="/dashboard/products" />
+        </MemoryRouter>
+      </LanguageProvider>,
+    )
+    expect(await screen.findByText('Desempenho dos produtos', { selector: 'h2, h3' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Visualizações da página do produto/ })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Taxa de AR/ })).toBeInTheDocument()
+    expect(screen.getAllByText('Últimos 30 dias').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Product performance')).toBeNull()
   })
 })
