@@ -7,7 +7,9 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { SecurityState } from '@/domain/types'
-import { account } from '@/services'
+import { accountErrorText } from '../accountError'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { type ServiceError, account } from '@/services'
 import type { Result } from '@/services/catalogService'
 import { ActionCodeDialog } from '../ActionCodeDialog'
 import { RecoveryCodes } from '../RecoveryCodes'
@@ -16,9 +18,9 @@ import { TotpSetup } from '../TotpSetup'
 
 const RECOVERY_SET = 8
 
-type Load = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'ready'; state: SecurityState }
+type Load = { kind: 'loading' } | { kind: 'error'; error: ServiceError } | { kind: 'ready'; state: SecurityState }
 
-const toLoad = (r: Result<SecurityState>): Load => (r.ok ? { kind: 'ready', state: r.data } : { kind: 'error', message: r.error.message })
+const toLoad = (r: Result<SecurityState>): Load => (r.ok ? { kind: 'ready', state: r.data } : { kind: 'error', error: r.error })
 
 /**
  * Reads the security state again after a change. `fallback` is what the change is known to have done; it is applied to
@@ -26,13 +28,14 @@ const toLoad = (r: Result<SecurityState>): Load => (r.ok ? { kind: 'ready', stat
  */
 type Refresh = (fallback: Partial<SecurityState>) => Promise<void>
 
-function recoveryLine(left: number | null) {
+function recoveryLine(left: number | null, t: ReturnType<typeof useI18n>['t']) {
   if (left === null) return null
-  if (left === 0) return <Badge tone="warning">No recovery codes left</Badge>
-  return <span className="text-ui-small text-ink-muted">{`${left} of ${RECOVERY_SET} recovery codes left`}</span>
+  if (left === 0) return <Badge tone="warning">{t('settings.security.noCodesLeft')}</Badge>
+  return <span className="text-ui-small text-ink-muted">{t('settings.security.codesLeft', { left, total: RECOVERY_SET })}</span>
 }
 
 function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; email: string | null; onChanged: Refresh }) {
+  const { t } = useI18n()
   const toast = useToast()
   const [settingUp, setSettingUp] = useState(false)
   const [dialog, setDialog] = useState<'regenerate' | 'disable' | null>(null)
@@ -57,7 +60,7 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
   }, [focusTick])
 
   const finishSetup = async () => {
-    toast.success('2FA is on', 'You will be asked for a code from your authenticator app when you sign in.')
+    toast.success(t('settings.totp.on'), t('settings.totp.onBody'))
     // Refresh first: the setup stays mounted (and the card on) until the new state is in, so Turn on never flashes back.
     await onChanged({ hasVerifiedFactor: true, aal: 'aal2' })
     setSettingUp(false)
@@ -91,7 +94,7 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
     if (r.ok) {
       setDialog(null)
       setFreshCodes(null)
-      toast.success('2FA is off')
+      toast.success(t('settings.security.off'))
       await onChanged({ hasVerifiedFactor: false, recoveryCodesLeft: null })
       focusTitle()
     }
@@ -101,16 +104,16 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
   return (
     <div ref={wrap}>
       <SettingsCard
-        title="Two-step verification (2FA)"
-        description="When you sign in, you also enter a 6-digit code from an authenticator app on your phone."
+        title={t('settings.security.twoFactor')}
+        description={t('settings.security.twoFactorDescription')}
       >
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-ui-body font-medium text-ink">Authenticator app</span>
+            <span className="text-ui-body font-medium text-ink">{t('settings.security.authenticator')}</span>
             <Badge tone={on ? 'success' : 'neutral'} dot>
-              {on ? 'On' : 'Off'}
+              {on ? t('settings.security.on') : t('settings.security.offLabel')}
             </Badge>
-            {on && !settingUp && recoveryLine(state.recoveryCodesLeft)}
+            {on && !settingUp && recoveryLine(state.recoveryCodesLeft, t)}
           </div>
 
           {settingUp && (
@@ -120,10 +123,10 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
           {!on && !settingUp && (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-ui-small text-ink-muted">
-                {state.requires2fa ? 'Your organisation requires 2FA. Set it up to keep using the dashboard.' : 'Recommended: it keeps your account safe even if your password leaks.'}
+                {state.requires2fa ? t('settings.security.required') : t('settings.security.recommended')}
               </p>
               <Button variant="primary" onClick={() => setSettingUp(true)}>
-                Turn on 2FA
+                {t('settings.security.turnOn')}
               </Button>
             </div>
           )}
@@ -132,7 +135,7 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
 
           {on && !settingUp && !freshCodes && !elevated && (
             <InlineNotice tone="info">
-              To change 2FA or your recovery codes, sign out and sign in again with your authenticator code.
+              {t('settings.security.needsAal2')}
             </InlineNotice>
           )}
 
@@ -140,18 +143,18 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="min-w-0 flex-1 basis-60 text-ui-small text-ink-muted">
-                  Recovery codes let you sign in without your phone. A new set replaces the old one. We email you a code to confirm.
+                  {t('settings.security.recoveryNote')}
                 </p>
-                <Button onClick={() => setDialog('regenerate')}>Regenerate recovery codes</Button>
+                <Button onClick={() => setDialog('regenerate')}>{t('settings.security.regenerate')}</Button>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
                 {state.requires2fa ? (
-                  <p className="text-ui-small text-ink-muted">Your organisation requires 2FA, so it can&rsquo;t be turned off.</p>
+                  <p className="text-ui-small text-ink-muted">{t('settings.security.cannotTurnOff')}</p>
                 ) : (
                   <>
-                    <p className="min-w-0 flex-1 basis-60 text-ui-small text-ink-muted">Turning 2FA off removes your authenticator and recovery codes.</p>
+                    <p className="min-w-0 flex-1 basis-60 text-ui-small text-ink-muted">{t('settings.security.turnOffNote')}</p>
                     <Button variant="danger" onClick={() => setDialog('disable')}>
-                      Turn off 2FA
+                      {t('settings.security.turnOff')}
                     </Button>
                   </>
                 )}
@@ -163,18 +166,18 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
         <ActionCodeDialog
           open={dialog === 'regenerate'}
           purpose="regenerate_recovery"
-          title="Regenerate recovery codes"
-          description="Your current recovery codes stop working and you get a new set of 8."
-          confirmLabel="Regenerate codes"
+          title={t('settings.security.regenerate')}
+          description={t('settings.security.regenerateBody', { n: RECOVERY_SET })}
+          confirmLabel={t('settings.security.regenerateConfirm')}
           onClose={() => setDialog(null)}
           onConfirm={regenerate}
         />
         <ActionCodeDialog
           open={dialog === 'disable'}
           purpose="disable_2fa"
-          title="Turn off 2FA?"
-          description="Signing in will need only your password. Your authenticator and recovery codes are removed."
-          confirmLabel="Turn off 2FA"
+          title={t('settings.security.turnOffTitle')}
+          description={t('settings.security.turnOffBody')}
+          confirmLabel={t('settings.security.turnOff')}
           destructive
           onClose={() => setDialog(null)}
           onConfirm={disable}
@@ -185,29 +188,30 @@ function TwoFactorCard({ state, email, onChanged }: { state: SecurityState; emai
 }
 
 function DevicesCard() {
+  const { t } = useI18n()
   const confirm = useConfirm()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
 
   const signOutOthers = async () => {
     const yes = await confirm({
-      title: 'Sign out other devices?',
-      body: 'Every other browser and device signed in to your account is signed out. This one stays signed in.',
-      confirmLabel: 'Sign out other devices',
+      title: t('settings.security.devices.confirmTitle'),
+      body: t('settings.security.devices.confirmBody'),
+      confirmLabel: t('settings.security.devices.signOut'),
     })
     if (!yes) return
     setBusy(true)
     const r = await account.signOutOtherDevices()
     setBusy(false)
-    if (r.ok) toast.success('Other devices were signed out')
-    else toast.error("Couldn't sign out other devices", r.error.message)
+    if (r.ok) toast.success(t('settings.security.devices.done'))
+    else toast.error(t('settings.security.devices.failed'), accountErrorText(r.error, t))
   }
 
   return (
-    <SettingsCard title="Signed-in devices" description="Signed in somewhere you no longer use, or on a shared computer? Sign out everywhere else.">
+    <SettingsCard title={t('settings.security.devices.title')} description={t('settings.security.devices.description')}>
       <div className="flex justify-end">
         <Button loading={busy} onClick={() => void signOutOthers()}>
-          Sign out other devices
+          {t('settings.security.devices.signOut')}
         </Button>
       </div>
     </SettingsCard>
@@ -215,6 +219,7 @@ function DevicesCard() {
 }
 
 export default function SecuritySection() {
+  const { t } = useI18n()
   const toast = useToast()
   const email = useOptionalAccount()?.user?.email ?? null
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
@@ -234,9 +239,9 @@ export default function SecuritySection() {
         return
       }
       setLoad((prev) => (prev.kind === 'ready' ? { kind: 'ready', state: { ...prev.state, ...fallback } } : prev))
-      toast.error("Couldn't refresh your security settings", r.error.message)
+      toast.error(t('settings.security.refreshFailed'), accountErrorText(r.error, t))
     },
-    [toast],
+    [toast, t],
   )
 
   useEffect(() => {
@@ -251,16 +256,16 @@ export default function SecuritySection() {
 
   return (
     <>
-      <SectionHeader title="Security & 2FA" description="Two-step verification, recovery codes and signed-in devices." />
+      <SectionHeader title={t('settings.section.security')} description={t('settings.security.description')} />
       <div className="space-y-6">
         {load.kind === 'loading' && (
-          <div role="status" aria-label="Loading security settings" className="space-y-3 rounded-[var(--radius-card)] bg-surface p-6">
+          <div role="status" aria-label={t('settings.security.loading')} className="space-y-3 rounded-[var(--radius-card)] bg-surface p-6">
             <Skeleton className="h-4 w-1/3" />
             <Skeleton className="h-3.5 w-2/3" />
             <Skeleton className="h-9 w-36" />
           </div>
         )}
-        {load.kind === 'error' && <ErrorState message={load.message} onRetry={() => void reload()} />}
+        {load.kind === 'error' && <ErrorState message={accountErrorText(load.error, t)} onRetry={() => void reload()} />}
         {load.kind === 'ready' && <TwoFactorCard state={load.state} email={email} onChanged={refreshAfterChange} />}
         {load.kind !== 'loading' && <DevicesCard />}
       </div>

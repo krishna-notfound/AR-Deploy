@@ -4,6 +4,7 @@ import { type ComponentType, type LazyExoticComponent, createContext, lazy, useC
 import { useOptionalAccount } from '@/auth/AccountProvider'
 import type { Need } from '@/auth/usePermission'
 import type { SettingsSection } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { isDemoMode } from '@/services'
 
 export type { SettingsSection } from '@/domain/types'
@@ -11,7 +12,13 @@ export type { SettingsSection } from '@/domain/types'
 /** Which dashboard the hub belongs to: the platform admin (/admin) or a business owner's (/dashboard). */
 export type SettingsScope = 'admin' | 'business'
 
-export type SettingsGroup = 'Your account' | 'Your business' | 'Platform'
+export type SettingsGroup = 'account' | 'business' | 'platform'
+
+export const GROUP_LABEL_KEY: Record<SettingsGroup, TranslationKey> = {
+  account: 'settings.group.account',
+  business: 'settings.group.business',
+  platform: 'settings.group.platform',
+}
 
 export interface SectionContext {
   scope: SettingsScope
@@ -20,7 +27,7 @@ export interface SectionContext {
 
 export interface SettingsSectionDef {
   id: SettingsSection
-  label: string
+  labelKey: TranslationKey
   group: SettingsGroup
   visible: (ctx: SectionContext) => boolean
   element: LazyExoticComponent<ComponentType>
@@ -31,19 +38,19 @@ const businessOnly = ({ scope }: SectionContext) => scope === 'business'
 const ownerOnly = ({ scope, can }: SectionContext) => scope === 'admin' && can('owner')
 
 export const SECTIONS: SettingsSectionDef[] = [
-  { id: 'account', label: 'My account', group: 'Your account', visible: everyone, element: lazy(() => import('./sections/AccountSection')) },
-  { id: 'profile', label: 'Profile', group: 'Your account', visible: everyone, element: lazy(() => import('./sections/ProfileSection')) },
-  { id: 'security', label: 'Security & 2FA', group: 'Your account', visible: everyone, element: lazy(() => import('./sections/SecuritySection')) },
-  { id: 'notifications', label: 'Notifications', group: 'Your account', visible: everyone, element: lazy(() => import('./sections/NotificationsSection')) },
-  { id: 'preferences', label: 'Preferences', group: 'Your account', visible: everyone, element: lazy(() => import('./sections/PreferencesSection')) },
-  { id: 'activity', label: 'Security activity', group: 'Your account', visible: everyone, element: lazy(() => import('./sections/ActivitySection')) },
-  { id: 'business', label: 'Business profile', group: 'Your business', visible: businessOnly, element: lazy(() => import('./sections/BusinessSection')) },
+  { id: 'account', labelKey: 'settings.section.account', group: 'account', visible: everyone, element: lazy(() => import('./sections/AccountSection')) },
+  { id: 'profile', labelKey: 'settings.section.profile', group: 'account', visible: everyone, element: lazy(() => import('./sections/ProfileSection')) },
+  { id: 'security', labelKey: 'settings.section.security', group: 'account', visible: everyone, element: lazy(() => import('./sections/SecuritySection')) },
+  { id: 'notifications', labelKey: 'settings.section.notifications', group: 'account', visible: everyone, element: lazy(() => import('./sections/NotificationsSection')) },
+  { id: 'preferences', labelKey: 'settings.section.preferences', group: 'account', visible: everyone, element: lazy(() => import('./sections/PreferencesSection')) },
+  { id: 'activity', labelKey: 'settings.section.activity', group: 'account', visible: everyone, element: lazy(() => import('./sections/ActivitySection')) },
+  { id: 'business', labelKey: 'settings.section.business', group: 'business', visible: businessOnly, element: lazy(() => import('./sections/BusinessSection')) },
   // Demo data tools and sample credits only: the live site has no General section (owner 2026-10-26).
-  { id: 'platform', label: 'General', group: 'Platform', visible: (c) => isDemoMode && ownerOnly(c), element: lazy(() => import('./sections/PlatformSection')) },
-  { id: 'security-policy', label: 'Security policy', group: 'Platform', visible: ownerOnly, element: lazy(() => import('./sections/SecurityPolicySection')) },
+  { id: 'platform', labelKey: 'settings.section.platform', group: 'platform', visible: (c) => isDemoMode && ownerOnly(c), element: lazy(() => import('./sections/PlatformSection')) },
+  { id: 'security-policy', labelKey: 'settings.section.securityPolicy', group: 'platform', visible: ownerOnly, element: lazy(() => import('./sections/SecurityPolicySection')) },
 ]
 
-export const SETTINGS_GROUPS: SettingsGroup[] = ['Your account', 'Your business', 'Platform']
+export const SETTINGS_GROUPS: SettingsGroup[] = ['account', 'business', 'platform']
 
 /** The sections this person may open, in list order. */
 export function visibleSections(ctx: SectionContext): SettingsSectionDef[] {

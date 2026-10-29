@@ -9,38 +9,39 @@ import { SkeletonRows } from '@/components/ui/Skeleton'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { AccessAction, AccessEvent } from '@/domain/types'
-import { formatDateTime } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { errorText } from '@/i18n/errorText'
+import { type TranslationKey } from '@/i18n/dictionaries/en'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { ROLE_LABEL } from './permissions'
+import { ROLE_KEY } from './teamLabels'
 
 const PAGE_SIZE = 20
 
-export const ACTION_LABEL: Record<AccessAction, string> = {
-  invite_created: 'Invitation created',
-  invite_email_sent: 'Invitation email sent',
-  invite_email_failed: 'Invitation email failed',
-  invite_accepted: 'Invitation accepted',
-  invite_revoked: 'Invitation revoked',
-  invite_expired_attempt: 'Expired invitation used',
-  role_changed: 'Role changed',
-  permissions_changed: 'Permissions changed',
-  member_deactivated: 'Member deactivated',
-  member_reactivated: 'Member reactivated',
-  denied: 'Access refused',
-  member_removed: 'Member removed',
-  member_email_changed: 'Sign-in email changed',
-  member_closed: 'Account closed',
+export const ACTION_LABEL: Record<AccessAction, TranslationKey> = {
+  invite_created: 'team.access.action.invite_created',
+  invite_email_sent: 'team.access.action.invite_email_sent',
+  invite_email_failed: 'team.access.action.invite_email_failed',
+  invite_accepted: 'team.access.action.invite_accepted',
+  invite_revoked: 'team.access.action.invite_revoked',
+  invite_expired_attempt: 'team.access.action.invite_expired_attempt',
+  role_changed: 'team.access.action.role_changed',
+  permissions_changed: 'team.access.action.permissions_changed',
+  member_deactivated: 'team.access.action.member_deactivated',
+  member_reactivated: 'team.access.action.member_reactivated',
+  denied: 'team.access.action.denied',
+  member_removed: 'team.access.action.member_removed',
+  member_email_changed: 'team.access.action.member_email_changed',
+  member_closed: 'team.access.action.member_closed',
 }
-
-const roleName = (r?: string) => (r === 'owner' || r === 'admin' || r === 'team' ? ROLE_LABEL[r] : r)
 
 /**
  * The whole access history (with filters), or one member's: events about that member, and the access refusals of
  * their login, matched on exact ids (R-W6-4).
  */
 export function AccessHistory({ member }: { member?: { id: string; userId: string | null } }) {
+  const { t } = useI18n()
   const [params, setParams] = useSearchParams()
   const q = member ? '' : (params.get('hq') ?? '')
   const memberId = member?.id
@@ -73,30 +74,30 @@ export function AccessHistory({ member }: { member?: { id: string; userId: strin
       {!member && (
         <div className="grid gap-3 border-b border-line p-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto_auto] lg:items-end">
           <div className="flex flex-col gap-2">
-            <span aria-hidden className="text-ui-body font-medium text-ink">Member</span>
-            <SearchInput value={q} onChange={(v) => set('hq', v)} label="Member email address (exact)" placeholder="Exact email address" className="sm:w-full" />
+            <span aria-hidden className="text-ui-body font-medium text-ink">{t('team.access.member')}</span>
+            <SearchInput value={q} onChange={(v) => set('hq', v)} label={t('team.access.memberLabel')} placeholder={t('team.access.memberPlaceholder')} className="sm:w-full" />
           </div>
-          <FormField label="Action">
+          <FormField label={t('team.access.filter.action')}>
             <Select value={action ?? ''} onChange={(e) => set('action', e.target.value)}>
-              <option value="">All actions</option>
+              <option value="">{t('team.access.allActions')}</option>
               {(Object.keys(ACTION_LABEL) as AccessAction[]).map((a) => (
                 <option key={a} value={a}>
-                  {ACTION_LABEL[a]}
+                  {t(ACTION_LABEL[a])}
                 </option>
               ))}
             </Select>
           </FormField>
-          <FormField label="Outcome">
+          <FormField label={t('team.access.filter.outcome')}>
             <Select value={outcome ?? ''} onChange={(e) => set('outcome', e.target.value)}>
-              <option value="">All outcomes</option>
-              <option value="ok">Done</option>
-              <option value="denied">Refused</option>
+              <option value="">{t('team.access.allOutcomes')}</option>
+              <option value="ok">{t('team.access.done')}</option>
+              <option value="denied">{t('team.access.refused')}</option>
             </Select>
           </FormField>
-          <FormField label="From">
+          <FormField label={t('team.access.filter.from')}>
             <Input type="date" value={from} onChange={(e) => set('from', e.target.value)} />
           </FormField>
-          <FormField label="To">
+          <FormField label={t('team.access.filter.to')}>
             <Input type="date" value={to} onChange={(e) => set('to', e.target.value)} />
           </FormField>
         </div>
@@ -105,9 +106,9 @@ export function AccessHistory({ member }: { member?: { id: string; userId: strin
       {events.status === 'loading' && !events.data ? (
         <SkeletonRows rows={5} />
       ) : events.status === 'error' ? (
-        <ErrorState message={`Could not load the access history. ${events.error.message}`} onRetry={events.refetch} className="m-6" />
+        <ErrorState message={`${t('team.access.loadFailed')} ${errorText(events.error, t)}`} onRetry={events.refetch} className="m-6" />
       ) : !events.data?.items.length ? (
-        <EmptyState icon={History} title="Nothing recorded yet" body={q || action || outcome || from || to ? 'Nothing matches these filters.' : 'Invitations and access changes will appear here.'} />
+        <EmptyState icon={History} title={t('team.access.empty.title')} body={q || action || outcome || from || to ? t('team.access.empty.filtered') : t('team.access.empty.body')} />
       ) : (
         <>
           <ol className="divide-y divide-line">
@@ -117,7 +118,7 @@ export function AccessHistory({ member }: { member?: { id: string; userId: strin
           </ol>
           {!member && (
             <div className="border-t border-line px-4 py-3 sm:px-6">
-              <Pagination page={page} pageSize={PAGE_SIZE} total={events.data.total} onPage={(p) => set('page', String(p))} noun="events" />
+              <Pagination page={page} pageSize={PAGE_SIZE} total={events.data.total} onPage={(p) => set('page', String(p))} noun={t('team.access.noun')} />
             </div>
           )}
         </>
@@ -127,15 +128,17 @@ export function AccessHistory({ member }: { member?: { id: string; userId: strin
 }
 
 function EventRow({ e }: { e: AccessEvent }) {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const fmt = useFormat()
+  const roleName = (r?: string) => (r === 'owner' || r === 'admin' || r === 'team' ? t(ROLE_KEY[r]) : r)
   return (
     <li className="grid gap-1 px-4 py-3.5 text-ui-body sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-start sm:gap-4 sm:px-6">
       <time dateTime={e.at} className="text-ui-small text-ink-muted tabular-nums sm:pt-0.5">
-        {formatDateTime(e.at, 'en', prefs)}
+        {fmt.dateTime(e.at)}
       </time>
       <div className="min-w-0">
         <p className="text-ink">
-          <span className="font-medium">{ACTION_LABEL[e.action]}</span>
+          <span className="font-medium">{t(ACTION_LABEL[e.action])}</span>
           {e.member && (
             <span className="text-ink-muted">
               {' '}
@@ -155,10 +158,10 @@ function EventRow({ e }: { e: AccessEvent }) {
         </p>
         <p className="mt-0.5 text-ui-small text-ink-muted">{e.details}</p>
         <p className="mt-0.5 truncate text-ui-small text-ink-muted" title={e.actor ?? undefined}>
-          By {e.actor ?? 'the system'}
+          {t('team.access.by', { who: e.actor ?? t('team.access.system') })}
         </p>
       </div>
-      <div>{e.outcome === 'denied' ? <Badge tone="danger">Refused</Badge> : <Badge tone="success">Done</Badge>}</div>
+      <div>{e.outcome === 'denied' ? <Badge tone="danger">{t('team.access.refused')}</Badge> : <Badge tone="success">{t('team.access.done')}</Badge>}</div>
     </li>
   )
 }

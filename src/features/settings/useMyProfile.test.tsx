@@ -28,7 +28,7 @@ describe('useMyProfile', () => {
     const good = result.current.profile
     vi.spyOn(account, 'getProfile').mockResolvedValue({ ok: false, error: { code: 'UNKNOWN', reason: 'unknown', message: 'Network down.' } })
     act(() => result.current.reload())
-    await waitFor(() => expect(result.current.error).toBe('Network down.'))
+    await waitFor(() => expect(result.current.error?.message).toBe('Network down.'))
     expect(result.current.profile).toBe(good)
     expect(result.current.loading).toBe(false)
   })

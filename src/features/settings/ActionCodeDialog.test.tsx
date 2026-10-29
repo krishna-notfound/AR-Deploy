@@ -97,7 +97,7 @@ describe('ActionCodeDialog', () => {
     await attempt()
     expect(await screen.findByText('Too many codes were requested. Wait a few minutes and try again.')).toBeInTheDocument()
     await attempt()
-    expect(await screen.findByText('Plain server sentence.')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong. Try again in a moment.')).toBeInTheDocument()
     expect(onConfirm).toHaveBeenCalledTimes(5)
   })
 

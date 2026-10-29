@@ -3,14 +3,14 @@
 // the signed-in user.
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { useAccount } from '@/auth/AccountProvider'
-import { type Profile, account } from '@/services'
+import { type Profile, type ServiceError, account } from '@/services'
 
 interface Snapshot {
   key: string | null
   /** The last profile loaded or saved for this person; kept when a later refetch fails. */
   profile: Profile | null
-  /** Why the last load failed (user-safe text), or null. */
-  error: string | null
+  /** Why the last load failed, or null (the UI shows errorText of it). */
+  error: ServiceError | null
   loading: boolean
   /** When `profile` was last loaded or saved (Date.now()). */
   at: number
@@ -53,7 +53,7 @@ async function load(key: string, force = false): Promise<void> {
   const r = await account.getProfile()
   if (pending === key) pending = null
   if (ticket !== latest || snap.key !== key) return
-  publish(r.ok ? { key, profile: r.data, error: null, loading: false, at: Date.now() } : { ...snap, error: r.error.message, loading: false })
+  publish(r.ok ? { key, profile: r.data, error: null, loading: false, at: Date.now() } : { ...snap, error: r.error, loading: false })
 }
 
 export interface MyProfile {
@@ -61,7 +61,7 @@ export interface MyProfile {
   profile: Profile | null
   loading: boolean
   /** Why the last load failed, even when an older profile is still shown. */
-  error: string | null
+  error: ServiceError | null
   reload: () => void
   /** Shows a new profile everywhere at once (after a save, or optimistically before it). */
   setProfile: (p: Profile) => void

@@ -1,6 +1,7 @@
 import { ImagePlus, Star, Trash2 } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import type { ProductImage } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { IMAGE_RULES, validateImageFile } from '@/lib/files'
 import { formatFileSize } from '@/lib/format'
@@ -31,6 +32,7 @@ export function ImageUpload({
   max?: number
   businessId?: string
 }) {
+  const { t } = useI18n()
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [errors, setErrors] = useState<string[]>([])
@@ -83,15 +85,15 @@ export function ImageUpload({
           <figure key={img.id} className="group relative">
             <SmartImage src={img.url} alt={img.alt ?? ''} className={cn('aspect-square w-full rounded-lg', img.isPrimary && allowPrimary && 'ring-2 ring-accent ring-offset-2')} />
             {img.isPrimary && allowPrimary && (
-              <figcaption className="absolute bottom-1.5 left-1.5 rounded bg-ink/80 px-1.5 py-0.5 text-[12px] font-medium text-white">Primary</figcaption>
+              <figcaption className="absolute bottom-1.5 left-1.5 rounded bg-ink/80 px-1.5 py-0.5 text-[12px] font-medium text-white">{t('ui.images.primary')}</figcaption>
             )}
             <div className="absolute top-1.5 right-1.5 flex gap-1 rounded-md bg-surface/95 p-0.5 opacity-100 shadow-sm sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
               {allowPrimary && !img.isPrimary && (
-                <IconButton aria-label={`Make ${img.alt || 'image'} the primary image`} size="sm" className="size-7" onClick={() => setPrimary(img.id)}>
+                <IconButton aria-label={t('ui.images.makePrimary', { name: img.alt || t('ui.images.image') })} size="sm" className="size-7" onClick={() => setPrimary(img.id)}>
                   <Star className="size-3.5" />
                 </IconButton>
               )}
-              <IconButton aria-label={`Remove ${img.alt || 'image'}`} size="sm" className="size-7 hover:text-danger" onClick={() => remove(img.id)}>
+              <IconButton aria-label={t('ui.images.remove', { name: img.alt || t('ui.images.image') })} size="sm" className="size-7 hover:text-danger" onClick={() => remove(img.id)}>
                 <Trash2 className="size-3.5" />
               </IconButton>
             </div>
@@ -110,7 +112,7 @@ export function ImageUpload({
           )}
         >
           <ImagePlus className="size-5" aria-hidden />
-          <span className="px-2">{busy ? 'Adding…' : 'Add images'}</span>
+          <span className="px-2">{busy ? t('ui.images.adding') : t('ui.images.add')}</span>
           <input
             ref={inputRef}
             id={inputId}
@@ -128,8 +130,9 @@ export function ImageUpload({
         </label>
       </div>
       <p className="mt-2 text-xs text-ink-muted">
-        JPG, PNG or WebP, up to {formatFileSize(IMAGE_RULES.maxBytes)} each.{isDemoMode && ' Large photos are resized for this demo.'}
-        {allowPrimary && ' The primary image is used as the catalog thumbnail and 3D poster.'}
+        {t('ui.images.rules', { size: formatFileSize(IMAGE_RULES.maxBytes) })}
+        {isDemoMode && ` ${t('ui.images.demoResize')}`}
+        {allowPrimary && ` ${t('ui.images.primaryHelp')}`}
       </p>
       {errors.length > 0 && (
         <ul role="alert" className="mt-2 space-y-1 text-xs font-medium text-danger">

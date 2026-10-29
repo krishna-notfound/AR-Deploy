@@ -10,8 +10,10 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { PlatformSettings } from '@/domain/types'
-import { formatDateTime } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { accountErrorText } from '../accountError'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { settingsPath } from '@/lib/urls'
 import { account } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
@@ -20,40 +22,46 @@ import { SectionHeader, SettingsCard } from '../SettingsUi'
 type Key = 'require2faStaff' | 'require2faBusiness'
 
 /** The lockout reason: shown on the disabled switches and after a save refused with aal2_required. */
-export const OWN_2FA_FIRST = 'Turn on your own 2FA first.'
+const OWN_2FA_FIRST = 'own' as const
 /** 2FA is set up but this session never proved it (aal1): RLS refuses every policy update until it does. */
-export const SIGN_IN_WITH_CODE = 'Sign in with your 2FA code to change these.'
+const SIGN_IN_WITH_CODE = 'code' as const
+const REASON_KEY: Record<typeof OWN_2FA_FIRST | typeof SIGN_IN_WITH_CODE, TranslationKey> = {
+  own: 'settings.policy.own2faFirst',
+  code: 'settings.policy.signInWithCode',
+}
 
-const POLICY: Record<Key, { label: string; description: string; who: string; on: string; off: string }> = {
+const POLICY: Record<Key, { label: TranslationKey; description: TranslationKey; who: TranslationKey; on: TranslationKey; off: TranslationKey }> = {
   require2faStaff: {
-    label: 'Require 2FA for staff',
-    description: 'Platform admins and team members must use an authenticator app.',
-    who: 'Staff',
-    on: 'Staff now need 2FA',
-    off: 'Staff no longer need 2FA',
+    label: 'settings.policy.staff.label',
+    description: 'settings.policy.staff.description',
+    who: 'settings.policy.staff.who',
+    on: 'settings.policy.staff.on',
+    off: 'settings.policy.staff.off',
   },
   require2faBusiness: {
-    label: 'Require 2FA for business owners',
-    description: 'Business owners must use an authenticator app to manage their catalog.',
-    who: 'Business owners',
-    on: 'Business owners now need 2FA',
-    off: 'Business owners no longer need 2FA',
+    label: 'settings.policy.business.label',
+    description: 'settings.policy.business.description',
+    who: 'settings.policy.business.who',
+    on: 'settings.policy.business.on',
+    off: 'settings.policy.business.off',
   },
 }
 
 export default function SecurityPolicySection() {
+  const { t } = useI18n()
   const can = useCan()
   return (
     <>
-      <SectionHeader title="Security policy" description="Who must use two-step verification on this platform." />
+      <SectionHeader title={t('settings.section.securityPolicy')} description={t('settings.policy.description')} />
       {/* The hub shows this section to the Owner only; the controls stay hidden for anyone else who reaches it. */}
-      {can('owner') ? <Policy /> : <InlineNotice tone="neutral">Only the platform Owner can change the security policy.</InlineNotice>}
+      {can('owner') ? <Policy /> : <InlineNotice tone="neutral">{t('settings.policy.ownerOnly')}</InlineNotice>}
     </>
   )
 }
 
 function Policy() {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const fmt = useFormat()
   const confirm = useConfirm()
   const toast = useToast()
   const settings = useServiceQuery(() => account.getPlatformSettings(), [])
@@ -76,9 +84,9 @@ function Policy() {
     const p = POLICY[key]
     if (value) {
       const ok = await confirm({
-        title: `${p.label}?`,
-        body: `${p.who} without 2FA will be asked to set it up at their next request.`,
-        confirmLabel: 'Require 2FA',
+        title: `${t(p.label)}?`,
+        body: t('settings.policy.confirmBody', { who: t(p.who) }),
+        confirmLabel: t('settings.policy.confirm'),
       })
       if (!ok) return
     }
@@ -88,7 +96,7 @@ function Policy() {
     setPending(null)
     if (r.ok) {
       setSaved(r.data)
-      toast.success(value ? p.on : p.off)
+      toast.success(t(value ? p.on : p.off))
       return
     }
     if (r.error.reason === 'aal2_required') {
@@ -97,20 +105,20 @@ function Policy() {
       security.refetch()
       return
     }
-    toast.error('Could not save the security policy', r.error.message)
+    toast.error(t('settings.policy.saveFailed'), accountErrorText(r.error, t))
   }
 
   return (
-    <SettingsCard title="Two-step verification" description="People who must use 2FA are asked to set it up before they can see any data.">
+    <SettingsCard title={t('settings.policy.title')} description={t('settings.policy.cardDescription')}>
       {loading ? (
-        <div className="space-y-3" aria-busy="true" aria-label="Loading the security policy">
+        <div className="space-y-3" aria-busy="true" aria-label={t('settings.policy.loading')}>
           <Skeleton className="h-4 w-56" />
           <Skeleton className="h-4 w-80 max-w-full" />
           <Skeleton className="h-4 w-56" />
         </div>
       ) : failed || !policy || !own ? (
         <ErrorState
-          message={`Could not load the security policy. ${(settings.status === 'error' ? settings.error.message : security.status === 'error' ? security.error.message : '') || 'Try again.'}`}
+          message={`${t('settings.policy.loadFailed')} ${settings.status === 'error' ? accountErrorText(settings.error, t) : security.status === 'error' ? accountErrorText(security.error, t) : t('common.retry')}`}
           onRetry={() => {
             settings.refetch()
             security.refetch()
@@ -119,13 +127,13 @@ function Policy() {
         />
       ) : (
         <div className="space-y-5">
-          {reason === SIGN_IN_WITH_CODE && !refused && <InlineNotice tone="warning">{SIGN_IN_WITH_CODE}</InlineNotice>}
+          {reason === SIGN_IN_WITH_CODE && !refused && <InlineNotice tone="warning">{t(REASON_KEY.code)}</InlineNotice>}
           {(reason === OWN_2FA_FIRST || refused) && (
             <InlineNotice tone="warning">
               <span>
-                {OWN_2FA_FIRST} Turning on staff 2FA without it would lock you out of staff data.{' '}
+                {t(REASON_KEY.own)} {t('settings.policy.lockout')}{' '}
                 <Link to={settingsPath('admin', 'security')} className="font-medium underline">
-                  Go to Security & 2FA
+                  {t('settings.policy.goToSecurity')}
                 </Link>
               </span>
             </InlineNotice>
@@ -138,13 +146,13 @@ function Policy() {
                   checked={checked}
                   disabled={pending !== null || reason !== null}
                   onChange={(v) => void change(key, v)}
-                  label={POLICY[key].label}
-                  description={reason ? `${POLICY[key].description} ${reason}` : POLICY[key].description}
+                  label={t(POLICY[key].label)}
+                  description={reason ? `${t(POLICY[key].description)} ${t(REASON_KEY[reason])}` : t(POLICY[key].description)}
                 />
               </div>
             )
           })}
-          {policy.updatedAt && <p className="border-t border-line pt-4 text-ui-small text-ink-muted">Last changed {formatDateTime(policy.updatedAt, 'en', prefs)}</p>}
+          {policy.updatedAt && <p className="border-t border-line pt-4 text-ui-small text-ink-muted">{t('settings.policy.lastChanged', { date: fmt.dateTime(policy.updatedAt) })}</p>}
         </div>
       )}
     </SettingsCard>
