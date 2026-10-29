@@ -1,4 +1,15 @@
 import type { TranslationKey } from './en'
+import { ptAdmin } from './pt.admin'
+import { ptApplications } from './pt.applications'
+import { ptAuth } from './pt.auth'
+import { ptBusiness } from './pt.business'
+import { ptCommon } from './pt.common'
+import { ptEditor } from './pt.editor'
+import { ptProducts } from './pt.products'
+import { ptSettings } from './pt.settings'
+import { ptSite } from './pt.site'
+import { ptTeam } from './pt.team'
+import { ptUi } from './pt.ui'
 
 // European Portuguese (pt-PT) — see open question Q3. Missing keys fall back to English.
 // landing.* and site.* are the client's reference copy, verbatim (Brazilian Portuguese as written; ADR-0023).
@@ -379,9 +390,6 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'reset.remembered': 'Lembrou-se da palavra-passe?',
   'reset.signIn': 'Entrar',
 
-  'common.loading': 'A carregar…',
-  'common.retry': 'Tentar novamente',
-  'common.errorTitle': 'Ocorreu um erro',
 
   'legal.privacy.link': 'Privacidade',
   'legal.terms.link': 'Termos',
@@ -400,5 +408,15 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'legal.agree.newTab': '(abre num novo separador)',
   'legal.agree.required': 'Para continuar, aceite os Termos e a Política de Privacidade.',
   'apply.err.terms_required': 'Para enviar a candidatura, aceite os Termos e a Política de Privacidade.',
-  'common.close': 'Fechar',
+  ...ptCommon,
+  ...ptEditor,
+  ...ptSite,
+  ...ptApplications,
+  ...ptAdmin,
+  ...ptProducts,
+  ...ptBusiness,
+  ...ptSettings,
+  ...ptTeam,
+  ...ptAuth,
+  ...ptUi,
 }

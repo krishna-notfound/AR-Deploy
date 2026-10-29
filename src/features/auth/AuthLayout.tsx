@@ -2,11 +2,9 @@ import { ArrowLeft } from 'lucide-react'
 import type { ReactNode, Ref } from 'react'
 import { Link } from 'react-router'
 import { Wordmark } from '@/components/ui/BrandMark'
-import type { TranslationKey } from '@/i18n/dictionaries/en'
-import { useMaybeI18n } from '@/i18n/LanguageProvider'
-import { type Vars, translate } from '@/i18n/translate'
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { LanguageSwitcher } from '../public/PublicShell'
 import { TAP_TARGET } from '../public/tapTarget'
 
 const YEAR = new Date().getFullYear()
@@ -17,15 +15,6 @@ export const AUTH_PHOTOS = {
   sofa: { src: '/images/sanctus/v2/sofa-travertine.webp', position: '50% 60%' },
   lounge: { src: '/images/sanctus/v2/lounge-chair.webp', position: '50% 50%' },
 } as const
-
-/**
- * Text for pages inside and outside the LanguageProvider: /login and /demo are English-only and sit outside it, so they
- * fall back to the English dictionary.
- */
-export function useAuthText() {
-  const i18n = useMaybeI18n()
-  return { t: (key: TranslationKey, vars?: Vars) => (i18n ? i18n.t(key, vars) : translate('en', key, vars)), hasLang: !!i18n }
-}
 
 /**
  * Split layout of the sign-in style pages (Stitch 10 and 17): a photograph with the brand statement on the left, the
@@ -44,7 +33,7 @@ export function AuthLayout({
   footer?: ReactNode
   children: ReactNode
 }) {
-  const { t, hasLang } = useAuthText()
+  const { t } = useI18n()
   const image = AUTH_PHOTOS[photo]
   return (
     <div className={cn('min-h-dvh bg-surface text-ink lg:grid', wide ? 'lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : 'lg:grid-cols-2')}>
@@ -81,7 +70,7 @@ export function AuthLayout({
             <ArrowLeft className="size-3.5" aria-hidden />
             {t('auth.backToSite')}
           </Link>
-          {hasLang && <LanguageSwitcher className="text-ink lg:order-first lg:mr-auto" />}
+          <LanguageSwitcher className="text-ink lg:order-first lg:mr-auto" />
         </div>
 
         <main className="flex flex-1 items-center px-5 py-10 sm:px-10 sm:py-14 lg:px-16">

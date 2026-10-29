@@ -10,7 +10,7 @@ import { cn } from '@/lib/cn'
 import { APPLY_PATH } from '@/lib/urls'
 import { LegalLinks } from '../legal/LegalLinks'
 import { isDemoMode } from '@/services'
-import { LanguageSwitcher } from '../public/PublicShell'
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { TAP_TARGET } from '../public/tapTarget'
 
 type NavItem = { key: TranslationKey; href: string }

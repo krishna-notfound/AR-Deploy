@@ -12,6 +12,7 @@ import { DashboardContext, type DashboardContextValue } from '@/components/layou
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
 import { IconButton } from '@/components/ui/Button'
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { cn } from '@/lib/cn'
 import { readReturnState, settingsReturnState } from '@/lib/settingsReturn'
 import { settingsPath } from '@/lib/urls'
@@ -164,7 +165,10 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
                         <ChevronLeft className="size-4" aria-hidden />
                         Settings
                       </Link>
-                      {closeButton}
+                      <div className="flex items-center gap-4">
+                        <LanguageSwitcher className="text-ink" />
+                        {closeButton}
+                      </div>
                     </div>
                   )}
                   <SettingsSectionPage section={current} />
@@ -226,11 +230,17 @@ function SectionList({
     >
       <div className={cn('flex w-full flex-col', wide ? 'max-w-[272px] px-4 py-8 lg:py-14' : 'px-4 pt-3 pb-10')}>
         {wide ? (
-          <p className="px-3 pb-4 text-ui-small text-ink-muted">Settings</p>
+          <div className="flex items-center justify-between gap-3 px-3 pb-4">
+            <p className="text-ui-small text-ink-muted">Settings</p>
+            <LanguageSwitcher className="text-ink" />
+          </div>
         ) : (
           <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
             <h1 id={titleId} className="font-display text-[1.75rem] leading-[1.15] font-medium tracking-[-0.01em] text-ink">Settings</h1>
-            {closeButton}
+            <div className="flex items-center gap-4">
+              <LanguageSwitcher className="text-ink" />
+              {closeButton}
+            </div>
           </div>
         )}
         {user && (

@@ -13,11 +13,13 @@ import {
   Users,
 } from 'lucide-react'
 import type { Need } from '@/auth/usePermission'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { settingsPath } from '@/lib/urls'
 
 export interface NavItem {
   to: string
-  label: string
+  /** Dictionary key of the item's name (common area file), rendered with t(). */
+  labelKey: TranslationKey
   icon: LucideIcon
   /** Match only the exact path (for index routes). */
   end?: boolean
@@ -30,25 +32,25 @@ export interface NavItem {
 }
 
 export const adminNav: NavItem[] = [
-  { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/admin/applications', label: 'Applications', icon: ClipboardList, badge: 'pendingApplications', requires: 'applications.view' },
-  { to: '/admin/businesses', label: 'Businesses', icon: Building2, requires: 'businesses.view' },
-  { to: '/admin/products', label: 'All Products', icon: Package, requires: 'products.view' },
-  { to: '/admin/model-requests', label: '3D requests', icon: Box, badge: 'requestedModelRequests', requires: 'models.manage' },
-  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, requires: 'analytics.view' },
-  { to: '/admin/catalogs', label: 'Catalogs & QR Codes', icon: QrCode, requires: 'products.view' },
-  { to: '/admin/team', label: 'Team & Access', icon: Users, requires: 'owner' },
-  { to: '/admin/activity', label: 'Audit log', icon: History, requires: ['records.view', 'access.view'] },
+  { to: '/admin', labelKey: 'nav.overview', icon: LayoutDashboard, end: true },
+  { to: '/admin/applications', labelKey: 'nav.applications', icon: ClipboardList, badge: 'pendingApplications', requires: 'applications.view' },
+  { to: '/admin/businesses', labelKey: 'nav.businesses', icon: Building2, requires: 'businesses.view' },
+  { to: '/admin/products', labelKey: 'nav.allProducts', icon: Package, requires: 'products.view' },
+  { to: '/admin/model-requests', labelKey: 'nav.modelRequests', icon: Box, badge: 'requestedModelRequests', requires: 'models.manage' },
+  { to: '/admin/analytics', labelKey: 'nav.analytics', icon: BarChart3, requires: 'analytics.view' },
+  { to: '/admin/catalogs', labelKey: 'nav.catalogsQr', icon: QrCode, requires: 'products.view' },
+  { to: '/admin/team', labelKey: 'nav.team', icon: Users, requires: 'owner' },
+  { to: '/admin/activity', labelKey: 'nav.auditLog', icon: History, requires: ['records.view', 'access.view'] },
   // Every platform role has account settings; the Owner-only sections are hidden inside the hub.
-  { to: settingsPath('admin'), label: 'Settings', icon: Settings, returnsHere: true },
+  { to: settingsPath('admin'), labelKey: 'nav.settings', icon: Settings, returnsHere: true },
 ]
 
 export const businessNav: NavItem[] = [
-  { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/dashboard', labelKey: 'nav.overview', icon: LayoutDashboard, end: true },
   // Not `end`: the product editor (/dashboard/products/:id/edit and /new) keeps "My Products" active (DUX-11).
   // "Add product" is an action, not a place: it is the primary button on Overview and My Products.
-  { to: '/dashboard/products', label: 'My Products', icon: Package },
-  { to: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/dashboard/catalog', label: 'My Catalog & QR', icon: Store },
-  { to: settingsPath('business'), label: 'Settings', icon: Settings, returnsHere: true },
+  { to: '/dashboard/products', labelKey: 'nav.myProducts', icon: Package },
+  { to: '/dashboard/analytics', labelKey: 'nav.analytics', icon: BarChart3 },
+  { to: '/dashboard/catalog', labelKey: 'nav.myCatalog', icon: Store },
+  { to: settingsPath('business'), labelKey: 'nav.settings', icon: Settings, returnsHere: true },
 ]

@@ -13,8 +13,10 @@ import { isDemoMode } from '@/services'
 import { account } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useMyProfile } from '@/features/settings/useMyProfile'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { Avatar } from '../ui/Avatar'
 import { IconButton } from '../ui/Button'
+import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { DropdownMenu } from '../ui/Menu'
 import { useFocusTrap } from '../ui/Modal'
 import { BrandMark, Wordmark } from '../ui/BrandMark'
@@ -231,6 +233,7 @@ function SidebarContent({
   footer?: React.ReactNode
 }) {
   const { pathname, search } = useLocation()
+  const { t } = useI18n()
   return (
     <>
       <div className={cn('flex min-h-[84px] items-center border-b border-white/10', collapsed ? 'justify-center px-2' : 'px-5')}>
@@ -246,7 +249,7 @@ function SidebarContent({
                 end={item.end}
                 state={item.returnsHere ? settingsReturnState(pathname + search) : undefined}
                 onClick={onNavigate}
-                title={collapsed ? item.label : undefined}
+                title={collapsed ? t(item.labelKey) : undefined}
                 className={({ isActive }) =>
                   cn(
                     'relative flex h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-[length:var(--text-ui-body)] transition-colors focus-visible:outline-accent-bright',
@@ -258,7 +261,7 @@ function SidebarContent({
                 }
               >
                 <item.icon className="size-[18px] shrink-0" strokeWidth={1.6} aria-hidden />
-                <span className={cn('truncate', collapsed && 'sr-only')}>{item.label}</span>
+                <span className={cn('truncate', collapsed && 'sr-only')}>{t(item.labelKey)}</span>
                 {item.badge && <NavBadge kind={item.badge} collapsed={collapsed} />}
               </NavLink>
             </li>
@@ -356,7 +359,7 @@ function MobileDrawer({ nav, variant, onClose }: { nav: NavItem[]; variant: Vari
         >
           <X className="size-5" aria-hidden />
         </button>
-        <SidebarContent nav={nav} variant={variant} onNavigate={onClose} />
+        <SidebarContent nav={nav} variant={variant} onNavigate={onClose} footer={<LanguageSwitcher className="px-3 text-chalk" />} />
       </div>
     </div>
   )
@@ -384,6 +387,7 @@ function Topbar({
   hasCrumbs: boolean
 }) {
   const section = useSection(nav)
+  const { t } = useI18n()
   const { business } = useAccount()
   const { home, homeTo } = useDashboard() ?? { home: 'Sanctus', homeTo: '/' }
   return (
@@ -412,7 +416,7 @@ function Topbar({
                 /
               </li>
               <li aria-current="page" className="truncate font-medium text-ink">
-                {section.label}
+                {t(section.labelKey)}
               </li>
             </>
           )}
@@ -420,6 +424,8 @@ function Topbar({
       </nav>
       )}
       <div className="ml-auto flex items-center gap-2">
+        {/* The same switch as the landing page; on phones it sits in the navigation menu instead. */}
+        <LanguageSwitcher className="max-sm:hidden" />
         {/* Honest labelling in the demo; a production owner has no use for the data source's name (DUX-08). */}
         {isDemoMode && (
           <span className="hidden border border-line-strong px-2.5 py-0.5 text-[12px] leading-tight text-ink-muted sm:inline">Demo mode</span>

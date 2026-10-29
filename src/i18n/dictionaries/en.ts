@@ -1,4 +1,16 @@
-// Master dictionary for public pages (landing, catalogues, product pages). Admin dashboards are English-only and do not use t().
+// Master dictionary: public pages (landing, catalogues, product pages) here; the dashboards and the shared words live in the
+// per-area files spread at the end (ADR-0044). Add new keys to your own area file, not here.
+import { enAdmin } from './en.admin'
+import { enApplications } from './en.applications'
+import { enAuth } from './en.auth'
+import { enBusiness } from './en.business'
+import { enCommon } from './en.common'
+import { enEditor } from './en.editor'
+import { enProducts } from './en.products'
+import { enSettings } from './en.settings'
+import { enSite } from './en.site'
+import { enTeam } from './en.team'
+import { enUi } from './en.ui'
 // landing.* and site.* carry the client's reference copy (AR-attachment/, ADR-0023): pt.ts has it verbatim, this file translates it.
 export const en = {
   'nav.backToCatalog': 'Back to {name}',
@@ -377,11 +389,6 @@ export const en = {
   'reset.remembered': 'Remembered your password?',
   'reset.signIn': 'Sign in',
 
-  'common.loading': 'Loading…',
-  'common.retry': 'Try again',
-  'common.errorTitle': 'Something went wrong',
-  'common.close': 'Close',
-
   // Legal pages (/privacy, /terms) and the "I agree" ticks. The page text itself comes from docs/legal/drafts.
   'legal.privacy.link': 'Privacy',
   'legal.terms.link': 'Terms',
@@ -400,6 +407,19 @@ export const en = {
   'legal.agree.newTab': '(opens in a new tab)',
   'legal.agree.required': 'Please agree to the Terms and the Privacy Policy to continue.',
   'apply.err.terms_required': 'Please agree to the Terms and the Privacy Policy to send your application.',
+
+  // Per-area files (ADR-0044): every track edits only its own.
+  ...enCommon,
+  ...enEditor,
+  ...enSite,
+  ...enApplications,
+  ...enAdmin,
+  ...enProducts,
+  ...enBusiness,
+  ...enSettings,
+  ...enTeam,
+  ...enAuth,
+  ...enUi,
 } as const
 
 export type TranslationKey = keyof typeof en

@@ -1,44 +1,15 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Wordmark } from '@/components/ui/BrandMark'
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { SmartImage } from '@/components/ui/SmartImage'
-import type { Business, Lang } from '@/domain/types'
+import type { Business } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { safeBrandAccent } from '@/lib/color'
 import { LegalLinks } from '../legal/LegalLinks'
 import { InAppNotice } from './InAppNotice'
 import { TAP_TARGET } from './tapTarget'
-
-/** "EN / PT" as in the reference header: a two-option radio group styled as spaced text. */
-/** `clear` sets the labels at 12px with 0.08em tracking (tenant catalogues); the platform pages keep the original text-label style. */
-export function LanguageSwitcher({ className, clear }: { className?: string; clear?: boolean }) {
-  const { lang, setLang, t } = useI18n()
-  const options: Lang[] = ['en', 'pt']
-  return (
-    <div role="radiogroup" aria-label={t('nav.language')} className={cn('flex items-center', clear ? 'text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase' : 'text-label', className)}>
-      {options.map((l, i) => (
-        <span key={l} className="flex items-center">
-          {i > 0 && (
-            <span className="px-1.5 opacity-50" aria-hidden>
-              /
-            </span>
-          )}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={lang === l}
-            lang={l}
-            onClick={() => setLang(l)}
-            className={cn(TAP_TARGET, 'py-2 transition-opacity', lang === l ? 'opacity-100' : 'opacity-60 hover:opacity-90')}
-          >
-            {l.toUpperCase()}
-          </button>
-        </span>
-      ))}
-    </div>
-  )
-}
 
 /** Public catalog chrome: business identity + language switcher. Brand accent is scoped here. */
 export function PublicShell({ business, catalogHref, children }: { business?: Business | null; catalogHref?: string; children: ReactNode }) {
