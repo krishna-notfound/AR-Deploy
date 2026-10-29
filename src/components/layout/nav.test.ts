@@ -9,7 +9,8 @@ describe('dashboard navigation labels', () => {
   it('are dictionary keys, never literal labels', () => {
     for (const item of items) {
       expect('label' in item, item.to).toBe(false)
-      expect(item.labelKey, item.to).toMatch(/^nav\./)
+      // `editor.nav` belongs to the Editor's own area file (ADR-0043); every other label is a `nav.*` key.
+      expect(item.labelKey, item.to).toMatch(/^(nav\.|editor\.nav$)/)
     }
   })
 
