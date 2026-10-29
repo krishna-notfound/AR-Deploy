@@ -388,7 +388,7 @@ export interface ContentService {
 - Side effect: staff whose browser is set to Portuguese now see Portuguese dashboards by default. They can switch back.
 - `document.documentElement.lang` keeps being set (`pt-PT` / `en`).
 
-**Switch.** `LanguageSwitcher` moves from `PublicShell.tsx` to `src/components/ui/LanguageSwitcher.tsx` with three looks: `clear` (on photos), the existing public look, and a **dashboard** look (a two-segment control "EN | PT", Inter, 14 px, no tracking or small caps, ADR-0031). Placement:
+**Switch.** `LanguageSwitcher` moves from `PublicShell.tsx` to `src/components/ui/LanguageSwitcher.tsx` and is **the same switch as on the landing page everywhere** (owner, 2026-10-29: "same as every for site"): same design and wording on public pages, the dashboards, settings and sign-in pages. The only variant is the existing `clear` colouring for use on photos. Placement:
 - `DashboardShell` `Topbar` (admin and business), left of the user menu; in the mobile menu as well.
 - `SettingsLayout` header (full-screen hub, outside the shell).
 - `AuthLayout` (login, reset, accept-invite, apply), `JoinPage`, `DemoEntryPage`.
@@ -464,6 +464,6 @@ Each phase ends with typecheck, lint, test and build green and a push to the fea
 
 ## 17. Open questions
 
-1. **Who reviews the Portuguese wording?** Phase 6 produces a large set of new pt-PT strings, and the client will write Portuguese form text himself (including the consent sentence). The owner or the client should read the dashboard strings before go-live.
+None. Decided 2026-10-29 by the owner: the dashboard text is not client-editable, so there is no separate review step; the pt-PT dashboard strings are written in this project (Portuguese of Portugal, consistent with the existing public pt dictionary) and ship with it.
 
 Decided in section 2 and not open: consent sentence editable (the checkbox stays required); steps capped at 8; choice options may be hidden; multiple choice added, no file upload.
