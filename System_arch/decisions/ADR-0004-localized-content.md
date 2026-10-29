@@ -1,5 +1,5 @@
 # ADR-0004: Localized product content; admin English-only
-- **Status:** Accepted
+- **Status:** Accepted (the admin English-only part is superseded by ADR-0044, 2026-10-29)
 - **Date:** 2026-10-12
 - **Affects:** design/04-domain-model.md, design/10-i18n.md, design/15-product-editor.md
 
