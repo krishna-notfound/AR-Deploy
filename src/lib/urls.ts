@@ -120,6 +120,17 @@ export const ACCEPT_INVITE_PATH = '/accept-invite'
 /** Public legal pages (EN/PT, text from docs/legal/drafts). Served on the platform domain and on business subdomains. */
 export const PRIVACY_PATH = '/privacy'
 export const TERMS_PATH = '/terms'
+/** A custom page made in the website Editor (ADR-0043): /pages/<slug>, on the platform domain and on business subdomains. */
+export const customPagePath = (slug: string) => `/pages/${encodeURIComponent(slug)}`
+
+/** The website Editor (staff, content.manage). `pageKey` is `terms`, `privacy` or a custom page id. */
+export const EDITOR_PATH = '/admin/editor'
+export const editorPagesPath = () => `${EDITOR_PATH}/pages`
+export const editorPagePath = (pageKey: string) => `${EDITOR_PATH}/pages/${encodeURIComponent(pageKey)}`
+export const editorApplyPath = (tab?: 'form' | 'messages') => `${EDITOR_PATH}/apply${tab ? `?tab=${tab}` : ''}`
+export const editorSocialPath = () => `${EDITOR_PATH}/social`
+/** Preview of the draft: `page/<pageKey>`, `apply`, `apply/done` or `footer`. */
+export const editorPreviewPath = (target: string) => `${EDITOR_PATH}/preview/${target}`
 
 export const applicationAdminPath = (id: string) => `/admin/applications/${id}`
 /** The applications list, optionally filtered by status (e.g. the overview's "awaiting review" link). */

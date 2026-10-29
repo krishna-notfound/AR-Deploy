@@ -8,6 +8,7 @@ import { SecurityGate } from '@/auth/SecurityGate'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { adminNav, businessNav } from '@/components/layout/nav'
+import { SiteContentProvider } from '@/features/marketing/SiteContentProvider'
 import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
 import { type Tenant, resolveTenant } from '@/tenant/resolveTenant'
 import { RootLayout } from './RootLayout'
@@ -23,6 +24,15 @@ const ApplyPage = lazy(() => import('@/features/apply/ApplyPage'))
 const NotFoundPage = lazy(() => import('@/features/demo/NotFoundPage'))
 const PublicNotFoundPage = lazy(() => import('@/features/marketing/PublicNotFoundPage'))
 const LegalPage = lazy(() => import('@/features/legal/LegalPage'))
+const CustomPage = lazy(() => import('@/features/legal/CustomPage'))
+
+// The website Editor (ADR-0043): one layout that owns the working copy, and a screen per section.
+const EditorLayout = lazy(() => import('@/features/editor/EditorLayout'))
+const EditorPagesScreen = lazy(() => import('@/features/editor/PagesScreen'))
+const EditorPageScreen = lazy(() => import('@/features/editor/PageEditorScreen'))
+const EditorApplyScreen = lazy(() => import('@/features/editor/ApplyScreen'))
+const EditorSocialScreen = lazy(() => import('@/features/editor/SocialScreen'))
+const EditorPreview = lazy(() => import('@/features/editor/EditorPreview'))
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/AdminOverviewPage'))
 const BusinessesListPage = lazy(() => import('@/features/admin/BusinessesListPage'))
@@ -53,10 +63,13 @@ const ProductPage = lazy(() => import('@/features/public/ProductPage'))
 const EmbedProductPage = lazy(() => import('@/features/public/EmbedProductPage'))
 
 function PublicLayout() {
+  // The footer pages and social links are loaded once and shared by every public page (spec 9).
   return (
-    <Suspense fallback={<FullPageSpinner />}>
-      <Outlet />
-    </Suspense>
+    <SiteContentProvider>
+      <Suspense fallback={<FullPageSpinner />}>
+        <Outlet />
+      </Suspense>
+    </SiteContentProvider>
   )
 }
 
@@ -98,6 +111,18 @@ const adminRoutes: RouteObject = {
     { path: 'model-requests/:requestId', element: <RequirePermission need="models.manage"><ModelRequestDetailPage /></RequirePermission> },
     { path: 'analytics', element: <RequirePermission need="analytics.view"><AdminAnalyticsPage /></RequirePermission> },
     { path: 'catalogs', element: <RequirePermission need="products.view"><AdminCatalogsPage /></RequirePermission> },
+    // The website Editor: pages, application form and social links, with draft, preview, publish and history (content.manage + 2FA).
+    {
+      path: 'editor',
+      element: <RequirePermission need="content.manage"><EditorLayout /></RequirePermission>,
+      children: [
+        { index: true, element: <Navigate to="pages" replace /> },
+        { path: 'pages', element: <EditorPagesScreen /> },
+        { path: 'pages/:pageKey', element: <EditorPageScreen /> },
+        { path: 'apply', element: <EditorApplyScreen /> },
+        { path: 'social', element: <EditorSocialScreen /> },
+      ],
+    },
     { path: 'team', element: <RequirePermission need="owner"><TeamPage /></RequirePermission> },
     { path: 'team/permissions', element: <RequirePermission need="owner"><RolePermissionsPage /></RequirePermission> },
     { path: 'team/:memberId', element: <RequirePermission need="owner"><MemberDetailPage /></RequirePermission> },
@@ -151,6 +176,21 @@ const settingsRoutes: RouteObject[] = [
   },
 ]
 
+// The Editor's preview is full-screen, outside DashboardShell (the public components keep their own styles), behind the same
+// role guard, 2FA gate and permission as the Editor.
+const editorPreviewRoute: RouteObject = {
+  path: '/admin/editor/preview/*',
+  element: (
+    <RequireRole allow="super_admin">
+      <SecurityGate>
+        <RequirePermission need="content.manage">
+          <EditorPreview />
+        </RequirePermission>
+      </SecurityGate>
+    </RequireRole>
+  ),
+}
+
 function pathModeRoutes(): RouteObject[] {
   return [
     {
@@ -165,6 +205,7 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/login', element: <LoginPage /> },
             { path: JOIN_PATH, element: <JoinPage /> },
             ...settingsRoutes,
+            editorPreviewRoute,
           ],
         },
         adminRoutes,
@@ -176,6 +217,7 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/apply', element: <ApplyPage /> },
             { path: PRIVACY_PATH, element: <LegalPage doc="privacy" /> },
             { path: TERMS_PATH, element: <LegalPage doc="terms" /> },
+            { path: '/pages/:slug', element: <CustomPage /> },
             { path: '/reset-password', element: <ResetPasswordPage /> },
             { path: '/accept-invite', element: <AcceptInvitePage /> },
             { path: '/catalog/:businessSlug', element: <LowercaseSlugs route="catalog"><CatalogPage /></LowercaseSlugs> },
@@ -206,6 +248,7 @@ function hostnameModeRoutes(slug: string): RouteObject[] {
             // The catalogue and product footers link here, so the legal pages answer on business subdomains too.
             { path: PRIVACY_PATH, element: <LegalPage doc="privacy" tenant /> },
             { path: TERMS_PATH, element: <LegalPage doc="terms" tenant /> },
+            { path: '/pages/:slug', element: <CustomPage tenant /> },
             { path: '*', element: <PublicNotFoundPage tenant /> },
           ],
         },
