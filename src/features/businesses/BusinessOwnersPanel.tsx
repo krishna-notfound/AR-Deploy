@@ -29,7 +29,7 @@ import { closureByBusiness } from './closure'
  * Authorization is enforced by the provision-owner Edge Function and the database, not by this panel.
  */
 export function BusinessOwnersPanel({ business, applicationId, defaultEmail, defaultLanguage = 'en' }: { business: Business; applicationId?: ID; defaultEmail?: string; defaultLanguage?: Lang }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const f = useFormat()
   const members = useServiceQuery(() => service.getBusinessMembers(business.id), [business.id])
   const provision = useServiceMutation((email: string, language: Lang) => service.provisionOwner({ businessId: business.id, email, language, applicationId }))
@@ -59,7 +59,7 @@ export function BusinessOwnersPanel({ business, applicationId, defaultEmail, def
 
   // The owner record exists either way; the toast says exactly what happened to the email.
   const report = (o: ProvisionOutcome, what: string) => {
-    const reason = knownEmailReason(o.email.error)
+    const reason = knownEmailReason(o.email.error, lang)
     if (o.email.status === 'accepted' || o.email.status === 'sent' || o.email.status === 'delivered')
       toast.success(what, t('admin.businesses.owner.emailAccepted'))
     else toast.error(t('admin.businesses.owner.emailNotSent', { what }), reason ?? t('admin.businesses.owner.emailRefused'))

@@ -16,7 +16,7 @@ import { useFormat } from '@/lib/useFormat'
 import { applicationAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { ApplicationStatusBadge } from '../applications/labels'
+import { ApplicationStatusBadge, joinPlace } from '../applications/labels'
 import { Monogram } from '../applications/Monogram'
 
 const PAGE_SIZE = 20
@@ -123,7 +123,7 @@ export default function ApplicationsPage() {
                       {a.businessName}
                     </Link>
                     <p className="text-[13px] leading-[18px] text-ink-muted">
-                      {a.applicantName} · {a.city}, {a.country}
+                      {[a.applicantName, joinPlace(a.city, a.country)].filter(Boolean).join(' · ')}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-muted">
                       <ApplicationStatusBadge status={a.status} />
@@ -185,7 +185,8 @@ function ApplicationRow({ a }: { a: BusinessApplication }) {
               {a.businessName}
             </Link>
             <p className="text-[13px] leading-[18px] text-ink-muted">
-              #{a.reference} · <span className="capitalize">{a.category}</span> · {a.city}, {a.country}
+              #{a.reference} · <span className="capitalize">{a.category}</span>
+              {joinPlace(a.city, a.country) && ` · ${joinPlace(a.city, a.country)}`}
             </p>
           </div>
         </div>

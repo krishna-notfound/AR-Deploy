@@ -16,7 +16,7 @@ import { service } from '@/services'
 import type { AuditEntry } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
 import { actorText } from '../applications/AuditTimeline'
-import { eventLabel, statusWord } from '../shared/auditLabels'
+import { eventLabel, statusWord } from '../applications/labels'
 
 const PAGE_SIZE = 30
 
@@ -25,7 +25,7 @@ const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** Administrative audit trail (append-only, written on the server). */
 export default function AuditLogPage() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const f = useFormat()
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
@@ -123,19 +123,19 @@ export default function AuditLogPage() {
                     </time>
                     <div className="min-w-0 max-md:order-1 max-md:col-span-2">
                       <p className="text-[length:var(--text-ui-body)] leading-5 text-ink">
-                        <span className="font-medium">{sentenceCase(eventLabel(e.eventType, e.metadata, t))}</span>
+                        <span className="font-medium">{sentenceCase(eventLabel(e.eventType, e.metadata, lang))}</span>
                         {e.toStatus && (
                           <span className="text-ink-muted">
                             {' '}
-                            · {e.fromStatus ? `${sentenceCase(statusWord(e.fromStatus, t))} → ` : ''}
-                            {sentenceCase(statusWord(e.toStatus, t))}
+                            · {e.fromStatus ? `${sentenceCase(statusWord(e.fromStatus, lang))} → ` : ''}
+                            {sentenceCase(statusWord(e.toStatus, lang))}
                           </span>
                         )}
                       </p>
                       {subject && <p className="mt-0.5 text-[length:var(--text-ui-small)] leading-[1.35] break-words text-ink-muted">{subject}</p>}
                     </div>
                     <span title={e.actorEmail} className="min-w-0 truncate text-[length:var(--text-ui-small)] text-ink-muted text-right max-md:order-3 md:max-w-[260px] md:text-[length:var(--text-ui-body)]">
-                      {actorText(e)}
+                      {actorText(e, lang)}
                     </span>
                   </li>
                 )

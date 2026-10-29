@@ -14,7 +14,7 @@ import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { ModelRequestDetail, ModelRequestOutcome } from '@/domain/modelRequests'
 import type { ModelAsset, ModelFormat, ProductModels } from '@/domain/types'
-import { eventLabel } from '@/features/shared/auditLabels'
+import { eventLabel } from '@/features/applications/labels'
 import { DeclineDialog } from '@/features/modelRequests/DeclineDialog'
 import { DeliverDialog, reviewToast } from '@/features/modelRequests/DeliverDialog'
 import { ModelRequestStatusBadge } from '@/features/modelRequests/ModelRequestStatusBadge'
@@ -51,7 +51,7 @@ export default function ModelRequestDetailPage(): JSX.Element {
 const OPEN = new Set(['requested', 'in_progress'])
 
 function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () => void }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const f = useFormat()
   const toast = useToast()
   const can = useCan()
@@ -230,7 +230,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
                   <ol className="space-y-3">
                     {r.history.map((e, i) => (
                       <li key={`${e.type}-${e.at}-${i}`} className="text-ui-body">
-                        <p className="font-medium text-ink">{eventLabel(e.type, undefined, t)}</p>
+                        <p className="font-medium text-ink">{eventLabel(e.type, undefined, lang)}</p>
                         <p className="text-ui-small text-ink-muted tabular-nums">
                           {f.dateTime(e.at)}
                           {e.actorLabel ? ` · ${e.actorLabel}` : ''}
