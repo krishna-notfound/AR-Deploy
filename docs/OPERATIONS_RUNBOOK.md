@@ -14,7 +14,7 @@ Environments, how to set up staging, and the rules that keep production safe. De
 | Frontend | `npm run dev` on localhost | Vercel **Preview** deployments | Vercel **Production** (`main` of `krishna-notfound/AR-Deploy`, project `ar-deploy`, team `track0`) |
 | Env file | `.env.local` (git-ignored) | Vercel Preview env vars; locally `.env.staging.local` (git-ignored) | Vercel Production env vars |
 | Sign-ups | n/a | on (testing owner registration) | **off** until the owner approves |
-| Data | sample | synthetic QA data, disposable | test data: the current setup is a testing environment (ADR-0042) |
+| Data | sample | synthetic QA data, disposable | real client data (sample data still present, O-4) |
 
 Rules:
 - Never run `npm run dev` with production values unless you intend to write production analytics (see HANDOFF gotchas).
