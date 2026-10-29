@@ -35,3 +35,4 @@ Architecture decision records live in `System_arch/decisions/` (index: `System_a
 | 2026-10-27 | `main` is the live branch; `sanctus.warpkit.online` serves Production; Production uses the client database, which holds real client data (no writes without the owner's OK) | Owner | ADR-0040 |
 | 2026-10-27 | `invite-member` redeployed on the client project so team invitation emails list "Handle 3D model requests" | Owner | System_arch/HANDOFF.md |
 | 2026-10-27 | Every decision is recorded when it is taken: an ADR for design or architecture, a row here for every owner decision (CLAUDE.md "Recording decisions") | Owner | CLAUDE.md |
+| 2026-10-29 | Everything is a testing environment (the client said so): the live site and `zggylkbgajamhriebdrg` hold test data, not real client data; Vercel is the owner's own account; the go-live plan ("flash" Supabase and Vercel) is not decided yet | Owner (relaying the client) | ADR-0042 |
