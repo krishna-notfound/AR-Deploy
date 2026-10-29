@@ -101,6 +101,7 @@ export const ptUi: Partial<Record<TranslationKey, string>> = {
   'ui.notice.preview': 'Pré-visualizar o seu catálogo',
   'ui.notice.draftTitle': '{name} ainda não é público.',
   'ui.notice.draftBody': 'Já pode adicionar produtos. Os clientes verão o seu catálogo quando a equipa da plataforma o ativar.',
+  'ui.loading': 'A carregar',
   'ui.notice.pausedTitle': 'O seu catálogo está em pausa.',
   'ui.notice.pausedBody': 'Os clientes que lerem o seu código QR ou abrirem as suas ligações veem «catálogo indisponível». Contacte a equipa da plataforma para o reativar.',
 }

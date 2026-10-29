@@ -7,7 +7,7 @@ import type { SettingsSectionDef } from './sections'
 function SectionLoading() {
   const { t } = useI18n()
   return (
-    <div role="status" aria-label={t('common.loading')}>
+    <div role="status" aria-label={t('ui.loading')}>
       <Skeleton className="h-9 w-1/3" />
       <Skeleton className="mt-3 h-4 w-1/2" />
       <Skeleton className="mt-8 h-48 w-full rounded-[var(--radius-card)]" />

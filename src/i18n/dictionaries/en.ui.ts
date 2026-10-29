@@ -99,6 +99,7 @@ export const enUi = {
   'ui.notice.preview': 'Preview your catalog',
   'ui.notice.draftTitle': '{name} is not public yet.',
   'ui.notice.draftBody': 'You can add products now. Customers will see your catalog once the platform team activates it.',
+  'ui.loading': 'Loading',
   'ui.notice.pausedTitle': 'Your catalog is paused.',
   'ui.notice.pausedBody': 'Customers who scan your QR code or open your links see “catalog unavailable”. Contact the platform team to reactivate it.',
 } as const

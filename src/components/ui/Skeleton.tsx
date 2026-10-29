@@ -14,7 +14,7 @@ export function SkeletonRows({ rows = 5, className }: { rows?: number; className
   if (dash) {
     // Same pitch as a table row (52px) with a 14px and a 13px text bar.
     return (
-      <div className={className} role="status" aria-label={t('common.loading')}>
+      <div className={className} role="status" aria-label={t('ui.loading')}>
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} className="flex h-[52px] items-center gap-3">
             <Skeleton className="size-8 shrink-0" />
@@ -29,7 +29,7 @@ export function SkeletonRows({ rows = 5, className }: { rows?: number; className
     )
   }
   return (
-    <div className={cn('space-y-3', className)} role="status" aria-label={t('common.loading')}>
+    <div className={cn('space-y-3', className)} role="status" aria-label={t('ui.loading')}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-3">
           <Skeleton className="size-10 shrink-0 rounded-[var(--radius-control)]" />
