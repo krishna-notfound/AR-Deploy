@@ -10,10 +10,12 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, User } from '@/domain/types'
-import { RECOVERED_NOTICE, TwoFactorStep } from '@/features/auth/TwoFactorStep'
+import { TwoFactorStep } from '@/features/auth/TwoFactorStep'
 import { ONBOARDING_CHECK, onboardingVisitsVersion, subscribeOnboardingVisits } from '@/features/settings/OnboardingChecklist'
 import { TotpSetup } from '@/features/settings/TotpSetup'
 import { InlineNotice } from '@/components/ui/States'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { translate } from '@/i18n/translate'
 import { settingsPath } from '@/lib/urls'
 import {
   ENABLED_PATCH,
@@ -70,12 +72,13 @@ function GateHeading({ title, children }: { title: string; children: ReactNode }
 
 /** A session at aal1 with an authenticator (for example a reload before the code was given): ask for the code. */
 function CodeGate({ ctx, hold }: GateScreenProps) {
+  const { t } = useI18n()
   const leave = useLeaveAccount()
   const navigate = useNavigate()
   const toast = useToast()
   return (
     <>
-      <GateHeading title="Two-step verification">Your account is protected with an authenticator app.</GateHeading>
+      <GateHeading title={t('auth.gate.codeTitle')}>{t('auth.gate.codeIntro')}</GateHeading>
       <Card className="p-5 sm:p-6">
         <TwoFactorStep
           onVerified={async () => {
@@ -85,7 +88,7 @@ function CodeGate({ ctx, hold }: GateScreenProps) {
           }}
           onRecovered={async () => {
             hold(true)
-            toast.show({ tone: 'info', title: RECOVERED_NOTICE }, 10_000)
+            toast.show({ tone: 'info', title: t('auth.twoFactor.recovered') }, 10_000)
             ctx.patch(RECOVERED_PATCH)
             await ctx.refresh()
             navigate(settingsPath(ctx.scope, 'security'))
@@ -101,12 +104,11 @@ function CodeGate({ ctx, hold }: GateScreenProps) {
 
 /** The policy requires 2FA: set it up (TotpSetup) or sign out. Nothing else of the app shows until it is done. */
 function SetupGate({ ctx, hold }: GateScreenProps) {
+  const { t } = useI18n()
   const leave = useLeaveAccount()
   return (
     <>
-      <GateHeading title="Set up 2FA to continue">
-        Your account must use two-step verification (2FA). Set up an authenticator app on your phone to continue.
-      </GateHeading>
+      <GateHeading title={t('auth.gate.setupTitle')}>{t('auth.gate.setupIntro')}</GateHeading>
       <Card className="p-5 sm:p-6">
         <TotpSetup
           email={ctx.user.email}
@@ -119,26 +121,28 @@ function SetupGate({ ctx, hold }: GateScreenProps) {
         />
       </Card>
       <div className="mt-5 flex justify-end">
-        <Button onClick={() => void leave({ signOut: true })}>Sign out</Button>
+        <Button onClick={() => void leave({ signOut: true })}>{t('auth.signOut')}</Button>
       </div>
     </>
   )
 }
 
-export const CHECK_FAILED = "We couldn't check your sign-in security. Some data may not load."
+/** English form of the notice, for callers outside the language context; the gate shows t('auth.gate.checkFailed'). */
+export const CHECK_FAILED = translate('en', 'auth.gate.checkFailed')
 
 /**
  * Both checks failed: a small notice, never blocking (the loader keeps retrying too). Over the app it is shown inline
  * at the top of the main column (SecurityNoticeSlot), so it never covers save bars or the sidebar.
  */
 function CheckFailedNotice({ onRetry }: { onRetry: () => void }) {
+  const { t } = useI18n()
   return (
     <div role="status">
       <InlineNotice tone="warning">
         <span className="flex flex-wrap items-center justify-between gap-x-4">
-          <span>{CHECK_FAILED}</span>
+          <span>{t('auth.gate.checkFailed')}</span>
           <button type="button" onClick={onRetry} className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-2 hover:no-underline">
-            Retry
+            {t('auth.gate.retry')}
           </button>
         </span>
       </InlineNotice>
@@ -155,12 +159,13 @@ export const GATE_CHECKS: readonly GateCheck[] = [
 
 function GateFrame({ scope, children }: { scope: 'admin' | 'business'; children: ReactNode }) {
   const { business } = useAccount()
+  const { t } = useI18n()
   const dashboard = useMemo<DashboardContextValue>(
     () =>
       scope === 'admin'
-        ? { variant: 'admin', home: 'Sanctus Admin', homeTo: '/admin', eyebrow: 'Security' }
-        : { variant: 'business', home: business?.name ?? 'My business', homeTo: '/dashboard', eyebrow: 'Security' },
-    [scope, business?.name],
+        ? { variant: 'admin', home: t('auth.gate.adminHome'), homeTo: '/admin', eyebrow: t('auth.gate.eyebrow') }
+        : { variant: 'business', home: business?.name ?? t('auth.gate.myBusiness'), homeTo: '/dashboard', eyebrow: t('auth.gate.eyebrow') },
+    [scope, business?.name, t],
   )
   return (
     <DashboardContext.Provider value={dashboard}>
@@ -176,6 +181,7 @@ function GateFrame({ scope, children }: { scope: 'admin' | 'business'; children:
  * applies to the signed-in user instead of the app; with none, the app.
  */
 export function SecurityGate({ children, checks = GATE_CHECKS }: { children: ReactNode; checks?: readonly GateCheck[] }) {
+  const { t } = useI18n()
   const { user, business, holdGate, refreshSecurityIfStale } = useAccount()
   const { refresh, patch, ...security } = useSecurityState()
   const leave = useLeaveAccount()
@@ -205,7 +211,7 @@ export function SecurityGate({ children, checks = GATE_CHECKS }: { children: Rea
         <GateFrame scope={scope}>
           <CheckFailedNotice onRetry={retry} />
           <div className="mt-5 flex justify-end">
-            <Button onClick={() => void leave({ signOut: true })}>Sign out</Button>
+            <Button onClick={() => void leave({ signOut: true })}>{t('auth.signOut')}</Button>
           </div>
         </GateFrame>
       )

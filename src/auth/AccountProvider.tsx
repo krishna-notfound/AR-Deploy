@@ -4,7 +4,7 @@
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useOptionalToast } from '@/components/ui/ToastProvider'
 import type { Business, ID, PlatformAccess, PlatformRole, SecurityState, User } from '@/domain/types'
-import { type AssuranceLevels, type AuthService, type SignedInAccount, account as accountApi, auth, service } from '@/services'
+import { type AssuranceLevels, type AuthService, type ServiceError, type SignedInAccount, account as accountApi, auth, service } from '@/services'
 import { onPermissionError, useServiceQuery } from '@/services/hooks'
 import { DEMO_PLATFORM_USERS, SUPER_ADMIN, businessAdminFor } from './accounts'
 
@@ -13,7 +13,8 @@ export const ACCOUNT_KEY = 'arfurn:account'
 export type Session = { role: 'super_admin'; platformRole?: PlatformRole } | { role: 'business_admin'; businessId: ID }
 
 /** `signedOut` false: the session is still active. `error`: what to tell the user (also when signed out on this device only). */
-export type LogoutResult = { signedOut: boolean; error?: string }
+/** `error` is English, for logs; `reason` says which sentence to show (auth.signOut.*). */
+export type LogoutResult = { signedOut: boolean; error?: string; reason?: 'device_only' | 'failed' }
 
 function readSession(): Session | null {
   try {
@@ -43,6 +44,8 @@ interface AccountCtx {
   accessDeactivated?: boolean
   /** Why the account or its business could not be loaded. A user who was already signed in stays signed in. */
   accountError?: string
+  /** The same failure with its code, so screens can word it in the person's language (errorText). */
+  accountFailure?: ServiceError
   /** Loads the account and its business again (after accountError). */
   retry: () => void
   /** The signed-in user's 2FA state, policy and session assurance level. */
@@ -286,7 +289,7 @@ function useBusiness(businessId: ID | null) {
 
 export function SupabaseAccountProvider({ auth, children }: { auth: AuthService; children: ReactNode }) {
   const [account, setAccount] = useState<SignedInAccount | null | undefined>(undefined)
-  const [accountError, setAccountError] = useState<string | undefined>()
+  const [accountFailure, setAccountFailure] = useState<ServiceError | undefined>()
   const businessId = account?.user?.businessId ?? null
   const biz = useBusiness(businessId)
   const bizRef = useRef(biz)
@@ -339,7 +342,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
         // Every auth event can change it (code verified, factor removed, new session).
         if (next) void refreshSecurity()
       }
-      setAccountError(r.ok ? undefined : r.error.message)
+      setAccountFailure(r.ok ? undefined : r.error)
     })
     // Signing in again keeps the same business id, so a failed business lookup has to be retried here.
     refetchFailedBusiness()
@@ -401,7 +404,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
   const logout = useCallback(async (): Promise<LogoutResult> => {
     const global = await auth.signOut()
     const local = global.ok ? global : await auth.signOut('local')
-    if (!local.ok) return { signedOut: false, error: 'Could not sign out. Check your connection and try again.' }
+    if (!local.ok) return { signedOut: false, error: 'Could not sign out. Check your connection and try again.', reason: 'failed' }
     loadId.current++ // a lookup still in flight must not bring the old account back
     accountRef.current = null
     clearPasswordSignIn()
@@ -409,8 +412,8 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     setGateHeld(false)
     setHiddenRefetch(null)
     setAccount(null)
-    setAccountError(undefined)
-    return global.ok ? { signedOut: true } : { signedOut: true, error: 'Signed out on this device only. Other devices stay signed in until their session expires.' }
+    setAccountFailure(undefined)
+    return global.ok ? { signedOut: true } : { signedOut: true, error: 'Signed out on this device only. Other devices stay signed in until their session expires.', reason: 'device_only' }
   }, [auth, clearSecurity])
   const signInAs = useCallback(() => {}, [])
 
@@ -421,7 +424,8 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       signInAs,
       logout,
       retry,
-      accountError,
+      accountError: accountFailure?.message,
+      accountFailure,
       signedInEmail: noRole ? account.email : undefined,
       accessDeactivated: noRole && account.deactivated ? true : undefined,
       security,
@@ -452,8 +456,8 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       if (twoFactorDue(security) || !security.state) return withoutBusiness
       return { ...base, user: null, signedInEmail: account?.email }
     }
-    return { ...base, user: undefined, accountError: biz.error.message }
-  }, [account, accountError, biz.data, biz.status, biz.error, signInAs, logout, retry, security, refreshSecurity, refreshSecurityIfStale, patchSecurity, holdGate, gateHeld, hiddenRefetch])
+    return { ...base, user: undefined, accountError: biz.error.message, accountFailure: biz.error }
+  }, [account, accountFailure, biz.data, biz.status, biz.error, signInAs, logout, retry, security, refreshSecurity, refreshSecurityIfStale, patchSecurity, holdGate, gateHeld, hiddenRefetch])
 
   useEffect(() => {
     shownWithoutBusiness.current = !!value.user?.businessId && !value.business
@@ -548,7 +552,7 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
     if (session.role === 'super_admin') {
       // The demo member was deactivated on Team & Access: no dashboard (as in Supabase mode).
       if (access.data?.status === 'deactivated') return { ...base, user: null }
-      if (!access.data || access.data.role !== platformRole) return access.status === 'error' ? { ...base, user: undefined, accountError: access.error.message } : { ...base, user: undefined }
+      if (!access.data || access.data.role !== platformRole) return access.status === 'error' ? { ...base, user: undefined, accountError: access.error.message, accountFailure: access.error } : { ...base, user: undefined }
       const person = platformRole === 'owner' ? SUPER_ADMIN : DEMO_PLATFORM_USERS[platformRole as 'admin' | 'team']
       return { ...base, user: { ...person, platform: access.data } }
     }
@@ -556,7 +560,7 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
     if (business) return { ...base, user: businessAdminFor(business), business }
     if (biz.status !== 'error') return { ...base, user: undefined }
     if (biz.error.code === 'NOT_FOUND') return { ...base, user: null }
-    return { ...base, user: undefined, accountError: biz.error.message }
+    return { ...base, user: undefined, accountError: biz.error.message, accountFailure: biz.error }
   }, [
     session,
     businessId,
