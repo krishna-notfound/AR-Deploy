@@ -1,4 +1,5 @@
 // Single source of truth for entity shapes. See System_arch/design/04-domain-model.md.
+import type { CustomAnswer } from '../../supabase/functions/_shared/applyForm'
 
 export type ID = string
 export type ISODate = string
@@ -269,6 +270,8 @@ export interface ApplicationInput {
   consent: boolean
   /** The "I agree to the Terms and the Privacy Policy" tick; submit-application refuses the request without it. */
   acceptedTerms?: boolean
+  /** Answers to the application form's custom questions, by question id (text, yes/no, option id, or option ids). */
+  custom?: Record<string, string | boolean | string[]>
   /** One per wizard session: retries and double clicks create one application. */
   submissionKey: string
 }
@@ -282,11 +285,23 @@ export interface BusinessApplication {
   applicantEmail: string
   applicantPhone?: string
   website?: string
-  country: string
-  city: string
-  category: string
+  /** Absent when the application form hides the field (Content Editor): show "Not given", never a stray comma. */
+  country?: string
+  city?: string
+  category?: string
   language: Lang
-  answers: { description?: string; applicantRole?: string; productCount?: string; photoReadiness?: string; modelReadiness?: string; notes?: string }
+  answers: {
+    description?: string
+    applicantRole?: string
+    productCount?: string
+    photoReadiness?: string
+    modelReadiness?: string
+    notes?: string
+    /** Answers to the form's custom questions, with label snapshots from the day it was sent. */
+    custom?: CustomAnswer[]
+    /** The published form version used (0 = the built-in form). */
+    formVersion?: number
+  }
   decisionReason?: string
   reviewedBy?: ID
   reviewedAt?: ISODate

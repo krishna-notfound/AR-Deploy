@@ -3,6 +3,7 @@
 // Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS, ADMIN_NOTIFICATION_EMAIL (design/23-email.md);
 // APPLICATION_SALT is optional (without it the salt is derived from the service key, which never leaves the server).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
+import { normalizeApplyForm, rulesFromConfig } from '../_shared/applyForm.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
 import { serviceKeyFrom, sha256Hex } from '../_shared/http.ts'
 import { MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, handleSubmitApplication, loggable } from './handler.ts'
@@ -58,6 +59,15 @@ Deno.serve((req) =>
       if (error) throw new Error(`rate check failed: ${error.message}`)
       return data === true
     },
+    // The published form's rules (nothing published: no rules, today's behaviour). A read error throws: the handler
+    // answers 503 config_unavailable instead of treating it as "no form".
+    async loadApplyRules() {
+      const { data, error } = await admin.from('site_content').select('published, published_version').eq('id', true).maybeSingle()
+      if (error) throw new Error(`form lookup failed: ${error.message}`)
+      const published = data?.published as { applyForm?: unknown } | null | undefined
+      if (!published) return null
+      return rulesFromConfig(normalizeApplyForm(published.applyForm), Number(data?.published_version) || 0)
+    },
     async insert(a, hash) {
       const { data, error } = await admin
         .from('business_applications')
@@ -78,6 +88,8 @@ Deno.serve((req) =>
             photoReadiness: a.photoReadiness,
             modelReadiness: a.modelReadiness,
             notes: a.notes,
+            custom: a.custom,
+            formVersion: a.formVersion,
           },
           submission_key: a.submissionKey,
           submitter_hash: hash,

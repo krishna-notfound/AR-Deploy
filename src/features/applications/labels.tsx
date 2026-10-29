@@ -1,109 +1,92 @@
-// Admin-facing labels for applications, email attempts and audit events (dashboards are English-only).
+// Labels for applications, email attempts and audit events, in English or Portuguese (dashboards are bilingual, ADR-0044).
+// The plain functions take the language as their last argument (default English, so older call sites keep working); pass
+// `lang` from `useI18n()` to get Portuguese. The badges read the language themselves.
 import { Badge, type Tone } from '@/components/ui/Badge'
-import type { ApplicationStatus, EmailAttemptStatus } from '@/domain/types'
+import type { ApplicationStatus, EmailAttemptStatus, Lang } from '@/domain/types'
+import { type TranslationKey, en } from '@/i18n/dictionaries/en'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { translate } from '@/i18n/translate'
 
-const APP_LABEL: Record<ApplicationStatus, [string, Tone]> = {
-  submitted: ['Submitted', 'accent'],
-  under_review: ['Under review', 'warning'],
-  approved: ['Approved', 'success'],
-  rejected: ['Rejected', 'danger'],
-}
+const has = (key: string): key is TranslationKey => key in en
+const word = (lang: Lang, key: string, fallback: string): string => (has(key) ? translate(lang, key) : fallback)
+
+const APP_TONE: Record<ApplicationStatus, Tone> = { submitted: 'accent', under_review: 'warning', approved: 'success', rejected: 'danger' }
 
 export function ApplicationStatusBadge({ status }: { status: ApplicationStatus }) {
-  const [label, tone] = APP_LABEL[status]
+  const { lang } = useI18n()
   return (
-    <Badge tone={tone} dot>
-      {label}
+    <Badge tone={APP_TONE[status]} dot>
+      {applicationStatusLabel(status, lang)}
     </Badge>
   )
 }
 
-export const applicationStatusLabel = (s: ApplicationStatus) => APP_LABEL[s][0]
+export const applicationStatusLabel = (s: ApplicationStatus, lang: Lang = 'en') => translate(lang, `applications.status.${s}`)
 
 // Only statuses backed by provider evidence say anything about delivery (design/23-email.md).
-const EMAIL_LABEL: Record<EmailAttemptStatus, [string, Tone]> = {
-  blocked: ['Not sent', 'warning'],
-  failed: ['Failed', 'danger'],
-  accepted: ['Accepted by Resend', 'info'],
-  sent: ['Sent by Resend', 'info'],
-  delivered: ['Delivered', 'success'],
-  delayed: ['Delayed', 'warning'],
-  bounced: ['Bounced', 'danger'],
-  complained: ['Marked as spam', 'danger'],
+const EMAIL_TONE: Record<EmailAttemptStatus, Tone> = {
+  blocked: 'warning',
+  failed: 'danger',
+  accepted: 'info',
+  sent: 'info',
+  delivered: 'success',
+  delayed: 'warning',
+  bounced: 'danger',
+  complained: 'danger',
 }
 
 export function EmailStatusBadge({ status }: { status: EmailAttemptStatus }) {
-  const [label, tone] = EMAIL_LABEL[status]
-  return <Badge tone={tone}>{label}</Badge>
+  const { lang } = useI18n()
+  return <Badge tone={EMAIL_TONE[status]}>{translate(lang, `applications.emailStatus.${status}`)}</Badge>
 }
 
-const EMAIL_REASON: Record<string, string> = {
-  demo_mode: 'Demo mode: no email is sent.',
-  email_not_configured: 'The email service is not configured on the server yet.',
-  test_sender_recipient_not_allowed: 'The Resend test sender can only email the Resend account owner until a domain is verified.',
-  invalid_recipient: 'The email address is not valid.',
-  admin_recipient_not_configured: 'No admin notification address (ADMIN_NOTIFICATION_EMAIL) is configured.',
-  no_recipient: 'The account has no email address.',
-}
+const EMAIL_REASONS = ['demo_mode', 'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'admin_recipient_not_configured', 'no_recipient'] as const
 
 /** Why an email was not sent or failed, in plain words, for the email log. Unknown text is the provider's own (sanitized) message. */
-export function emailReason(error?: string): string | undefined {
+export function emailReason(error?: string, lang: Lang = 'en'): string | undefined {
   if (!error) return undefined
-  return knownEmailReason(error) ?? error
+  return knownEmailReason(error, lang) ?? error
 }
 
 /** Fixed copy for a known reason code only; undefined for anything else. Toasts use this: raw provider text is never shown. */
-export function knownEmailReason(error?: string): string | undefined {
-  return error && Object.hasOwn(EMAIL_REASON, error) ? EMAIL_REASON[error] : undefined
+export function knownEmailReason(error?: string, lang: Lang = 'en'): string | undefined {
+  return error && (EMAIL_REASONS as readonly string[]).includes(error) ? translate(lang, `applications.emailReason.${error}` as TranslationKey) : undefined
 }
 
-export const EMAIL_KIND_LABEL: Record<string, string> = {
-  owner_invitation: 'Owner invitation',
-  invitation_resend: 'Invitation resent',
-  application_confirmation: 'Application confirmation',
-  application_decision: 'Application decision',
-  business_notice: 'Business notice',
-  team_invitation: 'Team invitation',
-  security_code: 'Security code',
-  security_notice: 'Security notice',
-  closure_request: 'Closure request',
-  team_notice: 'Team notice',
-  admin_notification: 'Admin notification',
-  test: 'Test email',
-  model_request_update: '3D model update',
-}
+const EMAIL_KINDS = [
+  'owner_invitation',
+  'invitation_resend',
+  'application_confirmation',
+  'application_decision',
+  'business_notice',
+  'team_invitation',
+  'security_code',
+  'security_notice',
+  'closure_request',
+  'team_notice',
+  'admin_notification',
+  'test',
+  'model_request_update',
+] as const
 
-const EVENT_LABEL: Record<string, string> = {
-  application_submitted: 'Application submitted',
-  application_status_changed: 'Status changed',
-  business_created: 'Business created',
-  business_status_changed: 'Catalogue status changed',
-  business_slug_changed: 'Catalogue address changed',
-  business_deleted: 'Business deleted',
-  product_created: 'Product added',
-  product_published: 'Product published',
-  product_unpublished: 'Product unpublished',
-  product_slug_changed: 'Product address changed',
-  product_deleted: 'Product deleted',
-  owner_provisioned: 'Owner provisioned',
-  owner_removed: 'Owner removed',
-  account_closure_voided: 'Closure request cancelled: owner removed',
-  owner_onboarding_completed: 'Owner completed onboarding',
-  invitation_requested: 'Invitation requested',
-  invitation_resent: 'Invitation resent',
-  invitation_failed: 'Invitation failed',
-  model_request_created: '3D model requested',
-  model_request_cancelled: '3D model request cancelled',
-  model_request_started: '3D model work started',
-  model_request_delivered: '3D model delivered',
-  model_request_rejected: '3D model request declined',
-}
+/** The label of an email kind; an unknown kind shows as it is. */
+export const emailKindLabel = (kind: string, lang: Lang = 'en'): string => ((EMAIL_KINDS as readonly string[]).includes(kind) ? translate(lang, `applications.emailKind.${kind}` as TranslationKey) : kind)
+
+/** The English labels, for code that does not know the language. Prefer `emailKindLabel(kind, lang)`. */
+export const EMAIL_KIND_LABEL: Record<string, string> = Object.fromEntries(EMAIL_KINDS.map((k) => [k, emailKindLabel(k, 'en')]))
 
 /** An audit event's label; `metadata` picks the wording where the event carries its direction (S4 §9.1). */
-export const eventLabel = (type: string, metadata?: Record<string, unknown>) =>
+export const eventLabel = (type: string, metadata?: Record<string, unknown>, lang: Lang = 'en'): string =>
   type === 'business_own_models_changed'
-    ? metadata?.to === true ? 'Own 3D uploads allowed' : 'Own 3D uploads turned off'
-    : (EVENT_LABEL[type] ?? type.replace(/_/g, ' '))
+    ? translate(lang, metadata?.to === true ? 'applications.event.ownModelsOn' : 'applications.event.ownModelsOff')
+    : word(lang, `applications.event.${type}`, word(lang, `editor.audit.${type}`, type.replace(/_/g, ' ')))
 
-const STATUS_WORD: Record<string, string> = { submitted: 'Submitted', under_review: 'Under review', approved: 'Approved', rejected: 'Rejected', active: 'Active', inactive: 'Inactive', draft: 'Draft' }
-export const statusWord = (s?: string) => (s ? (STATUS_WORD[s] ?? s) : '')
+export const statusWord = (s?: string, lang: Lang = 'en'): string => (s ? word(lang, `applications.status.${s}`, s) : '')
+
+/** City and country joined with a comma, leaving out whichever the application form did not ask for (no stray comma). */
+export function joinPlace(...parts: (string | null | undefined)[]): string {
+  return parts
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join(', ')
+}
