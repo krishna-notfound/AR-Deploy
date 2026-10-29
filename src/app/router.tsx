@@ -3,19 +3,17 @@ import { JOIN_PATH, PRIVACY_PATH, TERMS_PATH } from '@/lib/urls'
 import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, type RouteObject, createBrowserRouter, useLocation } from 'react-router'
 import { isDemoMode } from '@/services'
-import { RequireRole } from '@/auth/RequireRole'
-import { SecurityGate } from '@/auth/SecurityGate'
-import { DashboardShell } from '@/components/layout/DashboardShell'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { adminNav, businessNav } from '@/components/layout/nav'
 import { loadApplyScreen, loadEditorLayout, loadPageEditorScreen, loadPagesScreen, loadSocialScreen } from '@/features/editor/preload'
 import { SiteContentProvider } from '@/features/marketing/SiteContentProvider'
 import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
+import { DashboardDictionaries } from '@/i18n/DashboardDictionaries'
 import { type Tenant, resolveTenant } from '@/tenant/resolveTenant'
 import { RootLayout } from './RootLayout'
 import { RouteError } from './RouteError'
 
-// Lazy route modules per surface so public pages never load admin code.
+// Lazy route modules per surface so public pages never load admin code. The dashboard routes also wait for the dashboard text
+// (DashboardDictionaries, ADR-0045), which the public pages never download.
 const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
 const DemoEntryPage = lazy(() => import('@/features/demo/DemoEntryPage'))
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
@@ -34,7 +32,13 @@ const EditorPagesScreen = lazy(loadPagesScreen)
 const EditorPageScreen = lazy(loadPageEditorScreen)
 const EditorApplyScreen = lazy(loadApplyScreen)
 const EditorSocialScreen = lazy(loadSocialScreen)
-const EditorPreview = lazy(() => import('@/features/editor/EditorPreview'))
+
+// The signed-in frames (role guard, 2FA gate, shell) load with the first dashboard route, in parallel with the dashboard text.
+const loadFrames = () => import('./DashboardFrames')
+const AdminFrame = lazy(() => loadFrames().then((m) => ({ default: m.AdminFrame })))
+const BusinessFrame = lazy(() => loadFrames().then((m) => ({ default: m.BusinessFrame })))
+const SettingsFrame = lazy(() => loadFrames().then((m) => ({ default: m.SettingsFrame })))
+const EditorPreviewFrame = lazy(() => loadFrames().then((m) => ({ default: m.EditorPreviewFrame })))
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/AdminOverviewPage'))
 const BusinessesListPage = lazy(() => import('@/features/admin/BusinessesListPage'))
@@ -53,7 +57,6 @@ const RolePermissionsPage = lazy(() => import('@/features/team/RolePermissionsPa
 const MemberDetailPage = lazy(() => import('@/features/team/MemberDetailPage'))
 const JoinPage = lazy(() => import('@/features/join/JoinPage'))
 const ProductEditorPage = lazy(() => import('@/features/products/ProductEditorPage'))
-const SettingsLayout = lazy(() => import('@/features/settings/SettingsLayout'))
 
 const BusinessOverviewPage = lazy(() => import('@/features/business/BusinessOverviewPage'))
 const MyProductsPage = lazy(() => import('@/features/business/MyProductsPage'))
@@ -92,11 +95,9 @@ function Standalone() {
 const adminRoutes: RouteObject = {
   path: '/admin',
   element: (
-    <RequireRole allow="super_admin">
-      <SecurityGate>
-        <DashboardShell nav={adminNav} variant="admin" />
-      </SecurityGate>
-    </RequireRole>
+    <DashboardDictionaries alongside={loadFrames}>
+      <AdminFrame />
+    </DashboardDictionaries>
   ),
   children: [
     { index: true, element: <AdminOverviewPage /> },
@@ -136,11 +137,9 @@ const adminRoutes: RouteObject = {
 const businessRoutes: RouteObject = {
   path: '/dashboard',
   element: (
-    <RequireRole allow="business_admin">
-      <SecurityGate>
-        <DashboardShell nav={businessNav} variant="business" />
-      </SecurityGate>
-    </RequireRole>
+    <DashboardDictionaries alongside={loadFrames}>
+      <BusinessFrame />
+    </DashboardDictionaries>
   ),
   children: [
     { index: true, element: <BusinessOverviewPage /> },
@@ -159,21 +158,17 @@ const settingsRoutes: RouteObject[] = [
   {
     path: '/admin/settings/:section?',
     element: (
-      <RequireRole allow="super_admin">
-        <SecurityGate>
-          <SettingsLayout scope="admin" />
-        </SecurityGate>
-      </RequireRole>
+      <DashboardDictionaries alongside={loadFrames}>
+        <SettingsFrame scope="admin" />
+      </DashboardDictionaries>
     ),
   },
   {
     path: '/dashboard/settings/:section?',
     element: (
-      <RequireRole allow="business_admin">
-        <SecurityGate>
-          <SettingsLayout scope="business" />
-        </SecurityGate>
-      </RequireRole>
+      <DashboardDictionaries alongside={loadFrames}>
+        <SettingsFrame scope="business" />
+      </DashboardDictionaries>
     ),
   },
 ]
@@ -183,13 +178,9 @@ const settingsRoutes: RouteObject[] = [
 const editorPreviewRoute: RouteObject = {
   path: '/admin/editor/preview/*',
   element: (
-    <RequireRole allow="super_admin">
-      <SecurityGate>
-        <RequirePermission need="content.manage">
-          <EditorPreview />
-        </RequirePermission>
-      </SecurityGate>
-    </RequireRole>
+    <DashboardDictionaries alongside={loadFrames}>
+      <EditorPreviewFrame />
+    </DashboardDictionaries>
   ),
 }
 

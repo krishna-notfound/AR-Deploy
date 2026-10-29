@@ -2,11 +2,12 @@
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import type { ModelRequestOutcome } from '@/domain/modelRequests'
-import { type TranslationKey, en } from '@/i18n/dictionaries/en'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { hasTranslation } from '@/i18n/translate'
 import { type T, tEn } from './copy'
 
-export const NO_USDZ_WARNING = en['business.modelRequests.deliver.noUsdz']
+export const NO_USDZ_WARNING = tEn('business.modelRequests.deliver.noUsdz')
 
 export function DeliverDialog({
   open,
@@ -51,7 +52,7 @@ export function DeliverDialog({
 function knownReason(code: string | undefined, t: T): string | undefined {
   if (!code) return undefined
   const key = `business.modelRequests.emailReason.${code}`
-  return Object.hasOwn(en, key) ? t(key as TranslationKey) : undefined
+  return hasTranslation(key) ? t(key as TranslationKey) : undefined
 }
 
 /**

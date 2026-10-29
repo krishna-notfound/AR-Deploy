@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { en } from '../../../src/i18n/dictionaries/en'
-import { pt } from '../../../src/i18n/dictionaries/pt'
+import { en, pt } from '../../../src/i18n/dictionaries/full'
 import { MODEL_READINESS, PHOTO_READINESS, PRODUCT_COUNT_RANGES } from './application'
 import {
   APPLY_BUILTIN_KEYS,

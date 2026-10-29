@@ -3,9 +3,6 @@ import type { TranslationKey } from './en'
 // Portugal Portuguese (pt-PT) for the applications area. Missing keys fall back to English.
 export const ptApplications: Partial<Record<TranslationKey, string>> = {
   // ---- public form notices ----
-  'applications.apply.preview': 'Pré-visualização',
-  'applications.apply.formChanged': 'O formulário foi atualizado. Verifique os campos assinalados.',
-  'applications.apply.configError': 'Não foi possível verificar se existe uma versão mais recente deste formulário.',
 
   // ---- statuses ----
   'applications.status.submitted': 'Submetida',

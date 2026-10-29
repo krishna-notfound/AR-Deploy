@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { ModelRequestPhoto } from '@/domain/modelRequests'
-import { en } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { downloadUrl } from '@/lib/download'
 import { formatFileSize } from '@/lib/format'
+import { tEn } from './copy'
 
-export const PHOTO_FAILED = en['business.modelRequests.photo.failed']
+export const PHOTO_FAILED = tEn('business.modelRequests.photo.failed')
 
 /**
  * Load state of one photo; `retry` asks the page for fresh links (its refetch signs them again, so an expired

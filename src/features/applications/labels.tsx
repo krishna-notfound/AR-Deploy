@@ -3,11 +3,11 @@
 // `lang` from `useI18n()` to get Portuguese. The badges read the language themselves.
 import { Badge, type Tone } from '@/components/ui/Badge'
 import type { ApplicationStatus, EmailAttemptStatus, Lang } from '@/domain/types'
-import { type TranslationKey, en } from '@/i18n/dictionaries/en'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
-import { translate } from '@/i18n/translate'
+import { hasTranslation, translate } from '@/i18n/translate'
 
-const has = (key: string): key is TranslationKey => key in en
+const has = hasTranslation
 const word = (lang: Lang, key: string, fallback: string): string => (has(key) ? translate(lang, key) : fallback)
 
 const APP_TONE: Record<ApplicationStatus, Tone> = { submitted: 'accent', under_review: 'warning', approved: 'success', rejected: 'danger' }

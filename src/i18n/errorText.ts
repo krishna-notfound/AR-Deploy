@@ -1,13 +1,13 @@
 // The one place that turns a service failure into a sentence in the person's language (spec 12/13). `ServiceError.message`
 // stays English for logs; the UI shows errorText(error, t) and never the raw message.
 import type { ServiceError } from '@/services/catalogService'
-import { type TranslationKey, en } from './dictionaries/en'
+import type { TranslationKey } from './dictionaries/en'
 import { type FieldError, isFieldMessage } from './fieldMessage'
-import type { Vars } from './translate'
+import { type Vars, hasTranslation } from './translate'
 
 type T = (key: TranslationKey, vars?: Vars) => string
 
-const has = (key: string): key is TranslationKey => key in en
+const has = hasTranslation
 
 /** `common.error.reason.<reason>` if there is one, else `common.error.<code>`, else the generic sentence. */
 export function errorKey(error: Pick<ServiceError, 'code' | 'reason'>): TranslationKey {

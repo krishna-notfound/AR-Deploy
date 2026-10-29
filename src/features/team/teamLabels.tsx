@@ -3,9 +3,9 @@
 import { useMemo } from 'react'
 import { Badge, type Tone } from '@/components/ui/Badge'
 import type { InviteStatus, MemberStatus, PlatformRole } from '@/domain/types'
-import { type TranslationKey, en } from '@/i18n/dictionaries/en'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
-import type { Vars } from '@/i18n/translate'
+import { type Vars, hasTranslation } from '@/i18n/translate'
 
 const ROLE_TONE: Record<PlatformRole, Tone> = { owner: 'neutral', admin: 'accent', team: 'neutral' }
 
@@ -28,7 +28,7 @@ export const INVITE_STATUS_KEY: Record<InviteStatus, { label: TranslationKey; he
 }
 const INVITE_STATUS_TONE: Record<InviteStatus, Tone> = { pending: 'info', sent: 'info', email_failed: 'warning', accepted: 'success', expired: 'neutral', revoked: 'danger' }
 
-const has = (key: string): key is TranslationKey => key in en
+const has = hasTranslation
 
 /** Role, permission and group words in the current language; an unknown permission falls back to its English label. */
 export function useTeamText() {

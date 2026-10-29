@@ -1,7 +1,7 @@
 // Dashboard copy for 3D model requests (S4 spec §9.1), in the person's language (ADR-0044). The English constants
 // below are kept for files that still import them; new code passes `t` or reads the keys.
 import type { ModelRequest } from '@/domain/modelRequests'
-import { type TranslationKey, en } from '@/i18n/dictionaries/en'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { type Vars, translate } from '@/i18n/translate'
 
 export type T = (key: TranslationKey, vars?: Vars) => string
@@ -30,8 +30,8 @@ export function statusLine(r: StatusFields, optionName: string | undefined, form
   }
 }
 
-export const LOAD_ERROR = en['business.modelRequests.loadError']
+export const LOAD_ERROR = tEn('business.modelRequests.loadError')
 /** R-S4-19: demo deliver and decline toasts. */
-export const DEMO_NO_EMAIL = en['business.modelRequests.demoNoEmail']
-export const DEMO_SESSION_PHOTOS = en['business.modelRequests.demoSessionPhotos']
-export const SAMPLE_PHOTOS = en['business.modelRequests.samplePhotos']
+export const DEMO_NO_EMAIL = tEn('business.modelRequests.demoNoEmail')
+export const DEMO_SESSION_PHOTOS = tEn('business.modelRequests.demoSessionPhotos')
+export const SAMPLE_PHOTOS = tEn('business.modelRequests.samplePhotos')

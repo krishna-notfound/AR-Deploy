@@ -1,19 +1,12 @@
 import type { TranslationKey } from './en'
-import { ptAdmin } from './pt.admin'
-import { ptApplications } from './pt.applications'
 import { ptAuth } from './pt.auth'
-import { ptBusiness } from './pt.business'
 import { ptCommon } from './pt.common'
-import { ptEditor } from './pt.editor'
-import { ptProducts } from './pt.products'
-import { ptSettings } from './pt.settings'
+import { ptShared } from './pt.shared'
 import { ptSite } from './pt.site'
-import { ptTeam } from './pt.team'
-import { ptUi } from './pt.ui'
 
 // European Portuguese (pt-PT) — see open question Q3. Missing keys fall back to English.
 // landing.* and site.* are the client's reference copy, verbatim (Brazilian Portuguese as written; ADR-0023).
-export const pt: Partial<Record<TranslationKey, string>> = {
+export const ptCore: Partial<Record<TranslationKey, string>> = {
   'nav.backToCatalog': 'Voltar a {name}',
   'nav.language': 'Idioma',
   'nav.poweredBy': 'Catálogo com tecnologia Sanctus',
@@ -409,14 +402,7 @@ export const pt: Partial<Record<TranslationKey, string>> = {
   'legal.agree.required': 'Para continuar, aceite os Termos e a Política de Privacidade.',
   'apply.err.terms_required': 'Para enviar a candidatura, aceite os Termos e a Política de Privacidade.',
   ...ptCommon,
-  ...ptEditor,
   ...ptSite,
-  ...ptApplications,
-  ...ptAdmin,
-  ...ptProducts,
-  ...ptBusiness,
-  ...ptSettings,
-  ...ptTeam,
   ...ptAuth,
-  ...ptUi,
+  ...ptShared,
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ServiceError } from '@/services/catalogService'
-import { en } from './dictionaries/en'
+import { en } from './dictionaries/full'
 import { errorKey, errorText, fieldText, fieldTexts } from './errorText'
 import { msg } from './fieldMessage'
 import { translate } from './translate'

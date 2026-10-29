@@ -1,6 +1,7 @@
 import { arReadiness } from '@/features/ar/readiness'
 import type { Product, ProductModels, ProductVariant } from '@/domain/types'
-import { type TranslationKey, en } from '@/i18n/dictionaries/en'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { translate } from '@/i18n/translate'
 
 /**
  * One-word AR readiness for product lists (DUX-05), derived from the editor's `arReadiness()` so the list and
@@ -30,17 +31,17 @@ export const AR_READINESS_HINT_KEY: Record<ProductArReadiness, TranslationKey> =
 
 /** English text, kept for callers that have no `t` (tests, files not yet translated). */
 export const AR_READINESS_LABEL: Record<ProductArReadiness, string> = {
-  ready: en[AR_READINESS_LABEL_KEY.ready],
-  'android-only': en[AR_READINESS_LABEL_KEY['android-only']],
-  'android-blocked': en[AR_READINESS_LABEL_KEY['android-blocked']],
-  'photos-only': en[AR_READINESS_LABEL_KEY['photos-only']],
+  ready: translate('en', AR_READINESS_LABEL_KEY.ready),
+  'android-only': translate('en', AR_READINESS_LABEL_KEY['android-only']),
+  'android-blocked': translate('en', AR_READINESS_LABEL_KEY['android-blocked']),
+  'photos-only': translate('en', AR_READINESS_LABEL_KEY['photos-only']),
 }
 
 export const AR_READINESS_HINT: Record<ProductArReadiness, string> = {
-  ready: en[AR_READINESS_HINT_KEY.ready],
-  'android-only': en[AR_READINESS_HINT_KEY['android-only']],
-  'android-blocked': en[AR_READINESS_HINT_KEY['android-blocked']],
-  'photos-only': en[AR_READINESS_HINT_KEY['photos-only']],
+  ready: translate('en', AR_READINESS_HINT_KEY.ready),
+  'android-only': translate('en', AR_READINESS_HINT_KEY['android-only']),
+  'android-blocked': translate('en', AR_READINESS_HINT_KEY['android-blocked']),
+  'photos-only': translate('en', AR_READINESS_HINT_KEY['photos-only']),
 }
 
 const RANK: ProductArReadiness[] = ['ready', 'android-only', 'android-blocked', 'photos-only']

@@ -1,18 +1,13 @@
-// Master dictionary: public pages (landing, catalogues, product pages) here; the dashboards and the shared words live in the
-// per-area files spread at the end (ADR-0044). Add new keys to your own area file, not here.
-import { enAdmin } from './en.admin'
-import { enApplications } from './en.applications'
+// First-load dictionary: public pages (landing, catalogues, product pages) here, plus the shared words, the sign-in/join/reset text
+// (common, auth, site) and the few dashboard-area strings the public pages and app-wide providers reference (shared). Everything else
+// is the dashboard dictionary (en.dashboard.ts), loaded when a dashboard route opens (ADR-0045). Add new keys to your own area file, not here.
 import { enAuth } from './en.auth'
-import { enBusiness } from './en.business'
 import { enCommon } from './en.common'
-import { enEditor } from './en.editor'
-import { enProducts } from './en.products'
-import { enSettings } from './en.settings'
+import type { enDashboard } from './en.dashboard'
+import { enShared } from './en.shared'
 import { enSite } from './en.site'
-import { enTeam } from './en.team'
-import { enUi } from './en.ui'
 // landing.* and site.* carry the client's reference copy (AR-attachment/, ADR-0023): pt.ts has it verbatim, this file translates it.
-export const en = {
+export const enCore = {
   'nav.backToCatalog': 'Back to {name}',
   'nav.language': 'Language',
   'nav.poweredBy': 'Catalogue powered by Sanctus',
@@ -410,16 +405,10 @@ export const en = {
 
   // Per-area files (ADR-0044): every track edits only its own.
   ...enCommon,
-  ...enEditor,
   ...enSite,
-  ...enApplications,
-  ...enAdmin,
-  ...enProducts,
-  ...enBusiness,
-  ...enSettings,
-  ...enTeam,
   ...enAuth,
-  ...enUi,
+  ...enShared,
 } as const
 
-export type TranslationKey = keyof typeof en
+/** Every key, in both parts. The types are derived statically; only the loading of the dashboard part is lazy (ADR-0045). */
+export type TranslationKey = keyof typeof enCore | keyof typeof enDashboard

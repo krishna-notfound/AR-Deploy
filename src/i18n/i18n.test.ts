@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { en } from './dictionaries/en'
-import { pt } from './dictionaries/pt'
+import { en, pt } from './dictionaries/full'
 import { pickLocalized, translate } from './translate'
 
 describe('i18n', () => {

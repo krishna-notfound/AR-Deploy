@@ -4,9 +4,6 @@
 // Editor can override.
 export const enApplications = {
   // ---- public form notices (the wording of the form itself is apply.*) ----
-  'applications.apply.preview': 'Preview',
-  'applications.apply.formChanged': 'The form was updated. Please check the highlighted fields.',
-  'applications.apply.configError': 'We could not check for a newer version of this form.',
 
   // ---- statuses (applications, businesses) ----
   'applications.status.submitted': 'Submitted',

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { en } from '@/i18n/dictionaries/en'
-import { pt } from '@/i18n/dictionaries/pt'
+import { en, pt } from '@/i18n/dictionaries/full'
 import { adminNav, businessNav } from './nav'
 
 describe('dashboard navigation labels', () => {

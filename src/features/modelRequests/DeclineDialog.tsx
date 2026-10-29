@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Textarea } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { REQUEST_TEXT_MAX } from '@/domain/modelRequests'
-import { en } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { tEn } from './copy'
 
-export const DECLINE_HINT = en['business.modelRequests.decline.hint']
-export const REASON_REQUIRED = en['business.modelRequests.decline.reasonRequired']
+export const DECLINE_HINT = tEn('business.modelRequests.decline.hint')
+export const REASON_REQUIRED = tEn('business.modelRequests.decline.reasonRequired')
 
 export function DeclineDialog({ open, onClose, onConfirm, pending }: { open: boolean; onClose: () => void; onConfirm: (reason: string) => void; pending?: boolean }) {
   const { t } = useI18n()

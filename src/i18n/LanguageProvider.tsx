@@ -1,5 +1,6 @@
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Lang, LocalizedText } from '@/domain/types'
+import { dashboardInUse, dashboardReady, loadDashboardDictionaries } from './dashboardLoader'
 import type { TranslationKey } from './dictionaries/en'
 import { htmlLangOf } from './locale'
 import { type PluralBase, type Vars, pickLocalized, translate, translatePlural } from './translate'
@@ -68,16 +69,30 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   return nested ? <>{children}</> : <RootLanguageProvider>{children}</RootLanguageProvider>
 }
 
+/** Counts the language choices, so a slow switch that was overtaken by a newer choice does not win. */
+let latestChoice = 0
+
 function RootLanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(initialLang)
 
   const setLang = useCallback((l: Lang) => {
-    setLangState(l)
     try {
       localStorage.setItem(LANG_KEY, l)
     } catch {
       // ignore
     }
+    const choice = ++latestChoice
+    // The dashboard text of a language loads with the dashboard (ADR-0045). When a dashboard is open and the new language's text
+    // is not there yet, keep showing the current language until it arrives, so no screen flashes raw keys. If the download fails,
+    // the switch still happens and the missing dashboard strings show in English.
+    if (!dashboardInUse() || dashboardReady(l)) {
+      setLangState(l)
+      return
+    }
+    const settle = () => {
+      if (latestChoice === choice) setLangState(l)
+    }
+    loadDashboardDictionaries(l).then(settle, settle)
   }, [])
 
   useEffect(() => {

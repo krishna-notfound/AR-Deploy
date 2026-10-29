@@ -1,9 +1,32 @@
 import type { Lang, LocalizedText } from '@/domain/types'
-import { type TranslationKey, en } from './dictionaries/en'
-import { pt } from './dictionaries/pt'
+import { type TranslationKey, enCore } from './dictionaries/en'
+import { ptCore } from './dictionaries/pt'
 import { localeOf } from './locale'
 
-const DICTS: Record<Lang, Partial<Record<TranslationKey, string>>> = { en, pt }
+type Dict = Partial<Record<TranslationKey, string>>
+
+// The first-load dictionaries are always there. The dashboard dictionaries are registered when a dashboard route loads them
+// (dashboardDictionaries.ts, ADR-0045); until then a dashboard key falls through to the key itself, which the dashboard
+// routes avoid by waiting for the load before they render.
+const CORE: Record<Lang, Dict> = { en: enCore, pt: ptCore }
+const DASHBOARD: Record<Lang, Dict | undefined> = { en: undefined, pt: undefined }
+
+/** Adds the dashboard dictionary of a language (idempotent). */
+export function registerDashboardDictionary(lang: Lang, dict: Dict) {
+  DASHBOARD[lang] = dict
+}
+
+/** Forgets the dashboard dictionaries (tests of the loading path only). */
+export function unregisterDashboardDictionaries() {
+  DASHBOARD.en = undefined
+  DASHBOARD.pt = undefined
+}
+
+export function isDashboardDictionaryLoaded(lang: Lang): boolean {
+  return DASHBOARD[lang] !== undefined
+}
+
+const lookup = (lang: Lang, key: TranslationKey): string | undefined => DASHBOARD[lang]?.[key] ?? CORE[lang][key]
 
 export type Vars = Record<string, string | number>
 
@@ -12,12 +35,17 @@ function interpolate(s: string, vars?: Vars): string {
   return s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m))
 }
 
+/** Whether the English dictionary (loaded so far) has this key: for keys built at run time from data. */
+export function hasTranslation(key: string): key is TranslationKey {
+  return lookup('en', key as TranslationKey) !== undefined
+}
+
 /** Current language → English → key itself. */
 export function translate(lang: Lang, key: TranslationKey, vars?: Vars): string {
-  const hit = DICTS[lang][key]
+  const hit = lookup(lang, key)
   if (hit !== undefined) return interpolate(hit, vars)
   if (import.meta.env.DEV && lang !== 'en') console.warn(`[i18n] missing "${key}" for ${lang}`)
-  const fallback = en[key] as string | undefined
+  const fallback = lookup('en', key)
   return fallback !== undefined ? interpolate(fallback, vars) : key
 }
 

@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { RECOVERED_PATCH, VERIFIED_PATCH, clearPasswordSignIn, markPasswordSignIn, needsCodeStep, useAccount, useSecurityState } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
+import { preloadDashboardDictionaries } from '@/i18n/dashboardLoader'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
@@ -20,8 +21,10 @@ import { TwoFactorStep } from './TwoFactorStep'
 
 /** Real sign-in (Supabase mode). In demo mode this route forwards to the demo account picker. */
 export default function LoginPage() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   useDocumentTitle(t('auth.login.title'))
+  // Signing in leads to a dashboard: fetch its text while the person types, so the dashboard opens without waiting for it.
+  useEffect(() => preloadDashboardDictionaries(lang), [lang])
   const [params] = useSearchParams()
   const next = params.get('next')
   const { user, signedInEmail, accessDeactivated, accountFailure } = useAccount()
