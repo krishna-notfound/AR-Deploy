@@ -1,6 +1,7 @@
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { ActivityItem } from '@/domain/types'
+import { activityText } from '@/services/analytics'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { useFormat } from '@/lib/useFormat'
@@ -18,7 +19,7 @@ export function ActivityList({ query }: { query: QueryResult<ActivityItem[]> }) 
     <ol className="space-y-4">
       {items.map((a) => (
         <li key={a.id} className="min-w-0">
-          <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{a.message}</p>
+          <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{(a.params && activityText(a.kind, a.params, t)) ?? a.message}</p>
           <p className="mt-0.5 text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
             <time dateTime={a.at}>{fmt.relative(a.at)}</time>
           </p>

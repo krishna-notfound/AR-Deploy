@@ -1,5 +1,7 @@
 // Shared by the mock and Supabase services: turns daily aggregates + raw events into an AnalyticsSummary.
-import { ACTIVITY_KINDS, type ActivityItem, type ActivityKind, type AnalyticsEvent, type AnalyticsSummary, type AuditEvent, type Business, type DailyPoint, type ID, type Product, type ProductAnalytics } from '@/domain/types'
+import { ACTIVITY_KINDS, type ActivityItem, type ActivityParams, type ActivityKind, type AnalyticsEvent, type AnalyticsSummary, type AuditEvent, type Business, type DailyPoint, type ID, type Product, type ProductAnalytics } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { type TFn, tEn } from '@/i18n/translate'
 
 const DAYS = 30
 
@@ -179,35 +181,53 @@ export function summarize(db: AnalyticsInput, businessId?: ID, now: Date = new D
   }
 }
 
-/** "Catalog for {business} …" by the status the catalog moved to. */
-const CATALOG_STATUS_SENTENCE: Record<string, string> = { active: 'was activated', inactive: 'was paused', draft: 'was set to draft' }
+const CATALOG_STATUS_KEY: Record<string, TranslationKey> = {
+  active: 'admin.activity.catalogActive',
+  inactive: 'admin.activity.catalogInactive',
+  draft: 'admin.activity.catalogDraft',
+}
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 
-/** One Recent activity sentence for an audit event, or null for a type the feed does not show. */
-export function activityMessage(e: Pick<AuditEvent, 'eventType' | 'businessId' | 'toStatus' | 'metadata'>, businessName?: string): string | null {
-  const product = text(e.metadata.name) ?? 'A product'
+/** The parts of one Recent activity sentence, taken from an audit event. */
+export function activityParams(e: Pick<AuditEvent, 'eventType' | 'toStatus' | 'metadata'>, businessName?: string): ActivityParams {
   const business = text(e.metadata.business_name) ?? businessName ?? (e.eventType === 'business_deleted' ? text(e.metadata.name) : undefined)
-  switch (e.eventType) {
+  return {
+    ...(text(e.metadata.name) ? { name: text(e.metadata.name) } : {}),
+    ...(business ? { business } : {}),
+    ...(text(e.metadata.to) ? { to: text(e.metadata.to) } : {}),
+    ...(e.toStatus ? { status: e.toStatus } : {}),
+  }
+}
+
+/** One Recent activity sentence for an event type, or null for a type the feed does not show. */
+export function activityText(eventType: string, p: ActivityParams, t: TFn = tEn): string | null {
+  const product = p.name ?? t('admin.activity.aProduct')
+  switch (eventType) {
     case 'product_created':
-      return `${product} was added`
+      return t('admin.activity.productAdded', { product })
     case 'product_published':
-      return `${product} was published`
+      return t('admin.activity.productPublished', { product })
     case 'product_unpublished':
-      return `${product} was unpublished`
+      return t('admin.activity.productUnpublished', { product })
     case 'product_slug_changed':
-      return text(e.metadata.to) ? `${product} has a new address: /${text(e.metadata.to)}` : `${product} has a new address`
+      return p.to ? t('admin.activity.productSlug', { product, to: p.to }) : t('admin.activity.productSlugNoAddress', { product })
     case 'product_deleted':
-      return `${product} was deleted`
+      return t('admin.activity.productDeleted', { product })
     case 'business_status_changed':
-      return `Catalog for ${business ?? 'a business'} ${CATALOG_STATUS_SENTENCE[e.toStatus ?? ''] ?? 'changed status'}`
+      return t(CATALOG_STATUS_KEY[p.status ?? ''] ?? 'admin.activity.catalogChanged', { business: p.business ?? t('admin.activity.aBusinessLower') })
     case 'business_created':
-      return `${business ?? 'A business'} was created`
+      return t('admin.activity.businessCreated', { business: p.business ?? t('admin.activity.aBusiness') })
     case 'business_deleted':
-      return `${business ?? 'A business'} was deleted`
+      return t('admin.activity.businessDeleted', { business: p.business ?? t('admin.activity.aBusiness') })
     default:
       return null
   }
+}
+
+/** One Recent activity sentence for an audit event, or null for a type the feed does not show. */
+export function activityMessage(e: Pick<AuditEvent, 'eventType' | 'businessId' | 'toStatus' | 'metadata'>, businessName?: string, t: TFn = tEn): string | null {
+  return activityText(e.eventType, activityParams(e, businessName), t)
 }
 
 /**
@@ -221,7 +241,7 @@ export function deriveActivity(events: AuditEvent[], businessNames: ReadonlyMap<
     const message = activityMessage(e, e.businessId ? businessNames.get(e.businessId) : undefined)
     if (!message) continue
     const productId = e.eventType !== 'product_deleted' ? text(e.metadata.product_id) : undefined
-    items.push({ id: e.id, at: e.createdAt, kind: e.eventType as ActivityKind, message, ...(e.businessId ? { businessId: e.businessId } : {}), ...(productId ? { productId } : {}) })
+    items.push({ id: e.id, at: e.createdAt, kind: e.eventType as ActivityKind, message, params: activityParams(e, e.businessId ? businessNames.get(e.businessId) : undefined), ...(e.businessId ? { businessId: e.businessId } : {}), ...(productId ? { productId } : {}) })
   }
   return items.sort((a, b) => b.at.localeCompare(a.at))
 }

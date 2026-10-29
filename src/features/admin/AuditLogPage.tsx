@@ -16,7 +16,7 @@ import { service } from '@/services'
 import type { AuditEntry } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
 import { actorText } from '../applications/AuditTimeline'
-import { eventLabel, statusWord } from '../applications/labels'
+import { eventLabel, statusWord } from '../shared/auditLabels'
 
 const PAGE_SIZE = 30
 
@@ -123,12 +123,12 @@ export default function AuditLogPage() {
                     </time>
                     <div className="min-w-0 max-md:order-1 max-md:col-span-2">
                       <p className="text-[length:var(--text-ui-body)] leading-5 text-ink">
-                        <span className="font-medium">{sentenceCase(eventLabel(e.eventType, e.metadata))}</span>
+                        <span className="font-medium">{sentenceCase(eventLabel(e.eventType, e.metadata, t))}</span>
                         {e.toStatus && (
                           <span className="text-ink-muted">
                             {' '}
-                            · {e.fromStatus ? `${sentenceCase(statusWord(e.fromStatus))} → ` : ''}
-                            {sentenceCase(statusWord(e.toStatus))}
+                            · {e.fromStatus ? `${sentenceCase(statusWord(e.fromStatus, t))} → ` : ''}
+                            {sentenceCase(statusWord(e.toStatus, t))}
                           </span>
                         )}
                       </p>

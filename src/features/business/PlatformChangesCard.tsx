@@ -10,7 +10,7 @@ import { useFormat } from '@/lib/useFormat'
 import { service } from '@/services'
 import { activityMessage } from '@/services/analytics'
 import { useServiceQuery } from '@/services/hooks'
-import { eventLabel } from '../applications/labels'
+import { eventLabel } from '../shared/auditLabels'
 
 /**
  * R-W7-2: what the platform team (Owner, Admin or Team) changed in this business's catalogue, the last 20, read-only.
@@ -34,7 +34,7 @@ export function PlatformChangesCard({ businessId, className }: { businessId: ID;
           <ol className="space-y-4">
             {q.data.map((e) => (
               <li key={e.id} className="min-w-0">
-                <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{activityMessage(e) ?? eventLabel(e.eventType, e.metadata)}</p>
+                <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{activityMessage(e, undefined, t) ?? eventLabel(e.eventType, e.metadata, t)}</p>
                 <p className="mt-0.5 text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
                   <time dateTime={e.createdAt}>{fmt.dateTime(e.createdAt)}</time> · {t('business.platformChanges.team')}
                 </p>

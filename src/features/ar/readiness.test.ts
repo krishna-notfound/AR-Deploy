@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelAsset } from '@/domain/types'
 import { MB } from '@/lib/files'
+import { translate } from '@/i18n/translate'
 import { arReadiness, sceneViewerWarning, variantMediaSummary } from './readiness'
 
 const glb: ModelAsset = { format: 'glb', url: 'https://x.test/a.glb', fileName: 'a.glb', sizeBytes: 2 * MB, status: 'valid' }
@@ -108,5 +109,26 @@ describe('variantMediaSummary', () => {
     expect(s.lines.map((l) => l.level)).toEqual(['ready', 'warning', 'missing'])
     expect(s.lines[1]!.detail).toMatch(/1 own photo .*Android AR not offered/)
     expect(s.lines[2]!.detail).toMatch(/product photos .*product 3D model shown/)
+  })
+})
+
+describe('readiness texts in Portuguese', () => {
+  const pt = (key: Parameters<typeof translate>[1], vars?: Parameters<typeof translate>[2]) => translate('pt', key, vars)
+
+  it('words the platform items in pt-PT and keeps the levels', () => {
+    const items = arReadiness({ glb, usdz, preview: 'loaded', scale: verified, t: pt })
+    expect(levels(items)).toEqual({ viewer: 'ready', android: 'ready', ios: 'ready', scale: 'ready' })
+    expect(items.map((i) => i.label)).toEqual(['Visualizador 3D', 'RA no Android', 'RA no iPhone e iPad', 'Tamanho real'])
+    expect(items[0]!.detail).toBe('Funciona em todos os dispositivos.')
+    expect(arReadiness({ preview: 'loading', scale: { status: 'unknown' }, t: pt })[0]!.detail).toBe('Adicione um modelo GLB.')
+  })
+
+  it('words the Scene Viewer warning and the variant lines in pt-PT', () => {
+    const text = sceneViewerWarning(['KHR_draco_mesh_compression', 'KHR_texture_basisu'], pt)
+    expect(text).toContain('Draco e KTX2')
+    expect(text).toMatch(/Google ARCore/)
+    const s = variantMediaSummary([{ id: 'c', name: { en: '' } }], pt)
+    expect(s.lines[0]!.name).toBe('Opção sem nome')
+    expect(s.lines[0]!.detail).toMatch(/^fotografias do produto · /)
   })
 })
