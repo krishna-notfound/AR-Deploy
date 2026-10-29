@@ -23,9 +23,10 @@ import { service } from '@/services'
 import { REASON_MAX_LENGTH, availableActions } from '@/services/applicationRules'
 import { useServiceMutation, useServiceQuery } from '@/services/hooks'
 import { AuditTimeline } from '../applications/AuditTimeline'
+import { ExtraQuestionsCard } from '../applications/ExtraQuestionsCard'
 import { EmailActivity } from '../applications/EmailActivity'
 import { PossibleDuplicates } from '../applications/PossibleDuplicates'
-import { ApplicationStatusBadge, knownEmailReason } from '../applications/labels'
+import { ApplicationStatusBadge, joinPlace, knownEmailReason } from '../applications/labels'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 
 const READINESS: Record<string, TranslationKey> = {
@@ -62,7 +63,7 @@ export default function ApplicationDetailPage() {
 }
 
 function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChanged: () => void }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const f = useFormat()
   const ready = (v?: string) => (v && Object.hasOwn(READINESS, v) ? t(READINESS[v]!) : v)
   const confirm = useConfirm()
@@ -115,7 +116,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const reportRejection = (r: ReviewedApplication) => {
     if (!r.decisionEmail) return toast.success(t('admin.applications.detail.rejected'))
     if (r.decisionEmail.status === 'accepted') return toast.success(t('admin.applications.detail.rejectedEmailed'))
-    const why = (knownEmailReason(r.decisionEmail.error) ?? t('admin.applications.detail.emailRefused')).replace(/\.$/, '')
+    const why = (knownEmailReason(r.decisionEmail.error, lang) ?? t('admin.applications.detail.emailRefused')).replace(/\.$/, '')
     toast.error(t('admin.applications.detail.rejectedNoEmail', { why }))
   }
 
@@ -226,7 +227,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
                   [t('admin.businesses.form.name'), app.businessName],
                   [t('admin.applications.detail.category'), app.category],
                   [t('admin.businesses.form.website'), app.website ? <a key="w" className="text-accent-ink hover:underline" href={app.website} target="_blank" rel="noopener noreferrer">{app.website}</a> : undefined],
-                  [t('admin.applications.detail.location'), `${app.city}, ${app.country}`],
+                  [t('admin.applications.detail.location'), joinPlace(app.city, app.country)],
                   [t('admin.applications.detail.about'), app.answers.description],
                 ]}
               />
@@ -259,6 +260,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               />
             </CardBody>
           </Card>
+          <ExtraQuestionsCard custom={app.answers.custom} />
           {businessDeleted && (
             <Card>
               <PanelHeader title={t('admin.applications.detail.record')} />

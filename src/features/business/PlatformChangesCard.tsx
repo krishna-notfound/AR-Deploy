@@ -17,7 +17,7 @@ import { eventLabel } from '../applications/labels'
  * The owner is also emailed about pauses, activations, unpublished and deleted products; this is where they are listed.
  */
 export function PlatformChangesCard({ businessId, className }: { businessId: ID; className?: string }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const fmt = useFormat()
   const q = useServiceQuery(() => service.getPlatformChanges(businessId), [businessId])
   return (
@@ -34,7 +34,7 @@ export function PlatformChangesCard({ businessId, className }: { businessId: ID;
           <ol className="space-y-4">
             {q.data.map((e) => (
               <li key={e.id} className="min-w-0">
-                <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{activityMessage(e) ?? eventLabel(e.eventType, e.metadata)}</p>
+                <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{activityMessage(e, undefined, t) ?? eventLabel(e.eventType, e.metadata, lang)}</p>
                 <p className="mt-0.5 text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
                   <time dateTime={e.createdAt}>{fmt.dateTime(e.createdAt)}</time> · {t('business.platformChanges.team')}
                 </p>

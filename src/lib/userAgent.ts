@@ -1,3 +1,5 @@
+import { type TFn, tEn } from '@/i18n/translate'
+
 export type InAppBrowser = 'instagram' | 'facebook' | 'whatsapp' | 'tiktok' | 'linkedin' | 'snapchat' | 'line' | 'x' | 'google'
 
 /** Display names of the in-app browsers (brand names, the same in every language). */
@@ -66,10 +68,10 @@ export function browserName(ua: string = typeof navigator !== 'undefined' ? navi
 }
 
 /** "Chrome on Windows", "Safari on iPhone" from a stored user-agent string; "Unknown device" when it cannot tell. */
-export function describeUserAgent(ua: string | null | undefined): string {
-  if (!ua) return 'Unknown device'
+export function describeUserAgent(ua: string | null | undefined, t: TFn = tEn): string {
+  if (!ua) return t('ui.ua.unknown')
   const browser = browserName(ua) ?? undefined
   const system = SYSTEMS.find(([re]) => re.test(ua))?.[1]
-  if (browser && system) return `${browser} on ${system}`
-  return browser ?? system ?? 'Unknown device'
+  if (browser && system) return t('ui.ua.browserOnSystem', { browser, system })
+  return browser ?? system ?? t('ui.ua.unknown')
 }

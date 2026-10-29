@@ -1,4 +1,6 @@
 import type { ModelAsset, ProductVariant } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { type TFn, tEn } from '@/i18n/translate'
 import { MB, isStaleSessionAsset, sceneViewerUnsupported } from '@/lib/files'
 import { formatFileSize } from '@/lib/format'
 import type { ScaleCheck } from '@/lib/scale'
@@ -15,28 +17,33 @@ export interface ReadinessItem {
 }
 
 /** Message for a GLB that requires glTF extensions Scene Viewer (Android AR) does not support. */
-export function sceneViewerWarning(unsupported: string[]): string {
-  const names = [...new Set(unsupported.map((e) => EXTENSION_NAMES[e] ?? e))].join(' and ')
-  return `This model uses ${names} compression, which Android AR (Google ARCore) cannot open, so Android customers see it in 3D only. For AR on Android, upload a lighter model without this compression: textures up to 2048 px, about 100,000 triangles or fewer, and a file under ${formatFileSize(LARGE_MODEL_BYTES)}.`
+export function sceneViewerWarning(unsupported: string[], t: TFn = tEn): string {
+  return t('products.ar.sceneViewerWarning', { names: extensionNames(unsupported, t), size: formatFileSize(LARGE_MODEL_BYTES) })
+}
+
+/** "Draco and KTX2": the plain names of the extensions, each once (an unknown extension keeps its own name). */
+function extensionNames(unsupported: string[], t: TFn): string {
+  return [...new Set(unsupported.map((e) => (EXTENSION_NAMES[e] ? t(EXTENSION_NAMES[e]) : e)))].join(` ${t('products.ar.and')} `)
 }
 
 /** Plain names for the glTF extensions Scene Viewer cannot open (owner 2026-10-26: no raw extension names). */
-const EXTENSION_NAMES: Record<string, string> = {
-  KHR_draco_mesh_compression: 'Draco',
-  KHR_texture_basisu: 'KTX2',
-  EXT_meshopt_compression: 'meshopt',
-  KHR_mesh_quantization: 'quantization',
-  EXT_texture_webp: 'WebP texture',
-  EXT_texture_avif: 'AVIF texture',
+const EXTENSION_NAMES: Record<string, TranslationKey> = {
+  KHR_draco_mesh_compression: 'products.ar.ext.draco',
+  KHR_texture_basisu: 'products.ar.ext.ktx2',
+  EXT_meshopt_compression: 'products.ar.ext.meshopt',
+  KHR_mesh_quantization: 'products.ar.ext.quantization',
+  EXT_texture_webp: 'products.ar.ext.webp',
+  EXT_texture_avif: 'products.ar.ext.avif',
 }
 
-/** What a product's customers will get on each platform. Admin-only, English (dashboards are English-only). */
+/** What a product's customers will get on each platform, worded with `t` (English by default). */
 export function arReadiness({
   glb,
   usdz,
   preview,
   scale,
   requiredExtensions,
+  t = tEn,
 }: {
   glb?: ModelAsset
   usdz?: ModelAsset
@@ -44,57 +51,58 @@ export function arReadiness({
   scale: ScaleCheck
   /** Read from the loaded model; falls back to the value stored with the GLB. */
   requiredExtensions?: string[]
+  t?: TFn
 }): ReadinessItem[] {
   const hasGlb = usable(glb)
   const hasUsdz = usable(usdz)
   const glbLevel: ReadinessLevel = !hasGlb || preview === 'error' ? 'missing' : preview === 'loaded' ? 'ready' : 'warning'
-  const glbProblem = !hasGlb ? 'Add a GLB model.' : preview === 'error' ? 'The GLB does not load. Check the file or its URL.' : 'Checking the model…'
+  const glbProblem = !hasGlb ? t('products.ar.addGlb') : preview === 'error' ? t('products.ar.glbError') : t('products.ar.checking')
   const unsupported = hasGlb ? sceneViewerUnsupported(requiredExtensions ?? glb?.requiredExtensions) : []
 
   // The public page mounts the viewer, and so AR, only for a GLB that loads: a USDZ alone never reaches Quick Look.
   const ios: Pick<ReadinessItem, 'level' | 'detail'> = !hasGlb
-    ? { level: 'missing', detail: hasUsdz ? 'Add the GLB too: the page needs it to show 3D and AR, so the USDZ is not used on its own.' : 'Add a GLB, and a USDZ for iPhone.' }
+    ? { level: 'missing', detail: hasUsdz ? t('products.ar.iosNeedsGlb') : t('products.ar.iosNeedsBoth') }
     : glbLevel !== 'ready'
       ? { level: glbLevel, detail: glbProblem }
       : hasUsdz
-        ? { level: 'ready', detail: 'Uses the USDZ in AR Quick Look.' }
-        : { level: 'warning', detail: 'No USDZ: the phone converts the GLB itself, which is slower and not guaranteed. Upload a USDZ.' }
+        ? { level: 'ready', detail: t('products.ar.iosOk') }
+        : { level: 'warning', detail: t('products.ar.iosNoUsdz') }
 
   const items: ReadinessItem[] = [
-    { key: 'viewer', level: glbLevel, label: '3D viewer', detail: glbLevel === 'ready' ? 'Works on every device.' : glbProblem },
+    { key: 'viewer', level: glbLevel, label: t('products.ar.viewer'), detail: glbLevel === 'ready' ? t('products.ar.viewerOk') : glbProblem },
     {
       key: 'android',
       level: glbLevel === 'ready' && unsupported.length ? 'warning' : glbLevel,
-      label: 'Android AR',
+      label: t('products.ar.android'),
       detail:
         glbLevel !== 'ready'
           ? glbProblem
           : unsupported.length
-            ? sceneViewerWarning(unsupported)
-            : 'Uses the GLB. Opens on Android phones that support Google AR (ARCore); other phones may open it in 3D only.',
+            ? sceneViewerWarning(unsupported, t)
+            : t('products.ar.androidOk'),
     },
-    { key: 'ios', label: 'iPhone and iPad AR', ...ios },
+    { key: 'ios', label: t('products.ar.ios'), ...ios },
     {
       key: 'scale',
       level: scale.status === 'verified' ? 'ready' : 'warning',
-      label: 'True size',
+      label: t('products.ar.scale'),
       detail:
         scale.status === 'verified'
-          ? `The model matches the entered dimensions. AR shows “True size”.${hasUsdz ? ' Checked on the GLB: the iPhone (USDZ) file is not measured, so it must be exported at the same size.' : ''}`
+          ? `${t('products.ar.scaleOk')}${hasUsdz ? ` ${t('products.ar.scaleOkUsdz')}` : ''}`
           : scale.status === 'mismatch'
-            ? 'The model does not match the entered dimensions. AR shows “Size not verified”.'
-            : 'Not checked yet: needs a loaded model and width, height and depth.',
+            ? t('products.ar.scaleMismatch')
+            : t('products.ar.scaleUnknown'),
     },
   ]
   if (hasUsdz && usdz?.sizeBytes && usdz.sizeBytes > LARGE_MODEL_BYTES)
     items.push({
       key: 'usdzSize',
       level: 'warning',
-      label: 'iPhone file size',
-      detail: `${formatFileSize(usdz.sizeBytes)}: slow to open on iPhone. Remove it, and iPhones build a light one from the GLB (made lighter on upload); or upload a USDZ under ${formatFileSize(LARGE_MODEL_BYTES)}.`,
+      label: t('products.ar.usdzSize'),
+      detail: t('products.ar.usdzSizeDetail', { size: formatFileSize(usdz.sizeBytes), limit: formatFileSize(LARGE_MODEL_BYTES) }),
     })
   if (hasGlb && glb?.sizeBytes && glb.sizeBytes > LARGE_MODEL_BYTES)
-    items.push({ key: 'size', level: 'warning', label: 'File size', detail: `${formatFileSize(glb.sizeBytes)}: slow on mobile data. Google recommends ${formatFileSize(LARGE_MODEL_BYTES)} or less for Android AR.` })
+    items.push({ key: 'size', level: 'warning', label: t('products.ar.size'), detail: t('products.ar.sizeDetail', { size: formatFileSize(glb.sizeBytes), limit: formatFileSize(LARGE_MODEL_BYTES) }) })
   return items
 }
 
@@ -110,24 +118,24 @@ export interface VariantMediaSummary {
  * Per-variant summary without loading every model (each variant's own preview runs the load and scale check).
  * Never a publish blocker: a variant without its own files shows the product's photos and model.
  */
-export function variantMediaSummary(variants: ProductVariant[]): VariantMediaSummary {
+export function variantMediaSummary(variants: ProductVariant[], t: TFn = tEn): VariantMediaSummary {
   const lines = variants.map((v) => {
     const glb = usable(v.models?.glb)
     const usdz = usable(v.models?.usdz)
     const photos = v.images?.length ?? 0
     const unsupported = glb ? sceneViewerUnsupported(v.models?.glb?.requiredExtensions) : []
-    const parts = [photos ? `${photos} own photo${photos === 1 ? '' : 's'}` : 'product photos']
+    const parts = [photos ? t(photos === 1 ? 'products.ar.variant.ownPhotos.one' : 'products.ar.variant.ownPhotos.other', { n: photos }) : t('products.ar.variant.productPhotos')]
     let level: ReadinessLevel = 'ready'
-    if (glb) parts.push(usdz ? 'own GLB and USDZ' : 'own GLB (no USDZ: iPhone converts the GLB)')
-    else parts.push(usdz ? 'USDZ without a GLB is not used: product 3D model shown' : 'product 3D model shown, with a note that this finish may look different')
+    if (glb) parts.push(usdz ? t('products.ar.variant.glbUsdz') : t('products.ar.variant.glbOnly'))
+    else parts.push(usdz ? t('products.ar.variant.usdzOnly') : t('products.ar.variant.productModel'))
     if (glb && !usdz) level = 'warning'
     if (!glb && usdz) level = 'warning'
     if (unsupported.length) {
       level = 'warning'
-      parts.push(`Android AR not offered: requires ${unsupported.join(', ')}`)
+      parts.push(t('products.ar.variant.noAndroid', { names: unsupported.map((e) => (EXTENSION_NAMES[e] ? t(EXTENSION_NAMES[e]) : e)).join(', ') }))
     }
     if (!glb && !usdz) level = 'missing'
-    return { id: v.id, name: v.name.en || 'Unnamed option', level, detail: parts.join(' · ') }
+    return { id: v.id, name: v.name.en || t('products.ar.variant.unnamed'), level, detail: parts.join(' · ') }
   })
   return { withModel: variants.filter((v) => usable(v.models?.glb)).length, total: variants.length, lines }
 }

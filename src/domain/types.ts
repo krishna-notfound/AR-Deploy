@@ -221,11 +221,24 @@ export const ACTIVITY_KINDS = [
 ] as const
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number]
 
+/** What an activity sentence is built from, so the dashboard can word it in the person's language. */
+export interface ActivityParams {
+  /** The product's name, or the deleted business's. */
+  name?: string
+  business?: string
+  /** New product address (slug). */
+  to?: string
+  /** The status a catalog moved to. */
+  status?: string
+}
+
 export interface ActivityItem {
   id: ID
   at: ISODate
   kind: ActivityKind
+  /** The sentence in English (logs, tests). Screens word it with `activityText(kind, params, t)`. */
   message: string
+  params?: ActivityParams
   businessId?: ID
   productId?: ID
 }

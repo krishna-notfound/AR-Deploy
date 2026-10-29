@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
+import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
 import { APPLY_PATH, settingsPath } from '@/lib/urls'
@@ -23,7 +24,7 @@ export default function LoginPage() {
   useDocumentTitle(t('auth.login.title'))
   const [params] = useSearchParams()
   const next = params.get('next')
-  const { user, signedInEmail, accessDeactivated, accountError } = useAccount()
+  const { user, signedInEmail, accessDeactivated, accountFailure } = useAccount()
   const security = useSecurityState()
   const leave = useLeaveAccount()
   const toast = useToast()
@@ -109,9 +110,9 @@ export default function LoginPage() {
         </div>
       ) : (
         <form onSubmit={submit} className={cn('mt-8 space-y-5', authFieldsClass)} noValidate>
-          {(error || accountError) && (
+          {(error || accountFailure) && (
             <InlineNotice tone="warning">
-              <span role="alert">{error ?? accountError}</span>
+              <span role="alert">{error ?? (accountFailure ? errorText(accountFailure, t) : undefined)}</span>
             </InlineNotice>
           )}
           <FormField label={t('common.email')}>

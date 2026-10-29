@@ -3,6 +3,7 @@
 import { ShieldAlert } from 'lucide-react'
 import { type ReactNode, useCallback } from 'react'
 import type { Permission } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { useOptionalAccount } from './AccountProvider'
 
 export type Need = Permission | 'owner'
@@ -28,13 +29,14 @@ export function useCan(): (need: Need | Need[]) => boolean {
 /** Wraps an admin page: with no matching permission, a plain explanation instead of the page. Any of `need` is enough. */
 export function RequirePermission({ need, children }: { need: Need | Need[]; children: ReactNode }) {
   const can = useCan()
+  const { t } = useI18n()
   if (can(need)) return <>{children}</>
   return (
     <div className="grid min-h-[50vh] place-items-center px-6 py-16">
       <div className="max-w-sm text-center">
         <ShieldAlert className="mx-auto mb-4 size-6 text-ink-muted" aria-hidden strokeWidth={1.5} />
-        <h1 className="font-display text-title font-normal">You don't have access to this page</h1>
-        <p className="mt-2 text-sm text-ink-muted">Ask the platform owner if you need it.</p>
+        <h1 className="font-display text-title font-normal">{t('auth.noAccess.title')}</h1>
+        <p className="mt-2 text-sm text-ink-muted">{t('auth.noAccess.body')}</p>
       </div>
     </div>
   )

@@ -57,11 +57,18 @@ function makeCtx(lang: Lang, setLang: (l: Lang) => void): LangCtx {
 }
 
 // Outside a provider (a component test that renders one screen) everything stays English, the language tests assert on.
-// The app always renders inside the provider of RootLayout.
+// The app renders inside the provider in App.tsx (above the toast, confirm and account providers, which word their own
+// texts); the one in RootLayout then stands aside, and still serves a router rendered on its own.
 const Ctx = createContext<LangCtx>(makeCtx('en', () => {}))
+const InProvider = createContext(false)
 
-/** App-wide language (every route, path mode and hostname mode): `?lang=` > saved choice > browser language. */
+/** App-wide language (every route, path mode and hostname mode): `?lang=` > saved choice > browser language. A provider inside another one stands aside. */
 export function LanguageProvider({ children }: { children: ReactNode }) {
+  const nested = useContext(InProvider)
+  return nested ? <>{children}</> : <RootLanguageProvider>{children}</RootLanguageProvider>
+}
+
+function RootLanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(initialLang)
 
   const setLang = useCallback((l: Lang) => {
@@ -82,7 +89,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [lang])
 
   const value = useMemo(() => makeCtx(lang, setLang), [lang, setLang])
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return (
+    <InProvider.Provider value>
+      <Ctx.Provider value={value}>{children}</Ctx.Provider>
+    </InProvider.Provider>
+  )
 }
 
 export function useI18n(): LangCtx {

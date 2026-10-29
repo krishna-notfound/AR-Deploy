@@ -36,7 +36,7 @@ const PUBLISHED_HINT: Record<BusinessStatus, TranslationKey> = {
 
 export default function BusinessOverviewPage() {
   const business = useCurrentBusiness()
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const fmt = useFormat()
   const prefs = usePreferences()
   const timeZone = prefs?.timezone
@@ -81,7 +81,7 @@ export default function BusinessOverviewPage() {
               {
                 label: t('business.overview.stats.arAttempts'),
                 value: fmt.number(s?.totals.arActivations ?? 0),
-                hint: s && s.totals.views + s.totals.embedViews ? t('business.overview.stats.arRate', { rate: formatArRate(s.totals.arActivations / (s.totals.views + s.totals.embedViews)) }) : t('business.overview.last30'),
+                hint: s && s.totals.views + s.totals.embedViews ? t('business.overview.stats.arRate', { rate: formatArRate(s.totals.arActivations / (s.totals.views + s.totals.embedViews), lang) }) : t('business.overview.last30'),
               },
             ]}
             footer={

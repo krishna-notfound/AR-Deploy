@@ -111,7 +111,7 @@ function ModelSlot({
   const onFile = async (original: File, opts: { keepOriginal?: boolean; built?: boolean } = {}) => {
     if (checking) return
     setChecking('checking')
-    const check = await validateModelFile(original, format)
+    const check = await validateModelFile(original, format, t)
     if (!check.ok) {
       setChecking(false)
       return setError(check.message)
@@ -282,7 +282,7 @@ function ModelSlot({
           )}
         </p>
       )}
-      {unsupported.length > 0 && asset && <p className="mt-2 text-[13px] leading-[1.45] text-ink-muted">{sceneViewerWarning(unsupported)}</p>}
+      {unsupported.length > 0 && asset && <p className="mt-2 text-[13px] leading-[1.45] text-ink-muted">{sceneViewerWarning(unsupported, t)}</p>}
       {error && (
         <p role="alert" className="mt-2 text-[13px] text-danger">
           {error}
@@ -322,7 +322,7 @@ export function ModelPreview({
   const unavailable = !!glb && !stale && (!glb.url || glb.status === 'invalid')
   // Recomputed live, so editing the dimensions updates the check immediately.
   const scale: ScaleCheck = checkScale(measured, dimensions)
-  const readiness = <ArReadiness items={arReadiness({ glb, usdz, preview: state, scale, requiredExtensions: detected })} />
+  const readiness = <ArReadiness items={arReadiness({ glb, usdz, preview: state, scale, requiredExtensions: detected, t })} />
 
   // No progress for the whole window: treat it as failed rather than keep an endless "Checking" verdict.
   useEffect(() => {

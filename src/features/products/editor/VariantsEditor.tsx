@@ -62,7 +62,7 @@ export function VariantsEditor({
       if (item) next.splice(i + d, 0, item)
       return next
     })
-  const summary = variantMediaSummary(variants)
+  const summary = variantMediaSummary(variants, t)
   const add = () => onChange((list) => [...list, { id: newId('var'), name: { en: '' }, colorHex: '#c8c2b8' }])
 
   return (

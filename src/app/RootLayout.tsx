@@ -1,24 +1,30 @@
 import { useEffect } from 'react'
 import { Outlet, ScrollRestoration } from 'react-router'
 import { useToast } from '@/components/ui/ToastProvider'
-import { LanguageProvider } from '@/i18n/LanguageProvider'
+import { LanguageProvider, useI18n } from '@/i18n/LanguageProvider'
 import { demoStore as store, isDemoMode } from '@/services'
 
-/** Root route: the app-wide language, scroll restoration and demo storage notices. */
-export function RootLayout() {
+/** Browser-storage notices (demo mode only), in the person's language. */
+function DemoStorageNotices() {
   const toast = useToast()
+  const { t } = useI18n()
   useEffect(
     () =>
-      // Browser-storage notices only exist in demo mode.
       store.onNotice((n) => {
         if (!isDemoMode) return
-        if (n.kind === 'reset-corrupt') toast.info('Demo data was reset', 'Stored demo data was invalid, so the sample data has been restored.')
-        if (n.kind === 'quota') toast.error('Changes not saved to this browser', 'Browser storage is full. Your changes stay until you close this tab. Try removing large images.')
+        if (n.kind === 'reset-corrupt') toast.info(t('auth.demoReset.title'), t('auth.demoReset.body'))
+        if (n.kind === 'quota') toast.error(t('auth.demoQuota.title'), t('auth.demoQuota.body'))
       }),
-    [toast],
+    [toast, t],
   )
+  return null
+}
+
+/** Root route: the app-wide language (a no-op when App.tsx already provides it), scroll restoration and demo storage notices. */
+export function RootLayout() {
   return (
     <LanguageProvider>
+      <DemoStorageNotices />
       <ScrollRestoration />
       <Outlet />
     </LanguageProvider>

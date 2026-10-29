@@ -20,7 +20,7 @@ import { DeliverDialog, reviewToast } from '@/features/modelRequests/DeliverDial
 import { ModelRequestStatusBadge } from '@/features/modelRequests/ModelRequestStatusBadge'
 import { PhotoThumb, PhotoViewer } from '@/features/modelRequests/PhotoViewer'
 import { ModelSection } from '@/features/products/editor/ModelSection'
-import { AR_READINESS_HINT, AR_READINESS_LABEL, productArReadiness } from '@/features/products/productReadiness'
+import { AR_READINESS_HINT_KEY, AR_READINESS_LABEL_KEY, productArReadiness } from '@/features/products/productReadiness'
 import { editPath } from '@/features/products/useProductActions'
 import { MEDIA_REFRESH_MS, type Result } from '@/services/catalogService'
 import { errorText } from '@/i18n/errorText'
@@ -51,7 +51,7 @@ export default function ModelRequestDetailPage(): JSX.Element {
 const OPEN = new Set(['requested', 'in_progress'])
 
 function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () => void }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const f = useFormat()
   const toast = useToast()
   const can = useCan()
@@ -213,7 +213,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
                     )}
                   </Fact>
                   <Fact label={t('admin.modelRequests.detail.readiness')}>
-                    <span title={AR_READINESS_HINT[readiness]}>{AR_READINESS_LABEL[readiness]}</span>
+                    <span title={t(AR_READINESS_HINT_KEY[readiness])}>{t(AR_READINESS_LABEL_KEY[readiness])}</span>
                   </Fact>
                 </dl>
               </CardBody>
@@ -230,7 +230,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
                   <ol className="space-y-3">
                     {r.history.map((e, i) => (
                       <li key={`${e.type}-${e.at}-${i}`} className="text-ui-body">
-                        <p className="font-medium text-ink">{eventLabel(e.type)}</p>
+                        <p className="font-medium text-ink">{eventLabel(e.type, undefined, lang)}</p>
                         <p className="text-ui-small text-ink-muted tabular-nums">
                           {f.dateTime(e.at)}
                           {e.actorLabel ? ` · ${e.actorLabel}` : ''}

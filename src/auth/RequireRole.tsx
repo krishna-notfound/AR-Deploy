@@ -8,13 +8,13 @@ import { Button, ButtonLink } from '@/components/ui/Button'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { isDemoMode } from '@/services'
 import { useAccount } from './AccountProvider'
 
 /** Where to go to choose an account: the demo picker, or the real sign-in page in Supabase mode. */
 export const SIGN_IN_PATH = isDemoMode ? '/demo' : '/login'
-
-const ROLE_LABEL: Record<Role, string> = { super_admin: 'Super Admin', business_admin: 'Business Admin' }
 
 /**
  * Opens the sign-in page, after ending the session when `signOut` is set (awaited: the sign-in page sends a
@@ -24,28 +24,33 @@ export function useLeaveAccount() {
   const { logout } = useAccount()
   const navigate = useNavigate()
   const toast = useToast()
+  const { t } = useI18n()
   return useCallback(
     async ({ signOut, next }: { signOut: boolean; next?: string }) => {
       if (signOut) {
         const r = await logout()
-        if (r.error) toast.error(r.signedOut ? 'Signed out on this device only' : 'Could not sign out', r.error)
+        if (r.error) {
+          if (r.signedOut) toast.error(t('auth.signOut.deviceOnlyTitle'), t('auth.signOut.deviceOnlyBody'))
+          else toast.error(t('auth.signOut.failedTitle'), t('auth.signOut.failedBody'))
+        }
         if (!r.signedOut) return
       }
       navigate(next ? `${SIGN_IN_PATH}?next=${encodeURIComponent(next)}` : SIGN_IN_PATH)
     },
-    [logout, navigate, toast],
+    [logout, navigate, toast, t],
   )
 }
 
 export function RequireRole({ allow: role, children }: { allow: Role; children: ReactNode }) {
-  const { user, accountError, retry } = useAccount()
+  const { user, accountError, accountFailure, retry } = useAccount()
+  const { t } = useI18n()
   const location = useLocation()
   const leave = useLeaveAccount()
   if (user === undefined) {
     if (!accountError) return <FullPageSpinner />
     return (
       <main className="grid min-h-dvh place-items-center bg-canvas p-6">
-        <ErrorState message={`We could not load your account. ${accountError}`} onRetry={retry} />
+        <ErrorState message={`${t('auth.accountLoadFailed')} ${accountFailure ? errorText(accountFailure, t) : ''}`.trim()} onRetry={retry} />
       </main>
     )
   }
@@ -57,18 +62,18 @@ export function RequireRole({ allow: role, children }: { allow: Role; children: 
           <span className="mx-auto mb-4 grid size-11 place-items-center rounded-full bg-warning-soft text-warning">
             <ShieldAlert className="size-5" aria-hidden />
           </span>
-          <h1 className="text-lg font-semibold">This area is for {ROLE_LABEL[role]} accounts</h1>
+          <h1 className="text-lg font-semibold">{t('auth.wrongArea.title', { role: t(`auth.role.${role}`) })}</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            You are signed in as {ROLE_LABEL[user.role]}. {isDemoMode ? 'Switch account to continue.' : 'Sign in with another account to continue.'}
+            {t(isDemoMode ? 'auth.wrongArea.bodyDemo' : 'auth.wrongArea.body', { role: t(`auth.role.${user.role}`) })}
           </p>
           {isDemoMode ? (
             <ButtonLink to={`${SIGN_IN_PATH}?next=${encodeURIComponent(location.pathname)}`} variant="primary" className="mt-5">
-              Switch account
+              {t('auth.switchAccount')}
             </ButtonLink>
           ) : (
             // The sign-in page sends a signed-in user straight back, so the session ends first.
             <Button variant="primary" className="mt-5" onClick={() => void leave({ signOut: true, next: location.pathname })}>
-              Switch account
+              {t('auth.switchAccount')}
             </Button>
           )}
         </div>

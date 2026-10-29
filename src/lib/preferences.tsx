@@ -3,10 +3,10 @@
 // every page at once. Signed out, still loading or failed to load: no preferences, and dates keep the default format.
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useOptionalAccount } from '@/auth/AccountProvider'
-import { type Profile, type ProfilePatch, type Result, account } from '@/services'
+import { type Profile, type ProfilePatch, type Result, type ServiceError, account } from '@/services'
 import type { DatePrefs } from './format'
 
-export type ProfileState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; profile: Profile }
+export type ProfileState = { status: 'loading' } | { status: 'error'; error: ServiceError } | { status: 'ready'; profile: Profile }
 
 interface PreferencesCtx {
   state: ProfileState
@@ -32,7 +32,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     if (!key) return
     let live = true
     void account.getProfile().then((r) => {
-      if (live) setLoaded({ key, state: r.ok ? { status: 'ready', profile: r.data } : { status: 'error', message: r.error.message } })
+      if (live) setLoaded({ key, state: r.ok ? { status: 'ready', profile: r.data } : { status: 'error', error: r.error } })
     })
     return () => {
       live = false

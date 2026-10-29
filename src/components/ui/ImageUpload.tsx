@@ -1,6 +1,7 @@
 import { ImagePlus, Star, Trash2 } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import type { ProductImage } from '@/domain/types'
+import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { IMAGE_RULES, validateImageFile } from '@/lib/files'
@@ -54,17 +55,17 @@ export function ImageUpload({
     setBusy(true)
     for (const file of list) {
       if (own.length + added.length >= max) {
-        errs.push(`You can add up to ${max} images here.`)
+        errs.push(t('ui.images.maxCount', { max }))
         break
       }
-      const check = validateImageFile(file)
+      const check = validateImageFile(file, undefined, t)
       if (!check.ok) {
         errs.push(check.message)
         continue
       }
       const res = await service.uploadAsset({ kind: 'image', file, businessId })
       if (!res.ok) {
-        errs.push(res.error.message)
+        errs.push(errorText(res.error, t))
         continue
       }
       const { url, storagePath } = res.data

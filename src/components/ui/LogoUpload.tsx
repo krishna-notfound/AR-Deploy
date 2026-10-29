@@ -1,5 +1,6 @@
 import { Upload, X } from 'lucide-react'
 import { useId, useState } from 'react'
+import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { LOGO_RULES, validateImageFile } from '@/lib/files'
 import { service } from '@/services'
@@ -23,7 +24,7 @@ export function LogoUpload({
   const [busy, setBusy] = useState(false)
 
   const onFile = async (file: File) => {
-    const check = validateImageFile(file, LOGO_RULES)
+    const check = validateImageFile(file, LOGO_RULES, t)
     if (!check.ok) {
       setError(check.message)
       return
@@ -31,7 +32,7 @@ export function LogoUpload({
     setBusy(true)
     const res = await service.uploadAsset({ kind: 'logo', file, businessId })
     setBusy(false)
-    if (!res.ok) setError(res.error.message)
+    if (!res.ok) setError(errorText(res.error, t))
     else {
       setError(null)
       onChange(res.data.url)
