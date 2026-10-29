@@ -10,7 +10,13 @@ On 2026-10-29 the client asked to edit website text and content himself, and for
 - **Editor tab** at `/admin/editor` with Pages, Application form and Social media. New sidebar item "Editor", guarded by the new permission `content.manage` (the 17th key): Owner always, Admin by default, Team no. Business owners have no access.
 - **Editable, and only this:**
   - Terms and Privacy (seeded from the built-in text), and custom pages (title, slug at `/pages/:slug`, body, "show in footer", order), EN and PT.
-  - Application form: text overrides on top of the `apply.*` defaults, hide or show of the four optional fields, up to 5 extra questions (short text, long text, yes/no, single choice), answers stored in `answers.custom` with a snapshot of the question label.
+  - Application form, as a full form builder (owner, 2026-10-29):
+    - Every `apply.*` text is editable in EN and PT, including the consent sentence, error messages and the thank-you screen. Overrides keep the original `{token}` set. Reset to original per text.
+    - Steps can be renamed, reordered and added (8 at most, Review included). Review stays last and cannot be removed. A step with no visible fields is skipped.
+    - Built-in fields can be moved to another step, reordered, hidden, or switched optional. Locked, always shown and required: business name, contact name, contact email (approval creates the account from them). The consent and Terms checkboxes stay required; only the consent text is editable.
+    - Options of the choice fields can be renamed or hidden (one stays visible); the stored values stay the fixed set.
+    - Up to 10 extra questions on any step except Review: short text, long text, yes/no, single choice, multiple choice. Answers go to `answers.custom` with label snapshots.
+    - Hidden fields are stored as null. The migration makes `country`, `city` and `category` nullable and raises the `answers` size check to 64 KB. Admin screens and approval show "Not given" for missing values.
   - Social links: Instagram, Facebook, LinkedIn, YouTube, TikTok, Pinterest (https, host must match), shown as icons in the main site footer only.
 - **Body format** is a Markdown subset (the existing parser). Raw HTML is not allowed. No new dependency.
 - **Draft, then Publish.** Edits save to a draft. Preview renders the draft with the real page components. One Publish makes all Editor content live. Every publish is kept (who, when) and can be restored into the draft. The public site reads published content only. With nothing published, it shows today's built-in text.
@@ -23,6 +29,7 @@ On 2026-10-29 the client asked to edit website text and content himself, and for
 - Good: the draft cannot leak, even by a future `select *`, because the tables are closed to the API roles.
 - Trade-off: one function per read shape instead of plain table reads; more SQL to test (PGlite suite).
 - Trade-off: a published slug change breaks old links (no redirects). Legal text is only as good as what the client publishes; the client's lawyer review stays outside the app.
+- Trade-off: the form's structure is now data, so the page, the shared validator and the SQL publish gate must read the same model (one pure file, tested against the SQL gate).
 - Trade-off: until the function is redeployed, a required custom question is not enforced. The rollout order prevents this (migration, function, then the app).
 
 ## Alternatives rejected
