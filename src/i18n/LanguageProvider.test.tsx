@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -130,5 +130,32 @@ describe('provider at the app root', () => {
       </ToastProvider>,
     )
     expect(screen.getByText('Ver na minha casa')).toBeInTheDocument()
+  })
+
+  it('a provider inside another stands aside, so the toast and account providers above the router share the language', () => {
+    localStorage.setItem(LANG_KEY, 'pt')
+    function Outer() {
+      const { lang } = useI18n()
+      return <p>{lang}</p>
+    }
+    function Inner() {
+      const { setLang, lang } = useI18n()
+      return (
+        <button onClick={() => setLang('en')}>
+          inner:{lang}
+        </button>
+      )
+    }
+    render(
+      <LanguageProvider>
+        <LanguageProvider>
+          <Inner />
+        </LanguageProvider>
+        <Outer />
+      </LanguageProvider>,
+    )
+    expect(screen.getByRole('button')).toHaveTextContent('inner:pt')
+    act(() => screen.getByRole('button').click())
+    expect(screen.getByText('en')).toBeInTheDocument()
   })
 })
