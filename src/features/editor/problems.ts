@@ -42,7 +42,7 @@ export function describeProblem(path: string, key: string, draft: SiteContent, t
   if (parts[0] === 'applyForm') return { path, what, where: t('editor.menu.apply'), to: editorApplyPath('form') }
   if (parts[0] === 'social') {
     const net = SOCIAL_NETWORKS.find((n) => n === parts[1])
-    return { path, what, where: net ? t(`editor.social.${net}`) : t('editor.menu.social'), to: editorSocialPath() }
+    return { path, what, where: net ? t(`site.social.${net}`) : t('editor.menu.social'), to: editorSocialPath() }
   }
   return { path, what, where: t('editor.title'), to: editorPagePath('terms') }
 }
