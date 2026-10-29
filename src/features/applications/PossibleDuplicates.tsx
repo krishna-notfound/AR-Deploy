@@ -6,37 +6,27 @@ import { PanelHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { InlineNotice } from '@/components/ui/States'
-import type { ApplicationDuplicates, BusinessStatus, ID } from '@/domain/types'
+import type { ID } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { applicationAdminPath, businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { applicationStatusLabel } from './labels'
-
-const APPLICATION_MATCH: Record<ApplicationDuplicates['applications'][number]['match'], string> = {
-  email: 'same email',
-  name: 'same business name',
-  both: 'same email and business name',
-}
-const BUSINESS_MATCH: Record<ApplicationDuplicates['businesses'][number]['match'], string> = {
-  owner_email: 'its owner uses this email',
-  name: 'same business name',
-  both: 'same business name, and its owner uses this email',
-}
-const BUSINESS_STATUS: Record<BusinessStatus, string> = { active: 'Active', inactive: 'Inactive', draft: 'Draft' }
+import { applicationStatusLabel, statusWord } from './labels'
 
 const ROW = 'block rounded-[var(--radius-control)] px-3 py-2 text-ui-body break-words'
 
 export function PossibleDuplicates({ applicationId }: { applicationId: ID }) {
   const can = useCan()
+  const { t, lang } = useI18n()
   const dups = useServiceQuery(() => service.getApplicationDuplicates(applicationId), [applicationId])
 
-  if (dups.status === 'loading' && !dups.data) return <p className="text-ui-small text-ink-muted">Checking for possible duplicates…</p>
+  if (dups.status === 'loading' && !dups.data) return <p className="text-ui-small text-ink-muted">{t('applications.dup.checking')}</p>
   if (!dups.data)
     return (
       <InlineNotice tone="neutral">
-        <p>Couldn't check for possible duplicates. You can still review this application.</p>
+        <p>{t('applications.dup.failed')}</p>
         <Button size="sm" className="mt-2" onClick={dups.refetch}>
-          Try again
+          {t('common.retry')}
         </Button>
       </InlineNotice>
     )
@@ -46,18 +36,18 @@ export function PossibleDuplicates({ applicationId }: { applicationId: ID }) {
   const openBusinesses = can('businesses.view')
   return (
     <Card>
-      <PanelHeader title="Possible duplicates" description="Check these before you decide. This is only a warning; every action stays available." />
+      <PanelHeader title={t('applications.dup.title')} description={t('applications.dup.description')} />
       <CardBody>
         <ul className="-mx-3 space-y-1">
           {applications.map((a) => (
             <li key={`a-${a.id}`}>
               <Link to={applicationAdminPath(a.id)} className={`${ROW} text-accent-ink hover:bg-subtle hover:underline`}>
-                {`Application ${a.reference} · ${a.businessName} · ${applicationStatusLabel(a.status)} · ${APPLICATION_MATCH[a.match]}`}
+                {t('applications.dup.application', { reference: a.reference, name: a.businessName, status: applicationStatusLabel(a.status, lang), match: t(`applications.dup.match.${a.match}`) })}
               </Link>
             </li>
           ))}
           {businesses.map((b) => {
-            const text = `Business ${b.name} · ${BUSINESS_STATUS[b.status]} · ${BUSINESS_MATCH[b.match]}`
+            const text = t('applications.dup.business', { name: b.name, status: statusWord(b.status, lang), match: t(`applications.dup.bmatch.${b.match}`) })
             return (
               <li key={`b-${b.id}`}>
                 {openBusinesses ? (

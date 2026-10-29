@@ -56,7 +56,7 @@ describe('AuditTimeline (R-W7-1)', () => {
         <AuditTimeline applicationId="app-1" />
       </MemoryRouter>,
     )
-    expect(await screen.findByText('Network down.')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong. Try again in a moment.')).toBeInTheDocument()
     unmount()
     spy.mockResolvedValue(ok({ items: [], total: 0 }))
     renderTimeline([])

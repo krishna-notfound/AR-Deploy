@@ -1,2 +1,112 @@
-// Strings of the applications area (T-track owned; keys prefixed with the area name). English master; pt-PT in pt.applications.ts.
-export const enApplications = {} as const
+// Strings of the applications area: the public application form notices, the admin application labels, history, email
+// activity and duplicates, and the application form builder in the Editor (prefix applications.*). English master;
+// Portugal Portuguese in pt.applications.ts. The form's own wording stays in the apply.* keys (en.ts / pt.ts), which the
+// Editor can override.
+export const enApplications = {
+  // ---- public form notices (the wording of the form itself is apply.*) ----
+  'applications.apply.preview': 'Preview',
+  'applications.apply.formChanged': 'The form was updated. Please check the highlighted fields.',
+  'applications.apply.configError': 'We could not check for a newer version of this form.',
+
+  // ---- statuses (applications, businesses) ----
+  'applications.status.submitted': 'Submitted',
+  'applications.status.under_review': 'Under review',
+  'applications.status.approved': 'Approved',
+  'applications.status.rejected': 'Rejected',
+  'applications.status.active': 'Active',
+  'applications.status.inactive': 'Inactive',
+  'applications.status.draft': 'Draft',
+
+  // ---- email attempts ----
+  'applications.emailStatus.blocked': 'Not sent',
+  'applications.emailStatus.failed': 'Failed',
+  'applications.emailStatus.accepted': 'Accepted by Resend',
+  'applications.emailStatus.sent': 'Sent by Resend',
+  'applications.emailStatus.delivered': 'Delivered',
+  'applications.emailStatus.delayed': 'Delayed',
+  'applications.emailStatus.bounced': 'Bounced',
+  'applications.emailStatus.complained': 'Marked as spam',
+  'applications.emailReason.demo_mode': 'Demo mode: no email is sent.',
+  'applications.emailReason.email_not_configured': 'The email service is not configured on the server yet.',
+  'applications.emailReason.test_sender_recipient_not_allowed': 'The Resend test sender can only email the Resend account owner until a domain is verified.',
+  'applications.emailReason.invalid_recipient': 'The email address is not valid.',
+  'applications.emailReason.admin_recipient_not_configured': 'No admin notification address (ADMIN_NOTIFICATION_EMAIL) is configured.',
+  'applications.emailReason.no_recipient': 'The account has no email address.',
+  'applications.emailKind.owner_invitation': 'Owner invitation',
+  'applications.emailKind.invitation_resend': 'Invitation resent',
+  'applications.emailKind.application_confirmation': 'Application confirmation',
+  'applications.emailKind.application_decision': 'Application decision',
+  'applications.emailKind.business_notice': 'Business notice',
+  'applications.emailKind.team_invitation': 'Team invitation',
+  'applications.emailKind.security_code': 'Security code',
+  'applications.emailKind.security_notice': 'Security notice',
+  'applications.emailKind.closure_request': 'Closure request',
+  'applications.emailKind.team_notice': 'Team notice',
+  'applications.emailKind.admin_notification': 'Admin notification',
+  'applications.emailKind.test': 'Test email',
+  'applications.emailKind.model_request_update': '3D model update',
+
+  // ---- audit events ----
+  'applications.event.application_submitted': 'Application submitted',
+  'applications.event.application_status_changed': 'Status changed',
+  'applications.event.business_created': 'Business created',
+  'applications.event.business_status_changed': 'Catalogue status changed',
+  'applications.event.business_slug_changed': 'Catalogue address changed',
+  'applications.event.business_deleted': 'Business deleted',
+  'applications.event.product_created': 'Product added',
+  'applications.event.product_published': 'Product published',
+  'applications.event.product_unpublished': 'Product unpublished',
+  'applications.event.product_slug_changed': 'Product address changed',
+  'applications.event.product_deleted': 'Product deleted',
+  'applications.event.owner_provisioned': 'Owner provisioned',
+  'applications.event.owner_removed': 'Owner removed',
+  'applications.event.account_closure_voided': 'Closure request cancelled: owner removed',
+  'applications.event.owner_onboarding_completed': 'Owner completed onboarding',
+  'applications.event.invitation_requested': 'Invitation requested',
+  'applications.event.invitation_resent': 'Invitation resent',
+  'applications.event.invitation_failed': 'Invitation failed',
+  'applications.event.model_request_created': '3D model requested',
+  'applications.event.model_request_cancelled': '3D model request cancelled',
+  'applications.event.model_request_started': '3D model work started',
+  'applications.event.model_request_delivered': '3D model delivered',
+  'applications.event.model_request_rejected': '3D model request declined',
+  'applications.event.ownModelsOn': 'Own 3D uploads allowed',
+  'applications.event.ownModelsOff': 'Own 3D uploads turned off',
+
+  // ---- history timeline ----
+  'applications.audit.title': 'History',
+  'applications.audit.empty': 'No history yet',
+  'applications.audit.business': 'Business',
+  'applications.audit.businessDeleted': '{name} (deleted)',
+  'applications.audit.reason': 'Reason: {reason}',
+  'applications.audit.user': 'User {id}',
+  'applications.audit.deletedUser': 'Deleted user ({label})',
+  'applications.audit.system': 'System',
+
+  // ---- email activity ----
+  'applications.email.title': 'Email activity',
+  'applications.email.description': 'Each attempt as recorded by the platform. “Accepted” means Resend took the message; only “Delivered” confirms arrival.',
+  'applications.email.empty': 'No emails yet',
+  'applications.email.emptyBody': 'Confirmation, notification and invitation emails will appear here.',
+  'applications.email.attempt': 'attempt {n}',
+  'applications.email.to': 'To {recipient}',
+
+  // ---- possible duplicates ----
+  'applications.dup.title': 'Possible duplicates',
+  'applications.dup.description': 'Check these before you decide. This is only a warning; every action stays available.',
+  'applications.dup.checking': 'Checking for possible duplicates…',
+  'applications.dup.failed': "Couldn't check for possible duplicates. You can still review this application.",
+  'applications.dup.application': 'Application {reference} · {name} · {status} · {match}',
+  'applications.dup.business': 'Business {name} · {status} · {match}',
+  'applications.dup.match.email': 'same email',
+  'applications.dup.match.name': 'same business name',
+  'applications.dup.match.both': 'same email and business name',
+  'applications.dup.bmatch.owner_email': 'its owner uses this email',
+  'applications.dup.bmatch.name': 'same business name',
+  'applications.dup.bmatch.both': 'same business name, and its owner uses this email',
+
+  // ---- extra questions on the application detail page ----
+  'applications.extra.title': 'Extra questions',
+  'applications.extra.description': 'Questions added to the application form. Shown as they were worded when this application was sent.',
+  'applications.extra.notGiven': 'Not given',
+} as const

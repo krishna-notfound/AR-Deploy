@@ -1,4 +1,111 @@
 import type { TranslationKey } from './en'
 
 // Portugal Portuguese (pt-PT) for the applications area. Missing keys fall back to English.
-export const ptApplications: Partial<Record<TranslationKey, string>> = {}
+export const ptApplications: Partial<Record<TranslationKey, string>> = {
+  // ---- public form notices ----
+  'applications.apply.preview': 'Pré-visualização',
+  'applications.apply.formChanged': 'O formulário foi atualizado. Verifique os campos assinalados.',
+  'applications.apply.configError': 'Não foi possível verificar se existe uma versão mais recente deste formulário.',
+
+  // ---- statuses ----
+  'applications.status.submitted': 'Submetida',
+  'applications.status.under_review': 'Em análise',
+  'applications.status.approved': 'Aprovada',
+  'applications.status.rejected': 'Recusada',
+  'applications.status.active': 'Ativo',
+  'applications.status.inactive': 'Inativo',
+  'applications.status.draft': 'Rascunho',
+
+  // ---- email attempts ----
+  'applications.emailStatus.blocked': 'Não enviado',
+  'applications.emailStatus.failed': 'Falhou',
+  'applications.emailStatus.accepted': 'Aceite pelo Resend',
+  'applications.emailStatus.sent': 'Enviado pelo Resend',
+  'applications.emailStatus.delivered': 'Entregue',
+  'applications.emailStatus.delayed': 'Atrasado',
+  'applications.emailStatus.bounced': 'Devolvido',
+  'applications.emailStatus.complained': 'Marcado como spam',
+  'applications.emailReason.demo_mode': 'Modo de demonstração: não é enviado nenhum email.',
+  'applications.emailReason.email_not_configured': 'O serviço de email ainda não está configurado no servidor.',
+  'applications.emailReason.test_sender_recipient_not_allowed': 'O remetente de teste do Resend só pode enviar email ao titular da conta Resend até um domínio ser verificado.',
+  'applications.emailReason.invalid_recipient': 'O endereço de email não é válido.',
+  'applications.emailReason.admin_recipient_not_configured': 'Não está configurado nenhum endereço para as notificações de administração (ADMIN_NOTIFICATION_EMAIL).',
+  'applications.emailReason.no_recipient': 'A conta não tem endereço de email.',
+  'applications.emailKind.owner_invitation': 'Convite ao responsável',
+  'applications.emailKind.invitation_resend': 'Convite reenviado',
+  'applications.emailKind.application_confirmation': 'Confirmação da candidatura',
+  'applications.emailKind.application_decision': 'Decisão sobre a candidatura',
+  'applications.emailKind.business_notice': 'Aviso à empresa',
+  'applications.emailKind.team_invitation': 'Convite para a equipa',
+  'applications.emailKind.security_code': 'Código de segurança',
+  'applications.emailKind.security_notice': 'Aviso de segurança',
+  'applications.emailKind.closure_request': 'Pedido de encerramento',
+  'applications.emailKind.team_notice': 'Aviso à equipa',
+  'applications.emailKind.admin_notification': 'Notificação de administração',
+  'applications.emailKind.test': 'Email de teste',
+  'applications.emailKind.model_request_update': 'Atualização do modelo 3D',
+
+  // ---- audit events ----
+  'applications.event.application_submitted': 'Candidatura submetida',
+  'applications.event.application_status_changed': 'Estado alterado',
+  'applications.event.business_created': 'Empresa criada',
+  'applications.event.business_status_changed': 'Estado do catálogo alterado',
+  'applications.event.business_slug_changed': 'Endereço do catálogo alterado',
+  'applications.event.business_deleted': 'Empresa eliminada',
+  'applications.event.product_created': 'Produto adicionado',
+  'applications.event.product_published': 'Produto publicado',
+  'applications.event.product_unpublished': 'Produto despublicado',
+  'applications.event.product_slug_changed': 'Endereço do produto alterado',
+  'applications.event.product_deleted': 'Produto eliminado',
+  'applications.event.owner_provisioned': 'Responsável criado',
+  'applications.event.owner_removed': 'Responsável removido',
+  'applications.event.account_closure_voided': 'Pedido de encerramento cancelado: responsável removido',
+  'applications.event.owner_onboarding_completed': 'O responsável concluiu a configuração',
+  'applications.event.invitation_requested': 'Convite pedido',
+  'applications.event.invitation_resent': 'Convite reenviado',
+  'applications.event.invitation_failed': 'O convite falhou',
+  'applications.event.model_request_created': 'Modelo 3D pedido',
+  'applications.event.model_request_cancelled': 'Pedido de modelo 3D cancelado',
+  'applications.event.model_request_started': 'Trabalho no modelo 3D iniciado',
+  'applications.event.model_request_delivered': 'Modelo 3D entregue',
+  'applications.event.model_request_rejected': 'Pedido de modelo 3D recusado',
+  'applications.event.ownModelsOn': 'Modelos 3D próprios permitidos',
+  'applications.event.ownModelsOff': 'Modelos 3D próprios desativados',
+
+  // ---- history timeline ----
+  'applications.audit.title': 'Histórico',
+  'applications.audit.empty': 'Ainda sem histórico',
+  'applications.audit.business': 'Empresa',
+  'applications.audit.businessDeleted': '{name} (eliminada)',
+  'applications.audit.reason': 'Motivo: {reason}',
+  'applications.audit.user': 'Utilizador {id}',
+  'applications.audit.deletedUser': 'Utilizador eliminado ({label})',
+  'applications.audit.system': 'Sistema',
+
+  // ---- email activity ----
+  'applications.email.title': 'Atividade de email',
+  'applications.email.description': 'Cada tentativa tal como registada pela plataforma. “Aceite” significa que o Resend recebeu a mensagem; só “Entregue” confirma a chegada.',
+  'applications.email.empty': 'Ainda sem emails',
+  'applications.email.emptyBody': 'Os emails de confirmação, notificação e convite aparecem aqui.',
+  'applications.email.attempt': 'tentativa {n}',
+  'applications.email.to': 'Para {recipient}',
+
+  // ---- possible duplicates ----
+  'applications.dup.title': 'Possíveis duplicados',
+  'applications.dup.description': 'Verifique estes casos antes de decidir. É apenas um aviso; todas as ações continuam disponíveis.',
+  'applications.dup.checking': 'A verificar possíveis duplicados…',
+  'applications.dup.failed': 'Não foi possível verificar possíveis duplicados. Pode continuar a analisar esta candidatura.',
+  'applications.dup.application': 'Candidatura {reference} · {name} · {status} · {match}',
+  'applications.dup.business': 'Empresa {name} · {status} · {match}',
+  'applications.dup.match.email': 'mesmo email',
+  'applications.dup.match.name': 'mesmo nome de empresa',
+  'applications.dup.match.both': 'mesmo email e mesmo nome de empresa',
+  'applications.dup.bmatch.owner_email': 'o responsável usa este email',
+  'applications.dup.bmatch.name': 'mesmo nome de empresa',
+  'applications.dup.bmatch.both': 'mesmo nome de empresa, e o responsável usa este email',
+
+  // ---- extra questions on the application detail page ----
+  'applications.extra.title': 'Perguntas adicionais',
+  'applications.extra.description': 'Perguntas acrescentadas ao formulário de candidatura. Mostradas com a formulação que tinham quando esta candidatura foi enviada.',
+  'applications.extra.notGiven': 'Não indicado',
+}
