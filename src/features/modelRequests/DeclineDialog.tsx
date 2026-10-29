@@ -4,43 +4,46 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Textarea } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { REQUEST_TEXT_MAX } from '@/domain/modelRequests'
+import { en } from '@/i18n/dictionaries/en'
+import { useI18n } from '@/i18n/LanguageProvider'
 
-export const DECLINE_HINT = 'For example: the photos are too dark. Please send a new request with photos taken in daylight.'
-export const REASON_REQUIRED = 'Write a reason. It is sent to the business.'
+export const DECLINE_HINT = en['business.modelRequests.decline.hint']
+export const REASON_REQUIRED = en['business.modelRequests.decline.reasonRequired']
 
 export function DeclineDialog({ open, onClose, onConfirm, pending }: { open: boolean; onClose: () => void; onConfirm: (reason: string) => void; pending?: boolean }) {
+  const { t } = useI18n()
   const [reason, setReason] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [missing, setMissing] = useState(false)
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Decline this request?"
+      title={t('business.modelRequests.decline.title')}
       footer={
         <>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="danger"
             loading={pending}
             onClick={() => {
               const text = reason.trim()
-              if (!text) return setError(REASON_REQUIRED)
+              if (!text) return setMissing(true)
               onConfirm(text)
             }}
           >
-            Decline request
+            {t('business.modelRequests.decline.confirm')}
           </Button>
         </>
       }
     >
-      <FormField label="Reason (sent to the business)" required hint={DECLINE_HINT} error={error ?? undefined}>
+      <FormField label={t('business.modelRequests.decline.reasonLabel')} required hint={t('business.modelRequests.decline.hint')} error={missing ? t('business.modelRequests.decline.reasonRequired') : undefined}>
         <Textarea
           value={reason}
           maxLength={REQUEST_TEXT_MAX}
           onChange={(e) => {
             setReason(e.target.value)
-            setError(null)
+            setMissing(false)
           }}
         />
       </FormField>

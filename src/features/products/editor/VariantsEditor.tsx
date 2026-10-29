@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Form'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { variantMediaSummary } from '@/features/ar/readiness'
 import type { Currency, Dimensions, ModelAsset, ModelFormat, ProductImage, ProductVariant } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { minorToInput, parseMoneyInput } from '@/lib/format'
 import { newId } from '@/lib/id'
@@ -50,6 +51,7 @@ export function VariantsEditor({
   /** Fetches fresh signed URLs for the stored option files (ModelSection "Try again"). */
   onRefreshUrls?: () => void
 }) {
+  const { t, tn } = useI18n()
   const [open, setOpen] = useState<string | null>(null)
   const set = (id: string, fn: (v: ProductVariant) => ProductVariant) => onChange((list) => list.map((v) => (v.id === id ? fn(v) : v)))
   const update = (id: string, patch: Partial<ProductVariant>) => set(id, (v) => ({ ...v, ...patch }))
@@ -67,9 +69,9 @@ export function VariantsEditor({
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-[14px] leading-5 font-semibold text-ink">Colours and variants</h3>
+          <h3 className="text-[14px] leading-5 font-semibold text-ink">{t('products.variants.title')}</h3>
           <p className="mt-0.5 text-[13px] leading-[1.45] text-ink-muted">
-            {variants.length ? 'The price difference is added to the base price when a customer selects the option.' : 'No colours or options yet.'}
+            {t(variants.length ? 'products.variants.hint' : 'products.variants.none')}
           </p>
           {error && (
             <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-[1.45] text-danger">
@@ -79,15 +81,15 @@ export function VariantsEditor({
           )}
         </div>
         <Button size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={add}>
-          Add colour or option
+          {t('products.variants.add')}
         </Button>
       </div>
       {variants.length > 0 && (
         <ul className="mt-4 space-y-2">
           {variants.map((v, i) => {
-            const label = v.name.en || 'option'
+            const label = v.name.en || t('products.variants.optionFallback')
             const photos = v.images?.length ?? 0
-            const files = [photos ? `${photos} photo${photos === 1 ? '' : 's'}` : null, v.models?.glb ? 'GLB' : null, v.models?.usdz ? 'USDZ' : null].filter(Boolean)
+            const files = [photos ? tn('products.variants.photoCount', photos) : null, v.models?.glb ? 'GLB' : null, v.models?.usdz ? 'USDZ' : null].filter(Boolean)
             const expanded = open === v.id
             const panelId = `${v.id}-media`
             return (
@@ -95,23 +97,23 @@ export function VariantsEditor({
                 <div className="grid grid-cols-[auto_1fr_auto] items-start gap-2 p-2.5 sm:grid-cols-[auto_1fr_1fr_8rem_7rem_auto]">
                   <input
                     type="color"
-                    aria-label={`Colour swatch for ${label}`}
+                    aria-label={t('products.variants.swatch', { label })}
                     value={v.colorHex ?? '#cccccc'}
                     onChange={(e) => update(v.id, { colorHex: e.target.value })}
                     className="size-10 cursor-pointer rounded-[var(--radius-control)] border border-line-strong bg-surface p-1"
                   />
-                  <Input aria-label="Option name (English)" placeholder="Name (English)" value={v.name.en} onChange={(e) => update(v.id, { name: { ...v.name, en: e.target.value } })} />
+                  <Input aria-label={t('products.variants.nameEn')} placeholder={t('products.variants.nameEnPlaceholder')} value={v.name.en} onChange={(e) => update(v.id, { name: { ...v.name, en: e.target.value } })} />
                   <Input
-                    aria-label="Option name (Portuguese)"
-                    placeholder="Nome (Português)"
+                    aria-label={t('products.variants.namePt')}
+                    placeholder={t('products.variants.namePtPlaceholder')}
                     lang="pt-PT"
                     className="col-span-3 sm:col-span-1"
                     value={v.name.pt ?? ''}
                     onChange={(e) => update(v.id, { name: { ...v.name, pt: e.target.value || undefined } })}
                   />
-                  <Input aria-label="SKU" placeholder="SKU (optional)" className="col-span-2 sm:col-span-1" value={v.sku ?? ''} onChange={(e) => update(v.id, { sku: e.target.value || undefined })} />
+                  <Input aria-label={t('products.variants.sku')} placeholder={t('products.variants.skuPlaceholder')} className="col-span-2 sm:col-span-1" value={v.sku ?? ''} onChange={(e) => update(v.id, { sku: e.target.value || undefined })} />
                   <Input
-                    aria-label={`Price difference in ${currency}`}
+                    aria-label={t('products.variants.priceDelta', { currency })}
                     placeholder={`+ ${currency}`}
                     inputMode="decimal"
                     defaultValue={v.priceDelta ? minorToInput(v.priceDelta) : ''}
@@ -124,19 +126,19 @@ export function VariantsEditor({
                     }}
                   />
                   <div className="col-start-3 row-start-1 flex sm:col-start-auto sm:row-start-auto">
-                    <IconButton aria-label="Move option up" size="sm" disabled={i === 0} onClick={() => move(i, -1)}>
+                    <IconButton aria-label={t('products.variants.moveUp')} size="sm" disabled={i === 0} onClick={() => move(i, -1)}>
                       <ArrowUp className="size-4" />
                     </IconButton>
-                    <IconButton aria-label="Move option down" size="sm" disabled={i === variants.length - 1} onClick={() => move(i, 1)}>
+                    <IconButton aria-label={t('products.variants.moveDown')} size="sm" disabled={i === variants.length - 1} onClick={() => move(i, 1)}>
                       <ArrowDown className="size-4" />
                     </IconButton>
-                    <IconButton aria-label={`Remove ${label}`} size="sm" className="hover:text-danger" onClick={() => onChange((list) => list.filter((x) => x.id !== v.id))}>
+                    <IconButton aria-label={t('products.variants.remove', { label })} size="sm" className="hover:text-danger" onClick={() => onChange((list) => list.filter((x) => x.id !== v.id))}>
                       <Trash2 className="size-4" />
                     </IconButton>
                   </div>
                   {Number.isNaN(v.priceDelta) && (
                     <p id={`${v.id}-delta-error`} className="col-span-full text-[13px] text-danger">
-                      Enter the price difference as an amount such as 25.00. Negative amounts are not supported.
+                      {t('products.variants.priceDeltaError')}
                     </p>
                   )}
                   <button
@@ -147,19 +149,19 @@ export function VariantsEditor({
                     className="col-span-full inline-flex w-fit items-center gap-1.5 py-1 text-[13px] font-medium text-ink hover:text-accent-ink"
                   >
                     <ChevronDown className={cn('size-4 transition-transform', expanded && 'rotate-180')} aria-hidden />
-                    Photos and 3D for {label}
-                    <span className="font-normal text-ink-muted">· {files.length ? `own ${files.join(', ')}` : 'uses the product’s photos and model'}</span>
+                    {t('products.variants.mediaToggle', { label })}
+                    <span className="font-normal text-ink-muted">· {files.length ? t('products.variants.own', { files: files.join(', ') }) : t('products.variants.usesProduct')}</span>
                   </button>
                 </div>
                 {expanded && (
                   <div id={panelId} className="min-w-0 space-y-5 border-t border-line p-3 sm:p-4">
                     <div>
-                      <h4 className="text-[14px] font-semibold text-ink">Photos for {label}</h4>
+                      <h4 className="text-[14px] font-semibold text-ink">{t('products.variants.photosFor', { label })}</h4>
                       <p className="mt-0.5 mb-3 text-[13px] text-ink-muted">
-                        {photos ? 'Shown in the gallery when a customer picks this option.' : 'No photos yet: customers who pick this option see the product’s photos.'}
+                        {t(photos ? 'products.variants.photosShown' : 'products.variants.photosNone')}
                       </p>
                       <ImageUpload
-                        label={`Upload photos for ${label}`}
+                        label={t('products.variants.uploadPhotos', { label })}
                         kind="gallery"
                         allowPrimary={false}
                         max={MAX_VARIANT_IMAGES}
@@ -169,7 +171,7 @@ export function VariantsEditor({
                       />
                     </div>
                     <div className="border-t border-line pt-4">
-                      <h4 className="mb-3 text-[14px] font-semibold text-ink">3D models for {label}</h4>
+                      <h4 className="mb-3 text-[14px] font-semibold text-ink">{t('products.variants.modelsFor', { label })}</h4>
                       {modelsReadOnly ? (
                         <ModelFilesReadOnly models={v.models ?? {}} label={label} />
                       ) : (
@@ -193,11 +195,11 @@ export function VariantsEditor({
         </ul>
       )}
       {summary.total > 0 && (
-        <section aria-label="Options: photos and 3D" className="mt-4 rounded-[var(--radius-card)] border border-line p-4">
+        <section aria-label={t('products.variants.summaryLabel')} className="mt-4 rounded-[var(--radius-card)] border border-line p-4">
           <h4 className="text-[14px] font-semibold text-ink">
-            {summary.withModel} of {summary.total} option{summary.total === 1 ? '' : 's'} have their own 3D model
+            {tn('products.variants.summary', summary.total, { withModel: summary.withModel })}
           </h4>
-          <p className="mt-0.5 text-[13px] text-ink-muted">Never required to publish. Options without their own files show the product’s photos and model, with a note on the page.</p>
+          <p className="mt-0.5 text-[13px] text-ink-muted">{t('products.variants.neverRequired')}</p>
           <ul className="mt-3 space-y-2">
             {summary.lines.map((l) => (
               <li key={l.id} className="flex items-start gap-2.5 text-[13px]">

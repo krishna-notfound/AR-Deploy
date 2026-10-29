@@ -9,8 +9,11 @@ import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { type ModelRequest, OPEN_REQUEST_STATUSES, REQUEST_PHOTOS_MAX, REQUEST_PHOTOS_MIN, REQUEST_TEXT_MAX } from '@/domain/modelRequests'
 import type { Dimensions, ID, Product } from '@/domain/types'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { ModelRequestStatusBadge } from '@/features/modelRequests/ModelRequestStatusBadge'
-import { DEMO_SESSION_PHOTOS, LOAD_ERROR, statusLine } from '@/features/modelRequests/copy'
+import { statusLine } from '@/features/modelRequests/copy'
 import { useModelRequests } from '@/features/modelRequests/hooks'
 import { REQUEST_PHOTO_RULES, validateImageFile } from '@/lib/files'
 import { imageSize } from '@/lib/image'
@@ -30,12 +33,6 @@ export interface ModelRequestPanelProps {
 /** Status is re-read on focus once it is this old. */
 const STALE_MS = 60_000
 const PRODUCT_TARGET = ''
-const NOT_CANCELLABLE = 'The Sanctus team has started on this model. To stop it, contact the Sanctus team.'
-
-const INTRO =
-  'Send us 2 to 10 photos of this product, and the Sanctus team makes its 3D model. Customers see the 3D view and AR once the model is ready. Until then the product shows its photos only.'
-const TIPS =
-  'Photograph the product from the front, the back, both sides and at an angle, plus close-ups of the material. Use even light and keep people out of the photos. JPG, PNG or WebP, up to 10 MB each. Only the Sanctus team sees these photos; they are not added to your catalog.'
 
 interface Picked {
   key: string
@@ -53,22 +50,23 @@ function revoke(url: string): void {
 }
 
 export function ModelRequestPanel({ product, onSaveDraft, onReload, formDimensions, saving }: ModelRequestPanelProps): JSX.Element | null {
+  const { t } = useI18n()
   const titleId = useId()
   return (
     <section aria-labelledby={titleId} className="space-y-4 rounded-[var(--radius-card)] border border-line bg-surface p-4 sm:p-5">
       <div>
         <h3 id={titleId} className="text-[15px] leading-5 font-semibold text-ink">
-          Request a 3D model
+          {t('products.requestPanel.title')}
         </h3>
-        <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">{INTRO}</p>
+        <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">{t('products.requestPanel.intro')}</p>
       </div>
       {product ? (
         <SavedProductPanel product={product} onReload={onReload} onSave={onSaveDraft} formDimensions={formDimensions} saving={saving} />
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-[14px] text-ink-body">Save this product first, then request its 3D model.</p>
+          <p className="text-[14px] text-ink-body">{t('products.requestPanel.saveFirst')}</p>
           <Button size="sm" onClick={onSaveDraft}>
-            Save draft
+            {t('products.editor.saveDraft')}
           </Button>
         </div>
       )}
@@ -89,6 +87,7 @@ function SavedProductPanel({
   formDimensions?: Dimensions
   saving?: boolean
 }) {
+  const { t } = useI18n()
   const query = useModelRequests({ productId: product.id })
   useRefreshWhenStale(query.refetch, STALE_MS, query.data)
   const toast = useToast()
@@ -108,7 +107,7 @@ function SavedProductPanel({
   }
 
   if (!query.data) {
-    if (query.status === 'error') return <ErrorState message={LOAD_ERROR} onRetry={query.refetch} retryLabel="Retry" />
+    if (query.status === 'error') return <ErrorState message={t('business.modelRequests.loadError')} onRetry={query.refetch} retryLabel={t('business.modelRequests.photo.retry')} />
     return (
       <div data-testid="model-request-loading" className="space-y-2" aria-busy="true">
         <Skeleton className="h-5 w-1/2" />
@@ -119,7 +118,7 @@ function SavedProductPanel({
 
   const optionName = (variantId: ID | undefined) => (variantId ? product.variants.find((v) => v.id === variantId)?.name.en : undefined)
   const targets: { value: string; label: string }[] = [
-    { value: PRODUCT_TARGET, label: 'The product' },
+    { value: PRODUCT_TARGET, label: t('products.requestPanel.theProduct') },
     ...product.variants.map((v) => ({ value: v.id, label: v.name.en })),
   ]
   // Newest first per target (the service returns newest first).
@@ -128,18 +127,18 @@ function SavedProductPanel({
     const key = r.variantId ?? PRODUCT_TARGET
     byTarget.set(key, [...(byTarget.get(key) ?? []), r])
   }
-  const freeTargets = targets.filter((t) => !byTarget.get(t.value)?.some((r) => OPEN_REQUEST_STATUSES.includes(r.status)))
+  const freeTargets = targets.filter((target) => !byTarget.get(target.value)?.some((r) => OPEN_REQUEST_STATUSES.includes(r.status)))
 
   const cancel = async (id: ID) => {
     setCancelling(id)
     const res = await service.cancelModelRequest(id)
     setCancelling(null)
     if (!res.ok) {
-      toast.error(res.error.message)
+      toast.error(errorText(res.error, t))
       return
     }
-    toast.success('Request cancelled.')
-    if (res.data.cleanup === 'partial') toast.info("Some photos couldn't be removed.")
+    toast.success(t('products.requestPanel.cancelled'))
+    if (res.data.cleanup === 'partial') toast.info(t('products.requestPanel.photosNotRemoved'))
     query.refetch()
   }
   const newRequestFor = (target: string) => {
@@ -152,9 +151,9 @@ function SavedProductPanel({
       {deliveredWhileOpen && (
         <InlineNotice tone="info">
           <span className="flex flex-wrap items-center gap-3">
-            <span>Ready. Reload to see the 3D model in this editor.</span>
+            <span>{t('products.requestPanel.ready')}</span>
             <Button size="sm" onClick={onReload}>
-              Reload
+              {t('products.editor.reload')}
             </Button>
           </span>
         </InlineNotice>
@@ -165,22 +164,22 @@ function SavedProductPanel({
         const name = optionName(latest.variantId)
         return (
           <div key={target || 'product'} className="rounded-[var(--radius-control)] border border-line bg-subtle/60 px-3 py-3">
-            {product.variants.length > 0 && <p className="text-[13px] font-medium text-ink">{name ?? 'The product'}</p>}
+            {product.variants.length > 0 && <p className="text-[13px] font-medium text-ink">{name ?? t('products.requestPanel.theProduct')}</p>}
             <RequestLine request={latest} optionName={name} />
-            {latest.status === 'in_progress' && <p className="mt-1 text-[13px] text-ink-muted">{NOT_CANCELLABLE}</p>}
+            {latest.status === 'in_progress' && <p className="mt-1 text-[13px] text-ink-muted">{t('products.requestPanel.notCancellable')}</p>}
             {latest.status === 'requested' && (
               <Button size="sm" variant="ghost" className="mt-2" loading={cancelling === latest.id} onClick={() => void cancel(latest.id)}>
-                Cancel request
+                {t('products.requestPanel.cancel')}
               </Button>
             )}
             {latest.status === 'rejected' && (
               <Button size="sm" className="mt-2" onClick={() => newRequestFor(target)}>
-                Send a new request
+                {t('products.requestPanel.sendNew')}
               </Button>
             )}
             {earlier.length > 0 && (
               <details className="mt-2">
-                <summary className="cursor-pointer text-[13px] text-ink-muted">Earlier requests ({earlier.length})</summary>
+                <summary className="cursor-pointer text-[13px] text-ink-muted">{t('products.requestPanel.earlier', { n: earlier.length })}</summary>
                 <ul className="mt-2 space-y-2">
                   {earlier.map((r) => (
                     <li key={r.id}>
@@ -203,9 +202,9 @@ function SavedProductPanel({
             saving={saving}
             targets={freeTargets}
             showTargets={product.variants.length > 0}
-            initialTarget={preferredTarget && freeTargets.some((t) => t.value === preferredTarget) ? preferredTarget : freeTargets[0]!.value}
+            initialTarget={preferredTarget && freeTargets.some((target) => target.value === preferredTarget) ? preferredTarget : freeTargets[0]!.value}
             onSent={() => {
-              toast.success("Request sent. We'll email you when the model is ready.")
+              toast.success(t('products.requestPanel.sent'))
               setPreferredTarget(null)
               query.refetch()
             }}
@@ -217,10 +216,12 @@ function SavedProductPanel({
 }
 
 function RequestLine({ request, optionName }: { request: ModelRequest; optionName?: string }) {
+  const { t } = useI18n()
+  const fmt = useFormat()
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
       <ModelRequestStatusBadge status={request.status} />
-      <p className="text-[13px] text-ink-body">{statusLine(request, optionName)}</p>
+      <p className="text-[13px] text-ink-body">{statusLine(request, optionName, fmt.date, t)}</p>
     </div>
   )
 }
@@ -244,6 +245,7 @@ function RequestForm({
   initialTarget: string
   onSent: () => void
 }) {
+  const { t } = useI18n()
   const [target, setTarget] = useState(initialTarget)
   const [note, setNote] = useState('')
   const [picked, setPicked] = useState<Picked[]>([])
@@ -278,7 +280,7 @@ function RequestForm({
     let message: string | null = null
     for (const file of files) {
       if (picked.length + added.length >= REQUEST_PHOTOS_MAX) {
-        message = 'Up to 10 photos. Remove one to add another.'
+        message = t('products.requestPanel.maxPhotos')
         break
       }
       const check = validateImageFile(file, REQUEST_PHOTO_RULES)
@@ -295,7 +297,7 @@ function RequestForm({
     for (const p of added) {
       const size = await imageSize(p.file)
       if (size && Math.max(size.width, size.height) < REQUEST_PHOTO_RULES.minLongSide) {
-        const warning = `${p.file.name} is small (${size.width}×${size.height}). A larger photo gives a better model.`
+        const warning = t('products.requestPanel.smallPhoto', { name: p.file.name, width: size.width, height: size.height })
         setPicked((prev) => prev.map((x) => (x.key === p.key ? { ...x, warning } : x)))
       }
     }
@@ -327,7 +329,7 @@ function RequestForm({
     setSending(false)
     if (!res.ok) {
       // The picked photos stay so the owner can try again.
-      setSendError(res.error.message)
+      setSendError(errorText(res.error, t))
       setProgress({})
       return
     }
@@ -341,11 +343,11 @@ function RequestForm({
   return (
     <fieldset disabled={sending} className="min-w-0 space-y-4">
       {showTargets && (
-        <FormField label="Model for">
+        <FormField label={t('products.requestPanel.modelFor')}>
           <Select value={target} onChange={(e) => setTarget(e.target.value)}>
-            {targets.map((t) => (
-              <option key={t.value || 'product'} value={t.value}>
-                {t.label}
+            {targets.map((opt) => (
+              <option key={opt.value || 'product'} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </Select>
@@ -354,15 +356,15 @@ function RequestForm({
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[13px] text-ink-muted tabular-nums">{picked.length} of 10 photos · add at least 2</p>
+          <p className="text-[13px] text-ink-muted tabular-nums">{t('products.requestPanel.counter', { n: picked.length })}</p>
           <label htmlFor={inputId} className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-subtle">
             <ImagePlus className="size-4" aria-hidden />
-            Add photos
+            {t('products.requestPanel.addPhotos')}
           </label>
-          <input id={inputId} type="file" className="sr-only" accept="image/jpeg,image/png,image/webp" multiple aria-label="Add photos" onChange={(e) => void onFiles(e)} />
+          <input id={inputId} type="file" className="sr-only" accept="image/jpeg,image/png,image/webp" multiple aria-label={t('products.requestPanel.addPhotos')} onChange={(e) => void onFiles(e)} />
         </div>
-        <p className="text-[13px] leading-[18px] text-ink-muted">{TIPS}</p>
-        {isDemoMode && <p className="text-[13px] text-info">{DEMO_SESSION_PHOTOS}</p>}
+        <p className="text-[13px] leading-[18px] text-ink-muted">{t('products.requestPanel.tips')}</p>
+        {isDemoMode && <p className="text-[13px] text-info">{t('business.modelRequests.demoSessionPhotos')}</p>}
         {pickError && (
           <p role="alert" className="text-[13px] text-danger">
             {pickError}
@@ -380,13 +382,13 @@ function RequestForm({
                   <button
                     type="button"
                     className="shrink-0 rounded p-1 text-ink-muted hover:bg-danger-soft hover:text-danger disabled:opacity-50"
-                    aria-label={`Remove ${p.file.name}`}
+                    aria-label={t('products.requestPanel.removePhoto', { name: p.file.name })}
                     onClick={() => remove(p.key)}
                   >
                     <X className="size-3.5" aria-hidden />
                   </button>
                 </div>
-                {progress[i] && <p className="px-2 pb-1 text-[12px] text-ink-muted">{progress[i] === 'done' ? 'Uploaded' : 'Uploading…'}</p>}
+                {progress[i] && <p className="px-2 pb-1 text-[12px] text-ink-muted">{t(progress[i] === 'done' ? 'products.requestPanel.uploaded' : 'products.requestPanel.uploading')}</p>}
               </li>
             ))}
           </ul>
@@ -400,12 +402,12 @@ function RequestForm({
           ))}
       </div>
 
-      <FormField label="Notes for the Sanctus team (optional)">
+      <FormField label={t('products.requestPanel.notes')}>
         <Textarea
           rows={3}
           maxLength={REQUEST_TEXT_MAX}
           value={note}
-          placeholder="For example: the legs are oak and the cushion is removable."
+          placeholder={t('products.requestPanel.notesPlaceholder')}
           onChange={(e) => setNote(e.target.value)}
         />
       </FormField>
@@ -417,21 +419,21 @@ function RequestForm({
       )}
       {unsavedDimensions ? (
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-[13px] text-ink-body">Save the product to use its dimensions.</p>
+          <p className="text-[13px] text-ink-body">{t('products.requestPanel.saveToUse')}</p>
           <Button size="sm" loading={saving} onClick={onSave}>
-            Save changes
+            {t('products.editor.saveChanges')}
           </Button>
         </div>
       ) : hasDimensions ? (
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="primary" loading={sending} disabled={!enough} onClick={() => void send()}>
-            Send request
+            {t('products.requestPanel.send')}
           </Button>
-          {!enough && <p className="text-[13px] text-ink-muted">Add at least 2 photos.</p>}
+          {!enough && <p className="text-[13px] text-ink-muted">{t('products.requestPanel.addAtLeast')}</p>}
         </div>
       ) : (
         <a href="#specs" className="text-[13px] font-medium text-accent-ink underline underline-offset-2">
-          Add width, height and depth in Specifications first. The model is made to that size.
+          {t('products.requestPanel.addDims')}
         </a>
       )}
     </fieldset>

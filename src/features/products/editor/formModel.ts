@@ -1,4 +1,6 @@
 import type { Business, Product, ProductModels } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { type Vars, translate } from '@/i18n/translate'
 import { minorToInput, parseMoneyInput } from '@/lib/format'
 import type { ProductInput } from '@/services/catalogService'
 
@@ -119,29 +121,29 @@ export function convertDims(dims: EditorForm['dims'], from: 'cm' | 'in', to: 'cm
 }
 
 /** Converts raw text fields to typed values. Returns client-side field errors. */
-export function toInput(form: EditorForm): { input: ProductInput; errors: Record<string, string> } {
+export function toInput(form: EditorForm, t: (key: TranslationKey, vars?: Vars) => string = (key, vars) => translate('en', key, vars)): { input: ProductInput; errors: Record<string, string> } {
   const errors: Record<string, string> = {}
   const price = form.priceText.trim() === '' ? 0 : parseMoneyInput(form.priceText)
-  if (price === null) errors.price = 'Enter a price such as 1299.00'
+  if (price === null) errors.price = t('products.form.priceFormat')
   const dims = { width: 0, height: 0, depth: 0 }
   for (const k of ['width', 'height', 'depth'] as const) {
     const raw = form.dims[k].trim()
     if (raw === '') continue
     const v = num(raw)
-    if (!Number.isFinite(v) || v < 0) errors[`dimensions.${k}`] = 'Enter a positive number.'
+    if (!Number.isFinite(v) || v < 0) errors[`dimensions.${k}`] = t('common.validation.numberPositive')
     else dims[k] = Math.round(v * 10) / 10
   }
   let weight: ProductInput['weight'] = undefined
   if (form.weightText.trim()) {
     const v = num(form.weightText)
-    if (!Number.isFinite(v) || v <= 0) errors.weight = 'Enter a positive weight or leave it empty.'
+    if (!Number.isFinite(v) || v <= 0) errors.weight = t('products.form.weightInvalid')
     else weight = { value: v, unit: form.input.weight?.unit ?? 'kg' }
   }
   const cleanVariants = form.input.variants
     .filter((v) => v.name.en.trim())
     .map((v) => ({ ...v, name: { en: v.name.en.trim(), ...(v.name.pt?.trim() ? { pt: v.name.pt.trim() } : {}) } }))
   // An unnamed option is dropped on save, so one with anything entered (including its own files) must be named.
-  if (form.input.variants.some((v) => !v.name.en.trim() && (v.name.pt || v.sku || v.images?.length || v.models?.glb || v.models?.usdz))) errors.variants = 'Every option needs an English name.'
+  if (form.input.variants.some((v) => !v.name.en.trim() && (v.name.pt || v.sku || v.images?.length || v.models?.glb || v.models?.usdz))) errors.variants = t('products.form.variantName')
   return {
     input: {
       ...form.input,

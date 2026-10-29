@@ -9,11 +9,11 @@ import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
 import { Thumb } from '@/components/ui/SmartImage'
 import type { ProductRequestState } from '@/domain/modelRequests'
 import type { Business, Product, ProductAnalytics } from '@/domain/types'
-import { formatDate, formatMoney, formatNumber } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { primaryImage } from '@/lib/product'
-import { MODEL_REQUEST_BADGE_LABEL, type ModelRequestBadge, modelRequestBadge } from '../modelRequests/badge'
-import { AR_READINESS_HINT, AR_READINESS_LABEL, type ProductArReadiness, hasArModel, productArReadiness } from './productReadiness'
+import { useFormat } from '@/lib/useFormat'
+import { MODEL_REQUEST_BADGE_KEY, type ModelRequestBadge, modelRequestBadge } from '../modelRequests/badge'
+import { AR_READINESS_HINT_KEY, AR_READINESS_LABEL_KEY, type ProductArReadiness, hasArModel, productArReadiness } from './productReadiness'
 import { EmbedCodeDialog } from './EmbedCodeDialog'
 import { ProductQrDialog } from './ProductQrDialog'
 import { editPath, type EditorScope, useProductActions } from './useProductActions'
@@ -22,11 +22,12 @@ const readinessTone: Record<ProductArReadiness, Tone> = { ready: 'success', 'and
 
 /** AR readiness from the stored model files (DUX-05); the editor's 3D section has the full check. */
 export function ArReadinessPill({ product }: { product: Product }) {
+  const { t } = useI18n()
   const r = productArReadiness(product)
   return (
-    <span title={AR_READINESS_HINT[r]}>
-      <Badge tone={readinessTone[r]}>{AR_READINESS_LABEL[r]}</Badge>
-      <span className="sr-only">. {AR_READINESS_HINT[r]}</span>
+    <span title={t(AR_READINESS_HINT_KEY[r])}>
+      <Badge tone={readinessTone[r]}>{t(AR_READINESS_LABEL_KEY[r])}</Badge>
+      <span className="sr-only">. {t(AR_READINESS_HINT_KEY[r])}</span>
     </span>
   )
 }
@@ -35,13 +36,14 @@ const requestTone: Record<ModelRequestBadge, Tone> = { requested: 'accent', in_p
 
 /** The product's 3D request badge (R-S4-9); nothing when there is none to show. */
 function RequestBadge({ product, state }: { product: Product; state: ProductRequestState | undefined }) {
+  const { t } = useI18n()
   const badge = modelRequestBadge(state, productArReadiness(product) === 'photos-only')
-  return badge ? <Badge tone={requestTone[badge]}>{MODEL_REQUEST_BADGE_LABEL[badge]}</Badge> : null
+  return badge ? <Badge tone={requestTone[badge]}>{t(MODEL_REQUEST_BADGE_KEY[badge])}</Badge> : null
 }
 
 /** Stored AR launch attempts, or "No 3D" when the product has no 3D model and none were ever recorded (DUX-07). */
-export function arAttemptsText(p: Product, attempts: number | undefined): string {
-  return !attempts && !hasArModel(p) ? 'No 3D' : formatNumber(attempts ?? 0)
+export function arAttemptsText(p: Product, attempts: number | undefined, formatNumber: (n: number) => string, noModel: string): string {
+  return !attempts && !hasArModel(p) ? noModel : formatNumber(attempts ?? 0)
 }
 
 /**
@@ -73,7 +75,8 @@ export function ProductTable({
   page?: number
   onPageChange?: (p: number) => void
 }) {
-  const prefs = usePreferences()
+  const { t, tn } = useI18n()
+  const fmt = useFormat()
   const actions = useProductActions(scope)
   // Business owners manage their own products; platform users see what their role allows (ADR-0029).
   const can = useCan()
@@ -84,20 +87,20 @@ export function ProductTable({
   const menuItems = (p: Product): (MenuItem | 'separator')[] => {
     const b = businesses.get(p.businessId)
     return [
-      ...(allowed('products.edit') ? [{ label: 'Edit', icon: <Pencil />, onSelect: () => actions.edit(p) }] : []),
-      { label: p.status === 'published' ? 'Open product page' : 'Preview draft', icon: <ExternalLink />, onSelect: () => actions.openPreview(p, b) },
-      { label: 'Copy product URL', icon: <Copy />, onSelect: () => void actions.copyUrl(p, b) },
-      { label: p.status === 'published' ? 'Product QR code' : 'Product QR code (not public yet)', icon: <QrCode />, onSelect: () => setQrFor(p) },
-      { label: p.status === 'published' ? 'Embed on your website' : 'Embed on your website (not public yet)', icon: <CodeXml />, onSelect: () => setEmbedFor(p) },
-      ...(allowed('products.edit') ? [{ label: 'Duplicate', icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) }] : []),
+      ...(allowed('products.edit') ? [{ label: t('common.edit'), icon: <Pencil />, onSelect: () => actions.edit(p) }] : []),
+      { label: t(p.status === 'published' ? 'products.menu.open' : 'products.menu.previewDraft'), icon: <ExternalLink />, onSelect: () => actions.openPreview(p, b) },
+      { label: t('products.menu.copyUrl'), icon: <Copy />, onSelect: () => void actions.copyUrl(p, b) },
+      { label: t(p.status === 'published' ? 'products.menu.qr' : 'products.menu.qrDraft'), icon: <QrCode />, onSelect: () => setQrFor(p) },
+      { label: t(p.status === 'published' ? 'products.menu.embed' : 'products.menu.embedDraft'), icon: <CodeXml />, onSelect: () => setEmbedFor(p) },
+      ...(allowed('products.edit') ? [{ label: t('products.menu.duplicate'), icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) }] : []),
       ...(!allowed('products.publish')
         ? []
         : [
             p.status === 'published'
-              ? { label: 'Unpublish', icon: <EyeOff />, onSelect: () => void actions.unpublish(p) }
-              : { label: 'Publish', icon: <Eye />, onSelect: () => void actions.publish(p, b) },
+              ? { label: t('products.actions.unpublish'), icon: <EyeOff />, onSelect: () => void actions.unpublish(p) }
+              : { label: t('products.menu.publish'), icon: <Eye />, onSelect: () => void actions.publish(p, b) },
           ]),
-      ...(allowed('products.delete') ? (['separator', { label: 'Delete', icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(p) }] as const) : []),
+      ...(allowed('products.delete') ? (['separator', { label: t('common.delete'), icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(p) }] as const) : []),
     ]
   }
 
@@ -109,7 +112,7 @@ export function ProductTable({
           {p.name.en}
         </Link>
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[length:var(--text-ui-small)] leading-[1.15] text-ink-muted">
-          <span className="capitalize">{p.category}</span>
+          <span>{t(`products.category.${p.category}`)}</span>
           <ArReadinessPill product={p} />
           <RequestBadge product={p} state={requestStates?.[p.id]} />
         </span>
@@ -118,14 +121,14 @@ export function ProductTable({
   )
 
   const columns: Column<Product>[] = [
-    { key: 'name', header: 'Product', cell: name, sortValue: (p) => p.name.en.toLowerCase(), className: 'max-w-[280px]' },
+    { key: 'name', header: t('products.table.product'), cell: name, sortValue: (p) => p.name.en.toLowerCase(), className: 'max-w-[280px]' },
     ...(showBusiness
       ? [
           {
             key: 'business',
-            header: 'Business',
+            header: t('products.table.business'),
             cell: (p: Product) => {
-              const n = businesses.get(p.businessId)?.name ?? 'Unknown'
+              const n = businesses.get(p.businessId)?.name ?? t('products.table.unknownBusiness')
               return (
                 <span className="block truncate text-ink" title={n}>
                   {n}
@@ -137,24 +140,26 @@ export function ProductTable({
           } satisfies Column<Product>,
         ]
       : []),
-    { key: 'price', header: 'Price', cell: (p) => <span className="whitespace-nowrap">{formatMoney(p.price, p.currency)}</span>, sortValue: (p) => p.price, align: 'right' },
-    { key: 'status', header: 'Status', cell: (p) => <ProductStatusBadge status={p.status} />, sortValue: (p) => p.status },
-    { key: 'views', header: 'Views', cell: (p) => formatNumber(stats.get(p.id)?.views ?? 0), sortValue: (p) => stats.get(p.id)?.views ?? 0, align: 'right', priority: 'low' },
+    { key: 'price', header: t('products.table.price'), cell: (p) => <span className="whitespace-nowrap">{fmt.money(p.price, p.currency)}</span>, sortValue: (p) => p.price, align: 'right' },
+    { key: 'status', header: t('common.status'), cell: (p) => <ProductStatusBadge status={p.status} />, sortValue: (p) => p.status },
+    { key: 'views', header: t('products.table.views'), cell: (p) => fmt.number(stats.get(p.id)?.views ?? 0), sortValue: (p) => stats.get(p.id)?.views ?? 0, align: 'right', priority: 'low' },
     {
       key: 'ar',
-      header: 'AR attempts',
-      cell: (p) => <span title={hasArModel(p) ? 'AR launch attempts, not confirmed AR sessions' : 'No 3D model'}>{arAttemptsText(p, stats.get(p.id)?.arActivations)}</span>,
+      header: t('products.table.arAttempts'),
+      cell: (p) => (
+        <span title={t(hasArModel(p) ? 'products.table.arAttemptsHint' : 'products.table.noModel')}>{arAttemptsText(p, stats.get(p.id)?.arActivations, fmt.number, t('products.table.noModelShort'))}</span>
+      ),
       sortValue: (p) => stats.get(p.id)?.arActivations ?? 0,
       align: 'right',
       priority: 'low',
     },
-    { key: 'updated', header: 'Updated', cell: (p) => <span className="whitespace-nowrap tabular-nums">{formatDate(p.updatedAt, 'en', prefs)}</span>, sortValue: (p) => p.updatedAt },
+    { key: 'updated', header: t('common.updated'), cell: (p) => <span className="whitespace-nowrap tabular-nums">{fmt.date(p.updatedAt)}</span>, sortValue: (p) => p.updatedAt },
     {
       key: 'actions',
-      header: 'Actions',
+      header: t('common.actions'),
       srOnlyHeader: true,
       align: 'right',
-      cell: (p) => <DropdownMenu label={`Actions for ${p.name.en}`} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menuItems(p)} />,
+      cell: (p) => <DropdownMenu label={t('products.table.actionsFor', { name: p.name.en })} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menuItems(p)} />,
     },
   ]
 
@@ -166,8 +171,8 @@ export function ProductTable({
         rowKey={(p) => p.id}
         loading={loading}
         empty={empty}
-        caption="Products"
-        noun="products"
+        caption={t('products.table.caption')}
+        noun={t('products.table.noun')}
         twoLine
         initialSort={{ key: 'updated', dir: 'desc' }}
         page={page}
@@ -182,16 +187,18 @@ export function ProductTable({
               {showBusiness && <p className="truncate text-xs text-ink-muted">{businesses.get(p.businessId)?.name}</p>}
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
                 <ProductStatusBadge status={p.status} />
-                <span className="font-medium text-ink">{formatMoney(p.price, p.currency)}</span>
-                <span>{formatNumber(stats.get(p.id)?.views ?? 0)} views</span>
-                {hasArModel(p) || stats.get(p.id)?.arActivations ? <span>{formatNumber(stats.get(p.id)?.arActivations ?? 0)} AR attempts</span> : null}
+                <span className="font-medium text-ink">{fmt.money(p.price, p.currency)}</span>
+                <span>{tn('products.table.viewsCount', stats.get(p.id)?.views ?? 0, { count: fmt.number(stats.get(p.id)?.views ?? 0) })}</span>
+                {hasArModel(p) || stats.get(p.id)?.arActivations ? (
+                  <span>{tn('products.table.arCount', stats.get(p.id)?.arActivations ?? 0, { count: fmt.number(stats.get(p.id)?.arActivations ?? 0) })}</span>
+                ) : null}
               </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <ArReadinessPill product={p} />
                 <RequestBadge product={p} state={requestStates?.[p.id]} />
               </div>
             </div>
-            <DropdownMenu label={`Actions for ${p.name.en}`} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menuItems(p)} />
+            <DropdownMenu label={t('products.table.actionsFor', { name: p.name.en })} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menuItems(p)} />
           </div>
         )}
       />
