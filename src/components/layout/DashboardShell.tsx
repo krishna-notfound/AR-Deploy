@@ -6,7 +6,7 @@ import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
 import { SecurityNoticeSlot } from '@/auth/securityNotice'
 import { cn } from '@/lib/cn'
-import { formatNumber } from '@/lib/format'
+import { useFormat } from '@/lib/useFormat'
 import { catalogLocalPath, settingsPath } from '@/lib/urls'
 import { settingsReturnState } from '@/lib/settingsReturn'
 import { isDemoMode } from '@/services'
@@ -41,6 +41,7 @@ function readCollapsed() {
 export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; variant: Variant }) {
   // Only the places this platform role may open (ADR-0029); business owners have no `requires` items.
   const can = useCan()
+  const { t } = useI18n()
   const nav = useMemo(() => allNav.filter((i) => !i.requires || can(i.requires)), [allNav, can])
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -70,9 +71,9 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
   const ctx = useMemo<DashboardContextValue>(
     () =>
       variant === 'admin'
-        ? { variant, home: 'Sanctus Admin', homeTo: '/admin', eyebrow: 'Platform admin' }
-        : { variant, home: business?.name ?? 'My business', homeTo: '/dashboard', eyebrow: 'Business dashboard' },
-    [variant, business?.name],
+        ? { variant, home: 'Sanctus Admin', homeTo: '/admin', eyebrow: t('ui.shell.platformAdmin') }
+        : { variant, home: business?.name ?? t('ui.shell.myBusiness'), homeTo: '/dashboard', eyebrow: t('ui.shell.businessDashboard') },
+    [variant, business?.name, t],
   )
 
   const crumbs = useMemo<BreadcrumbSlot>(() => ({ slot: crumbSlot, setHasCrumbs }), [crumbSlot])
@@ -82,7 +83,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
       <BreadcrumbSlotContext.Provider value={crumbs}>
       <div data-surface="dashboard" className="min-h-dvh bg-canvas" style={{ '--sidebar-w': collapsed ? '72px' : '256px' } as React.CSSProperties}>
         <a href="#main" className="sr-only z-50 rounded bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
-          Skip to content
+          {t('ui.shell.skip')}
         </a>
         {/* Desktop sidebar */}
         <aside
@@ -99,7 +100,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
               <button
                 type="button"
                 onClick={() => setCollapsed((c) => !c)}
-                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-label={collapsed ? t('ui.shell.expand') : t('ui.shell.collapse')}
                 aria-expanded={!collapsed}
                 className={cn(
                   'flex h-9 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-[13px] text-chalk/70 hover:bg-white/5 hover:text-chalk focus-visible:outline-accent-bright',
@@ -107,7 +108,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
                 )}
               >
                 {collapsed ? <ChevronsRight className="size-4 shrink-0" aria-hidden /> : <ChevronsLeft className="size-4 shrink-0" aria-hidden />}
-                {!collapsed && 'Collapse'}
+                {!collapsed && t('ui.shell.collapseShort')}
               </button>
             }
           />
@@ -139,6 +140,7 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
  */
 export function CatalogStatusNotice() {
   const { business } = useAccount()
+  const { t } = useI18n()
   // Read again when the business changes (a closure request or its cancellation changes the status).
   const security = useServiceQuery(() => account.getSecurityState(), [business?.id, business?.status, business?.updatedAt])
   if (!business || business.status === 'active') return null
@@ -147,29 +149,27 @@ export function CatalogStatusNotice() {
   if (security.data?.closure)
     return (
       <InlineNotice tone="warning" className="mb-6">
-        Your catalog is offline because you asked to close your account. To keep it, cancel the request in{' '}
+        {t('ui.notice.closureBefore')}{' '}
         <Link to={settingsPath('business', 'account')} className="font-medium underline underline-offset-2">
-          My account
+          {t('ui.notice.closureLink')}
         </Link>
-        .
+        {t('ui.notice.closureAfter')}
       </InlineNotice>
     )
   const preview = (
     <a href={catalogLocalPath(business, { preview: true })} target="_blank" rel="noopener" className="font-medium underline underline-offset-2">
-      Preview your catalog
+      {t('ui.notice.preview')}
     </a>
   )
   return (
     <InlineNotice tone="warning" className="mb-6">
       {business.status === 'draft' ? (
         <>
-          <strong className="font-medium">{business.name} is not public yet.</strong> You can add products now. Customers will see your
-          catalog once the platform team activates it. {preview}
+          <strong className="font-medium">{t('ui.notice.draftTitle', { name: business.name })}</strong> {t('ui.notice.draftBody')} {preview}
         </>
       ) : (
         <>
-          <strong className="font-medium">Your catalog is paused.</strong> Customers who scan your QR code or open your links see “catalog
-          unavailable”. Contact the platform team to reactivate it. {preview}
+          <strong className="font-medium">{t('ui.notice.pausedTitle')}</strong> {t('ui.notice.pausedBody')} {preview}
         </>
       )}
     </InlineNotice>
@@ -178,11 +178,12 @@ export function CatalogStatusNotice() {
 
 function Brand({ collapsed, variant }: { collapsed?: boolean; variant: Variant }) {
   const { business } = useAccount()
-  const label = variant === 'business' ? (business?.name ?? 'Business dashboard') : 'Admin console'
+  const { t } = useI18n()
+  const label = variant === 'business' ? (business?.name ?? t('ui.shell.businessDashboard')) : t('ui.shell.adminConsole')
   const to = variant === 'business' ? '/dashboard' : '/admin'
   if (collapsed) {
     return (
-      <Link to={to} aria-label={variant === 'business' ? `${label}, business dashboard` : 'Sanctus admin console'} className="grid size-10 place-items-center rounded-[var(--radius-control)] focus-visible:outline-accent-bright">
+      <Link to={to} aria-label={variant === 'business' ? t('ui.shell.brandBusiness', { label }) : t('ui.shell.brandAdmin')} className="grid size-10 place-items-center rounded-[var(--radius-control)] focus-visible:outline-accent-bright">
         <BrandMark className="size-7 text-chalk" />
       </Link>
     )
@@ -198,6 +199,8 @@ function Brand({ collapsed, variant }: { collapsed?: boolean; variant: Variant }
 }
 
 function NavBadge({ kind, collapsed }: { kind: NonNullable<NavItem['badge']>; collapsed?: boolean }) {
+  const { t } = useI18n()
+  const { number: formatNumber } = useFormat()
   const applications = usePendingApplications(kind === 'pendingApplications')
   const requests = useRequestedModelRequests(kind === 'requestedModelRequests')
   const n = (kind === 'pendingApplications' ? applications.data?.total : requests.data) ?? 0
@@ -205,7 +208,7 @@ function NavBadge({ kind, collapsed }: { kind: NonNullable<NavItem['badge']>; co
   const text = n > 99 ? '99+' : formatNumber(n)
   return (
     <>
-      <span className="sr-only">, {formatNumber(n)} {kind === 'pendingApplications' ? 'awaiting review' : 'waiting to start'}</span>
+      <span className="sr-only">, {formatNumber(n)} {kind === 'pendingApplications' ? t('ui.shell.awaitingReview') : t('ui.shell.waitingToStart')}</span>
       <span
         aria-hidden
         className={cn(
@@ -240,7 +243,7 @@ function SidebarContent({
         <Brand collapsed={collapsed} variant={variant} />
       </div>
       {/* The user block sits inside the "Main" navigation so Log out stays with the other places to go. */}
-      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
+      <nav aria-label={t('ui.shell.main')} className="flex min-h-0 flex-1 flex-col">
         <ul className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
           {nav.map((item) => (
             <li key={item.to}>
@@ -276,6 +279,7 @@ function SidebarContent({
 
 function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Variant }) {
   const { user } = useAccount()
+  const { t } = useI18n()
   const { profile } = useMyProfile()
   const leave = useLeaveAccount()
   const navigate = useNavigate()
@@ -283,20 +287,20 @@ function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Varia
   const iconBtn =
     'grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-chalk/70 hover:bg-white/[0.06] hover:text-chalk focus-visible:outline-accent-bright pointer-coarse:size-11'
   // The name and photo set in Profile settings win; until they load (or if they can't), the account's own name.
-  const name = profile?.displayName || user?.name || 'Signed in'
+  const name = profile?.displayName || user?.name || t('ui.shell.signedIn')
   // Settings is full-screen; its close button comes back to this page.
   const openSettings = (section: 'account' | 'security') => navigate(settingsPath(variant, section), { state: settingsReturnState(pathname + search) })
   const menu = (
     // The menu sits at the foot of the sidebar, so it opens upwards (the descendant classes place it above the trigger).
     <div className={cn('[&_[role=menu]]:bottom-full [&_[role=menu]]:mb-1', !collapsed && 'flex min-w-0 flex-1 [&>div]:min-w-0 [&>div]:flex-1')}>
       <DropdownMenu
-        label={`Account menu, ${name}`}
+        label={t('ui.shell.accountMenu', { name })}
         align="start"
         items={[
-          { label: 'Account settings', icon: <UserRound />, onSelect: () => openSettings('account') },
-          { label: 'Security & 2FA', icon: <ShieldCheck />, onSelect: () => openSettings('security') },
+          { label: t('ui.shell.accountSettings'), icon: <UserRound />, onSelect: () => openSettings('account') },
+          { label: t('ui.shell.security'), icon: <ShieldCheck />, onSelect: () => openSettings('security') },
           'separator',
-          { label: 'Sign out', icon: <LogOut />, onSelect: () => void leave({ signOut: true }) },
+          { label: t('ui.shell.signOut'), icon: <LogOut />, onSelect: () => void leave({ signOut: true }) },
         ]}
         triggerClassName={cn(
           'h-auto! w-full! justify-start! gap-2.5 p-1! text-left text-chalk! hover:bg-white/[0.06]! hover:text-chalk! focus-visible:outline-accent-bright',
@@ -310,7 +314,7 @@ function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Varia
                 <span className="block truncate text-[length:var(--text-ui-body)] font-medium text-chalk">{name}</span>
                 <span className="block truncate text-[12px] text-chalk/65">
                   {user?.email}
-                  {isDemoMode && ' · demo'}
+                  {isDemoMode && ` · ${t('ui.shell.demo')}`}
                 </span>
               </span>
             )}
@@ -325,13 +329,13 @@ function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Varia
         type="button"
         // Supabase mode: the sign-in page sends a signed-in user straight back, so end the session first.
         onClick={() => void leave({ signOut: !isDemoMode })}
-        aria-label="Switch account"
-        title="Switch account"
+        aria-label={t('ui.shell.switchAccount')}
+        title={t('ui.shell.switchAccount')}
         className={iconBtn}
       >
         <Repeat className="size-4" aria-hidden />
       </button>
-      <button type="button" onClick={() => void leave({ signOut: true })} aria-label="Log out" title="Log out" className={iconBtn}>
+      <button type="button" onClick={() => void leave({ signOut: true })} aria-label={t('ui.shell.logOut')} title={t('ui.shell.logOut')} className={iconBtn}>
         <LogOut className="size-4" aria-hidden />
       </button>
     </>
@@ -345,15 +349,16 @@ function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Varia
 }
 
 function MobileDrawer({ nav, variant, onClose }: { nav: NavItem[]; variant: Variant; onClose: () => void }) {
+  const { t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
   useFocusTrap(ref, true, onClose)
   return (
     <div className="fixed inset-0 z-40 lg:hidden">
       <div className="absolute inset-0 animate-fade-in bg-obsidian/50" onClick={onClose} aria-hidden />
-      <div ref={ref} role="dialog" aria-modal="true" aria-label="Navigation" className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-obsidian text-chalk shadow-[var(--shadow-pop)]">
+      <div ref={ref} role="dialog" aria-modal="true" aria-label={t('ui.shell.navigation')} className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-obsidian text-chalk shadow-[var(--shadow-pop)]">
         <button
           type="button"
-          aria-label="Close navigation"
+          aria-label={t('ui.shell.closeNavigation')}
           onClick={onClose}
           className="absolute top-5 right-3 grid size-11 place-items-center rounded-[var(--radius-control)] text-chalk/75 hover:bg-white/[0.06] hover:text-chalk focus-visible:outline-accent-bright"
         >
@@ -392,10 +397,10 @@ function Topbar({
   const { home, homeTo } = useDashboard() ?? { home: 'Sanctus', homeTo: '/' }
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-canvas px-4 sm:px-6 lg:px-10">
-      <IconButton aria-label="Open navigation" onClick={onMenu} className="-ml-2 lg:hidden pointer-coarse:size-11">
+      <IconButton aria-label={t('ui.shell.openNavigation')} onClick={onMenu} className="-ml-2 lg:hidden pointer-coarse:size-11">
         <Menu className="size-5" />
       </IconButton>
-      <Link to={homeTo} aria-label="Sanctus, dashboard home" className="text-ink lg:hidden">
+      <Link to={homeTo} aria-label={t('ui.shell.dashboardHome')} className="text-ink lg:hidden">
         <span data-wordmark className="flex">
           <Wordmark size={12} />
         </span>
@@ -403,7 +408,7 @@ function Topbar({
       {/* A page with its own path (breadcrumbs prop) portals it here; otherwise the default trail below shows. */}
       <div ref={slotRef} className="contents" />
       {!hasCrumbs && (
-      <nav aria-label="You are here" className="hidden min-w-0 lg:block">
+      <nav aria-label={t('ui.shell.youAreHere')} className="hidden min-w-0 lg:block">
         <ol className="flex min-w-0 items-center gap-1.5 text-[length:var(--text-ui-body)] text-ink-muted">
           <li className="min-w-0 truncate">
             <Link to={homeTo} className="hover:text-ink hover:underline">
@@ -428,7 +433,7 @@ function Topbar({
         <LanguageSwitcher className="max-sm:hidden" />
         {/* Honest labelling in the demo; a production owner has no use for the data source's name (DUX-08). */}
         {isDemoMode && (
-          <span className="hidden border border-line-strong px-2.5 py-0.5 text-[12px] leading-tight text-ink-muted sm:inline">Demo mode</span>
+          <span className="hidden border border-line-strong px-2.5 py-0.5 text-[12px] leading-tight text-ink-muted sm:inline">{t('ui.shell.demoMode')}</span>
         )}
         {variant === 'business' && business && (
           <a
@@ -437,10 +442,10 @@ function Topbar({
             rel="noopener"
             className="inline-flex min-h-10 items-center gap-1.5 px-2 text-[length:var(--text-ui-body)] font-medium text-ink hover:underline pointer-coarse:min-h-11"
           >
-            <span className="hidden sm:inline">{business.status === 'active' ? 'View catalog' : 'Preview catalog'}</span>
-            <span className="sm:hidden">Catalog</span>
+            <span className="hidden sm:inline">{business.status === 'active' ? t('ui.shell.viewCatalog') : t('ui.shell.previewCatalog')}</span>
+            <span className="sm:hidden">{t('ui.shell.catalog')}</span>
             <ArrowUpRight className="size-4" aria-hidden />
-            <span className="sr-only">(opens in a new tab)</span>
+            <span className="sr-only">{t('ui.shell.newTab')}</span>
           </a>
         )}
       </div>

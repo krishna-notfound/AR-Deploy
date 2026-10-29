@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import { ACCOUNT_KEY } from '@/auth/AccountProvider'
+import { LANG_KEY } from '@/i18n/LanguageProvider'
 import { service } from '@/services'
 import type { PlatformMember } from '@/domain/types'
 import { fail } from '@/services/catalogService'
@@ -146,7 +147,7 @@ describe('Team & Access page (ADR-0029)', () => {
   it('shows a retry state when the members cannot load', { timeout: 20_000 }, async () => {
     vi.spyOn(service, 'listMembers').mockResolvedValue(fail('UNKNOWN', 'Network down.'))
     open('/admin/team')
-    expect(await screen.findByText(/Network down/)).toBeInTheDocument()
+    expect(await screen.findByText(/Could not load the team. Something went wrong/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
   })
 })
@@ -163,5 +164,18 @@ describe('Email failed invitations (R-W7-3)', () => {
     open('/admin/team?tab=invitations')
     const row = (await within(await screen.findByRole('table')).findByText('marta.lopes@sanctus.example')).closest('tr') as HTMLElement
     expect(within(row).getByText('Email failed')).toBeInTheDocument()
+  })
+
+  it('shows the page in Portuguese when the language is pt', { timeout: 20_000 }, async () => {
+    localStorage.setItem(LANG_KEY, 'pt')
+    open('/admin/team')
+    await screen.findByRole('heading', { level: 1, name: 'Equipa e acessos' })
+    expect(screen.getByRole('button', { name: 'Convidar membro' })).toBeInTheDocument()
+    expect(screen.getByText('Membros ativos', { selector: 'dt' })).toBeInTheDocument()
+    const row = (await within(await screen.findByRole('table')).findByText('ana.ribeiro@sanctus.example')).closest('tr') as HTMLElement
+    expect(within(row).getByText('Administrador')).toBeInTheDocument()
+    expect(within(row).getByText('Ativo')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Histórico de acessos/ })).toBeInTheDocument()
+    expect(screen.queryByText('Invite member')).toBeNull()
   })
 })

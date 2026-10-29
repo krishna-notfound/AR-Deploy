@@ -44,7 +44,7 @@ export const BIZ = '10000000-0000-0000-0000-0000000000b1'
 const TEAM_DEFAULTS = ['analytics.view', 'applications.view', 'businesses.view', 'products.edit', 'products.view']
 const ALL = [
   'access.view', 'analytics.view', 'applications.approve', 'applications.reject', 'applications.view', 'businesses.delete',
-  'businesses.edit', 'businesses.status', 'businesses.view', 'models.manage', 'owners.manage', 'products.delete', 'products.edit',
+  'businesses.edit', 'businesses.status', 'businesses.view', 'content.manage', 'models.manage', 'owners.manage', 'products.delete', 'products.edit',
   'products.publish', 'products.view', 'records.view',
 ]
 

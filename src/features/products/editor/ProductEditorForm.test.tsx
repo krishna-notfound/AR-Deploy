@@ -4,6 +4,7 @@ import { RouterProvider, createMemoryRouter, useParams } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
 import type { Business } from '@/domain/types'
 import { service } from '@/services'
 import { ok } from '@/services/catalogService'
@@ -301,7 +302,7 @@ describe('product editor: per-variant photos and 3D', () => {
     expect(uploads).toHaveLength(2) // the product's slot and this option's slot
     await user.upload(within(panel).getByLabelText('Upload .glb file'), glbFile('walnut.glb'))
     expect(await within(panel).findByText('walnut.glb')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '1 of 1 option have their own 3D model' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '1 of 1 option has its own 3D model' })).toBeInTheDocument()
     expect(toggle).toHaveTextContent('own GLB')
     // The product's own model slot is untouched.
     expect(screen.getAllByText('No GLB file yet.')).toHaveLength(1)
@@ -485,7 +486,7 @@ describe('S4 Task 3: the 3D section by role and switch (R-S4-4, R-S4-17)', () =>
     })
     await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
     expect(await screen.findByText(/to continue$/)).toBeInTheDocument()
-    expect(summary()).toHaveTextContent('3D files for this business are made by the Sanctus team. Request a 3D model instead.')
+    expect(summary()).toHaveTextContent('This business is not allowed to upload its own 3D files.')
     expect(screen.getByRole('textbox', { name: /^Product name/ })).toHaveValue(`${p.name.en} II`)
     expect(models().getByText('mine.glb')).toBeInTheDocument()
     const stored = await service.getProductById(p.id)
@@ -502,7 +503,7 @@ describe('S4 Task 3: the 3D section by role and switch (R-S4-4, R-S4-17)', () =>
     await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
     await screen.findByText(/to continue$/)
     const alert = summary()
-    expect(alert).toHaveTextContent('The Sanctus team delivered a 3D model while you were editing. Reload to see it.')
+    expect(alert).toHaveTextContent('The 3D files were changed somewhere else. Reload the page and try again.')
     // The team delivered a GLB for the product and one for its first option meanwhile.
     const glb = { format: 'glb' as const, url: 'blob:delivered', fileName: 'delivered.glb', status: 'valid' as const }
     const stamp = '2026-10-26T12:00:00.000Z'
@@ -525,5 +526,33 @@ describe('S4 Task 3: the 3D section by role and switch (R-S4-4, R-S4-17)', () =>
     expect(sent.modelsChangedAt).toBe(stamp)
     expect(sent.models?.glb?.fileName).toBe('delivered.glb')
     if (p.variants[0]) expect(sent.variants?.[0]?.models?.glb?.fileName).toBe('option.glb')
+  })
+})
+
+describe('T6: product editor in Portuguese', () => {
+  afterEach(() => localStorage.removeItem(LANG_KEY))
+
+  it('shows the Portuguese title, sections and buttons, and a Portuguese publish message', async () => {
+    localStorage.setItem(LANG_KEY, 'pt')
+    const user = userEvent.setup()
+    const router = createMemoryRouter(
+      [{ path: '/dashboard/products/new', element: <ProductEditorForm scope="business" product={null} currentStatus="draft" businesses={[business]} fixedBusiness={business} breadcrumbs={crumbs} /> }],
+      { initialEntries: ['/dashboard/products/new'] },
+    )
+    render(
+      <LanguageProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <RouterProvider router={router} />
+          </ConfirmProvider>
+        </ToastProvider>
+      </LanguageProvider>,
+    )
+    expect(screen.getByRole('heading', { name: 'Adicionar produto', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Informação básica' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar rascunho' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Publicar' }))
+    expect(await screen.findByText(/problemas para continuar$/)).toBeInTheDocument()
+    expect(screen.queryByText(/to continue$/)).toBeNull()
   })
 })

@@ -12,6 +12,8 @@ const KEYS: Record<string, TranslationKey> = {
   refresh_token_not_found: 'auth.error.sessionExpired',
   network: 'auth.error.network',
   otp_expired: 'auth.error.codeInvalid',
+  invalid_credentials: 'auth.error.invalidCredentials',
+  email_not_confirmed: 'auth.error.emailNotConfirmed',
 }
 
 /** A code as typed or pasted from the email: spaces and dashes dropped. Valid when 6 to 10 digits remain. */

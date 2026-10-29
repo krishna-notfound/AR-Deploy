@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { useInDashboard } from '@/components/layout/dashboardContext'
 import { Pagination, paginate } from './Pagination'
@@ -52,6 +53,7 @@ export function DataTable<T>({
   page?: number
   onPageChange?: (p: number) => void
 }) {
+  const { t } = useI18n()
   const dash = useInDashboard()
   const [sort, setSort] = useState<SortState | undefined>(initialSort)
   const [localPage, setLocalPage] = useState(1)
@@ -82,7 +84,7 @@ export function DataTable<T>({
 
   if (loading) {
     return (
-      <div className="space-y-4 p-5" role="status" aria-label="Loading">
+      <div className="space-y-4 p-5" role="status" aria-label={t('common.loading')}>
         {Array.from({ length: 5 }, (_, i) => (
           <div key={i} className="flex items-center gap-4">
             <Skeleton className="size-10 rounded-[var(--radius-control)]" />

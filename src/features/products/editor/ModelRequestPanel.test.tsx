@@ -222,7 +222,8 @@ describe('S4 Task 4: ModelRequestPanel', () => {
     await screen.findByRole('button', { name: 'Send request' })
     await pick(photos(2))
     await userEvent.click(sendButton())
-    expect(await screen.findByText('This product already has an open 3D model request.')).toBeInTheDocument()
+    // The service sentence stays English for logs; the panel shows the translated sentence for the reason.
+    expect(await screen.findByText('This already has an open 3D model request.')).toBeInTheDocument()
     expect(screen.getByText('2 of 10 photos · add at least 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove photo-2.jpg' })).toBeEnabled()
   })
@@ -291,6 +292,6 @@ describe('S4 Task 4: ModelRequestPanel', () => {
     vi.spyOn(service, 'cancelModelRequest').mockResolvedValue({ ok: false, error: { code: 'CONFLICT', message: 'The Sanctus team has started on this model. To stop it, contact the Sanctus team.', reason: 'model_request_not_cancellable' } })
     renderPanel()
     await userEvent.click(await screen.findByRole('button', { name: 'Cancel request' }))
-    await waitFor(() => expect(screen.getAllByText('The Sanctus team has started on this model. To stop it, contact the Sanctus team.').length).toBeGreaterThan(0))
+    await waitFor(() => expect(screen.getAllByText('This request has already started and can no longer be cancelled.').length).toBeGreaterThan(0))
   })
 })

@@ -1,5 +1,6 @@
 import { arReadiness } from '@/features/ar/readiness'
 import type { Product, ProductModels, ProductVariant } from '@/domain/types'
+import { type TranslationKey, en } from '@/i18n/dictionaries/en'
 
 /**
  * One-word AR readiness for product lists (DUX-05), derived from the editor's `arReadiness()` so the list and
@@ -12,18 +13,34 @@ import type { Product, ProductModels, ProductVariant } from '@/domain/types'
  */
 export type ProductArReadiness = 'ready' | 'android-only' | 'android-blocked' | 'photos-only'
 
+/** Translate with `t(AR_READINESS_LABEL_KEY[r])` and `t(AR_READINESS_HINT_KEY[r])`. */
+export const AR_READINESS_LABEL_KEY: Record<ProductArReadiness, TranslationKey> = {
+  ready: 'products.readiness.ready',
+  'android-only': 'products.readiness.androidOnly',
+  'android-blocked': 'products.readiness.androidBlocked',
+  'photos-only': 'products.readiness.photosOnly',
+}
+
+export const AR_READINESS_HINT_KEY: Record<ProductArReadiness, TranslationKey> = {
+  ready: 'products.readiness.ready.hint',
+  'android-only': 'products.readiness.androidOnly.hint',
+  'android-blocked': 'products.readiness.androidBlocked.hint',
+  'photos-only': 'products.readiness.photosOnly.hint',
+}
+
+/** English text, kept for callers that have no `t` (tests, files not yet translated). */
 export const AR_READINESS_LABEL: Record<ProductArReadiness, string> = {
-  ready: 'AR ready',
-  'android-only': 'Android only',
-  'android-blocked': 'Android AR blocked',
-  'photos-only': 'Photos only',
+  ready: en[AR_READINESS_LABEL_KEY.ready],
+  'android-only': en[AR_READINESS_LABEL_KEY['android-only']],
+  'android-blocked': en[AR_READINESS_LABEL_KEY['android-blocked']],
+  'photos-only': en[AR_READINESS_LABEL_KEY['photos-only']],
 }
 
 export const AR_READINESS_HINT: Record<ProductArReadiness, string> = {
-  ready: 'Has a 3D model (GLB) and an iPhone AR file (USDZ).',
-  'android-only': 'Has a 3D model but no iPhone AR file (USDZ): iPhone AR is not guaranteed.',
-  'android-blocked': 'The 3D model uses a feature Google Scene Viewer cannot open (for example WebP textures), so Android customers get 3D without AR. Re-export the model without it.',
-  'photos-only': 'No 3D model: customers see photos only, without 3D or AR.',
+  ready: en[AR_READINESS_HINT_KEY.ready],
+  'android-only': en[AR_READINESS_HINT_KEY['android-only']],
+  'android-blocked': en[AR_READINESS_HINT_KEY['android-blocked']],
+  'photos-only': en[AR_READINESS_HINT_KEY['photos-only']],
 }
 
 const RANK: ProductArReadiness[] = ['ready', 'android-only', 'android-blocked', 'photos-only']

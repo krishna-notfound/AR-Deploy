@@ -78,7 +78,7 @@ describe('ProfileSection', () => {
     await user.clear(field)
     await user.type(field, 'Nope')
     await user.click(screen.getByRole('button', { name: 'Save name' }))
-    expect(await screen.findByText('Could not save. Try again.')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong. Try again.')).toBeInTheDocument()
     // The preview initials come back to the saved name.
     await waitFor(() => expect(preview().textContent).not.toBe('N'))
   })
@@ -172,7 +172,7 @@ describe('ProfileSection', () => {
     await screen.findByText('Photo updated')
     vi.spyOn(account, 'removeAvatar').mockResolvedValue(fail('unknown', 'Could not remove the photo. Try again.'))
     await user.click(screen.getByRole('button', { name: 'Remove photo' }))
-    expect(await screen.findByText('Could not remove the photo. Try again.')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong. Try again.')).toBeInTheDocument()
     expect(preview().querySelector('img')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument()
   })
@@ -180,7 +180,7 @@ describe('ProfileSection', () => {
   it('shows an error with a retry when the profile cannot be loaded', async () => {
     const get = vi.spyOn(account, 'getProfile').mockResolvedValue({ ok: false, error: { code: 'UNKNOWN', reason: 'unknown', message: 'Network down.' } })
     open()
-    expect(await screen.findByText('Network down.')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong. Try again.')).toBeInTheDocument()
     get.mockRestore()
     await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByRole('textbox', { name: 'Name' })).toBeInTheDocument()

@@ -7,24 +7,26 @@ import { FormField, Input } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
 import { useOptionalAccount } from '@/auth/AccountProvider'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { accountErrorText } from './accountError'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { type ActionPurpose, type Result, type ServiceError, account, isDemoMode } from '@/services'
 
 /** Seconds before another code can be sent (spec: resend cooldown 30 s). */
 export const RESEND_COOLDOWN_S = 30
 const CODE_LENGTH = 6
 
-/** Fixed copy for the code errors; any other failure shows its own (already user-safe) message. */
-const CODE_ERRORS: Record<string, string> = {
-  invalid_code: "That code isn't right. Check it and try again.",
-  code_expired: 'That code has expired. Send a new code and try again.',
-  too_many_attempts: 'Too many wrong attempts. Send a new code and try again.',
-  rate_limited: 'Too many codes were requested. Wait a few minutes and try again.',
+/** Fixed copy for the code errors; any other failure shows the shared sentence for its code. */
+const CODE_ERRORS: Record<string, TranslationKey> = {
+  invalid_code: 'settings.code.err.invalid',
+  code_expired: 'settings.code.err.expired',
+  too_many_attempts: 'settings.code.err.tooMany',
+  rate_limited: 'settings.code.err.rateLimited',
 }
-const EMAIL_BLOCKED = "Email can't be sent to this address yet. Contact the Sanctus team."
-const SEND_ERRORS: Record<string, string> = {
-  email_failed: "We couldn't send the code. Try again.",
-  email_blocked: EMAIL_BLOCKED,
-  rate_limited: CODE_ERRORS.rate_limited as string,
+const SEND_ERRORS: Record<string, TranslationKey> = {
+  email_failed: 'settings.code.err.sendFailed',
+  email_blocked: 'settings.code.emailBlocked',
+  rate_limited: 'settings.code.err.rateLimited',
 }
 
 /**
@@ -51,10 +53,11 @@ const rememberBlocked = (uid: string) => {
 /** After these the code in hand is no longer usable: clear the field so the next step is a new code. */
 const CODE_SPENT = new Set(['code_expired', 'too_many_attempts'])
 
-const codeMessage = (e: ServiceError) => (e.reason && Object.hasOwn(CODE_ERRORS, e.reason) ? (CODE_ERRORS[e.reason] as string) : e.message)
-const sendMessage = (e: ServiceError) => (e.reason && Object.hasOwn(SEND_ERRORS, e.reason) ? (SEND_ERRORS[e.reason] as string) : e.message)
+type T = ReturnType<typeof useI18n>['t']
+const codeMessage = (e: ServiceError, t: T) => (e.reason && Object.hasOwn(CODE_ERRORS, e.reason) ? t(CODE_ERRORS[e.reason] as TranslationKey) : accountErrorText(e, t))
+const sendMessage = (e: ServiceError, t: T) => (e.reason && Object.hasOwn(SEND_ERRORS, e.reason) ? t(SEND_ERRORS[e.reason] as TranslationKey) : accountErrorText(e, t))
 
-type Send = { status: 'sending' } | { status: 'sent'; sentTo: string } | { status: 'failed'; message: string } | { status: 'blocked' }
+type Send = { status: 'sending' } | { status: 'sent'; sentTo: string } | { status: 'failed'; error: ServiceError } | { status: 'blocked' }
 
 export interface ActionCodeDialogProps {
   open: boolean
@@ -75,6 +78,7 @@ export function ActionCodeDialog(props: ActionCodeDialogProps) {
 }
 
 function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destructive, onClose, onConfirm }: ActionCodeDialogProps) {
+  const { t } = useI18n()
   const uid = useOptionalAccount()?.user?.id ?? ''
   const [send, setSend] = useState<Send>(() => (sendBlocked(uid) ? { status: 'blocked' } : { status: 'sending' }))
   // Resend waits until this time (ms); `now` ticks once a second while it is in the future.
@@ -102,12 +106,12 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
       setSend({ status: 'blocked' })
     } else if (r.ok) {
       setSend({ status: 'sent', sentTo: r.data.sentTo })
-      const t = Date.now()
-      setNow(t)
-      setResendAt(t + RESEND_COOLDOWN_S * 1000)
+      const at = Date.now()
+      setNow(at)
+      setResendAt(at + RESEND_COOLDOWN_S * 1000)
     } else {
       // No cooldown after a failure: nothing was sent, so Resend is the next step straight away.
-      setSend({ status: 'failed', message: sendMessage(r.error) })
+      setSend({ status: 'failed', error: r.error })
     }
   }, [purpose, uid])
 
@@ -145,7 +149,7 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
     e?.preventDefault()
     if (submitting.current || send.status !== 'sent') return
     if (code.length !== CODE_LENGTH) {
-      setError('Enter the 6-digit code.')
+      setError(t('settings.code.enter'))
       return
     }
     submitting.current = true
@@ -159,7 +163,7 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
       onClose()
       return
     }
-    setError(codeMessage(r.error))
+    setError(codeMessage(r.error, t))
     if (r.error.reason && CODE_SPENT.has(r.error.reason)) setCode('')
   }
 
@@ -181,7 +185,7 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
       footer={
         <>
           <Button onClick={onClose} disabled={pending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form={formId} variant={destructive ? 'danger' : 'primary'} loading={pending} disabled={!sent}>
             {confirmLabel}
@@ -192,22 +196,22 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
       <form id={formId} onSubmit={(e) => void submit(e)} noValidate className="space-y-4">
         {/* One polite live region announces the sending state, the sent address and a send failure. */}
         <div aria-live="polite">
-          {send.status === 'sending' && <p className="text-ui-body text-ink-muted">Sending a code to your email…</p>}
+          {send.status === 'sending' && <p className="text-ui-body text-ink-muted">{t('settings.code.sending')}</p>}
           {send.status === 'sent' && (
             <p className="text-ui-body text-ink">
-              We emailed a 6-digit code to <strong className="font-medium break-words">{send.sentTo}</strong>. It is valid for 10 minutes.
+              {t('settings.code.sentTo')} <strong className="font-medium break-words">{send.sentTo}</strong>. {t('settings.code.valid')}
             </p>
           )}
           {send.status === 'failed' && (
-            <InlineNotice tone="warning">{send.message}</InlineNotice>
+            <InlineNotice tone="warning">{sendMessage(send.error, t)}</InlineNotice>
           )}
-          {send.status === 'blocked' && <InlineNotice tone="warning">{EMAIL_BLOCKED}</InlineNotice>}
+          {send.status === 'blocked' && <InlineNotice tone="warning">{t('settings.code.emailBlocked')}</InlineNotice>}
         </div>
         {isDemoMode && (
-          <InlineNotice tone="neutral">Demo: no email is sent. Use the code 123456.</InlineNotice>
+          <InlineNotice tone="neutral">{t('settings.code.demo')}</InlineNotice>
         )}
         <div ref={codeField}>
-          <FormField label="6-digit code" error={error ?? undefined}>
+          <FormField label={t('settings.code.label')} error={error ?? undefined}>
             <Input
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -225,9 +229,9 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Button size="sm" variant="ghost" onClick={resend} disabled={!canResend} className="-ml-3!">
-            {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+            {cooldown > 0 ? t('settings.code.resendIn', { n: cooldown }) : t('settings.code.resend')}
           </Button>
-          {cooldown <= 0 && send.status === 'sent' && <span className="text-ui-small text-ink-muted">A new code replaces the last one.</span>}
+          {cooldown <= 0 && send.status === 'sent' && <span className="text-ui-small text-ink-muted">{t('settings.code.replaces')}</span>}
         </div>
       </form>
     </Modal>

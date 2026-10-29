@@ -11,18 +11,26 @@ import { FormField, Input } from '@/components/ui/Form'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
-import { formatDate } from '@/lib/format'
+import { accountErrorText } from '../accountError'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { PASSWORD_MAX, PASSWORD_MIN, type SecurityState, account, auth, isDemoMode } from '@/services'
 import { EMAIL_PATTERN } from '@/services/accountService'
 import { type QueryResult, useServiceQuery } from '@/services/hooks'
 import { ActionCodeDialog } from '../ActionCodeDialog'
 import { useCancelClosure } from '../useCancelClosure'
-import { OWNER_CLOSURE_LINE } from '@/features/businesses/closure'
 import { SectionHeader, SettingsCard } from '../SettingsUi'
 
 type Security = QueryResult<SecurityState>
 
+const CLOSURE_LINE = {
+  inactive: 'settings.account.closureLine.inactive',
+  draft: 'settings.account.closureLine.draft',
+  active: 'settings.account.closureLine.active',
+} as const
+
 export default function AccountSection() {
+  const { t } = useI18n()
   const { user } = useAccount()
   const security = useServiceQuery(() => account.getSecurityState(), [])
   const { refetch } = security
@@ -41,10 +49,10 @@ export default function AccountSection() {
 
   return (
     <>
-      <SectionHeader title="My account" description="Your sign-in email, password and account closure." />
+      <SectionHeader title={t('settings.section.account')} description={t('settings.account.description')} />
       <div className="space-y-6">
         {isDemoMode && (
-          <InlineNotice tone="neutral">Demo: no email is sent, and changes here last until you reload this tab.</InlineNotice>
+          <InlineNotice tone="neutral">{t('settings.account.demoNotice')}</InlineNotice>
         )}
         <EmailCard currentEmail={user?.email ?? ''} security={security} />
         <PasswordCard />
@@ -57,12 +65,13 @@ export default function AccountSection() {
 /* ---------- Email ---------- */
 
 function EmailCard({ currentEmail, security }: { currentEmail: string; security: Security }) {
+  const { t } = useI18n()
   const pendingEmail = security.data?.pendingEmail ?? null
   return (
-    <SettingsCard title="Email" description="The address you sign in with. We send security notices here.">
+    <SettingsCard title={t('settings.account.email')} description={t('settings.account.emailDescription')}>
       <div className="space-y-5">
         <div>
-          <p className="text-ui-small text-ink-muted">Sign-in email</p>
+          <p className="text-ui-small text-ink-muted">{t('settings.account.signInEmail')}</p>
           <p className="mt-0.5 text-ui-body font-medium break-words text-ink">{currentEmail}</p>
         </div>
         {security.status === 'loading' && !security.data ? (
@@ -74,7 +83,7 @@ function EmailCard({ currentEmail, security }: { currentEmail: string; security:
         )}
         {security.status === 'error' && !security.data && (
           <p role="alert" className="text-ui-small text-danger">
-            We couldn't check for a pending email change. {security.error.message}
+            {t('settings.account.pendingCheckFailed')} {accountErrorText(security.error, t)}
           </p>
         )}
       </div>
@@ -83,6 +92,7 @@ function EmailCard({ currentEmail, security }: { currentEmail: string; security:
 }
 
 function EmailForm({ currentEmail, onRequested }: { currentEmail: string; onRequested: () => void }) {
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
@@ -92,9 +102,9 @@ function EmailForm({ currentEmail, onRequested }: { currentEmail: string; onRequ
     e.preventDefault()
     const next = email.trim()
     const found: typeof errors = {}
-    if (!EMAIL_PATTERN.test(next)) found.email = 'Enter a valid email address.'
-    else if (next.toLowerCase() === currentEmail.toLowerCase()) found.email = 'This is already your sign-in email.'
-    if (!password) found.password = 'Enter your current password.'
+    if (!EMAIL_PATTERN.test(next)) found.email = t('common.validation.emailInvalid')
+    else if (next.toLowerCase() === currentEmail.toLowerCase()) found.email = t('settings.account.sameEmail')
+    if (!password) found.password = t('settings.account.enterCurrent')
     setErrors(found)
     if (found.email || found.password) return
     setPending(true)
@@ -107,29 +117,31 @@ function EmailForm({ currentEmail, onRequested }: { currentEmail: string; onRequ
       return
     }
     const reason = r.error.reason
-    if (reason === 'password_incorrect') setErrors({ password: 'Password is incorrect.' })
-    else if (reason === 'email_taken' || reason === 'invalid_email') setErrors({ email: r.error.message })
-    else setErrors({ form: r.error.message })
+    if (reason === 'password_incorrect') setErrors({ password: t('settings.account.passwordIncorrect') })
+    else if (reason === 'email_taken') setErrors({ email: accountErrorText(r.error, t) })
+    else if (reason === 'invalid_email') setErrors({ email: accountErrorText(r.error, t) })
+    else setErrors({ form: accountErrorText(r.error, t) })
   }
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="space-y-4">
-      <p className="text-ui-small text-ink-muted">We send a confirmation link to the new address. Your sign-in email changes once you open it.</p>
-      <FormField label="New email" error={errors.email}>
+      <p className="text-ui-small text-ink-muted">{t('settings.account.emailChangeIntro')}</p>
+      <FormField label={t('settings.account.newEmail')} error={errors.email}>
         <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       </FormField>
-      <FormField label="Current password" error={errors.password}>
+      <FormField label={t('settings.account.currentPassword')} error={errors.password}>
         <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
       </FormField>
       {errors.form && <FormAlert>{errors.form}</FormAlert>}
       <Button type="submit" variant="primary" loading={pending}>
-        Change email
+        {t('settings.account.changeEmail')}
       </Button>
     </form>
   )
 }
 
 function PendingEmail({ currentEmail, pendingEmail, onChanged }: { currentEmail: string; pendingEmail: string; onChanged: () => void }) {
+  const { t } = useI18n()
   const toast = useToast()
   const [resending, setResending] = useState(false)
   const [password, setPassword] = useState('')
@@ -141,60 +153,60 @@ function PendingEmail({ currentEmail, pendingEmail, onChanged }: { currentEmail:
     const r = await account.cancelEmailChange()
     setBusy(null)
     if (!r.ok) {
-      toast.error("Couldn't cancel the email change", r.error.message)
+      toast.error(t('settings.account.cancelEmailFailed'), accountErrorText(r.error, t))
       return
     }
-    toast.success('Email change cancelled', `You keep signing in with ${currentEmail}.`)
+    toast.success(t('settings.account.emailCancelled'), t('settings.account.emailCancelledBody', { email: currentEmail }))
     onChanged()
   }
 
   const resend = async (e: FormEvent) => {
     e.preventDefault()
     if (!password) {
-      setError('Enter your current password.')
+      setError(t('settings.account.enterCurrent'))
       return
     }
     setBusy('resend')
     const r = await account.requestEmailChange(password, pendingEmail)
     setBusy(null)
     if (!r.ok) {
-      setError(r.error.reason === 'password_incorrect' ? 'Password is incorrect.' : r.error.message)
+      setError(r.error.reason === 'password_incorrect' ? t('settings.account.passwordIncorrect') : accountErrorText(r.error, t))
       return
     }
     setPassword('')
     setError(null)
     setResending(false)
-    toast.success('Link sent again', `Check ${pendingEmail} for the new confirmation link.`)
+    toast.success(t('settings.account.linkResent'), t('settings.account.linkResentBody', { email: pendingEmail }))
     onChanged()
   }
 
   return (
     <div role="status" className="space-y-3 rounded-[var(--radius-control)] bg-info-soft px-4 py-3.5 text-ui-body text-ink">
       <p>
-        Confirm your new email: we sent a link to <strong className="font-medium break-words">{pendingEmail}</strong>. Until you open it you sign in
-        with <span className="break-words">{currentEmail}</span>.
+        {t('settings.account.pendingIntro')} <strong className="font-medium break-words">{pendingEmail}</strong>. {t('settings.account.pendingUntil')}{' '}
+        <span className="break-words">{currentEmail}</span>.
       </p>
       {resending ? (
         <form onSubmit={(e) => void resend(e)} noValidate className="space-y-3">
-          <FormField label="Current password" error={error ?? undefined} hint="Needed to send the link again.">
+          <FormField label={t('settings.account.currentPassword')} error={error ?? undefined} hint={t('settings.account.resendHint')}>
             <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </FormField>
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" variant="primary" loading={busy === 'resend'}>
-              Send link again
+              {t('settings.account.sendAgain')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setResending(false)} disabled={busy !== null}>
-              Back
+              {t('common.back')}
             </Button>
           </div>
         </form>
       ) : (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => setResending(true)} disabled={busy !== null}>
-            Resend
+            {t('settings.account.resend')}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => void cancel()} loading={busy === 'cancel'}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       )}
@@ -205,18 +217,16 @@ function PendingEmail({ currentEmail, pendingEmail, onChanged }: { currentEmail:
 /* ---------- Password ---------- */
 
 /** Length is the only rule (spec 8: a strength hint, no composition rules). */
-function lengthHint(n: number): string {
-  if (n === 0) return `Use ${PASSWORD_MIN} to ${PASSWORD_MAX} characters. A longer passphrase is stronger.`
-  if (n < PASSWORD_MIN) {
-    const left = PASSWORD_MIN - n
-    return `Too short: ${left} more ${left === 1 ? 'character' : 'characters'} needed.`
-  }
-  if (n > PASSWORD_MAX) return `Too long: use at most ${PASSWORD_MAX} characters.`
-  if (n < 16) return 'Long enough. Longer is stronger.'
-  return 'Strong length.'
+function lengthHint(n: number, t: ReturnType<typeof useI18n>['t'], tn: ReturnType<typeof useI18n>['tn']): string {
+  if (n === 0) return t('settings.account.pw.range', { min: PASSWORD_MIN, max: PASSWORD_MAX })
+  if (n < PASSWORD_MIN) return tn('settings.account.pw.short', PASSWORD_MIN - n)
+  if (n > PASSWORD_MAX) return t('settings.account.pw.long', { max: PASSWORD_MAX })
+  if (n < 16) return t('settings.account.pw.ok')
+  return t('settings.account.pw.strong')
 }
 
 function PasswordCard() {
+  const { t, tn } = useI18n()
   const toast = useToast()
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
@@ -227,10 +237,10 @@ function PasswordCard() {
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const found: typeof errors = {}
-    if (!current) found.current = 'Enter your current password.'
-    if (next.length < PASSWORD_MIN) found.next = `Use at least ${PASSWORD_MIN} characters.`
-    else if (next.length > PASSWORD_MAX) found.next = `Use at most ${PASSWORD_MAX} characters.`
-    else if (confirmNext !== next) found.confirm = "The passwords don't match."
+    if (!current) found.current = t('settings.account.enterCurrent')
+    if (next.length < PASSWORD_MIN) found.next = t('settings.account.pw.min', { n: PASSWORD_MIN })
+    else if (next.length > PASSWORD_MAX) found.next = t('settings.account.pw.max', { n: PASSWORD_MAX })
+    else if (confirmNext !== next) found.confirm = t('settings.account.pw.mismatch')
     setErrors(found)
     if (Object.keys(found).length) return
     setPending(true)
@@ -240,30 +250,31 @@ function PasswordCard() {
       setCurrent('')
       setNext('')
       setConfirmNext('')
-      toast.success('Password changed. Other devices were signed out.')
+      toast.success(t('settings.account.pw.changed'))
       return
     }
     const reason = r.error.reason
-    if (reason === 'current_password_mismatch') setErrors({ current: r.error.message })
-    else if (reason === 'same_password' || reason === 'weak_password') setErrors({ next: r.error.message })
-    else setErrors({ form: r.error.message })
+    if (reason === 'current_password_mismatch') setErrors({ current: accountErrorText(r.error, t) })
+    else if (reason === 'same_password') setErrors({ next: accountErrorText(r.error, t) })
+    else if (reason === 'weak_password') setErrors({ next: accountErrorText(r.error, t) })
+    else setErrors({ form: accountErrorText(r.error, t) })
   }
 
   return (
-    <SettingsCard title="Password" description="Changing it signs you out on every other device.">
+    <SettingsCard title={t('settings.account.pw.title')} description={t('settings.account.pw.description')}>
       <form onSubmit={(e) => void submit(e)} noValidate className="space-y-4">
-        <FormField label="Current password" error={errors.current}>
+        <FormField label={t('settings.account.currentPassword')} error={errors.current}>
           <Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
         </FormField>
-        <FormField label="New password" error={errors.next} hint={lengthHint(next.length)}>
+        <FormField label={t('settings.account.pw.new')} error={errors.next} hint={lengthHint(next.length, t, tn)}>
           <Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
         </FormField>
-        <FormField label="Confirm new password" error={errors.confirm}>
+        <FormField label={t('settings.account.pw.confirm')} error={errors.confirm}>
           <Input type="password" autoComplete="new-password" value={confirmNext} onChange={(e) => setConfirmNext(e.target.value)} />
         </FormField>
         {errors.form && <FormAlert>{errors.form}</FormAlert>}
         <Button type="submit" variant="primary" loading={pending}>
-          Change password
+          {t('settings.account.pw.change')}
         </Button>
       </form>
     </SettingsCard>
@@ -273,16 +284,15 @@ function PasswordCard() {
 /* ---------- Closure ---------- */
 
 function ClosureCard({ security }: { security: Security }) {
+  const { t } = useI18n()
   const { user } = useAccount()
   const can = useCan()
   if (!user) return null
   if (user.role === 'business_admin') return <BusinessClosure security={security} />
   if (can('owner')) {
     return (
-      <SettingsCard title="Delete account">
-        <p className="text-ui-body text-ink-muted">
-          The platform needs its Owner, so the Owner's account can't be deleted. Admins and team members can delete their own accounts.
-        </p>
+      <SettingsCard title={t('settings.account.delete.title')}>
+        <p className="text-ui-body text-ink-muted">{t('settings.account.delete.ownerNote')}</p>
       </SettingsCard>
     )
   }
@@ -290,6 +300,8 @@ function ClosureCard({ security }: { security: Security }) {
 }
 
 function BusinessClosure({ security }: { security: Security }) {
+  const { t } = useI18n()
+  const fmt = useFormat()
   const { business } = useAccount()
   const confirm = useConfirm()
   const toast = useToast()
@@ -299,15 +311,15 @@ function BusinessClosure({ security }: { security: Security }) {
 
   const start = async () => {
     const go = await confirm({
-      title: 'Request closure?',
+      title: t('settings.account.closure.confirmTitle'),
       body: (
         <ul className="list-disc space-y-1.5 pl-5">
-          <li>Your catalog goes offline now.</li>
-          <li>The platform completes the deletion of your business and account within 30 days.</li>
-          <li>You can cancel the request until then, and your catalog comes back as it was.</li>
+          <li>{t('settings.account.closure.point1')}</li>
+          <li>{t('settings.account.closure.point2')}</li>
+          <li>{t('settings.account.closure.point3')}</li>
         </ul>
       ),
-      confirmLabel: 'Continue',
+      confirmLabel: t('common.continue'),
       destructive: true,
     })
     if (go) setDialog(true)
@@ -315,48 +327,43 @@ function BusinessClosure({ security }: { security: Security }) {
 
   let body: ReactNode
   if (security.status === 'loading' && !security.data) body = <Skeleton className="h-16 w-full" />
-  else if (security.status === 'error' && !security.data) body = <ErrorState message={security.error.message} onRetry={security.refetch} className="py-6" />
+  else if (security.status === 'error' && !security.data) body = <ErrorState message={accountErrorText(security.error, t)} onRetry={security.refetch} className="py-6" />
   else if (closure)
     body = (
       <div className="space-y-3">
         <div role="status" className="rounded-[var(--radius-control)] bg-warning-soft px-4 py-3 text-ui-body text-warning">
-          Closure requested on {formatDate(closure.requestedAt)} · {OWNER_CLOSURE_LINE[business?.status ?? 'inactive']}
+          {t('settings.account.closure.requestedOn', { date: fmt.date(closure.requestedAt) })} · {t(CLOSURE_LINE[business?.status ?? 'inactive'])}
         </div>
-        <p className="text-ui-small text-ink-muted">
-          The platform completes the deletion within 30 days. Cancel before then to keep your account; your catalog returns to its previous status.
-        </p>
+        <p className="text-ui-small text-ink-muted">{t('settings.account.closure.pendingNote')}</p>
         <Button onClick={() => void cancelRequest()} loading={cancelling}>
-          Cancel request
+          {t('settings.account.closure.cancelRequest')}
         </Button>
       </div>
     )
   else
     body = (
       <div className="space-y-4">
-        <p className="text-ui-body text-ink-muted">
-          Your catalog goes offline as soon as you ask. The platform deletes your business and your account within 30 days, and you can cancel
-          until then.
-        </p>
+        <p className="text-ui-body text-ink-muted">{t('settings.account.closure.note')}</p>
         <Button variant="danger" onClick={() => void start()}>
-          Request closure
+          {t('settings.account.closure.request')}
         </Button>
       </div>
     )
 
   return (
-    <SettingsCard title="Close your account" tone="danger">
+    <SettingsCard title={t('settings.account.closure.title')} tone="danger">
       {body}
       <ActionCodeDialog
         open={dialog}
         purpose="request_closure"
-        title="Confirm closure request"
-        description="Enter the code to request closure. Your catalog goes offline straight away."
-        confirmLabel="Request closure"
+        title={t('settings.account.closure.dialogTitle')}
+        description={t('settings.account.closure.dialogBody')}
+        confirmLabel={t('settings.account.closure.request')}
         destructive
         onClose={() => setDialog(false)}
         onConfirm={async (code) => {
           const r = await account.requestClosure(code)
-          if (r.ok) toast.success('Closure requested', 'Your catalog is offline. You can cancel until the platform completes it.')
+          if (r.ok) toast.success(t('settings.account.closure.requested'), t('settings.account.closure.requestedBody'))
           // An open request found by the server shows here too.
           if (r.ok || r.error.reason === 'already_requested') security.refetch()
           return r
@@ -367,6 +374,7 @@ function BusinessClosure({ security }: { security: Security }) {
 }
 
 function StaffDeletion() {
+  const { t } = useI18n()
   const confirm = useConfirm()
   const toast = useToast()
   const navigate = useNavigate()
@@ -375,28 +383,28 @@ function StaffDeletion() {
 
   const start = async () => {
     const go = await confirm({
-      title: 'Delete your account?',
-      body: "Your platform access ends now and you are signed out on every device. This can't be undone.",
-      confirmLabel: 'Continue',
+      title: t('settings.account.delete.confirmTitle'),
+      body: t('settings.account.delete.confirmBody'),
+      confirmLabel: t('common.continue'),
       destructive: true,
     })
     if (go) setDialog(true)
   }
 
   return (
-    <SettingsCard title="Delete account" tone="danger">
+    <SettingsCard title={t('settings.account.delete.title')} tone="danger">
       <div className="space-y-4">
-        <p className="text-ui-body text-ink-muted">Deleting your account ends your platform access straight away and signs you out. This can't be undone.</p>
+        <p className="text-ui-body text-ink-muted">{t('settings.account.delete.note')}</p>
         <Button variant="danger" onClick={() => void start()}>
-          Delete account
+          {t('settings.account.delete.title')}
         </Button>
       </div>
       <ActionCodeDialog
         open={dialog}
         purpose="request_closure"
-        title="Confirm account deletion"
-        description="Enter the code to delete your account."
-        confirmLabel="Delete account"
+        title={t('settings.account.delete.dialogTitle')}
+        description={t('settings.account.delete.dialogBody')}
+        confirmLabel={t('settings.account.delete.title')}
         destructive
         onClose={() => setDialog(false)}
         onConfirm={async (code) => {
@@ -405,7 +413,7 @@ function StaffDeletion() {
           // The server has ended the sessions; logout() ends this one (global, with a local fallback). The account is
           // gone either way, so the person leaves for the sign-in page even when only this device was signed out.
           const out = await logout()
-          toast.info('Your account was deleted', out.signedOut && !out.error ? 'You have been signed out.' : 'You were signed out on this device only.')
+          toast.info(t('settings.account.delete.done'), out.signedOut && !out.error ? t('settings.account.delete.signedOut') : t('settings.account.delete.signedOutHere'))
           // The route guard may get there first (with ?next= back to settings); either way the person lands on sign-in.
           navigate(SIGN_IN_PATH, { replace: true })
           return r

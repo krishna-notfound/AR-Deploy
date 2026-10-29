@@ -107,6 +107,6 @@ describe('Join page (ADR-0030)', () => {
     await user.type(screen.getByLabelText('Password'), 'password1234')
     await user.type(screen.getByLabelText('Confirm password'), 'password1234')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
-    expect(await screen.findByText('Password is known to be weak')).toBeInTheDocument()
+    expect(await screen.findByText('Choose a stronger password.')).toBeInTheDocument()
   })
 })

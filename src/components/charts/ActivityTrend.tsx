@@ -1,6 +1,7 @@
 import { Table2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import type { DailyPoint } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import type { DatePrefs } from '@/lib/format'
 import { useFormat } from '@/lib/useFormat'
 import { Button } from '../ui/Button'
@@ -16,7 +17,7 @@ const KEYS = Object.keys(SERIES) as SeriesKey[]
 export function ActivityTrend({
   data,
   compact,
-  emptyBody = 'Views and AR opens will appear here once people visit your catalog.',
+  emptyBody,
   prefs,
 }: {
   data: DailyPoint[]
@@ -30,16 +31,17 @@ export function ActivityTrend({
   const [show, setShow] = useState<Record<SeriesKey, boolean>>({ views: true, ar: true })
   const lockedHint = useId()
   const f = useFormat()
+  const { t } = useI18n()
   const views = data.reduce((s, d) => s + d.views, 0)
   const ar = data.reduce((s, d) => s + d.arActivations, 0)
   const tableToggle = (
     <Button size="sm" variant="ghost" icon={<Table2 className="size-4" aria-hidden />} onClick={() => setShowTable((v) => !v)} aria-pressed={showTable}>
-      {showTable ? 'Show charts' : 'Show as table'}
+      {showTable ? t('ui.chart.showCharts') : t('ui.chart.showTable')}
     </Button>
   )
 
   // Nothing to plot: a month of zeros would only draw empty axes, so say so the way the other cards do.
-  if (views + ar === 0) return <EmptyState title="No activity in the last 30 days" body={emptyBody} />
+  if (views + ar === 0) return <EmptyState title={t('ui.chart.emptyTitle')} body={emptyBody ?? t('ui.chart.emptyBody')} />
 
   if (compact) {
     const visible = KEYS.filter((k) => show[k]).length
@@ -47,7 +49,7 @@ export function ActivityTrend({
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           {!showTable && (
-            <div role="group" aria-label="Series shown in the chart" className="-ml-2 flex flex-wrap items-center gap-x-1 gap-y-1">
+            <div role="group" aria-label={t('ui.chart.seriesShown')} className="-ml-2 flex flex-wrap items-center gap-x-1 gap-y-1">
               {KEYS.map((k) => {
                 // The chart is never empty: the last visible series stays on. It stays focusable and says why.
                 const locked = show[k] && visible === 1
@@ -68,12 +70,12 @@ export function ActivityTrend({
                       style={{ borderColor: SERIES[k].color, background: show[k] ? SERIES[k].color : 'transparent' }}
                       aria-hidden
                     />
-                    {SERIES[k].label}
+                    {t(SERIES[k].labelKey)}
                   </button>
                 )
               })}
               <span id={lockedHint} className="sr-only">
-                At least one series stays visible
+                {t('ui.chart.oneStays')}
               </span>
             </div>
           )}
@@ -94,8 +96,8 @@ export function ActivityTrend({
             <div key={k}>
               <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
                 <span className="inline-block h-0.5 w-4 shrink-0" style={{ background: SERIES[k].color }} aria-hidden />
-                <span className="font-medium text-ink">{SERIES[k].label}</span>
-                <span className="text-ink-muted tabular-nums">{f.number(k === 'views' ? views : ar)} in 30 days</span>
+                <span className="font-medium text-ink">{t(SERIES[k].labelKey)}</span>
+                <span className="text-ink-muted tabular-nums">{t('ui.chart.in30', { n: f.number(k === 'views' ? views : ar) })}</span>
               </div>
               <TrendChart data={data} series={k} height={160} prefs={prefs} />
             </div>

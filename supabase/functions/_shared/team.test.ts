@@ -15,8 +15,8 @@ describe('team helpers (ADR-0030)', () => {
     expect(await hashSecret('a')).toBe('ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb')
   })
 
-  it('lists the 16 permission keys', () => {
-    expect(PERMISSIONS).toHaveLength(16)
+  it('lists the 17 permission keys', () => {
+    expect(PERMISSIONS).toHaveLength(17)
   })
 
   // R-W6-5: the invitation email lists the role's permissions with the same labels as the dashboards.

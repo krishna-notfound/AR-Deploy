@@ -4,8 +4,9 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import type { ID } from '@/domain/types'
-import { formatDateTime } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { service } from '@/services'
 import { activityMessage } from '@/services/analytics'
 import { useServiceQuery } from '@/services/hooks'
@@ -16,25 +17,26 @@ import { eventLabel } from '../applications/labels'
  * The owner is also emailed about pauses, activations, unpublished and deleted products; this is where they are listed.
  */
 export function PlatformChangesCard({ businessId, className }: { businessId: ID; className?: string }) {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const fmt = useFormat()
   const q = useServiceQuery(() => service.getPlatformChanges(businessId), [businessId])
   return (
-    <Card role="region" aria-label="Changes by the platform team" className={className}>
-      <PanelHeader title="Changes by the platform team" />
+    <Card role="region" aria-label={t('business.platformChanges.title')} className={className}>
+      <PanelHeader title={t('business.platformChanges.title')} />
       <CardBody>
         {q.status === 'loading' && !q.data ? (
           <SkeletonRows rows={3} />
         ) : q.status === 'error' && !q.data ? (
-          <ErrorState message={q.error.message} onRetry={q.refetch} />
+          <ErrorState message={errorText(q.error, t)} onRetry={q.refetch} retryLabel={t('common.retry')} />
         ) : !q.data?.length ? (
-          <EmptyState icon={ShieldCheck} title="No changes by the platform team." className="py-6" />
+          <EmptyState icon={ShieldCheck} title={t('business.platformChanges.empty')} className="py-6" />
         ) : (
           <ol className="space-y-4">
             {q.data.map((e) => (
               <li key={e.id} className="min-w-0">
                 <p className="text-[length:var(--text-ui-body)] leading-snug break-words text-ink">{activityMessage(e) ?? eventLabel(e.eventType, e.metadata)}</p>
                 <p className="mt-0.5 text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
-                  <time dateTime={e.createdAt}>{formatDateTime(e.createdAt, 'en', prefs)}</time> · Sanctus team
+                  <time dateTime={e.createdAt}>{fmt.dateTime(e.createdAt)}</time> · {t('business.platformChanges.team')}
                 </p>
               </li>
             ))}

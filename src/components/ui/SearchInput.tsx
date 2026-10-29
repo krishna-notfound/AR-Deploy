@@ -1,5 +1,6 @@
 import { Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { useInDashboard } from '@/components/layout/dashboardContext'
 import { useFieldProps } from './Form'
@@ -14,7 +15,7 @@ const hasWidth = (c?: string) => !!c && /(^|\s)(\S+:)*(w|max-w|flex)-/.test(c)
 export function SearchInput({
   value,
   onChange,
-  placeholder = 'Search',
+  placeholder,
   label,
   className,
   delay = 250,
@@ -26,6 +27,7 @@ export function SearchInput({
   className?: string
   delay?: number
 }) {
+  const { t } = useI18n()
   const dash = useInDashboard()
   const field = useFieldProps()
   const inField = 'id' in field
@@ -49,7 +51,7 @@ export function SearchInput({
         {...field}
         aria-label={inField ? undefined : label}
         value={draft}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('common.search')}
         onChange={(e) => setDraft(e.target.value)}
         className={
           dash
@@ -60,7 +62,7 @@ export function SearchInput({
       {draft && (
         <button
           type="button"
-          aria-label="Clear search"
+          aria-label={t('ui.search.clear')}
           onClick={() => {
             setDraft('')
             onChangeRef.current('')

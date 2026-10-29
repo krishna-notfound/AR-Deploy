@@ -353,7 +353,7 @@ export type Permission =
   | 'businesses.view' | 'businesses.edit' | 'businesses.status' | 'businesses.delete' | 'owners.manage'
   | 'applications.view' | 'applications.approve' | 'applications.reject'
   | 'products.view' | 'products.edit' | 'products.publish' | 'products.delete' | 'models.manage'
-  | 'analytics.view' | 'records.view' | 'access.view'
+  | 'analytics.view' | 'records.view' | 'access.view' | 'content.manage'
 export type PlatformRole = 'owner' | 'admin' | 'team'
 export type MemberRole = Exclude<PlatformRole, 'owner'>
 export interface PlatformAccess {

@@ -1,4 +1,5 @@
 import { type ReactNode, createContext, useCallback, useContext, useRef, useState } from 'react'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { Button } from './Button'
 import { Modal, isDashboardSurface } from './Modal'
 
@@ -14,6 +15,7 @@ type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>
 const ConfirmContext = createContext<ConfirmFn | null>(null)
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const [opts, setOpts] = useState<ConfirmOptions | null>(null)
   const [dash, setDash] = useState(false) // read when the dialog opens, not on every render
   const resolver = useRef<((v: boolean) => void) | null>(null)
@@ -43,7 +45,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         footer={
           <>
             <Button onClick={() => settle(false)} data-autofocus>
-              {opts?.cancelLabel ?? 'Cancel'}
+              {opts?.cancelLabel ?? t('common.cancel')}
             </Button>
             <Button variant={opts?.destructive ? 'danger' : 'primary'} onClick={() => settle(true)}>
               {opts?.confirmLabel}
