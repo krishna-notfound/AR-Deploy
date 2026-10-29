@@ -432,9 +432,9 @@ export interface ApplicationRow {
   applicant_email: string
   applicant_phone: string | null
   website: string | null
-  country: string
-  city: string
-  category: string
+  country: string | null
+  city: string | null
+  category: string | null
   language: Lang
   answers: BusinessApplication['answers'] | null
   decision_reason: string | null
@@ -501,9 +501,9 @@ const toApplication = (r: ApplicationRow): BusinessApplication => ({
   applicantEmail: r.applicant_email,
   applicantPhone: r.applicant_phone ?? undefined,
   website: r.website ?? undefined,
-  country: r.country,
-  city: r.city,
-  category: r.category,
+  country: r.country ?? undefined,
+  city: r.city ?? undefined,
+  category: (r.category ?? undefined) as BusinessApplication['category'],
   language: r.language,
   answers: r.answers ?? {},
   decisionReason: r.decision_reason ?? undefined,
@@ -577,6 +577,10 @@ const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string 
   invalid_transition: { code: 'CONFLICT', message: 'This application can no longer change to that status.' },
   reopen_not_allowed: REOPEN_NOT_ALLOWED_ERROR,
   application_not_found: { code: 'NOT_FOUND', message: 'Application not found.' },
+  // submit-application with the form builder (ADR-0043): the form was republished while the visitor typed, or the
+  // published form could not be read. Both keep their reason so the page can react (reload the form, or retry).
+  form_changed: { code: 'CONFLICT', message: 'The form was updated. Please check the new questions.' },
+  config_unavailable: { code: 'UNKNOWN', message: 'The application could not be sent. Try again in a moment.' },
 }
 
 export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService {
@@ -638,6 +642,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     const known = payload.error ? FUNCTION_ERRORS[payload.error] : undefined
     // A refusal that can be retried later (owner invitations) keeps its reason and time.
     if (known && typeof payload.retryAt === 'string') return { ok: false, error: { code: known.code, message: known.message, reason: payload.error, retryAt: payload.retryAt } }
+    if (known && (payload.error === 'form_changed' || payload.error === 'config_unavailable')) return { ok: false, error: { code: known.code, message: known.message, reason: payload.error } }
     if (known) return fail(known.code, payload.message ?? known.message, payload.fields)
     return fail('UNKNOWN', 'The request could not be completed. Try again in a moment.')
   }
