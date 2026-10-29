@@ -39,7 +39,7 @@ export default function AdminProductsPage() {
   return (
     <>
       <PageHeader
-        title={t('nav.allProducts')}
+        title={t('admin.products.title')}
         actions={
           can('products.edit') && (
             <Button variant="primary" icon={<PackagePlus className="size-4" aria-hidden />} onClick={addProduct}>

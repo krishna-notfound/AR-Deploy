@@ -216,6 +216,7 @@ export const enAdmin = {
   'admin.catalogs.business': 'Business',
   'admin.businesses.create.title': 'Create business',
   'admin.businesses.create.description': 'Set up a business profile and its catalog address. You can add products right after.',
+  'admin.products.title': 'All products',
   'admin.products.add': 'Add product',
   'admin.products.noMatchTitle': 'No products match these filters',
   'admin.products.noMatchBody': 'Try another search, business or status.',

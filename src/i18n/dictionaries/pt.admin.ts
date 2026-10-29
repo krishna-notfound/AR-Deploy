@@ -217,6 +217,7 @@ export const ptAdmin: Partial<Record<TranslationKey, string>> = {
   'admin.catalogs.business': 'Empresa',
   'admin.businesses.create.title': 'Criar empresa',
   'admin.businesses.create.description': 'Configure o perfil da empresa e o endereço do catálogo. Pode adicionar produtos logo a seguir.',
+  'admin.products.title': 'Todos os produtos',
   'admin.products.add': 'Adicionar produto',
   'admin.products.noMatchTitle': 'Nenhum produto corresponde a estes filtros',
   'admin.products.noMatchBody': 'Experimente outra pesquisa, empresa ou estado.',
