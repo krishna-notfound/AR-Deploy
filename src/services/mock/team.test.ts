@@ -251,4 +251,19 @@ describe('team (demo service): the database rules (S1.5 R-W8-5)', () => {
     expect(upgradeDemoTeam(fresh)).toBe(false)
     expect(fresh.team!.rolePermissions.admin).toContain('models.manage')
   })
+
+  it('ADR-0043: a stored demo Admin set that predates the Content Editor gains content.manage once on load', () => {
+    const old = createSeed()
+    const t = old.team!
+    delete t.contentManageBackfilled
+    t.rolePermissions.admin = t.rolePermissions.admin.filter((p) => p !== 'content.manage')
+    expect(upgradeDemoTeam(old)).toBe(true)
+    expect(t.rolePermissions.admin).toContain('content.manage')
+    expect(t.rolePermissions.team).not.toContain('content.manage')
+    expect(t.events[0]).toMatchObject({ action: 'permissions_changed', details: 'Admin: +content.manage' })
+    t.rolePermissions.admin = t.rolePermissions.admin.filter((p) => p !== 'content.manage')
+    expect(upgradeDemoTeam(old)).toBe(false)
+    expect(t.rolePermissions.admin).not.toContain('content.manage')
+    expect(createSeed().team!.rolePermissions.admin).toContain('content.manage')
+  })
 })
