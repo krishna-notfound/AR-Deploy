@@ -79,7 +79,7 @@ export const EMAIL_KIND_LABEL: Record<string, string> = Object.fromEntries(EMAIL
 export const eventLabel = (type: string, metadata?: Record<string, unknown>, lang: Lang = 'en'): string =>
   type === 'business_own_models_changed'
     ? translate(lang, metadata?.to === true ? 'applications.event.ownModelsOn' : 'applications.event.ownModelsOff')
-    : word(lang, `applications.event.${type}`, type.replace(/_/g, ' '))
+    : word(lang, `applications.event.${type}`, word(lang, `editor.audit.${type}`, type.replace(/_/g, ' ')))
 
 export const statusWord = (s?: string, lang: Lang = 'en'): string => (s ? word(lang, `applications.status.${s}`, s) : '')
 

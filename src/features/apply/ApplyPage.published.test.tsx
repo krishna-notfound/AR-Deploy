@@ -97,19 +97,6 @@ describe('ApplyPage with published content', () => {
     read.mockRestore()
   })
 
-  it('the draft preview never sends the application', async () => {
-    await publishForm(() => {}, false)
-    asStaff()
-    const submit = vi.spyOn(service, 'submitApplication')
-    renderApply(['/apply?step=review'], 'draft')
-    // The preview keeps no draft, so it starts at step one, and the send button of the last step is the Preview button.
-    await stepHeading('Your business')
-    expect(screen.queryByRole('button', { name: 'Send application' })).not.toBeInTheDocument()
-    expect(submit).not.toHaveBeenCalled()
-    expect(sessionStorage.getItem('sanctus:apply:draft')).toBeNull()
-    submit.mockRestore()
-  })
-
   it('sends to the demo service with the published rules: hidden country and city are stored as not given, and approval works', async () => {
     await publishForm((c) => {
       for (const k of ['country', 'city']) c.fields.find((f) => f.key === k)!.hidden = true

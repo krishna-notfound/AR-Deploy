@@ -1,13 +1,12 @@
-import { useContext, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { InlineNotice } from '@/components/ui/States'
 import { useI18n } from '@/i18n/LanguageProvider'
-import { SiteContentSourceContext, usePublishedApplyForm } from '@/services/contentHooks'
+import { usePublishedApplyForm } from '@/services/contentHooks'
 import { AuthLayout } from '../auth/AuthLayout'
 import { LegalLinks } from '../legal/LegalLinks'
-import { ApplyDone } from './ApplyDone'
 import { ApplyForm } from './ApplyForm'
 import { makeApplyTexts } from './applyText'
 
@@ -34,12 +33,11 @@ function FormSkeleton({ label }: { label: string }) {
 
 /**
  * Public application form (design/24, spec section 10). The steps, fields, questions and wording come from the published
- * form (Editor); nothing published, or a failed read, shows the built-in form. In the Editor's draft preview
- * (`SiteContentSourceContext` = 'draft') nothing is ever sent.
+ * form (Editor); nothing published, or a failed read, shows the built-in form. The Editor's preview renders this page
+ * with the draft (SiteContentSourceContext) and answers the submit call itself (previewGuard).
  */
 export default function ApplyPage() {
   const { t, lang } = useI18n()
-  const preview = useContext(SiteContentSourceContext) === 'draft'
   const { config, version, loading, error, reload } = usePublishedApplyForm()
   // Only the first read shows the skeleton; a reload after a 409 keeps the form and the answers on screen.
   const [loaded, setLoaded] = useState(false)
@@ -48,7 +46,7 @@ export default function ApplyPage() {
   useDocumentTitle(tx.text('apply.title'))
 
   return (
-    <AuthLayout photo="sofa" wide footer={<LegalLinks linkClassName="transition-colors hover:text-ink" />}>
+    <AuthLayout photo="sofa" wide footer={<LegalLinks social linkClassName="transition-colors hover:text-ink" />}>
       {!loaded ? (
         <FormSkeleton label={t('common.loading')} />
       ) : (
@@ -61,22 +59,9 @@ export default function ApplyPage() {
               </Button>
             </InlineNotice>
           )}
-          <ApplyForm config={config} version={version} preview={preview} onStale={reload} />
+          <ApplyForm config={config} version={version} onStale={reload} />
         </>
       )}
-    </AuthLayout>
-  )
-}
-
-/** The thank-you screen with a sample reference: the Editor's `preview/apply/done`. Nothing is sent. */
-export function ApplyDonePreview() {
-  const { lang, t } = useI18n()
-  const { config, loading } = usePublishedApplyForm()
-  const tx = useMemo(() => makeApplyTexts(config, lang), [config, lang])
-  useDocumentTitle(tx.text('apply.done.title'))
-  return (
-    <AuthLayout photo="sofa" wide footer={<LegalLinks linkClassName="transition-colors hover:text-ink" />}>
-      {loading ? <FormSkeleton label={t('common.loading')} /> : <ApplyDone done={{ reference: 'SAMPLE01', email: 'name@example.com' }} tx={tx} />}
     </AuthLayout>
   )
 }
