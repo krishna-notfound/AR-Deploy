@@ -104,4 +104,6 @@ export const ptUi: Partial<Record<TranslationKey, string>> = {
   'ui.loading': 'A carregar',
   'ui.notice.pausedTitle': 'O seu catálogo está em pausa.',
   'ui.notice.pausedBody': 'Os clientes que lerem o seu código QR ou abrirem as suas ligações veem «catálogo indisponível». Contacte a equipa da plataforma para o reativar.',
+  'ui.ua.unknown': 'Dispositivo desconhecido',
+  'ui.ua.browserOnSystem': '{browser} em {system}',
 }

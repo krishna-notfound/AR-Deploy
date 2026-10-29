@@ -41,3 +41,9 @@ export function pickLocalized(text: LocalizedText | undefined, lang: Lang): { te
   if (v && v.trim()) return { text: v, lang, isFallback: false }
   return { text: text.en, lang: 'en', isFallback: lang !== 'en' }
 }
+
+/** The shape of `useI18n().t`, for helpers that take a translator. */
+export type TFn = (key: TranslationKey, vars?: Vars) => string
+
+/** English translator: the default for a helper's optional `t` argument, so callers that omit it stay English. */
+export const tEn: TFn = (key, vars) => translate('en', key, vars)

@@ -102,4 +102,6 @@ export const enUi = {
   'ui.loading': 'Loading',
   'ui.notice.pausedTitle': 'Your catalog is paused.',
   'ui.notice.pausedBody': 'Customers who scan your QR code or open your links see “catalog unavailable”. Contact the platform team to reactivate it.',
+  'ui.ua.unknown': 'Unknown device',
+  'ui.ua.browserOnSystem': '{browser} on {system}',
 } as const

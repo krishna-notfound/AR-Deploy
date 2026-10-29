@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { translate } from '@/i18n/translate'
 import { describeUserAgent } from './userAgent'
 
 const UA = {
@@ -35,5 +36,13 @@ describe('describeUserAgent', () => {
     expect(describeUserAgent(null)).toBe('Unknown device')
     expect(describeUserAgent('')).toBe('Unknown device')
     expect(describeUserAgent('curl/8.4.0')).toBe('Unknown device')
+  })
+})
+
+describe('describeUserAgent in Portuguese', () => {
+  const pt = (key: Parameters<typeof translate>[1], vars?: Parameters<typeof translate>[2]) => translate('pt', key, vars)
+  it('words the sentence in pt-PT', () => {
+    expect(describeUserAgent(UA.windowsChrome, pt)).toBe('Chrome em Windows')
+    expect(describeUserAgent(null, pt)).toBe('Dispositivo desconhecido')
   })
 })

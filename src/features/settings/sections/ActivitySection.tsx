@@ -84,7 +84,7 @@ export default function ActivitySection() {
                 <div className="min-w-0">
                   <p className="text-ui-body font-medium text-ink">{securityEventLabel(e, t)}</p>
                   <p className="text-ui-small break-words text-ink-muted">
-                    {describeUserAgent(e.userAgent)}
+                    {describeUserAgent(e.userAgent, t)}
                     {e.ip && <> · IP {e.ip}</>}
                   </p>
                 </div>
