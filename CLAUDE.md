@@ -14,7 +14,7 @@ It runs in **demo mode** by default (a mock service layer, no setup). **Supabase
 ## Facts and live state: no guessing
 - State as current only what you checked in this session. Anything from docs, memory or an earlier session: give its source and date and say it is unverified ("last known 2026-10-20 QA note, not checked"). Never list an unverified item as a confirmed blocker.
 - Read-only checks you can run: migrations `npx supabase migration list --linked`; functions `npx supabase functions list --project-ref zggylkbgajamhriebdrg`; secret names `npx supabase secrets list --project-ref zggylkbgajamhriebdrg -o json` (names only, never print values); deploy status `gh api repos/{owner}/{repo}/commits/<sha>/statuses`; the live site with curl or Playwright.
-- Cannot be checked from here, so ask the owner: Supabase Auth settings (Site URL, redirect URLs, security switches; the owner's role is below Admin), secret values, Vercel env vars and domains (the Vercel MCP gets 403 on team track0), and AR on a real phone.
+- Cannot be checked from here, so ask the owner: Supabase Auth settings (Site URL, redirect URLs, security switches; the owner has the Administrator role in the client's Supabase organisation (owner, 2026-10-29) and can check them in the dashboard, but the Supabase MCP login failed earlier and the CLI cannot read them), secret values, Vercel env vars and domains (the Vercel MCP gets 403 on team track0), and AR on a real phone.
 
 ## Recording decisions (owner, 2026-10-27: "every decision should be stored")
 - Record each decision in the same change that carries it out, never later:
