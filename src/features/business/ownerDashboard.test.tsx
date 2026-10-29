@@ -311,3 +311,14 @@ describe("S2 Task 2: the owner's closure line follows the real status (R-W3-6)",
     expect(await screen.findByText(/^Closure requested on .+ · Your catalog is not public yet\.$/, {}, { timeout: 15_000 })).toBeInTheDocument()
   })
 })
+
+describe('T6: business dashboard in Portuguese', () => {
+  it('the Overview shows the Portuguese title, add button and card headings', { timeout: 20_000 }, async () => {
+    localStorage.setItem('arfurn:lang', 'pt')
+    openApp('/dashboard', asOwner('biz_casa'))
+    await screen.findByRole('heading', { name: 'Visão geral', level: 1 }, { timeout: 15_000 })
+    expect(screen.getByRole('link', { name: /Adicionar produto/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Produtos mais vistos' }, { timeout: 15_000 })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Overview' })).toBeNull()
+  })
+})
