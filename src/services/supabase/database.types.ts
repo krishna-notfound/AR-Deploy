@@ -123,9 +123,9 @@ export type Database = {
           business_deleted_at: string | null
           business_id: string | null
           business_name: string
-          category: string
-          city: string
-          country: string
+          category: string | null
+          city: string | null
+          country: string | null
           created_at: string
           decision_reason: string | null
           id: string
@@ -147,9 +147,9 @@ export type Database = {
           business_deleted_at?: string | null
           business_id?: string | null
           business_name: string
-          category: string
-          city: string
-          country: string
+          category?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           decision_reason?: string | null
           id?: string
@@ -171,9 +171,9 @@ export type Database = {
           business_deleted_at?: string | null
           business_id?: string | null
           business_name?: string
-          category?: string
-          city?: string
-          country?: string
+          category?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           decision_reason?: string | null
           id?: string
@@ -978,6 +978,63 @@ export type Database = {
         }
         Relationships: []
       }
+      site_content: {
+        Row: {
+          draft: Json
+          draft_updated_at: string
+          draft_updated_by: string | null
+          id: boolean
+          published: Json | null
+          published_at: string | null
+          published_by: string | null
+          published_version: number
+        }
+        Insert: {
+          draft?: Json
+          draft_updated_at?: string
+          draft_updated_by?: string | null
+          id?: boolean
+          published?: Json | null
+          published_at?: string | null
+          published_by?: string | null
+          published_version?: number
+        }
+        Update: {
+          draft?: Json
+          draft_updated_at?: string
+          draft_updated_by?: string | null
+          id?: boolean
+          published?: Json | null
+          published_at?: string | null
+          published_by?: string | null
+          published_version?: number
+        }
+        Relationships: []
+      }
+      site_content_versions: {
+        Row: {
+          content: Json
+          published_at: string
+          published_by: string | null
+          published_by_name: string
+          version: number
+        }
+        Insert: {
+          content: Json
+          published_at?: string
+          published_by?: string | null
+          published_by_name: string
+          version: number
+        }
+        Update: {
+          content?: Json
+          published_at?: string
+          published_by?: string | null
+          published_by_name?: string
+          version?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       business_product_counts: {
@@ -1036,6 +1093,28 @@ export type Database = {
         Returns: Json
       }
       admin_get_member: { Args: { p_member: string }; Returns: Json }
+      admin_get_site_content: { Args: never; Returns: Json }
+      admin_list_site_content_versions: {
+        Args: never
+        Returns: {
+          published_at: string
+          published_by_name: string
+          version: number
+        }[]
+      }
+      admin_publish_site_content: { Args: { p_base: string }; Returns: Json }
+      admin_restore_site_content_version: {
+        Args: { p_base: string; p_version: number }
+        Returns: string
+      }
+      admin_save_site_content_draft: {
+        Args: { p_base: string; p_content: Json }
+        Returns: string
+      }
+      get_published_site_content: {
+        Args: { p_part: string; p_slug?: string }
+        Returns: Json
+      }
       admin_invite_member: {
         Args: {
           p_email: string

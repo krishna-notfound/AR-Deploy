@@ -11,6 +11,8 @@ export interface DemoTeam {
   tokens: Record<string, { memberId: string; inviteId: string }>
   /** S4 R-S4-1: the Admin set has had its one-time models.manage backfill (absent in demo data saved before S4). */
   modelsManageBackfilled?: boolean
+  /** Content Editor (ADR-0043): the Admin set has had its one-time content.manage backfill (absent in demo data saved before). */
+  contentManageBackfilled?: boolean
 }
 
 /** A recorded access event plus the exact ids a member's history filters on (R-W6-4), as the database stores them. */
@@ -71,5 +73,6 @@ export function createDemoTeam(now: number = Date.now()): DemoTeam {
     ],
     tokens: { [DEMO_INVITE_TOKEN]: { memberId: 'mem_marta', inviteId: 'inv_marta' } },
     modelsManageBackfilled: true,
+    contentManageBackfilled: true,
   }
 }

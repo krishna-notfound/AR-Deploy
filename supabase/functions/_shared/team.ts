@@ -2,12 +2,12 @@
 // Web-standard APIs only, so it runs in Edge Functions and under Vitest.
 import { sha256Hex } from './http.ts'
 
-/** The 16 permission keys; the same list as the platform_role_permissions check constraint. */
+/** The 17 permission keys; the same list as the platform_role_permissions check constraint. */
 export const PERMISSIONS = [
   'businesses.view', 'businesses.edit', 'businesses.status', 'businesses.delete', 'owners.manage',
   'applications.view', 'applications.approve', 'applications.reject',
   'products.view', 'products.edit', 'products.publish', 'products.delete', 'models.manage',
-  'analytics.view', 'records.view', 'access.view',
+  'analytics.view', 'records.view', 'access.view', 'content.manage',
 ] as const
 
 export type MemberRole = 'admin' | 'team'
@@ -33,6 +33,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   'analytics.view': 'View analytics',
   'records.view': 'View the audit log and email log',
   'access.view': 'View access history',
+  'content.manage': 'Edit website content',
 }
 
 /** The labels of a role's permissions, in the dashboard order; unknown keys are left out. */

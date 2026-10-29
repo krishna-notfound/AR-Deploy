@@ -53,21 +53,31 @@ export function demoViewer(): { role: 'super_admin' } | { role: 'business_admin'
 const team = (db: Db): DemoTeam => (db.team ??= createDemoTeam())
 
 /**
- * S4 R-S4-1, as the SQL backfill: demo data saved before S4 gets models.manage (and any prerequisite it lacks) in the
- * Admin set once, with an access event. Team is unchanged. Answers whether it changed anything; a set the Owner
- * changes afterwards is left alone.
+ * One-time Admin backfills, as the SQL migrations do (S4 R-S4-1 models.manage; Content Editor ADR-0043 content.manage):
+ * demo data saved before a key existed gets it (and any prerequisite it lacks) in the Admin set once, with an access
+ * event. Team is unchanged. Answers whether it changed anything; a set the Owner changes afterwards is left alone.
  */
+const BACKFILLS = [
+  { flag: 'modelsManageBackfilled', key: 'models.manage' },
+  { flag: 'contentManageBackfilled', key: 'content.manage' },
+] as const
+
 export function upgradeDemoTeam(db: Db): boolean {
   const t = db.team
-  if (!t || t.modelsManageBackfilled) return false
-  t.modelsManageBackfilled = true
-  const prev = t.rolePermissions.admin
-  const added = withPrerequisites([...prev, 'models.manage']).filter((p) => !prev.includes(p))
-  if (added.length) {
-    t.rolePermissions.admin = [...prev, ...added]
-    t.events.unshift({ id: newId('acc'), at: nowIso(), actor: 'system', member: null, action: 'permissions_changed', outcome: 'ok', details: `Admin: ${added.map((p) => `+${p}`).join(', ')}` })
+  if (!t) return false
+  let changed = false
+  for (const { flag, key } of BACKFILLS) {
+    if (t[flag]) continue
+    t[flag] = true
+    changed = true
+    const prev = t.rolePermissions.admin
+    const added = withPrerequisites([...prev, key]).filter((p) => !prev.includes(p))
+    if (added.length) {
+      t.rolePermissions.admin = [...prev, ...added]
+      t.events.unshift({ id: newId('acc'), at: nowIso(), actor: 'system', member: null, action: 'permissions_changed', outcome: 'ok', details: `Admin: ${added.map((p) => `+${p}`).join(', ')}` })
+    }
   }
-  return true
+  return changed
 }
 const effective = (i: MemberInvite) => (LIVE.has(i.status) && Date.parse(i.expiresAt) <= Date.now() ? 'expired' : i.status)
 const nowIso = () => new Date().toISOString()
@@ -432,5 +442,8 @@ export function createMockTeam(run: Run): TeamMethods {
   }
 }
 
-// S4 R-S4-1: upgrade demo data saved before S4 once, when this module loads (after every declaration above).
-if (store.get().team && !store.get().team?.modelsManageBackfilled) store.update((d) => void upgradeDemoTeam(d))
+// S4 R-S4-1 and ADR-0043: upgrade demo data saved before these keys once, when this module loads (after every declaration above).
+{
+  const t = store.get().team
+  if (t && (!t.modelsManageBackfilled || !t.contentManageBackfilled)) store.update((d) => void upgradeDemoTeam(d))
+}

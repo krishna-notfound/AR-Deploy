@@ -180,14 +180,15 @@ describe('S4 Task 1: permission, switch, tables, bucket', () => {
     }
   }, 120_000)
 
-  it("the Owner's my_platform_access().permissions has length 16 after Admin and Team sets are both {}", async () => {
+  it("the Owner's my_platform_access().permissions has length 17 after Admin and Team sets are both {}", async () => {
     const saved = (await db.query<{ role: string; permission: string }>('select role::text, permission from public.platform_role_permissions')).rows
     try {
       await db.query('delete from public.platform_role_permissions')
       const owner = (await h.call(f.owner, 'select public.my_platform_access() as r')) as { role: string; permissions: string[] }
       expect(owner.role).toBe('owner')
-      expect(owner.permissions).toHaveLength(16)
+      expect(owner.permissions).toHaveLength(17) // 16 from S4, plus content.manage (Content Editor)
       expect(owner.permissions).toContain('models.manage')
+      expect(owner.permissions).toContain('content.manage')
       expect(await h.call(f.admin, 'select public.my_platform_access() as r')).toEqual({ role: 'admin', permissions: [] })
     } finally {
       for (const r of saved) await db.query('insert into public.platform_role_permissions (role, permission) values ($1::public.platform_role, $2)', [r.role, r.permission])

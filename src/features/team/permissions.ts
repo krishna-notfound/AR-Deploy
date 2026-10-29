@@ -1,4 +1,4 @@
-// The 16 platform permissions (ADR-0029) as the dashboards show them: labels, groups, warnings and defaults.
+// The 17 platform permissions (ADR-0029) as the dashboards show them: labels, groups, warnings and defaults.
 // The database holds the same keys (platform_role_permissions check constraint); this is the single UI source.
 import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from '@/domain/permissions'
 import type { MemberRole, Permission, PlatformRole } from '@/domain/types'
@@ -57,6 +57,12 @@ export const PERMISSION_GROUPS: { title: string; items: PermissionItem[] }[] = [
       { key: 'analytics.view', label: 'View analytics', description: 'Product views and AR launches, across the platform and per business.' },
       { key: 'records.view', label: 'View the audit log and email log', description: 'Every recorded change and every email the platform sent.' },
       { key: 'access.view', label: 'View access history', description: 'Invitations, role and permission changes, and refused attempts.' },
+    ],
+  },
+  {
+    title: 'Website content',
+    items: [
+      { key: 'content.manage', label: 'Edit website content', description: 'Edit pages, the application form and social links, and publish them.' },
     ],
   },
 ]

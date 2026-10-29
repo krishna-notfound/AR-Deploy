@@ -6,7 +6,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   'businesses.view', 'businesses.edit', 'businesses.status', 'businesses.delete', 'owners.manage',
   'applications.view', 'applications.approve', 'applications.reject',
   'products.view', 'products.edit', 'products.publish', 'products.delete', 'models.manage',
-  'analytics.view', 'records.view', 'access.view',
+  'analytics.view', 'records.view', 'access.view', 'content.manage',
 ]
 
 export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
@@ -38,6 +38,8 @@ export const PERMISSION_PREREQUISITES: Readonly<Record<Permission, readonly Perm
   'analytics.view': [],
   'records.view': [],
   'access.view': [],
+  // Content Editor (ADR-0043): needs no other permission to be usable.
+  'content.manage': [],
 }
 
 /** `set` plus every permission it needs (transitive closure), once each, in the order of ALL_PERMISSIONS. */
