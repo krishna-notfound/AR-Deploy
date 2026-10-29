@@ -11,16 +11,17 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business } from '@/domain/types'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { modelRequestsAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
-import { LOAD_ERROR } from '../modelRequests/copy'
-
-const HINT_ON = 'The business can upload its own GLB and USDZ files, and can still request models.'
-const HINT_OFF = "The business requests 3D models from the Sanctus team and can't add, replace or remove 3D files itself."
 
 export function BusinessModelsCard({ business, onChanged }: { business: Business; onChanged?: () => void }) {
+  const { t, tn } = useI18n()
+  const f = useFormat()
   const can = useCan()
   const manage = can('models.manage')
   const confirm = useConfirm()
@@ -42,10 +43,10 @@ export function BusinessModelsCard({ business, onChanged }: { business: Business
     if (saving) return
     if (!next) {
       const yes = await confirm({
-        title: `Stop ${business.name} uploading its own 3D files?`,
-        body: 'Its current 3D files stay on its products and public pages. From now on only the Sanctus team can change them, and the business requests new models.',
-        confirmLabel: 'Turn off',
-        cancelLabel: 'Cancel',
+        title: t('admin.businesses.models.stopTitle', { name: business.name }),
+        body: t('admin.businesses.models.stopBody'),
+        confirmLabel: t('admin.businesses.models.turnOff'),
+        cancelLabel: t('common.cancel'),
         destructive: true,
       })
       if (!yes) return
@@ -54,34 +55,34 @@ export function BusinessModelsCard({ business, onChanged }: { business: Business
     const r = await service.setBusinessOwnModels(business.id, next)
     setSaving(false)
     if (r.ok) {
-      toast.success('Saved')
+      toast.success(t('common.saved'))
       onChanged?.()
-    } else toast.error("Couldn't save the change", r.error.message)
+    } else toast.error(t('admin.businesses.models.saveFailed'), errorText(r.error, t))
   }
 
   return (
     <Card>
-      <PanelHeader title="3D models" />
+      <PanelHeader title={t('admin.businesses.models.title')} />
       <CardBody className="space-y-4 pt-0">
         {manage ? (
           <>
-            <Switch label="Can upload its own 3D files" description={allowed ? HINT_ON : HINT_OFF} checked={allowed} disabled={saving} onChange={(v) => void change(v)} />
+            <Switch label={t('admin.businesses.models.switch')} description={t(allowed ? 'admin.businesses.models.hintOn' : 'admin.businesses.models.hintOff')} checked={allowed} disabled={saving} onChange={(v) => void change(v)} />
             <div className="border-t border-line pt-4 text-ui-body">
               {open.status === 'loading' && open.data === undefined ? (
                 <Skeleton className="h-5 w-40" />
               ) : open.status === 'error' && open.data === undefined ? (
-                <ErrorState message={LOAD_ERROR} onRetry={open.refetch} retryLabel="Retry" className="py-2" />
+                <ErrorState message={t('admin.businesses.models.loadError')} onRetry={open.refetch} retryLabel={t('common.retry')} className="py-2" />
               ) : open.data ? (
                 <Link to={modelRequestsAdminPath({ status: 'open', businessId: business.id })} className="font-medium text-accent-ink hover:underline">
-                  {open.data === 1 ? '1 open request' : `${open.data} open requests`}
+                  {tn('admin.businesses.models.openRequests', open.data, { n: f.number(open.data) })}
                 </Link>
               ) : (
-                <p className="text-ink-muted">No open requests</p>
+                <p className="text-ink-muted">{t('admin.businesses.models.noOpen')}</p>
               )}
             </div>
           </>
         ) : (
-          <p className="text-ui-body text-ink-muted">Own 3D uploads: {allowed ? 'allowed' : 'not allowed'}. Changing this needs 'Handle 3D model requests'.</p>
+          <p className="text-ui-body text-ink-muted">{t(allowed ? 'admin.businesses.models.readOnlyAllowed' : 'admin.businesses.models.readOnlyNotAllowed')}</p>
         )}
       </CardBody>
     </Card>

@@ -175,9 +175,10 @@ describe('validation messages follow the language', () => {
         </ToastProvider>
       </LanguageProvider>,
     )
-    const description = await screen.findByLabelText('Description')
+    expect(await screen.findByText('Perfil da empresa')).toBeInTheDocument()
+    const description = await screen.findByLabelText('Descrição')
     fireEvent.change(description, { target: { value: 'd'.repeat(1001) } })
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar alterações' }))
     expect(await screen.findByText('Use 1000 caracteres ou menos.')).toBeInTheDocument()
   })
 })

@@ -102,7 +102,7 @@ describe('BusinessModelsCard', () => {
     await renderCard(await business('biz_casa'))
     expect(await screen.findByText("Couldn't load 3D model requests.")).toBeInTheDocument()
     spy.mockResolvedValue(ok({ items: [], total: 1 }))
-    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByRole('link', { name: /1 open request$/ })).toBeInTheDocument()
   })
 

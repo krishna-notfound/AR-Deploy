@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { type Business, type BusinessStatus, CURRENCIES, type Currency } from '@/domain/types'
-import { fieldText } from '@/i18n/errorText'
+import { errorText, fieldText } from '@/i18n/errorText'
 import type { FieldError } from '@/i18n/fieldMessage'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { slugInput, slugify } from '@/lib/slug'
@@ -92,23 +92,23 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
     const local = validateBusiness(payload, [])
     if (Object.keys(local).length) {
       setErrors(local)
-      toast.error(business ? 'Could not save changes' : 'Could not create business', 'Please fix the highlighted fields.')
+      toast.error(t(business ? 'admin.businesses.form.saveFailed' : 'admin.businesses.form.createFailed'), t('admin.businesses.form.fixFields'))
       return
     }
     const patch = business ? changedBusinessFields(payload, JSON.parse(snapshot) as BusinessInput, mode === 'owner' ? OWNER_FIELDS : undefined) : null
     if (business && patch?.slug !== undefined && patch.slug !== business.slug) {
       const ok = await confirm({
-        title: 'Change the catalog address?',
+        title: t('admin.businesses.form.changeAddressTitle'),
         body: (
           <>
             <p>
-              The catalog moves from <strong className="font-medium text-ink break-all">{catalogPublicUrl(business)}</strong> to{' '}
+              {t('admin.businesses.form.moveFrom')} <strong className="font-medium text-ink break-all">{catalogPublicUrl(business)}</strong> {t('admin.businesses.form.moveTo')}{' '}
               <strong className="font-medium text-ink break-all">{catalogPublicUrl({ slug: patch.slug })}</strong>.
             </p>
-            <p className="mt-2">Printed QR codes and shared links to the old address will stop working. You will need to print new QR codes.</p>
+            <p className="mt-2">{t('admin.businesses.form.moveWarning')}</p>
           </>
         ),
-        confirmLabel: 'Change address',
+        confirmLabel: t('admin.businesses.form.changeAddress'),
         destructive: true,
       })
       if (!ok) return
@@ -118,22 +118,22 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
     setBusy(null)
     if (!res.ok) {
       setErrors(res.error.fieldErrors ?? {})
-      toast.error(business ? 'Could not save changes' : 'Could not create business', res.error.message)
+      toast.error(t(business ? 'admin.businesses.form.saveFailed' : 'admin.businesses.form.createFailed'), errorText(res.error, t))
       return
     }
     setErrors({})
     setSnapshot(JSON.stringify(toInput(res.data)))
     setData(toInput(res.data))
     if (!business && 'logoMoveFailed' in res.data) {
-      toast.info('Business created', "The logo couldn't be moved into the business folder; upload it again.")
+      toast.info(t('admin.businesses.form.created'), t('admin.businesses.form.logoMoveFailed'))
       skipBlock.current = true
     } else if (!business) {
       toast.success(
-        intent === 'draft' ? 'Business saved as draft' : 'Business created',
-        PUBLIC_URLS_ARE_LIVE ? `Catalog address: ${catalogPublicUrl(res.data)}` : 'Demo address only: a real subdomain and SSL certificate need deployment setup.',
+        t(intent === 'draft' ? 'admin.businesses.form.savedDraft' : 'admin.businesses.form.created'),
+        PUBLIC_URLS_ARE_LIVE ? t('admin.businesses.form.addressToast', { url: catalogPublicUrl(res.data) }) : t('admin.businesses.form.demoAddressToast'),
       )
       skipBlock.current = true
-    } else toast.success('Changes saved')
+    } else toast.success(t('admin.businesses.form.changesSaved'))
     onSaved?.(res.data)
   }
 
@@ -151,9 +151,9 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
     >
       <div className="min-w-0 space-y-6">
         <Card>
-          <CardHeader title="Business profile" />
+          <CardHeader title={t('admin.businesses.form.profile')} />
           <div className="space-y-5 px-6 pb-6">
-            <FormField label="Business name" required error={fx('name')}>
+            <FormField label={t('admin.businesses.form.name')} required error={fx('name')}>
               <Input
                 value={data.name}
                 maxLength={BUSINESS_LIMITS.name}
@@ -164,58 +164,58 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                 }}
               />
             </FormField>
-            <FormField label="Logo">
+            <FormField label={t('admin.businesses.form.logo')}>
               <LogoUpload value={data.logoUrl} onChange={(logoUrl) => set({ logoUrl })} name={data.name} businessId={business?.id} />
             </FormField>
-            <FormField label="Description" hint="Shown at the top of the public catalog." error={fx('description')}>
+            <FormField label={t('admin.businesses.form.description')} hint={t('admin.businesses.form.descriptionHint')} error={fx('description')}>
               <Textarea value={data.description} maxLength={BUSINESS_LIMITS.description} rows={3} onChange={(e) => set({ description: e.target.value })} />
             </FormField>
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="Contact" description="Shown to customers when a product has no call-to-action link." />
+          <CardHeader title={t('admin.businesses.form.contact')} description={t('admin.businesses.form.contactHint')} />
           <div className="grid gap-5 px-6 pb-6 sm:grid-cols-2">
-            <FormField label="Email" optional error={fx('contact.email')}>
+            <FormField label={t('common.email')} optional error={fx('contact.email')}>
               <Input type="email" autoComplete="email" maxLength={BUSINESS_LIMITS.email} value={data.contact.email ?? ''} onChange={(e) => setContact({ email: e.target.value })} />
             </FormField>
-            <FormField label="Phone" optional error={fx('contact.phone')}>
+            <FormField label={t('admin.businesses.form.phone')} optional error={fx('contact.phone')}>
               <Input type="tel" autoComplete="tel" maxLength={BUSINESS_LIMITS.phone} value={data.contact.phone ?? ''} onChange={(e) => setContact({ phone: e.target.value })} />
             </FormField>
-            <FormField label="Website" optional error={fx('contact.website')}>
+            <FormField label={t('admin.businesses.form.website')} optional error={fx('contact.website')}>
               <Input type="url" placeholder="https://" value={data.contact.website ?? ''} onChange={(e) => setContact({ website: e.target.value })} />
             </FormField>
-            <FormField label="Address" optional error={fx('contact.address')}>
+            <FormField label={t('admin.businesses.form.address')} optional error={fx('contact.address')}>
               <Input autoComplete="street-address" maxLength={BUSINESS_LIMITS.address} value={data.contact.address ?? ''} onChange={(e) => setContact({ address: e.target.value })} />
             </FormField>
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="Catalog" />
+          <CardHeader title={t('admin.businesses.form.catalog')} />
           <div className="space-y-5 px-6 pb-6">
             {isOwner ? (
               <div>
-                <p className="text-ui-body font-medium">Catalog address</p>
+                <p className="text-ui-body font-medium">{t('admin.businesses.form.catalogAddress')}</p>
                 <p className="mt-1.5 flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-ui-body" title={catalogPublicUrl(data)}>
                   <span className="min-w-0 truncate">{catalogPublicUrl(data)}</span>
                 </p>
                 <InlineNotice className="mt-3" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
-                  Changing your catalog address requires platform support. Editing your profile does not change the address.
+                  {t('admin.businesses.form.ownerAddressNotice')}
                 </InlineNotice>
               </div>
             ) : (
               <>
                 <FormField
-                  label={PUBLIC_URL_MODE === 'path' ? 'Catalog address' : 'Catalog address (subdomain)'}
+                  label={t(PUBLIC_URL_MODE === 'path' ? 'admin.businesses.form.catalogAddress' : 'admin.businesses.form.catalogAddressSub')}
                   required
                   error={fx('slug')}
                   hint={
                     mode === 'edit'
-                      ? `Changing this breaks printed QR codes and shared links.${PUBLIC_URLS_ARE_LIVE ? '' : ' Demo only: no DNS or SSL is configured.'}`
+                      ? t(PUBLIC_URLS_ARE_LIVE ? 'admin.businesses.form.slugEditHint' : 'admin.businesses.form.slugEditHintDemo')
                       : PUBLIC_URLS_ARE_LIVE
-                        ? `Catalog URL: ${catalogPublicUrl(previewBusiness)}`
-                        : `Demo URL: ${catalogPublicUrl(previewBusiness)}. No DNS or SSL is configured in this demo.`
+                        ? t('admin.businesses.form.slugUrlHint', { url: catalogPublicUrl(previewBusiness) })
+                        : t('admin.businesses.form.slugDemoHint', { url: catalogPublicUrl(previewBusiness) })
                   }
                 >
                   <InputAddon side={PUBLIC_URL_MODE === 'path' ? 'left' : 'right'} addon={PUBLIC_URL_MODE === 'path' ? '/catalog/' : `.${ROOT_DOMAIN}`}>
@@ -231,15 +231,15 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                 </FormField>
                 <div className="grid gap-5 sm:grid-cols-2">
                   {mode === 'edit' && can('businesses.status') && (
-                    <FormField label="Catalog status" hint="Inactive catalogs are hidden from customers.">
+                    <FormField label={t('admin.businesses.form.status')} hint={t('admin.businesses.form.statusHint')}>
                       <Select value={data.status} onChange={(e) => set({ status: e.target.value as BusinessStatus })}>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="draft">Draft</option>
+                        <option value="active">{t('admin.businesses.status.active')}</option>
+                        <option value="inactive">{t('admin.businesses.status.inactive')}</option>
+                        <option value="draft">{t('admin.businesses.status.draft')}</option>
                       </Select>
                     </FormField>
                   )}
-                  <FormField label="Default currency" hint="Used for new products.">
+                  <FormField label={t('admin.businesses.form.currency')} hint={t('admin.businesses.form.currencyHint')}>
                     <Select value={data.defaultCurrency} onChange={(e) => set({ defaultCurrency: e.target.value as Currency })}>
                       {CURRENCIES.map((c) => (
                         <option key={c}>{c}</option>
@@ -248,14 +248,14 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                   </FormField>
                 </div>
                 <fieldset>
-                  <legend className="text-ui-body font-medium">Catalog accent colour</legend>
-                  <p className="mt-1 text-ui-small text-ink-muted">Used for buttons and links on the public catalog.</p>
+                  <legend className="text-ui-body font-medium">{t('admin.businesses.form.accent')}</legend>
+                  <p className="mt-1 text-ui-small text-ink-muted">{t('admin.businesses.form.accentHint')}</p>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
                     {ACCENTS.map((c) => (
                       <button
                         key={c}
                         type="button"
-                        aria-label={`Accent ${c}`}
+                        aria-label={t('admin.businesses.form.accentAria', { color: c })}
                         aria-pressed={data.branding.accentColor.toLowerCase() === c.toLowerCase()}
                         onClick={() => set({ branding: { accentColor: c } })}
                         className="size-8 rounded-full ring-offset-2 aria-pressed:ring-2 aria-pressed:ring-ink"
@@ -263,7 +263,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                       />
                     ))}
                     <label className="ml-1 inline-flex items-center gap-2 text-ui-small text-ink-muted">
-                      Custom
+                      {t('admin.businesses.form.custom')}
                       <input type="color" value={data.branding.accentColor} onChange={(e) => set({ branding: { accentColor: e.target.value.toUpperCase() } })} className="size-8 cursor-pointer rounded border border-line-strong bg-surface p-0.5" />
                     </label>
                   </div>
@@ -277,16 +277,16 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
         <div className="flex flex-wrap justify-end gap-2">
           {business ? (
             <Button type="submit" variant="primary" loading={busy === 'save'} disabled={!!busy || !dirty} icon={<Save className="size-4" aria-hidden />}>
-              Save changes
+              {t('admin.businesses.form.save')}
             </Button>
           ) : (
             <>
               <Button variant={canCreateActive ? 'secondary' : 'primary'} onClick={() => void submit('draft')} loading={busy === 'draft'} disabled={!!busy}>
-                Save as draft
+                {t('admin.businesses.form.saveDraft')}
               </Button>
               {canCreateActive && (
                 <Button type="submit" variant="primary" loading={busy === 'create'} disabled={!!busy}>
-                  Create business
+                  {t('admin.businesses.form.create')}
                 </Button>
               )}
             </>
@@ -301,16 +301,16 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
       <Modal
         open={blocker.state === 'blocked'}
         onClose={() => blocker.reset?.()}
-        title="Leave without saving?"
-        description="Your changes to this business have not been saved."
+        title={t('admin.businesses.form.leaveTitle')}
+        description={t('admin.businesses.form.leaveBody')}
         size="sm"
         footer={
           <>
             <Button onClick={() => blocker.reset?.()} data-autofocus>
-              Stay on page
+              {t('admin.businesses.form.stay')}
             </Button>
             <Button variant="danger" onClick={() => blocker.proceed?.()}>
-              Leave page
+              {t('admin.businesses.form.leave')}
             </Button>
           </>
         }
