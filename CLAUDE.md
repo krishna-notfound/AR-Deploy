@@ -5,7 +5,7 @@ This project is a multi-tenant 3D furniture catalog with AR. It has three surfac
 - Business Admin (`/dashboard`, scope pending)
 - Public EN/PT catalog and product pages
 
-It runs in **demo mode** by default (a mock service layer, no setup). **Supabase mode** (`VITE_DATA_MODE=supabase`) runs on the client project `zggylkbgajamhriebdrg`: all 18 migrations in `supabase/migrations/` applied and 13 Edge Functions deployed (checked 2026-10-27). The old dev project `pmnjchhrgvajtjpadpqo` is not used; never touch it. Never re-apply or roll back without the owner's approval. All architecture docs live in `System_arch/`.
+It runs in **demo mode** by default (a mock service layer, no setup). **Supabase mode** (`VITE_DATA_MODE=supabase`) runs on the client project `zggylkbgajamhriebdrg`: all 19 migrations in `supabase/migrations/` applied and 13 Edge Functions deployed (checked 2026-10-29). The old dev project `pmnjchhrgvajtjpadpqo` is not used; never touch it. Never re-apply or roll back without the owner's approval. All architecture docs live in `System_arch/`.
 
 **Start here:** `System_arch/HANDOFF.md` (live state, AR, accounts, gotchas), then `docs/PRODUCTION_READINESS.md` (release gate). Live AR is **WebXR first on Android** (AR inside Chrome, Scene Viewer as the fallback) and Quick Look on iPhone (`webxr scene-viewer quick-look`, ADR-0035, owner decision 2026-10-26; replaces ADR-0021's native-only). Never change AR modes without the owner's go-ahead and a device test.
 

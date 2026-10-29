@@ -1,5 +1,3 @@
-// Generated from the schema of the client project (zggylkbgajamhriebdrg) on 2026-10-26 after migration 20261026120000
-// (Supabase type generator). Regenerate after any migration: npx supabase gen types typescript --project-id <ref>.
 export type Json =
   | string
   | number
@@ -1094,27 +1092,6 @@ export type Database = {
       }
       admin_get_member: { Args: { p_member: string }; Returns: Json }
       admin_get_site_content: { Args: never; Returns: Json }
-      admin_list_site_content_versions: {
-        Args: never
-        Returns: {
-          published_at: string
-          published_by_name: string
-          version: number
-        }[]
-      }
-      admin_publish_site_content: { Args: { p_base: string }; Returns: Json }
-      admin_restore_site_content_version: {
-        Args: { p_base: string; p_version: number }
-        Returns: string
-      }
-      admin_save_site_content_draft: {
-        Args: { p_base: string; p_content: Json }
-        Returns: string
-      }
-      get_published_site_content: {
-        Args: { p_part: string; p_slug?: string }
-        Returns: Json
-      }
       admin_invite_member: {
         Args: {
           p_email: string
@@ -1137,12 +1114,25 @@ export type Database = {
       admin_list_member_invites: { Args: { p_member: string }; Returns: Json }
       admin_list_members: { Args: never; Returns: Json }
       admin_list_owner_states: { Args: never; Returns: Json }
+      admin_list_site_content_versions: {
+        Args: never
+        Returns: {
+          published_at: string
+          published_by_name: string
+          version: number
+        }[]
+      }
+      admin_publish_site_content: { Args: { p_base: string }; Returns: Json }
       admin_reactivate_member: { Args: { p_member: string }; Returns: Json }
       admin_reject_model_request: {
         Args: { p_reason: string; p_request: string }
         Returns: Json
       }
       admin_remove_member: { Args: { p_member: string }; Returns: Json }
+      admin_restore_site_content_version: {
+        Args: { p_base: string; p_version: number }
+        Returns: string
+      }
       admin_review_application: {
         Args: { p_action: string; p_application_id: string; p_reason?: string }
         Returns: {
@@ -1153,9 +1143,9 @@ export type Database = {
           business_deleted_at: string | null
           business_id: string | null
           business_name: string
-          category: string
-          city: string
-          country: string
+          category: string | null
+          city: string | null
+          country: string | null
           created_at: string
           decision_reason: string | null
           id: string
@@ -1177,6 +1167,10 @@ export type Database = {
         }
       }
       admin_revoke_member_invite: { Args: { p_member: string }; Returns: Json }
+      admin_save_site_content_draft: {
+        Args: { p_base: string; p_content: Json }
+        Returns: string
+      }
       admin_set_member_role: {
         Args: {
           p_member: string
@@ -1232,10 +1226,18 @@ export type Database = {
       }
       caller_has_verified_factor: { Args: never; Returns: boolean }
       caller_mfa_satisfied: { Args: never; Returns: boolean }
+      can_sync_ar_models: {
+        Args: { p_business?: string; p_product: string }
+        Returns: boolean
+      }
       can_write_own_models: { Args: { p_business: string }; Returns: boolean }
       cancel_account_closure: { Args: never; Returns: Json }
       cancel_model_request: { Args: { p_request: string }; Returns: Json }
       complete_owner_onboarding: { Args: never; Returns: string }
+      get_published_site_content: {
+        Args: { p_part: string; p_slug?: string }
+        Returns: Json
+      }
       is_business_member: { Args: { bid: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_platform_member: { Args: never; Returns: boolean }
