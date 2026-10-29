@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import type { AssetStatus, BusinessStatus, ProductStatus } from '@/domain/types'
 import { useInDashboard } from '@/components/layout/dashboardContext'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 
 export type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
@@ -37,35 +39,39 @@ export function Badge({ tone = 'neutral', children, className, dot }: { tone?: T
 }
 
 const productTone: Record<ProductStatus, Tone> = { published: 'success', draft: 'neutral' }
-const productLabel: Record<ProductStatus, string> = { published: 'Published', draft: 'Draft' }
+const productLabel: Record<ProductStatus, TranslationKey> = { published: 'ui.status.published', draft: 'ui.status.draft' }
 export function ProductStatusBadge({ status }: { status: ProductStatus }) {
+  const { t } = useI18n()
   return (
     <Badge tone={productTone[status]} dot>
-      {productLabel[status]}
+      {t(productLabel[status])}
     </Badge>
   )
 }
 
 const businessTone: Record<BusinessStatus, Tone> = { active: 'success', inactive: 'warning', draft: 'neutral' }
-const businessLabel: Record<BusinessStatus, string> = { active: 'Active', inactive: 'Inactive', draft: 'Draft' }
+const businessLabel: Record<BusinessStatus, TranslationKey> = { active: 'ui.status.active', inactive: 'ui.status.inactive', draft: 'ui.status.draft' }
 export function BusinessStatusBadge({ status }: { status: BusinessStatus }) {
+  const { t } = useI18n()
   return (
     <Badge tone={businessTone[status]} dot>
-      {businessLabel[status]}
+      {t(businessLabel[status])}
     </Badge>
   )
 }
 
 const assetTone: Record<AssetStatus, Tone> = { valid: 'success', invalid: 'danger', missing: 'warning', 'session-only': 'info' }
-const assetLabel: Record<AssetStatus, string> = { valid: 'Linked', invalid: 'Invalid', missing: 'Missing', 'session-only': 'This session only' }
+const assetLabel: Record<AssetStatus, TranslationKey> = { valid: 'ui.asset.valid', invalid: 'ui.asset.invalid', missing: 'ui.asset.missing', 'session-only': 'ui.asset.sessionOnly' }
 export function AssetStatusBadge({ status }: { status: AssetStatus }) {
-  return <Badge tone={assetTone[status]}>{assetLabel[status]}</Badge>
+  const { t } = useI18n()
+  return <Badge tone={assetTone[status]}>{t(assetLabel[status])}</Badge>
 }
 
 export function SampleDataTag({ className }: { className?: string }) {
+  const { t } = useI18n()
   return (
     <Badge tone="info" className={className}>
-      Sample data
+      {t('ui.sampleData')}
     </Badge>
   )
 }

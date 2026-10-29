@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useInDashboard } from '@/components/layout/dashboardContext'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { Skeleton } from './Skeleton'
 
@@ -18,10 +19,11 @@ export interface Stat {
  * is a row inside the same card. Outside the dashboard: a row of separate stat cards.
  */
 export function StatGroup({ stats, loading, className, footer }: { stats: Stat[]; loading?: boolean; className?: string; footer?: ReactNode }) {
+  const { t } = useI18n()
   const inDashboard = useInDashboard()
   if (inDashboard) {
     return (
-      <section className={className} aria-label="Key figures">
+      <section className={className} aria-label={t('ui.stats.label')}>
         <div className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
           <dl className="grid grid-cols-2 gap-px bg-line xl:grid-flow-col xl:auto-cols-fr xl:grid-cols-none xl:gap-0 xl:divide-x xl:divide-line">
             {stats.map((s) => (
@@ -42,7 +44,7 @@ export function StatGroup({ stats, loading, className, footer }: { stats: Stat[]
     )
   }
   return (
-    <section className={className} aria-label="Key figures">
+    <section className={className} aria-label={t('ui.stats.label')}>
       <dl
         className={cn(
           'grid grid-cols-2 gap-3 sm:gap-4',

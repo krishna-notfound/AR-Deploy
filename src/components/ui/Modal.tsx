@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useInDashboard } from '@/components/layout/dashboardContext'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { IconButton } from './Button'
 
@@ -68,7 +69,7 @@ export function Modal({
   footer,
   size = 'md',
   dismissible = true,
-  closeLabel = 'Close dialog',
+  closeLabel,
 }: {
   open: boolean
   onClose: () => void
@@ -80,6 +81,7 @@ export function Modal({
   dismissible?: boolean
   closeLabel?: string
 }) {
+  const { t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
   const dash = useDashboardSurface()
   const titleId = useId()
@@ -123,7 +125,7 @@ export function Modal({
             )}
           </div>
           {dismissible && (
-            <IconButton aria-label={closeLabel} size="sm" onClick={onClose} className="-mt-1 -mr-2">
+            <IconButton aria-label={closeLabel ?? t('ui.modal.close')} size="sm" onClick={onClose} className="-mt-1 -mr-2">
               <X className="size-4" />
             </IconButton>
           )}
