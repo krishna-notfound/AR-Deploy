@@ -59,7 +59,8 @@ describe('ar_public_models migration', () => {
     expect(AR_MIGRATION > S2_MIGRATION).toBe(true)
     expect(AR_MIGRATION > '20261026120000_s4_model_requests.sql').toBe(true) // released after S4
     const all = readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()
-    expect(all.at(-1)).toBe(AR_MIGRATION)
+    // Later migrations (the Content Editor's) sort after it.
+    expect(all.at(-1)! >= AR_MIGRATION).toBe(true)
   })
 
   it('creates the public ar-models bucket: 50 MB, GLB and USDZ only', async () => {

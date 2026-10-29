@@ -27,8 +27,8 @@ export const UP_TO_S2 = (n: string) => n <= S2_MIGRATION
 export const BEFORE_S4 = (n: string) => n < S4_MIGRATION
 /** Migrations up to and including S4 (the latest, so every migration today): the S4 rollback checks. */
 export const UP_TO_S4 = (n: string) => n <= S4_MIGRATION
-/** Permission keys added after S1.5 (S4: models.manage). The S1.5 suite, run on UP_TO_S15, leaves them out. */
-export const LATER_PERMISSIONS = ['models.manage'] as const
+/** Permission keys added after S1.5 (S4: models.manage; Content Editor: content.manage). The S1.5 suite, run on UP_TO_S15, leaves them out. */
+export const LATER_PERMISSIONS = ['models.manage', 'content.manage'] as const
 
 /** The parts of Supabase the migrations rely on: API roles, auth (users, uid/jwt from test settings, MFA), storage. */
 export const SUPABASE_STUBS = `
