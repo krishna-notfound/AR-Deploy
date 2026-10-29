@@ -6,12 +6,14 @@
 // application: an audit failure is logged and the emails still go, and a retry with the same submission key sends
 // the emails that were never logged (S1.5 R-W2-10, R-W2-11).
 import { type NormalizedApplication, validateApplication } from '../_shared/application.ts'
+import type { ApplyRules } from '../_shared/applyForm.ts'
 import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
 import { clientIp, readJsonObject, reply, sha256Hex } from '../_shared/http.ts'
 
 export const MAX_SUBMISSIONS_PER_HOUR = 5
-const MAX_BODY_BYTES = 20_000
+/** Room for the answers to up to 10 questions (the custom block itself is capped at 40,000 bytes). */
+const MAX_BODY_BYTES = 48_000
 /** A key replay newer than this is a double click while the first request may still be sending: it sends nothing. */
 const REPLAY_SETTLE_MS = 30_000
 
@@ -45,6 +47,11 @@ export interface SubmitDeps {
   log(entry: LogEntry): Promise<string>
   /** Staff who can see applications (applications.view) and keep new-application alerts on (profiles). */
   staffAlertRecipients(): Promise<string[]>
+  /**
+   * The rules of the published application form (service role read of site_content.published), or null when nothing is
+   * published. Throws when the read fails: that is not "no form" (spec section 10), the request is answered 503.
+   */
+  loadApplyRules(): Promise<ApplyRules | null>
 }
 
 /** Salted hash of the submitter's IP for one UTC day (`YYYY-MM-DD`): it cannot follow a submitter across days. */
@@ -79,7 +86,18 @@ export async function handleSubmitApplication(req: Request, deps: SubmitDeps): P
   // accepted version and time is a later item (docs/legal/drafts/README.md, "What the app must do", 3).
   if (body.acceptedTerms !== true) return reply(422, { error: 'invalid_request' })
 
-  const v = validateApplication(body)
+  let rules: ApplyRules | null
+  try {
+    rules = await deps.loadApplyRules()
+  } catch (e) {
+    // Without the form the server cannot tell what is required or hidden: refuse rather than accept unchecked answers.
+    console.error(`apply form lookup failed: ${loggable(e)}`)
+    return reply(503, { error: 'config_unavailable' })
+  }
+  const v = validateApplication(body, rules)
+  // The visitor answered a form that was republished meanwhile (an unknown question or option, a hidden option):
+  // the page reloads the form and keeps the answers.
+  if (!v.ok && v.stale) return reply(409, { error: 'form_changed' })
   if (!v.ok) return reply(400, { error: 'invalid_application', fields: v.errors })
   const app = v.value
   const now = (deps.now ?? (() => new Date()))()

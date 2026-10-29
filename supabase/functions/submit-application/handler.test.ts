@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { NormalizedApplication } from '../_shared/application'
 import type { EmailConfig, LogEntry } from '../_shared/email'
 import { renderEmail } from '../_shared/email-templates'
+import { type ApplyFormConfig, DEFAULT_APPLY_FORM, rulesFromConfig } from '../_shared/applyForm'
 import { MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, type SubmitDeps, handleSubmitApplication, submitterHash } from './handler'
 
 const CONFIG: EmailConfig = {
@@ -91,6 +92,7 @@ function deps(over: Partial<SubmitDeps> = {}) {
     loggedWorkflows: async (id) => new Set(logs.filter((l) => l.applicationId === id).map((l) => l.workflow ?? '')),
     log: async (e) => (logs.push(e), `log-${logs.length}`),
     staffAlertRecipients: async () => [],
+    loadApplyRules: async () => null,
     ...over,
   }
   return { d, rows, logs, audits, sends, fetchFn, attempts, clock }
@@ -386,5 +388,145 @@ describe('submit-application: nothing lost after the insert (R-W2-11)', () => {
     expect(sends).toHaveLength(0)
     expect(audits).toHaveLength(0)
     expect(logs).toHaveLength(0)
+  })
+})
+
+// ---- the published application form (Content Editor, spec section 10) -------------------------------------------------
+const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T
+/** Rules for the default form with one change applied; form version 4. */
+function formRules(change: (c: ApplyFormConfig) => void) {
+  const c = clone(DEFAULT_APPLY_FORM)
+  change(c)
+  return rulesFromConfig(c, 4)
+}
+const place = (c: ApplyFormConfig, key: string, patch: { hidden?: boolean; required?: boolean }) => Object.assign(c.fields.find((f) => f.key === key)!, patch)
+const OPTIONS = [
+  { id: 'o1', label: { en: 'Wood', pt: 'Madeira' } },
+  { id: 'o2', label: { en: 'Metal' } },
+]
+const askQuestions = (c: ApplyFormConfig) => {
+  c.customQuestions = [
+    { id: 'q1', type: 'short_text', label: { en: 'Where did you hear about us?', pt: 'Como nos conheceu?' } },
+    { id: 'q2', type: 'multi_choice', label: { en: 'Materials' }, options: OPTIONS },
+  ]
+  c.fields.push({ key: 'custom:q1', stepId: 'catalogue', required: true }, { key: 'custom:q2', stepId: 'catalogue', required: false })
+}
+
+describe('submit-application: published application form', () => {
+  it('no published form behaves as today', async () => {
+    const { d, rows } = deps({ loadApplyRules: async () => null })
+    const res = await handleSubmitApplication(post(VALID), d)
+    expect(res.status).toBe(200)
+    expect(rows[0]!.app).toMatchObject({ custom: [], formVersion: 0 })
+  })
+
+  it('a required question that is missing is refused with its field id', async () => {
+    const { d, rows } = deps({ loadApplyRules: async () => formRules(askQuestions) })
+    const res = await handleSubmitApplication(post({ ...VALID, custom: {} }), d)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid_application', fields: { 'custom.q1': 'required' } })
+    expect(rows).toHaveLength(0)
+  })
+
+  it('an answer that is too long is refused', async () => {
+    const { d } = deps({ loadApplyRules: async () => formRules(askQuestions) })
+    const res = await handleSubmitApplication(post({ ...VALID, custom: { q1: 'x'.repeat(201) } }), d)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid_application', fields: { 'custom.q1': 'too_long' } })
+  })
+
+  it('stores the answers as snapshots with the form version', async () => {
+    const { d, rows } = deps({ loadApplyRules: async () => formRules(askQuestions) })
+    const res = await handleSubmitApplication(post({ ...VALID, custom: { q1: 'A friend', q2: ['o2', 'o1'] } }), d)
+    expect(res.status).toBe(200)
+    expect(rows[0]!.app.formVersion).toBe(4)
+    expect(rows[0]!.app.custom).toEqual([
+      { id: 'q1', type: 'short_text', label: { en: 'Where did you hear about us?', pt: 'Como nos conheceu?' }, value: 'A friend' },
+      { id: 'q2', type: 'multi_choice', label: { en: 'Materials' }, value: ['o2', 'o1'], valueLabels: [{ en: 'Metal' }, { en: 'Wood', pt: 'Madeira' }] },
+    ])
+  })
+
+  it('a hidden field that is submitted is ignored and stored as null', async () => {
+    const { d, rows } = deps({ loadApplyRules: async () => formRules((c) => place(c, 'applicantPhone', { hidden: true })) })
+    const res = await handleSubmitApplication(post({ ...VALID, applicantPhone: '+351 912 345 678' }), d)
+    expect(res.status).toBe(200)
+    expect(rows[0]!.app.applicantPhone).toBeNull()
+  })
+
+  it('a hidden country, city and category are accepted without them; the locked fields are still stored', async () => {
+    const hide = (c: ApplyFormConfig) => {
+      for (const k of ['country', 'city', 'category']) place(c, k, { hidden: true })
+    }
+    const { d, rows, sends } = deps({ loadApplyRules: async () => formRules(hide) })
+    const res = await handleSubmitApplication(post({ ...VALID, country: undefined, city: undefined, category: undefined }), d)
+    expect(res.status).toBe(200)
+    expect(rows[0]!.app).toMatchObject({ country: null, city: null, category: null, businessName: 'Atelier Cão', applicantEmail: 'ana@studio.test' })
+    expect(sends).toHaveLength(2)
+  })
+
+  it('a missing locked field is refused whatever the rules say', async () => {
+    const { d, rows } = deps({ loadApplyRules: async () => formRules(() => {}) })
+    for (const missing of ['businessName', 'applicantName', 'applicantEmail']) {
+      const res = await handleSubmitApplication(post({ ...VALID, [missing]: '' }), d)
+      expect(res.status).toBe(400)
+      expect(((await res.json()) as { fields: Record<string, string> }).fields[missing]).toBe('required')
+    }
+    expect(rows).toHaveLength(0)
+  })
+
+  it('an unknown question or option id and a hidden option give 409 form_changed', async () => {
+    const hide = (c: ApplyFormConfig) => {
+      askQuestions(c)
+      c.hiddenOptions = { productCount: ['200+'] }
+    }
+    for (const body of [{ custom: { q1: 'x', ghost: 'y' } }, { custom: { q1: 'x', q2: ['gone'] } }, { custom: { q1: 'x' }, productCount: '200+' }]) {
+      const { d, rows } = deps({ loadApplyRules: async () => formRules(hide) })
+      const res = await handleSubmitApplication(post({ ...VALID, ...body }), d)
+      expect(res.status).toBe(409)
+      expect(await res.json()).toEqual({ error: 'form_changed' })
+      expect(rows).toHaveLength(0)
+    }
+  })
+
+  it('a stale form does not use up the rate limit or reach the duplicate check', async () => {
+    const dup = vi.fn(async () => null)
+    const { d, attempts } = deps({ loadApplyRules: async () => formRules(askQuestions), findOpenDuplicate: dup })
+    const res = await handleSubmitApplication(post({ ...VALID, custom: { q1: 'x', ghost: 1 } }), d)
+    expect(res.status).toBe(409)
+    expect(attempts).toHaveLength(0)
+    expect(dup).not.toHaveBeenCalled()
+  })
+
+  it('a failed read of the form answers 503 config_unavailable and stores nothing', async () => {
+    const { d, rows, attempts } = deps({
+      loadApplyRules: async () => {
+        throw new Error('db down')
+      },
+    })
+    const res = await handleSubmitApplication(post(VALID), d)
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ error: 'config_unavailable' })
+    expect(rows).toHaveLength(0)
+    expect(attempts).toHaveLength(0)
+  })
+
+  it('the honeypot and the Terms tick are checked before the form is read', async () => {
+    const load = vi.fn(async () => null)
+    const { d } = deps({ loadApplyRules: load })
+    expect((await handleSubmitApplication(post({ ...VALID, hp: 'spam' }), d)).status).toBe(400)
+    expect((await handleSubmitApplication(post({ ...VALID, acceptedTerms: false }), d)).status).toBe(422)
+    expect(load).not.toHaveBeenCalled()
+  })
+
+  it('accepts a body up to 48,000 bytes (32,000 here) and refuses a larger one', async () => {
+    const { d, rows } = deps({ loadApplyRules: async () => formRules(askQuestions) })
+    const pad = (n: number) => ({ ...VALID, custom: { q1: 'x' }, padding: 'p'.repeat(Math.max(0, n)) })
+    const base = new TextEncoder().encode(JSON.stringify(pad(0))).length
+    expect((await handleSubmitApplication(post(pad(32_000 - base)), d)).status).toBe(200)
+    expect(rows).toHaveLength(1)
+    const big = await handleSubmitApplication(post({ ...pad(48_001 - base), submissionKey: key(3) }), d)
+    expect(big.status).toBe(400)
+    expect(await big.json()).toEqual({ error: 'invalid_application' })
+    expect(rows).toHaveLength(1)
   })
 })

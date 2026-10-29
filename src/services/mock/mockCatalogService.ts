@@ -7,12 +7,14 @@ import { newId } from '@/lib/id'
 import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
+import { rulesFromConfig } from '../../../supabase/functions/_shared/applyForm.ts'
 import { modelRequestError } from '../modelRequestRules'
 import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview, normalizeBusinessName } from '../applicationRules'
 import { CLOSURE_PENDING_ERROR, type CatalogService, type ProductInput, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok, toAuditEntry } from '../catalogService'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { mockClosureOpen, noteMockClosureStatus, voidMockClosure } from './mockAccount'
+import { mockContentService } from './mockContent'
 import { createMockTeam, demoPlatformRole, demoViewer } from './mockTeam'
 import { createMockModelRequestsBusiness } from './mockModelRequestsBusiness'
 import { createMockModelRequestsRead } from './mockModelRequestsRead'
@@ -678,9 +680,14 @@ export const mockCatalogService: CatalogService = {
     }),
 
   // ---------------- business applications ----------------
-  submitApplication: (input) =>
-    run(() => {
-      const v = validateApplication(input)
+  // Same validator and rules as the submit-application function: the demo's published form (nothing published = today's form).
+  submitApplication: async (input) => {
+    const form = await mockContentService.getPublishedApplyForm()
+    if (!form.ok) return fail('UNKNOWN', 'The application form could not be read. Try again.')
+    const rules = form.data ? rulesFromConfig(form.data.config, form.data.version) : null
+    return run(() => {
+      const v = validateApplication(input, rules)
+      if (!v.ok && v.stale) return { ok: false, error: { code: 'CONFLICT', message: 'The application form was updated. Check the highlighted fields.', reason: 'form_changed' } }
       if (!v.ok) return fail('VALIDATION', 'Please fix the highlighted fields.', v.errors)
       const a = v.value
       const db = store.get()
@@ -700,17 +707,19 @@ export const mockCatalogService: CatalogService = {
         applicantEmail: a.applicantEmail,
         applicantPhone: a.applicantPhone ?? undefined,
         website: a.website ?? undefined,
-        country: a.country,
-        city: a.city,
-        category: a.category,
+        country: a.country ?? undefined,
+        city: a.city ?? undefined,
+        category: a.category ?? undefined,
         language: a.language,
         answers: {
-          description: a.description,
+          description: a.description ?? undefined,
           applicantRole: a.applicantRole ?? undefined,
-          productCount: a.productCount,
-          photoReadiness: a.photoReadiness,
-          modelReadiness: a.modelReadiness,
+          productCount: a.productCount ?? undefined,
+          photoReadiness: a.photoReadiness ?? undefined,
+          modelReadiness: a.modelReadiness ?? undefined,
           notes: a.notes ?? undefined,
+          custom: a.custom,
+          formVersion: a.formVersion,
         },
         submissionKey: a.submissionKey,
         createdAt: ts,
@@ -723,7 +732,8 @@ export const mockCatalogService: CatalogService = {
         demoEmail(d, { kind: 'admin_notification', recipient: 'platform admins', subject: `New business awaiting review: ${app.businessName}`, applicationId: app.id, workflow: `application:${app.id}:admin_notification` })
       })
       return ok({ id: app.id, reference: app.reference })
-    }),
+    })
+  },
 
   getApplications: (q = {}) =>
     run(() => {
