@@ -1,6 +1,7 @@
 import type { Lang, LocalizedText } from '@/domain/types'
 import { type TranslationKey, en } from './dictionaries/en'
 import { pt } from './dictionaries/pt'
+import { localeOf } from './locale'
 
 const DICTS: Record<Lang, Partial<Record<TranslationKey, string>>> = { en, pt }
 
@@ -18,6 +19,19 @@ export function translate(lang: Lang, key: TranslationKey, vars?: Vars): string 
   if (import.meta.env.DEV && lang !== 'en') console.warn(`[i18n] missing "${key}" for ${lang}`)
   const fallback = en[key] as string | undefined
   return fallback !== undefined ? interpolate(fallback, vars) : key
+}
+
+/** Keys that come as a `<base>.one` / `<base>.other` pair, as the base name `tn()` takes. */
+export type PluralBase = TranslationKey extends infer K ? (K extends `${infer B}.one` ? B : never) : never
+
+/** `<base>.one` or `<base>.other` for `n`, by the language's plural rules (pt-PT: only exactly 1 is "one"). */
+export function pluralKey(lang: Lang, base: string, n: number): string {
+  return `${base}.${new Intl.PluralRules(localeOf(lang)).select(n) === 'one' ? 'one' : 'other'}`
+}
+
+/** Counted text: `{n}` is always available to the template next to `vars`. */
+export function translatePlural(lang: Lang, base: PluralBase, n: number, vars?: Vars): string {
+  return translate(lang, pluralKey(lang, base, n) as TranslationKey, { n, ...vars })
 }
 
 /** Product content: the requested language, falling back to English. */

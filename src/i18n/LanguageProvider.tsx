@@ -1,17 +1,34 @@
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Lang, LocalizedText } from '@/domain/types'
 import type { TranslationKey } from './dictionaries/en'
-import { type Vars, pickLocalized, translate } from './translate'
+import { htmlLangOf } from './locale'
+import { type PluralBase, type Vars, pickLocalized, translate, translatePlural } from './translate'
 
+/** Storage key of the saved choice (localStorage; older builds kept it in sessionStorage). */
 export const LANG_KEY = 'arfurn:lang'
 
-function initialLang(): Lang {
-  // An explicit ?lang= (e.g. from an owner invitation link) wins for this visit.
-  const fromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null
-  if (fromUrl === 'en' || fromUrl === 'pt') return fromUrl
+const isLang = (v: unknown): v is Lang => v === 'en' || v === 'pt'
+
+/** One-time move of the old per-tab choice into the device's saved choice. */
+function migrateSessionChoice() {
   try {
-    const stored = sessionStorage.getItem(LANG_KEY)
-    if (stored === 'en' || stored === 'pt') return stored
+    if (localStorage.getItem(LANG_KEY)) return
+    const old = sessionStorage.getItem(LANG_KEY)
+    if (isLang(old)) localStorage.setItem(LANG_KEY, old)
+    if (old !== null) sessionStorage.removeItem(LANG_KEY)
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data); the choice then lasts for this visit only.
+  }
+}
+
+/** `?lang=` for this visit (not stored), then the device's saved choice, then the browser language. */
+function initialLang(): Lang {
+  const fromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null
+  if (isLang(fromUrl)) return fromUrl
+  migrateSessionChoice()
+  try {
+    const stored = localStorage.getItem(LANG_KEY)
+    if (isLang(stored)) return stored
   } catch {
     // ignore
   }
@@ -22,20 +39,35 @@ interface LangCtx {
   lang: Lang
   setLang: (l: Lang) => void
   t: (key: TranslationKey, vars?: Vars) => string
+  /** Counted text: picks `<key>.one` or `<key>.other` by the language's plural rules; `{n}` is available in the template. */
+  tn: (key: PluralBase, n: number, vars?: Vars) => string
   localized: (text: LocalizedText | undefined) => string
   localizedMeta: (text: LocalizedText | undefined) => ReturnType<typeof pickLocalized>
 }
 
-const Ctx = createContext<LangCtx | null>(null)
+function makeCtx(lang: Lang, setLang: (l: Lang) => void): LangCtx {
+  return {
+    lang,
+    setLang,
+    t: (key, vars) => translate(lang, key, vars),
+    tn: (key, n, vars) => translatePlural(lang, key, n, vars),
+    localized: (text) => pickLocalized(text, lang).text,
+    localizedMeta: (text) => pickLocalized(text, lang),
+  }
+}
 
-/** Wraps public routes only (admin stays English). */
+// Outside a provider (a component test that renders one screen) everything stays English, the language tests assert on.
+// The app always renders inside the provider of RootLayout.
+const Ctx = createContext<LangCtx>(makeCtx('en', () => {}))
+
+/** App-wide language (every route, path mode and hostname mode): `?lang=` > saved choice > browser language. */
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(initialLang)
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l)
     try {
-      sessionStorage.setItem(LANG_KEY, l)
+      localStorage.setItem(LANG_KEY, l)
     } catch {
       // ignore
     }
@@ -43,33 +75,22 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const prev = document.documentElement.lang
-    document.documentElement.lang = lang === 'pt' ? 'pt-PT' : 'en'
+    document.documentElement.lang = htmlLangOf(lang)
     return () => {
       document.documentElement.lang = prev || 'en'
     }
   }, [lang])
 
-  const value = useMemo<LangCtx>(
-    () => ({
-      lang,
-      setLang,
-      t: (key, vars) => translate(lang, key, vars),
-      localized: (text) => pickLocalized(text, lang).text,
-      localizedMeta: (text) => pickLocalized(text, lang),
-    }),
-    [lang, setLang],
-  )
+  const value = useMemo(() => makeCtx(lang, setLang), [lang, setLang])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 export function useI18n(): LangCtx {
-  const ctx = useContext(Ctx)
-  if (!ctx) throw new Error('useI18n must be used inside <LanguageProvider>')
-  return ctx
+  return useContext(Ctx)
 }
 
-/** For chrome shared with English-only pages (sign-in, demo picker): null outside a LanguageProvider. */
-export function useMaybeI18n(): LangCtx | null {
+/** @deprecated The provider is app-wide now; use `useI18n()`. Kept so public-site files owned by other tracks keep compiling. */
+export function useMaybeI18n(): LangCtx {
   return useContext(Ctx)
 }
 

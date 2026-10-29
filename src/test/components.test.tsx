@@ -84,7 +84,7 @@ describe('LanguageSwitcher', () => {
     return <p>{t('ar.button')}</p>
   }
 
-  it('switches between English and Portuguese and persists for the session', async () => {
+  it('switches between English and Portuguese and remembers the choice on the device', async () => {
     const user = userEvent.setup()
     render(
       <LanguageProvider>
@@ -95,7 +95,7 @@ describe('LanguageSwitcher', () => {
     expect(screen.getByText('View in my home')).toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: 'PT' }))
     expect(screen.getByText('Ver na minha casa')).toBeInTheDocument()
-    expect(sessionStorage.getItem('arfurn:lang')).toBe('pt')
+    expect(localStorage.getItem('arfurn:lang')).toBe('pt')
     expect(document.documentElement.lang).toBe('pt-PT')
   })
 })

@@ -8,7 +8,6 @@ import { SecurityGate } from '@/auth/SecurityGate'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { adminNav, businessNav } from '@/components/layout/nav'
-import { LanguageProvider } from '@/i18n/LanguageProvider'
 import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
 import { type Tenant, resolveTenant } from '@/tenant/resolveTenant'
 import { RootLayout } from './RootLayout'
@@ -55,11 +54,9 @@ const EmbedProductPage = lazy(() => import('@/features/public/EmbedProductPage')
 
 function PublicLayout() {
   return (
-    <LanguageProvider>
-      <Suspense fallback={<FullPageSpinner />}>
-        <Outlet />
-      </Suspense>
-    </LanguageProvider>
+    <Suspense fallback={<FullPageSpinner />}>
+      <Outlet />
+    </Suspense>
   )
 }
 
@@ -179,7 +176,6 @@ function pathModeRoutes(): RouteObject[] {
             { path: '/apply', element: <ApplyPage /> },
             { path: PRIVACY_PATH, element: <LegalPage doc="privacy" /> },
             { path: TERMS_PATH, element: <LegalPage doc="terms" /> },
-            // Both use t(), so they need the LanguageProvider of this layout.
             { path: '/reset-password', element: <ResetPasswordPage /> },
             { path: '/accept-invite', element: <AcceptInvitePage /> },
             { path: '/catalog/:businessSlug', element: <LowercaseSlugs route="catalog"><CatalogPage /></LowercaseSlugs> },

@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import { Outlet, ScrollRestoration } from 'react-router'
 import { useToast } from '@/components/ui/ToastProvider'
+import { LanguageProvider } from '@/i18n/LanguageProvider'
 import { demoStore as store, isDemoMode } from '@/services'
 
-/** Root route: scroll restoration + demo storage notices. */
+/** Root route: the app-wide language, scroll restoration and demo storage notices. */
 export function RootLayout() {
   const toast = useToast()
   useEffect(
@@ -17,9 +18,9 @@ export function RootLayout() {
     [toast],
   )
   return (
-    <>
+    <LanguageProvider>
       <ScrollRestoration />
       <Outlet />
-    </>
+    </LanguageProvider>
   )
 }
