@@ -1,10 +1,11 @@
-# Handoff: read this first in a new session (updated 2026-10-27)
+# Handoff: read this first in a new session (updated 2026-10-29)
 
 ## Live state (checked 2026-10-27; re-check before relying on it, see CLAUDE.md "Facts and live state")
 - **Site:** `main` is the live branch (owner, 2026-10-27). Vercel Production (`ar-deploy`, team `track0`) builds `main` and serves `sanctus.warpkit.online` (domain moved from the feature branch to Production on 2026-10-27), `builtbykrishna.dev`, `*.builtbykrishna.dev`, `www.builtbykrishna.dev` and `ar-deploy-sage.vercel.app`. Production env vars point at `zggylkbgajamhriebdrg` (set by the owner 2026-10-27, redeployed, checked in the built code). How to check which database a build uses: grep its JS chunks for `https://<ref>.supabase.co`; which deployment a domain serves: `npx vercel api "/v13/deployments/<domain>?teamId=track0"`. Hosting moves to the client's Vercel later.
 - **Supabase `zggylkbgajamhriebdrg`:** all 18 migrations applied; 13 Edge Functions active. `invite-member` redeployed 2026-10-26 19:43 UTC (v4, owner's go-ahead) so team invitation emails list "Handle 3D model requests"; the other functions deployed before the later `_shared` changes behave the same (refactor/type-only differences).
 - **Not checkable from here:** Auth Site URL and redirect URLs. The only record is a 2026-10-20 QA note that the Site URL was the default `http://localhost:3000/`; it may have been fixed. Ask the owner before stating it either way. Same for the `APP_BASE_URL` secret's value (it is set) and Vercel env vars.
-- **Live test content:** catalog `idk` (products `idkidk` Astronaut, `chair` 17.5 MB Tripo chair). Remove before handover, with the owner's OK.
+- **Testing environment (owner, 2026-10-29, ADR-0042):** the current site and `zggylkbgajamhriebdrg` are the testing setup with test data; production is set up fresh at go-live, and only with the client's explicit approval. Test writes are fine; wipes, resets, migrations and function deploys need the owner's go-ahead.
+- **Test content:** catalog `idk` (products `idkidk` Astronaut, `chair` 17.5 MB Tripo chair).
 
 
 ## Business-logic fixes, S1.5 (2026-10-26, same branch; migration `20261026041731` applied to `zggylkbgajamhriebdrg`, checked 2026-10-27)
