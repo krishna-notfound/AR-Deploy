@@ -8,16 +8,19 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
 import { APPLY_PATH, settingsPath } from '@/lib/urls'
 import { cn } from '@/lib/cn'
 import { TAP_TARGET } from '../public/tapTarget'
 import { AuthHeading, AuthLayout, authFieldsClass } from './AuthLayout'
-import { RECOVERED_NOTICE, TwoFactorStep } from './TwoFactorStep'
+import { authErrorText } from './authErrors'
+import { TwoFactorStep } from './TwoFactorStep'
 
 /** Real sign-in (Supabase mode). In demo mode this route forwards to the demo account picker. */
 export default function LoginPage() {
-  useDocumentTitle('Sign in')
+  const { t } = useI18n()
+  useDocumentTitle(t('auth.login.title'))
   const [params] = useSearchParams()
   const next = params.get('next')
   const { user, signedInEmail, accessDeactivated, accountError } = useAccount()
@@ -46,8 +49,8 @@ export default function LoginPage() {
   if (codeStep) {
     return (
       <AuthLayout>
-        <AuthHeading eyebrow="Platform access" title="Two-step verification">
-          <p>Your account is protected with an authenticator app.</p>
+        <AuthHeading eyebrow={t('auth.login.eyebrow')} title={t('auth.twoFactor.title')}>
+          <p>{t('auth.twoFactor.intro')}</p>
         </AuthHeading>
         <TwoFactorStep
           className={cn('mt-8', authFieldsClass)}
@@ -59,7 +62,7 @@ export default function LoginPage() {
           }}
           onRecovered={async () => {
             setStage('recovering')
-            toast.show({ tone: 'info', title: RECOVERED_NOTICE }, 10_000)
+            toast.show({ tone: 'info', title: t('auth.twoFactor.recovered') }, 10_000)
             security.patch(RECOVERED_PATCH)
             await security.refresh()
             setStage('recovered')
@@ -82,28 +85,27 @@ export default function LoginPage() {
     setPending(false)
     if (!res.ok) clearPasswordSignIn()
     // On success the auth listener reloads the account and the redirect above takes over.
-    setError(res.ok ? null : res.error.message)
+    setError(res.ok ? null : authErrorText(t, res.error))
   }
 
   return (
     <AuthLayout>
-      <AuthHeading eyebrow="Platform access" title="Sign in">
-        <p>For platform admins and business owners.</p>
+      <AuthHeading eyebrow={t('auth.login.eyebrow')} title={t('auth.login.title')}>
+        <p>{t('auth.login.intro')}</p>
       </AuthHeading>
 
       {signedInEmail ? (
         <div className="mt-8 space-y-6">
           <InlineNotice tone="neutral">
-            Signed in as <strong className="font-medium">{signedInEmail}</strong>.{' '}
-            <span>{accessDeactivated ? 'Your platform access was turned off by the Owner. Contact them if you need it back.' : 'This account does not manage a business.'}</span>
+            {t('auth.login.signedInAs')} <strong className="font-medium">{signedInEmail}</strong>.{' '}
+            <span>{accessDeactivated ? t('auth.login.deactivated') : t('auth.login.noBusiness')}</span>
           </InlineNotice>
           {!accessDeactivated && (
             <p className="text-sm leading-6 text-ink-muted">
-              Business owners get access by invitation from the Sanctus team after their application is approved. If you applied, we will email you
-              when it has been reviewed.
+              {t('auth.login.invitationOnly')}
             </p>
           )}
-          <Button onClick={() => void leave({ signOut: true })}>Sign out</Button>
+          <Button onClick={() => void leave({ signOut: true })}>{t('auth.signOut')}</Button>
         </div>
       ) : (
         <form onSubmit={submit} className={cn('mt-8 space-y-5', authFieldsClass)} noValidate>
@@ -112,39 +114,39 @@ export default function LoginPage() {
               <span role="alert">{error ?? accountError}</span>
             </InlineNotice>
           )}
-          <FormField label="Email">
+          <FormField label={t('common.email')}>
             <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </FormField>
           <FormField
-            label="Password"
+            label={t('auth.login.password')}
             aside={
               <Link to="/reset-password" className={cn(TAP_TARGET, 'text-xs text-accent-ink hover:underline')}>
-                Forgot your password?
+                {t('auth.login.forgot')}
               </Link>
             }
           >
             <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </FormField>
           <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending || checking} disabled={!email || !password}>
-            Sign in
+            {t('auth.login.title')}
             {!pending && !checking && <ArrowRight className="size-4" aria-hidden />}
           </Button>
           <div className="flex items-center gap-3 text-xs text-ink-muted" aria-hidden>
             <span className="h-px flex-1 bg-line" />
-            or
+            {t('auth.login.or')}
             <span className="h-px flex-1 bg-line" />
           </div>
           {/* Placeholder until Google sign-in is configured in Supabase Auth: disabled and labelled, so it is not a dead button. */}
           <Button type="button" variant="secondary" className="h-11 w-full" disabled icon={<GoogleMark />} aria-describedby="google-soon">
-            Continue with Google
+            {t('auth.login.google')}
           </Button>
           <p id="google-soon" className="-mt-3 text-center text-xs text-ink-muted">
-            Coming soon
+            {t('auth.login.comingSoon')}
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-canvas px-5 py-4 text-sm">
-            <span className="text-ink-muted">New to Sanctus?</span>
+            <span className="text-ink-muted">{t('auth.login.newTo')}</span>
             <Link to={APPLY_PATH} className="inline-flex min-h-11 items-center gap-2 text-label text-ink hover:text-accent-ink">
-              Apply as a business <ArrowRight className="size-3.5" aria-hidden />
+              {t('auth.login.apply')} <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           </div>
         </form>

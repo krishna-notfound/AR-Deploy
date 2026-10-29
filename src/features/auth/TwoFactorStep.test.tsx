@@ -132,7 +132,7 @@ describe('Sign-in with 2FA (Supabase mode)', () => {
     renderLogin()
     const user = await signIn()
     await user.type(await screen.findByLabelText('6-digit code'), TOTP)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Too many requests. Wait a while and try again.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts. Wait a moment and try again.')
     // The step is usable again: the next code goes through.
     await user.type(screen.getByLabelText('6-digit code'), TOTP)
     expect(await screen.findByText('Admin home')).toBeInTheDocument()

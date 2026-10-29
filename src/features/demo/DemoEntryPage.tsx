@@ -1,28 +1,29 @@
 import { useDocumentTitle } from '@/components/layout/PageHeader'
-import { translate } from '@/i18n/translate'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { isDemoMode } from '@/services'
 import { AuthHeading, AuthLayout } from '../auth/AuthLayout'
 import { DemoAccounts } from './DemoAccounts'
 
-/** /demo: choose a mock account or open a public catalog. No real authentication in demo mode. English-only. */
+/** /demo: choose a mock account or open a public catalog. No real authentication in demo mode. */
 export default function DemoEntryPage() {
-  useDocumentTitle('Demo')
+  const { t } = useI18n()
+  useDocumentTitle(t('demo.title'))
   return (
     <AuthLayout
       photo="lounge"
       wide
       footer={
         <>
-          {translate('en', 'site.credits')}
-          {isDemoMode ? ` ${translate('en', 'site.sampleData')}` : ''}
+          {t('site.credits')}
+          {isDemoMode ? ` ${t('site.sampleData')}` : ''}
         </>
       }
     >
-      <AuthHeading eyebrow={isDemoMode ? 'Demo' : 'Platform access'} title="Choose how to explore the platform.">
+      <AuthHeading eyebrow={isDemoMode ? t('demo.title') : t('auth.login.eyebrow')} title={t('demo.heading')}>
         <p>
           {isDemoMode
-            ? 'Pick an account to open a dashboard, or open a public catalog as a customer would.'
-            : 'Sign in to open a dashboard, or open a public catalog as a customer would.'}
+            ? t('demo.introDemo')
+            : t('demo.introLive')}
         </p>
       </AuthHeading>
       <div className="mt-10">
@@ -30,8 +31,7 @@ export default function DemoEntryPage() {
       </div>
       {isDemoMode && (
         <p className="mt-10 text-xs leading-5 text-ink-muted">
-          Demo mode: there is no real authentication, and all changes are stored only in this browser. Account roles here are for navigation, not
-          security.
+          {t('demo.footnote')}
         </p>
       )}
     </AuthLayout>
