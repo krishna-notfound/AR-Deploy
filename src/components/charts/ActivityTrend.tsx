@@ -1,7 +1,8 @@
 import { Table2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import type { DailyPoint } from '@/domain/types'
-import { type DatePrefs, formatNumber } from '@/lib/format'
+import type { DatePrefs } from '@/lib/format'
+import { useFormat } from '@/lib/useFormat'
 import { Button } from '../ui/Button'
 import { EmptyState } from '../ui/States'
 import { CombinedTrendChart, SERIES, type SeriesKey, SeriesTable, TrendChart } from './Charts'
@@ -28,6 +29,7 @@ export function ActivityTrend({
   const [showTable, setShowTable] = useState(false)
   const [show, setShow] = useState<Record<SeriesKey, boolean>>({ views: true, ar: true })
   const lockedHint = useId()
+  const f = useFormat()
   const views = data.reduce((s, d) => s + d.views, 0)
   const ar = data.reduce((s, d) => s + d.arActivations, 0)
   const tableToggle = (
@@ -93,7 +95,7 @@ export function ActivityTrend({
               <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
                 <span className="inline-block h-0.5 w-4 shrink-0" style={{ background: SERIES[k].color }} aria-hidden />
                 <span className="font-medium text-ink">{SERIES[k].label}</span>
-                <span className="text-ink-muted tabular-nums">{formatNumber(k === 'views' ? views : ar)} in 30 days</span>
+                <span className="text-ink-muted tabular-nums">{f.number(k === 'views' ? views : ar)} in 30 days</span>
               </div>
               <TrendChart data={data} series={k} height={160} prefs={prefs} />
             </div>

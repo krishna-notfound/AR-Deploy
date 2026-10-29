@@ -20,7 +20,8 @@ import { clearSessionRequestMedia, mockActor, sessionRequestMedia } from './mock
 import { createMockModelRequestsStaff } from './mockModelRequestsStaff'
 import { createSeed } from './seed'
 import { store } from './store'
-import { normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
+import { msg } from '@/i18n/fieldMessage'
+import { isSlugTaken, normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const FAIL_RATE_KEY = 'arfurn:debug:failRate'
 /** Demo actor for audit entries (the demo account picker is not authentication). */
@@ -291,7 +292,7 @@ export const mockCatalogService: CatalogService = {
       const db = store.get()
       const errors = validateBusiness(data, db.businesses)
       if (Object.keys(errors).length) {
-        const code = errors.slug?.includes('already') ? 'CONFLICT' : 'VALIDATION'
+        const code = isSlugTaken(errors.slug) ? 'CONFLICT' : 'VALIDATION'
         return fail(code, 'Please fix the highlighted fields.', errors)
       }
       const ts = nowIso()
@@ -412,9 +413,9 @@ export const mockCatalogService: CatalogService = {
       const business = db.businesses.find((b) => b.id === data.businessId)
       const siblings = db.products.filter((p) => p.businessId === data.businessId)
       const errors = validateProductDraft(data, siblings)
-      if (!business && !errors.businessId) errors.businessId = 'The selected business no longer exists.'
+      if (!business && !errors.businessId) errors.businessId = msg('common.validation.product.businessGone')
       if (Object.keys(errors).length) {
-        const code = errors.slug?.includes('already') ? 'CONFLICT' : 'VALIDATION'
+        const code = isSlugTaken(errors.slug) ? 'CONFLICT' : 'VALIDATION'
         return fail(code, 'Please fix the highlighted fields.', errors)
       }
       const ts = nowIso()

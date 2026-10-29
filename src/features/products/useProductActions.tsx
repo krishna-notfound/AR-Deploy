@@ -2,6 +2,10 @@ import { useNavigate } from 'react-router'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, Product } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { errorText, fieldText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import type { Vars } from '@/i18n/translate'
 import { copyText } from '@/lib/clipboard'
 import { PUBLIC_URLS_ARE_LIVE, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
@@ -17,14 +21,15 @@ export function editPath(scope: EditorScope, p: Pick<Product, 'id'>) {
   return scope === 'admin' ? `/admin/products/${p.id}/edit` : `/dashboard/products/${p.id}/edit`
 }
 
-export function describeErrors(err: ServiceError): string {
-  const fields = Object.values(err.fieldErrors ?? {})
-  return fields.length ? fields.slice(0, 3).join(' ') : err.message
+export function describeErrors(err: ServiceError, t: (key: TranslationKey, vars?: Vars) => string): string {
+  const fields = Object.values(err.fieldErrors ?? {}).map((e) => fieldText(e, t) ?? '')
+  return fields.length ? fields.slice(0, 3).join(' ') : errorText(err, t)
 }
 
 /** Shared product actions for both dashboards. Every action reports its outcome with a toast. */
 export function useProductActions(scope: EditorScope) {
   const toast = useToast()
+  const { t } = useI18n()
   const confirm = useConfirm()
   const navigate = useNavigate()
 
@@ -42,7 +47,7 @@ export function useProductActions(scope: EditorScope) {
     },
     async publish(p: Product, business?: Business) {
       const r = await service.publishProduct(p.id)
-      if (!r.ok) return toast.error('Cannot publish yet', describeErrors(r.error))
+      if (!r.ok) return toast.error('Cannot publish yet', describeErrors(r.error, t))
       if (business && business.status !== 'active')
         toast.success('Published', 'The catalog is not active yet: customers will see this product once the business is activated.')
       else toast.success('Published', business ? `Live at ${PUBLIC_URLS_ARE_LIVE ? '' : 'the demo URL '}${productPublicUrl(business, p)}` : undefined)

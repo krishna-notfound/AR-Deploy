@@ -168,6 +168,6 @@ describe('Supabase service: variant media', () => {
     const calls: Call[] = []
     const svc = createSupabaseCatalogService(fakeClient({ row }, calls))
     const res = await svc.createProduct({ ...base, variants: [{ id: 'v', name: { en: 'Blob' }, models: { glb: { format: 'glb', url: 'blob:x', fileName: 'x.glb', status: 'session-only' } } }] })
-    expect(res.ok === false && res.error.fieldErrors?.variants).toMatch(/not uploaded/)
+    expect(res.ok === false && res.error.fieldErrors?.variants).toEqual({ key: 'common.validation.product.variantFilesNotUploaded' })
   })
 })

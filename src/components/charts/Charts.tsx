@@ -4,8 +4,10 @@
 // Views and AR launch attempts have different magnitudes, so they never share a dual axis: the analytics page draws
 // them as two small multiples, and the overview's combined chart lets people hide a series so the other rescales.
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { DailyPoint } from '@/domain/types'
-import { type DatePrefs, formatCompact, formatDate, formatNumber } from '@/lib/format'
+import type { DailyPoint, Lang } from '@/domain/types'
+import { localeOf } from '@/i18n/locale'
+import { type DatePrefs, formatDate } from '@/lib/format'
+import { useFormat } from '@/lib/useFormat'
 
 export const SERIES = {
   // The views series counts product page views plus embed views (R-W5-3): its label says so.
@@ -16,16 +18,16 @@ export const SERIES = {
 // Axis ticks follow the dashboard floor: 12px in the muted ink (#5A5148), never smaller.
 const AXIS = { stroke: '#d9d3c7', fontSize: 12, tick: { fill: '#5a5148', fontSize: 12 } }
 
-function shortDate(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+function shortDate(iso: string, lang: Lang) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(localeOf(lang), { month: 'short', day: 'numeric' })
 }
 
 /**
- * A series day in the person's date format: `formatDate(iso, 'en', prefs)`. The day is already a local date in their
+ * A series day in the person's date format: `formatDate(iso, lang, prefs)`. The day is already a local date in their
  * zone (R-W5-2), and formatDate reads it as UTC midnight, so it is formatted in UTC to keep the same date.
  */
-export function dayLabel(day: string, prefs?: DatePrefs): string {
-  return prefs ? formatDate(day, 'en', { ...prefs, timezone: 'UTC' }) : shortDate(day)
+export function dayLabel(day: string, prefs?: DatePrefs, lang: Lang = 'en'): string {
+  return prefs ? formatDate(day, lang, { ...prefs, timezone: 'UTC' }) : shortDate(day, lang)
 }
 
 interface TooltipPayload {
@@ -34,12 +36,13 @@ interface TooltipPayload {
 }
 
 export function TrendTooltip({ active, payload, label, seriesLabel, prefs }: { active?: boolean; payload?: readonly TooltipPayload[]; label?: string; seriesLabel: string; prefs?: DatePrefs }) {
+  const f = useFormat()
   if (!active || !payload?.length || !label) return null
   return (
     <div className="rounded-[var(--radius-control)] bg-surface px-3 py-2 text-xs shadow-[var(--shadow-pop)]">
-      <p className="text-ink-muted">{dayLabel(label, prefs)}</p>
+      <p className="text-ink-muted">{dayLabel(label, prefs, f.lang)}</p>
       <p className="mt-0.5 font-medium text-ink tabular-nums">
-        {formatNumber(Number(payload[0]?.value ?? 0))} {seriesLabel.toLowerCase()}
+        {f.number(Number(payload[0]?.value ?? 0))} {seriesLabel.toLowerCase()}
       </p>
     </div>
   )
@@ -48,14 +51,15 @@ export function TrendTooltip({ active, payload, label, seriesLabel, prefs }: { a
 /** One series over time. Crosshair + tooltip on hover. */
 export function TrendChart({ data, series, height = 160, prefs }: { data: DailyPoint[]; series: keyof typeof SERIES; height?: number; prefs?: DatePrefs }) {
   const s = SERIES[series]
+  const f = useFormat()
   const key = series === 'views' ? 'views' : 'arActivations'
   return (
     <div style={{ height }} role="img" aria-label={`${s.label}, last 30 days`}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} stroke="#ece7dd" strokeDasharray="2 4" />
-          <XAxis dataKey="date" tickFormatter={(d: string) => dayLabel(d, prefs)} minTickGap={28} tickLine={false} axisLine={false} {...AXIS} />
-          <YAxis tickFormatter={(v: number) => formatCompact(v)} tickLine={false} axisLine={false} width={44} allowDecimals={false} {...AXIS} />
+          <XAxis dataKey="date" tickFormatter={(d: string) => dayLabel(d, prefs, f.lang)} minTickGap={28} tickLine={false} axisLine={false} {...AXIS} />
+          <YAxis tickFormatter={(v: number) => f.compact(v)} tickLine={false} axisLine={false} width={44} allowDecimals={false} {...AXIS} />
           <Tooltip
             cursor={{ stroke: '#8a8073', strokeWidth: 1, strokeDasharray: '3 3' }}
             content={(props) => <TrendTooltip active={props.active} payload={props.payload as readonly TooltipPayload[] | undefined} label={props.label as string | undefined} seriesLabel={s.label} prefs={prefs} />}
@@ -81,14 +85,15 @@ export type SeriesKey = keyof typeof SERIES
 
 /** Both series on one axis, as on the overview screens. `show` hides a series so the other rescales to fill the chart. */
 export function CombinedTrendChart({ data, show, height = 220, prefs }: { data: DailyPoint[]; show: Record<SeriesKey, boolean>; height?: number; prefs?: DatePrefs }) {
+  const f = useFormat()
   const shown = (Object.keys(SERIES) as SeriesKey[]).filter((k) => show[k])
   return (
     <div style={{ height }} role="img" aria-label={`${shown.map((k) => SERIES[k].label).join(' and ')}, last 30 days`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} stroke="#ece7dd" />
-          <XAxis dataKey="date" tickFormatter={(d: string) => dayLabel(d, prefs)} minTickGap={56} tickLine={false} axisLine={false} {...AXIS} />
-          <YAxis tickFormatter={(v: number) => formatCompact(v)} tickLine={false} axisLine={false} width={44} allowDecimals={false} {...AXIS} />
+          <XAxis dataKey="date" tickFormatter={(d: string) => dayLabel(d, prefs, f.lang)} minTickGap={56} tickLine={false} axisLine={false} {...AXIS} />
+          <YAxis tickFormatter={(v: number) => f.compact(v)} tickLine={false} axisLine={false} width={44} allowDecimals={false} {...AXIS} />
           <Tooltip
             cursor={{ stroke: '#8a8073', strokeWidth: 1, strokeDasharray: '3 3' }}
             content={(props) => {
@@ -96,10 +101,10 @@ export function CombinedTrendChart({ data, show, height = 220, prefs }: { data: 
               if (!props.active || !point) return null
               return (
                 <div className="rounded-[var(--radius-control)] bg-surface px-3 py-2 text-xs shadow-[var(--shadow-pop)]">
-                  <p className="text-ink-muted">{dayLabel(point.date, prefs)}</p>
+                  <p className="text-ink-muted">{dayLabel(point.date, prefs, f.lang)}</p>
                   {shown.map((k) => (
                     <p key={k} className="mt-0.5 font-medium text-ink tabular-nums">
-                      {formatNumber(k === 'views' ? point.views : point.arActivations)} {SERIES[k].label.toLowerCase()}
+                      {f.number(k === 'views' ? point.views : point.arActivations)} {SERIES[k].label.toLowerCase()}
                     </p>
                   ))}
                 </div>
@@ -134,6 +139,7 @@ export interface BarDatum {
 /** Horizontal bars for comparing magnitude across a few named items. */
 export function HorizontalBars({ data, series, valueLabel }: { data: BarDatum[]; series: keyof typeof SERIES; valueLabel: string }) {
   const s = SERIES[series]
+  const f = useFormat()
   const height = Math.max(120, data.length * 44 + 24)
   return (
     <div style={{ height }} role="img" aria-label={`${valueLabel} by business`}>
@@ -150,7 +156,7 @@ export function HorizontalBars({ data, series, valueLabel }: { data: BarDatum[];
                 <div className="rounded-[var(--radius-control)] bg-surface px-3 py-2 text-xs shadow-[var(--shadow-pop)]">
                   <p className="text-ink-muted">{p.payload.label}</p>
                   <p className="mt-0.5 font-medium text-ink tabular-nums">
-                    {formatNumber(p.payload.value)} {valueLabel.toLowerCase()}
+                    {f.number(p.payload.value)} {valueLabel.toLowerCase()}
                   </p>
                 </div>
               )
@@ -162,7 +168,7 @@ export function HorizontalBars({ data, series, valueLabel }: { data: BarDatum[];
             radius={[0, 1, 1, 0]}
             maxBarSize={22}
             isAnimationActive={false}
-            label={{ position: 'right', fill: '#5a5148', fontSize: 12, formatter: (v: unknown) => formatCompact(Number(v)) }}
+            label={{ position: 'right', fill: '#5a5148', fontSize: 12, formatter: (v: unknown) => f.compact(Number(v)) }}
           />
         </BarChart>
       </ResponsiveContainer>
@@ -172,6 +178,7 @@ export function HorizontalBars({ data, series, valueLabel }: { data: BarDatum[];
 
 /** Accessible table alternative for a daily series. */
 export function SeriesTable({ data, prefs }: { data: DailyPoint[]; prefs?: DatePrefs }) {
+  const f = useFormat()
   return (
     <div className="max-h-64 overflow-auto rounded-[var(--radius-control)] border border-line">
       <table className="w-full text-[length:var(--text-ui-small)]">
@@ -192,9 +199,9 @@ export function SeriesTable({ data, prefs }: { data: DailyPoint[]; prefs?: DateP
         <tbody className="divide-y divide-line tabular-nums">
           {[...data].reverse().map((d) => (
             <tr key={d.date}>
-              <td className="px-3 py-1.5">{dayLabel(d.date, prefs)}</td>
-              <td className="px-3 py-1.5 text-right">{formatNumber(d.views)}</td>
-              <td className="px-3 py-1.5 text-right">{formatNumber(d.arActivations)}</td>
+              <td className="px-3 py-1.5">{dayLabel(d.date, prefs, f.lang)}</td>
+              <td className="px-3 py-1.5 text-right">{f.number(d.views)}</td>
+              <td className="px-3 py-1.5 text-right">{f.number(d.arActivations)}</td>
             </tr>
           ))}
         </tbody>

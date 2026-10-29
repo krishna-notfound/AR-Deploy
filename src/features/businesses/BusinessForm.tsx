@@ -11,6 +11,9 @@ import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import { type Business, type BusinessStatus, CURRENCIES, type Currency } from '@/domain/types'
+import { fieldText } from '@/i18n/errorText'
+import type { FieldError } from '@/i18n/fieldMessage'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { slugInput, slugify } from '@/lib/slug'
 import { BUSINESS_SLUG_MAX } from '@/lib/slug'
 import { PUBLIC_URLS_ARE_LIVE, PUBLIC_URL_MODE, ROOT_DOMAIN, catalogPublicUrl } from '@/lib/urls'
@@ -48,13 +51,15 @@ export function changedBusinessFields(next: BusinessInput, base: BusinessInput, 
 export function BusinessForm({ business, mode, onSaved }: { business: Business | null; mode: BusinessFormMode; onSaved?: (b: Business) => void }) {
   const toast = useToast()
   const confirm = useConfirm()
+  const { t } = useI18n()
   // Creating a live business needs businesses.status (R-W3-3; the database refuses it too); otherwise only a draft.
   const can = useCan()
   const canCreateActive = can('businesses.status')
   const [data, setData] = useState<BusinessInput>(() => toInput(business))
   const [snapshot, setSnapshot] = useState(() => JSON.stringify(toInput(business)))
   const [slugTouched, setSlugTouched] = useState(mode !== 'create')
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [errors, setErrors] = useState<Record<string, FieldError>>({})
+  const fx = (field: string) => fieldText(errors[field], t)
   const [busy, setBusy] = useState<null | 'draft' | 'create' | 'save'>(null)
   const skipBlock = useRef(false)
   const dirty = JSON.stringify(data) !== snapshot
@@ -148,7 +153,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
         <Card>
           <CardHeader title="Business profile" />
           <div className="space-y-5 px-6 pb-6">
-            <FormField label="Business name" required error={errors.name}>
+            <FormField label="Business name" required error={fx('name')}>
               <Input
                 value={data.name}
                 maxLength={BUSINESS_LIMITS.name}
@@ -162,7 +167,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
             <FormField label="Logo">
               <LogoUpload value={data.logoUrl} onChange={(logoUrl) => set({ logoUrl })} name={data.name} businessId={business?.id} />
             </FormField>
-            <FormField label="Description" hint="Shown at the top of the public catalog." error={errors.description}>
+            <FormField label="Description" hint="Shown at the top of the public catalog." error={fx('description')}>
               <Textarea value={data.description} maxLength={BUSINESS_LIMITS.description} rows={3} onChange={(e) => set({ description: e.target.value })} />
             </FormField>
           </div>
@@ -171,16 +176,16 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
         <Card>
           <CardHeader title="Contact" description="Shown to customers when a product has no call-to-action link." />
           <div className="grid gap-5 px-6 pb-6 sm:grid-cols-2">
-            <FormField label="Email" optional error={errors['contact.email']}>
+            <FormField label="Email" optional error={fx('contact.email')}>
               <Input type="email" autoComplete="email" maxLength={BUSINESS_LIMITS.email} value={data.contact.email ?? ''} onChange={(e) => setContact({ email: e.target.value })} />
             </FormField>
-            <FormField label="Phone" optional error={errors['contact.phone']}>
+            <FormField label="Phone" optional error={fx('contact.phone')}>
               <Input type="tel" autoComplete="tel" maxLength={BUSINESS_LIMITS.phone} value={data.contact.phone ?? ''} onChange={(e) => setContact({ phone: e.target.value })} />
             </FormField>
-            <FormField label="Website" optional error={errors['contact.website']}>
+            <FormField label="Website" optional error={fx('contact.website')}>
               <Input type="url" placeholder="https://" value={data.contact.website ?? ''} onChange={(e) => setContact({ website: e.target.value })} />
             </FormField>
-            <FormField label="Address" optional error={errors['contact.address']}>
+            <FormField label="Address" optional error={fx('contact.address')}>
               <Input autoComplete="street-address" maxLength={BUSINESS_LIMITS.address} value={data.contact.address ?? ''} onChange={(e) => setContact({ address: e.target.value })} />
             </FormField>
           </div>
@@ -204,7 +209,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                 <FormField
                   label={PUBLIC_URL_MODE === 'path' ? 'Catalog address' : 'Catalog address (subdomain)'}
                   required
-                  error={errors.slug}
+                  error={fx('slug')}
                   hint={
                     mode === 'edit'
                       ? `Changing this breaks printed QR codes and shared links.${PUBLIC_URLS_ARE_LIVE ? '' : ' Demo only: no DNS or SSL is configured.'}`
@@ -262,7 +267,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                       <input type="color" value={data.branding.accentColor} onChange={(e) => set({ branding: { accentColor: e.target.value.toUpperCase() } })} className="size-8 cursor-pointer rounded border border-line-strong bg-surface p-0.5" />
                     </label>
                   </div>
-                  {errors['branding.accentColor'] && <p className="mt-1 text-ui-small font-medium text-danger">{errors['branding.accentColor']}</p>}
+                  {fx('branding.accentColor') && <p className="mt-1 text-ui-small font-medium text-danger">{fx('branding.accentColor')}</p>}
                 </fieldset>
               </>
             )}

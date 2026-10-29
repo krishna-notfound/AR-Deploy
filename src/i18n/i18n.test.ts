@@ -24,3 +24,37 @@ describe('i18n', () => {
     expect(missing).toEqual([])
   })
 })
+
+const tokens = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort()
+
+describe('dictionary consistency', () => {
+  it('has no empty values in either language', () => {
+    const empty = [...Object.entries(en), ...Object.entries(pt)].filter(([, v]) => typeof v !== 'string' || v.trim() === '').map(([k]) => k)
+    expect(empty).toEqual([])
+  })
+
+  it('uses the same {tokens} in English and Portuguese for every key', () => {
+    const mismatched = (Object.keys(en) as (keyof typeof en)[])
+      .filter((k) => k in pt)
+      .filter((k) => tokens(en[k]).join() !== tokens(pt[k] as string).join())
+    expect(mismatched).toEqual([])
+  })
+
+  it('every .one plural key has its .other, in both languages', () => {
+    const bases = Object.keys(en)
+      .filter((k) => k.endsWith('.one'))
+      .map((k) => k.slice(0, -4))
+    for (const b of bases) {
+      expect(`${b}.other` in en, b).toBe(true)
+      expect(`${b}.one` in pt, b).toBe(true)
+      expect(`${b}.other` in pt, b).toBe(true)
+    }
+  })
+
+  it('seeds the common words in both languages', () => {
+    for (const k of ['save', 'cancel', 'delete', 'edit', 'close', 'retry', 'loading', 'saving', 'saved', 'back', 'continue', 'search', 'yes', 'no', 'notProvided', 'required', 'optional', 'actions', 'status', 'name', 'email', 'created', 'updated', 'error.generic']) {
+      expect(`common.${k}` in en, k).toBe(true)
+      expect(`common.${k}` in pt, k).toBe(true)
+    }
+  })
+})

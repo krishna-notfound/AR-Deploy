@@ -23,10 +23,10 @@ function draft(cta: ProductInput['cta']): ProductInput {
 
 describe('product CTA label (R-W4-13)', () => {
   it("a CTA url with an empty English label gives fieldErrors['cta.label']", () => {
-    expect(validateProductDraft(draft({ label: { en: '' }, url: 'https://wa.me/351' }), [])['cta.label']).toBe('Add a button label, or remove the link.')
+    expect(validateProductDraft(draft({ label: { en: '' }, url: 'https://wa.me/351' }), [])['cta.label']).toEqual({ key: 'common.validation.product.ctaLabelRequired' })
   })
   it('a whitespace-only label counts as empty', () => {
-    expect(validateProductDraft(draft({ label: { en: '   ' }, url: 'https://wa.me/351' }), [])['cta.label']).toBe('Add a button label, or remove the link.')
+    expect(validateProductDraft(draft({ label: { en: '   ' }, url: 'https://wa.me/351' }), [])['cta.label']).toEqual({ key: 'common.validation.product.ctaLabelRequired' })
   })
   it('a label with no url is valid', () => {
     expect(validateProductDraft(draft({ label: { en: '' } }), [])['cta.label']).toBeUndefined()

@@ -33,6 +33,7 @@ import type {
   ReviewedApplication,
   RolePermissions,
 } from '@/domain/types'
+import type { FieldError } from '@/i18n/fieldMessage'
 import type { ModelAsset, ModelFormat } from '@/domain/types'
 import type { ModelRequest, ModelRequestDetail, ModelRequestOutcome, ModelRequestQuery, ProductRequestState } from '@/domain/modelRequests'
 
@@ -53,7 +54,7 @@ export type ServiceErrorCode =
 export interface ServiceError {
   code: ServiceErrorCode
   message: string
-  fieldErrors?: Record<string, string>
+  fieldErrors?: Record<string, FieldError>
   /** A more specific machine-readable cause, e.g. 'already_member' (team roles, ADR-0029). */
   reason?: string
   /** When a refused action can be tried again (owner invitations: `cooldown`, `too_many_invitations`; S1.5 R-W2-4). */
@@ -71,7 +72,7 @@ export const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
 export type Result<T> = { ok: true; data: T } | { ok: false; error: ServiceError }
 
 export const ok = <T>(data: T): Result<T> => ({ ok: true, data })
-export const fail = <T = never>(code: ServiceErrorCode, message: string, fieldErrors?: Record<string, string>): Result<T> => ({
+export const fail = <T = never>(code: ServiceErrorCode, message: string, fieldErrors?: Record<string, FieldError>): Result<T> => ({
   ok: false,
   error: fieldErrors ? { code, message, fieldErrors } : { code, message },
 })

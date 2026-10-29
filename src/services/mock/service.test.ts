@@ -145,7 +145,7 @@ describe('products', () => {
   it('caps options and photos per option like the database', async () => {
     const many = Array.from({ length: 51 }, (_, i) => ({ id: `v${i}`, name: { en: `V${i}` } }))
     const res = await svc.createProduct(draftInput({ slug: 'too-many', variants: many }))
-    expect(res.ok === false && res.error.fieldErrors?.variants).toMatch(/50/)
+    expect(res.ok === false && res.error.fieldErrors?.variants).toEqual({ key: 'common.validation.product.variantsMax', vars: { n: 50 } })
   })
 
   it('filters by business, status and search', async () => {

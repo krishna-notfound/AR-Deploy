@@ -229,7 +229,7 @@ describe('product draft validation', () => {
   it('limits slugs to 70 characters and rejects bad variant price differences', async () => {
     const { validateProductDraft } = await import('./validation')
     expect(validateProductDraft(sampleProduct({ slug: 'a'.repeat(70) }), []).slug).toBeUndefined()
-    expect(validateProductDraft(sampleProduct({ slug: 'a'.repeat(71) }), []).slug).toMatch(/70 characters/)
+    expect(validateProductDraft(sampleProduct({ slug: 'a'.repeat(71) }), []).slug).toEqual({ key: 'common.validation.tooLong', vars: { n: 70 } })
     const variant = (priceDelta?: number) => sampleProduct({ variants: [{ id: 'v', name: { en: 'Oak' }, priceDelta }] })
     expect(validateProductDraft(variant(2500), []).variants).toBeUndefined()
     expect(validateProductDraft(variant(undefined), []).variants).toBeUndefined()
@@ -262,7 +262,7 @@ describe('reserved subdomains', () => {
   it('refuses reserved catalog addresses and matches the database check', async () => {
     const { validateBusiness } = await import('./validation')
     const { RESERVED_SUBDOMAINS } = await import('@/tenant/resolveTenant')
-    expect(validateBusiness({ ...businessInput, slug: 'www' }, []).slug).toMatch(/reserved/)
+    expect(validateBusiness({ ...businessInput, slug: 'www' }, []).slug).toEqual({ key: 'common.validation.business.slugReserved' })
     const { readFileSync } = await import('node:fs')
     const sql = readFileSync('supabase/migrations/20261012192143_init_schema.sql', 'utf8')
     const list = /slug not in \(([^)]+)\)/.exec(sql)?.[1]?.match(/'([a-z]+)'/g)?.map((s) => s.slice(1, -1))

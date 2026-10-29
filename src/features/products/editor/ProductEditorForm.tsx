@@ -14,11 +14,15 @@ import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
 import { OPEN_REQUEST_STATUSES } from '@/domain/modelRequests'
 import { type Business, CATEGORIES, CURRENCIES, type Category, type Currency, type Product, type ProductStatus } from '@/domain/types'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { fieldTexts } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import type { Vars } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
 import { PRODUCT_SLUG_MAX, slugInput, slugify } from '@/lib/slug'
 import { PUBLIC_URLS_ARE_LIVE, modelRequestAdminPath, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
-import { MEDIA_REFRESH_MS } from '@/services/catalogService'
+import { MEDIA_REFRESH_MS, type ServiceError } from '@/services/catalogService'
 import { useRefreshWhenStale } from '@/services/hooks'
 import { validateForPublish } from '@/services/validation'
 import { primaryImage } from '@/lib/product'
@@ -58,6 +62,7 @@ const FIELD_SECTION: Record<string, (typeof SECTIONS)[number]['id']> = {
 }
 
 type Errors = Record<string, string>
+type T = (key: TranslationKey, vars?: Vars) => string
 /** Router state handed to the edit route after a new product's first save. */
 type NavState = { justPublished?: boolean; publishErrors?: Errors } | null
 
@@ -78,13 +83,13 @@ function fieldValue(f: EditorForm, key: string): string {
 }
 
 /** Every client-side rule in one pass: `errors` block saving, `publish` only block publishing. */
-function checkForm(f: EditorForm) {
+function checkForm(f: EditorForm, t: T) {
   const { input, errors } = toInput(f)
-  if (!input.businessId) errors.businessId = 'Choose the business this product belongs to.'
-  if (!input.name.en) errors['name.en'] = 'Product name (English) is required.'
-  if (!input.slug) errors.slug = 'Product URL slug is required.'
+  if (!input.businessId) errors.businessId = t('common.validation.product.businessRequired')
+  if (!input.name.en) errors['name.en'] = t('common.validation.product.nameRequired')
+  if (!input.slug) errors.slug = t('common.validation.product.slugRequired')
   const publish: Errors = {}
-  for (const [k, msg] of Object.entries(validateForPublish(input as Product))) if (!errors[k]) publish[k] = msg
+  for (const [k, m] of Object.entries(validateForPublish(input as Product))) if (!errors[k]) publish[k] = t(m.key, m.vars)
   return { input, errors, publish }
 }
 
@@ -168,6 +173,9 @@ export function ProductEditorForm({
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
+  const { t } = useI18n()
+  /** A refused save or publish as text next to the fields; without field errors, the service sentence (product copy for it: T6 moves these to keys). */
+  const failureErrors = (error: ServiceError): Errors => (error.fieldErrors ? fieldTexts(error.fieldErrors, t) : { _: error.message })
   const actions = useProductActions(scope)
   // Business owners manage their own products; platform users see what their role allows (ADR-0029).
   const can = useCan()
@@ -255,7 +263,7 @@ export function ProductEditorForm({
     setErrors((current) => {
       const changed = Object.keys(current).filter((k) => k in FIELD_SECTION && fieldValue(prev, k) !== fieldValue(form, k))
       if (!changed.length) return current
-      const now = checkForm(form)
+      const now = checkForm(form, t)
       const next = { ...current }
       for (const k of changed) {
         const msg = now.errors[k] ?? (now.publish[k] === current[k] ? now.publish[k] : undefined)
@@ -264,7 +272,7 @@ export function ProductEditorForm({
       }
       return next
     })
-  }, [form])
+  }, [form, t])
 
   // ---- field helpers ----
   const setInput = (patch: Partial<EditorForm['input']>) => setForm((f) => ({ ...f, input: { ...f.input, ...patch } }))
@@ -279,7 +287,7 @@ export function ProductEditorForm({
 
   /** Saves (create or update). Returns the saved product or null. */
   const save = async (): Promise<Product | null> => {
-    const { input, errors: local } = checkForm(form)
+    const { input, errors: local } = checkForm(form, t)
     if (Object.keys(local).length) {
       showErrors(local)
       return null
@@ -289,7 +297,7 @@ export function ProductEditorForm({
     const res = product ? await service.updateProduct(product.id, payload) : await service.createProduct(payload)
     if (!res.ok) {
       setStaleModels(res.error.reason === 'models_changed_elsewhere')
-      showErrors(res.error.fieldErrors ?? { _: res.error.message })
+      showErrors(failureErrors(res.error))
       toast.error('Could not save product', res.error.message)
       return null
     }
@@ -356,7 +364,7 @@ export function ProductEditorForm({
   }
 
   const onPublish = async () => {
-    const check = checkForm(form)
+    const check = checkForm(form, t)
     if (Object.keys(check.errors).length) return publishBlocked({ ...check.errors, ...check.publish })
     setBusy('publish')
     const saved = dirty || isNew ? await save() : latest
@@ -367,7 +375,7 @@ export function ProductEditorForm({
     }
     const res = await service.publishProduct(saved.id)
     setBusy(null)
-    if (!res.ok) return publishBlocked(res.error.fieldErrors ?? { _: res.error.message }, saved)
+    if (!res.ok) return publishBlocked(failureErrors(res.error), saved)
     setLatest(res.data)
     if (isNew) goToEdit(res.data, { justPublished: true })
     else setPublishedOpen(true)

@@ -14,6 +14,8 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessApplication, ReviewAction, ReviewedApplication } from '@/domain/types'
+import { fieldText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { businessAdminPath } from '@/lib/urls'
@@ -60,6 +62,7 @@ export default function ApplicationDetailPage() {
 
 function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChanged: () => void }) {
   const prefs = usePreferences()
+  const { t } = useI18n()
   const confirm = useConfirm()
   const toast = useToast()
   const review = useServiceMutation((action: ReviewAction, reason?: string, includeReason?: boolean) => service.reviewApplication(app.id, action, reason, { includeReason: includeReason === true }))
@@ -117,7 +120,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const run = async (action: ReviewAction, why?: string) => {
     const res = await review.mutate(action, why, action === 'reject' && includeReason)
     if (!res.ok) {
-      if (action === 'reject' && res.error.fieldErrors?.reason) return setReasonError(res.error.fieldErrors.reason)
+      if (action === 'reject' && res.error.fieldErrors?.reason) return setReasonError(fieldText(res.error.fieldErrors.reason, t) ?? null)
       return toast.error('The application was not updated', res.error.message)
     }
     setRejectOpen(false)

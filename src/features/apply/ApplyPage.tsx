@@ -182,7 +182,7 @@ export default function ApplyPage() {
       return
     }
     if (res.error.code === 'VALIDATION' && res.error.fieldErrors) {
-      const errs = Object.fromEntries(Object.entries(res.error.fieldErrors).map(([f, c]) => [f, message(f, c)]))
+      const errs = Object.fromEntries(Object.entries(res.error.fieldErrors).map(([f, c]) => [f, typeof c === 'string' ? message(f, c) : t(c.key, c.vars)]))
       setErrors(errs)
       const first = STEPS.find((s) => (APPLICATION_STEPS[s] as readonly string[]).some((f) => errs[f]))
       if (first && first !== 'review') go(first)

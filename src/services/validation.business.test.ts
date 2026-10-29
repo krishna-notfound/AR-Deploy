@@ -17,14 +17,14 @@ const email = (n: number) => `${'a'.repeat(n - '@ex.com'.length)}@ex.com`
 
 describe('S2 Task 2: validateBusiness field limits (R-W3-7)', () => {
   it("a 501-character address gives fieldErrors['contact.address'] = 'Use 500 characters or fewer.'", () => {
-    expect(validateBusiness({ ...base(), contact: { address: 'a'.repeat(501) } }, [])['contact.address']).toBe('Use 500 characters or fewer.')
+    expect(validateBusiness({ ...base(), contact: { address: 'a'.repeat(501) } }, [])['contact.address']).toEqual({ key: 'common.validation.tooLong', vars: { n: 500 } })
   })
 
   it('one character over each limit gives the field error', () => {
-    expect(validateBusiness({ ...base(), slug: 'a'.repeat(64) }, []).slug).toBe('Use 63 characters or fewer.')
-    expect(validateBusiness({ ...base(), contact: { email: email(321) } }, [])['contact.email']).toBe('Use 320 characters or fewer.')
-    expect(validateBusiness({ ...base(), contact: { phone: '1'.repeat(51) } }, [])['contact.phone']).toBe('Use 50 characters or fewer.')
-    expect(validateBusiness({ ...base(), description: 'd'.repeat(1001) }, []).description).toBe('Use 1000 characters or fewer.')
+    expect(validateBusiness({ ...base(), slug: 'a'.repeat(64) }, []).slug).toEqual({ key: 'common.validation.tooLong', vars: { n: 63 } })
+    expect(validateBusiness({ ...base(), contact: { email: email(321) } }, [])['contact.email']).toEqual({ key: 'common.validation.tooLong', vars: { n: 320 } })
+    expect(validateBusiness({ ...base(), contact: { phone: '1'.repeat(51) } }, [])['contact.phone']).toEqual({ key: 'common.validation.tooLong', vars: { n: 50 } })
+    expect(validateBusiness({ ...base(), description: 'd'.repeat(1001) }, []).description).toEqual({ key: 'common.validation.tooLong', vars: { n: 1000 } })
   })
 
   it('exactly at each limit is valid', () => {
@@ -43,6 +43,6 @@ describe('S2 Task 2: validateBusiness field limits (R-W3-7)', () => {
   })
 
   it('the name keeps its message', () => {
-    expect(validateBusiness({ ...base(), name: 'n'.repeat(81) }, []).name).toBe('Use 80 characters or fewer.')
+    expect(validateBusiness({ ...base(), name: 'n'.repeat(81) }, []).name).toEqual({ key: 'common.validation.tooLong', vars: { n: 80 } })
   })
 })

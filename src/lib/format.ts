@@ -1,10 +1,12 @@
 import type { Currency, DateFormatPref, Dimensions, Lang, LengthUnit } from '@/domain/types'
+import { localeOf } from '@/i18n/locale'
 
-const CURRENCY_LOCALE: Record<Lang, string> = { en: 'en-US', pt: 'pt-PT' }
+// Every formatter takes the language with a default of 'en': a caller that forgets it silently stays English. Dashboard
+// code gets all of them already bound to the current language and the person's date settings from useFormat().
 
 /** Formats a price stored in minor units. */
 export function formatMoney(minor: number, currency: Currency, lang: Lang = 'en'): string {
-  return new Intl.NumberFormat(CURRENCY_LOCALE[lang], { style: 'currency', currency }).format(minor / 100)
+  return new Intl.NumberFormat(localeOf(lang), { style: 'currency', currency }).format(minor / 100)
 }
 
 /** "1234.5" → 123450. Returns null for invalid input. */
@@ -19,15 +21,15 @@ export function minorToInput(minor: number): string {
 }
 
 export function formatNumber(n: number, lang: Lang = 'en'): string {
-  return new Intl.NumberFormat(CURRENCY_LOCALE[lang]).format(n)
+  return new Intl.NumberFormat(localeOf(lang)).format(n)
 }
 
-export function formatCompact(n: number): string {
-  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+export function formatCompact(n: number, lang: Lang = 'en'): string {
+  return new Intl.NumberFormat(localeOf(lang), { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 }
 
-export function formatPercent(ratio: number): string {
-  return `${(ratio * 100).toFixed(1)}%`
+export function formatPercent(ratio: number, lang: Lang = 'en'): string {
+  return `${new Intl.NumberFormat(localeOf(lang), { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(ratio * 100)}%`
 }
 
 /** A signed-in person's date settings (Settings → Preferences). Dashboards pass `usePreferences()`. */
@@ -60,10 +62,16 @@ function partsIn(iso: string, zone: string) {
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-function prefDate({ y, m, d }: { y: number; m: number; d: number }, format: DateFormatPref): string {
+/** Short month name: the fixed English list for 'en' (so output is stable), the language's own abbreviation otherwise. */
+function shortMonth(m: number, lang: Lang): string {
+  if (lang === 'en') return MONTHS[m - 1] ?? ''
+  return new Intl.DateTimeFormat(localeOf(lang), { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, m - 1, 15)))
+}
+
+function prefDate({ y, m, d }: { y: number; m: number; d: number }, format: DateFormatPref, lang: Lang): string {
   if (format === 'dd/MM/yyyy') return `${pad(d)}/${pad(m)}/${y}`
   if (format === 'yyyy-MM-dd') return `${y}-${pad(m)}-${pad(d)}`
-  return `${d} ${MONTHS[m - 1]} ${y}`
+  return `${d} ${shortMonth(m, lang)} ${y}`
 }
 
 function prefTime({ h, min }: { h: number; min: number }, clock: DatePrefs['clock']): string {
@@ -73,8 +81,8 @@ function prefTime({ h, min }: { h: number; min: number }, clock: DatePrefs['cloc
 
 /** Without `prefs` (public pages, signed-out views): the original locale format, unchanged. */
 export function formatDate(iso: string, lang: Lang = 'en', prefs?: DatePrefs): string {
-  if (prefs) return prefDate(partsIn(iso, prefs.timezone), prefs.dateFormat)
-  return new Intl.DateTimeFormat(CURRENCY_LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric' }).format(
+  if (prefs) return prefDate(partsIn(iso, prefs.timezone), prefs.dateFormat, lang)
+  return new Intl.DateTimeFormat(localeOf(lang), { day: 'numeric', month: 'short', year: 'numeric' }).format(
     new Date(iso),
   )
 }
@@ -83,9 +91,9 @@ export function formatDate(iso: string, lang: Lang = 'en', prefs?: DatePrefs): s
 export function formatDateTime(iso: string, lang: Lang = 'en', prefs?: DatePrefs): string {
   if (prefs) {
     const p = partsIn(iso, prefs.timezone)
-    return `${prefDate(p, prefs.dateFormat)}, ${prefTime(p, prefs.clock)}`
+    return `${prefDate(p, prefs.dateFormat, lang)}, ${prefTime(p, prefs.clock)}`
   }
-  return new Intl.DateTimeFormat(CURRENCY_LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+  return new Intl.DateTimeFormat(localeOf(lang), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 }
 
 /** Only the time of day, in the person's zone and clock: "14:05" or "2:05 pm". */
@@ -94,15 +102,15 @@ export function formatTime(iso: string, prefs: DatePrefs): string {
 }
 
 /** "3 hours ago"; older than 30 days, the date (in the person's format with `prefs`). */
-export function formatRelative(iso: string, now: Date = new Date(), prefs?: DatePrefs): string {
+export function formatRelative(iso: string, now: Date = new Date(), prefs?: DatePrefs, lang: Lang = 'en'): string {
   const diffSec = Math.round((new Date(iso).getTime() - now.getTime()) / 1000)
   const abs = Math.abs(diffSec)
-  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+  const rtf = new Intl.RelativeTimeFormat(localeOf(lang), { numeric: 'auto' })
   if (abs < 60) return rtf.format(diffSec, 'second')
   if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute')
   if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), 'hour')
   if (abs < 86400 * 30) return rtf.format(Math.round(diffSec / 86400), 'day')
-  return formatDate(iso, 'en', prefs)
+  return formatDate(iso, lang, prefs)
 }
 
 export function formatFileSize(bytes: number): string {

@@ -6,6 +6,7 @@ import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import type { Permission } from '@/domain/types'
+import { LanguageProvider } from '@/i18n/LanguageProvider'
 import { service } from '@/services'
 import { ok } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
@@ -157,5 +158,26 @@ describe('S2 Task 2: field limits and the status select (R-W3-5, R-W3-7)', () =>
     expect(await screen.findByText('Use 1000 characters or fewer.')).toBeInTheDocument()
     expect(screen.getByLabelText('Description')).toHaveAttribute('aria-invalid', 'true')
     expect(update).not.toHaveBeenCalled()
+  })
+})
+
+describe('validation messages follow the language', () => {
+  it('shows the field limit message in Portuguese when the language is pt', async () => {
+    localStorage.setItem('arfurn:lang', 'pt')
+    const user = userEvent.setup()
+    const router = createMemoryRouter([{ path: '/admin/businesses/biz_nord', element: <EditRoute /> }], { initialEntries: ['/admin/businesses/biz_nord'] })
+    render(
+      <LanguageProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <RouterProvider router={router} />
+          </ConfirmProvider>
+        </ToastProvider>
+      </LanguageProvider>,
+    )
+    const description = await screen.findByLabelText('Description')
+    fireEvent.change(description, { target: { value: 'd'.repeat(1001) } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Use 1000 caracteres ou menos.')).toBeInTheDocument()
   })
 })

@@ -38,6 +38,7 @@ import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import { type AuditEntry, type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, type CreatedBusiness, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type StorageSweep, type UploadKind, fail, ok, teamFail, toAuditEntry } from '../catalogService'
+import { msg } from '@/i18n/fieldMessage'
 import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
@@ -800,9 +801,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
   async function saveProduct(id: ID | null, input: ProductInput): Promise<Result<Product>> {
     const errors = validateProductDraft(input, [])
     const local = [...input.images.map((i) => i.url), input.models.glb?.url ?? '', input.models.usdz?.url ?? '']
-    if (local.some(isBlobOrDataUrl)) errors.images = 'Some files were not uploaded to storage. Remove them and upload again.'
+    if (local.some(isBlobOrDataUrl)) errors.images = msg('common.validation.product.filesNotUploaded')
     const variantFiles = input.variants.flatMap((v) => [...(v.images ?? []), ...modelList(v.models)])
-    if (variantFiles.some((f) => !f.storagePath)) errors.variants = 'Some colour or option files were not uploaded to storage. Remove them and upload again.'
+    if (variantFiles.some((f) => !f.storagePath)) errors.variants = msg('common.validation.product.variantFilesNotUploaded')
     if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
     const { data, error } = await sb.rpc('save_product', toSaveProductArgs(id, input))
     if (error) return mapDbError(error, { conflictField: 'product', notFound: 'Product not found.' })
