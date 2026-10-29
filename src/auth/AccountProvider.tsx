@@ -5,6 +5,8 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import { useOptionalToast } from '@/components/ui/ToastProvider'
 import type { Business, ID, PlatformAccess, PlatformRole, SecurityState, User } from '@/domain/types'
 import { type AssuranceLevels, type AuthService, type ServiceError, type SignedInAccount, account as accountApi, auth, service } from '@/services'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { translate } from '@/i18n/translate'
 import { onPermissionError, useServiceQuery } from '@/services/hooks'
 import { DEMO_PLATFORM_USERS, SUPER_ADMIN, businessAdminFor } from './accounts'
 
@@ -276,7 +278,7 @@ function applyPatch(info: Pick<SecurityInfo, 'state' | 'assurance'>, p: Security
 }
 
 /** Shown when a reload finds that the signed-in platform user's role or permissions changed (S1.5 R-W6-8). */
-export const ACCESS_CHANGED = 'Your access changed. This page was updated.'
+export const ACCESS_CHANGED = translate('en', 'auth.accessChanged')
 /** A PERMISSION error reloads the platform access at most this often. */
 const ACCESS_ON_REFUSAL_MS = 2_000
 
@@ -360,6 +362,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
   // nav and permission checks follow) and says so; access turned off reloads the account, which signs them out of
   // the dashboard. Business owners have no platform access to reload.
   const toast = useOptionalToast()
+  const { t } = useI18n()
   const accessLoad = useRef({ running: false, at: 0 })
   const refreshAccess = useCallback(async () => {
     const cur = accountRef.current
@@ -375,11 +378,11 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
       const next: SignedInAccount = { ...cur, user: { ...cur.user, platform: r.data } }
       accountRef.current = next
       setAccount(next)
-      toast?.info(ACCESS_CHANGED)
+      toast?.info(t('auth.accessChanged'))
     } finally {
       accessLoad.current.running = false
     }
-  }, [load, toast])
+  }, [load, toast, t])
   useEffect(() => {
     refreshAccessRef.current = () => void refreshAccess()
   }, [refreshAccess])
@@ -493,14 +496,15 @@ function DemoAccountProvider({ children }: { children: ReactNode }) {
   )
   // A changed role or permission set for the same demo account says so (the nav follows the new access).
   const toast = useOptionalToast()
+  const { t } = useI18n()
   const seenAccess = useRef<{ role: PlatformRole; access: PlatformAccess } | null>(null)
   useEffect(() => {
     const now = access.data
     if (!platformRole || !now) return
     const prev = seenAccess.current
     seenAccess.current = { role: platformRole, access: now }
-    if (prev?.role === platformRole && now.status === 'active' && !sameAccess(prev.access, now)) toast?.info(ACCESS_CHANGED)
-  }, [access.data, platformRole, toast])
+    if (prev?.role === platformRole && now.status === 'active' && !sameAccess(prev.access, now)) toast?.info(t('auth.accessChanged'))
+  }, [access.data, platformRole, toast, t])
   const [gateHeld, setGateHeld] = useState(false)
   const holdGate = useCallback((on: boolean) => setGateHeld(on), [])
   // The demo security state follows the chosen account (the staff and business policies differ).

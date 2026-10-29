@@ -97,4 +97,11 @@ export const enAuth = {
   'auth.signOut.deviceOnlyBody': 'Other devices stay signed in until their session expires.',
   'auth.signOut.failedTitle': 'Could not sign out',
   'auth.signOut.failedBody': 'Check your connection and try again.',
+  'auth.accessChanged': 'Your access changed. This page was updated.',
+  'auth.noAccess.title': 'You don\'t have access to this page',
+  'auth.noAccess.body': 'Ask the platform owner if you need it.',
+  'auth.demoReset.title': 'Demo data was reset',
+  'auth.demoReset.body': 'Stored demo data was invalid, so the sample data has been restored.',
+  'auth.demoQuota.title': 'Changes not saved to this browser',
+  'auth.demoQuota.body': 'Browser storage is full. Your changes stay until you close this tab. Try removing large images.',
 } as const

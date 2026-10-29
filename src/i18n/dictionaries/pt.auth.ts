@@ -99,4 +99,11 @@ export const ptAuth: Partial<Record<TranslationKey, string>> = {
   'auth.signOut.deviceOnlyBody': 'Os outros dispositivos mantêm a sessão iniciada até esta expirar.',
   'auth.signOut.failedTitle': 'Não foi possível terminar a sessão',
   'auth.signOut.failedBody': 'Verifique a ligação e tente novamente.',
+  'auth.accessChanged': 'O seu acesso mudou. Esta página foi atualizada.',
+  'auth.noAccess.title': 'Não tem acesso a esta página',
+  'auth.noAccess.body': 'Peça ao proprietário da plataforma se precisar dele.',
+  'auth.demoReset.title': 'Os dados de demonstração foram repostos',
+  'auth.demoReset.body': 'Os dados de demonstração guardados eram inválidos, por isso os dados de exemplo foram restaurados.',
+  'auth.demoQuota.title': 'Alterações não guardadas neste navegador',
+  'auth.demoQuota.body': 'O armazenamento do navegador está cheio. As alterações mantêm-se até fechar este separador. Experimente remover imagens grandes.',
 }
