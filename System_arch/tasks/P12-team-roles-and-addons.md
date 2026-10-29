@@ -124,9 +124,23 @@ Order: **P12.0 team roles first**, then the add-ons in the order **A3 → A2 →
 - ~~**S3:** an application form builder: the Owner edits the fields, and the values are stored in the database.~~ **Cancelled by the owner on 2026-10-26:** "keep form as it is … I don't want a form builder now". The application form stays as it is. Its audit fixes (APP-04, APP-11, APP-09/MAIL-14) moved to S1.5, Tasks 16–18 (with the other application fixes that were planned for S3: R-W2-2 to R-W2-8 and R-W8-1).
 - **S4:** 3D model requests (A3): a per-business "allow own 3D upload" setting, separate catalog and request photos (2–10), admin upload, notification to the business, and the 3D part hidden until the model is ready. **Also fixes** audit findings PROD-03, ANA-03, PROD-12. **Moved here from S1.5:** R-W4-2 (PROD-02, stale save), R-W4-3 (PROD-08), R-W4-4 (PROD-07), R-W4-5 (PROD-10), R-W4-6 (PROD-11), R-W4-7 (PROD-09) and R-W4-14 (PROD-05, docs; also the published-slug confirmation of R-W3-2).
 
+
+## Content Editor and bilingual dashboards (owner request, 2026-10-29; ADR-0043, ADR-0044)
+
+Spec `docs/superpowers/specs/2026-10-29-content-editor-and-bilingual-dashboards-design.md`, plan `docs/superpowers/plans/2026-10-29-content-editor-and-bilingual-dashboards.md`.
+
+- [x] `content.manage` (17th permission), migration `20261029074648_site_content.sql` + rollback + PGlite tests, `ContentService`, mock, Supabase module (written, not applied)
+- [x] Editor: Pages (Terms, Privacy, custom pages, footer links), publish and history, preview
+- [x] Application form builder, shared validator with rules, `submit-application` handler, "Extra questions" on the detail page
+- [x] Social links and footer icons
+- [x] App-wide `LanguageProvider`, one `LanguageSwitcher` on every screen, dashboards translated to pt-PT
+- [x] T8: Playwright e2e (desktop and mobile) and docs (HANDOFF, design 10/12/19/24, CLIENT_HANDOVER "Editor", TEST_PLAN, OPERATIONS_RUNBOOK, PRD X-04 and X-05, CLAUDE.md language rule). Note: demo-mode e2e only. Live checks in `docs/TEST_PLAN.md` wait for the owner's go-ahead to apply the migration and redeploy `submit-application`.
+- [ ] Owner's go-ahead: apply the migration, `npm run db:types`, redeploy `submit-application`, then live checks (runbook "Content Editor")
+
 ## Log
 
 | Date | Note |
 |---|---|
 | 2026-10-25 | P12.0 spec approved and plan written. Add-ons A1–A3 recorded from the owner's request, to run after P12.0. |
 | 2026-10-25 | P12.0 live. A1 dashboard clarity pass built and reviewed (14 tasks plus a visual review against Stitch); next is the owner's business-logic pass, then A3 and A2. |
+| 2026-10-29 | Content Editor and bilingual dashboards built on the feature branch (ADR-0043, ADR-0044); e2e and docs done. Migration and function not applied: waiting for the owner. |

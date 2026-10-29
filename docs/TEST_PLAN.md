@@ -9,6 +9,7 @@ Three kinds of evidence, never mixed: **automated** (local, demo mode or disposa
 | `npm run typecheck`, `npm run lint`, `npm run build` | types, lint (0 errors), production bundle | pass |
 | `npm test` | unit + component + PGlite database tests (migrations, RLS, publish rules, registration, claim links, cross-business isolation, rollback script) | 121 passed, 15 skipped (live suite) |
 | `npm run test:e2e` | Playwright, demo mode, desktop + emulated Pixel 7: catalog, product page, 3D fallback, WebXR first (stubbed `navigator.xr`: one session request per tap, button never stuck), Scene Viewer fallback intent on a **simulated** Android UA without WebXR, one launch per double tap, PT/EN, in-app notice, admin CRUD, QR | 27/27 (one earlier run had a flaky demo-only failure, see PRODUCTION_READINESS 6c) |
+| `npm run test:e2e` (Editor and PT dashboards, 2026-10-29) | `tests/e2e/content-editor.spec.ts` (desktop) and `content-editor.mobile.spec.ts` (Pixel 7), shared flows in `editorFlows.ts`: edit Terms, preview, publish; custom page in the footers; form builder, required question, reviewer's "Extra questions"; PT dashboards and one language switch; Team blocked from the Editor | 6/6 desktop, 6/6 mobile (branch `feature/sanctus-brand-design-system`, demo mode) |
 
 ## Live integration (real Supabase API)
 
@@ -114,6 +115,28 @@ Run on `zggylkbgajamhriebdrg` with accounts and businesses labelled "QA", a QA T
 | Delete a QA product that has a request | its request photos and staged files are removed from Storage |
 | **Real devices:** open a delivered model in Android Scene Viewer and iPhone Quick Look (see the AR checklist above) | opens at true size (ADR-0021); only a device test closes this row |
 | **Rollback rehearsal** (optional, on a copy): export and empty the bucket, run the S4 rollback, re-apply | the script refuses while the bucket has objects; delivered models stay |
+
+## Content Editor live checks (after the release, with the owner's OK)
+
+Run on `zggylkbgajamhriebdrg` after the migration and the `submit-application` redeploy (`docs/OPERATIONS_RUNBOOK.md`, "Content Editor"). Use an Admin and a Team QA account, both with 2FA, and a Resend test address. The automated suites below pass without the database: PGlite (`supabase/tests/siteContent.test.ts`), the `submit-application` handler tests, the unit and component tests (`siteContent`, `applyForm`, `ApplyForm`, `ApplyFormEditor`, Editor pages and publish, `LegalPage`, `CustomPage`, language provider, i18n key parity) and the demo Playwright flows `tests/e2e/content-editor.spec.ts` and `content-editor.mobile.spec.ts` (Terms edit and Publish; custom page in the footers and at `/pages/<slug>`; form builder with a required question and the reviewer's "Extra questions"; PT dashboards from the top bar; the same switch everywhere; Team cannot open the Editor). Only a live check proves the real functions, grants and 2FA gate.
+
+| Check | Expected |
+|---|---|
+| Before publishing anything, open `/terms`, `/privacy`, `/apply` and the landing footer | Unchanged built-in text; no social icons |
+| An Admin (2FA done) edits Terms in the Editor, previews, publishes; open `/terms` signed out | The new text is live on the next load; Portuguese keeps the shipped text if not edited |
+| A custom page with "Show in footer" is published | The link shows in the footers (landing, catalogue page, apply page) and `/pages/<slug>` opens; an empty Portuguese text shows the English text |
+| A Team member without `content.manage` opens `/admin/editor`, then calls `admin_get_site_content` directly with a REST client | No nav item and no access in the app; 42501 from the function |
+| An Admin without 2FA calls `admin_save_site_content_draft` | `aal2_required` (42501) |
+| Two Admin sessions: one saves, the other saves with the old `draftUpdatedAt`; then publishes with it | `draft_conflict`; the second sees the banner and nothing is overwritten |
+| A signed-out REST read of `site_content`, and of the draft through `get_published_site_content` | No rows / only the published part; the draft is never returned |
+| Restore an earlier version, then Publish | Restore changes only the draft; the audit log shows `site_content_published` and `site_content_draft_restored` with the actor |
+| Publish an application form with a required question and a hidden `website`; submit through `/apply` | The application is stored with `answers.custom` (label snapshot) and `formVersion`; the detail page shows "Extra questions" and "Not given" for the website; approval still works |
+| Submit with the question missing, with an unknown question id, and with a stale form (publish a change while the page is open) | Refused; 409 `form_changed` for the stale form, and the page reloads the form and keeps the answers |
+| Only on a copy of the project, if one exists: make the function unable to read the form | 503 `config_unavailable` and the page's "could not send" state; never an application without rules |
+| Applications list and detail with an application that has no city, country or category | No stray comma; "Not given" |
+| Language: switch to Portuguese in the dashboard top bar, on a phone in the menu; reload; sign in on another device | The choice is kept per device; Portuguese labels everywhere on the dashboards, settings and sign-in pages |
+| Social links: publish a link with a wrong host (`instagram.com.evil.example`) and `http://` | The Editor refuses both; a direct database call with an `http://` link is refused too (the database checks the `https` prefix, the host check is the Editor's) |
+| **Rollback rehearsal** (optional, on a copy): export the content, run the rollback script, re-apply | Null `country`, `city` and `category` become "Not given"; the script refuses while an application's answers exceed 16,384 bytes |
 
 ## Pending manual checks
 

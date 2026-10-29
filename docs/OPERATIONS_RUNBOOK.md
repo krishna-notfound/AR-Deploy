@@ -326,6 +326,58 @@ Order matters: **S4 first, then S2, then S1.5.**
 7. **The bucket itself.** On hosted Supabase, deleting from the Storage tables directly can be refused. The script then only raises a notice and the rest still commits: delete the empty `model-request-photos` bucket in the dashboard (Storage → `model-request-photos` → Delete bucket).
 8. Then, if wanted, the S2 rollback (`20261026_s2_business_logic_rollback.sql`), and after it the S1.5 one (see "Business-logic fixes (S1.5)"). Regenerate the types: `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
 
+## Content Editor (ADR-0043) and bilingual dashboards (ADR-0044)
+
+The Editor of 2026-10-29: the `content.manage` permission, the `site_content` tables with their functions, the nullable `country`, `city` and `category` of applications, and a changed `submit-application` function. Written and tested in PGlite and demo mode; **not applied to any project** (checked in the repo 2026-10-29). Apply and deploy only with the owner's explicit go-ahead (ADR-0042). The PT dashboards are frontend only and need nothing here.
+
+One migration (`supabase/migrations/20261029074648_site_content.sql`, dated after the S4 migration) and one rollback script (`supabase/rollback/20261029_site_content_rollback.sql`).
+
+### Release order
+
+1. **Go-ahead.** The owner approves the release for `zggylkbgajamhriebdrg`. Confirm a recent backup exists (Supabase, Database, Backups).
+2. **Read-only pre-flight.** The same statements are in the migration's `PRE-FLIGHT (site_content)` comment. Show the owner the results before anything is applied.
+   ```sql
+   -- The Admin set gains content.manage (with one audit row); Team is not changed.
+   select role::text, array_agg(permission order by permission) as permissions
+     from public.platform_role_permissions group by role order by role;
+   -- Expect two nulls: the tables do not exist yet.
+   select to_regclass('public.site_content'), to_regclass('public.site_content_versions');
+   -- The new answers limit is 65,536 bytes; nothing existing is affected.
+   select max(pg_column_size(answers)) from public.business_applications;
+   ```
+3. **Apply the migration.** `npx supabase db push --linked`. **Never `supabase config push`**. If it fails, read the error before retrying and check `supabase_migrations.schema_migrations`. The old function and the live site keep working with it: it only loosens constraints on applications.
+4. **Regenerate the types.** `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+5. **Redeploy `submit-application`**, straight after the migration (it reads `site_content`):
+   ```
+   npx supabase functions deploy submit-application --project-ref zggylkbgajamhriebdrg
+   ```
+   It now validates custom answers against the published form (409 `form_changed`, 503 `config_unavailable`) and accepts a body up to 48,000 bytes.
+6. **Only then may anyone publish an application form change** (a required question, a hidden field). An old function ignores custom answers and the new rules, so a required question would not be enforced and a hidden `country` would make it refuse every application. Pages, Terms, Privacy and social links are safe once step 3 is done.
+7. **Live smoke checks** (see `docs/TEST_PLAN.md`, "Content Editor live checks"): save, publish and restore as an Admin with 2FA; a Team member is refused; an application with a required question.
+8. **Release the frontend** to the Preview first, then to `sanctus.warpkit.online` only when the owner asks (push to `main`). Migration and function before the frontend, always: the new Editor calls functions the old database does not have.
+
+### Mixed versions
+
+- **New frontend against the old database:** the Editor shows an error state with Retry and the public pages show the built-in text (the published-content read fails and falls back, with the one-line notice). The dashboards still work.
+- **Old frontend against the new database:** works. The old Role editor does not know `content.manage`; do not edit roles in it between steps 3 and 8, because it could write a set without the key.
+- **New database, old function:** safe only while no form change is published (step 6).
+
+### Rollback
+
+Order: **frontend, function, then the script, and before any earlier rollback (S4, S2, S1.5).**
+
+1. **Frontend.** Vercel, Deployments, the previous production deployment, **Instant Rollback**.
+2. **Function.** Redeploy the previous `submit-application` (the version from before this release) **before** the script, so no new application is written with null fields or custom answers.
+3. **Export what the client wants to keep.** The published pages, the draft and the version history are deleted with the tables:
+   ```sql
+   select draft, published, published_version from public.site_content;
+   select * from public.site_content_versions order by version;
+   ```
+4. **Database.** In the SQL editor, as the database owner, run `supabase/rollback/20261029_site_content_rollback.sql`. It drops the tables and functions, restores the S4 bodies of `my_platform_access` and `admin_set_role_permissions`, removes `content.manage` from every role set (one `access_permissions_changed` row per role that had it) and the check goes back to 16 keys. It fills null `country`, `city` and `category` with "Not given" and makes them required again, and restores the 16,384-byte answers limit. If an application is larger than that it stops with `application_answers_too_large` and changes nothing: shorten or export that row, then run it again.
+5. **What stays.** `audit_events` and `email_log` rows.
+6. Regenerate the types: `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
+
+
 ## Rollback
 
 | What | How | Data effect |

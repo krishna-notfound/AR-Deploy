@@ -250,6 +250,58 @@ Products you deleted keep their numbers and appear as one **Deleted products** r
 
 ---
 
+## Editor: change the website text, pages and the application form
+
+The Editor is for Owners and Admins. A Team member does not see it unless the Owner gives that person the "Edit website content" permission. In the left menu it is called **Website editor**. It is available once the Sanctus team has switched it on for your site.
+
+You never change the live site by accident. Everything you type is saved as a **draft**. Visitors see nothing until you press **Publish**.
+
+### What you can edit
+
+| Section | What you can change |
+|---|---|
+| **Pages** | The text of **Terms** and **Privacy**, in English and in Portuguese. You can also add your own pages (shipping, returns, about us) with a title, an address such as `/pages/shipping` and a text in both languages. |
+| **Application form** | The questions on the "Apply as a business" page: their order, their wording, which step they are on, which are required or optional, which are hidden, and up to 10 extra questions of your own. All the other texts on that page and the thank-you screen can be reworded too. |
+| **Social media** | Links to Instagram, Facebook, LinkedIn, YouTube, TikTok and Pinterest. The ones you fill in appear as small icons in the footer of the main site. |
+
+### Edit and publish
+
+1. Open **Website editor** and choose a section.
+2. Change the text. The bar at the top shows "Draft saved" a moment after you stop typing.
+3. Press **Preview** to see the page as visitors will see it. It says "Preview of the draft. Not live." Nothing is sent from the preview.
+4. Press **Publish**. A box lists what will change (for example "2 pages, 1 extra question"). Confirm and the change is live on the next page load.
+
+If the box says some text is still marked "to be completed", those are placeholders in the legal text (such as the company name or the date). You can still publish, but visitors will see the marker. Fill them in first.
+
+### Pages
+
+- **Terms** and **Privacy** start from the text we supplied. Edit a language to publish your own version of it. **Reset to original** puts our text back.
+- **New page**: type the English title and the address is filled in for you. Switch on **Show in footer** to add a link to the footer of the public site, next to Privacy and Terms. Use the arrows to set the order of the footer links.
+- Portuguese is optional for your own pages. If the Portuguese box is empty, Portuguese visitors see the English text.
+- Formatting: the buttons above the text box add **bold**, headings, lists and links. Links must start with `https://`, `mailto:` or `/`. Raw HTML is not accepted.
+- Changing the address of a page that is already live breaks old links to it. The Editor warns you.
+
+### The application form
+
+- Each step is a card. Use the arrows to move a question up or down, and **Move to step** to put it on another step.
+- **Edit** opens the question's wording (English and Portuguese), whether it is required, and whether it is hidden. A hidden question is not asked. For questions with choices (such as the number of products) you can hide some of the choices, but at least one must stay.
+- Three questions are locked because we create your company account from them: **business name**, **contact name** and **contact email**. They are always asked and always required. The confirmation tick box and the agreement to the Terms are also fixed on the last step.
+- **Add question** adds your own question to a step: short text, long text, yes or no, one choice or several choices. You can add up to 10, and add steps (8 steps at most; the last step, Review, always stays last).
+- The **Messages** tab holds every other text on the page: buttons, error messages, the tick box sentence and the thank-you screen. The original wording is shown in grey in each box. **Reset** brings it back.
+- On a wide screen the form is shown live on the right as you change it.
+- When an application arrives, the answers to your own questions are shown on its page under **Extra questions**, worded as they were on the day it was sent. A question you hide or delete later does not change old applications.
+- A hidden question shows "Not given" on applications received after you hid it.
+
+### History and undo
+
+**History** lists every published version with the date and who published it. **Restore this version** copies it into the draft; it does not go live until you press Publish.
+
+### Good to know
+
+- If a colleague changes the draft at the same time, the Editor tells you and asks you to reload. Nothing is overwritten without a warning.
+- If you leave with unsaved changes, the Editor saves first and asks only if that fails.
+- Dashboard text (menus, buttons) is not editable. The dashboards, settings and sign-in pages are available in English and Portuguese: use the **EN / PT** switch at the top of any screen (inside the menu on a phone). The choice is remembered on that device.
+
 ## 9. Troubleshooting
 
 | Problem | What to check |

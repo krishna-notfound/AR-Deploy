@@ -36,6 +36,7 @@ It runs in **demo mode** by default (a mock service layer, no setup). **Supabase
 | Client user guide | `docs/CLIENT_HANDOVER.md` |
 | ADRs | `System_arch/decisions/README.md` (owner scope decisions: `docs/DECISIONS.md`) |
 | Supabase schema and RLS | `System_arch/design/19-supabase.md`, `supabase/migrations/` |
+| Website Editor and bilingual dashboards (ADR-0043, ADR-0044) | `docs/superpowers/specs/2026-10-29-content-editor-and-bilingual-dashboards-design.md`, `System_arch/design/12-features-admin.md`, `System_arch/design/24-applications.md` |
 
 `System_arch/audit/` is a historical 2026-10-13 snapshot (every file is marked "superseded in part"). Don't treat it as current.
 
@@ -61,7 +62,7 @@ It runs in **demo mode** by default (a mock service layer, no setup). **Supabase
   - The role guard is not a security boundary.
 - Components get data only through `src/services` (`service`, `auth`, hooks). Never import `services/mock/*` or `services/supabase/*` into the UI.
 - URLs are built only in `src/lib/urls.ts`. The catalog QR code always encodes the **catalog** URL.
-- The admin and business dashboards are English-only. The landing page, tenant catalog and product pages use `t()` and `localized()` (landing copy is the client's reference text, design/21).
+- The admin and business dashboards, settings and sign-in pages are bilingual (EN and PT-PT) through `t()` (ADR-0044); no literal user-facing strings. The landing page, tenant catalog and product pages keep `t()` and `localized()` (landing copy is the client's reference text, design/21). The language switch is the same `LanguageSwitcher` component on every screen. Business and product data is not translated.
 - Design tokens live in `src/index.css` (ADR-0023, Sanctus palette from the client's brand board). Use `accent-ink` for bronze text and `accent-bright` only under dark text. The primary button is obsidian. Headings use the serif through `text-display`/`text-headline`/`text-title` or `font-display`.
 - Shared features (ProductEditor, ProductTable, CatalogQrPanel, AnalyticsView, BusinessForm) are never duplicated per dashboard.
 - No dead buttons. Every data view has loading, empty and error states.

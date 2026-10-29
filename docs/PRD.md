@@ -84,6 +84,8 @@ Authority order when items conflict: (1) accepted client offer, (2) owner-approv
 | X-01 | Business-owner dashboard `/dashboard`, owner sign-up, draft registration, claim links | **Superseded by ADR-0024 (apply → approve → admin-provisioned owner)** (S1.5 R-W2-8). Was: VERIFIED (live API) for registration + claims; `/signup` email flow not tested (production sign-ups off) | Owner-approved scope change (ADR-0022). Migration `20261013144121` applied to `pmnjchhrgvajtjpadpqo` 2026-10-13; PGlite + live API tests pass |
 | X-02 | Physics/fit features (drag, overlap, wall clearance) | OUT_OF_SCOPE | Change request only (A-4) |
 | X-03 | AI photo-to-3D, billing, business-side team roles, fashion (platform team roles are in scope: ADR-0029) | OUT_OF_SCOPE | — |
+| X-04 | Website Editor `/admin/editor`: Terms, Privacy, extra pages, application form builder, social links, draft, Preview, Publish, History (ADR-0043) | IMPLEMENTED_NOT_VERIFIED, REQUIRES_OWNER_APPROVAL | Owner request 2026-10-29. Built on the feature branch and tested in demo mode and PGlite. The migration `20261029074648_site_content.sql` and the `submit-application` redeploy are not applied; live checks in `docs/TEST_PLAN.md`. Needs the client's approval before production (ADR-0042) |
+| X-05 | Dashboards, settings and sign-in pages in English and Portuguese (pt-PT) with one language switch (ADR-0044) | IMPLEMENTED_NOT_VERIFIED | Owner request 2026-10-29. Frontend only. Portuguese wording written in this project; native-speaker review is the client's call |
 
 
 ## Variants and materials: current behaviour (for the client to confirm, A-3)

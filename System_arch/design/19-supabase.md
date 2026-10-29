@@ -254,3 +254,11 @@ Fixed in the migration files (none had been applied anywhere):
 - **Search:** name search is filtered in the browser (marked with a `ponytail:` comment in the code).
 - **Demo-only features:** demo reset and simulated errors.
 - **Business switcher:** a user who belongs to several businesses gets the first one.
+
+## Content Editor additions (ADR-0043, migration `20261029074648_site_content.sql`; written, NOT applied as of 2026-10-29)
+- Tables (RLS on, no grants to `anon` or `authenticated`): `site_content` (exactly one row: `draft`, `published`, `published_version`, `draft_updated_at`, who and when) and `site_content_versions` (every published document). Only security-definer functions touch them.
+- Functions: `get_published_site_content(p_part, p_slug)` (public, reads only `published`), `admin_get_site_content`, `admin_save_site_content_draft(p_content, p_base)`, `admin_publish_site_content(p_base)`, `admin_list_site_content_versions`, `admin_restore_site_content_version(p_version, p_base)`. The admin ones require the 2FA step (`aal2_required`) then `content.manage` (`forbidden`, both 42501); a stale `p_base` gives `draft_conflict`; bad content gives `invalid_content` with the document path. Private helpers: `require_content_manage`, `validate_site_content`, `validate_apply_form`, `check_site_content_shape`, `content_actor_name`.
+- `content.manage` is the 17th permission: the check constraint, `my_platform_access()` (Owner list) and the stored Admin set (backfilled with one `access_permissions_changed` row) are updated. `private.permission_prerequisites()` has no row for it.
+- `business_applications`: `country`, `city`, `category` nullable; answers limit 65,536 bytes.
+- Audit events: `site_content_published`, `site_content_draft_restored`.
+- Rollback: `supabase/rollback/20261029_site_content_rollback.sql`. Tests: `supabase/tests/siteContent.test.ts` (PGlite).

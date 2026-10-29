@@ -12,7 +12,7 @@ The owner asked for production-level settings: a person can change their email a
   - Settings is a full-screen view (× or Esc returns to the previous page), opened from the user menu and the Settings nav item.
   - My account, Profile, Security & 2FA, Notifications, Preferences and Security activity are shared by every role.
   - Business profile shows for business owners. General and Security policy (under Platform) show for the Owner only.
-  - The two dashboards stay English-only.
+  - The two dashboards stay English-only. (Superseded by ADR-0044, 2026-10-29: the dashboards are now EN and PT-PT.)
   - The hub is the extension point for S2 to S4.
 - **Profiles are the single source for name and photo.**
   - `public.profiles` has one row per auth user, created by a trigger on sign-up (a failure there never blocks a sign-up).
