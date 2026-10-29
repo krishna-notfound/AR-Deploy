@@ -307,7 +307,7 @@ describe('BusinessesListPage: an open closure is visible and blocks activation (
     const list = vi.spyOn(account, 'listClosureRequests').mockResolvedValue(fail('UNKNOWN', 'Network down.'))
     const user = userEvent.setup()
     renderAt('/admin/businesses', <BusinessesListPage />)
-    expect(await screen.findByText('Could not load the closure requests. Network down.')).toBeInTheDocument()
+    expect(await screen.findByText('Could not load the closure requests. Something went wrong. Try again in a moment.')).toBeInTheDocument()
     expect(await menuItemsFor(user, 'Oak & Ember Studio')).not.toContain('Activate catalog')
     list.mockResolvedValue(ok([]))
     await user.click(screen.getByRole('button', { name: 'Try again' }))

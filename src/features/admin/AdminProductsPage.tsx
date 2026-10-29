@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/Card'
 import { FormField, Select } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState, ErrorState } from '@/components/ui/States'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { CLEARED_PRODUCT_FILTERS, ProductFilterBar, applyProductFilters, hasProductFilters, useProductFilterParams } from '../products/ProductFilters'
@@ -15,6 +17,7 @@ import { ProductTable } from '../products/ProductTable'
 import { useBusinesses, useProductStats } from '../products/useCatalogData'
 
 export default function AdminProductsPage() {
+  const { t } = useI18n()
   const can = useCan()
   const [filters, update] = useProductFilterParams()
   const products = useServiceQuery(() => service.getProducts(), [])
@@ -36,11 +39,11 @@ export default function AdminProductsPage() {
   return (
     <>
       <PageHeader
-        title="All products"
+        title={t('nav.allProducts')}
         actions={
           can('products.edit') && (
             <Button variant="primary" icon={<PackagePlus className="size-4" aria-hidden />} onClick={addProduct}>
-              Add product
+              {t('admin.products.add')}
             </Button>
           )
         }
@@ -48,7 +51,7 @@ export default function AdminProductsPage() {
       <Card>
         <ProductFilterBar state={filters} update={update} businesses={businesses} />
         {products.status === 'error' && !products.data ? (
-          <ErrorState message={products.error.message} onRetry={products.refetch} />
+          <ErrorState message={errorText(products.error, t)} onRetry={products.refetch} />
         ) : (
           <ProductTable
             scope="admin"
@@ -61,12 +64,12 @@ export default function AdminProductsPage() {
             empty={
               hasFilters ? (
                 <EmptyState
-                  title="No products match these filters"
-                  body="Try another search, business or status."
-                  action={<Button onClick={() => update(CLEARED_PRODUCT_FILTERS)}>Clear filters</Button>}
+                  title={t('admin.products.noMatchTitle')}
+                  body={t('admin.products.noMatchBody')}
+                  action={<Button onClick={() => update(CLEARED_PRODUCT_FILTERS)}>{t('admin.products.clearFilters')}</Button>}
                 />
               ) : (
-                <EmptyState icon={Package} title="No products yet" body="Add the first product to a business catalog." action={<Button variant="primary" onClick={addProduct}>Add product</Button>} />
+                <EmptyState icon={Package} title={t('admin.products.emptyTitle')} body={t('admin.products.emptyBody')} action={<Button variant="primary" onClick={addProduct}>{t('admin.products.add')}</Button>} />
               )
             }
           />
@@ -76,19 +79,19 @@ export default function AdminProductsPage() {
       <Modal
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        title="Add a product"
-        description="Choose the business catalog this product belongs to."
+        title={t('admin.products.pickerTitle')}
+        description={t('admin.products.pickerBody')}
         size="sm"
         footer={
           <>
-            <Button onClick={() => setPickerOpen(false)}>Cancel</Button>
+            <Button onClick={() => setPickerOpen(false)}>{t('common.cancel')}</Button>
             <Button variant="primary" disabled={!pick} onClick={() => navigate(`/admin/products/new?business=${pick}`)}>
-              Continue
+              {t('common.continue')}
             </Button>
           </>
         }
       >
-        <FormField label="Business">
+        <FormField label={t('admin.products.business')}>
           <Select value={pick} onChange={(e) => setPick(e.target.value)} data-autofocus>
             {businesses.map((b) => (
               <option key={b.id} value={b.id}>

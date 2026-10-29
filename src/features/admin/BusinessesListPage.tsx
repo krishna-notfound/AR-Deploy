@@ -15,11 +15,12 @@ import { SmartImage } from '@/components/ui/SmartImage'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, BusinessCatalog, BusinessStatus, ClosureRequest, OwnerState } from '@/domain/types'
-import { formatDate, formatNumber } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
+import { useFormat } from '@/lib/useFormat'
 import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
 import { account, isDemoMode, service } from '@/services'
-import { CLOSURE_PENDING_ERROR, ok } from '@/services/catalogService'
+import { ok } from '@/services/catalogService'
 import { useNoticeToast } from '@/features/team/useMemberActions'
 import { useServiceQuery } from '@/services/hooks'
 import { closureByBusiness } from '../businesses/closure'
@@ -42,7 +43,8 @@ interface Row {
 }
 
 export default function BusinessesListPage() {
-  const prefs = usePreferences()
+  const { t, tn } = useI18n()
+  const f = useFormat()
   const can = useCan()
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
@@ -102,31 +104,31 @@ export default function BusinessesListPage() {
   }, [catalogs.data, analytics.data, q, status, ownerFilter, ownerStates.data, ownerOf, closureOnly, closing])
 
   const menu = (b: Business, count: number): (MenuItem | 'separator')[] => [
-    { label: can('businesses.edit') ? 'Edit details' : 'View details', icon: <Pencil />, onSelect: () => navigate(businessAdminPath(b.id)) },
-    { label: b.status === 'active' ? 'Open catalog' : 'Preview catalog', icon: <ExternalLink />, onSelect: () => window.open(catalogLocalPath(b, { preview: b.status !== 'active' }), '_blank', 'noopener') },
+    { label: t(can('businesses.edit') ? 'admin.businesses.list.editDetails' : 'admin.businesses.list.viewDetails'), icon: <Pencil />, onSelect: () => navigate(businessAdminPath(b.id)) },
+    { label: t(b.status === 'active' ? 'admin.catalogs.open' : 'admin.businesses.list.previewCatalog'), icon: <ExternalLink />, onSelect: () => window.open(catalogLocalPath(b, { preview: b.status !== 'active' }), '_blank', 'noopener') },
     ...(can('products.view')
       ? [
-          { label: 'View products', icon: <Package />, onSelect: () => navigate(`/admin/products?business=${b.id}`) },
-          { label: 'View QR code', icon: <QrCode />, onSelect: () => navigate(`/admin/catalogs?business=${b.id}`) },
+          { label: t('admin.catalogs.viewProducts'), icon: <Package />, onSelect: () => navigate(`/admin/products?business=${b.id}`) },
+          { label: t('admin.businesses.list.viewQr'), icon: <QrCode />, onSelect: () => navigate(`/admin/catalogs?business=${b.id}`) },
         ]
       : []),
     ...(!can(['businesses.status']) || !can('businesses.edit')
       ? []
       : b.status === 'active'
-        ? [{ label: 'Deactivate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, false) }]
+        ? [{ label: t('admin.businesses.actions.deactivate'), icon: <Power />, onSelect: () => void actions.setActive(b, false) }]
         : // Offered only once the closure requests are known and none is open for this business (R-W1-3).
           canViewClosures && closures.data && !closureOf.has(b.id)
-          ? [{ label: 'Activate catalog', icon: <Power />, onSelect: () => void actions.setActive(b, true) }]
+          ? [{ label: t('admin.businesses.actions.activate'), icon: <Power />, onSelect: () => void actions.setActive(b, true) }]
           : []),
     ...(can('businesses.delete')
-      ? (['separator', { label: 'Delete business', icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(b, count) }] as const)
+      ? (['separator', { label: t('admin.businesses.actions.delete'), icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(b, count) }] as const)
       : []),
   ]
 
   const columns: Column<Row>[] = [
     {
       key: 'name',
-      header: 'Business',
+      header: t('admin.catalogs.business'),
       sortValue: (r) => r.catalog.business.name.toLowerCase(),
       cell: (r) => (
         <div className="flex items-center gap-3">
@@ -140,25 +142,25 @@ export default function BusinessesListPage() {
         </div>
       ),
     },
-    { key: 'products', header: 'Products', align: 'right', sortValue: (r) => r.catalog.totalProductCount, cell: (r) => formatNumber(r.catalog.totalProductCount) },
-    { key: 'published', header: 'Published', align: 'right', sortValue: (r) => r.catalog.publishedProductCount, cell: (r) => formatNumber(r.catalog.publishedProductCount) },
-    { key: 'views', header: 'Views', align: 'right', priority: 'low', sortValue: (r) => r.views, cell: (r) => formatNumber(r.views) },
-    { key: 'ar', header: 'AR', align: 'right', priority: 'low', sortValue: (r) => r.ar, cell: (r) => formatNumber(r.ar) },
+    { key: 'products', header: t('admin.overview.products'), align: 'right', sortValue: (r) => r.catalog.totalProductCount, cell: (r) => f.number(r.catalog.totalProductCount) },
+    { key: 'published', header: t('admin.overview.published'), align: 'right', sortValue: (r) => r.catalog.publishedProductCount, cell: (r) => f.number(r.catalog.publishedProductCount) },
+    { key: 'views', header: t('admin.businesses.list.views'), align: 'right', priority: 'low', sortValue: (r) => r.views, cell: (r) => f.number(r.views) },
+    { key: 'ar', header: 'AR', align: 'right', priority: 'low', sortValue: (r) => r.ar, cell: (r) => f.number(r.ar) },
     {
       key: 'owner',
-      header: 'Owner',
+      header: t('admin.businesses.owner.title'),
       sortValue: (r) => OWNER_ORDER[ownerOf.get(r.catalog.business.id)?.state ?? 'needs_owner'],
       cell: (r) => <OwnerStateBadge state={ownerOf.get(r.catalog.business.id)} loading={ownersLoading} />,
     },
-    { key: 'status', header: 'Status', sortValue: (r) => r.catalog.business.status, cell: (r) => <StatusBadges b={r.catalog.business} closure={closureOf.get(r.catalog.business.id)} /> },
-    { key: 'updated', header: 'Last updated', align: 'right', sortValue: (r) => r.catalog.business.updatedAt, cell: (r) => <span className="whitespace-nowrap">{formatDate(r.catalog.business.updatedAt, 'en', prefs)}</span> },
+    { key: 'status', header: t('common.status'), sortValue: (r) => r.catalog.business.status, cell: (r) => <StatusBadges b={r.catalog.business} closure={closureOf.get(r.catalog.business.id)} /> },
+    { key: 'updated', header: t('admin.businesses.list.lastUpdated'), align: 'right', sortValue: (r) => r.catalog.business.updatedAt, cell: (r) => <span className="whitespace-nowrap">{f.date(r.catalog.business.updatedAt)}</span> },
     {
       key: 'actions',
-      header: 'Actions',
+      header: t('common.actions'),
       srOnlyHeader: true,
       align: 'right',
       cell: (r) => (
-        <DropdownMenu label={`Actions for ${r.catalog.business.name}`} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menu(r.catalog.business, r.catalog.totalProductCount)} />
+        <DropdownMenu label={t('admin.businesses.list.actionsFor', { name: r.catalog.business.name })} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menu(r.catalog.business, r.catalog.totalProductCount)} />
       ),
     },
   ]
@@ -166,63 +168,63 @@ export default function BusinessesListPage() {
   return (
     <>
       <PageHeader
-        title="Businesses"
-        description={`Furniture businesses and their catalogs. Views and AR are last-30-day ${isDemoMode ? 'sample ' : ''}figures.`}
+        title={t('nav.businesses')}
+        description={t(isDemoMode ? 'admin.businesses.list.descriptionDemo' : 'admin.businesses.list.description')}
         actions={
           can('businesses.edit') && (<ButtonLink to="/admin/businesses/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-            Create business
+            {t('admin.catalogs.createBusiness')}
           </ButtonLink>)
         }
       />
       <Card>
         <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-end sm:px-6">
-          <FormField label="Search businesses">
-            <SearchInput value={q} onChange={(v) => setParam('q', v)} label="Search businesses" placeholder="Search by name or address" />
+          <FormField label={t('admin.businesses.list.search')}>
+            <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('admin.businesses.list.search')} placeholder={t('admin.businesses.list.searchPlaceholder')} />
           </FormField>
-          <FormField label="Status">
-            <Select aria-label="Filter by status" value={status} onChange={(e) => setParam('status', e.target.value)} className="sm:w-44">
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="draft">Draft</option>
+          <FormField label={t('common.status')}>
+            <Select aria-label={t('admin.businesses.list.filterStatus')} value={status} onChange={(e) => setParam('status', e.target.value)} className="sm:w-44">
+              <option value="">{t('admin.businesses.list.allStatuses')}</option>
+              <option value="active">{t('admin.businesses.status.active')}</option>
+              <option value="inactive">{t('admin.businesses.status.inactive')}</option>
+              <option value="draft">{t('admin.businesses.status.draft')}</option>
             </Select>
           </FormField>
           {ownerStates.data && (
-            <FormField label="Owner">
-              <Select aria-label="Filter by owner" value={ownerFilter} onChange={(e) => setParam('owner', e.target.value)} className="sm:w-44">
-                <option value="">All owners</option>
-                <option value="needs_owner">Needs owner</option>
-                <option value="invite_pending">Invite pending</option>
-                <option value="owner_active">Owner active</option>
+            <FormField label={t('admin.businesses.owner.title')}>
+              <Select aria-label={t('admin.businesses.list.filterOwner')} value={ownerFilter} onChange={(e) => setParam('owner', e.target.value)} className="sm:w-44">
+                <option value="">{t('admin.businesses.list.allOwners')}</option>
+                <option value="needs_owner">{t('admin.businesses.list.needsOwner')}</option>
+                <option value="invite_pending">{t('admin.businesses.list.invitePending')}</option>
+                <option value="owner_active">{t('admin.businesses.owner.active')}</option>
               </Select>
             </FormField>
           )}
           {isPlatformOwner && (
             <Button aria-pressed={closureOnly} variant={closureOnly ? 'primary' : 'secondary'} onClick={() => setParam('closure', closureOnly ? '' : '1')}>
-              Closure requested{' '}
-              {catalogs.data && closures.data && <Badge tone={closureCount > 0 ? 'warning' : 'neutral'}>{formatNumber(closureCount)}</Badge>}
+              {t('admin.businesses.list.closureRequested')}{' '}
+              {catalogs.data && closures.data && <Badge tone={closureCount > 0 ? 'warning' : 'neutral'}>{f.number(closureCount)}</Badge>}
             </Button>
           )}
         </div>
         {closureOnly && orphans.length > 0 && <OrphanRequests requests={orphans} onChanged={closures.refetch} />}
         {!closureOnly && closures.status === 'error' && !closures.data && (
-          <ErrorState className="border-b border-line py-4" message={`Could not load the closure requests. ${closures.error.message}`} onRetry={closures.refetch} />
+          <ErrorState className="border-b border-line py-4" message={`${t('admin.businesses.list.closureLoadFailed')} ${errorText(closures.error, t)}`} onRetry={closures.refetch} />
         )}
         {ownerStates.status === 'error' && !ownerStates.data && (
-          <ErrorState className="border-b border-line py-4" message="Couldn't load owner states." onRetry={ownerStates.refetch} />
+          <ErrorState className="border-b border-line py-4" message={t('admin.businesses.list.ownerStatesFailed')} onRetry={ownerStates.refetch} />
         )}
         {catalogs.status === 'error' && !catalogs.data ? (
-          <ErrorState message={catalogs.error.message} onRetry={catalogs.refetch} />
+          <ErrorState message={errorText(catalogs.error, t)} onRetry={catalogs.refetch} />
         ) : closureOnly && closures.status === 'error' && !closures.data ? (
-          <ErrorState message={`Could not load the closure requests. ${closures.error.message}`} onRetry={closures.refetch} />
+          <ErrorState message={`${t('admin.businesses.list.closureLoadFailed')} ${errorText(closures.error, t)}`} onRetry={closures.refetch} />
         ) : (
           <DataTable
             rows={rows}
             columns={columns}
             rowKey={(r) => r.catalog.business.id}
             loading={(catalogs.status === 'loading' && !catalogs.data) || (closureOnly && closures.status === 'loading' && !closures.data)}
-            caption="Businesses"
-            noun="businesses"
+            caption={t('nav.businesses')}
+            noun={t('admin.businesses.list.noun')}
             twoLine
             initialSort={{ key: 'updated', dir: 'desc' }}
             page={page}
@@ -230,20 +232,20 @@ export default function BusinessesListPage() {
             empty={
               closureOnly && !q && !status ? (
                 orphans.length > 0 ? (
-                  <EmptyState title="No listed business has a closure request" body="Only the requests above are open." />
+                  <EmptyState title={t('admin.businesses.list.noListedClosureTitle')} body={t('admin.businesses.list.noListedClosureBody')} />
                 ) : (
-                  <EmptyState title="No closure requests" body="When a business owner asks to close their account, their business shows here." />
+                  <EmptyState title={t('admin.businesses.list.noClosureTitle')} body={t('admin.businesses.list.noClosureBody')} />
                 )
               ) : q || status || closureOnly || (ownerFilter && ownerStates.data) ? (
-                <EmptyState title="No businesses match" body="Try a different search, status or owner." />
+                <EmptyState title={t('admin.businesses.list.noMatchTitle')} body={t('admin.businesses.list.noMatchBody')} />
               ) : (
                 <EmptyState
                   icon={Building2}
-                  title="No businesses yet"
-                  body="Create the first business to set up its catalog and QR code."
+                  title={t('admin.businesses.list.emptyTitle')}
+                  body={t('admin.businesses.list.emptyBody')}
                   action={
                     can('businesses.edit') && (<ButtonLink to="/admin/businesses/new" variant="primary">
-                      Create business
+                      {t('admin.catalogs.createBusiness')}
                     </ButtonLink>)
                   }
                 />
@@ -260,12 +262,12 @@ export default function BusinessesListPage() {
                     <StatusBadges b={r.catalog.business} closure={closureOf.get(r.catalog.business.id)} />
                     <OwnerStateBadge state={ownerOf.get(r.catalog.business.id)} loading={ownersLoading} />
                     <span>
-                      {r.catalog.publishedProductCount}/{r.catalog.totalProductCount} published
+                      {t('admin.businesses.list.publishedOf', { published: f.number(r.catalog.publishedProductCount), total: f.number(r.catalog.totalProductCount) })}
                     </span>
-                    <span>{formatNumber(r.views)} views</span>
+                    <span>{tn('admin.analytics.views', r.views, { n: f.number(r.views) })}</span>
                   </div>
                 </div>
-                <DropdownMenu label={`Actions for ${r.catalog.business.name}`} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menu(r.catalog.business, r.catalog.totalProductCount)} />
+                <DropdownMenu label={t('admin.businesses.list.actionsFor', { name: r.catalog.business.name })} trigger={<MoreHorizontal className="size-4" aria-hidden />} items={menu(r.catalog.business, r.catalog.totalProductCount)} />
               </div>
             )}
           />
@@ -279,39 +281,40 @@ const OWNER_ORDER: Record<OwnerState['state'], number> = { needs_owner: 0, invit
 
 /** Owner state (R-W2-5); "email not sent" when the newest invitation was not sent, failed or bounced. */
 function OwnerStateBadge({ state, loading }: { state?: OwnerState; loading: boolean }) {
+  const { t } = useI18n()
   if (loading)
     return (
       <span className="inline-block">
         <Skeleton className="h-4 w-24" />
-        <span className="sr-only">Loading owner state</span>
+        <span className="sr-only">{t('admin.businesses.list.loadingOwner')}</span>
       </span>
     )
   if (!state) return null
-  if (state.state === 'needs_owner') return <Badge tone="neutral">Needs owner</Badge>
-  if (state.state === 'owner_active') return <Badge tone="success">Owner active</Badge>
-  return state.emailFailed ? <Badge tone="danger">Invite pending · email not sent</Badge> : <Badge tone="warning">Invite pending</Badge>
+  if (state.state === 'needs_owner') return <Badge tone="neutral">{t('admin.businesses.list.needsOwner')}</Badge>
+  if (state.state === 'owner_active') return <Badge tone="success">{t('admin.businesses.owner.active')}</Badge>
+  return state.emailFailed ? <Badge tone="danger">{t('admin.businesses.list.inviteNotSent')}</Badge> : <Badge tone="warning">{t('admin.businesses.list.invitePending')}</Badge>
 }
 
 /** The status, and the read-only closure badge whose tooltip says why the business can't be activated (R-W1-3). */
 function StatusBadges({ b, closure }: { b: Business; closure?: ClosureRequest }) {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const f = useFormat()
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <BusinessStatusBadge status={b.status} />
       {closure && (
-        <span title={CLOSURE_PENDING_ERROR.message}>
-          <Badge tone="warning">Closure requested on {formatDate(closure.requestedAt, 'en', prefs)}</Badge>
+        <span title={t('common.error.reason.closure_pending')}>
+          <Badge tone="warning">{t('admin.businesses.list.closureOn', { date: f.date(closure.requestedAt) })}</Badge>
         </span>
       )}
     </span>
   )
 }
 
-const ALREADY_HANDLED = 'This closure was already handled.'
-
 /** Closure requests whose business is gone: the Owner completes them with the same action-code flow as on business detail. */
 function OrphanRequests({ requests, onChanged }: { requests: ClosureRequest[]; onChanged: () => void }) {
-  const prefs = usePreferences()
+  const { t } = useI18n()
+  const f = useFormat()
   const toast = useToast()
   const noticeToast = useNoticeToast()
   const titleId = useId()
@@ -320,20 +323,20 @@ function OrphanRequests({ requests, onChanged }: { requests: ClosureRequest[]; o
   return (
     <section aria-labelledby={titleId} className="border-b border-line bg-warning-soft/40 p-4 sm:px-6">
       <h2 id={titleId} className="text-ui-body font-semibold text-ink">
-        Requests without a business
+        {t('admin.businesses.list.orphanTitle')}
       </h2>
-      <p className="mt-0.5 text-ui-small text-ink-muted">Their business is no longer on the platform. Complete the closure to delete the account and close the request.</p>
+      <p className="mt-0.5 text-ui-small text-ink-muted">{t('admin.businesses.list.orphanBody')}</p>
       <ul className="mt-3 divide-y divide-line">
         {requests.map((r) => (
           <li key={r.userId} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5">
             <div className="min-w-0">
               <p className="text-ui-body break-words text-ink">{r.email}</p>
               <p className="text-ui-small text-ink-muted">
-                {r.businessName ? `${r.businessName} · ` : ''}Requested {formatDate(r.requestedAt, 'en', prefs)}
+                {r.businessName ? `${r.businessName} · ` : ''}{t('admin.businesses.list.requestedOn', { date: f.date(r.requestedAt) })}
               </p>
             </div>
-            <Button size="sm" variant="danger" aria-label={`Complete closure for ${r.email}`} onClick={() => setTarget(r)}>
-              Complete closure
+            <Button size="sm" variant="danger" aria-label={t('admin.businesses.list.completeFor', { email: r.email })} onClick={() => setTarget(r)}>
+              {t('admin.businesses.list.completeClosure')}
             </Button>
           </li>
         ))}
@@ -341,20 +344,20 @@ function OrphanRequests({ requests, onChanged }: { requests: ClosureRequest[]; o
       <ActionCodeDialog
         open={target !== null}
         purpose="complete_closure"
-        title={`Complete closure for ${target?.email ?? ''}?`}
-        description="This deletes their account and closes the request. It can't be undone. We email them a final notice."
-        confirmLabel="Complete closure"
+        title={t('admin.businesses.list.completeTitle', { email: target?.email ?? '' })}
+        description={t('admin.businesses.list.completeBody')}
+        confirmLabel={t('admin.businesses.list.completeClosure')}
         destructive
         onClose={() => setTarget(null)}
         onConfirm={async (code) => {
           if (!target) return { ok: true as const, data: undefined }
           const r = await account.completeClosure(target.userId, code)
           if (r.ok) {
-            noticeToast('Closure completed', r.data.notice, `The account for ${target.email} was deleted.`)
+            noticeToast(t('admin.businesses.list.closureDone'), r.data.notice, t('admin.businesses.list.accountDeleted', { email: target.email }))
             onChanged()
           } else if (r.error.reason === 'not_found') {
             // Nothing left to complete: close the dialog (an ok answer closes it) and show the current list.
-            toast.info(ALREADY_HANDLED)
+            toast.info(t('admin.businesses.list.alreadyHandled'))
             onChanged()
             return { ok: true as const, data: undefined }
           }

@@ -434,7 +434,7 @@ describe('BusinessDetailPage: an open closure is visible and blocks activation (
     const user = userEvent.setup()
     as('admin')
     renderOak()
-    expect(await screen.findByText('Could not check for a closure request. Network down.')).toBeInTheDocument()
+    expect(await screen.findByText('Could not check for a closure request. Something went wrong. Try again in a moment.')).toBeInTheDocument()
     expect(await statusActions(user)).toEqual([])
     list.mockResolvedValue(ok([]))
     await user.click(screen.getByRole('button', { name: 'Try again' }))

@@ -14,10 +14,10 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { BusinessApplication, ReviewAction, ReviewedApplication } from '@/domain/types'
-import { fieldText } from '@/i18n/errorText'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
+import { errorText, fieldText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
-import { formatDate, formatDateTime } from '@/lib/format'
-import { usePreferences } from '@/lib/preferences'
+import { useFormat } from '@/lib/useFormat'
 import { businessAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { REASON_MAX_LENGTH, availableActions } from '@/services/applicationRules'
@@ -28,32 +28,33 @@ import { PossibleDuplicates } from '../applications/PossibleDuplicates'
 import { ApplicationStatusBadge, knownEmailReason } from '../applications/labels'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 
-const READINESS: Record<string, string> = {
-  '1-10': '1–10 products',
-  '11-50': '11–50 products',
-  '51-200': '51–200 products',
-  '200+': 'More than 200 products',
-  all: 'Photos for every product',
-  some: 'Some ready',
-  none: 'Not yet',
-  glb_usdz: 'GLB/USDZ models ready',
-  need_help: 'Needs help creating 3D models',
+const READINESS: Record<string, TranslationKey> = {
+  '1-10': 'admin.applications.detail.ready.1-10',
+  '11-50': 'admin.applications.detail.ready.11-50',
+  '51-200': 'admin.applications.detail.ready.51-200',
+  '200+': 'admin.applications.detail.ready.200+',
+  all: 'admin.applications.detail.ready.all',
+  some: 'admin.applications.detail.ready.some',
+  none: 'admin.applications.detail.ready.none',
+  glb_usdz: 'admin.applications.detail.ready.glb_usdz',
+  need_help: 'admin.applications.detail.ready.need_help',
 }
 
 export default function ApplicationDetailPage() {
+  const { t } = useI18n()
   const { applicationId = '' } = useParams()
   const app = useServiceQuery(() => service.getApplication(applicationId), [applicationId])
 
   if (app.status === 'loading' && !app.data) return <FullPageSpinner />
   if (!app.data)
     return app.status === 'error' && app.error.code !== 'NOT_FOUND' ? (
-      <ErrorState message={app.error.message} onRetry={app.refetch} className="py-24" />
+      <ErrorState message={errorText(app.error, t)} onRetry={app.refetch} className="py-24" />
     ) : (
       <EmptyState
         icon={FileX}
-        title="Application not found"
-        body="It may have been removed, or the link is wrong."
-        action={<ButtonLink to="/admin/applications">Back to applications</ButtonLink>}
+        title={t('admin.applications.detail.notFoundTitle')}
+        body={t('admin.applications.detail.notFoundBody')}
+        action={<ButtonLink to="/admin/applications">{t('admin.applications.detail.back')}</ButtonLink>}
         className="py-24"
       />
     )
@@ -61,8 +62,9 @@ export default function ApplicationDetailPage() {
 }
 
 function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChanged: () => void }) {
-  const prefs = usePreferences()
   const { t } = useI18n()
+  const f = useFormat()
+  const ready = (v?: string) => (v && Object.hasOwn(READINESS, v) ? t(READINESS[v]!) : v)
   const confirm = useConfirm()
   const toast = useToast()
   const review = useServiceMutation((action: ReviewAction, reason?: string, includeReason?: boolean) => service.reviewApplication(app.id, action, reason, { includeReason: includeReason === true }))
@@ -111,35 +113,35 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   // The toast is worded from the decision email's status (§11.1); "accepted" means Resend took it, not that it arrived.
   // No email at all means nothing changed (the application was already rejected).
   const reportRejection = (r: ReviewedApplication) => {
-    if (!r.decisionEmail) return toast.success('Application rejected')
-    if (r.decisionEmail.status === 'accepted') return toast.success('Application rejected. The applicant was emailed.')
-    const why = (knownEmailReason(r.decisionEmail.error) ?? 'the email service did not take it').replace(/\.$/, '')
-    toast.error(`Application rejected, but the email was not sent: ${why}.`)
+    if (!r.decisionEmail) return toast.success(t('admin.applications.detail.rejected'))
+    if (r.decisionEmail.status === 'accepted') return toast.success(t('admin.applications.detail.rejectedEmailed'))
+    const why = (knownEmailReason(r.decisionEmail.error) ?? t('admin.applications.detail.emailRefused')).replace(/\.$/, '')
+    toast.error(t('admin.applications.detail.rejectedNoEmail', { why }))
   }
 
   const run = async (action: ReviewAction, why?: string) => {
     const res = await review.mutate(action, why, action === 'reject' && includeReason)
     if (!res.ok) {
       if (action === 'reject' && res.error.fieldErrors?.reason) return setReasonError(fieldText(res.error.fieldErrors.reason, t) ?? null)
-      return toast.error('The application was not updated', res.error.message)
+      return toast.error(t('admin.applications.detail.notUpdated'), errorText(res.error, t))
     }
     setRejectOpen(false)
     onChanged()
     if (action === 'approve') {
       if (canInviteOwner) {
-        toast.success('Application approved', 'Next: invite the owner so they can set up the catalogue.')
+        toast.success(t('admin.applications.detail.approved'), t('admin.applications.detail.approvedNext'))
         revealOwner.current = true
-      } else toast.success("Approved. A draft business was created. Someone with 'Invite and remove business owners' must invite the owner.")
+      } else toast.success(t('admin.applications.detail.approvedNoInvite'))
     } else if (action === 'reject') reportRejection(res.data)
-    else if (action === 'reopen') toast.success('Reopened for review')
-    else toast.success('Marked as under review')
+    else if (action === 'reopen') toast.success(t('admin.applications.detail.reopened'))
+    else toast.success(t('admin.applications.detail.markedReview'))
   }
 
   const approve = async () => {
     const ok = await confirm({
-      title: `Approve ${app.businessName}?`,
-      body: 'This creates the business as a draft. Its catalogue stays private until you activate it. Then invite the owner.',
-      confirmLabel: 'Approve',
+      title: t('admin.applications.detail.approveTitle', { name: app.businessName }),
+      body: t('admin.applications.detail.approveBody'),
+      confirmLabel: t('admin.applications.detail.approve'),
     })
     if (ok) await run('approve')
   }
@@ -148,12 +150,12 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
     <>
       <PageHeader
         title={app.businessName}
-        breadcrumbs={[{ label: 'Applications', to: '/admin/applications' }, { label: app.businessName }]}
+        breadcrumbs={[{ label: t('nav.applications'), to: '/admin/applications' }, { label: app.businessName }]}
         meta={
           <>
             <ApplicationStatusBadge status={app.status} />
             <span className="text-[length:var(--text-ui-small)] text-ink-muted tabular-nums">
-              #{app.reference} · submitted {formatDateTime(app.createdAt, 'en', prefs)}
+              #{app.reference} · {t('admin.applications.detail.submittedAt', { date: f.dateTime(app.createdAt) })}
             </span>
           </>
         }
@@ -166,7 +168,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
           <div className="flex flex-wrap gap-2">
             {canStartReview && (
               <Button icon={<Eye className="size-4" aria-hidden />} loading={review.pending} onClick={() => void run('start_review')}>
-                {app.status === 'rejected' ? 'Reopen review' : 'Start review'}
+                {t(app.status === 'rejected' ? 'admin.applications.detail.reopenReview' : 'admin.applications.detail.startReview')}
               </Button>
             )}
             {canReject && (
@@ -179,17 +181,17 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
                   setRejectOpen(true)
                 }}
               >
-                Reject
+                {t('admin.applications.detail.reject')}
               </Button>
             )}
             {canReopen && (
               <Button icon={<RotateCcw className="size-4" aria-hidden />} loading={review.pending} onClick={() => void run('reopen')}>
-                Reopen for review
+                {t('admin.applications.detail.reopen')}
               </Button>
             )}
             {canApprove && (
               <Button variant="primary" icon={<Check className="size-4" aria-hidden />} loading={review.pending} onClick={() => void approve()}>
-                Approve
+                {t('admin.applications.detail.approve')}
               </Button>
             )}
           </div>
@@ -202,88 +204,88 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
             <InlineNotice tone="info">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span>
-                  <strong className="font-medium">Next step: invite the owner.</strong> The business is created as a draft. The owner gets an email link to set a password and manage the catalogue.
+                  <strong className="font-medium">{t('admin.applications.detail.nextStep')}</strong> {t('admin.applications.detail.nextStepBody')}
                 </span>
                 <Button size="sm" icon={<ArrowDown className="size-4" aria-hidden />} onClick={goToOwner}>
-                  Go to owner invitation
+                  {t('admin.applications.detail.goToOwner')}
                 </Button>
               </div>
             </InlineNotice>
           )}
           {app.status === 'rejected' && app.decisionReason && (
             <InlineNotice tone="warning">
-              <strong className="font-medium">Rejected</strong>
-              {app.reviewedAt ? ` on ${formatDateTime(app.reviewedAt, 'en', prefs)}` : ''}: {app.decisionReason}
+              <strong className="font-medium">{t('admin.applications.status.rejected')}</strong>
+              {app.reviewedAt ? ` ${t('admin.applications.detail.onDate', { date: f.dateTime(app.reviewedAt) })}` : ''}: {app.decisionReason}
             </InlineNotice>
           )}
           <Card>
-            <PanelHeader title="Business" />
+            <PanelHeader title={t('admin.catalogs.business')} />
             <CardBody>
               <Answers
                 rows={[
-                  ['Business name', app.businessName],
-                  ['Category', app.category],
-                  ['Website', app.website ? <a key="w" className="text-accent-ink hover:underline" href={app.website} target="_blank" rel="noopener noreferrer">{app.website}</a> : undefined],
-                  ['Location', `${app.city}, ${app.country}`],
-                  ['About the business', app.answers.description],
+                  [t('admin.businesses.form.name'), app.businessName],
+                  [t('admin.applications.detail.category'), app.category],
+                  [t('admin.businesses.form.website'), app.website ? <a key="w" className="text-accent-ink hover:underline" href={app.website} target="_blank" rel="noopener noreferrer">{app.website}</a> : undefined],
+                  [t('admin.applications.detail.location'), `${app.city}, ${app.country}`],
+                  [t('admin.applications.detail.about'), app.answers.description],
                 ]}
               />
             </CardBody>
           </Card>
           <Card>
-            <PanelHeader title="Applicant" />
+            <PanelHeader title={t('admin.applications.applicant')} />
             <CardBody>
               <Answers
                 rows={[
-                  ['Name', app.applicantName],
-                  ['Role', app.answers.applicantRole],
-                  ['Email', <a key="e" className="text-accent-ink hover:underline" href={`mailto:${app.applicantEmail}`}>{app.applicantEmail}</a>],
-                  ['Phone', app.applicantPhone],
-                  ['Preferred language', app.language === 'pt' ? 'Português' : 'English'],
+                  [t('common.name'), app.applicantName],
+                  [t('admin.applications.detail.role'), app.answers.applicantRole],
+                  [t('common.email'), <a key="e" className="text-accent-ink hover:underline" href={`mailto:${app.applicantEmail}`}>{app.applicantEmail}</a>],
+                  [t('admin.businesses.form.phone'), app.applicantPhone],
+                  [t('admin.applications.detail.language'), app.language === 'pt' ? 'Português' : 'English'],
                 ]}
               />
             </CardBody>
           </Card>
           <Card>
-            <PanelHeader title="Catalogue readiness" />
+            <PanelHeader title={t('admin.applications.detail.readiness')} />
             <CardBody>
               <Answers
                 rows={[
-                  ['Products to show', READINESS[app.answers.productCount ?? ''] ?? app.answers.productCount],
-                  ['Product photos', READINESS[app.answers.photoReadiness ?? ''] ?? app.answers.photoReadiness],
-                  ['3D models', READINESS[app.answers.modelReadiness ?? ''] ?? app.answers.modelReadiness],
-                  ['Notes', app.answers.notes],
+                  [t('admin.applications.detail.productsToShow'), ready(app.answers.productCount)],
+                  [t('admin.applications.detail.photos'), ready(app.answers.photoReadiness)],
+                  [t('admin.applications.detail.models'), ready(app.answers.modelReadiness)],
+                  [t('admin.applications.detail.notes'), app.answers.notes],
                 ]}
               />
             </CardBody>
           </Card>
           {businessDeleted && (
             <Card>
-              <PanelHeader title="Business record" />
+              <PanelHeader title={t('admin.applications.detail.record')} />
               <CardBody>
                 <p className="text-ui-body text-ink-muted">
                   {app.businessDeletedAt
-                    ? `Business deleted on ${formatDate(app.businessDeletedAt, 'en', prefs)}`
-                    : 'The business created from this application was deleted.'}
+                    ? t('admin.applications.detail.deletedOn', { date: f.date(app.businessDeletedAt) })
+                    : t('admin.applications.detail.deleted')}
                 </p>
               </CardBody>
             </Card>
           )}
           {app.businessId && !canOpenBusiness && (
             <Card>
-              <PanelHeader title="Business record" />
+              <PanelHeader title={t('admin.applications.detail.record')} />
               <CardBody>
-                <p className="text-ui-body text-ink-muted">A draft business was created. Your role can't open businesses.</p>
+                <p className="text-ui-body text-ink-muted">{t('admin.applications.detail.draftNoAccess')}</p>
               </CardBody>
             </Card>
           )}
           {businessId && (
             <Card>
               <PanelHeader
-                title="Business record"
+                title={t('admin.applications.detail.record')}
                 actions={
                   <ButtonLink to={businessAdminPath(businessId)} size="sm" icon={<Building2 className="size-4" aria-hidden />}>
-                    Open business
+                    {t('admin.applications.detail.openBusiness')}
                   </ButtonLink>
                 }
               />
@@ -297,13 +299,13 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
                       <BusinessStatusBadge status={business.data.status} />
                     </p>
                     <span className="text-ink-muted">
-                      Catalogue address: <span className="text-ink">{business.data.slug}</span>
+                      {t('admin.applications.detail.address')} <span className="text-ink">{business.data.slug}</span>
                     </span>
                   </div>
                 ) : business.status === 'error' ? (
-                  <ErrorState message={business.error.message} onRetry={business.refetch} />
+                  <ErrorState message={errorText(business.error, t)} onRetry={business.refetch} />
                 ) : (
-                  <p className="text-ui-body text-ink-muted">Loading…</p>
+                  <p className="text-ui-body text-ink-muted">{t('common.loading')}</p>
                 )}
               </CardBody>
             </Card>
@@ -316,7 +318,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
         </div>
         <div className="space-y-6">
           {/* R-W7-8: the business's own history and emails need records.view; without it, the application's only. */}
-          <AuditTimeline applicationId={app.id} businessId={canReadRecords ? app.businessId : undefined} note={canReadRecords ? undefined : 'Showing application events only.'} />
+          <AuditTimeline applicationId={app.id} businessId={canReadRecords ? app.businessId : undefined} note={canReadRecords ? undefined : t('admin.applications.detail.eventsOnly')} />
           <EmailActivity applicationId={app.id} businessId={canReadRecords ? app.businessId : undefined} />
         </div>
       </div>
@@ -324,25 +326,25 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
       <Modal
         open={rejectOpen}
         onClose={() => setRejectOpen(false)}
-        title={`Reject ${app.businessName}?`}
-        description="The reason is kept with the application and shown in its history. No business is created."
+        title={t('admin.applications.detail.rejectTitle', { name: app.businessName })}
+        description={t('admin.applications.detail.rejectBody')}
         footer={
           <>
-            <Button onClick={() => setRejectOpen(false)}>Cancel</Button>
+            <Button onClick={() => setRejectOpen(false)}>{t('common.cancel')}</Button>
             <Button
               variant="danger"
               loading={review.pending}
               onClick={() => {
-                if (!reason.trim()) return setReasonError('Give a reason for the rejection.')
+                if (!reason.trim()) return setReasonError(t('common.error.reason.reason_required'))
                 void run('reject', reason.trim())
               }}
             >
-              Reject application
+              {t('admin.applications.detail.rejectApplication')}
             </Button>
           </>
         }
       >
-        <FormField label="Reason" required error={reasonError ?? undefined}>
+        <FormField label={t('admin.applications.detail.reason')} required error={reasonError ?? undefined}>
           <Textarea
             value={reason}
             maxLength={REASON_MAX_LENGTH}
@@ -353,9 +355,9 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
           />
         </FormField>
         <div className="mt-4 flex flex-col gap-1">
-          <Checkbox label="Include the reason in the email" checked={includeReason} onChange={(e) => setIncludeReason(e.target.checked)} aria-describedby={includeHintId} />
+          <Checkbox label={t('admin.applications.detail.includeReason')} checked={includeReason} onChange={(e) => setIncludeReason(e.target.checked)} aria-describedby={includeHintId} />
           <p id={includeHintId} className="pl-6 text-ui-small text-ink-muted">
-            Off: the applicant is told the application was not approved, with no reason.
+            {t('admin.applications.detail.includeHint')}
           </p>
         </div>
       </Modal>
@@ -364,12 +366,13 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
 }
 
 function Answers({ rows }: { rows: [string, React.ReactNode | undefined][] }) {
+  const { t } = useI18n()
   return (
     <dl className="divide-y divide-subtle">
       {rows.map(([label, value]) => (
         <div key={label} className="grid gap-1 py-2.5 sm:grid-cols-[160px_1fr] sm:gap-4">
           <dt className="text-ui-body text-ink-muted">{label}</dt>
-          <dd className="text-ui-body break-words whitespace-pre-line text-ink">{value || <span className="text-ink-muted italic">Not given</span>}</dd>
+          <dd className="text-ui-body break-words whitespace-pre-line text-ink">{value || <span className="text-ink-muted italic">{t('admin.applications.detail.notGiven')}</span>}</dd>
         </div>
       ))}
     </dl>

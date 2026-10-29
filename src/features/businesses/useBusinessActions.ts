@@ -33,7 +33,7 @@ export function useBusinessActions() {
     },
     /** `productCount` is undefined when the products could not be counted; the dialog then says "all of its products", never a wrong number. */
     async remove(b: Business, productCount: number | undefined, opts?: { after?: string }) {
-      const products = productCount === undefined ? t('admin.businesses.actions.allProducts') : tn('admin.businesses.actions.productCount', productCount, { n: f.number(productCount) })
+      const products = productCount === undefined ? t('admin.businesses.actions.allProducts') : tn('admin.businesses.actions.productCount', productCount)
       const ok = await confirm({
         title: t('admin.businesses.actions.deleteTitle', { name: b.name }),
         body: t('admin.businesses.actions.deleteBody', { products }),

@@ -6,11 +6,14 @@ import { ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { FormField, Select } from '@/components/ui/Form'
 import { EmptyState, ErrorState } from '@/components/ui/States'
+import { errorText } from '@/i18n/errorText'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { CatalogQrPanel } from '../catalogs/CatalogQrPanel'
 
 export default function AdminCatalogsPage() {
+  const { t } = useI18n()
   const [params, setParams] = useSearchParams()
   const catalogs = useServiceQuery(() => service.getCatalogs(), [])
   const list = catalogs.data ?? []
@@ -19,25 +22,25 @@ export default function AdminCatalogsPage() {
 
   return (
     <>
-      <PageHeader title="Catalogs & QR codes" description="Each business has one catalog URL and one QR code for print, packaging and showrooms." />
+      <PageHeader title={t('admin.catalogs.pageTitle')} description={t('admin.catalogs.pageDescription')} />
       {catalogs.status === 'loading' && !catalogs.data ? (
         <FullPageSpinner />
       ) : catalogs.status === 'error' && !catalogs.data ? (
         <Card>
-          <ErrorState message={catalogs.error.message} onRetry={catalogs.refetch} />
+          <ErrorState message={errorText(catalogs.error, t)} onRetry={catalogs.refetch} />
         </Card>
       ) : list.length === 0 ? (
         <Card>
-          <EmptyState icon={Building2} title="No catalogs yet" body="Create a business to get its catalog URL and QR code." action={<ButtonLink to="/admin/businesses/new" variant="primary">Create business</ButtonLink>} />
+          <EmptyState icon={Building2} title={t('admin.catalogs.emptyTitle')} body={t('admin.catalogs.emptyBody')} action={<ButtonLink to="/admin/businesses/new" variant="primary">{t('admin.catalogs.createBusiness')}</ButtonLink>} />
         </Card>
       ) : (
         <div className="space-y-6">
-          <FormField label="Business" className="max-w-xs">
+          <FormField label={t('admin.catalogs.business')} className="max-w-xs">
             <Select value={selected?.business.id} onChange={(e) => setParams({ business: e.target.value }, { replace: true })}>
               {list.map((c) => (
                 <option key={c.business.id} value={c.business.id}>
                   {c.business.name}
-                  {c.business.status !== 'active' ? ` (${c.business.status})` : ''}
+                  {c.business.status !== 'active' ? ` (${t(`admin.businesses.status.${c.business.status}`).toLowerCase()})` : ''}
                 </option>
               ))}
             </Select>
