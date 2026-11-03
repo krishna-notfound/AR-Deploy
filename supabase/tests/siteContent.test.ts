@@ -9,9 +9,12 @@ import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { MIGRATIONS, S4_ROLLBACK_SQL, UP_TO_S4, freshDb, ids, makeHelpers, type Helpers } from './harness'
 import { DEFAULT_APPLY_FORM, validateApplyForm, type ApplyFormConfig } from '../functions/_shared/applyForm'
-import { RESERVED_PAGE_SLUGS, emptySiteContent, type SiteContent } from '../../src/domain/siteContent'
+import { LANDING_IMAGE_KEYS, RESERVED_PAGE_SLUGS, emptySiteContent, type SiteContent } from '../../src/domain/siteContent'
+import { CATEGORIES } from '../../src/domain/types'
 
 const SC_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_site_content.sql'))!
+const LC_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_landing_collections.sql'))!
+const LC_ROLLBACK_SQL = join(__dirname, '..', 'rollback', '20261103_landing_collections_rollback.sql')
 const SC_ROLLBACK_SQL = join(__dirname, '..', 'rollback', '20261029_site_content_rollback.sql')
 const BEFORE_SC = (n: string) => n < SC_MIGRATION
 
@@ -147,7 +150,7 @@ describe('tables and public reads', () => {
     await publish()
     expect(await publicPart('chrome')).toEqual({
       version: 1,
-      content: { footerPages: [{ slug: 'a-page', title: { en: 'Alpha', pt: 'Alfa' } }, { slug: 'b-page', title: { en: 'Beta' } }], social: { instagram: 'https://instagram.com/sanctus' } },
+      content: { footerPages: [{ slug: 'a-page', title: { en: 'Alpha', pt: 'Alfa' } }, { slug: 'b-page', title: { en: 'Beta' } }], social: { instagram: 'https://instagram.com/sanctus' }, landingCollections: [] },
     })
     expect(await publicPart('page', 'terms')).toEqual({ version: 1, content: { kind: 'builtin', body: { en: 'New terms', pt: 'Novos termos' } } })
     expect(await publicPart('page', 'privacy')).toEqual({ version: 1, content: { kind: 'builtin', body: {} } })
@@ -451,6 +454,97 @@ describe('business_applications', () => {
     expect(r.status).toBe('approved')
     expect((await db.query(`select name, description from public.businesses where id = $1`, [r.business_id])).rows).toEqual([{ name: 'No Details Co', description: '' }])
   })
+})
+
+describe('landing collections (20261103095519_landing_collections)', () => {
+  const card = (over: Record<string, unknown> = {}) => ({ id: crypto.randomUUID(), title: { en: 'Sofas', pt: 'Sofás' }, text: { en: 'Comfort.' }, image: 'sofa-travertine', link: { kind: 'none' }, ...over })
+  const refuses = async (content: unknown, detail: string) => {
+    const b = await forceDraft(content)
+    await expect(h.probe(ADMIN, 'select public.admin_publish_site_content($1::timestamptz)', [b])).rejects.toMatchObject({ message: 'invalid_content', detail })
+  }
+  const withCards = (...cards: unknown[]) => doc((c) => void (c.landing.collections = cards as never))
+
+  it('anon gets the published cards in the chrome part (hidden ones included), and never the draft cards', async () => {
+    await resetContent()
+    const shown = card({ link: { kind: 'product', businessSlug: 'acme', productSlug: 'linden-chair' } })
+    const hidden = card({ title: { en: 'Hidden one' }, link: { kind: 'catalog', businessSlug: 'acme', category: 'sofa' }, hidden: true })
+    await save(withCards(shown, hidden))
+    await publish()
+    const chrome = await publicPart('chrome')
+    expect((chrome.content as { landingCollections: unknown[] }).landingCollections).toEqual([shown, hidden])
+    // A later, unpublished draft never reaches the public answer.
+    await save(withCards(card({ title: { en: 'DRAFT-CARD-MARKER' } })))
+    expect(JSON.stringify(await publicPart('chrome'))).not.toContain('DRAFT-CARD-MARKER')
+    await resetContent()
+  })
+
+  it('a published document without landing cards returns an empty list (the page then shows its built-in cards)', async () => {
+    await resetContent()
+    await save(doc())
+    await publish()
+    expect((await publicPart('chrome')).content).toMatchObject({ landingCollections: [] })
+    await resetContent()
+  })
+
+  it('a ninth card is refused, on save and on publish; eight publish', async () => {
+    const nine = withCards(...Array.from({ length: 9 }, () => card()))
+    await expect(h.probe(ADMIN, 'select public.admin_save_site_content_draft($1::jsonb, $2::timestamptz)', [JSON.stringify(nine), await base()])).rejects.toMatchObject({ message: 'invalid_content', detail: 'landing.collections|too_many' })
+    await refuses(nine, 'landing.collections|too_many')
+    const b = await forceDraft(withCards(...Array.from({ length: 8 }, () => card())))
+    expect((await publish(ADMIN, b)).version).toBeGreaterThan(0)
+    await resetContent()
+  })
+
+  it('refuses a bad title, text, photo, link kind, slug or category with the path of the problem', async () => {
+    await refuses(withCards(card({ title: { en: '  ' } })), 'landing.collections.0.title.en|required')
+    await refuses(withCards(card({ title: { en: 'x'.repeat(61) } })), 'landing.collections.0.title.en|too_long')
+    await refuses(withCards(card({ title: { en: 'A', pt: 'x'.repeat(61) } })), 'landing.collections.0.title.pt|too_long')
+    await refuses(withCards(card({ text: { en: 'x'.repeat(161) } })), 'landing.collections.0.text.en|too_long')
+    await refuses(withCards(card(), card({ image: 'not-a-photo' })), 'landing.collections.1.image|invalid_value')
+    await refuses(withCards(card({ image: '' })), 'landing.collections.0.image|required')
+    const dup = card()
+    await refuses(withCards(dup, dup), 'landing.collections.1.id|duplicate_id')
+    await refuses(withCards(card({ link: { kind: 'external', url: 'https://x.test' } })), 'landing.collections.0.link|invalid_value')
+    await refuses(withCards(card({ link: { kind: 'product', businessSlug: 'Bad Slug', productSlug: 'ok' } })), 'landing.collections.0.link.businessSlug|invalid_slug')
+    await refuses(withCards(card({ link: { kind: 'product', businessSlug: 'acme', productSlug: '-x' } })), 'landing.collections.0.link.productSlug|invalid_slug')
+    await refuses(withCards(card({ link: { kind: 'product', businessSlug: 'acme' } })), 'landing.collections.0.link.productSlug|required')
+    await refuses(withCards(card({ link: { kind: 'catalog', businessSlug: '' } })), 'landing.collections.0.link.businessSlug|required')
+    await refuses(withCards(card({ link: { kind: 'catalog', businessSlug: 'acme', category: 'spaceship' } })), 'landing.collections.0.link.category|invalid_value')
+  })
+
+  it('accepts every link kind, every photo key and every category the TypeScript model knows', async () => {
+    const cards = [card({ link: { kind: 'apply' } }), card({ link: { kind: 'catalog', businessSlug: 'acme' } }), ...LANDING_IMAGE_KEYS.map((image) => card({ image }))]
+    for (let i = 0; i < cards.length; i += 8) {
+      const b = await forceDraft(withCards(...cards.slice(i, i + 8)))
+      expect((await publish(ADMIN, b)).version).toBeGreaterThan(0)
+    }
+    for (const category of CATEGORIES) {
+      const b = await forceDraft(withCards(card({ link: { kind: 'catalog', businessSlug: 'acme', category } })))
+      expect((await publish(ADMIN, b)).version).toBeGreaterThan(0)
+    }
+    await resetContent()
+  })
+
+  it('the rollback puts the three functions back and keeps their grants', async () => {
+    const before = await freshDb((n) => n < LC_MIGRATION)
+    const rolled = await freshDb()
+    try {
+      const defs = async (target: PGlite) => {
+        const out: string[] = []
+        for (const sig of ['private.check_site_content_shape(jsonb)', 'private.validate_site_content(jsonb)', 'public.get_published_site_content(text,text)'])
+          out.push((await target.query<{ d: string }>(`select pg_get_functiondef($1::regprocedure) as d`, [sig])).rows[0]!.d.replace(/\r\n/g, '\n'))
+        return out
+      }
+      expect(await defs(rolled)).not.toEqual(await defs(before))
+      await rolled.exec(readFileSync(LC_ROLLBACK_SQL, 'utf8'))
+      expect(await defs(rolled)).toEqual(await defs(before))
+      const grants = await rolled.query<{ a: boolean; n: boolean }>(`select has_function_privilege('anon', 'public.get_published_site_content(text,text)', 'execute') as a, has_function_privilege('anon', 'private.validate_site_content(jsonb)', 'execute') as n`)
+      expect(grants.rows[0]).toEqual({ a: true, n: false })
+    } finally {
+      await before.close()
+      await rolled.close()
+    }
+  }, 120_000)
 })
 
 describe('rollback', () => {

@@ -17,6 +17,7 @@ const GROUPS = [
   ['applicationFields', 'editor.summary.applicationFields'],
   ['questions', 'editor.summary.questions'],
   ['social', 'editor.summary.social'],
+  ['landingCollections', 'editor.summary.landingCollections'],
 ] as const satisfies readonly (readonly [string, TranslationKey])[]
 
 /** "Publish N changes to the live site?": the counts by group and the placeholders still to be completed. */

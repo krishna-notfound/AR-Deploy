@@ -21,7 +21,7 @@ test('landing page shows the client copy in Portuguese and links to real catalog
   await expect(page.getByRole('banner').getByRole('link', { name: 'Candidatar a sua empresa' })).toHaveAttribute('href', '/apply')
 
   // "Ver coleção" opens a published catalogue filtered to that category.
-  await page.getByRole('link', { name: 'Mesas: Ver coleção' }).click()
+  await page.getByRole('link', { name: /^Mesas/ }).click()
   await expect(page).toHaveURL(/\/catalog\/[\w-]+\?category=table$/)
 
   // The illustrative piece (no product record, no 3D model) never links to another product's 3D/AR page.

@@ -74,7 +74,8 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
           if (!isObj(p) || typeof p.slug !== 'string' || !isObj(p.title) || typeof p.title.en !== 'string') return []
           return [{ slug: p.slug, title: typeof p.title.pt === 'string' ? { en: p.title.en, pt: p.title.pt } : { en: p.title.en } }]
         })
-        return ok({ version, footerPages, social: normalizeSiteContent({ social: c.social }).social })
+        const landingCollections = normalizeSiteContent({ landing: { collections: c.landingCollections } }).landing.collections
+        return ok({ version, footerPages, social: normalizeSiteContent({ social: c.social }).social, landingCollections })
       }),
 
     getPublishedPage: (slug) =>

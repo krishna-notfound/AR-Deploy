@@ -3,7 +3,7 @@
 import { SOCIAL_NETWORKS, type ContentErrors, type SiteContent } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import type { Vars } from '@/i18n/translate'
-import { editorApplyPath, editorPagePath, editorSocialPath } from '@/lib/urls'
+import { editorApplyPath, editorLandingPath, editorPagePath, editorSocialPath } from '@/lib/urls'
 
 type T = (key: TranslationKey, vars?: Vars) => string
 
@@ -25,6 +25,18 @@ const FIELD_KEYS: Record<string, TranslationKey> = {
   order: 'editor.field.order',
 }
 
+const LANDING_FIELD_KEYS: Record<string, TranslationKey> = {
+  'title.en': 'editor.field.titleEn',
+  'title.pt': 'editor.field.titlePt',
+  'text.en': 'editor.field.bodyEn',
+  'text.pt': 'editor.field.bodyPt',
+  image: 'editor.landing.picture',
+  link: 'editor.landing.link',
+  'link.businessSlug': 'editor.landing.business',
+  'link.productSlug': 'editor.landing.product',
+  'link.category': 'editor.landing.category',
+}
+
 export function describeProblem(path: string, key: string, draft: SiteContent, t: T): Problem {
   const what = t(`editor.err.${key}` as TranslationKey)
   const parts = path.split('.')
@@ -38,6 +50,14 @@ export function describeProblem(path: string, key: string, draft: SiteContent, t
     const name = page.title.en.trim() || t('editor.page.untitled')
     const field = FIELD_KEYS[parts.slice(2).join('.')]
     return { path, what, where: field ? `${name}: ${t(field)}` : name, to: editorPagePath(page.id) }
+  }
+  if (parts[0] === 'landing') {
+    const card = parts[1] === 'collections' && parts[2] !== undefined ? draft.landing.collections[Number(parts[2])] : undefined
+    const where = t('editor.menu.landing')
+    if (!card) return { path, what, where, to: editorLandingPath() }
+    const field = LANDING_FIELD_KEYS[parts.slice(3).join('.')]
+    const name = card.title.en.trim() || t('editor.landing.untitled')
+    return { path, what, where: `${where}: ${field ? `${name}, ${t(field).toLowerCase()}` : name}`, to: editorLandingPath() }
   }
   if (parts[0] === 'applyForm') return { path, what, where: t('editor.menu.apply'), to: editorApplyPath('form') }
   if (parts[0] === 'social') {
