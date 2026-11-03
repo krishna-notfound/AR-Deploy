@@ -4,12 +4,13 @@ import { Link, Navigate, useSearchParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import type { Business, Category, Product } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { localeOf } from '@/i18n/locale'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
 import { APPLY_PATH, catalogLocalPath, productLocalPath } from '@/lib/urls'
-import { service } from '@/services'
+import { service, siteAssetUrl } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { useLandingFeatured } from '@/services/contentHooks'
+import { useLandingFeatured, useLandingShowcase } from '@/services/contentHooks'
 import { LandingCollections } from './LandingCollections'
 import { LandingShowcase, type ShowcaseView, ShowcaseCta, useProductShowcaseView, useShowcaseProduct } from './LandingShowcase'
 import { SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
@@ -191,7 +192,8 @@ function Experience() {
   const { featured } = useLandingFeatured()
   const showcase = useShowcaseProduct(featured)
   const fallbackView = useProductShowcaseView(showcase)
-  const adminView: ShowcaseView | undefined = undefined // TODO(controller): from useLandingShowcase()
+  // The admin's own showcase from the Website Editor (picture, 3D model, texts) comes first.
+  const adminView = useAdminShowcaseView()
   const view = adminView ?? fallbackView
   return (
     <section id="experiencia" className="scroll-mt-24 bg-obsidian text-chalk" aria-labelledby="xp-title">
@@ -284,4 +286,27 @@ function Partners() {
       </div>
     </section>
   )
+}
+
+/** The Editor's showcase as the card's view: the admin's own picture and model, independent of any business. */
+function useAdminShowcaseView(): ShowcaseView | undefined {
+  const { lang, localized } = useI18n()
+  const { showcase } = useLandingShowcase()
+  return useMemo(() => {
+    if (!showcase?.title.en) return undefined
+    const text = (v?: { en: string; pt?: string }) => (v ? localized(v) || undefined : undefined)
+    const product = showcase.product
+    return {
+      eyebrow: text(showcase.eyebrow),
+      title: localized(showcase.title),
+      text: text(showcase.text),
+      dimensions: showcase.dimensions || undefined,
+      materials: text(showcase.materials),
+      priceLabel: showcase.price ? new Intl.NumberFormat(localeOf(lang), { style: 'currency', currency: 'EUR' }).format(showcase.price.amount) : undefined,
+      imageUrl: showcase.image ? siteAssetUrl(showcase.image) : undefined,
+      glbUrl: showcase.model ? siteAssetUrl(showcase.model.glb) : undefined,
+      usdzUrl: showcase.model?.usdz ? siteAssetUrl(showcase.model.usdz) : undefined,
+      productHref: product ? productLocalPath({ slug: product.businessSlug }, { slug: product.productSlug }) : undefined,
+    }
+  }, [showcase, lang, localized])
 }
