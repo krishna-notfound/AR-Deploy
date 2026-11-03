@@ -9,7 +9,7 @@ import { APPLY_PATH, catalogLocalPath, collectionPath, productLocalPath } from '
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { BUILTIN_COLLECTIONS } from './landingBuiltin'
-import { landingImage } from './landingImages'
+import { collectionImage, landingImage } from './landingImages'
 import { useSiteContent } from './SiteContentProvider'
 
 // The landing page's Collections section (ADR-0046). The cards come from the Website Editor when it has published some;
@@ -87,7 +87,7 @@ function editorCards(list: LandingCollection[], localized: ReturnType<typeof use
   return list
     .filter((c) => !c.hidden)
     .flatMap((c) => {
-      const img = landingImage(c.image)
+      const img = collectionImage(c.image)
       if (!img) return [] // an unknown photo key is never published (the database refuses it); skip rather than show a broken card
       return [{ id: c.id, title: localized(c.title), text: c.text ? localized(c.text) || undefined : undefined, image: img.src, focus: img.focus, href: hrefOf(c.link, targets, c.slug) }]
     })

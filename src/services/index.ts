@@ -3,7 +3,8 @@ import type { AccountService } from './accountService'
 import { backend } from './backend'
 import { type CatalogService, fail } from './catalogService'
 import type { ContentService } from './contentService'
-import { mockContentService } from './mock/mockContent'
+import { mockContentService, mockSiteAssetUrl } from './mock/mockContent'
+import { SITE_ASSET_BUCKET, type SiteAsset } from '@/domain/siteContent'
 import { mockAccountService } from './mock/mockAccount'
 import { mockCatalogService } from './mock/mockCatalogService'
 import { type AuthService, createSupabaseAuthService } from './supabase/auth'
@@ -65,6 +66,16 @@ export const content: ContentService = SUPABASE_BUILD
   : backend.mode === 'demo'
     ? mockContentService
     : unavailableContent(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
+
+/**
+ * The public URL of a file uploaded in the Website Editor. Supabase: the public bucket `site-content`
+ * (`${VITE_SUPABASE_URL}/storage/v1/object/public/site-content/<path>`). Demo: the session-only object URL ('' after a reload).
+ */
+export function siteAssetUrl(asset: SiteAsset): string {
+  if (!SUPABASE_BUILD) return mockSiteAssetUrl(asset)
+  const base = String(import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/+$/, '')
+  return `${base}/storage/v1/object/public/${SITE_ASSET_BUCKET}/${asset.path}`
+}
 
 export { backend, isDemoMode } from './backend'
 export type { AccountService, AssuranceLevels, NoticeOutcome, ProfilePatch } from './accountService'

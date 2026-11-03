@@ -17,7 +17,7 @@ import { useServiceQuery } from '@/services/hooks'
 import { PublicMessage } from '../public/PublicMessage'
 import { TAP_TARGET } from '../public/tapTarget'
 import { BUILTIN_COLLECTIONS } from './landingBuiltin'
-import { landingImage } from './landingImages'
+import { collectionImage, landingImage } from './landingImages'
 import PublicNotFoundPage from './PublicNotFoundPage'
 import { useSiteContent } from './SiteContentProvider'
 import { SiteFooter, SiteHeader } from './SiteChrome'
@@ -53,7 +53,7 @@ export default function CollectionPage() {
 
   const view: View | null = useMemo(() => {
     if (collection) {
-      const img = landingImage(collection.image)
+      const img = collectionImage(collection.image)
       return { title: localized(collection.title), text: collection.text ? localized(collection.text) || undefined : undefined, image: img?.src ?? '', focus: img?.focus, refs: collection.products }
     }
     const builtin = nothingPublished ? BUILTIN_COLLECTIONS.find((c) => c.key === slug) : undefined

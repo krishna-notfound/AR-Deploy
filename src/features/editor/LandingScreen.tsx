@@ -14,6 +14,8 @@ import {
   MAX_COLLECTION_TITLE,
   MAX_LANDING_COLLECTIONS,
   type ProductRef,
+  type SiteAsset,
+  isSiteAsset,
 } from '@/domain/siteContent'
 import { CATEGORIES, type Category } from '@/domain/types'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
@@ -21,11 +23,12 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
 import { slugInput } from '@/lib/slug'
-import { service } from '@/services'
+import { service, siteAssetUrl } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { BUILTIN_COLLECTIONS, builtinAsCollections } from '../marketing/landingBuiltin'
-import { LANDING_IMAGES, landingImage } from '../marketing/landingImages'
+import { LANDING_IMAGES, collectionImage } from '../marketing/landingImages'
 import { useEditor } from './EditorContext'
+import { ShowcasePanel, UploadButton } from './ShowcasePanel'
 import {
   addCollection,
   addCollectionProduct,
@@ -132,6 +135,8 @@ export default function LandingScreen() {
         </div>
       </div>
 
+      <ShowcasePanel products={choices.products} productsLoading={choices.loading} />
+
       <FeaturedPicker choices={choices} />
 
       {choices.failed && (
@@ -199,7 +204,7 @@ function CardEditor({
       const { text: _old, ...rest } = c
       return text.en || text.pt ? { ...rest, text } : rest
     })
-  const photo = landingImage(card.image)
+  const photo = collectionImage(card.image)
   const panelId = `landing-card-${card.id}`
 
   return (
@@ -268,7 +273,7 @@ function CardEditor({
   )
 }
 
-function PicturePicker({ value, error, onChange }: { value: string; error?: string; onChange: (key: string) => void }) {
+function PicturePicker({ value, error, onChange }: { value: string | SiteAsset; error?: string; onChange: (image: string | SiteAsset) => void }) {
   const { t, lang } = useI18n()
   return (
     <fieldset>
@@ -294,6 +299,16 @@ function PicturePicker({ value, error, onChange }: { value: string; error?: stri
           )
         })}
       </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <UploadButton kind="image" label={t('editor.showcase.uploadPicture')} onUploaded={onChange} />
+        {isSiteAsset(value) && (
+          <span className="flex items-center gap-2 text-ui-small text-ink">
+            {siteAssetUrl(value) ? <img src={siteAssetUrl(value)} alt="" width={64} height={48} className="h-12 w-16 border-2 border-ink object-cover" /> : null}
+            {t('editor.landing.uploadedPicture')}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-ui-small text-ink-muted">{t('editor.showcase.pictureHint')}</p>
       {error && (
         <p role="alert" className="mt-2 text-ui-small text-danger">
           {error}
