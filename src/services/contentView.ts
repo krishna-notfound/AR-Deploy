@@ -16,6 +16,7 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
     .sort((a, b) => a.order - b.order || a.title.en.localeCompare(b.title.en))
     .map((p) => ({ slug: p.slug, title: clone(p.title) }))
   const featured = content.landing?.featured
+  const example = content.landing?.example
   const showcase = content.landing?.showcase
   return {
     version,
@@ -23,6 +24,7 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
     social: clone(content.social),
     landingCollections: clone(content.landing?.collections ?? []),
     ...(featured ? { landingFeatured: clone(featured) } : {}),
+    ...(example ? { landingExample: clone(example) } : {}),
     ...(showcase ? { landingShowcase: clone(showcase) } : {}),
   }
 }

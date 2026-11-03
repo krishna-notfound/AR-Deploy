@@ -57,6 +57,12 @@ export function useLandingFeatured(): { featured?: ProductRef; loading: boolean 
   return { featured: chrome?.landingFeatured, loading }
 }
 
+/** The admin's piece the hero's "See a live example" opens (ADR-0047), or undefined when none was chosen. */
+export function useLandingExample(): { example?: ProductRef; loading: boolean } {
+  const { chrome, loading } = usePublishedChrome()
+  return { example: chrome?.landingExample, loading }
+}
+
 /** The landing page's 3D showcase card from the Editor (the published copy, or the draft inside the Editor's preview). */
 export function useLandingShowcase(): { showcase?: LandingShowcase; loading: boolean } {
   const { chrome, loading } = usePublishedChrome()

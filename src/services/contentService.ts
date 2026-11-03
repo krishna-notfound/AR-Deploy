@@ -19,6 +19,8 @@ export interface PublishedChrome {
   landingCollections: LandingCollection[]
   /** The product the landing page's "Open a live piece in 3D" opens; absent when the admin has not chosen one. */
   landingFeatured?: ProductRef
+  /** The admin's piece the hero's "See a live example" opens (ADR-0047); absent when none was chosen. */
+  landingExample?: ProductRef
   /** The landing page's 3D showcase card (the Owner/Admin's own files and texts); absent when none is published. */
   landingShowcase?: LandingShowcase
 }

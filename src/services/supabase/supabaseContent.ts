@@ -75,13 +75,14 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
           if (!isObj(p) || typeof p.slug !== 'string' || !isObj(p.title) || typeof p.title.en !== 'string') return []
           return [{ slug: p.slug, title: typeof p.title.pt === 'string' ? { en: p.title.en, pt: p.title.pt } : { en: p.title.en } }]
         })
-        const landing = normalizeSiteContent({ landing: { collections: c.landingCollections, featured: c.landingFeatured, showcase: c.landingShowcase } }).landing
+        const landing = normalizeSiteContent({ landing: { collections: c.landingCollections, featured: c.landingFeatured, example: c.landingExample, showcase: c.landingShowcase } }).landing
         return ok({
           version,
           footerPages,
           social: normalizeSiteContent({ social: c.social }).social,
           landingCollections: landing.collections,
           ...(landing.featured ? { landingFeatured: landing.featured } : {}),
+          ...(landing.example ? { landingExample: landing.example } : {}),
           ...(landing.showcase ? { landingShowcase: landing.showcase } : {}),
         })
       }),
