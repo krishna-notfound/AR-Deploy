@@ -1,6 +1,5 @@
-// The landing page's 3D/AR card. It renders a ShowcaseView: the admin's own picture, 3D model and texts from the Website
-// Editor (owner decision 2026-11-03), or, only when there is none, a real published product converted to the same view
-// (productToShowcaseView), or last the labelled illustration (ADR-0023).
+// The landing page's 3D/AR card. It renders a ShowcaseView: one of the admin's own showcase pieces (ADR-0047, never a
+// business's product) converted by productToShowcaseView, or, when there is no piece, the labelled illustration (ADR-0023).
 // "3D" switches the picture to the live model in place; "AR" launches AR from the card with the same model-viewer setup as
 // the product page (ar-modes webxr scene-viewer quick-look, ADR-0035; an iPhone uses the USDZ when given, else model-viewer
 // builds one). Where AR is not available the card says so. With only a product page behind it, "AR" links there.
@@ -8,17 +7,17 @@ import { AlertTriangle } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { type ModelLoadInfo, ModelViewer, type ModelViewerHandle } from '@/components/three/ModelViewer'
-import type { Business, Product } from '@/domain/types'
+import { HOUSE_BUSINESS_SLUG, type ProductRef } from '@/domain/siteContent'
+import type { Product } from '@/domain/types'
 import { arLaunchUrl, variantMedia } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { primaryImage } from '@/lib/product'
+import { initialPrice, primaryImage } from '@/lib/product'
 import { useFormat } from '@/lib/useFormat'
-import { productLocalPath } from '@/lib/urls'
-import { service } from '@/services'
-import { useServiceQuery } from '@/services/hooks'
+import { showcaseProductPath } from '@/lib/urls'
+import { hasGlb, useShowcasePieces } from './useShowcasePieces'
 
-/** What the card shows. The admin's showcase from the Website Editor, or a product converted by productToShowcaseView. */
+/** What the card shows: a showcase piece converted by productToShowcaseView. */
 export interface ShowcaseView {
   eyebrow?: string
   title: string
@@ -27,57 +26,21 @@ export interface ShowcaseView {
   materials?: string
   /** Already formatted. */
   priceLabel?: string
-  /** Admin picture. */
   imageUrl?: string
-  /** Admin 3D model, plus the iPhone file. */
+  /** The 3D model, plus the iPhone file. */
   glbUrl?: string
   usdzUrl?: string
-  /** Optional link to a business product page. */
+  /** The piece's showcase page. */
   productHref?: string
-  /** "By <business>" line; only the product fallback sets it. */
-  byLine?: string
 }
-
-export type FeaturedRef = { businessSlug: string; productSlug: string }
-export type ShowcaseItem = { product: Product; business: Business }
-export type ShowcaseState = {
-  status: 'loading' | 'ready'
-  item?: ShowcaseItem
-  /** The product page of the resolved product; undefined for the illustration. */
-  href?: string
-}
-
-const hasModel = (p: Product) => !!variantMedia(p).models.glb
 
 /**
- * The featured product when it is published, its business is active and it can be shown; otherwise the first published
- * product with a 3D model (an armchair when there is one); otherwise nothing (the illustration).
+ * The piece the 3D card shows: the featured one when it is a published house piece; otherwise the newest piece with a 3D
+ * model; otherwise nothing (the illustration). `pieces` are the admin's showcase pieces, newest first (ADR-0047).
  */
-export function resolveShowcase(products: Product[], businesses: Business[], featured?: FeaturedRef): ShowcaseItem | undefined {
-  const active = new Map(businesses.filter((b) => b.status === 'active').map((b) => [b.id, b]))
-  const items: ShowcaseItem[] = products
-    .filter((p) => p.status === 'published' && active.has(p.businessId))
-    .map((p) => ({ product: p, business: active.get(p.businessId)! }))
-    .sort((a, b) => a.business.name.localeCompare(b.business.name) || a.product.name.en.localeCompare(b.product.name.en))
-  const picked = featured && items.find((i) => i.business.slug === featured.businessSlug && i.product.slug === featured.productSlug)
-  if (picked) return picked
-  const withModel = items.filter((i) => hasModel(i.product))
-  return withModel.find((i) => i.product.category === 'chair') ?? withModel[0]
-}
-
-/** The product the card shows when the admin has no showcase. `service.getBusinesses()`, not `getCatalogs()` (staff only). */
-export function useShowcaseProduct(featured?: FeaturedRef): ShowcaseState {
-  const products = useServiceQuery(() => service.getProducts({ status: 'published' }), [])
-  const businesses = useServiceQuery(() => service.getBusinesses(), [])
-  const loading = products.status === 'loading' || businesses.status === 'loading'
-  const slugs = `${featured?.businessSlug ?? ''}/${featured?.productSlug ?? ''}`
-  return useMemo(() => {
-    if (loading) return { status: 'loading' }
-    const item = resolveShowcase(products.data ?? [], businesses.data ?? [], featured)
-    return { status: 'ready', item, href: item ? productLocalPath(item.business, item.product) : undefined }
-    // `slugs` stands for `featured`, which callers may rebuild on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, products.data, businesses.data, slugs])
+export function pickShowcasePiece(pieces: Product[], featured?: ProductRef): Product | undefined {
+  const picked = featured && featured.businessSlug === HOUSE_BUSINESS_SLUG && pieces.find((p) => p.slug === featured.productSlug)
+  return picked || pieces.find(hasGlb)
 }
 
 type Fmt = {
@@ -86,8 +49,8 @@ type Fmt = {
   money: ReturnType<typeof useFormat>['money']
 }
 
-/** The product fallback, as the same view the admin's showcase uses. */
-export function productToShowcaseView({ product, business }: ShowcaseItem, href: string | undefined, { t, localized, money }: Fmt): ShowcaseView {
+/** A showcase piece as the card's view. */
+export function productToShowcaseView(product: Product, { t, localized, money }: Fmt): ShowcaseView {
   const media = variantMedia(product)
   const image = primaryImage(product)
   const d = product.dimensions
@@ -101,21 +64,25 @@ export function productToShowcaseView({ product, business }: ShowcaseItem, href:
       ? `${initial(t('product.width'))} ${d.width} × ${initial(t('product.height'))} ${d.height} × ${initial(t('product.depth'))} ${d.depth} ${d.unit}`
       : undefined,
     materials: localized(product.material) || undefined,
-    priceLabel: money(product.price, product.currency),
+    priceLabel: money(initialPrice(product), product.currency),
     imageUrl: image?.url,
     glbUrl: media.models.glb ? arLaunchUrl(media.models.glb) : undefined,
     usdzUrl: media.models.usdz ? arLaunchUrl(media.models.usdz) : undefined,
-    productHref: href,
-    byLine: t('landing.show.by', { business: business.name }),
+    productHref: showcaseProductPath(product.slug),
   }
 }
 
-/** The fallback view for the resolved product; undefined while loading or when no product can be shown. */
-export function useProductShowcaseView(state: ShowcaseState): ShowcaseView | undefined {
+/** The 3D card's view: a showcase piece, or undefined (the illustration) when there is none. `loading` while the pieces load. */
+export function useShowcaseCardView(featured?: ProductRef): { view?: ShowcaseView; loading: boolean } {
   const { t, localized } = useI18n()
   const { money } = useFormat()
-  const { item, href } = state
-  return useMemo(() => (item && href ? productToShowcaseView(item, href, { t, localized, money }) : undefined), [item, href, t, localized, money])
+  const { status, pieces } = useShowcasePieces()
+  const slug = featured?.businessSlug === HOUSE_BUSINESS_SLUG ? featured.productSlug : ''
+  const view = useMemo(() => {
+    const piece = pickShowcasePiece(pieces, slug ? { businessSlug: HOUSE_BUSINESS_SLUG, productSlug: slug } : undefined)
+    return piece ? productToShowcaseView(piece, { t, localized, money }) : undefined
+  }, [pieces, slug, t, localized, money])
+  return { view, loading: status === 'loading' }
 }
 
 const SHOW_3D_EVENT = 'sanctus:showcase-3d'
@@ -157,7 +124,7 @@ const CARD = 'border border-chalk/15 p-4 sm:p-6'
 const STAGE = 'relative mt-4 aspect-[4/3] overflow-hidden bg-umber sm:mt-6'
 const CHIP = 'border px-2.5 py-1.5 text-[10px] leading-none tracking-[0.2em] uppercase transition-colors select-none'
 
-/** `view` is the admin's showcase, else the product fallback, else nothing (the labelled illustration). */
+/** `view` is a showcase piece, else nothing (the labelled illustration). */
 export function LandingShowcase({ view, loading }: { view?: ShowcaseView; loading?: boolean }) {
   if (loading) return <figure className={CARD} aria-busy="true"><div className={STAGE} aria-hidden /></figure>
   if (!view) return <IllustrationCard />
@@ -166,7 +133,7 @@ export function LandingShowcase({ view, loading }: { view?: ShowcaseView; loadin
 
 export function ShowcaseCard({ view }: { view: ShowcaseView }) {
   const { t } = useI18n()
-  const { title, eyebrow, text, dimensions, materials, priceLabel, imageUrl, glbUrl, usdzUrl, productHref, byLine } = view
+  const { title, eyebrow, text, dimensions, materials, priceLabel, imageUrl, glbUrl, usdzUrl, productHref } = view
 
   const [mode, setMode] = useState<'image' | '3d'>(!imageUrl && glbUrl ? '3d' : 'image')
   const [load, setLoad] = useState<{ state: 'loading' | 'loaded' | 'error'; attempt: number; progress: number; timedOut: boolean }>({ state: 'loading', attempt: 0, progress: 0, timedOut: false })
@@ -320,7 +287,6 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
         </dl>
         {priceLabel && <p className="font-display text-xl tracking-[0.04em] sm:text-right">{priceLabel}</p>}
         {text && <p className="text-[13px] leading-5 text-chalk/80 sm:col-span-2">{text}</p>}
-        {byLine && <p className="text-xs leading-5 text-chalk/60 sm:col-span-2">{byLine}</p>}
       </figcaption>
     </figure>
   )

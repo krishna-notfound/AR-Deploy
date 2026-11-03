@@ -1,19 +1,15 @@
 import { ArrowRight } from 'lucide-react'
-import { type ReactNode, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
-import type { Business, Category, Product } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
-import { localeOf } from '@/i18n/locale'
 import { cn } from '@/lib/cn'
-import { primaryImage } from '@/lib/product'
-import { APPLY_PATH, catalogLocalPath, productLocalPath } from '@/lib/urls'
-import { service, siteAssetUrl } from '@/services'
-import { useServiceQuery } from '@/services/hooks'
-import { useLandingFeatured, useLandingShowcase } from '@/services/contentHooks'
+import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
+import { useLandingExample, useLandingFeatured } from '@/services/contentHooks'
 import { LandingCollections } from './LandingCollections'
-import { LandingShowcase, type ShowcaseView, ShowcaseCta, useProductShowcaseView, useShowcaseProduct } from './LandingShowcase'
+import { LandingShowcase, ShowcaseCta, useShowcaseCardView } from './LandingShowcase'
 import { SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
+import { useShowcasePieces } from './useShowcasePieces'
 
 // Photography: the owner's Stitch set (AI-generated, design/stitch/BRIEF.md), 1200×896 unless noted.
 const IMG = (name: string) => `/images/sanctus/v2/${name}.webp`
@@ -30,21 +26,19 @@ const SECTION = 'mx-auto max-w-[1320px] px-5 sm:px-10'
 const CTA = 'inline-flex h-12 items-center justify-center gap-3 whitespace-nowrap rounded-[var(--radius-control)] px-6 text-label uppercase transition-colors select-none'
 const CTA_DARK = cn(CTA, 'bg-ink text-chalk hover:bg-umber')
 
-type Showcase = { product: Product; business: Business }
-
 export default function LandingPage() {
   const { t } = useI18n()
   useDocumentTitle(t('landing.title'))
   const [params] = useSearchParams()
-  const links = useLandingLinks()
-  useSectionScroll(links.settled)
+  const example = useExampleHref()
+  useSectionScroll(example.settled)
   // Old links sent people to "/?next=…" for the account picker, which now lives at /demo.
   if (params.has('next')) return <Navigate to={`/demo?${params.toString()}`} replace />
   return (
     <div className="min-h-dvh bg-canvas">
       <SiteHeader />
       <main>
-        <Hero exampleHref={links.piece3d ?? links.catalog} />
+        <Hero exampleHref={example.href} />
         <HowItWorks />
         <Experience />
         <LandingCollections />
@@ -57,33 +51,17 @@ export default function LandingPage() {
 }
 
 /**
- * Where the reference's calls to action lead: real published catalogues and products from the service.
- * A link without a destination is not rendered (no dead buttons).
+ * Where "See a live example" leads (ADR-0047): the admin's chosen example piece, else the 3D card's piece, else the newest
+ * showcase piece, as its showcase page. No piece at all: no button (no dead buttons).
  */
-function useLandingLinks() {
-  const products = useServiceQuery(() => service.getProducts({ status: 'published' }), [])
-  // Businesses, not getCatalogs(): the catalogue counts view is staff-only, so visitors got a 401 and no links at all.
-  const catalogs = useServiceQuery(() => service.getBusinesses(), [])
-  return useMemo(() => {
-    const active = new Map((catalogs.data ?? []).filter((b) => b.status === 'active').map((b) => [b.id, b]))
-    const items: Showcase[] = (products.data ?? [])
-      .filter((p) => active.has(p.businessId) && primaryImage(p))
-      .map((p) => ({ product: p, business: active.get(p.businessId)! }))
-      .sort((a, b) => a.business.name.localeCompare(b.business.name) || a.product.name.en.localeCompare(b.product.name.en))
-    const byCategory = (c: Category) => {
-      const hit = items.find((i) => i.product.category === c)
-      return hit ? `${catalogLocalPath(hit.business)}?category=${c}` : undefined
-    }
-    // The 3D section opens a real product that has a 3D model, an armchair when there is one.
-    const withModel = items.filter((i) => i.product.models.glb)
-    const piece = withModel.find((i) => i.product.category === 'chair') ?? withModel[0]
-    return {
-      catalog: items[0] ? catalogLocalPath(items[0].business) : undefined,
-      piece3d: piece ? productLocalPath(piece.business, piece.product) : undefined,
-      category: byCategory,
-      settled: products.status !== 'loading' && catalogs.status !== 'loading',
-    }
-  }, [products.data, products.status, catalogs.data, catalogs.status])
+function useExampleHref() {
+  const { example, loading: exampleLoading } = useLandingExample()
+  const { featured, loading: featuredLoading } = useLandingFeatured()
+  const { status, pieces, ofRef } = useShowcasePieces()
+  // Not before the chosen pieces are known, so the button never points at the newest piece for a moment and then moves.
+  const settled = status !== 'loading' && !exampleLoading && !featuredLoading
+  const piece = settled ? (ofRef(example) ?? ofRef(featured) ?? pieces[0]) : undefined
+  return { href: piece ? showcaseProductPath(piece.slug) : undefined, settled }
 }
 
 /** A heading set on two lines as in the reference, read as one sentence by screen readers. */
@@ -113,18 +91,15 @@ function Hero({ exampleHref }: { exampleHref?: string }) {
             <TwoLines a={t('landing.hero.title1')} b={t('landing.hero.title2')} italic />
           </h1>
           <p className="mt-6 max-w-md text-[15px] leading-7 text-ink-body">{t('landing.hero.body')}</p>
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col lg:items-start xl:flex-row">
-            <Link to={APPLY_PATH} className={CTA_DARK}>
-              {t('site.apply')}
-              {arrowIcon}
-            </Link>
-            {exampleHref && (
-              <Link to={exampleHref} className={cn(CTA, 'border border-ink text-ink hover:bg-subtle')}>
+          {exampleHref && (
+            <>
+              <Link to={exampleHref} className={cn(CTA_DARK, 'mt-9 self-start')}>
                 {t('landing.hero.cta3d')}
+                {arrowIcon}
               </Link>
-            )}
-          </div>
-          <p className="mt-5 max-w-md text-[13px] leading-5 text-ink-muted">{t('landing.hero.note')}</p>
+              <p className="mt-5 max-w-md text-[13px] leading-5 text-ink-muted">{t('landing.hero.note')}</p>
+            </>
+          )}
         </div>
         <figure className="relative order-1 lg:order-2">
           <img
@@ -182,19 +157,14 @@ function HowItWorks() {
 }
 
 /**
- * 3D and AR, explained. The card on the right is a real product the admin features (image or live 3D); with no
- * product that has a model it is the labelled Linden illustration (ADR-0023). The call to action opens that same
- * product's page, never a catalogue.
+ * 3D and AR, explained. The card on the right is one of the admin's own showcase pieces (image or live 3D, ADR-0047); with
+ * no piece it is the labelled Linden illustration (ADR-0023). The call to action opens that same piece, never a catalogue.
  */
 function Experience() {
   const { t } = useI18n()
-  // The featured 3D piece the admin picks in the Editor; without one, the first published piece with a model.
+  // The featured 3D piece the admin picks in the Editor; without one, the newest showcase piece with a model.
   const { featured } = useLandingFeatured()
-  const showcase = useShowcaseProduct(featured)
-  const fallbackView = useProductShowcaseView(showcase)
-  // The admin's own showcase from the Website Editor (picture, 3D model, texts) comes first.
-  const adminView = useAdminShowcaseView()
-  const view = adminView ?? fallbackView
+  const { view, loading } = useShowcaseCardView(featured)
   return (
     <section id="experiencia" className="scroll-mt-24 bg-obsidian text-chalk" aria-labelledby="xp-title">
       <div className={cn(SECTION, 'grid gap-14 py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-center lg:gap-20 lg:py-28')}>
@@ -222,7 +192,7 @@ function Experience() {
           </ShowcaseCta>
         </div>
 
-        <LandingShowcase view={view} loading={!adminView && showcase.status === 'loading'} />
+        <LandingShowcase view={view} loading={loading} />
       </div>
     </section>
   )
@@ -286,27 +256,4 @@ function Partners() {
       </div>
     </section>
   )
-}
-
-/** The Editor's showcase as the card's view: the admin's own picture and model, independent of any business. */
-function useAdminShowcaseView(): ShowcaseView | undefined {
-  const { lang, localized } = useI18n()
-  const { showcase } = useLandingShowcase()
-  return useMemo(() => {
-    if (!showcase?.title.en) return undefined
-    const text = (v?: { en: string; pt?: string }) => (v ? localized(v) || undefined : undefined)
-    const product = showcase.product
-    return {
-      eyebrow: text(showcase.eyebrow),
-      title: localized(showcase.title),
-      text: text(showcase.text),
-      dimensions: showcase.dimensions || undefined,
-      materials: text(showcase.materials),
-      priceLabel: showcase.price ? new Intl.NumberFormat(localeOf(lang), { style: 'currency', currency: 'EUR' }).format(showcase.price.amount) : undefined,
-      imageUrl: showcase.image ? siteAssetUrl(showcase.image) : undefined,
-      glbUrl: showcase.model ? siteAssetUrl(showcase.model.glb) : undefined,
-      usdzUrl: showcase.model?.usdz ? siteAssetUrl(showcase.model.usdz) : undefined,
-      productHref: product ? productLocalPath({ slug: product.businessSlug }, { slug: product.productSlug }) : undefined,
-    }
-  }, [showcase, lang, localized])
 }

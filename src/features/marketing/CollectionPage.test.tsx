@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
-import { type LandingCollection, emptySiteContent } from '@/domain/siteContent'
+import { HOUSE_BUSINESS_SLUG, type LandingCollection, emptySiteContent } from '@/domain/siteContent'
 import { content, service } from '@/services'
 
 const open = (path: string) => {
@@ -11,6 +11,7 @@ const open = (path: string) => {
 
 let seq = 0
 const card = (over: Partial<LandingCollection>): LandingCollection => ({ id: crypto.randomUUID(), slug: `card-${++seq}`, products: [], title: { en: 'X' }, image: 'lamp-vase', link: { kind: 'collection' }, ...over })
+const ref = (slug: string) => ({ businessSlug: HOUSE_BUSINESS_SLUG, productSlug: slug })
 
 /** Publishes `cards` through the demo service, as the Editor does. */
 async function publishCards(cards: LandingCollection[]) {
@@ -24,12 +25,28 @@ async function publishCards(cards: LandingCollection[]) {
   localStorage.clear() // the visitor is not signed in
 }
 
-/** Published products of active businesses, with the business, from the demo data. */
-async function livePieces() {
+/** The admin's published showcase pieces from the demo data, newest first (the page's own order). */
+async function housePieces() {
+  const r = await service.getShowcase()
+  if (!r.ok) throw new Error('demo data')
+  return r.data.products.filter((p) => p.status === 'published').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.name.en.localeCompare(b.name.en))
+}
+
+/** A published product of a real business, to prove it never shows up. */
+async function businessProduct() {
   const [products, businesses] = await Promise.all([service.getProducts({ status: 'published' }), service.getBusinesses()])
   if (!products.ok || !businesses.ok) throw new Error('demo data')
-  const active = new Map(businesses.data.filter((b) => b.status === 'active').map((b) => [b.id, b]))
-  return products.data.filter((p) => active.has(p.businessId)).map((product) => ({ product, business: active.get(product.businessId)! }))
+  const product = products.data[0]!
+  return { product, business: businesses.data.find((b) => b.id === product.businessId)!, all: products.data }
+}
+
+async function unpublish(ids: string[]) {
+  localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
+  for (const id of ids) {
+    const r = await service.unpublishProduct(id)
+    if (!r.ok) throw new Error(JSON.stringify(r.error))
+  }
+  localStorage.clear()
 }
 
 beforeEach(async () => {
@@ -44,21 +61,17 @@ afterEach(() => {
 })
 
 describe('CollectionPage', () => {
-  it('shows a published collection: title, text, and its pieces in the chosen order, each one a link to the product page', { timeout: 30_000 }, async () => {
-    const pieces = await livePieces()
-    const [a, b] = pieces
-    if (!a || !b) throw new Error('need two published products')
+  it('shows a published collection: title, text, and its showcase pieces in the chosen order, each one a link to /showcase/<slug>', { timeout: 30_000 }, async () => {
+    const [a, b] = await housePieces()
+    if (!a || !b) throw new Error('need two showcase pieces')
+    const { business } = await businessProduct()
     await publishCards([
       card({
         slug: 'my-picks',
         title: { en: 'My picks', pt: 'As minhas escolhas' },
         text: { en: 'Chosen by hand.', pt: 'Escolhidas à mão.' },
-        // b before a; and one piece that does not exist is skipped.
-        products: [
-          { businessSlug: b.business.slug, productSlug: b.product.slug },
-          { businessSlug: 'nobody', productSlug: 'ghost' },
-          { businessSlug: a.business.slug, productSlug: a.product.slug },
-        ],
+        // b before a; a missing piece and a piece "of a business" (the right slug, the wrong catalogue) are skipped.
+        products: [ref(b.slug), ref('ghost'), { businessSlug: business.slug, productSlug: a.slug }, ref(a.slug)],
       }),
     ])
     open('/collections/my-picks')
@@ -66,16 +79,32 @@ describe('CollectionPage', () => {
     expect(screen.getByText('Chosen by hand.')).toBeInTheDocument()
     const list = await screen.findByRole('list', { name: 'Pieces in My picks' })
     const links = within(list).getAllByRole('link')
-    expect(links.map((l) => l.getAttribute('href'))).toEqual([`/products/${b.business.slug}/${b.product.slug}`, `/products/${a.business.slug}/${a.product.slug}`])
-    expect(links[0]).toHaveTextContent(b.business.name)
+    expect(links.map((l) => l.getAttribute('href'))).toEqual([`/showcase/${b.slug}`, `/showcase/${a.slug}`])
+    // Name and price; the "3D · AR" chip when the piece has a model; never a business name.
+    expect(links[0]).toHaveTextContent(b.name.en)
+    expect(links[0]).toHaveTextContent(/€/)
+    expect(links[0]).toHaveTextContent('3D · AR')
+    expect(links[0]).not.toHaveTextContent(business.name)
+  })
+
+  it('never shows a business product, even when a card points at one', { timeout: 30_000 }, async () => {
+    const { business, all } = await businessProduct()
+    const pieces = await housePieces()
+    // The demo's showcase pieces are copies of business pieces with the same slug: use a business piece the house lacks.
+    const only = all.find((p) => !pieces.some((h) => h.slug === p.slug))
+    if (!only) throw new Error('need a business piece the showcase does not have')
+    await publishCards([card({ slug: 'bleed', title: { en: 'Bleed' }, products: [{ businessSlug: business.slug, productSlug: only.slug }, ref(only.slug)] })])
+    open('/collections/bleed')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Bleed' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Pieces coming soon' })).toBeInTheDocument()
+    expect(screen.queryAllByRole('link').filter((l) => l.getAttribute('href')?.startsWith('/products/'))).toHaveLength(0)
   })
 
   it('does not show a piece that is no longer published', { timeout: 30_000 }, async () => {
-    const [a] = await livePieces()
-    if (!a) throw new Error('need a published product')
-    await publishCards([card({ slug: 'one', title: { en: 'One' }, products: [{ businessSlug: a.business.slug, productSlug: a.product.slug }] })])
-    const unpublished = await service.unpublishProduct(a.product.id)
-    if (!unpublished.ok) throw new Error(JSON.stringify(unpublished.error))
+    const [a] = await housePieces()
+    if (!a) throw new Error('need a showcase piece')
+    await publishCards([card({ slug: 'one', title: { en: 'One' }, products: [ref(a.slug)] })])
+    await unpublish([a.id])
     open('/collections/one')
     expect(await screen.findByRole('heading', { level: 1, name: 'One' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Pieces coming soon' })).toBeInTheDocument()
@@ -88,23 +117,38 @@ describe('CollectionPage', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Dupla' })).toBeInTheDocument()
   })
 
-  it('a collection with no pieces says "Pieces coming soon" and offers the application', { timeout: 30_000 }, async () => {
+  it('a collection with no pieces says "Pieces coming soon", links no business, and ends with the one apply banner', { timeout: 30_000 }, async () => {
     await publishCards([card({ slug: 'empty', title: { en: 'Empty one' }, products: [] })])
     open('/collections/empty')
     expect(await screen.findByRole('heading', { level: 1, name: 'Empty one' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Pieces coming soon' })).toBeInTheDocument()
-    const apply = screen.getAllByRole('link', { name: 'Apply as a business' }).find((l) => l.getAttribute('href') === '/apply')
-    expect(apply).toBeDefined()
+    const main = screen.getByRole('main')
+    expect(within(main).queryAllByRole('link').filter((l) => /^\/(products|catalog)\//.test(l.getAttribute('href') ?? ''))).toHaveLength(0)
+    const banner = within(main).getByRole('region', { name: 'This is how your customers will see your pieces.' })
+    expect(within(banner).getByRole('link', { name: 'Apply as a business' })).toHaveAttribute('href', '/apply')
+    // It is the only apply link in the page body (the header has its own).
+    expect(within(main).getAllByRole('link', { name: 'Apply as a business' })).toHaveLength(1)
   })
 
-  it('before anything is published, the built-in collections have a page: the published pieces of that category', { timeout: 30_000 }, async () => {
-    const sofas = (await livePieces()).filter((x) => x.product.category === 'sofa')
-    open('/collections/sofas')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Sofas' })).toBeInTheDocument()
-    const list = await screen.findByRole('list', { name: 'Pieces in Sofas' })
+  it('before anything is published, a built-in collection lists the showcase pieces of that category', { timeout: 30_000 }, async () => {
+    const pieces = await housePieces()
+    const category = pieces[0]!.category
+    const key = ({ sofa: 'sofas', table: 'tables', chair: 'armchairs', decor: 'decor' } as Record<string, string>)[category]
+    if (!key) throw new Error(`no built-in collection for ${category}`)
+    const expected = pieces.filter((p) => p.category === category).map((p) => `/showcase/${p.slug}`)
+    open(`/collections/${key}`)
+    const list = await screen.findByRole('list', { name: /^Pieces in / })
     const hrefs = within(list).getAllByRole('link').map((l) => l.getAttribute('href'))
-    expect(hrefs.sort()).toEqual(sofas.map((x) => `/products/${x.business.slug}/${x.product.slug}`).sort())
+    expect(hrefs).toEqual(expected)
     expect(hrefs.length).toBeGreaterThan(0)
+  })
+
+  it('a built-in collection whose category has no showcase piece is calm and empty', { timeout: 30_000 }, async () => {
+    await unpublish((await housePieces()).filter((p) => p.category === 'decor').map((p) => p.id))
+    open('/collections/decor')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Decor' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Pieces coming soon' })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: /^Pieces in / })).toBeNull()
   })
 
   it('an unknown address is the not-found page', { timeout: 30_000 }, async () => {
