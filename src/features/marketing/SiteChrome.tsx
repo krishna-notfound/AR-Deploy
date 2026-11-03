@@ -16,27 +16,21 @@ import { SocialLinks } from './SocialLinks'
 
 type NavItem = { key: TranslationKey; href: string }
 
-// Every item is a section of the landing page (ids set in LandingPage); "Parcerias" is the business band, "Contato" the footer.
+// Every item is a section of the landing page (ids set in LandingPage). The apply button next to them is the main action.
 const NAV: NavItem[] = [
-  { key: 'site.nav.collections', href: '/#colecoes' },
+  { key: 'site.nav.how', href: '/#como-funciona' },
   { key: 'site.nav.experience', href: '/#experiencia' },
-  { key: 'site.nav.projects', href: '/#projetos' },
+  { key: 'site.nav.collections', href: '/#colecoes' },
   { key: 'site.nav.about', href: '/#sobre' },
-  { key: 'site.nav.partners', href: '/#parcerias' },
-  { key: 'site.nav.contact', href: '/#contato' },
 ]
 
 const FOOTER_EXPLORE: NavItem[] = [
-  { key: 'site.nav.collections', href: '/#colecoes' },
+  { key: 'site.nav.how', href: '/#como-funciona' },
   { key: 'site.nav.experience', href: '/#experiencia' },
-  { key: 'site.nav.projects', href: '/#projetos' },
+  { key: 'site.nav.collections', href: '/#colecoes' },
 ]
 
-const FOOTER_BRAND: NavItem[] = [
-  { key: 'site.nav.about', href: '/#sobre' },
-  { key: 'site.nav.manifesto', href: '/#manifesto' },
-  { key: 'site.nav.partners', href: '/#parcerias' },
-]
+const FOOTER_BRAND: NavItem[] = [{ key: 'site.nav.about', href: '/#sobre' }]
 
 const YEAR = new Date().getFullYear()
 
@@ -109,7 +103,7 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface text-ink">
-      <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-4 px-5 sm:h-20 sm:gap-6 sm:px-10">
+      <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 px-5 sm:h-20 sm:gap-6 sm:px-10">
         <Link to="/" aria-label={t('site.home')} className="flex min-h-11 shrink-0 items-center">
           <Wordmark size={15} />
         </Link>
@@ -124,17 +118,21 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
             ))}
           </ul>
         </nav>
-        <div className="ml-auto flex items-center gap-3 sm:gap-5 xl:ml-0">
-          {hasLang && <LanguageSwitcher />}
+        <div className="ml-auto flex items-center gap-2 sm:gap-5 xl:ml-0">
+          {hasLang && <LanguageSwitcher className="max-[379px]:hidden" />}
           {cta && (
-            // Below xl the section nav is in the menu, which leaves room for the apply link in the bar.
-            <Link to={APPLY_PATH} className="hidden border-b border-current pb-0.5 text-label sm:inline xl:hidden">
-              {t('site.apply')}
+            // The main action, in the bar at every width (a shorter label on a phone).
+            <Link
+              to={APPLY_PATH}
+              aria-label={t('site.apply')}
+              className="inline-flex h-10 items-center justify-center rounded-[var(--radius-control)] bg-ink px-4 text-label whitespace-nowrap text-chalk uppercase transition-colors select-none hover:bg-umber sm:h-11 sm:px-5"
+            >
+              <span className="sm:hidden">{t('site.applyShort')}</span>
+              <span className="hidden sm:inline">{t('site.apply')}</span>
             </Link>
           )}
           {cta && (
             <>
-              <span className="hidden h-4 w-px bg-line sm:block" aria-hidden />
               <Link
                 to={account.href}
                 aria-label={account.label}

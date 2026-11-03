@@ -8,6 +8,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
+import { useFormat } from '@/lib/useFormat'
 import { APPLY_PATH, catalogLocalPath, productLocalPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
@@ -51,12 +52,11 @@ export default function LandingPage() {
     <div className="min-h-dvh bg-canvas">
       <SiteHeader />
       <main>
-        <Hero />
-        <Collections links={links} />
+        <Hero exampleHref={links.piece3d ?? links.catalog} />
+        <HowItWorks />
         <Experience pieceHref={links.piece3d} catalogHref={links.catalog} />
+        <Collections links={links} />
         <About />
-        <Manifesto />
-        <Projects catalogHref={links.catalog} />
         <Partners />
       </main>
       <SiteFooter />
@@ -131,27 +131,30 @@ function Eyebrow({ children, className }: { children: ReactNode; className?: str
   return <p className={cn('text-eyebrow text-accent-ink', className)}>{children}</p>
 }
 
-function Hero() {
+function Hero({ exampleHref }: { exampleHref?: string }) {
   const { t } = useI18n()
   return (
     <section aria-labelledby="hero-title">
       {/* Full-bleed: edge to edge, and on large screens fills the viewport below the 80px header. */}
       <div className="grid border-b border-line bg-surface lg:min-h-[calc(100dvh-5rem)] lg:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <div className="order-2 flex flex-col justify-center px-5 py-10 sm:px-10 sm:py-14 lg:order-1 lg:px-16 lg:py-16 xl:px-24">
+        <div className="order-2 flex flex-col justify-center px-5 py-10 sm:px-10 sm:py-14 lg:order-1 lg:px-14 lg:py-16 xl:px-16">
           <Eyebrow>{t('landing.hero.eyebrow')}</Eyebrow>
-          <h1 id="hero-title" className="mt-5 text-display text-ink">
+          <h1 id="hero-title" className="mt-5 font-display text-[clamp(2.25rem,1.4rem+1.6vw,3.25rem)] leading-[1.06] font-normal text-ink">
             <TwoLines a={t('landing.hero.title1')} b={t('landing.hero.title2')} italic />
           </h1>
-          <p className="mt-6 max-w-sm text-[15px] leading-7 font-light text-ink-body">{t('landing.hero.body')}</p>
-          <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col lg:items-start xl:flex-row">
-            <SectionLink href="/#colecoes" className={CTA_DARK}>
-              {t('landing.hero.cta')}
+          <p className="mt-6 max-w-md text-[15px] leading-7 text-ink-body">{t('landing.hero.body')}</p>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col lg:items-start xl:flex-row">
+            <Link to={APPLY_PATH} className={CTA_DARK}>
+              {t('site.apply')}
               {arrowIcon}
-            </SectionLink>
-            <SectionLink href="/#experiencia" className={cn(CTA, 'border border-ink text-ink hover:bg-subtle')}>
-              {t('landing.hero.cta3d')}
-            </SectionLink>
+            </Link>
+            {exampleHref && (
+              <Link to={exampleHref} className={cn(CTA, 'border border-ink text-ink hover:bg-subtle')}>
+                {t('landing.hero.cta3d')}
+              </Link>
+            )}
           </div>
+          <p className="mt-5 max-w-md text-[13px] leading-5 text-ink-muted">{t('landing.hero.note')}</p>
         </div>
         <figure className="relative order-1 lg:order-2">
           <img
@@ -166,6 +169,43 @@ function Hero() {
             {t('landing.hero.caption')}
           </figcaption>
         </figure>
+      </div>
+    </section>
+  )
+}
+
+const STEPS = [
+  ['landing.how.s1Title', 'landing.how.s1Body'],
+  ['landing.how.s2Title', 'landing.how.s2Body'],
+  ['landing.how.s3Title', 'landing.how.s3Body'],
+  ['landing.how.s4Title', 'landing.how.s4Body'],
+] as const
+
+/** What a furniture business does with Sanctus, in the order they do it. Every step exists in the product. */
+function HowItWorks() {
+  const { t } = useI18n()
+  return (
+    <section id="como-funciona" className="scroll-mt-24" aria-labelledby="how-title">
+      <div className={cn(SECTION, 'py-20 lg:py-28')}>
+        <Eyebrow>{t('landing.how.eyebrow')}</Eyebrow>
+        <h2 id="how-title" className="mt-4 text-headline">
+          <TwoLines a={t('landing.how.title1')} b={t('landing.how.title2')} />
+        </h2>
+        <ol className="mt-10 grid gap-x-8 border-t border-line sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
+          {STEPS.map(([title, body], i) => (
+            <li key={title} className="border-b border-line py-6 lg:border-b-0">
+              <span className="font-display text-[2rem] leading-none text-accent-ink italic" aria-hidden>
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3 className="mt-4 text-label text-ink">{t(title)}</h3>
+              <p className="mt-3 text-[14px] leading-6 text-ink-muted">{t(body)}</p>
+            </li>
+          ))}
+        </ol>
+        <Link to={APPLY_PATH} className={cn(CTA_DARK, 'mt-10')}>
+          {t('site.apply')}
+          {arrowIcon}
+        </Link>
       </div>
     </section>
   )
@@ -229,6 +269,7 @@ function Collections({ links }: { links: ReturnType<typeof useLandingLinks> }) {
  */
 function Experience({ pieceHref, catalogHref }: { pieceHref?: string; catalogHref?: string }) {
   const { t } = useI18n()
+  const { money } = useFormat()
   const href = pieceHref ?? catalogHref
   return (
     <section id="experiencia" className="scroll-mt-24 bg-obsidian text-chalk" aria-labelledby="xp-title">
@@ -296,7 +337,7 @@ function Experience({ pieceHref, catalogHref }: { pieceHref?: string; catalogHre
                 <dd className="mt-1.5 leading-5 text-chalk/85">{t('landing.feature.materials')}</dd>
               </div>
             </dl>
-            <p className="font-display text-xl tracking-[0.04em] sm:text-right">{t('landing.feature.price')}</p>
+            <p className="font-display text-xl tracking-[0.04em] sm:text-right">{money(249000, 'EUR')}</p>
             <p className="text-xs leading-5 text-chalk/60 sm:col-span-2">{t('landing.feature.illustrative')}</p>
           </figcaption>
         </figure>
@@ -316,9 +357,6 @@ function About() {
             <TwoLines a={t('landing.about.title1')} b={t('landing.about.title2')} />
           </h2>
           <p className="mt-6 max-w-md text-[15px] leading-7 text-ink-muted">{t('landing.about.body')}</p>
-          <ArrowLink href="/#manifesto" className="mt-10 text-ink">
-            {t('landing.about.cta')}
-          </ArrowLink>
         </div>
         <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-3 sm:gap-6">
           <img
@@ -341,52 +379,6 @@ function About() {
             <span className="block h-px w-8 bg-accent" aria-hidden />
             <p className="mt-3 font-display text-base leading-snug text-ink-body italic sm:text-xl">{t('landing.feature.textureCaption')}</p>
           </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Manifesto() {
-  const { t } = useI18n()
-  return (
-    <section id="manifesto" className={cn(SECTION, 'scroll-mt-24')}>
-      <figure className="border border-line bg-surface px-6 py-14 text-center sm:px-12 lg:py-20">
-        <blockquote className="mx-auto max-w-3xl font-display text-[clamp(1.5rem,1.1rem+1.4vw,2.25rem)] leading-snug font-normal text-ink italic">
-          {t('landing.quote')}
-        </blockquote>
-        <figcaption className="mt-5 text-label text-accent-ink">{t('landing.quoteBy')}</figcaption>
-      </figure>
-    </section>
-  )
-}
-
-function Projects({ catalogHref }: { catalogHref?: string }) {
-  const { t } = useI18n()
-  return (
-    <section id="projetos" className={cn(SECTION, 'scroll-mt-24 pt-20 lg:pt-28')} aria-labelledby="projects-title">
-      <div className="relative isolate flex min-h-[440px] items-end overflow-hidden border border-line bg-obsidian lg:min-h-[540px]">
-        <img
-          src={IMG('interior-villa')}
-          alt={t('landing.projects.imageAlt')}
-          width={1376}
-          height={768}
-          loading="lazy"
-          className="absolute inset-0 -z-10 size-full object-cover"
-        />
-        {/* Plain legibility scrim over the photograph. */}
-        <div className="absolute inset-0 -z-10 bg-obsidian/55 sm:bg-obsidian/45" aria-hidden />
-        <div className="max-w-xl px-6 py-10 text-chalk sm:px-12 sm:py-14">
-          <p className="text-eyebrow text-chalk/85">{t('landing.projects.eyebrow')}</p>
-          <h2 id="projects-title" className="mt-4 text-headline text-chalk">
-            <TwoLines a={t('landing.projects.title1')} b={t('landing.projects.title2')} />
-          </h2>
-          <p className="mt-5 max-w-sm text-[15px] leading-7 text-chalk/90">{t('landing.projects.body')}</p>
-          {catalogHref && (
-            <ArrowLink to={catalogHref} className="mt-8 border-chalk/70 text-chalk hover:text-limestone">
-              {t('landing.projects.cta')}
-            </ArrowLink>
-          )}
         </div>
       </div>
     </section>
