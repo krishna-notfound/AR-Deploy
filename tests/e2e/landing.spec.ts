@@ -13,7 +13,7 @@ test('landing page recreates the Sanctus reference and leads into the demo', asy
   await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
 })
 
-test('landing page shows the client copy in Portuguese and links to real catalogues and products', async ({ page }) => {
+test('landing page shows the client copy in Portuguese and links only to the showcase pieces', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('radio', { name: 'PT' }).first().click()
   await expect(page.getByRole('heading', { name: 'Formas que conectam.' })).toBeVisible()
@@ -24,22 +24,23 @@ test('landing page shows the client copy in Portuguese and links to real catalog
   await page.getByRole('link', { name: /^Mesas/ }).click()
   await expect(page).toHaveURL(/\/collections\/tables$/)
 
-  // The illustrative piece (no product record, no 3D model) never links to another product's 3D/AR page.
+  // The 3D card shows one of the admin's own showcase pieces in place (ADR-0047), never links to a business product.
   await page.goto('/')
-  await expect(page.getByText('Peça ilustrativa: a imagem e o preço são exemplos, não um produto à venda.')).toBeVisible()
-  await expect(page.locator('#experiencia figure').getByRole('link')).toHaveCount(0)
+  await expect(page.locator('#experiencia a[href^="/products/"], #experiencia a[href^="/catalog/"]')).toHaveCount(0)
+  await expect(page.locator('#experiencia').getByRole('button', { name: '3D', exact: true })).toBeVisible()
 })
 
-test('the header apply button and the hero calls to action go to real pages', async ({ page }) => {
+test('the header apply button and the one hero action go to real pages', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('banner').getByRole('link', { name: 'Apply as a business' })).toHaveAttribute('href', '/apply')
-  const example = page.getByRole('link', { name: 'See a live example' })
-  await expect(example).toHaveAttribute('href', /\/catalog\/|\/[\w-]+\/[\w-]+/)
+  const hero = page.locator('#hero-title').locator('xpath=ancestor::section')
+  // One action in the hero (ADR-0047): the apply button lives in the header and the closing banners.
+  await expect(hero.getByRole('link', { name: /Apply as a business/ })).toHaveCount(0)
+  const example = hero.getByRole('link', { name: 'See a live example' })
+  await expect(example).toHaveAttribute('href', /^\/showcase\/[\w-]+$/)
   await example.click()
-  await expect(page).not.toHaveURL(/\/$/)
-  await page.goto('/')
-  await page.locator('#hero-title').locator('xpath=ancestor::section').getByRole('link', { name: /Apply as a business/ }).click()
-  await expect(page).toHaveURL(/\/apply$/)
+  await expect(page).toHaveURL(/\/showcase\/[\w-]+$/)
+  await expect(page.getByRole('link', { name: /Apply as a business/ }).last()).toHaveAttribute('href', '/apply')
 })
 
 test('old "/?next=" links still reach the account picker', async ({ page }) => {

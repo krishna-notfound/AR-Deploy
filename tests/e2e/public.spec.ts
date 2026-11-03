@@ -26,13 +26,13 @@ test('product without a model shows photos and no AR button', async ({ page }) =
   await expect(page.getByText('W 48', { exact: false }).or(page.getByText('48 cm')).first()).toBeVisible()
 })
 
-test('broken model shows a recoverable error', async ({ page }) => {
+test('a broken model never offers a 3D view: the page stays on the photograph', async ({ page }) => {
   await page.goto('/products/casa-lisboa/tejo-side-table')
-  // The page opens on the photograph (client requirement); the 3D action reveals the viewer and its error.
+  // The page opens on the photograph (client requirement). Once the model fails to load, neither the in-stage
+  // Photos | 3D switch nor a "View in 3D" action is offered (ADR-0047), and the photograph stays.
   await expect(page.getByRole('img', { name: /Tejo Side Table/ })).toBeVisible()
-  await page.getByRole('button', { name: 'View in 3D', exact: true }).click()
-  await expect(page.getByText('The 3D model could not be loaded')).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('alert').getByRole('button', { name: 'Photos' }).click()
+  await expect(page.getByRole('button', { name: 'View in 3D', exact: true })).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveCount(0)
   await expect(page.getByRole('img', { name: /Tejo Side Table/ })).toBeVisible()
 })
 
