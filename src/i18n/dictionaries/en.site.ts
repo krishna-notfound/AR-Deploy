@@ -23,5 +23,6 @@ export const enSite = {
   'landing.show.viewLabel': 'Show the piece as',
   'landing.show.image': 'Image',
   'landing.show.arLabel': 'View in your room',
+  'landing.show.arHint': 'Open on your phone to see it in your room',
   'landing.show.by': 'By {business}. Open the piece to see it in your room with AR.',
 } as const

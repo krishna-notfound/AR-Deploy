@@ -28,7 +28,14 @@ vi.mock('@/components/three/ModelViewer', () => ({
   ),
 }))
 
-import { LandingShowcase, resolveShowcase } from './LandingShowcase'
+import { LandingShowcase, type ShowcaseView, resolveShowcase, useProductShowcaseView, useShowcaseProduct } from './LandingShowcase'
+
+// The section's wiring: the admin's view first, else the product fallback, else the illustration.
+function Section({ featured, adminView }: { featured?: { businessSlug: string; productSlug: string }; adminView?: ShowcaseView }) {
+  const state = useShowcaseProduct(featured)
+  const fallback = useProductShowcaseView(state)
+  return <LandingShowcase view={adminView ?? fallback} loading={!adminView && state.status === 'loading'} />
+}
 
 const biz = (id: string, slug: string, name: string, status: Business['status'] = 'active') => ({ id, slug, name, status }) as Business
 const glb = { id: 'a', url: 'https://cdn.example/m.glb', name: 'm.glb', format: 'glb', size: 1 }
@@ -57,12 +64,12 @@ const sofa = prod('p1', 'sofa-one', 'b1', 'sofa', true)
 const chair = prod('p2', 'chair-one', 'b2', 'chair', true)
 const table = prod('p3', 'table-one', 'b1', 'table', false)
 
-function renderCard(featured?: { businessSlug: string; productSlug: string }, lang: 'en' | 'pt' = 'en') {
+function renderCard(featured?: { businessSlug: string; productSlug: string }, lang: 'en' | 'pt' = 'en', adminView?: ShowcaseView) {
   localStorage.setItem(LANG_KEY, lang)
   return render(
     <LanguageProvider>
       <MemoryRouter>
-        <LandingShowcase featured={featured} />
+        <Section featured={featured} adminView={adminView} />
       </MemoryRouter>
     </LanguageProvider>,
   )
@@ -135,17 +142,17 @@ describe('landing showcase card', () => {
     expect(screen.getByTestId('viewer')).toBeInTheDocument()
   })
 
-  it('the AR chip is a link to the product page, named for screen readers', async () => {
+  it('the product fallback has an AR chip button (AR runs in the card) and keeps the By line', async () => {
     renderCard({ businessSlug: 'alpha', productSlug: 'sofa-one' })
-    const ar = await screen.findByRole('link', { name: 'View in your room' })
-    expect(ar).toHaveAttribute('href', '/products/alpha/sofa-one')
+    expect(await screen.findByRole('button', { name: 'View in your room' })).toBeInTheDocument()
+    expect(screen.getByText(/By Alpha/)).toBeInTheDocument()
   })
 
   it('speaks Portuguese', async () => {
     renderCard({ businessSlug: 'alpha', productSlug: 'sofa-one' }, 'pt')
     expect(await screen.findByText('Nome sofa-one')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Imagem' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ver na sua sala' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver na sua sala' })).toBeInTheDocument()
   })
 
   it('is the labelled illustration, without 3D or AR chips, when no product has a model', async () => {
@@ -153,6 +160,49 @@ describe('landing showcase card', () => {
     renderCard()
     expect(await screen.findByText(/Illustrative piece/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '3D' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'View in your room' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View in your room' })).not.toBeInTheDocument()
+  })
+})
+
+describe('admin showcase view', () => {
+  const admin: ShowcaseView = {
+    eyebrow: 'Signature',
+    title: 'Admin Lounge',
+    text: 'Made by hand.',
+    dimensions: 'W 90 x H 80 x D 70 cm',
+    materials: 'Walnut',
+    priceLabel: 'EUR 1,234',
+    imageUrl: 'https://cdn.example/admin.jpg',
+    glbUrl: 'https://cdn.example/admin.glb',
+  }
+  beforeEach(() => {
+    localStorage.clear()
+    data.products = [sofa, chair]
+    data.businesses = [A, B]
+  })
+
+  it('renders its own texts and image, not the product, and no By line', async () => {
+    renderCard(undefined, 'en', admin)
+    expect(await screen.findByText('Admin Lounge')).toBeInTheDocument()
+    expect(screen.getByText('Made by hand.')).toBeInTheDocument()
+    expect(screen.getByText('Walnut')).toBeInTheDocument()
+    expect(screen.getByText('EUR 1,234')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Admin Lounge' })).toHaveAttribute('src', admin.imageUrl)
+    expect(screen.queryByText('Name chair-one')).not.toBeInTheDocument()
+    expect(screen.queryByText(/By /)).not.toBeInTheDocument()
+  })
+
+  it('the 3D toggle uses glbUrl and the AR chip is present with a model', async () => {
+    const user = userEvent.setup()
+    renderCard(undefined, 'en', admin)
+    await user.click(await screen.findByRole('button', { name: '3D' }))
+    expect(screen.getByTestId('viewer')).toHaveAttribute('data-src', admin.glbUrl)
+    expect(screen.getByRole('button', { name: 'View in your room' })).toBeInTheDocument()
+  })
+
+  it('with only a product link the AR chip links there; without a model there is no 3D toggle', async () => {
+    renderCard(undefined, 'en', { title: 'Linked', imageUrl: admin.imageUrl, productHref: '/products/alpha/sofa-one' })
+    expect(await screen.findByRole('link', { name: 'View in your room' })).toHaveAttribute('href', '/products/alpha/sofa-one')
+    expect(screen.queryByRole('button', { name: '3D' })).not.toBeInTheDocument()
   })
 })

@@ -1,6 +1,6 @@
 // The landing page speaks to a furniture business owner: a clear apply button on every width, hero calls to action that
 // go somewhere real, and facts that match the product (AR in Chrome first on Android, prices in euros).
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
@@ -58,15 +58,15 @@ describe('landing page for a business owner', () => {
     expect(xp).not.toHaveTextContent('Android with Scene Viewer')
   })
 
-  it('shows a real product with a model in the 3D section, and its call to action opens that product page', async () => {
+  it('shows a real product with a model in the 3D section; its call to action switches the card to 3D in place', async () => {
     renderLanding()
     const xp = document.getElementById('experiencia')!
     const three = await within(xp).findByRole('button', { name: '3D' })
     expect(three).toHaveAttribute('aria-pressed', 'false')
     expect(xp).not.toHaveTextContent('Illustrative piece')
-    const cta = within(xp).getByRole('link', { name: /Open a live piece in 3D/ })
-    expect(cta.getAttribute('href')).toMatch(/^\/products\/[\w-]+\/[\w-]+$/)
-    expect(within(xp).getByRole('link', { name: 'View in your room' })).toHaveAttribute('href', cta.getAttribute('href'))
+    expect(within(xp).getByRole('button', { name: 'View in your room' })).toBeInTheDocument()
+    fireEvent.click(within(xp).getByRole('button', { name: /Open a live piece in 3D/ }))
+    expect(three).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows the 3D section in Portuguese too', async () => {

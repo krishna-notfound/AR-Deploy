@@ -24,5 +24,6 @@ export const ptSite: Partial<Record<TranslationKey, string>> = {
   'landing.show.viewLabel': 'Mostrar a peça como',
   'landing.show.image': 'Imagem',
   'landing.show.arLabel': 'Ver na sua sala',
+  'landing.show.arHint': 'Abra no telemóvel para a ver na sua sala',
   'landing.show.by': 'Por {business}. Abra a peça para a ver na sua sala com Realidade Aumentada.',
 }

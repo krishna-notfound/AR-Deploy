@@ -11,7 +11,7 @@ import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useLandingFeatured } from '@/services/contentHooks'
 import { LandingCollections } from './LandingCollections'
-import { LandingShowcase, useShowcaseProduct } from './LandingShowcase'
+import { LandingShowcase, type ShowcaseView, ShowcaseCta, useProductShowcaseView, useShowcaseProduct } from './LandingShowcase'
 import { SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
 
 // Photography: the owner's Stitch set (AI-generated, design/stitch/BRIEF.md), 1200×896 unless noted.
@@ -190,7 +190,9 @@ function Experience() {
   // The featured 3D piece the admin picks in the Editor; without one, the first published piece with a model.
   const { featured } = useLandingFeatured()
   const showcase = useShowcaseProduct(featured)
-  const href = showcase.href
+  const fallbackView = useProductShowcaseView(showcase)
+  const adminView: ShowcaseView | undefined = undefined // TODO(controller): from useLandingShowcase()
+  const view = adminView ?? fallbackView
   return (
     <section id="experiencia" className="scroll-mt-24 bg-obsidian text-chalk" aria-labelledby="xp-title">
       <div className={cn(SECTION, 'grid gap-14 py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-center lg:gap-20 lg:py-28')}>
@@ -213,15 +215,12 @@ function Experience() {
               </li>
             ))}
           </ol>
-          {href && (
-            <Link to={href} className={cn(CTA, 'mt-10 bg-chalk text-ink hover:bg-limestone')}>
-              {t('landing.xp.cta')}
-              {arrowIcon}
-            </Link>
-          )}
+          <ShowcaseCta view={view} className={cn(CTA, 'mt-10 bg-chalk text-ink hover:bg-limestone')}>
+            {arrowIcon}
+          </ShowcaseCta>
         </div>
 
-        <LandingShowcase featured={featured} resolved={showcase} />
+        <LandingShowcase view={view} loading={!adminView && showcase.status === 'loading'} />
       </div>
     </section>
   )
