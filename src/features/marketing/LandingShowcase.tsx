@@ -3,10 +3,9 @@
 // "3D" switches the picture to the live model in place; "AR" launches AR from the card with the same model-viewer setup as
 // the product page (ar-modes webxr scene-viewer quick-look, ADR-0035; an iPhone uses the USDZ when given, else model-viewer
 // builds one). Where AR is not available the card says so. With only a product page behind it, "AR" links there.
-import { AlertTriangle } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { type ModelLoadInfo, ModelViewer, type ModelViewerHandle } from '@/components/three/ModelViewer'
+import type { ModelLoadInfo, ModelViewerHandle } from '@/components/three/ModelViewer'
 import { HOUSE_BUSINESS_SLUG, type ProductRef } from '@/domain/siteContent'
 import type { Product } from '@/domain/types'
 import { arLaunchUrl, variantMedia } from '@/features/ar/variantMedia'
@@ -15,6 +14,7 @@ import { cn } from '@/lib/cn'
 import { initialPrice, primaryImage } from '@/lib/product'
 import { useFormat } from '@/lib/useFormat'
 import { showcaseProductPath } from '@/lib/urls'
+import { InPlaceModel } from './InPlaceModel'
 import { hasGlb, useShowcasePieces } from './useShowcasePieces'
 
 /** What the card shows: a showcase piece converted by productToShowcaseView. */
@@ -119,7 +119,6 @@ export function ShowcaseCta({ view, className, children }: { view?: ShowcaseView
   return null
 }
 
-const STALL_MS = 45_000
 const CARD = 'border border-chalk/15 p-4 sm:p-6'
 const STAGE = 'relative mt-4 aspect-[4/3] overflow-hidden bg-umber sm:mt-6'
 const CHIP = 'border px-2.5 py-1.5 text-[10px] leading-none tracking-[0.2em] uppercase transition-colors select-none'
@@ -136,11 +135,10 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
   const { title, eyebrow, text, dimensions, materials, priceLabel, imageUrl, glbUrl, usdzUrl, productHref } = view
 
   const [mode, setMode] = useState<'image' | '3d'>(!imageUrl && glbUrl ? '3d' : 'image')
-  const [load, setLoad] = useState<{ state: 'loading' | 'loaded' | 'error'; attempt: number; progress: number; timedOut: boolean }>({ state: 'loading', attempt: 0, progress: 0, timedOut: false })
+  const [loaded, setLoaded] = useState(false)
   const [arHint, setArHint] = useState(false)
   const viewerRef = useRef<ModelViewerHandle>(null)
   const wantAr = useRef(false)
-  const retry = () => setLoad((l) => ({ state: 'loading', attempt: l.attempt + 1, progress: 0, timedOut: false }))
   const show3d = mode === '3d' && !!glbUrl
 
   // "Open a live piece in 3D" in the section's call to action.
@@ -150,18 +148,17 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
     return () => window.removeEventListener(SHOW_3D_EVENT, on)
   }, [glbUrl])
 
-  // No endless spinner: a model that makes no progress for the whole window is treated as failed.
-  useEffect(() => {
-    if (!show3d || load.state !== 'loading') return
-    const timer = setTimeout(() => setLoad((l) => ({ ...l, state: 'error', timedOut: true })), STALL_MS)
-    return () => clearTimeout(timer)
-  }, [show3d, load.state, load.attempt, load.progress])
+  // A model that is shown again loads again.
+  const showImage = () => {
+    setMode('image')
+    setLoaded(false)
+  }
 
   const startAr = () => {
     viewerRef.current?.activateAR().catch(() => setArHint(true))
   }
   const onLoaded = (info: ModelLoadInfo) => {
-    setLoad((l) => ({ ...l, state: 'loaded' }))
+    setLoaded(true)
     if (info.canActivateAR) {
       setArHint(false)
       if (wantAr.current) startAr()
@@ -175,7 +172,7 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
     if (!show3d) {
       wantAr.current = true
       setMode('3d')
-    } else if (load.state === 'loaded') {
+    } else if (loaded) {
       if (viewerRef.current?.canActivateAR()) startAr()
       else setArHint(true)
     } else {
@@ -195,7 +192,7 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
         <div className="flex shrink-0 gap-2">
           {imageUrl && glbUrl && (
             <div role="group" aria-label={t('landing.show.viewLabel')} className="flex gap-2">
-              <button type="button" aria-pressed={!show3d} onClick={() => setMode('image')} className={chipOn(!show3d)}>
+              <button type="button" aria-pressed={!show3d} onClick={showImage} className={chipOn(!show3d)}>
                 {t('landing.show.image')}
               </button>
               <button type="button" aria-pressed={show3d} onClick={() => setMode('3d')} className={chipOn(show3d)}>
@@ -225,48 +222,16 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
       <div className={STAGE}>
         {imageUrl && <img src={imageUrl} alt={title} loading="lazy" className={cn('absolute inset-0 size-full object-cover', show3d && 'invisible')} />}
         {show3d && glbUrl && (
-          <div className="absolute inset-0 bg-subtle text-ink">
-            <ModelViewer
-              key={`${glbUrl}#${load.attempt}`}
-              ref={viewerRef}
-              src={glbUrl}
-              iosSrc={usdzUrl}
-              poster={imageUrl}
-              alt={`${t('product.view3d')}: ${title}`}
-              ar
-              className="absolute inset-0"
-              onLoad={onLoaded}
-              onError={() => setLoad((l) => ({ ...l, state: 'error' }))}
-              onProgress={(p) => setLoad((l) => ({ ...l, progress: p }))}
-            />
-            {load.state === 'loading' && (
-              <p className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-xs leading-4 font-medium tracking-[0.08em] uppercase" role="status">
-                {t('viewer.loading')}
-              </p>
-            )}
-            {load.state === 'loaded' && (
-              <p className="pointer-events-none absolute bottom-3 left-3 border border-line bg-surface px-2.5 py-1.5 text-xs leading-4 font-medium tracking-[0.08em] uppercase">{t('viewer.hint')}</p>
-            )}
-            {load.state === 'error' && (
-              <div className="absolute inset-0 grid place-items-center bg-canvas p-4 text-center" role="alert">
-                <div className="max-w-xs">
-                  <AlertTriangle className="mx-auto size-5 text-warning" strokeWidth={1.5} aria-hidden />
-                  <p className="mt-2 font-display text-lg leading-snug">{t('viewer.errorTitle')}</p>
-                  <p className="mt-1 text-[13px] text-ink-muted">{load.timedOut ? t('viewer.timeout') : t('viewer.errorBody')}</p>
-                  <div className="mt-3 flex justify-center gap-4">
-                    <button type="button" onClick={retry} className="text-label underline underline-offset-4">
-                      {t('viewer.retry')}
-                    </button>
-                    {imageUrl && (
-                      <button type="button" onClick={() => setMode('image')} className="text-label underline underline-offset-4">
-                        {t('landing.show.image')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <InPlaceModel
+            src={glbUrl}
+            iosSrc={usdzUrl}
+            poster={imageUrl}
+            alt={`${t('product.view3d')}: ${title}`}
+            ar
+            viewerRef={viewerRef}
+            onLoaded={onLoaded}
+            onShowImage={imageUrl ? showImage : undefined}
+          />
         )}
       </div>
 

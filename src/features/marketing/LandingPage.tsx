@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
 import { useLandingExample, useLandingFeatured } from '@/services/contentHooks'
+import { HeroMedia } from './HeroMedia'
 import { LandingCollections } from './LandingCollections'
 import { LandingShowcase, ShowcaseCta, useShowcaseCardView } from './LandingShowcase'
 import { SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
@@ -101,19 +102,7 @@ function Hero({ exampleHref }: { exampleHref?: string }) {
             </>
           )}
         </div>
-        <figure className="relative order-1 lg:order-2">
-          <img
-            src={IMG('hero-living')}
-            alt={t('landing.hero.imageAlt')}
-            width={1376}
-            height={768}
-            fetchPriority="high"
-            className="aspect-[4/3] size-full object-cover sm:aspect-[16/9] lg:absolute lg:inset-0 lg:aspect-auto"
-          />
-          <figcaption className="absolute right-3 bottom-3 bg-surface px-3 py-2 text-[10px] leading-none font-medium tracking-[0.18em] text-ink uppercase sm:right-5 sm:bottom-5">
-            {t('landing.hero.caption')}
-          </figcaption>
-        </figure>
+        <HeroMedia />
       </div>
     </section>
   )

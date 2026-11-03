@@ -22,6 +22,9 @@ import {
   setCollectionTitleEn,
   setExample,
   setFeatured,
+  setHeroAlt,
+  setHeroImage,
+  setHeroModel,
   toggleCollectionProduct,
   uniqueCollectionSlug,
   updateCollection,
@@ -142,6 +145,72 @@ const savedLanding = async () => {
   return s.data.draft.landing
 }
 
+describe('landingOps: hero picture, 3D model and description (ADR-0049)', () => {
+  const img = { path: 'landing/11111111-1111-4111-8111-111111111111.png' }
+  const glb = { path: 'landing/22222222-2222-4222-8222-222222222222.glb' }
+
+  it('sets and clears the picture and the model, keeping the rest of the hero', () => {
+    const doc = setHeroModel(setHeroImage(emptySiteContent(), img), glb)
+    expect(doc.landing.hero).toEqual({ image: img, model: { glb } })
+    expect(setHeroImage(doc, undefined).landing.hero).toEqual({ model: { glb } })
+    expect(setHeroModel(doc, undefined).landing.hero).toEqual({ image: img })
+  })
+
+  it('sets the description per language; a blank Portuguese is removed, a blank English with no Portuguese removes it', () => {
+    let doc = setHeroAlt(emptySiteContent(), 'en', 'Showroom')
+    doc = setHeroAlt(doc, 'pt', 'Loja')
+    expect(doc.landing.hero).toEqual({ alt: { en: 'Showroom', pt: 'Loja' } })
+    expect(setHeroAlt(doc, 'pt', '  ').landing.hero).toEqual({ alt: { en: 'Showroom' } })
+    expect(setHeroAlt(setHeroAlt(doc, 'pt', ''), 'en', '').landing.hero).toBeUndefined()
+  })
+
+  it('drops landing.hero entirely when it becomes empty, and leaves the other landing parts alone', () => {
+    const base = setFeatured(addCollection(emptySiteContent(), newCollection('a')), houseRef('one'))
+    const full = setHeroAlt(setHeroModel(setHeroImage(base, img), glb), 'en', 'Showroom')
+    expect(full.landing).toMatchObject({ featured: houseRef('one'), hero: { image: img, model: { glb }, alt: { en: 'Showroom' } } })
+    const empty = setHeroAlt(setHeroModel(setHeroImage(full, undefined), undefined), 'en', '')
+    expect('hero' in empty.landing).toBe(false)
+    expect(empty).toEqual(base)
+    expect(setHeroImage(emptySiteContent(), undefined)).toEqual(emptySiteContent())
+  })
+})
+
+describe('Landing tab: the hero picture block (ADR-0049)', () => {
+  it('is the first block; uploads and removes the picture and the model, and sets the description in both languages', { timeout: 60_000 }, async () => {
+    let seq = 0
+    Object.assign(URL, { createObjectURL: vi.fn(() => `blob:hero/${++seq}`) })
+    open()
+    const block = await screen.findByRole('region', { name: 'Hero picture' }, { timeout: 15_000 })
+    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('Hero picture')
+    // Built-in at first.
+    expect(within(block).getByRole('img', { name: 'The hero picture' })).toHaveAttribute('src', '/images/sanctus/v2/hero-living.webp')
+    expect(within(block).getByText('No 3D model, so the picture has no 3D button.')).toBeInTheDocument()
+
+    await userEvent.upload(within(block).getByTestId('upload-image'), new File([new Uint8Array(1024)], 'hero.png', { type: 'image/png' }))
+    await waitFor(async () => expect((await savedLanding()).hero?.image?.path).toMatch(/^landing\/.+\.png$/), { timeout: 8000 })
+    expect(within(block).getByRole('img', { name: 'The hero picture' })).toHaveAttribute('src', 'blob:hero/1')
+
+    await userEvent.upload(within(block).getByTestId('upload-glb'), new File([new Uint8Array(1024)], 'sofa.glb', { type: 'model/gltf-binary' }))
+    await waitFor(async () => expect((await savedLanding()).hero?.model?.glb.path).toMatch(/^landing\/.+\.glb$/), { timeout: 8000 })
+    expect(within(block).getByText(/^Model file: .+\.glb$/)).toBeInTheDocument()
+    expect(within(block).getByRole('button', { name: 'Replace 3D model' })).toBeInTheDocument()
+
+    await userEvent.type(within(block).getByRole('textbox', { name: /Description \(English\)/ }), 'Our showroom')
+    await userEvent.type(within(block).getByRole('textbox', { name: /Description \(Portuguese\)/ }), 'A nossa loja')
+    await waitFor(async () => expect((await savedLanding()).hero?.alt).toEqual({ en: 'Our showroom', pt: 'A nossa loja' }), { timeout: 8000 })
+
+    await userEvent.click(within(block).getByRole('button', { name: 'Remove: 3D model' }))
+    await waitFor(async () => expect((await savedLanding()).hero?.model).toBeUndefined(), { timeout: 8000 })
+    await userEvent.click(within(block).getByRole('button', { name: 'Remove: Picture' }))
+    await waitFor(async () => expect((await savedLanding()).hero).toEqual({ alt: { en: 'Our showroom', pt: 'A nossa loja' } }), { timeout: 8000 })
+    expect(within(block).getByRole('img', { name: 'The hero picture' })).toHaveAttribute('src', '/images/sanctus/v2/hero-living.webp')
+
+    await userEvent.clear(within(block).getByRole('textbox', { name: /Description \(Portuguese\)/ }))
+    await userEvent.clear(within(block).getByRole('textbox', { name: /Description \(English\)/ }))
+    await waitFor(async () => expect((await savedLanding()).hero).toBeUndefined(), { timeout: 8000 })
+  })
+})
+
 describe('Landing tab: the three blocks (ADR-0047)', () => {
   it('shows the blocks in page order and offers only the four house pieces, never a business product', { timeout: 40_000 }, async () => {
     const pieces = await showcasePieces()
@@ -149,7 +218,7 @@ describe('Landing tab: the three blocks (ADR-0047)', () => {
     open()
     const example = await screen.findByRole('radiogroup', { name: 'See a live example' }, { timeout: 15_000 })
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(headings).toEqual(['See a live example', '3D card', 'Collections'])
+    expect(headings).toEqual(['Hero picture', 'See a live example', '3D card', 'Collections'])
     // Automatic + exactly the house pieces.
     expect(within(example).getAllByRole('radio')).toHaveLength(1 + pieces.length)
     for (const p of pieces) expect(within(example).getByRole('radio', { name: p.name.en })).toBeInTheDocument()
@@ -258,7 +327,7 @@ describe('Landing tab: the three blocks (ADR-0047)', () => {
 
     // The second card is open: a large picture area with its actions, then the texts.
     expect(screen.getByRole('img', { name: 'The picture of this card' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Upload picture' })).toBeInTheDocument()
+    expect(within(screen.getByRole('img', { name: 'The picture of this card' }).closest('fieldset')!).getByRole('button', { name: 'Upload picture' })).toBeInTheDocument()
     await userEvent.type(screen.getByRole('textbox', { name: /Title \(English\)/ }), 'Showroom in 3D')
     await userEvent.type(screen.getByRole('textbox', { name: /Title \(Portuguese\)/ }), 'Showroom em 3D')
     await userEvent.type(screen.getByRole('textbox', { name: /Text \(English\)/ }), 'See it in your room')
@@ -290,10 +359,11 @@ describe('Landing tab: the three blocks (ADR-0047)', () => {
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:test/1') })
     open()
     await userEvent.click(await screen.findByRole('button', { name: 'Add a collection' }))
-    await userEvent.upload(await screen.findByTestId('upload-image'), new File([new Uint8Array(1024)], 'card.png', { type: 'image/png' }))
+    const cardPicture = (await screen.findByRole('img', { name: 'The picture of this card' })).closest('fieldset')!
+    await userEvent.upload(within(cardPicture).getByTestId('upload-image'), new File([new Uint8Array(1024)], 'card.png', { type: 'image/png' }))
     await waitFor(async () => expect(typeof (await savedLanding()).collections[0]!.image).toBe('object'), { timeout: 8000 })
     expect(screen.getByRole('img', { name: 'The picture of this card' })).toHaveAttribute('src', 'blob:test/1')
-    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(cardPicture).getByRole('button', { name: 'Remove' }))
     await waitFor(async () => expect((await savedLanding()).collections[0]!.image).toBe('hero-living'), { timeout: 8000 })
   })
 
