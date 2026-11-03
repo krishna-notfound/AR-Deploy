@@ -197,6 +197,11 @@ export interface CatalogService {
   getProductsByBusiness(businessId: ID): Promise<Result<Product[]>>
   getProductById(id: ID): Promise<Result<Product>>
   getPublicProduct(businessSlug: string, productSlug: string, opts?: { allowDraft?: boolean }): Promise<Result<{ business: Business; product: Product }>>
+  /**
+   * The platform's own showcase catalogue (ADR-0047) and its products, newest first: published ones for visitors, all for
+   * staff. getBusinesses, getCatalogs, getCatalog and getProducts never include it.
+   */
+  getShowcase(): Promise<Result<{ business: Business; products: Product[] }>>
   createProduct(data: ProductInput): Promise<Result<Product>>
   updateProduct(id: ID, data: Partial<ProductInput>): Promise<Result<Product>>
   duplicateProduct(id: ID): Promise<Result<Product>>

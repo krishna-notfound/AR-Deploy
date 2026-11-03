@@ -77,6 +77,9 @@ export function siteAssetKind(path: string): SiteAssetKind | null {
 }
 
 /** A product named by the public address parts: the business slug and the product slug. */
+/** The slug of the platform's own showcase catalogue (ADR-0047). Landing refs to it are the admin's own pieces. */
+export const HOUSE_BUSINESS_SLUG = 'sanctus-showcase'
+
 export interface ProductRef {
   businessSlug: string
   productSlug: string
@@ -155,6 +158,8 @@ export interface SiteContent {
     collections: LandingCollection[]
     /** The piece the landing's "Open a live piece in 3D" opens. Absent: the page chooses one itself. */
     featured?: ProductRef
+    /** The admin's piece the hero's "See a live example" opens (ADR-0047). Absent: the 3D card's piece, else the first showcase piece. */
+    example?: ProductRef
     /** The 3D showcase card (picture, model, texts, price). Absent: the page shows its built-in card. */
     showcase?: LandingShowcase
   }
@@ -217,6 +222,7 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   const landing = obj(raw.landing)
   if (Array.isArray(landing.collections)) out.landing.collections = landing.collections.map(normalizeCollection)
   if (typeof landing.featured === 'object' && landing.featured !== null && !Array.isArray(landing.featured)) out.landing.featured = productRef(landing.featured)
+  if (typeof landing.example === 'object' && landing.example !== null && !Array.isArray(landing.example)) out.landing.example = productRef(landing.example)
   if (typeof landing.showcase === 'object' && landing.showcase !== null && !Array.isArray(landing.showcase)) out.landing.showcase = normalizeShowcase(landing.showcase)
   return out
 }
@@ -443,6 +449,7 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
   }
   validateLandingCollections(doc.landing?.collections ?? [], put)
   if (doc.landing?.featured) validateRef(doc.landing.featured, 'landing.featured', put)
+  if (doc.landing?.example) validateRef(doc.landing.example, 'landing.example', put)
   if (doc.landing?.showcase) validateShowcase(doc.landing.showcase, put)
   return e
 }
@@ -640,6 +647,7 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
   if (!same([...ca.keys()].filter((id) => cb.has(id)), [...cb.keys()].filter((id) => ca.has(id)))) landingCollections++
 
   if (!same(a.landing?.featured, b.landing?.featured)) landingCollections++
+  if (!same(a.landing?.example, b.landing?.example)) landingCollections++
 
   const landingShowcase = same(a.landing?.showcase, b.landing?.showcase) ? 0 : 1
 

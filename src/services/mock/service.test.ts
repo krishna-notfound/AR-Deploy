@@ -42,7 +42,8 @@ describe('seed', () => {
   it('is a valid db with the expected shape', () => {
     const seed = createSeed()
     expect(isValidDb(seed)).toBe(true)
-    expect(seed.businesses).toHaveLength(4)
+    expect(seed.businesses.filter((b) => !b.house)).toHaveLength(4)
+    expect(seed.businesses.filter((b) => b.house)).toHaveLength(1)
     expect(seed.businesses.filter((b) => b.status === 'inactive')).toHaveLength(1)
     expect(seed.products.length).toBeGreaterThanOrEqual(20)
     expect(seed.products.some((p) => !p.models.glb)).toBe(true)

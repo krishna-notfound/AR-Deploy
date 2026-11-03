@@ -275,7 +275,7 @@ export const mockCatalogService: CatalogService = {
   ...createMockModelRequestsStaff({ run, audit }),
 
   // ---------------- businesses ----------------
-  getBusinesses: () => run(() => ok([...store.get().businesses].sort(byUpdatedDesc))),
+  getBusinesses: () => run(() => ok(store.get().businesses.filter((b) => !b.house).sort(byUpdatedDesc))),
 
   getBusinessById: (id) =>
     run(() => {
@@ -365,27 +365,40 @@ export const mockCatalogService: CatalogService = {
     run(() => {
       const db = store.get()
       const b = db.businesses.find((x) => x.slug === slug)
-      return b && demoCanRead(b) ? ok(toCatalog(db, b)) : fail('NOT_FOUND', 'Catalog not found.')
+      return b && !b.house && demoCanRead(b) ? ok(toCatalog(db, b)) : fail('NOT_FOUND', 'Catalog not found.')
     }),
 
   getCatalogs: () =>
     run(() => {
       const db = store.get()
-      return ok([...db.businesses].sort((a, b) => a.name.localeCompare(b.name)).map((b) => toCatalog(db, b)))
+      return ok(db.businesses.filter((b) => !b.house).sort((a, b) => a.name.localeCompare(b.name)).map((b) => toCatalog(db, b)))
     }),
 
   // ---------------- products ----------------
   getProducts: (q = {}) =>
     run(() => {
       const term = q.search?.trim().toLowerCase()
-      const list = store
-        .get()
-        .products.filter((p) => !q.businessId || p.businessId === q.businessId)
+      const db = store.get()
+      const house = new Set(db.businesses.filter((b) => b.house).map((b) => b.id))
+      const list = db.products
+        .filter((p) => !house.has(p.businessId))
+        .filter((p) => !q.businessId || p.businessId === q.businessId)
         .filter((p) => !q.status || p.status === q.status)
         .filter((p) => !q.category || p.category === q.category)
         .filter((p) => !term || p.name.en.toLowerCase().includes(term) || (p.name.pt ?? '').toLowerCase().includes(term))
         .sort(byUpdatedDesc)
       return ok(list)
+    }),
+
+  getShowcase: () =>
+    run(() => {
+      const db = store.get()
+      const business = db.businesses.find((b) => b.house)
+      if (!business) return fail('NOT_FOUND', 'Showcase not found.')
+      const v = demoViewer()
+      const staff = v?.role === 'super_admin'
+      const products = db.products.filter((p) => p.businessId === business.id && (staff || p.status === 'published')).sort(byUpdatedDesc)
+      return ok({ business, products })
     }),
 
   getProductsByBusiness: (businessId) =>

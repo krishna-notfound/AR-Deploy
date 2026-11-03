@@ -6,7 +6,7 @@ import type { SiteContent } from '@/domain/siteContent'
 
 export type { DailyStat }
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2 // 2: the house showcase catalogue (ADR-0047)
 
 export interface DemoInviteAttempt {
   businessId: ID

@@ -181,6 +181,20 @@ export function createSeed(now: number = Date.now()): Db {
 
   const businesses: Business[] = [
     {
+      id: 'biz_house',
+      name: 'Sanctus',
+      slug: 'sanctus-showcase',
+      description: 'The platform\'s own showcase pieces (sample data).',
+      contact: {},
+      status: 'active',
+      branding: { accentColor: '#8a765c' },
+      defaultCurrency: 'EUR',
+      allowOwnModels: true,
+      house: true,
+      createdAt: daysAgo(60, now),
+      updatedAt: daysAgo(1, now),
+    },
+    {
       id: 'biz_casa',
       name: 'Casa Lisboa Interiors',
       slug: 'casa-lisboa',
@@ -669,6 +683,13 @@ export function createSeed(now: number = Date.now()): Db {
       updatedAt: updated,
     }
   })
+
+  // The showcase's sample pieces: copies of the first four published 3D pieces, owned by the house catalogue (ADR-0047).
+  const house = products
+    .filter((p) => p.status === 'published' && p.models.glb)
+    .slice(0, 4)
+    .map((p, i) => ({ ...p, id: `prd_house_${i + 1}`, businessId: 'biz_house', variants: [], cta: { label: CTA_DEFAULT } }))
+  products.push(...house)
 
   return {
     schemaVersion: SCHEMA_VERSION,

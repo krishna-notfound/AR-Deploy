@@ -1019,6 +1019,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         return error ? mapDbError(error) : ok(await hydrate(data))
       }),
     getProductById: (id) => guard(() => productById(id)),
+    // TODO(agent A): read the house business (is_house) and its products once the migration exists.
+    getShowcase: () => guard(async () => fail('NOT_FOUND', 'Showcase not found.')),
     getPublicProduct: (businessSlug, productSlug, opts) =>
       guard(async () => {
         const b = await sb.from('businesses').select('*').eq('slug', businessSlug).maybeSingle<BusinessRow>()
