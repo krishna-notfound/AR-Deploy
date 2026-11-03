@@ -67,7 +67,8 @@ describe('MarkdownField toolbar', () => {
 describe('Editor in Portuguese', () => {
   it('shows the shell and the pages list in pt-PT', { timeout: 30_000 }, async () => {
     openEditor('/admin/editor/pages?lang=pt')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Editor do site' })).toBeInTheDocument()
+    // The shell renders once in English and again when the lazy pt-PT editor text arrives: wait for the settled heading.
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Editor do site' })).toBeInTheDocument(), { timeout: 10_000 })
     expect(await screen.findByRole('button', { name: 'Sem alterações' })).toBeDisabled()
     expect(await screen.findByRole('button', { name: 'Nova página' })).toBeInTheDocument()
     expect(screen.getByText('Ainda nada publicado')).toBeInTheDocument()
