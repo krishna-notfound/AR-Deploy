@@ -60,9 +60,10 @@ export default function LandingPage() {
  */
 function useLandingLinks() {
   const products = useServiceQuery(() => service.getProducts({ status: 'published' }), [])
-  const catalogs = useServiceQuery(() => service.getCatalogs(), [])
+  // Businesses, not getCatalogs(): the catalogue counts view is staff-only, so visitors got a 401 and no links at all.
+  const catalogs = useServiceQuery(() => service.getBusinesses(), [])
   return useMemo(() => {
-    const active = new Map((catalogs.data ?? []).filter((c) => c.business.status === 'active').map((c) => [c.business.id, c.business]))
+    const active = new Map((catalogs.data ?? []).filter((b) => b.status === 'active').map((b) => [b.id, b]))
     const items: Showcase[] = (products.data ?? [])
       .filter((p) => active.has(p.businessId) && primaryImage(p))
       .map((p) => ({ product: p, business: active.get(p.businessId)! }))
