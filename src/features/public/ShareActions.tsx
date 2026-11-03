@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { copyText } from '@/lib/clipboard'
 import { shareableCurrentUrl } from '@/lib/urls'
+import { secondaryAction } from './ProductParts'
 
 /** Copies the URL of the page the customer is on. */
 export function CopyLink({ size = 'md' }: { size?: ButtonSize }) {
@@ -24,7 +25,7 @@ export function CopyLink({ size = 'md' }: { size?: ButtonSize }) {
   )
 }
 
-/** Native share sheet where available; otherwise copies the link. */
+/** Native share sheet where available; otherwise copies the link. An outlined button, like the product's own link. */
 export function ShareButton({ title }: { title: string }) {
   const { t } = useI18n()
   const toast = useToast()
@@ -43,8 +44,9 @@ export function ShareButton({ title }: { title: string }) {
     else toast.error(t('product.copyFailed'))
   }
   return (
-    <Button variant="ghost" icon={<Share2 className="size-4" aria-hidden />} onClick={onShare}>
+    <button type="button" onClick={onShare} className={secondaryAction}>
+      <Share2 className="size-4" strokeWidth={1.4} aria-hidden />
       {t('product.share')}
-    </Button>
+    </button>
   )
 }

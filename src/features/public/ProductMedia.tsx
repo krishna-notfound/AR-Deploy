@@ -46,6 +46,7 @@ export function ProductMedia({
   onInteract,
   ar = true,
   fill = false,
+  switcher = false,
 }: {
   name: string
   gallery: ProductImage[]
@@ -62,6 +63,8 @@ export function ProductMedia({
   ar?: boolean
   /** Stage fills the parent's height instead of a fixed aspect ratio (embed). */
   fill?: boolean
+  /** Shows the "Photos | 3D" switch inside the stage (the product pages; the embed has its own). */
+  switcher?: boolean
 }) {
   const { t } = useI18n()
   const { glb, usdz } = models
@@ -177,6 +180,30 @@ export function ProductMedia({
           </div>
         )}
         {mode === 'photos' && <Gallery images={gallery} name={name} idx={Math.min(photoIdx, Math.max(0, gallery.length - 1))} onIdx={setPhotoIdx} />}
+        {/* Photo | 3D, inside the stage, top left (the reset chip is top right). Only where both exist and the model works. */}
+        {switcher && glb && gallery.length > 0 && (state === 'loading' || state === 'loaded') && (
+          <div role="group" aria-label={t('product.stageSwitch')} className="absolute top-3 left-3 z-10 inline-flex rounded-[var(--radius-control)] border border-line bg-surface p-0.5 sm:top-4 sm:left-4">
+            {(
+              [
+                ['photos', t('product.viewPhotos')],
+                ['3d', '3D'],
+              ] as const
+            ).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={mode === m}
+                onClick={() => onModeChange(m)}
+                className={cn(
+                  'h-10 min-w-14 rounded-[calc(var(--radius-control)-2px)] px-3.5 text-xs leading-4 font-medium tracking-[0.08em] uppercase transition-colors',
+                  mode === m ? 'bg-obsidian text-chalk' : 'text-ink-muted hover:text-ink',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {gallery.length > 1 && (

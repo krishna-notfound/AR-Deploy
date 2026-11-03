@@ -25,6 +25,7 @@ const PublicNotFoundPage = lazy(() => import('@/features/marketing/PublicNotFoun
 const LegalPage = lazy(() => import('@/features/legal/LegalPage'))
 const CustomPage = lazy(() => import('@/features/legal/CustomPage'))
 const CollectionPage = lazy(() => import('@/features/marketing/CollectionPage'))
+const ShowcaseProductPage = lazy(() => import('@/features/marketing/ShowcaseProductPage'))
 
 // The website Editor (ADR-0043): one layout that owns the working copy, and a screen per section.
 // The loaders are shared with the nav's "preload on intent"; loading the layout also starts the draft request.
@@ -215,6 +216,8 @@ function pathModeRoutes(): RouteObject[] {
             { path: TERMS_PATH, element: <LegalPage doc="terms" /> },
             { path: '/pages/:slug', element: <CustomPage /> },
             { path: '/collections/:slug', element: <CollectionPage /> },
+            // The platform's own showcase pieces (ADR-0047); path mode only. The old /products/sanctus-showcase/:slug redirects here.
+            { path: '/showcase/:productSlug', element: <ShowcaseProductPage /> },
             { path: '/reset-password', element: <ResetPasswordPage /> },
             { path: '/accept-invite', element: <AcceptInvitePage /> },
             { path: '/catalog/:businessSlug', element: <LowercaseSlugs route="catalog"><CatalogPage /></LowercaseSlugs> },

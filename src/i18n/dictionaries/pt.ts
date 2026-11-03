@@ -72,6 +72,7 @@ export const ptCore: Partial<Record<TranslationKey, string>> = {
   'product.translationFallback': 'Apresentado em inglês',
   'product.stage3d': 'Visualizador 3D',
   'product.stagePhotos': 'Fotografias',
+  'product.stageSwitch': 'Mostrar fotografias ou o modelo 3D',
   'product.dimsLine': 'L {w} × P {d} × A {h} {unit}',
 
   'embed.arLink': 'Ver no seu espaço (abre a Sanctus)',

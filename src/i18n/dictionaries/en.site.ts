@@ -11,6 +11,14 @@ export const enSite = {
   'site.collection.emptyBody': 'We are choosing the first pieces for this collection. Do you make or sell furniture? Show your pieces in 3D and AR with Sanctus.',
   'site.collection.loadError': 'We could not load the pieces of this collection.',
 
+  // The showcase product page /showcase/:slug (ADR-0047)
+  'showcase.arButton': 'View in your room',
+  'showcase.moreTitle': 'More pieces',
+  'showcase.moreList': 'More pieces from the showcase',
+  'showcase.bannerTitle': 'This is how your customers will see your pieces.',
+  'showcase.bannerBody': 'Photos, 3D and AR on every piece, on a page of your own. Tell us about your business and we will set it up with you.',
+  'showcase.loadError': 'We could not load this piece.',
+
   'site.social.label': 'Social media',
   'site.social.opens': '{name}, opens in a new tab',
   'site.social.instagram': 'Instagram',
