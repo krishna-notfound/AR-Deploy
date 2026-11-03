@@ -45,7 +45,7 @@ These are drafts for the client's lawyer. No lawyer has reviewed or approved the
 22. **Vendor accounts and DPAs**: confirm the Supabase, Vercel and Resend accounts are held by the client's entity and each DPA is accepted in its name; check the DPF certifications on dataprivacyframework.gov — no token (the drafts assume this)
 23. **Resend**: sending domain, sender address, and confirmation that open and click tracking are off — no token (the drafts state "no tracking")
 24. **Enterprise size** under Rec. 2003/361/EC (headcount, turnover, balance sheet, including linked or partner enterprises). It decides DSA arts. 15 and 20–28 and P2B arts. 11–12 — `[[ENTERPRISE_SIZE]]`
-25. **Fee model** for businesses (free, subscription, per catalog) — `[[FEES]]`
+25. **Fee model** for businesses — `[[FEES]]`. Subscriptions were declined by the client (2026-11-03); the remaining choice (free or another model) is still open
 26. **Liability cap** for slight negligence (for example fees paid in the last 12 months, or a fixed sum for a free service) — `[[LIABILITY_CAP]]`
 27. **Who business users sell to** (consumers, trade only, both) and whether all are established in the EU; this decides P2B scope — no token (counsel question 16)
 28. **Own goods**: does Sanctus or an affiliate offer its own products next to businesses (P2B art. 7)? — `[[OWN_GOODS]]`

@@ -52,3 +52,7 @@ Architecture decision records live in `System_arch/decisions/` (index: `System_a
 | 2026-10-29 | Fix the 7-8 s Editor open delay: draft request and chunks start together and on menu hover/touch, skeletons replace the spinner in the dashboards; pushed live (`main` f71f141). Next: split the dictionaries so each page loads only the text it needs | Owner | commit f71f141 |
 | 2026-10-29 | Split the dictionaries: dashboard text loads with the dashboard, public pages load only their own text (no change to wording or behaviour) | Owner | ADR-0045 |
 | 2026-10-29 | Make the dictionary split live (`main` 7ba0c0d); undo by Vercel Instant Rollback or `git revert 7ba0c0d` | Owner | ADR-0045 |
+| 2026-11-03 | No subscription model: the client declined subscriptions for businesses (billing stays out of scope, X-03). The fee model in the Terms (`[[FEES]]`) is still open | Client, via the owner | docs/legal/drafts/README.md |
+| 2026-11-03 | The landing page speaks first to furniture business owners: Apply button at the top, a clear hero message, a "how it works for your business" section, correct AR wording (Android opens AR in Chrome first) and prices in euros | Owner | commit (landing agent) |
+| 2026-11-03 | Landing collections are a showcase the Owner/Admin can add, edit, reorder and hide in the Website Editor (EN and PT); no separate collection pages | Owner | ADR-0046 |
+| 2026-11-03 | UI bugs from the owner's `UI-bugs/` folder: row action menus clipped inside tables; favicon file was a JPEG named .svg | Owner | commits (fix agent) |
