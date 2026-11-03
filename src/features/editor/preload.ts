@@ -13,12 +13,13 @@ export const loadPageEditorScreen = () => import('./PageEditorScreen')
 export const loadApplyScreen = () => import('./ApplyScreen')
 export const loadSocialScreen = () => import('./SocialScreen')
 export const loadLandingScreen = () => import('./LandingScreen')
+export const loadShowcaseScreen = () => import('./ShowcaseScreen')
 
 const ignore = () => undefined
 
 /** The screens inside the layout, fetched in parallel (called as soon as the layout chunk runs). */
 export function preloadEditorScreens(): void {
-  for (const load of [loadPagesScreen, loadPageEditorScreen, loadApplyScreen, loadSocialScreen, loadLandingScreen]) load().catch(ignore)
+  for (const load of [loadPagesScreen, loadPageEditorScreen, loadApplyScreen, loadSocialScreen, loadLandingScreen, loadShowcaseScreen]) load().catch(ignore)
 }
 
 /** Everything the Editor needs for its first screen, in parallel: the layout, the Pages screen and the draft request. */

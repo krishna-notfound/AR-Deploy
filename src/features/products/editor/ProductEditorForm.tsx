@@ -20,7 +20,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import type { Vars } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
 import { PRODUCT_SLUG_MAX, slugInput, slugify } from '@/lib/slug'
-import { PUBLIC_URLS_ARE_LIVE, modelRequestAdminPath, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, editorShowcasePath, modelRequestAdminPath, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import { MEDIA_REFRESH_MS, type ServiceError } from '@/services/catalogService'
 import { useRefreshWhenStale } from '@/services/hooks'
@@ -227,7 +227,7 @@ export function ProductEditorForm({
     !!form.input.models.glb?.storagePath ||
     !!form.input.models.usdz?.storagePath ||
     form.input.variants.some((v) => v.images?.some((i) => i.storagePath) || !!v.models?.glb?.storagePath || !!v.models?.usdz?.storagePath)
-  const base = scope === 'admin' ? '/admin/products' : '/dashboard/products'
+  const base = scope === 'house' ? editorShowcasePath() : scope === 'admin' ? '/admin/products' : '/dashboard/products'
   // S4 R-S4-4: a business owner uploads 3D files only when the business's switch allows it; otherwise the Sanctus
   // team manages them and every save keeps the stored ones. Staff always get the upload controls.
   const ownerUploadsOff = scope === 'business' && business?.allowOwnModels !== true
@@ -648,7 +648,7 @@ export function ProductEditorForm({
                 onReload={() => void onReload()}
               />
             )}
-            {(scope === 'admin' || (ownerChoice && modelChoice === 'upload')) && (
+            {(scope !== 'business' || (ownerChoice && modelChoice === 'upload')) && (
               <ModelSection
                 businessId={form.input.businessId}
                 models={form.input.models}

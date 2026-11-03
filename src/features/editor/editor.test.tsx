@@ -70,6 +70,18 @@ describe('Editor navigation', () => {
 })
 
 describe('Editor shell', () => {
+  it('lists the sections with Showcase before Landing page', async () => {
+    renderEditor()
+    const menu = await screen.findByRole('navigation', { name: 'Editor sections' })
+    expect(within(menu).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Pages', '/admin/editor/pages'],
+      ['Showcase', '/admin/editor/showcase'],
+      ['Landing page', '/admin/editor/landing'],
+      ['Application form', '/admin/editor/apply'],
+      ['Social media', '/admin/editor/social'],
+    ])
+  })
+
   it('Publish says "No changes" and is disabled until the draft differs from the published content', async () => {
     renderEditor()
     const publish = await screen.findByRole('button', { name: 'No changes' })

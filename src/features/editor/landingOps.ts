@@ -1,5 +1,5 @@
 // Pure edits of the landing collections of a SiteContent document, used by the Landing collections screen (ADR-0046).
-import { type LandingCollection, type LandingCollectionLink, type LandingShowcase, MAX_COLLECTION_PRODUCTS, MAX_LANDING_COLLECTIONS, type ProductRef, type SiteContent } from '@/domain/siteContent'
+import { HOUSE_BUSINESS_SLUG, type LandingCollection, type LandingCollectionLink, MAX_COLLECTION_PRODUCTS, MAX_LANDING_COLLECTIONS, type ProductRef, type SiteContent } from '@/domain/siteContent'
 import { slugify } from '@/lib/slug'
 
 /** A new card at the end: no title or slug yet (publishing needs them), the first built-in photo, its own page as the link, no products. */
@@ -78,29 +78,32 @@ export const moveCollectionProduct = (doc: SiteContent, id: string, ref: Product
     return { ...c, products: list }
   })
 
-/** The featured 3D piece of the landing page; `undefined` clears it. */
-/** Edits the 3D showcase card; starts an empty one (English title still to write) when there is none. */
-export function updateShowcase(doc: SiteContent, fn: (s: LandingShowcase) => LandingShowcase): SiteContent {
-  return { ...doc, landing: { ...doc.landing, showcase: fn(doc.landing.showcase ?? { title: { en: '' } }) } }
-}
+/** The reference to one of the admin's own showcase pieces (ADR-0047): the house business plus the product slug. */
+export const houseRef = (productSlug: string): ProductRef => ({ businessSlug: HOUSE_BUSINESS_SLUG, productSlug })
 
-/** Removes the 3D showcase card; the landing page then shows its built-in card again. */
+/** Removes the old uploaded 3D card; ADR-0047 replaces it by a piece of the showcase and the page ignores it. */
 export function clearShowcase(doc: SiteContent): SiteContent {
   const { showcase: _old, ...rest } = doc.landing
   return { ...doc, landing: rest }
 }
 
-/** The optional business product the showcase links to (undefined removes the link). */
-export function setShowcaseProduct(doc: SiteContent, ref: ProductRef | undefined): SiteContent {
-  return updateShowcase(doc, (s) => {
-    const { product: _old, ...rest } = s
-    return ref ? { ...rest, product: { businessSlug: ref.businessSlug, productSlug: ref.productSlug } } : rest
-  })
+/** The piece the 3D card opens; `undefined` clears it. Choosing here also drops the old uploaded 3D card (ADR-0047). */
+export function setFeatured(doc: SiteContent, ref: ProductRef | undefined): SiteContent {
+  const { featured: _old, ...rest } = clearShowcase(doc).landing
+  return { ...doc, landing: ref ? { ...rest, featured: ref } : rest }
 }
 
-export function setFeatured(doc: SiteContent, ref: ProductRef | undefined): SiteContent {
-  const { featured: _old, ...rest } = doc.landing
-  return { ...doc, landing: ref ? { ...rest, featured: ref } : rest }
+/** The piece the hero's "See a live example" opens; `undefined` clears it (the page then chooses by itself). */
+export function setExample(doc: SiteContent, ref: ProductRef | undefined): SiteContent {
+  const { example: _old, ...rest } = doc.landing
+  return { ...doc, landing: ref ? { ...rest, example: ref } : rest }
+}
+
+/** Adds the piece to a collection when it is not in it (and there is room), removes it when it is: one tap on a tile. */
+export function toggleCollectionProduct(doc: SiteContent, id: string, ref: ProductRef): SiteContent {
+  const card = doc.landing.collections.find((c) => c.id === id)
+  if (!card) return doc
+  return card.products.some((p) => sameRef(p, ref)) ? removeCollectionProduct(doc, id, ref) : addCollectionProduct(doc, id, ref)
 }
 
 /** The link of a new kind, empty where the person must still choose (publishing is blocked until they do). */

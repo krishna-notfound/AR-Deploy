@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
-import { emptySiteContent } from '@/domain/siteContent'
+import { HOUSE_BUSINESS_SLUG, emptySiteContent } from '@/domain/siteContent'
 import { content } from '@/services'
 import { mockCatalogService } from '@/services/mock/mockCatalogService'
 import {
@@ -10,7 +10,9 @@ import {
   addCollectionProduct,
   canAddCollection,
   canAddProduct,
+  clearShowcase,
   emptyLink,
+  houseRef,
   moveCollection,
   moveCollectionProduct,
   newCollection,
@@ -18,7 +20,9 @@ import {
   removeCollectionProduct,
   setCollectionHidden,
   setCollectionTitleEn,
+  setExample,
   setFeatured,
+  toggleCollectionProduct,
   uniqueCollectionSlug,
   updateCollection,
   withLang,
@@ -28,11 +32,6 @@ const open = () => {
   localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
   window.history.replaceState(null, '', '/admin/editor/landing')
   return render(<App />)
-}
-const savedDraft = async () => {
-  const s = await content.getContentDraft()
-  if (!s.ok) throw new Error('draft')
-  return s.data.draft.landing.collections
 }
 
 beforeEach(async () => {
@@ -101,131 +100,212 @@ describe('landingOps: slug, products, featured', () => {
   })
 })
 
-describe('Landing collections screen', () => {
-  it('starts empty, copies the built-in four on request, and each opens the right catalogue', { timeout: 40_000 }, async () => {
-    open()
-    expect(await screen.findByText(/No cards yet\. The landing page shows its four built-in collections/)).toBeInTheDocument()
-    const start = screen.getByRole('button', { name: 'Start from the current collections' })
-    await waitFor(() => expect(start).toBeEnabled())
-    await userEvent.click(start)
-    const list = await screen.findByRole('list', { name: 'Collections, in the order the page shows them' })
-    const rows = within(list).getAllByRole('listitem').filter((r) => within(r).queryByText(/^Collection \d$/)) // the open card also lists its products
-    expect(rows.map((r) => within(r).getByText(/^Collection \d$/).nextElementSibling?.textContent)).toEqual(['Sofas', 'Tables', 'Armchairs', 'Decor'])
-    // Autosaved to the draft; each card links to a real catalogue.
-    await waitFor(async () => expect(await savedDraft()).toHaveLength(4), { timeout: 6000 })
-    const saved = await savedDraft()
-    expect(saved.map((c) => c.title.pt)).toEqual(['Sofás', 'Mesas', 'Poltronas', 'Decoração'])
-    // Each card opens its own collection page (never a catalogue), is filled with the published products of its category.
-    expect(saved.map((c) => c.slug)).toEqual(['sofas', 'tables', 'armchairs', 'decor'])
-    expect(saved.every((c) => c.link.kind === 'collection')).toBe(true)
-    expect(saved[0]!.products.length).toBeGreaterThan(0)
+describe('landingOps: example, 3D card and ticking pieces (ADR-0047)', () => {
+  it('houseRef points at the house business', () => {
+    expect(houseRef('linden')).toEqual({ businessSlug: HOUSE_BUSINESS_SLUG, productSlug: 'linden' })
   })
 
-  it('picks the products of a collection (add, reorder, remove) and the featured 3D piece', { timeout: 60_000 }, async () => {
-    const published = await mockCatalogService.getProducts({ status: 'published' })
-    const businesses = await mockCatalogService.getBusinesses()
-    if (!published.ok || !businesses.ok) throw new Error('demo data')
-    const active = businesses.data.filter((b) => b.status === 'active')
-    const live = published.data.filter((p) => active.some((b) => b.id === p.businessId))
-    const withModel = live.find((p) => p.models.glb)!
-    const modelBusiness = active.find((b) => b.id === withModel.businessId)!
+  it('sets and clears the live example without touching anything else', () => {
+    const doc = setFeatured(addCollection(emptySiteContent(), newCollection('a')), houseRef('one'))
+    const set = setExample(doc, houseRef('two'))
+    expect(set.landing).toMatchObject({ example: houseRef('two'), featured: houseRef('one') })
+    expect(set.landing.collections).toHaveLength(1)
+    expect('example' in setExample(set, undefined).landing).toBe(false)
+  })
 
+  it('choosing the 3D card piece also drops the old uploaded 3D card', () => {
+    const doc = { ...emptySiteContent(), landing: { collections: [], showcase: { title: { en: 'Old' } } } }
+    expect('showcase' in setFeatured(doc, houseRef('one')).landing).toBe(false)
+    expect('showcase' in setFeatured(doc, undefined).landing).toBe(false)
+    expect('showcase' in clearShowcase(doc).landing).toBe(false)
+  })
+
+  it('toggleCollectionProduct adds a piece, removes it on the second tap, and respects the limit', () => {
+    let doc = addCollection(emptySiteContent(), newCollection('a'))
+    doc = toggleCollectionProduct(doc, 'a', houseRef('one'))
+    expect(doc.landing.collections[0]!.products).toEqual([houseRef('one')])
+    expect(toggleCollectionProduct(doc, 'a', houseRef('one')).landing.collections[0]!.products).toEqual([])
+    for (let i = 0; i < 30; i++) doc = toggleCollectionProduct(doc, 'a', houseRef(`p${i}`))
+    expect(doc.landing.collections[0]!.products).toHaveLength(24)
+    expect(toggleCollectionProduct(doc, 'missing', houseRef('x'))).toBe(doc)
+  })
+})
+
+const showcasePieces = async () => {
+  const r = await mockCatalogService.getShowcase()
+  if (!r.ok) throw new Error('showcase')
+  return r.data.products
+}
+const savedLanding = async () => {
+  const s = await content.getContentDraft()
+  if (!s.ok) throw new Error('draft')
+  return s.data.draft.landing
+}
+
+describe('Landing tab: the three blocks (ADR-0047)', () => {
+  it('shows the blocks in page order and offers only the four house pieces, never a business product', { timeout: 40_000 }, async () => {
+    const pieces = await showcasePieces()
+    expect(pieces).toHaveLength(4)
+    open()
+    const example = await screen.findByRole('radiogroup', { name: 'See a live example' }, { timeout: 15_000 })
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(headings).toEqual(['See a live example', '3D card', 'Collections'])
+    // Automatic + exactly the house pieces.
+    expect(within(example).getAllByRole('radio')).toHaveLength(1 + pieces.length)
+    for (const p of pieces) expect(within(example).getByRole('radio', { name: p.name.en })).toBeInTheDocument()
+    const businessOnly = await mockCatalogService.getProducts({ status: 'published' })
+    if (!businessOnly.ok) throw new Error('products')
+    expect(businessOnly.data.every((p) => !pieces.some((h) => h.id === p.id))).toBe(true)
+    // The old pickers are gone.
+    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByRole('heading', { name: '3D showcase' })).toBeNull()
+  })
+
+  it('picks the live example and the 3D card from the pieces; "Automatic" clears them; the old uploaded card is dropped', { timeout: 60_000 }, async () => {
+    const pieces = await showcasePieces()
+    const withModel = pieces.filter((p) => p.models.glb)
+    localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
+    const s = await content.getContentDraft()
+    if (!s.ok) throw new Error('draft')
+    await content.saveContentDraft({ ...s.data.draft, landing: { collections: [], showcase: { title: { en: 'Old card' } } } }, s.data.draftUpdatedAt)
+
+    open()
+    const example = await screen.findByRole('radiogroup', { name: 'See a live example' }, { timeout: 15_000 })
+    await userEvent.click(within(example).getByRole('radio', { name: pieces[1]!.name.en }))
+    expect(within(example).getByRole('radio', { name: pieces[1]!.name.en })).toBeChecked()
+    await waitFor(async () => expect((await savedLanding()).example).toEqual({ businessSlug: HOUSE_BUSINESS_SLUG, productSlug: pieces[1]!.slug }), { timeout: 8000 })
+
+    const card = screen.getByRole('radiogroup', { name: '3D card' })
+    expect(within(card).getAllByRole('radio')).toHaveLength(1 + withModel.length) // only pieces with a 3D model
+    await userEvent.click(within(card).getByRole('radio', { name: withModel[0]!.name.en }))
+    await waitFor(
+      async () => {
+        const l = await savedLanding()
+        expect(l.featured).toEqual({ businessSlug: HOUSE_BUSINESS_SLUG, productSlug: withModel[0]!.slug })
+        expect(l.showcase).toBeUndefined()
+      },
+      { timeout: 8000 },
+    )
+
+    await userEvent.click(within(example).getByRole('radio', { name: 'Automatic' }))
+    await waitFor(async () => expect((await savedLanding()).example).toBeUndefined(), { timeout: 8000 })
+  })
+
+  it('without showcase pieces each block says where to add the first one', { timeout: 40_000 }, async () => {
+    for (const p of await showcasePieces()) await mockCatalogService.deleteProduct(p.id)
+    open()
+    expect(await screen.findAllByText(/You have no showcase pieces yet\./)).toHaveLength(3)
+    const links = screen.getAllByRole('link', { name: 'Add your first piece' })
+    expect(links[0]).toHaveAttribute('href', '/admin/editor/showcase')
+    expect(screen.queryByRole('radiogroup', { name: 'See a live example' })).toBeNull()
+    expect(screen.queryByRole('radiogroup', { name: '3D card' })).toBeNull()
+  })
+
+  it('starts empty, copies the built-in four on request, filled with showcase pieces and each opening its own page', { timeout: 40_000 }, async () => {
+    open()
+    expect(await screen.findByText(/No cards yet\. The landing page shows its four built-in collections/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Start from the current collections' }))
+    const list = await screen.findByRole('list', { name: 'Collections, in the order the page shows them' })
+    const rows = within(list).getAllByRole('listitem').filter((r) => within(r).queryByText(/^Collection \d$/)) // the open card also lists its pieces
+    expect(rows.map((r) => within(r).getByText(/^Collection \d$/).nextElementSibling?.textContent)).toEqual(['Sofas', 'Tables', 'Armchairs', 'Decor'])
+    await waitFor(async () => expect((await savedLanding()).collections).toHaveLength(4), { timeout: 6000 })
+    const saved = (await savedLanding()).collections
+    expect(saved.map((c) => c.title.pt)).toEqual(['Sofás', 'Mesas', 'Poltronas', 'Decoração'])
+    expect(saved.map((c) => c.slug)).toEqual(['sofas', 'tables', 'armchairs', 'decor'])
+    expect(saved.every((c) => c.link.kind === 'collection')).toBe(true)
+    // Only house pieces.
+    const house = await showcasePieces()
+    const refs = saved.flatMap((c) => c.products)
+    expect(refs.length).toBeGreaterThan(0)
+    expect(refs.every((r) => r.businessSlug === HOUSE_BUSINESS_SLUG && house.some((p) => p.slug === r.productSlug))).toBe(true)
+  })
+
+  it('ticks pieces for a collection from the thumbnail grid, reorders and removes them', { timeout: 60_000 }, async () => {
+    const pieces = await showcasePieces()
     open()
     await userEvent.click(await screen.findByRole('button', { name: 'Add a collection' }))
     await userEvent.type(await screen.findByRole('textbox', { name: /Title \(English\)/ }), 'Pieces I like')
+    await userEvent.click(screen.getByText('Page address', { selector: 'summary' })) // the address follows the title
     expect(screen.getByRole('textbox', { name: /Page address/ })).toHaveValue('pieces-i-like')
 
-    const add = screen.getByRole('combobox', { name: 'Add a product' })
-    await waitFor(() => expect(within(add).getAllByRole('option').length).toBeGreaterThan(2))
-    const options = within(add).getAllByRole('option').slice(1, 3)
-    await userEvent.selectOptions(add, options[0]!)
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Add a product' }), within(screen.getByRole('combobox', { name: 'Add a product' })).getAllByRole('option')[1]!)
+    const grid = screen.getByRole('group', { name: 'Pieces of your showcase' })
+    expect(within(grid).getAllByRole('checkbox')).toHaveLength(pieces.length)
+    await userEvent.click(within(grid).getByRole('checkbox', { name: pieces[0]!.name.en }))
+    await userEvent.click(within(grid).getByRole('checkbox', { name: pieces[1]!.name.en }))
+    expect(within(grid).getByRole('checkbox', { name: pieces[0]!.name.en })).toBeChecked()
     expect(screen.getByText('2 of 24 products')).toBeInTheDocument()
-    await waitFor(async () => expect((await savedDraft())[0]!.products).toHaveLength(2), { timeout: 8000 })
-    const [first, second] = (await savedDraft())[0]!.products
-    // The only collection cannot move down, so the first enabled "down" button is the first product's.
-    await userEvent.click(screen.getAllByRole('button', { name: /^Move .* down$/ }).find((b) => !b.hasAttribute('disabled'))!)
-    await waitFor(async () => expect((await savedDraft())[0]!.products).toEqual([second, first]), { timeout: 8000 })
-    await userEvent.click(screen.getAllByRole('button', { name: /^Remove .* from the collection$/ })[0]!)
-    await waitFor(async () => expect((await savedDraft())[0]!.products).toEqual([first]), { timeout: 8000 })
+    const slugs = async () => (await savedLanding()).collections[0]!.products.map((r) => r.productSlug)
+    await waitFor(async () => expect(await slugs()).toEqual([pieces[0]!.slug, pieces[1]!.slug]), { timeout: 8000 })
 
-    // Featured piece: only products with a 3D model are listed.
-    const featured = screen.getByRole('combobox', { name: 'Featured 3D piece' })
-    const choices = within(featured).getAllByRole('option').slice(1)
-    expect(choices.length).toBeGreaterThan(0)
-    expect(choices.every((o) => o.textContent?.endsWith('Has 3D'))).toBe(true)
-    await userEvent.selectOptions(featured, choices.find((o) => o.textContent?.includes(`· ${modelBusiness.name}`))!)
-    await waitFor(async () => {
-      const s = await content.getContentDraft()
-      expect(s.ok && s.data.draft.landing.featured).toBeTruthy()
-    }, { timeout: 8000 })
+    await userEvent.click(screen.getByRole('button', { name: `Move ${pieces[0]!.name.en} down` }))
+    await waitFor(async () => expect(await slugs()).toEqual([pieces[1]!.slug, pieces[0]!.slug]), { timeout: 8000 })
+    await userEvent.click(screen.getByRole('button', { name: `Remove ${pieces[1]!.name.en} from the collection` }))
+    await waitFor(async () => expect(await slugs()).toEqual([pieces[0]!.slug]), { timeout: 8000 })
+    // Tapping a ticked tile unticks it.
+    await userEvent.click(within(grid).getByRole('checkbox', { name: pieces[0]!.name.en }))
+    await waitFor(async () => expect(await slugs()).toEqual([]), { timeout: 8000 })
   })
 
-  it('adds a card, edits its texts, picks a picture and a published product, moves, hides and removes it', { timeout: 60_000 }, async () => {
-    const published = await mockCatalogService.getProducts({ status: 'published' })
-    const businesses = await mockCatalogService.getBusinesses()
-    if (!published.ok || !businesses.ok) throw new Error('demo data')
-    const product = published.data.find((p) => businesses.data.find((b) => b.id === p.businessId)?.status === 'active')!
-    const business = businesses.data.find((b) => b.id === product.businessId)!
-
+  it('adds a card, edits its texts, picks a built-in picture, moves, hides and removes it', { timeout: 60_000 }, async () => {
     open()
     await userEvent.click(await screen.findByRole('button', { name: 'Add a collection' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Add a collection' }))
     const list = await screen.findByRole('list', { name: 'Collections, in the order the page shows them' })
-    expect(within(list).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(list).getAllByRole('listitem').filter((r) => within(r).queryByText(/^Collection \d$/))).toHaveLength(2)
     const [firstUp, secondUp] = screen.getAllByRole('button', { name: 'Move Untitled collection up' })
     expect(firstUp).toBeDisabled() // the first card cannot go up
     expect(secondUp).toBeEnabled()
 
-    // The second card is open: fill it in.
+    // The second card is open: a large picture area with its actions, then the texts.
+    expect(screen.getByRole('img', { name: 'The picture of this card' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upload picture' })).toBeInTheDocument()
     await userEvent.type(screen.getByRole('textbox', { name: /Title \(English\)/ }), 'Showroom in 3D')
     await userEvent.type(screen.getByRole('textbox', { name: /Title \(Portuguese\)/ }), 'Showroom em 3D')
     await userEvent.type(screen.getByRole('textbox', { name: /Text \(English\)/ }), 'See it in your room')
+    await userEvent.click(screen.getByRole('button', { name: 'Choose a built-in picture' }))
     await userEvent.click(screen.getByRole('radio', { name: /phone showing an armchair/ }))
     expect(screen.getByRole('radio', { name: /phone showing an armchair/ })).toBeChecked()
+    expect(screen.queryByRole('combobox')).toBeNull() // no link choice any more
 
-    // Link: a published product, by name and business.
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Where the card leads' }), 'product')
-    const picker = screen.getByRole('combobox', { name: /Product/ })
-    await waitFor(() => expect(within(picker).getAllByRole('option').length).toBeGreaterThan(1))
-    const option = within(picker).getAllByRole('option').find((o) => o.textContent?.endsWith(`· ${business.name}`))!
-    await userEvent.selectOptions(picker, option)
-
-    // Move the card to the top, hide it, then remove it with a confirmation.
     await userEvent.click(screen.getByRole('button', { name: 'Move Showroom in 3D up' }))
     expect(within(list).getAllByRole('listitem')[0]).toHaveTextContent('Showroom in 3D')
     await userEvent.click(screen.getByRole('button', { name: 'Hide Showroom in 3D' }))
     expect(within(list).getAllByRole('listitem')[0]).toHaveTextContent('Hidden')
-    await waitFor(async () => {
-      const [first, second] = await savedDraft()
-      expect(first).toMatchObject({
-        title: { en: 'Showroom in 3D', pt: 'Showroom em 3D' },
-        text: { en: 'See it in your room' },
-        image: 'ar-phone',
-        hidden: true,
-        link: { kind: 'product', businessSlug: business.slug, productSlug: product.slug },
-      })
-      expect(second!.title.en).toBe('')
-    }, { timeout: 8000 })
+    await waitFor(
+      async () => {
+        const [first, second] = (await savedLanding()).collections
+        expect(first).toMatchObject({ title: { en: 'Showroom in 3D', pt: 'Showroom em 3D' }, text: { en: 'See it in your room' }, image: 'ar-phone', hidden: true, link: { kind: 'collection' } })
+        expect(second!.title.en).toBe('')
+      },
+      { timeout: 8000 },
+    )
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Showroom in 3D' }))
     const confirm = await screen.findByRole('dialog', { name: 'Remove this collection?' })
     await userEvent.click(within(confirm).getByRole('button', { name: 'Remove' }))
-    await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(1))
+    await waitFor(() => expect(within(list).getAllByRole('listitem').filter((r) => within(r).queryByText(/^Collection \d$/))).toHaveLength(1))
+  })
+
+  it('an uploaded card picture can be removed again (back to a built-in one)', { timeout: 40_000 }, async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:test/1') })
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a collection' }))
+    await userEvent.upload(await screen.findByTestId('upload-image'), new File([new Uint8Array(1024)], 'card.png', { type: 'image/png' }))
+    await waitFor(async () => expect(typeof (await savedLanding()).collections[0]!.image).toBe('object'), { timeout: 8000 })
+    expect(screen.getByRole('img', { name: 'The picture of this card' })).toHaveAttribute('src', 'blob:test/1')
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    await waitFor(async () => expect((await savedLanding()).collections[0]!.image).toBe('hero-living'), { timeout: 8000 })
   })
 
   it('an incomplete card is listed as a problem and keeps Publish disabled; the limit of eight stops "Add"', { timeout: 60_000 }, async () => {
     open()
     const add = await screen.findByRole('button', { name: 'Add a collection' })
     await userEvent.click(add)
-    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Where the card leads' }), 'catalog')
-    await userEvent.type(screen.getByRole('textbox', { name: /Title \(English\)/ }), 'Catalogue')
-    const summary = await screen.findByText('1 problem to fix before publishing')
-    await userEvent.click(summary)
-    expect(screen.getByText(/Landing collections: Catalogue, business/)).toBeInTheDocument()
+    expect(await screen.findByText(/to fix before publishing/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled()
     for (let i = 0; i < 7; i++) await userEvent.click(add)
     expect(add).toBeDisabled()
     expect(screen.getByText('The landing page shows up to 8 collections.')).toBeInTheDocument()
   })
 })
+

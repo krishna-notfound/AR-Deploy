@@ -56,7 +56,8 @@ export function describeProblem(path: string, key: string, draft: SiteContent, t
   if (parts[0] === 'landing') {
     const card = parts[1] === 'collections' && parts[2] !== undefined ? draft.landing.collections[Number(parts[2])] : undefined
     const where = t('editor.menu.landing')
-    if (parts[1] === 'featured') return { path, what, where: `${where}: ${t('editor.landing.featured')}`, to: editorLandingPath() }
+    if (parts[1] === 'featured') return { path, what, where: `${where}: ${t('editor.landing.card3d.title')}`, to: editorLandingPath() }
+    if (parts[1] === 'example') return { path, what, where: `${where}: ${t('editor.landing.example.title')}`, to: editorLandingPath() }
     if (!card) return { path, what, where, to: editorLandingPath() }
     const field = LANDING_FIELD_KEYS[parts.slice(3).join('.')]
     const name = card.title.en.trim() || t('editor.landing.untitled')
