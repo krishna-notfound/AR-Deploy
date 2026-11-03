@@ -5,6 +5,7 @@ import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { CollectionsBlock } from './CollectionsBlock'
 import { useEditor } from './EditorContext'
+import { HeroPictureBlock } from './HeroPictureBlock'
 import { NoPiecesPrompt, PiecePicker } from './PiecePicker'
 import { setExample, setFeatured } from './landingOps'
 import { useShowcasePieces } from './useShowcasePieces'
@@ -23,8 +24,8 @@ function Block({ id, title, help, children }: { id: string; title: string; help:
 }
 
 /**
- * /admin/editor/landing: the three places of the landing page the admin chooses, in page order (ADR-0047): the live
- * example of the hero, the 3D card and the collections. Everything is picked from the admin's own showcase pieces.
+ * /admin/editor/landing: the places of the landing page the admin chooses, in page order (ADR-0047, ADR-0049): the hero
+ * picture, the live example of the hero, the 3D card and the collections. Everything is picked from the admin's own showcase pieces.
  */
 export default function LandingScreen() {
   const { t } = useI18n()
@@ -44,6 +45,10 @@ export default function LandingScreen() {
         <h2 className="text-ui-card font-medium text-ink">{t('editor.menu.landing')}</h2>
         <p className="mt-1 max-w-xl text-ui-small text-ink-muted">{t('editor.landing.description')}</p>
       </div>
+
+      <Block id="landing-hero-heading" title={t('editor.landing.hero.title')} help={t('editor.landing.hero.help')}>
+        <HeroPictureBlock />
+      </Block>
 
       {showcase.status === 'error' && <ErrorState message={errorText(showcase.error, t)} onRetry={showcase.retry} retryLabel={t('common.retry')} />}
 

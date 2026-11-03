@@ -1,5 +1,15 @@
 // Pure edits of the landing collections of a SiteContent document, used by the Landing collections screen (ADR-0046).
-import { HOUSE_BUSINESS_SLUG, type LandingCollection, type LandingCollectionLink, MAX_COLLECTION_PRODUCTS, MAX_LANDING_COLLECTIONS, type ProductRef, type SiteContent } from '@/domain/siteContent'
+import {
+  HOUSE_BUSINESS_SLUG,
+  type LandingCollection,
+  type LandingCollectionLink,
+  type LandingHero,
+  MAX_COLLECTION_PRODUCTS,
+  MAX_LANDING_COLLECTIONS,
+  type ProductRef,
+  type SiteAsset,
+  type SiteContent,
+} from '@/domain/siteContent'
 import { slugify } from '@/lib/slug'
 
 /** A new card at the end: no title or slug yet (publishing needs them), the first built-in photo, its own page as the link, no products. */
@@ -127,4 +137,30 @@ export function withLang(value: { en: string; pt?: string } | undefined, lang: '
     return rest
   }
   return { ...base, pt: text }
+}
+
+/** Replaces the hero; `landing.hero` is dropped entirely when nothing is left in it, so an emptied hero equals one never set. */
+function withHero(doc: SiteContent, hero: LandingHero): SiteContent {
+  const { hero: _old, ...rest } = doc.landing
+  const empty = !hero.image && !hero.model && !hero.alt
+  return { ...doc, landing: empty ? rest : { ...rest, hero } }
+}
+
+/** The hero's own picture; `undefined` goes back to the built-in photo. */
+export function setHeroImage(doc: SiteContent, image: SiteAsset | undefined): SiteContent {
+  const { image: _old, ...rest } = doc.landing.hero ?? {}
+  return withHero(doc, image ? { ...rest, image } : rest)
+}
+
+/** The hero's 3D model (a GLB); `undefined` removes the 3D button. */
+export function setHeroModel(doc: SiteContent, glb: SiteAsset | undefined): SiteContent {
+  const { model: _old, ...rest } = doc.landing.hero ?? {}
+  return withHero(doc, glb ? { ...rest, model: { glb } } : rest)
+}
+
+/** The hero's description (alt text and caption) in one language; with both texts blank it is removed. */
+export function setHeroAlt(doc: SiteContent, lang: 'en' | 'pt', text: string): SiteContent {
+  const { alt: old, ...rest } = doc.landing.hero ?? {}
+  const alt = withLang(old, lang, text)
+  return withHero(doc, alt.en.trim() || alt.pt?.trim() ? { ...rest, alt } : rest)
 }
