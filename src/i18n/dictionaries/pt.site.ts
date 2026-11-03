@@ -5,6 +5,13 @@ export const ptSite: Partial<Record<TranslationKey, string>> = {
   'site.page.checkFailed': 'Não foi possível verificar se há uma versão mais recente desta página.',
   'site.page.loadError': 'Não foi possível carregar esta página.',
 
+  'site.collection.eyebrow': 'Coleção',
+  'site.collection.all': 'Todas as coleções',
+  'site.collection.pieces': 'Peças em {name}',
+  'site.collection.emptyTitle': 'Peças em breve',
+  'site.collection.emptyBody': 'Estamos a escolher as primeiras peças desta coleção. Fabrica ou vende mobiliário? Mostre as suas peças em 3D e RA com a Sanctus.',
+  'site.collection.loadError': 'Não foi possível carregar as peças desta coleção.',
+
   'site.social.label': 'Redes sociais',
   'site.social.opens': '{name}, abre num novo separador',
   'site.social.instagram': 'Instagram',

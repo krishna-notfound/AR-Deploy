@@ -22,17 +22,19 @@ export const BUILTIN_COLLECTIONS: readonly BuiltinCollection[] = [
 
 /**
  * The built-in cards as Editor cards, for the "Start from the current collections" button. `linkFor` chooses where each
- * card leads (the Editor picks a catalogue that has that category); without it the cards start with no link.
+ * card leads (the default: the collection's own page, /collections/<slug>).
  */
 export function builtinAsCollections(
-  linkFor: (c: BuiltinCollection) => LandingCollectionLink = () => ({ kind: 'none' }),
+  linkFor: (c: BuiltinCollection) => LandingCollectionLink = () => ({ kind: 'collection' }),
   newId: () => string = () => crypto.randomUUID(),
 ): LandingCollection[] {
   return BUILTIN_COLLECTIONS.map((c) => ({
     id: newId(),
+    slug: c.key,
     title: { en: enCore[`landing.col.${c.key}`], pt: ptCore[`landing.col.${c.key}`] ?? enCore[`landing.col.${c.key}`] },
     text: { en: enCore[`landing.col.${c.key}Body`], pt: ptCore[`landing.col.${c.key}Body`] ?? enCore[`landing.col.${c.key}Body`] },
     image: c.image,
     link: linkFor(c),
+    products: [],
   }))
 }

@@ -56,8 +56,15 @@ export const LANDING_IMAGE_KEYS = [
 ] as const
 export type LandingImageKey = (typeof LANDING_IMAGE_KEYS)[number]
 
-/** Where a landing collection card leads. `product` and `catalog` name the business and product by slug (the public address parts). */
+/** A product named by the public address parts: the business slug and the product slug. */
+export interface ProductRef {
+  businessSlug: string
+  productSlug: string
+}
+
+/** Where a landing collection card leads. `collection` opens the collection's own page (/collections/<slug>, the default); `product` and `catalog` name the business and product by slug (the public address parts). */
 export type LandingCollectionLink =
+  | { kind: 'collection' }
   | { kind: 'product'; businessSlug: string; productSlug: string }
   | { kind: 'catalog'; businessSlug: string; category?: Category }
   | { kind: 'apply' }
@@ -67,6 +74,8 @@ export type LandingCollectionLink =
 export interface LandingCollection {
   /** crypto.randomUUID(); stable while the card is edited and moved. */
   id: string
+  /** The collection's own page, /collections/<slug>: ^[a-z0-9]+(-[a-z0-9]+)*$, 1..60 characters, unique among the collections. */
+  slug: string
   /** 1..60 characters. */
   title: { en: string; pt?: string }
   /** 0..160 characters. */
@@ -74,8 +83,12 @@ export interface LandingCollection {
   /** A key of LANDING_IMAGE_KEYS. */
   image: string
   link: LandingCollectionLink
+  /** The published products the collection's page shows, in this order. 0..24. */
+  products: ProductRef[]
   hidden?: boolean
 }
+
+export const MAX_COLLECTION_PRODUCTS = 24
 
 export const MAX_LANDING_COLLECTIONS = 8
 export const MAX_COLLECTION_TITLE = 60
@@ -91,7 +104,11 @@ export interface SiteContent {
   /** https URL per network. */
   social: Partial<Record<SocialNetwork, string>>
   /** The landing page's Collections cards. Empty = the page shows its built-in four. At most 8. */
-  landing: { collections: LandingCollection[] }
+  landing: {
+    collections: LandingCollection[]
+    /** The piece the landing's "Open a live piece in 3D" opens. Absent: the page chooses one itself. */
+    featured?: ProductRef
+  }
 }
 
 export const MAX_CUSTOM_PAGES = 20
@@ -148,9 +165,15 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   out.applyForm = normalizeApplyForm(raw.applyForm)
   const social = obj(raw.social)
   for (const n of SOCIAL_NETWORKS) if (typeof social[n] === 'string' && social[n]) out.social[n] = social[n]
-  const collections = obj(raw.landing).collections
-  if (Array.isArray(collections)) out.landing.collections = collections.map(normalizeCollection)
+  const landing = obj(raw.landing)
+  if (Array.isArray(landing.collections)) out.landing.collections = landing.collections.map(normalizeCollection)
+  if (typeof landing.featured === 'object' && landing.featured !== null && !Array.isArray(landing.featured)) out.landing.featured = productRef(landing.featured)
   return out
+}
+
+function productRef(x: unknown): ProductRef {
+  const o = obj(x)
+  return { businessSlug: str(o.businessSlug), productSlug: str(o.productSlug) }
 }
 
 function normalizeCollection(x: unknown): LandingCollection {
@@ -161,7 +184,9 @@ function normalizeCollection(x: unknown): LandingCollection {
   else if (l.kind === 'catalog')
     link = typeof l.category === 'string' && l.category ? { kind: 'catalog', businessSlug: str(l.businessSlug), category: l.category as Category } : { kind: 'catalog', businessSlug: str(l.businessSlug) }
   else if (l.kind === 'apply') link = { kind: 'apply' }
-  const out: LandingCollection = { id: str(o.id), title: pair(o.title), image: str(o.image), link }
+  else if (l.kind === 'collection') link = { kind: 'collection' }
+  const products = Array.isArray(o.products) ? o.products.map(productRef) : []
+  const out: LandingCollection = { id: str(o.id), slug: str(o.slug), title: pair(o.title), image: str(o.image), link, products }
   if (o.text !== undefined) {
     const text = pair(o.text)
     if (text.en || text.pt) out.text = text
@@ -333,17 +358,35 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
     }
   }
   validateLandingCollections(doc.landing?.collections ?? [], put)
+  if (doc.landing?.featured) validateRef(doc.landing.featured, 'landing.featured', put)
   return e
+}
+
+function validateRef(ref: ProductRef, path: string, put: (path: string, key: ContentErrorKey) => void): void {
+  for (const f of ['businessSlug', 'productSlug'] as const) {
+    const v = ref?.[f]
+    if (!v) put(`${path}.${f}`, 'required')
+    else if (v.length > MAX_SLUG_LENGTH || !SLUG.test(v)) put(`${path}.${f}`, 'invalid_slug')
+  }
 }
 
 function validateLandingCollections(list: LandingCollection[], put: (path: string, key: ContentErrorKey) => void): void {
   if (list.length > MAX_LANDING_COLLECTIONS) put('landing.collections', 'too_many')
   const ids = new Set<string>()
+  const slugs = new Set<string>()
   list.forEach((c, i) => {
     const p = `landing.collections.${i}`
     if (!c.id) put(`${p}.id`, 'required')
     else if (ids.has(c.id)) put(`${p}.id`, 'duplicate_id')
     ids.add(c.id)
+    if (!c.slug) put(`${p}.slug`, 'required')
+    else if (c.slug.length > MAX_SLUG_LENGTH) put(`${p}.slug`, 'too_long')
+    else if (!SLUG.test(c.slug)) put(`${p}.slug`, 'invalid_slug')
+    else if (slugs.has(c.slug)) put(`${p}.slug`, 'slug_duplicate')
+    slugs.add(c.slug)
+    const products = c.products ?? []
+    if (products.length > MAX_COLLECTION_PRODUCTS) put(`${p}.products`, 'too_many')
+    products.forEach((ref, j) => validateRef(ref, `${p}.products.${j}`, put))
     if (!(c.title?.en ?? '').trim()) put(`${p}.title.en`, 'required')
     if ((c.title?.en ?? '').length > MAX_COLLECTION_TITLE) put(`${p}.title.en`, 'too_long')
     if ((c.title?.pt ?? '').length > MAX_COLLECTION_TITLE) put(`${p}.title.pt`, 'too_long')
@@ -361,7 +404,7 @@ function validateLandingCollections(list: LandingCollection[], put: (path: strin
       if (!link.businessSlug) put(`${p}.link.businessSlug`, 'required')
       else if (link.businessSlug.length > MAX_SLUG_LENGTH || !SLUG.test(link.businessSlug)) put(`${p}.link.businessSlug`, 'invalid_slug')
       if (link.category !== undefined && !(CATEGORIES as readonly string[]).includes(link.category)) put(`${p}.link.category`, 'invalid_value')
-    } else if (link?.kind !== 'apply' && link?.kind !== 'none') put(`${p}.link`, 'invalid_value')
+    } else if (link?.kind !== 'apply' && link?.kind !== 'none' && link?.kind !== 'collection') put(`${p}.link`, 'invalid_value')
   })
 }
 
@@ -479,6 +522,8 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
   for (const [id, c] of cb) if (!ca.has(id) || !same(ca.get(id), c)) landingCollections++
   for (const id of ca.keys()) if (!cb.has(id)) landingCollections++
   if (!same([...ca.keys()].filter((id) => cb.has(id)), [...cb.keys()].filter((id) => ca.has(id)))) landingCollections++
+
+  if (!same(a.landing?.featured, b.landing?.featured)) landingCollections++
 
   return {
     pages,

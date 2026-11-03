@@ -457,7 +457,8 @@ describe('business_applications', () => {
 })
 
 describe('landing collections (20261103095519_landing_collections)', () => {
-  const card = (over: Record<string, unknown> = {}) => ({ id: crypto.randomUUID(), title: { en: 'Sofas', pt: 'Sofás' }, text: { en: 'Comfort.' }, image: 'sofa-travertine', link: { kind: 'none' }, ...over })
+  let cardSeq = 0
+  const card = (over: Record<string, unknown> = {}) => ({ id: crypto.randomUUID(), slug: `card-${++cardSeq}`, products: [] as unknown[], title: { en: 'Sofas', pt: 'Sofás' }, text: { en: 'Comfort.' }, image: 'sofa-travertine', link: { kind: 'none' }, ...over })
   const refuses = async (content: unknown, detail: string) => {
     const b = await forceDraft(content)
     await expect(h.probe(ADMIN, 'select public.admin_publish_site_content($1::timestamptz)', [b])).rejects.toMatchObject({ message: 'invalid_content', detail })
@@ -512,8 +513,46 @@ describe('landing collections (20261103095519_landing_collections)', () => {
     await refuses(withCards(card({ link: { kind: 'catalog', businessSlug: 'acme', category: 'spaceship' } })), 'landing.collections.0.link.category|invalid_value')
   })
 
+  it('refuses a bad or repeated slug, too many products, a bad product reference and a bad featured piece', async () => {
+    await refuses(withCards(card({ slug: '' })), 'landing.collections.0.slug|required')
+    await refuses(withCards(card({ slug: 'Not A Slug' })), 'landing.collections.0.slug|invalid_slug')
+    await refuses(withCards(card({ slug: 'x'.repeat(61) })), 'landing.collections.0.slug|too_long')
+    await refuses(withCards(card({ slug: 'sofas' }), card({ slug: 'sofas' })), 'landing.collections.1.slug|slug_duplicate')
+    const ref = { businessSlug: 'acme', productSlug: 'linden-chair' }
+    await refuses(withCards(card({ products: Array.from({ length: 25 }, () => ref) })), 'landing.collections.0.products|too_many')
+    await refuses(withCards(card({ products: [ref, { businessSlug: 'Bad', productSlug: 'x' }] })), 'landing.collections.0.products.1.businessSlug|invalid_slug')
+    await refuses(withCards(card({ products: [{ businessSlug: 'acme' }] })), 'landing.collections.0.products.0.productSlug|required')
+    await refuses(doc((c) => void ((c.landing as Record<string, unknown>).featured = { businessSlug: 'acme' })), 'landing.featured.productSlug|required')
+    await refuses(doc((c) => void ((c.landing as Record<string, unknown>).featured = { businessSlug: 'Acme X', productSlug: 'y' })), 'landing.featured.businessSlug|invalid_slug')
+  })
+
+  it('anon gets each card slug and products, and the featured piece, in the chrome part; 24 products and a collection link publish', async () => {
+    await resetContent()
+    const ref = { businessSlug: 'acme', productSlug: 'linden-chair' }
+    const own = card({ slug: 'sofas', link: { kind: 'collection' }, products: Array.from({ length: 24 }, () => ref) })
+    await save(
+      doc((c) => {
+        c.landing.collections = [own] as never
+        ;(c.landing as Record<string, unknown>).featured = ref
+      }),
+    )
+    await publish()
+    const chrome = (await publicPart('chrome')).content as { landingCollections: unknown[]; landingFeatured?: unknown }
+    expect(chrome.landingCollections).toEqual([own])
+    expect(chrome.landingFeatured).toEqual(ref)
+    await resetContent()
+  })
+
+  it('a published document without a featured piece has no landingFeatured key', async () => {
+    await resetContent()
+    await save(doc())
+    await publish()
+    expect((await publicPart('chrome')).content).not.toHaveProperty('landingFeatured')
+    await resetContent()
+  })
+
   it('accepts every link kind, every photo key and every category the TypeScript model knows', async () => {
-    const cards = [card({ link: { kind: 'apply' } }), card({ link: { kind: 'catalog', businessSlug: 'acme' } }), ...LANDING_IMAGE_KEYS.map((image) => card({ image }))]
+    const cards = [card({ link: { kind: 'apply' } }), card({ link: { kind: 'collection' } }), card({ link: { kind: 'catalog', businessSlug: 'acme' } }), ...LANDING_IMAGE_KEYS.map((image) => card({ image }))]
     for (let i = 0; i < cards.length; i += 8) {
       const b = await forceDraft(withCards(...cards.slice(i, i + 8)))
       expect((await publish(ADMIN, b)).version).toBeGreaterThan(0)

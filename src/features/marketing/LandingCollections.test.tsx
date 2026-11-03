@@ -39,24 +39,25 @@ afterEach(() => {
 })
 
 describe('LandingCollections: nothing published', () => {
-  it('shows the four built-in cards, each one link to a catalogue, with no "01 // COLLECTION" label', { timeout: 30_000 }, async () => {
+  it('shows the four built-in cards, each one link to its own collection page, with no "01 // COLLECTION" label', { timeout: 30_000 }, async () => {
     openLanding()
     const s = await section()
     const cards = await s.findAllByRole('link', { name: /Sofas|Tables|Armchairs|Decor/ })
     expect(cards.map((c) => c.querySelector('h3')?.textContent)).toEqual(['Sofas', 'Tables', 'Armchairs', 'Decor'])
+    expect(cards.map((c) => c.getAttribute('href'))).toEqual(['/collections/sofas', '/collections/tables', '/collections/armchairs', '/collections/decor'])
     for (const card of cards) {
-      expect(card.getAttribute('href')).toMatch(/^\/catalog\/[\w-]+(\?category=\w+)?$/)
       // The whole card is the link: the photo and the title are inside it.
       expect(card.querySelector('img')).not.toBeNull()
     }
     expect(screen.queryByText(/\/\/ Collection/i)).toBeNull()
-    // A category no catalogue has still leads to a catalogue (never a dead card).
-    expect(cards.every((c) => c.getAttribute('href'))).toBe(true)
+    // Never a business catalogue.
+    expect(cards.some((c) => c.getAttribute('href')?.startsWith('/catalog'))).toBe(false)
   })
 })
 
 describe('LandingCollections: published cards', () => {
-  const card = (over: Partial<LandingCollection>): LandingCollection => ({ id: crypto.randomUUID(), title: { en: 'X' }, image: 'lamp-vase', link: { kind: 'none' }, ...over })
+  let cardSeq = 0
+  const card = (over: Partial<LandingCollection>): LandingCollection => ({ id: crypto.randomUUID(), slug: `card-${++cardSeq}`, products: [], title: { en: 'X' }, image: 'lamp-vase', link: { kind: 'none' }, ...over })
 
   it('shows the published cards instead of the built-in ones, skips hidden ones, and links each by its kind', { timeout: 30_000 }, async () => {
     const published = await service.getProducts({ status: 'published' })
@@ -71,6 +72,7 @@ describe('LandingCollections: published cards', () => {
       card({ title: { en: 'Sell with Sanctus' }, image: 'showroom-qr', link: { kind: 'apply' } }),
       card({ title: { en: 'Just a picture' }, link: { kind: 'none' } }),
       card({ title: { en: 'Not shown' }, hidden: true, link: { kind: 'apply' } }),
+      card({ title: { en: 'Own page' }, slug: 'own-page', link: { kind: 'collection' } }),
     ])
     openLanding()
     const s = await section()
@@ -83,6 +85,7 @@ describe('LandingCollections: published cards', () => {
     expect(productCard).toHaveTextContent('Open it in AR') // the text is part of the same link
     expect(s.getByRole('link', { name: /Browse a catalogue/ })).toHaveAttribute('href', `/catalog/${business.slug}?category=${product.category}`)
     expect(s.getByRole('link', { name: /Sell with Sanctus/ })).toHaveAttribute('href', '/apply')
+    expect(s.getByRole('link', { name: /Own page/ })).toHaveAttribute('href', '/collections/own-page')
     // "No link" is not a link at all.
     expect(s.queryByRole('link', { name: /Just a picture/ })).toBeNull()
     expect(s.getByRole('heading', { name: 'Just a picture' })).toBeInTheDocument()
@@ -134,10 +137,12 @@ describe('Editor preview', () => {
 })
 
 describe('hrefOf', () => {
-  const targets = (over: Partial<Targets> = {}): Targets => ({ settled: true, businesses: new Set(['acme']), products: new Set(['acme/chair']), byCategory: new Map(), ...over })
+  const targets = (over: Partial<Targets> = {}): Targets => ({ settled: true, businesses: new Set(['acme']), products: new Set(['acme/chair']), ...over })
 
   it('builds the address of each link kind, only through the URL helpers', () => {
     expect(hrefOf({ kind: 'apply' }, targets())).toBe('/apply')
+    expect(hrefOf({ kind: 'collection' }, targets(), 'sofas')).toBe('/collections/sofas')
+    expect(hrefOf({ kind: 'collection' }, targets())).toBeUndefined()
     expect(hrefOf({ kind: 'none' }, targets())).toBeUndefined()
     expect(hrefOf({ kind: 'product', businessSlug: 'acme', productSlug: 'chair' }, targets())).toBe('/products/acme/chair')
     expect(hrefOf({ kind: 'catalog', businessSlug: 'acme' }, targets())).toBe('/catalog/acme')

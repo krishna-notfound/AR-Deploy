@@ -75,6 +75,9 @@ export function tenantProductPath(p: ProductSluggable, opts?: { preview?: boolea
   return `/products/${p.slug}${opts?.preview ? '?preview=1' : ''}`
 }
 
+/** A landing collection's own public page (curated in the Website Editor), on the platform domain. */
+export const collectionPath = (slug: string): string => `/collections/${slug}`
+
 export function productLocalPath(b: Sluggable, p: ProductSluggable, opts?: { preview?: boolean }): string {
   return `/products/${b.slug}/${p.slug}${opts?.preview ? '?preview=1' : ''}`
 }

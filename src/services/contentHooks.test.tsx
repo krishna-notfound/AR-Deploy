@@ -2,7 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { emptySiteContent } from '@/domain/siteContent'
-import { SiteContentSourceContext, useContentDraft, usePublishedApplyForm, usePublishedChrome, usePublishedPage } from './contentHooks'
+import { SiteContentSourceContext, useContentDraft, useLandingFeatured, usePublishedApplyForm, usePublishedChrome, usePublishedCollection, usePublishedPage } from './contentHooks'
 import { content, unavailableContent } from './index'
 import { mockCatalogService } from './mock/mockCatalogService'
 import { mockContentService } from './mock/mockContent'
@@ -120,6 +120,33 @@ describe('published hooks', () => {
     await waitFor(() => expect(chrome.result.current.loading).toBe(false))
     expect(chrome.result.current.chrome).toBeNull()
     expect(chrome.result.current.error?.code).toBe('PERMISSION')
+  })
+
+  it('useLandingFeatured and usePublishedCollection read the published collections, never a later draft, and honour the draft source', async () => {
+    const ref = { businessSlug: 'acme', productSlug: 'chair' }
+    const col = (slug: string, over: Record<string, unknown> = {}) => ({ id: crypto.randomUUID(), slug, title: { en: slug }, image: 'lamp-vase', link: { kind: 'collection' as const }, products: [ref], ...over })
+    const doc = (cols: ReturnType<typeof col>[], featured?: typeof ref) => ({ ...emptySiteContent(), landing: { collections: cols, ...(featured ? { featured } : {}) } })
+
+    // Nothing published: no featured piece, every slug not found (the page then shows the built-in four).
+    const none = renderHook(() => ({ f: useLandingFeatured(), c: usePublishedCollection('sofas') }))
+    await waitFor(() => expect(none.result.current.f.loading).toBe(false))
+    expect(none.result.current.f.featured).toBeUndefined()
+    expect(none.result.current.c).toMatchObject({ collection: undefined, notFound: true })
+
+    await put(doc([col('mine'), col('secret', { hidden: true })], ref), true)
+    await put(doc([col('draft-only')], { businessSlug: 'acme', productSlug: 'other' }), false)
+    const pub = renderHook(() => ({ f: useLandingFeatured(), mine: usePublishedCollection('mine'), secret: usePublishedCollection('secret'), draftOnly: usePublishedCollection('draft-only') }))
+    await waitFor(() => expect(pub.result.current.f.loading).toBe(false))
+    expect(pub.result.current.f.featured).toEqual(ref)
+    expect(pub.result.current.mine.collection).toMatchObject({ slug: 'mine', products: [ref] })
+    expect(pub.result.current.mine.notFound).toBe(false)
+    expect(pub.result.current.secret).toMatchObject({ collection: undefined, notFound: true }) // hidden = no page
+    expect(pub.result.current.draftOnly.notFound).toBe(true)
+
+    const draft = renderHook(() => ({ f: useLandingFeatured(), c: usePublishedCollection('draft-only') }), { wrapper: draftSource })
+    await waitFor(() => expect(draft.result.current.f.loading).toBe(false))
+    expect(draft.result.current.f.featured).toEqual({ businessSlug: 'acme', productSlug: 'other' })
+    expect(draft.result.current.c.collection?.slug).toBe('draft-only')
   })
 
   it('useContentDraft returns the Editor state', async () => {

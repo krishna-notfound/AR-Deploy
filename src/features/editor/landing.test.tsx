@@ -5,7 +5,24 @@ import { App } from '@/app/App'
 import { emptySiteContent } from '@/domain/siteContent'
 import { content } from '@/services'
 import { mockCatalogService } from '@/services/mock/mockCatalogService'
-import { addCollection, canAddCollection, emptyLink, moveCollection, newCollection, removeCollection, setCollectionHidden, updateCollection, withLang } from './landingOps'
+import {
+  addCollection,
+  addCollectionProduct,
+  canAddCollection,
+  canAddProduct,
+  emptyLink,
+  moveCollection,
+  moveCollectionProduct,
+  newCollection,
+  removeCollection,
+  removeCollectionProduct,
+  setCollectionHidden,
+  setCollectionTitleEn,
+  setFeatured,
+  uniqueCollectionSlug,
+  updateCollection,
+  withLang,
+} from './landingOps'
 
 const open = () => {
   localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
@@ -43,8 +60,44 @@ describe('landingOps (pure edits)', () => {
     expect(updateCollection(doc, 'c3', (c) => ({ ...c, title: { en: 'X' } })).landing.collections[3]!.title.en).toBe('X')
     expect(removeCollection(doc, 'c4').landing.collections).toHaveLength(7)
     expect(emptyLink('catalog')).toEqual({ kind: 'catalog', businessSlug: '' })
+    expect(emptyLink('collection')).toEqual({ kind: 'collection' })
+    expect(newCollection('n')).toMatchObject({ slug: '', link: { kind: 'collection' }, products: [] })
     expect(withLang({ en: 'A', pt: 'B' }, 'pt', '  ')).toEqual({ en: 'A' }) // a blank Portuguese falls back to the English
     expect(withLang({ en: 'A' }, 'pt', 'B')).toEqual({ en: 'A', pt: 'B' })
+  })
+})
+
+describe('landingOps: slug, products, featured', () => {
+  const r = (n: number) => ({ businessSlug: 'acme', productSlug: `p${n}` })
+
+  it('the slug follows the English title until it is edited, and stays unique among the collections', () => {
+    let doc = addCollection(addCollection(emptySiteContent(), newCollection('a')), newCollection('b'))
+    doc = setCollectionTitleEn(doc, 'a', 'Sofás Glam')
+    expect(doc.landing.collections[0]).toMatchObject({ slug: 'sofas-glam', title: { en: 'Sofás Glam' } })
+    doc = setCollectionTitleEn(doc, 'b', 'Sofas Glam')
+    expect(doc.landing.collections[1]!.slug).toBe('sofas-glam-2')
+    doc = updateCollection(doc, 'a', (c) => ({ ...c, slug: 'mine' })) // edited by hand: the title no longer changes it
+    expect(setCollectionTitleEn(doc, 'a', 'Other').landing.collections[0]!.slug).toBe('mine')
+    expect(uniqueCollectionSlug(doc, 'x', '!!!')).toBe('')
+  })
+
+  it('adds products once, up to 24, moves and removes them', () => {
+    let doc = addCollection(emptySiteContent(), newCollection('a'))
+    for (let i = 0; i < 30; i++) doc = addCollectionProduct(doc, 'a', r(i))
+    expect(doc.landing.collections[0]!.products).toHaveLength(24)
+    expect(canAddProduct(doc.landing.collections[0]!)).toBe(false)
+    expect(addCollectionProduct(doc, 'a', r(0)).landing.collections[0]!.products).toHaveLength(24) // not twice
+    expect(moveCollectionProduct(doc, 'a', r(0), -1).landing.collections[0]!.products).toEqual(doc.landing.collections[0]!.products) // the first cannot go up
+    expect(moveCollectionProduct(doc, 'a', r(1), -1).landing.collections[0]!.products.slice(0, 2)).toEqual([r(1), r(0)])
+    expect(removeCollectionProduct(doc, 'a', r(5)).landing.collections[0]!.products).toHaveLength(23)
+  })
+
+  it('sets and clears the featured piece without touching the collections', () => {
+    const doc = addCollection(emptySiteContent(), newCollection('a'))
+    const set = setFeatured(doc, r(1))
+    expect(set.landing).toMatchObject({ featured: r(1) })
+    expect(set.landing.collections).toHaveLength(1)
+    expect('featured' in setFeatured(set, undefined).landing).toBe(false)
   })
 })
 
@@ -56,13 +109,56 @@ describe('Landing collections screen', () => {
     await waitFor(() => expect(start).toBeEnabled())
     await userEvent.click(start)
     const list = await screen.findByRole('list', { name: 'Collections, in the order the page shows them' })
-    const rows = within(list).getAllByRole('listitem')
+    const rows = within(list).getAllByRole('listitem').filter((r) => within(r).queryByText(/^Collection \d$/)) // the open card also lists its products
     expect(rows.map((r) => within(r).getByText(/^Collection \d$/).nextElementSibling?.textContent)).toEqual(['Sofas', 'Tables', 'Armchairs', 'Decor'])
     // Autosaved to the draft; each card links to a real catalogue.
     await waitFor(async () => expect(await savedDraft()).toHaveLength(4), { timeout: 6000 })
     const saved = await savedDraft()
     expect(saved.map((c) => c.title.pt)).toEqual(['Sofás', 'Mesas', 'Poltronas', 'Decoração'])
-    expect(saved.every((c) => c.link.kind === 'catalog' && c.link.businessSlug !== '')).toBe(true)
+    // Each card opens its own collection page (never a catalogue), is filled with the published products of its category.
+    expect(saved.map((c) => c.slug)).toEqual(['sofas', 'tables', 'armchairs', 'decor'])
+    expect(saved.every((c) => c.link.kind === 'collection')).toBe(true)
+    expect(saved[0]!.products.length).toBeGreaterThan(0)
+  })
+
+  it('picks the products of a collection (add, reorder, remove) and the featured 3D piece', { timeout: 60_000 }, async () => {
+    const published = await mockCatalogService.getProducts({ status: 'published' })
+    const businesses = await mockCatalogService.getBusinesses()
+    if (!published.ok || !businesses.ok) throw new Error('demo data')
+    const active = businesses.data.filter((b) => b.status === 'active')
+    const live = published.data.filter((p) => active.some((b) => b.id === p.businessId))
+    const withModel = live.find((p) => p.models.glb)!
+    const modelBusiness = active.find((b) => b.id === withModel.businessId)!
+
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a collection' }))
+    await userEvent.type(await screen.findByRole('textbox', { name: /Title \(English\)/ }), 'Pieces I like')
+    expect(screen.getByRole('textbox', { name: /Page address/ })).toHaveValue('pieces-i-like')
+
+    const add = screen.getByRole('combobox', { name: 'Add a product' })
+    await waitFor(() => expect(within(add).getAllByRole('option').length).toBeGreaterThan(2))
+    const options = within(add).getAllByRole('option').slice(1, 3)
+    await userEvent.selectOptions(add, options[0]!)
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Add a product' }), within(screen.getByRole('combobox', { name: 'Add a product' })).getAllByRole('option')[1]!)
+    expect(screen.getByText('2 of 24 products')).toBeInTheDocument()
+    await waitFor(async () => expect((await savedDraft())[0]!.products).toHaveLength(2), { timeout: 8000 })
+    const [first, second] = (await savedDraft())[0]!.products
+    // The only collection cannot move down, so the first enabled "down" button is the first product's.
+    await userEvent.click(screen.getAllByRole('button', { name: /^Move .* down$/ }).find((b) => !b.hasAttribute('disabled'))!)
+    await waitFor(async () => expect((await savedDraft())[0]!.products).toEqual([second, first]), { timeout: 8000 })
+    await userEvent.click(screen.getAllByRole('button', { name: /^Remove .* from the collection$/ })[0]!)
+    await waitFor(async () => expect((await savedDraft())[0]!.products).toEqual([first]), { timeout: 8000 })
+
+    // Featured piece: only products with a 3D model are listed.
+    const featured = screen.getByRole('combobox', { name: 'Featured 3D piece' })
+    const choices = within(featured).getAllByRole('option').slice(1)
+    expect(choices.length).toBeGreaterThan(0)
+    expect(choices.every((o) => o.textContent?.endsWith('Has 3D'))).toBe(true)
+    await userEvent.selectOptions(featured, choices.find((o) => o.textContent?.includes(`· ${modelBusiness.name}`))!)
+    await waitFor(async () => {
+      const s = await content.getContentDraft()
+      expect(s.ok && s.data.draft.landing.featured).toBeTruthy()
+    }, { timeout: 8000 })
   })
 
   it('adds a card, edits its texts, picks a picture and a published product, moves, hides and removes it', { timeout: 60_000 }, async () => {

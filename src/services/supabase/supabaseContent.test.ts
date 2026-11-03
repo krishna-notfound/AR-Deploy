@@ -50,7 +50,7 @@ describe('supabase content service: one rpc per method', () => {
         footerPages: [],
         social: {},
         landingCollections: [
-          { id: 'a', title: { en: 'Sofas', pt: 'Sofás' }, image: 'sofa-travertine', link: { kind: 'catalog', businessSlug: 'acme', category: 'sofa' }, junk: 1 },
+          { id: 'a', slug: 'sofas', products: [{ businessSlug: 'acme', productSlug: 'linden' }, 5], title: { en: 'Sofas', pt: 'Sofás' }, image: 'sofa-travertine', link: { kind: 'catalog', businessSlug: 'acme', category: 'sofa' }, junk: 1 },
           { id: 'b', title: { en: 'Hidden' }, image: 'lamp-vase', link: { kind: 'javascript', url: 'x' }, hidden: true },
         ],
       },
@@ -63,11 +63,17 @@ describe('supabase content service: one rpc per method', () => {
         footerPages: [],
         social: {},
         landingCollections: [
-          { id: 'a', title: { en: 'Sofas', pt: 'Sofás' }, image: 'sofa-travertine', link: { kind: 'catalog', businessSlug: 'acme', category: 'sofa' } },
-          { id: 'b', title: { en: 'Hidden' }, image: 'lamp-vase', link: { kind: 'none' }, hidden: true },
+          { id: 'a', slug: 'sofas', title: { en: 'Sofas', pt: 'Sofás' }, image: 'sofa-travertine', link: { kind: 'catalog', businessSlug: 'acme', category: 'sofa' }, products: [{ businessSlug: 'acme', productSlug: 'linden' }, { businessSlug: '', productSlug: '' }] },
+          { id: 'b', slug: '', title: { en: 'Hidden' }, image: 'lamp-vase', link: { kind: 'none' }, products: [], hidden: true },
         ],
       },
     })
+
+    // The featured 3D piece comes through when it is a pair of slugs, and is absent otherwise.
+    const featured = createSupabaseContent(fake({ get_published_site_content: { data: { version: 6, content: { footerPages: [], social: {}, landingCollections: [], landingFeatured: { businessSlug: 'acme', productSlug: 'linden', junk: 1 } } } } }).sb)
+    expect(await featured.getPublishedChrome()).toEqual({ ok: true, data: { version: 6, footerPages: [], social: {}, landingCollections: [], landingFeatured: { businessSlug: 'acme', productSlug: 'linden' } } })
+    const noFeatured = createSupabaseContent(fake({ get_published_site_content: { data: { version: 6, content: { footerPages: [], social: {}, landingCollections: [], landingFeatured: null } } } }).sb)
+    expect(await noFeatured.getPublishedChrome()).toEqual({ ok: true, data: { version: 6, footerPages: [], social: {}, landingCollections: [] } })
 
     const builtin = createSupabaseContent(fake({ get_published_site_content: { data: { version: 2, content: { kind: 'builtin', body: { pt: 'Termos' } } } } }).sb)
     expect(await builtin.getPublishedPage('terms')).toEqual({ ok: true, data: { kind: 'builtin', body: { pt: 'Termos' } } })

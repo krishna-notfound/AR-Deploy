@@ -2,7 +2,9 @@
 -- (`landing.collections`, at most 8). Three functions of migration `site_content` are replaced, with the same signatures and
 -- grants: the shape check (the array cap, so a draft save refuses a ninth card), the publish gate (what protects the live
 -- site: titles, link kinds, slugs, categories, photo keys) and the public read (part 'chrome' also returns the published
--- cards as `landingCollections`, hidden ones included; the page skips them). No tables, no new objects.
+-- cards as `landingCollections`, hidden ones included; the page skips them; and the featured 3D piece as `landingFeatured`
+-- when one is chosen). Each card has its own public page /collections/<slug> (owner decision 2026-11-03): its slug (unique)
+-- and its products (at most 24, named by business and product slug) are part of the card. No tables, no new objects.
 -- Rollback: supabase/rollback/20261103_landing_collections_rollback.sql
 -- Tests: supabase/tests/siteContent.test.ts (PGlite).
 -- NOT APPLIED to any project. Apply only with the owner's go-ahead (ADR-0042), then no `npm run db:types` is needed (no
@@ -68,8 +70,10 @@ revoke execute on function private.check_site_content_shape(jsonb) from public, 
 
 -- The publish gate: the shape, then the checks that protect the live site. Null when the document may be published.
 -- Slugs: ^[a-z0-9]+(-[a-z0-9]+)*$, 60 characters or fewer, unique, not reserved. Social values start with https://.
--- Landing cards: at most 8 (shape), unique ids, title.en 1..60 (pt 60), text 160, a known photo key, a link of kind
--- product (business and product slug), catalog (business slug, optional known category), apply or none.
+-- Landing cards: at most 8 (shape), unique ids, a unique slug, title.en 1..60 (pt 60), text 160, a known photo key, at most 24
+-- products (business and product slug each), a link of kind collection (the card's own page), product (business and
+-- product slug), catalog (business slug, optional known category), apply or none. landing.featured, when present: business
+-- and product slug.
 create or replace function private.validate_site_content(p jsonb)
 returns text
 language plpgsql
@@ -90,6 +94,10 @@ declare
   v_cols jsonb;
   v_link jsonb;
   v_ids text[] := '{}';
+  v_card_slugs text[] := '{}';
+  v_j integer;
+  v_prods jsonb;
+  v_ref jsonb;
   v_path text;
   v_f text;
   r record;
@@ -150,6 +158,40 @@ begin
       return v_path || '.id|duplicate_id';
     end if;
     v_ids := v_ids || (v_el ->> 'id');
+    if jsonb_typeof(v_el -> 'slug') is distinct from 'string' or (v_el ->> 'slug') = '' then
+      return v_path || '.slug|required';
+    end if;
+    if char_length(v_el ->> 'slug') > 60 then
+      return v_path || '.slug|too_long';
+    end if;
+    if (v_el ->> 'slug') !~ c_slug then
+      return v_path || '.slug|invalid_slug';
+    end if;
+    if (v_el ->> 'slug') = any (v_card_slugs) then
+      return v_path || '.slug|slug_duplicate';
+    end if;
+    v_card_slugs := v_card_slugs || (v_el ->> 'slug');
+    v_prods := coalesce(v_el -> 'products', '[]'::jsonb);
+    if jsonb_typeof(v_prods) <> 'array' then
+      return v_path || '.products|invalid_value';
+    end if;
+    if jsonb_array_length(v_prods) > 24 then
+      return v_path || '.products|too_many';
+    end if;
+    for v_j in 0 .. jsonb_array_length(v_prods) - 1 loop
+      v_ref := v_prods -> v_j;
+      if jsonb_typeof(v_ref) is distinct from 'object' then
+        return format('%s.products.%s|invalid_value', v_path, v_j);
+      end if;
+      foreach v_f in array array['businessSlug', 'productSlug'] loop
+        if jsonb_typeof(v_ref -> v_f) is distinct from 'string' or (v_ref ->> v_f) = '' then
+          return format('%s.products.%s.%s|required', v_path, v_j, v_f);
+        end if;
+        if char_length(v_ref ->> v_f) > 60 or (v_ref ->> v_f) !~ c_slug then
+          return format('%s.products.%s.%s|invalid_slug', v_path, v_j, v_f);
+        end if;
+      end loop;
+    end loop;
     if jsonb_typeof(v_el -> 'title' -> 'en') is distinct from 'string' or btrim(v_el -> 'title' ->> 'en') = '' then
       return v_path || '.title.en|required';
     end if;
@@ -172,7 +214,7 @@ begin
     end if;
     v_link := v_el -> 'link';
     if jsonb_typeof(v_link) is distinct from 'object' or jsonb_typeof(v_link -> 'kind') is distinct from 'string'
-       or (v_link ->> 'kind') <> all (array['product', 'catalog', 'apply', 'none']) then
+       or (v_link ->> 'kind') <> all (array['collection', 'product', 'catalog', 'apply', 'none']) then
       return v_path || '.link|invalid_value';
     end if;
     if (v_link ->> 'kind') in ('product', 'catalog') then
@@ -190,6 +232,22 @@ begin
       end if;
     end if;
   end loop;
+
+  -- landing.featured (the piece "Open a live piece in 3D" opens)
+  if p -> 'landing' ? 'featured' then
+    v_ref := p -> 'landing' -> 'featured';
+    if jsonb_typeof(v_ref) is distinct from 'object' then
+      return 'landing.featured|invalid_value';
+    end if;
+    foreach v_f in array array['businessSlug', 'productSlug'] loop
+      if jsonb_typeof(v_ref -> v_f) is distinct from 'string' or (v_ref ->> v_f) = '' then
+        return 'landing.featured.' || v_f || '|required';
+      end if;
+      if char_length(v_ref ->> v_f) > 60 or (v_ref ->> v_f) !~ c_slug then
+        return 'landing.featured.' || v_f || '|invalid_slug';
+      end if;
+    end loop;
+  end if;
   return null;
 end;
 $$;
@@ -226,7 +284,9 @@ begin
           from jsonb_array_elements(case when jsonb_typeof(v_pub -> 'customPages') = 'array' then v_pub -> 'customPages' else '[]'::jsonb end) pg
          where pg -> 'showInFooter' = 'true'::jsonb),
       'social', case when jsonb_typeof(v_pub -> 'social') = 'object' then v_pub -> 'social' else '{}'::jsonb end,
-      'landingCollections', case when jsonb_typeof(v_pub -> 'landing' -> 'collections') = 'array' then v_pub -> 'landing' -> 'collections' else '[]'::jsonb end);
+      'landingCollections', case when jsonb_typeof(v_pub -> 'landing' -> 'collections') = 'array' then v_pub -> 'landing' -> 'collections' else '[]'::jsonb end)
+      || case when jsonb_typeof(v_pub -> 'landing' -> 'featured') = 'object'
+              then jsonb_build_object('landingFeatured', v_pub -> 'landing' -> 'featured') else '{}'::jsonb end;
   elsif p_part = 'apply' then
     v_content := case when jsonb_typeof(v_pub -> 'applyForm') = 'object' then v_pub -> 'applyForm' end;
   else
