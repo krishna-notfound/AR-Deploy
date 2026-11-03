@@ -134,9 +134,10 @@ function Eyebrow({ children, className }: { children: ReactNode; className?: str
 function Hero() {
   const { t } = useI18n()
   return (
-    <section className={cn(SECTION, 'pt-5 sm:pt-10')} aria-labelledby="hero-title">
-      <div className="grid border border-line bg-surface lg:min-h-[600px] lg:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <div className="order-2 flex flex-col justify-center px-6 py-10 sm:px-12 sm:py-14 lg:order-1 lg:px-12 lg:py-16 xl:px-14">
+    <section aria-labelledby="hero-title">
+      {/* Full-bleed: edge to edge, and on large screens fills the viewport below the 80px header. */}
+      <div className="grid border-b border-line bg-surface lg:min-h-[calc(100dvh-5rem)] lg:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="order-2 flex flex-col justify-center px-5 py-10 sm:px-10 sm:py-14 lg:order-1 lg:px-16 lg:py-16 xl:px-24">
           <Eyebrow>{t('landing.hero.eyebrow')}</Eyebrow>
           <h1 id="hero-title" className="mt-5 text-display text-ink">
             <TwoLines a={t('landing.hero.title1')} b={t('landing.hero.title2')} italic />
