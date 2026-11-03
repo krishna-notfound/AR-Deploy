@@ -31,6 +31,8 @@ const LANDING_FIELD_KEYS: Record<string, TranslationKey> = {
   'text.en': 'editor.field.bodyEn',
   'text.pt': 'editor.field.bodyPt',
   image: 'editor.landing.picture',
+  slug: 'editor.landing.slug',
+  products: 'editor.landing.products',
   link: 'editor.landing.link',
   'link.businessSlug': 'editor.landing.business',
   'link.productSlug': 'editor.landing.product',
@@ -54,6 +56,7 @@ export function describeProblem(path: string, key: string, draft: SiteContent, t
   if (parts[0] === 'landing') {
     const card = parts[1] === 'collections' && parts[2] !== undefined ? draft.landing.collections[Number(parts[2])] : undefined
     const where = t('editor.menu.landing')
+    if (parts[1] === 'featured') return { path, what, where: `${where}: ${t('editor.landing.featured')}`, to: editorLandingPath() }
     if (!card) return { path, what, where, to: editorLandingPath() }
     const field = LANDING_FIELD_KEYS[parts.slice(3).join('.')]
     const name = card.title.en.trim() || t('editor.landing.untitled')

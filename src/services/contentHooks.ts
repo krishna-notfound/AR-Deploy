@@ -11,7 +11,7 @@
 // `error` is a failed read, which is not the same thing: show the built-in text and a retry line (spec 9). In draft mode
 // reading needs content.manage, like the Editor itself.
 import { createContext, useContext } from 'react'
-import type { ApplyFormConfig } from '@/domain/siteContent'
+import type { ApplyFormConfig, LandingCollection, ProductRef } from '@/domain/siteContent'
 import { type Result, ok } from './catalogService'
 import type { ServiceError } from './catalogService'
 import { content } from './index'
@@ -49,6 +49,23 @@ export function usePublishedPage(slug: string): { page: PublishedPage | null; lo
   const notFound = raw.status === 'error' && raw.error.code === 'NOT_FOUND'
   const q = reads(raw)
   return { page: q.data, loading: q.loading, error: notFound ? null : q.error, notFound, reload: q.reload }
+}
+
+/** The product the landing page's "Open a live piece in 3D" opens (chosen in the Editor), or undefined when none was chosen. */
+export function useLandingFeatured(): { featured?: ProductRef; loading: boolean } {
+  const { chrome, loading } = usePublishedChrome()
+  return { featured: chrome?.landingFeatured, loading }
+}
+
+/**
+ * A published (not hidden) landing collection by its slug, for /collections/:slug. `notFound` is true once the read has
+ * finished and there is no such collection (this includes the built-in four before anything is published: the page
+ * then shows its own built-in version).
+ */
+export function usePublishedCollection(slug: string): { collection?: LandingCollection; loading: boolean; notFound: boolean } {
+  const { chrome, loading } = usePublishedChrome()
+  const collection = chrome?.landingCollections.find((c) => c.slug === slug && !c.hidden)
+  return { collection, loading, notFound: !loading && !collection }
 }
 
 export function usePublishedApplyForm(): { config: ApplyFormConfig | null; version: number; loading: boolean; error: ServiceError | null; reload: () => void } {

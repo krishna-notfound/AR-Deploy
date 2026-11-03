@@ -54,7 +54,7 @@ export const enEditor = {
 
   // Landing collections
   'editor.landing.description':
-    'The cards under "Collections" on the landing page. Use them to show a furniture business, in a few seconds, what Sanctus does: 3D and AR catalogues. Up to {max} cards; each one can open a product, a catalogue or the application form.',
+    'The cards under "Collections" on the landing page. Use them to show a furniture business, in a few seconds, what Sanctus does: 3D and AR catalogues. Up to {max} cards; each one opens its own collection page with the products you choose (or, if you prefer, a product, a business catalogue or the application form).',
   'editor.landing.empty': 'No cards yet. The landing page shows its four built-in collections (Sofas, Tables, Armchairs, Decor) until you publish your own.',
   'editor.landing.startFromCurrent': 'Start from the current collections',
   'editor.landing.add': 'Add a collection',
@@ -92,6 +92,26 @@ export const enEditor = {
   'editor.landing.linkMissing.product': 'product',
   'editor.landing.linkMissing.business': 'business',
   'editor.landing.dataError': 'The products and businesses could not be loaded.',
+  'editor.landing.link.collection': "Open the collection's own page",
+  'editor.landing.slug': 'Page address',
+  'editor.landing.slugHint': 'The collection opens at /collections/{slug}. Made from the English title; lowercase letters, numbers and hyphens.',
+  'editor.landing.products': 'Products in this collection',
+  'editor.landing.productsHelp': 'Choose published products from any business, up to {max}. The collection page shows them in this order.',
+  'editor.landing.productsCount': '{n} of {max} products',
+  'editor.landing.productsAdd': 'Add a product',
+  'editor.landing.productsAddPick': 'Choose a product to add',
+  'editor.landing.productsNone': 'No products yet. The collection page says "Pieces coming soon" until you add some.',
+  'editor.landing.productsFull': 'The limit of {max} products is reached.',
+  'editor.landing.productsGone': 'No longer published: visitors do not see it.',
+  'editor.landing.productMoveUp': 'Move {name} up',
+  'editor.landing.productMoveDown': 'Move {name} down',
+  'editor.landing.productRemove': 'Remove {name} from the collection',
+  'editor.landing.featured': 'Featured 3D piece',
+  'editor.landing.featuredHelp': 'The piece "Open a live piece in 3D" opens on the landing page. Only published products with a 3D model are listed.',
+  'editor.landing.featuredPick': 'Let the page choose',
+  'editor.landing.featuredEmpty': 'No published product has a 3D model yet.',
+  'editor.landing.featuredGone': 'This product is no longer published or has no 3D model. Choose another.',
+  'editor.landing.has3d': 'Has 3D',
   'editor.landing.previewHint': 'Use Preview at the top to see the whole landing page with this draft.',
 
   // History

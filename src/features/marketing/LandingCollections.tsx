@@ -1,16 +1,13 @@
 import { ArrowRight } from 'lucide-react'
 import { type ReactNode, useMemo } from 'react'
 import { Link } from 'react-router'
-import { arrowLinkClasses } from '@/components/ui/Button'
 import type { LandingCollection, LandingCollectionLink } from '@/domain/siteContent'
-import type { Category } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
-import { APPLY_PATH, catalogLocalPath, productLocalPath } from '@/lib/urls'
+import { APPLY_PATH, catalogLocalPath, collectionPath, productLocalPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { TAP_TARGET } from '../public/tapTarget'
 import { BUILTIN_COLLECTIONS } from './landingBuiltin'
 import { landingImage } from './landingImages'
 import { useSiteContent } from './SiteContentProvider'
@@ -39,9 +36,6 @@ export interface Targets {
   businesses: ReadonlySet<string>
   /** `<business slug>/<product slug>` of published products of active businesses. */
   products: ReadonlySet<string>
-  /** The first catalogue and, per category, the first catalogue that has a published product of it. */
-  firstCatalog?: string
-  byCategory: ReadonlyMap<Category, string>
 }
 
 /** Published products and active catalogues, loaded once for the section. */
@@ -55,22 +49,20 @@ function useTargets(): Targets {
       .filter((p) => active.has(p.businessId) && primaryImage(p))
       .map((p) => ({ product: p, business: active.get(p.businessId)! }))
       .sort((a, b) => a.business.name.localeCompare(b.business.name) || a.product.name.en.localeCompare(b.product.name.en))
-    const byCategory = new Map<Category, string>()
-    for (const i of items) if (!byCategory.has(i.product.category)) byCategory.set(i.product.category, i.business.slug)
     const names = [...active.values()].sort((a, b) => a.name.localeCompare(b.name))
     return {
       settled: products.status !== 'loading' && catalogs.status !== 'loading',
       businesses: new Set(names.map((b) => b.slug)),
       products: new Set(items.map((i) => `${i.business.slug}/${i.product.slug}`)),
-      firstCatalog: items[0]?.business.slug,
-      byCategory,
     }
   }, [products.data, products.status, catalogs.data, catalogs.status])
 }
 
 /** The address of an Editor card's link. A link to a product or catalogue that is gone (once the lists have loaded) is dropped, so a card never leads to an error page. */
-export function hrefOf(link: LandingCollectionLink, targets: Targets): string | undefined {
+export function hrefOf(link: LandingCollectionLink, targets: Targets, slug?: string): string | undefined {
   switch (link.kind) {
+    case 'collection':
+      return slug ? collectionPath(slug) : undefined
     case 'apply':
       return APPLY_PATH
     case 'product':
@@ -82,13 +74,11 @@ export function hrefOf(link: LandingCollectionLink, targets: Targets): string | 
   }
 }
 
-/** The built-in cards: the category's catalogue when one has it, else the first catalogue unfiltered, else no link. */
-function builtinCards(t: ReturnType<typeof useI18n>['t'], targets: Targets): CardView[] {
+/** The built-in cards: each opens its own collection page (/collections/sofas, ...), never a business catalogue. */
+function builtinCards(t: ReturnType<typeof useI18n>['t']): CardView[] {
   return BUILTIN_COLLECTIONS.map((c) => {
-    const withCategory = targets.byCategory.get(c.category)
-    const href = withCategory ? catalogLocalPath({ slug: withCategory }, { category: c.category }) : targets.firstCatalog ? catalogLocalPath({ slug: targets.firstCatalog }) : undefined
     const img = landingImage(c.image)
-    return { id: c.key, title: t(`landing.col.${c.key}`), text: t(`landing.col.${c.key}Body`), image: img?.src ?? '', focus: img?.focus, href }
+    return { id: c.key, title: t(`landing.col.${c.key}`), text: t(`landing.col.${c.key}Body`), image: img?.src ?? '', focus: img?.focus, href: collectionPath(c.key) }
   })
 }
 
@@ -99,7 +89,7 @@ function editorCards(list: LandingCollection[], localized: ReturnType<typeof use
     .flatMap((c) => {
       const img = landingImage(c.image)
       if (!img) return [] // an unknown photo key is never published (the database refuses it); skip rather than show a broken card
-      return [{ id: c.id, title: localized(c.title), text: c.text ? localized(c.text) || undefined : undefined, image: img.src, focus: img.focus, href: hrefOf(c.link, targets) }]
+      return [{ id: c.id, title: localized(c.title), text: c.text ? localized(c.text) || undefined : undefined, image: img.src, focus: img.focus, href: hrefOf(c.link, targets, c.slug) }]
     })
 }
 
@@ -121,7 +111,7 @@ export function LandingCollections() {
   const targets = useTargets()
   const published = chrome?.landingCollections ?? []
   const cards = useMemo(
-    () => (published.length > 0 ? editorCards(published, localized, targets) : builtinCards(t, targets)),
+    () => (published.length > 0 ? editorCards(published, localized, targets) : builtinCards(t)),
     // `localized` and `t` change with the language.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [published, targets, lang],
@@ -130,7 +120,7 @@ export function LandingCollections() {
   return (
     <section id="colecoes" className="scroll-mt-24" aria-labelledby="col-title">
       <div className={cn(SECTION, 'py-20 lg:py-28')}>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] lg:items-end lg:gap-14">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-end lg:gap-14">
           <div>
             <p className="text-eyebrow text-accent-ink">{t('landing.col.eyebrow')}</p>
             <h2 id="col-title" className="mt-4 text-headline">
@@ -138,12 +128,6 @@ export function LandingCollections() {
             </h2>
           </div>
           <p className="max-w-xl text-[15px] leading-7 text-ink-muted">{t('landing.col.body')}</p>
-          {targets.firstCatalog && (
-            <Link to={catalogLocalPath({ slug: targets.firstCatalog })} className={cn(arrowLinkClasses, TAP_TARGET, 'justify-self-start text-ink lg:justify-self-end')}>
-              {t('landing.col.all')}
-              <ArrowRight className="size-3.5 transition-transform group-hover/arrow:translate-x-0.5" strokeWidth={1.5} aria-hidden />
-            </Link>
-          )}
         </div>
         <hr className="mt-10 border-line lg:mt-14" />
         {cards.length > 0 && (

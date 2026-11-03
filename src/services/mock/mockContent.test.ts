@@ -106,7 +106,8 @@ describe('mock content service', () => {
 
   it('landing collections: a draft with cards is not public until published; publish carries them; more than eight cannot be saved; a bad card cannot be published', async () => {
     const s = data(await svc.getContentDraft())
-    const card = (title: string, over: Record<string, unknown> = {}) => ({ id: crypto.randomUUID(), title: { en: title }, image: 'lamp-vase', link: { kind: 'apply' }, ...over }) as never
+    let n = 0
+    const card = (title: string, over: Record<string, unknown> = {}) => ({ id: crypto.randomUUID(), slug: `card-${++n}`, products: [], title: { en: title }, image: 'lamp-vase', link: { kind: 'apply' }, ...over }) as never
     const cards = [card('First'), card('Second', { hidden: true })]
     const saved = data(await svc.saveContentDraft(doc((x) => void (x.landing.collections = cards)), s.draftUpdatedAt))
     expect(data(await svc.getPublishedChrome()).landingCollections).toEqual([])

@@ -1,9 +1,10 @@
 // Pure edits of the landing collections of a SiteContent document, used by the Landing collections screen (ADR-0046).
-import { type LandingCollection, type LandingCollectionLink, MAX_LANDING_COLLECTIONS, type SiteContent } from '@/domain/siteContent'
+import { type LandingCollection, type LandingCollectionLink, MAX_COLLECTION_PRODUCTS, MAX_LANDING_COLLECTIONS, type ProductRef, type SiteContent } from '@/domain/siteContent'
+import { slugify } from '@/lib/slug'
 
-/** A new card at the end: no title yet (publishing needs one), the first built-in photo, no link. */
+/** A new card at the end: no title or slug yet (publishing needs them), the first built-in photo, its own page as the link, no products. */
 export function newCollection(id: string = crypto.randomUUID()): LandingCollection {
-  return { id, title: { en: '' }, image: 'hero-living', link: { kind: 'none' } }
+  return { id, slug: '', title: { en: '' }, image: 'hero-living', link: { kind: 'collection' }, products: [] }
 }
 
 export function canAddCollection(doc: SiteContent): boolean {
@@ -38,6 +39,50 @@ export const setCollectionHidden = (doc: SiteContent, id: string, hidden: boolea
     const { hidden: _old, ...rest } = c
     return hidden ? { ...rest, hidden: true } : rest
   })
+
+/** A slug from `base` that no other collection uses (-2, -3, ... appended). Empty when the title gives no letters. */
+export function uniqueCollectionSlug(doc: SiteContent, id: string, base: string): string {
+  const root = slugify(base)
+  if (!root) return ''
+  const taken = new Set(doc.landing.collections.filter((c) => c.id !== id).map((c) => c.slug))
+  let slug = root
+  for (let n = 2; taken.has(slug); n++) slug = `${root.slice(0, 56)}-${n}`
+  return slug
+}
+
+/** Sets the English title; while the slug is empty or still the one made from the old title, it follows the title. */
+export const setCollectionTitleEn = (doc: SiteContent, id: string, text: string): SiteContent =>
+  updateCollection(doc, id, (c) => {
+    const follows = c.slug === '' || c.slug === uniqueCollectionSlug(doc, id, c.title.en)
+    return { ...c, title: withLang(c.title, 'en', text), slug: follows ? uniqueCollectionSlug(doc, id, text) : c.slug }
+  })
+
+export const sameRef = (a: ProductRef, b: ProductRef): boolean => a.businessSlug === b.businessSlug && a.productSlug === b.productSlug
+
+export const canAddProduct = (c: LandingCollection): boolean => c.products.length < MAX_COLLECTION_PRODUCTS
+
+export const addCollectionProduct = (doc: SiteContent, id: string, ref: ProductRef): SiteContent =>
+  updateCollection(doc, id, (c) => (canAddProduct(c) && !c.products.some((p) => sameRef(p, ref)) ? { ...c, products: [...c.products, ref] } : c))
+
+export const removeCollectionProduct = (doc: SiteContent, id: string, ref: ProductRef): SiteContent =>
+  updateCollection(doc, id, (c) => ({ ...c, products: c.products.filter((p) => !sameRef(p, ref)) }))
+
+/** Moves a product one place up or down inside its collection. */
+export const moveCollectionProduct = (doc: SiteContent, id: string, ref: ProductRef, dir: -1 | 1): SiteContent =>
+  updateCollection(doc, id, (c) => {
+    const list = [...c.products]
+    const from = list.findIndex((p) => sameRef(p, ref))
+    const to = from + dir
+    if (from < 0 || to < 0 || to >= list.length) return c
+    ;[list[from], list[to]] = [list[to]!, list[from]!]
+    return { ...c, products: list }
+  })
+
+/** The featured 3D piece of the landing page; `undefined` clears it. */
+export function setFeatured(doc: SiteContent, ref: ProductRef | undefined): SiteContent {
+  const { featured: _old, ...rest } = doc.landing
+  return { ...doc, landing: ref ? { ...rest, featured: ref } : rest }
+}
 
 /** The link of a new kind, empty where the person must still choose (publishing is blocked until they do). */
 export function emptyLink(kind: LandingCollectionLink['kind']): LandingCollectionLink {

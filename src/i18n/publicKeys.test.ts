@@ -31,6 +31,7 @@ const ROOTS = [
   'features/apply/ApplyPage.tsx',
   'features/legal/LegalPage.tsx',
   'features/legal/CustomPage.tsx',
+  'features/marketing/CollectionPage.tsx',
   'features/join/JoinPage.tsx',
   'features/public/CatalogPage.tsx',
   'features/public/ProductPage.tsx',

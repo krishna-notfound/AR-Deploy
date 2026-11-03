@@ -1,28 +1,56 @@
-import { ArrowDown, ArrowUp, ChevronDown, Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, Eye, EyeOff, Plus, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FormField, Input, Select, Textarea } from '@/components/ui/Form'
 import { InlineNotice } from '@/components/ui/States'
-import { LANDING_IMAGE_KEYS, type LandingCollection, type LandingCollectionLink, MAX_COLLECTION_TEXT, MAX_COLLECTION_TITLE, MAX_LANDING_COLLECTIONS } from '@/domain/siteContent'
+import {
+  LANDING_IMAGE_KEYS,
+  type LandingCollection,
+  type LandingCollectionLink,
+  MAX_COLLECTION_PRODUCTS,
+  MAX_COLLECTION_TEXT,
+  MAX_COLLECTION_TITLE,
+  MAX_LANDING_COLLECTIONS,
+  type ProductRef,
+} from '@/domain/siteContent'
 import { CATEGORIES, type Category } from '@/domain/types'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { primaryImage } from '@/lib/product'
+import { slugInput } from '@/lib/slug'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { builtinAsCollections } from '../marketing/landingBuiltin'
+import { BUILTIN_COLLECTIONS, builtinAsCollections } from '../marketing/landingBuiltin'
 import { LANDING_IMAGES, landingImage } from '../marketing/landingImages'
 import { useEditor } from './EditorContext'
-import { addCollection, canAddCollection, emptyLink, moveCollection, newCollection, removeCollection, replaceCollections, setCollectionHidden, updateCollection, withLang } from './landingOps'
+import {
+  addCollection,
+  addCollectionProduct,
+  canAddCollection,
+  canAddProduct,
+  emptyLink,
+  moveCollection,
+  moveCollectionProduct,
+  newCollection,
+  removeCollection,
+  removeCollectionProduct,
+  replaceCollections,
+  setCollectionHidden,
+  setCollectionTitleEn,
+  setFeatured,
+  updateCollection,
+  withLang,
+} from './landingOps'
 
 /** What a card may open: active businesses, and the published products of those. */
 interface Choices {
   loading: boolean
   failed: boolean
   businesses: { slug: string; name: string }[]
-  products: { value: string; label: string; businessSlug: string; productSlug: string; category: Category }[]
+  products: { value: string; label: string; name: string; businessName: string; image?: string; hasModel: boolean; businessSlug: string; productSlug: string; category: Category }[]
 }
 
 function useChoices(): Choices {
@@ -35,7 +63,17 @@ function useChoices(): Choices {
       .filter((p) => active.has(p.businessId))
       .map((p) => {
         const b = active.get(p.businessId)!
-        return { value: `${b.slug}/${p.slug}`, label: `${localized(p.name)} · ${b.name}`, businessSlug: b.slug, productSlug: p.slug, category: p.category }
+        return {
+          value: `${b.slug}/${p.slug}`,
+          label: `${localized(p.name)} · ${b.name}`,
+          name: localized(p.name),
+          businessName: b.name,
+          image: primaryImage(p)?.url,
+          hasModel: !!p.models.glb,
+          businessSlug: b.slug,
+          productSlug: p.slug,
+          category: p.category,
+        }
       })
       .sort((a, b) => a.label.localeCompare(b.label))
     return {
@@ -63,10 +101,11 @@ export default function LandingScreen() {
     setOpenId(card.id)
   }
   const startFromCurrent = () => {
-    // Each built-in card opens the first catalogue that has that category, as the page does today.
-    const cards = builtinAsCollections((c) => {
-      const hit = choices.products.find((p) => p.category === c.category) ?? choices.products[0]
-      return hit ? { kind: 'catalog', businessSlug: hit.businessSlug, ...(choices.products.some((p) => p.category === c.category) ? { category: c.category } : {}) } : { kind: 'none' }
+    // Each built-in card opens its own collection page, filled with the published products of that category.
+    const cards = builtinAsCollections().map((card) => {
+      const category = BUILTIN_COLLECTIONS.find((c) => c.key === card.slug)?.category
+      const products = choices.products.filter((p) => p.category === category).slice(0, MAX_COLLECTION_PRODUCTS).map((p) => ({ businessSlug: p.businessSlug, productSlug: p.productSlug }))
+      return { ...card, products }
     })
     setDraft((d) => replaceCollections(d, cards))
     setOpenId(cards[0]?.id ?? null)
@@ -92,6 +131,8 @@ export default function LandingScreen() {
           </Button>
         </div>
       </div>
+
+      <FeaturedPicker choices={choices} />
 
       {choices.failed && (
         <InlineNotice tone="warning" className="mt-4">
@@ -199,7 +240,7 @@ function CardEditor({
         <div id={panelId} className="space-y-6 border-t border-line p-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label={t('editor.field.titleEn')} required error={err('title.en')} hint={t('editor.landing.titleLimit', { max: MAX_COLLECTION_TITLE })}>
-              <Input value={card.title.en} onChange={(e) => patch((c) => ({ ...c, title: withLang(c.title, 'en', e.target.value) }))} />
+              <Input value={card.title.en} onChange={(e) => setDraft((d) => setCollectionTitleEn(d, card.id, e.target.value))} />
             </FormField>
             <FormField label={t('editor.field.titlePt')} optional={t('common.optional')} error={err('title.pt')} hint={t('editor.landing.ptHint')}>
               <Input value={card.title.pt ?? ''} onChange={(e) => patch((c) => ({ ...c, title: withLang(c.title, 'pt', e.target.value) }))} />
@@ -212,7 +253,13 @@ function CardEditor({
             </FormField>
           </div>
 
+          <FormField label={t('editor.landing.slug')} required error={err('slug')} hint={t('editor.landing.slugHint', { slug: card.slug || '…' })}>
+            <Input value={card.slug} maxLength={60} spellCheck={false} onChange={(e) => patch((c) => ({ ...c, slug: slugInput(e.target.value, 60) }))} />
+          </FormField>
+
           <PicturePicker value={card.image} error={err('image')} onChange={(image) => patch((c) => ({ ...c, image }))} />
+
+          <ProductsPicker card={card} choices={choices} error={err('products')} />
 
           <LinkPicker link={card.link} choices={choices} errors={{ kind: err('link'), business: err('link.businessSlug'), product: err('link.productSlug'), category: err('link.category') }} onChange={(link) => patch((c) => ({ ...c, link }))} />
         </div>
@@ -256,7 +303,7 @@ function PicturePicker({ value, error, onChange }: { value: string; error?: stri
   )
 }
 
-const KINDS: LandingCollectionLink['kind'][] = ['product', 'catalog', 'apply', 'none']
+const KINDS: LandingCollectionLink['kind'][] = ['collection', 'product', 'catalog', 'apply', 'none']
 
 function LinkPicker({
   link,
@@ -342,6 +389,131 @@ function LinkPicker({
               ))}
             </Select>
           </FormField>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The thumbnail, name and business of a product, for the pickers. */
+function ProductLine({ image, name, businessName, hasModel }: { image?: string; name: string; businessName: string; hasModel?: boolean }) {
+  const { t } = useI18n()
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-3">
+      {image ? <img src={image} alt="" width={40} height={40} className="size-10 shrink-0 bg-subtle object-cover" /> : <span className="size-10 shrink-0 bg-subtle" aria-hidden />}
+      <span className="min-w-0">
+        <span className="block truncate text-ui-body font-medium text-ink">{name}</span>
+        <span className="block truncate text-ui-small text-ink-muted">{businessName}</span>
+      </span>
+      {hasModel && <Badge tone="success">{t('editor.landing.has3d')}</Badge>}
+    </span>
+  )
+}
+
+/** The products the collection's own page shows: added from the published products of all businesses, reordered, removed. */
+function ProductsPicker({ card, choices, error }: { card: LandingCollection; choices: Choices; error?: string }) {
+  const { t } = useI18n()
+  const { setDraft } = useEditor()
+  const known = new Map(choices.products.map((p) => [p.value, p]))
+  const keyOf = (r: ProductRef) => `${r.businessSlug}/${r.productSlug}`
+  const full = !canAddProduct(card)
+  const available = choices.products.filter((p) => !card.products.some((r) => keyOf(r) === p.value))
+  const gone = !choices.loading && !choices.failed
+  return (
+    <fieldset>
+      <legend className="text-ui-small font-medium text-ink">{t('editor.landing.products')}</legend>
+      <p className="mt-0.5 text-ui-small text-ink-muted">{t('editor.landing.productsHelp', { max: MAX_COLLECTION_PRODUCTS })}</p>
+      {card.products.length === 0 ? (
+        <p className="mt-3 text-ui-small text-ink-muted">{t('editor.landing.productsNone')}</p>
+      ) : (
+        <ol className="mt-3 space-y-2">
+          {card.products.map((r, i) => {
+            const hit = known.get(keyOf(r))
+            const name = hit?.name ?? keyOf(r)
+            return (
+              <li key={keyOf(r)} className="flex flex-wrap items-center gap-2 border border-line p-2">
+                <ProductLine image={hit?.image} name={name} businessName={hit?.businessName ?? (gone ? t('editor.landing.productsGone') : '')} />
+                <span className="flex shrink-0 gap-1">
+                  <Button size="sm" aria-label={t('editor.landing.productMoveUp', { name })} disabled={i === 0} onClick={() => setDraft((d) => moveCollectionProduct(d, card.id, r, -1))}>
+                    <ArrowUp className="size-4" aria-hidden />
+                  </Button>
+                  <Button size="sm" aria-label={t('editor.landing.productMoveDown', { name })} disabled={i === card.products.length - 1} onClick={() => setDraft((d) => moveCollectionProduct(d, card.id, r, 1))}>
+                    <ArrowDown className="size-4" aria-hidden />
+                  </Button>
+                  <Button size="sm" variant="danger" aria-label={t('editor.landing.productRemove', { name })} onClick={() => setDraft((d) => removeCollectionProduct(d, card.id, r))}>
+                    <X className="size-4" aria-hidden />
+                  </Button>
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Select
+          aria-label={t('editor.landing.productsAdd')}
+          value=""
+          disabled={full || available.length === 0}
+          onChange={(e) => {
+            const hit = choices.products.find((p) => p.value === e.target.value)
+            if (hit) setDraft((d) => addCollectionProduct(d, card.id, { businessSlug: hit.businessSlug, productSlug: hit.productSlug }))
+          }}
+          className="max-w-md"
+        >
+          <option value="">{t('editor.landing.productsAddPick')}</option>
+          {available.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </Select>
+        <span className="text-ui-small text-ink-muted">{full ? t('editor.landing.productsFull', { max: MAX_COLLECTION_PRODUCTS }) : t('editor.landing.productsCount', { n: card.products.length, max: MAX_COLLECTION_PRODUCTS })}</span>
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-ui-small text-danger">
+          {error}
+        </p>
+      )}
+    </fieldset>
+  )
+}
+
+/** The piece the landing page's "Open a live piece in 3D" opens: a published product that has a 3D model. */
+function FeaturedPicker({ choices }: { choices: Choices }) {
+  const { t } = useI18n()
+  const { draft, setDraft, errors } = useEditor()
+  const featured = draft.landing.featured
+  const value = featured ? `${featured.businessSlug}/${featured.productSlug}` : ''
+  const withModel = choices.products.filter((p) => p.hasModel)
+  const current = withModel.find((p) => p.value === value)
+  const missing = !!featured && !choices.loading && !choices.failed && !current
+  const err = errors['landing.featured.businessSlug'] ?? errors['landing.featured.productSlug']
+  return (
+    <div className="mt-6 border border-line bg-surface p-4">
+      <FormField
+        label={t('editor.landing.featured')}
+        error={err ? t(`editor.err.${err}` as TranslationKey) : missing ? t('editor.landing.featuredGone') : undefined}
+        hint={!choices.loading && !choices.failed && withModel.length === 0 ? t('editor.landing.featuredEmpty') : t('editor.landing.featuredHelp')}
+      >
+        <Select
+          value={value}
+          onChange={(e) => {
+            const hit = withModel.find((p) => p.value === e.target.value)
+            setDraft((d) => setFeatured(d, hit ? { businessSlug: hit.businessSlug, productSlug: hit.productSlug } : undefined))
+          }}
+        >
+          <option value="">{t('editor.landing.featuredPick')}</option>
+          {missing && <option value={value}>{value}</option>}
+          {withModel.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label} · {t('editor.landing.has3d')}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+      {current && (
+        <div className="mt-3">
+          <ProductLine image={current.image} name={current.name} businessName={current.businessName} hasModel />
         </div>
       )}
     </div>

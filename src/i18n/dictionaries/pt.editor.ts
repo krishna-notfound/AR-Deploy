@@ -55,7 +55,7 @@ export const ptEditor: Partial<Record<TranslationKey, string>> = {
 
   // Landing collections
   'editor.landing.description':
-    'Os cartões em «Coleções» na página inicial. Use-os para mostrar, em poucos segundos, a uma empresa de mobiliário o que a Sanctus faz: catálogos 3D e em realidade aumentada. Até {max} cartões; cada um pode abrir um produto, um catálogo ou o formulário de candidatura.',
+    'Os cartões em «Coleções» na página inicial. Use-os para mostrar, em poucos segundos, a uma empresa de mobiliário o que a Sanctus faz: catálogos 3D e em realidade aumentada. Até {max} cartões; cada um abre a sua própria página de coleção com os produtos que escolher (ou, se preferir, um produto, o catálogo de uma empresa ou o formulário de candidatura).',
   'editor.landing.empty': 'Ainda não há cartões. A página inicial mostra as quatro coleções incluídas (Sofás, Mesas, Poltronas, Decoração) até publicar as suas.',
   'editor.landing.startFromCurrent': 'Começar pelas coleções atuais',
   'editor.landing.add': 'Adicionar uma coleção',
@@ -93,6 +93,26 @@ export const ptEditor: Partial<Record<TranslationKey, string>> = {
   'editor.landing.linkMissing.product': 'produto',
   'editor.landing.linkMissing.business': 'empresa',
   'editor.landing.dataError': 'Não foi possível carregar os produtos e as empresas.',
+  'editor.landing.link.collection': 'Abrir a página própria da coleção',
+  'editor.landing.slug': 'Endereço da página',
+  'editor.landing.slugHint': 'A coleção abre em /collections/{slug}. Feito a partir do título em inglês; letras minúsculas, números e hífenes.',
+  'editor.landing.products': 'Produtos desta coleção',
+  'editor.landing.productsHelp': 'Escolha produtos publicados de qualquer empresa, até {max}. A página da coleção mostra-os por esta ordem.',
+  'editor.landing.productsCount': '{n} de {max} produtos',
+  'editor.landing.productsAdd': 'Adicionar um produto',
+  'editor.landing.productsAddPick': 'Escolha um produto para adicionar',
+  'editor.landing.productsNone': 'Ainda não há produtos. A página da coleção mostra «Peças em breve» até adicionar alguns.',
+  'editor.landing.productsFull': 'O limite de {max} produtos foi atingido.',
+  'editor.landing.productsGone': 'Já não está publicado: os visitantes não o veem.',
+  'editor.landing.productMoveUp': 'Subir {name}',
+  'editor.landing.productMoveDown': 'Descer {name}',
+  'editor.landing.productRemove': 'Remover {name} da coleção',
+  'editor.landing.featured': 'Peça 3D em destaque',
+  'editor.landing.featuredHelp': 'A peça que «Abrir uma peça real em 3D» abre na página inicial. Só aparecem produtos publicados com modelo 3D.',
+  'editor.landing.featuredPick': 'Deixar a página escolher',
+  'editor.landing.featuredEmpty': 'Ainda não há produtos publicados com modelo 3D.',
+  'editor.landing.featuredGone': 'Este produto já não está publicado ou não tem modelo 3D. Escolha outro.',
+  'editor.landing.has3d': 'Tem 3D',
   'editor.landing.previewHint': 'Use Pré-visualizar, no topo, para ver toda a página inicial com este rascunho.',
 
   // History
