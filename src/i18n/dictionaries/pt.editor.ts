@@ -52,6 +52,7 @@ export const ptEditor: Partial<Record<TranslationKey, string>> = {
   'editor.summary.questions': 'Perguntas extra',
   'editor.summary.social': 'Ligações às redes sociais',
   'editor.summary.landingCollections': 'Coleções da página inicial',
+  'editor.summary.landingShowcase': 'Montra 3D da página inicial',
 
   // Landing collections
   'editor.landing.description':
@@ -227,4 +228,38 @@ export const ptEditor: Partial<Record<TranslationKey, string>> = {
   // Audit-log labels
   'editor.audit.site_content_published': 'Conteúdo do site publicado',
   'editor.audit.site_content_draft_restored': 'Rascunho do site reposto a partir de uma versão anterior',
+
+  // Página inicial: a montra 3D e as imagens carregadas (decisão do proprietário, 2026-11-03)
+  'editor.showcase.title': 'Montra 3D',
+  'editor.showcase.help': 'A imagem, o modelo 3D, os textos e o preço do cartão 3D da página inicial. São os seus próprios ficheiros; não precisa de nenhuma empresa.',
+  'editor.showcase.empty': 'Ainda nada aqui. A página inicial mostra o cartão predefinido até publicar uma montra sua.',
+  'editor.showcase.clear': 'Remover a montra',
+  'editor.showcase.picture': 'Imagem',
+  'editor.showcase.pictureAlt': 'A imagem carregada da montra',
+  'editor.showcase.pictureHint': 'JPG, PNG ou WebP, até 5 MB.',
+  'editor.showcase.uploadPicture': 'Carregar imagem',
+  'editor.showcase.replacePicture': 'Substituir imagem',
+  'editor.showcase.model': 'Modelo 3D',
+  'editor.showcase.modelSet': 'Modelo carregado: {name}',
+  'editor.showcase.modelHint': 'Um ficheiro .glb, até 30 MB.',
+  'editor.showcase.uploadModel': 'Carregar modelo 3D (.glb)',
+  'editor.showcase.replaceModel': 'Substituir modelo 3D',
+  'editor.showcase.remove': 'Remover',
+  'editor.showcase.uploading': 'A carregar...',
+  'editor.showcase.sessionOnly': 'Esta imagem de exemplo só existe nesta sessão do navegador e desaparece ao recarregar.',
+  'editor.showcase.titleEn': 'Título da montra (inglês)',
+  'editor.showcase.titlePt': 'Título da montra (português)',
+  'editor.showcase.textEn': 'Texto da montra (inglês)',
+  'editor.showcase.textPt': 'Texto da montra (português)',
+  'editor.showcase.eyebrowEn': 'Título pequeno (inglês)',
+  'editor.showcase.eyebrowPt': 'Título pequeno (português)',
+  'editor.showcase.materialsEn': 'Materiais (inglês)',
+  'editor.showcase.materialsPt': 'Materiais (português)',
+  'editor.showcase.dimensions': 'Dimensões',
+  'editor.showcase.dimensionsHint': 'Por exemplo 220 x 95 x 78 cm. Até {max} caracteres.',
+  'editor.showcase.price': 'Preço (EUR)',
+  'editor.showcase.product': 'Ligar a um produto de uma empresa',
+  'editor.showcase.productHelp': 'Opcional. O cartão passa a abrir também a página desse produto.',
+  'editor.showcase.productNone': 'Sem ligação a produto',
+  'editor.landing.uploadedPicture': 'Imagem carregada em uso',
 }

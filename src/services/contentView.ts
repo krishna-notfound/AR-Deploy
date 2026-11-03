@@ -16,7 +16,15 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
     .sort((a, b) => a.order - b.order || a.title.en.localeCompare(b.title.en))
     .map((p) => ({ slug: p.slug, title: clone(p.title) }))
   const featured = content.landing?.featured
-  return { version, footerPages, social: clone(content.social), landingCollections: clone(content.landing?.collections ?? []), ...(featured ? { landingFeatured: clone(featured) } : {}) }
+  const showcase = content.landing?.showcase
+  return {
+    version,
+    footerPages,
+    social: clone(content.social),
+    landingCollections: clone(content.landing?.collections ?? []),
+    ...(featured ? { landingFeatured: clone(featured) } : {}),
+    ...(showcase ? { landingShowcase: clone(showcase) } : {}),
+  }
 }
 
 /**

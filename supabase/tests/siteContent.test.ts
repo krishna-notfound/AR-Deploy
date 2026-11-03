@@ -586,6 +586,53 @@ describe('landing collections (20261103095519_landing_collections)', () => {
   }, 120_000)
 })
 
+describe('site content assets (20261103120418_site_content_assets)', () => {
+  const showcase = (over: Record<string, unknown> = {}) => ({
+    title: { en: 'The Linden sofa', pt: 'O sofa Linden' },
+    price: { amount: 1290, currency: 'EUR' },
+    image: { path: 'landing/0a1b2c3d-1111-4222-8333-444455556666.jpg' },
+    model: { glb: { path: 'landing/0a1b2c3d-1111-4222-8333-444455556667.glb' } },
+    ...over,
+  })
+  const withShowcase = (sc: unknown) => doc((c) => void ((c.landing as Record<string, unknown>).showcase = sc))
+  const refuses = async (content: unknown, detail: string) => {
+    const b = await forceDraft(content)
+    await expect(h.probe(ADMIN, 'select public.admin_publish_site_content($1::timestamptz)', [b])).rejects.toMatchObject({ message: 'invalid_content', detail })
+  }
+
+  it('anon reads the published showcase in the chrome part and never the draft one', async () => {
+    await resetContent()
+    const sc = showcase()
+    await save(withShowcase(sc))
+    expect((await publicPart('chrome')).content).toBeNull()
+    await publish()
+    expect((await publicPart('chrome')).content).toMatchObject({ landingShowcase: sc })
+    await save(withShowcase(showcase({ title: { en: 'Draft only' } })))
+    expect(((await publicPart('chrome')).content as { landingShowcase: { title: { en: string } } }).landingShowcase.title.en).toBe('The Linden sofa')
+    const bucket = await db.query<{ public: boolean }>(`select public from storage.buckets where id = 'site-content'`)
+    expect(bucket.rows).toEqual([{ public: true }])
+    await resetContent()
+  })
+
+  it('refuses a showcase over its caps, with a bad file path or kind, and accepts an uploaded collection picture', async () => {
+    await resetContent()
+    await refuses(withShowcase(showcase({ title: { en: ' ' } })), 'landing.showcase.title.en|required')
+    await refuses(withShowcase(showcase({ title: { en: 'x'.repeat(81) } })), 'landing.showcase.title.en|too_long')
+    await refuses(withShowcase(showcase({ text: { en: 'x'.repeat(401) } })), 'landing.showcase.text.en|too_long')
+    await refuses(withShowcase(showcase({ dimensions: 'x'.repeat(81) })), 'landing.showcase.dimensions|too_long')
+    await refuses(withShowcase(showcase({ price: { amount: 10, currency: 'USD' } })), 'landing.showcase.price.currency|invalid_value')
+    await refuses(withShowcase(showcase({ image: { path: '../evil.jpg' } })), 'landing.showcase.image|invalid_value')
+    await refuses(withShowcase(showcase({ image: { path: 'landing/abc.glb' } })), 'landing.showcase.image|invalid_value')
+    await refuses(withShowcase(showcase({ model: { glb: { path: 'landing/abc.jpg' } } })), 'landing.showcase.model.glb|invalid_value')
+    await refuses(withShowcase(showcase({ product: { businessSlug: 'Bad Slug', productSlug: 'x' } })), 'landing.showcase.product.businessSlug|invalid_slug')
+    const card = { id: crypto.randomUUID(), slug: 'own', products: [], title: { en: 'Own' }, image: { path: 'landing/abc-123.png' }, link: { kind: 'none' } }
+    const b = await forceDraft(doc((c) => void (c.landing.collections = [card] as never)))
+    expect((await publish(ADMIN, b)).version).toBeGreaterThan(0)
+    await refuses(doc((c) => void (c.landing.collections = [{ ...card, image: { path: 'landing/abc.exe' } }] as never)), 'landing.collections.0.image|invalid_value')
+    await resetContent()
+  })
+})
+
 describe('rollback', () => {
   const defs = async (target: PGlite) => {
     const fn = async (sig: string) => (await target.query<{ d: string }>(`select pg_get_functiondef($1::regprocedure) as d`, [sig])).rows[0]!.d.replace(/\r\n/g, '\n')

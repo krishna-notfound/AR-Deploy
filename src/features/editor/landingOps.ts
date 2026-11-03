@@ -1,5 +1,5 @@
 // Pure edits of the landing collections of a SiteContent document, used by the Landing collections screen (ADR-0046).
-import { type LandingCollection, type LandingCollectionLink, MAX_COLLECTION_PRODUCTS, MAX_LANDING_COLLECTIONS, type ProductRef, type SiteContent } from '@/domain/siteContent'
+import { type LandingCollection, type LandingCollectionLink, type LandingShowcase, MAX_COLLECTION_PRODUCTS, MAX_LANDING_COLLECTIONS, type ProductRef, type SiteContent } from '@/domain/siteContent'
 import { slugify } from '@/lib/slug'
 
 /** A new card at the end: no title or slug yet (publishing needs them), the first built-in photo, its own page as the link, no products. */
@@ -79,6 +79,25 @@ export const moveCollectionProduct = (doc: SiteContent, id: string, ref: Product
   })
 
 /** The featured 3D piece of the landing page; `undefined` clears it. */
+/** Edits the 3D showcase card; starts an empty one (English title still to write) when there is none. */
+export function updateShowcase(doc: SiteContent, fn: (s: LandingShowcase) => LandingShowcase): SiteContent {
+  return { ...doc, landing: { ...doc.landing, showcase: fn(doc.landing.showcase ?? { title: { en: '' } }) } }
+}
+
+/** Removes the 3D showcase card; the landing page then shows its built-in card again. */
+export function clearShowcase(doc: SiteContent): SiteContent {
+  const { showcase: _old, ...rest } = doc.landing
+  return { ...doc, landing: rest }
+}
+
+/** The optional business product the showcase links to (undefined removes the link). */
+export function setShowcaseProduct(doc: SiteContent, ref: ProductRef | undefined): SiteContent {
+  return updateShowcase(doc, (s) => {
+    const { product: _old, ...rest } = s
+    return ref ? { ...rest, product: { businessSlug: ref.businessSlug, productSlug: ref.productSlug } } : rest
+  })
+}
+
 export function setFeatured(doc: SiteContent, ref: ProductRef | undefined): SiteContent {
   const { featured: _old, ...rest } = doc.landing
   return { ...doc, landing: ref ? { ...rest, featured: ref } : rest }

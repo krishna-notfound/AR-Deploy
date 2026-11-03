@@ -56,6 +56,26 @@ export const LANDING_IMAGE_KEYS = [
 ] as const
 export type LandingImageKey = (typeof LANDING_IMAGE_KEYS)[number]
 
+/** A file the Owner/Admin uploaded in the Website Editor: its object path inside the public storage bucket `site-content`. Resolve it to a URL with `siteAssetUrl` (src/services). */
+export interface SiteAsset {
+  /** `landing/<name>.<ext>`, matching SITE_ASSET_PATH. */
+  path: string
+}
+export type SiteAssetKind = 'image' | 'glb' | 'usdz'
+export const SITE_ASSET_BUCKET = 'site-content'
+export const SITE_ASSET_PATH = /^landing\/[a-z0-9-]+\.(webp|jpg|jpeg|png|glb|usdz)$/
+export const SITE_ASSET_EXTENSIONS: Record<SiteAssetKind, readonly string[]> = { image: ['webp', 'jpg', 'jpeg', 'png'], glb: ['glb'], usdz: ['usdz'] }
+/** Upload limits in bytes; the bucket repeats them (migration site_content_assets). */
+export const SITE_ASSET_MAX_BYTES: Record<SiteAssetKind, number> = { image: 5 * 1024 * 1024, glb: 30 * 1024 * 1024, usdz: 40 * 1024 * 1024 }
+
+export const isSiteAsset = (v: unknown): v is SiteAsset => typeof v === 'object' && v !== null && !Array.isArray(v) && typeof (v as { path?: unknown }).path === 'string'
+/** The kind of file an asset path names (by extension), or null when it is not a valid asset path. */
+export function siteAssetKind(path: string): SiteAssetKind | null {
+  if (!SITE_ASSET_PATH.test(path)) return null
+  const ext = path.slice(path.lastIndexOf('.') + 1)
+  return (Object.keys(SITE_ASSET_EXTENSIONS) as SiteAssetKind[]).find((k) => SITE_ASSET_EXTENSIONS[k].includes(ext)) ?? null
+}
+
 /** A product named by the public address parts: the business slug and the product slug. */
 export interface ProductRef {
   businessSlug: string
@@ -80,8 +100,8 @@ export interface LandingCollection {
   title: { en: string; pt?: string }
   /** 0..160 characters. */
   text?: { en: string; pt?: string }
-  /** A key of LANDING_IMAGE_KEYS. */
-  image: string
+  /** A key of LANDING_IMAGE_KEYS (built-in picture), or an uploaded picture (SiteAsset, an image path). */
+  image: string | SiteAsset
   link: LandingCollectionLink
   /** The published products the collection's page shows, in this order. 0..24. */
   products: ProductRef[]
@@ -89,6 +109,33 @@ export interface LandingCollection {
 }
 
 export const MAX_COLLECTION_PRODUCTS = 24
+
+/** The landing page's 3D showcase card, run from the Website Editor with the Owner/Admin's own files (owner decision 2026-11-03). */
+export interface LandingShowcase {
+  /** 0..40 characters. */
+  eyebrow?: { en: string; pt?: string }
+  /** 1..80 characters. */
+  title: { en: string; pt?: string }
+  /** 0..400 characters. */
+  text?: { en: string; pt?: string }
+  /** 0..80 characters, e.g. "220 x 95 x 78 cm". */
+  dimensions?: string
+  /** 0..120 characters. */
+  materials?: { en: string; pt?: string }
+  price?: { amount: number; currency: 'EUR' }
+  /** An uploaded picture (image path). */
+  image?: SiteAsset
+  /** An uploaded 3D model: the GLB (Android, web viewer) and optionally the USDZ (iPhone Quick Look). */
+  model?: { glb: SiteAsset; usdz?: SiteAsset }
+  /** Optional add-on: a business product the card also links to. */
+  product?: ProductRef
+}
+export const MAX_SHOWCASE_EYEBROW = 40
+export const MAX_SHOWCASE_TITLE = 80
+export const MAX_SHOWCASE_TEXT = 400
+export const MAX_SHOWCASE_DIMENSIONS = 80
+export const MAX_SHOWCASE_MATERIALS = 120
+export const MAX_SHOWCASE_PRICE = 1_000_000
 
 export const MAX_LANDING_COLLECTIONS = 8
 export const MAX_COLLECTION_TITLE = 60
@@ -108,6 +155,8 @@ export interface SiteContent {
     collections: LandingCollection[]
     /** The piece the landing's "Open a live piece in 3D" opens. Absent: the page chooses one itself. */
     featured?: ProductRef
+    /** The 3D showcase card (picture, model, texts, price). Absent: the page shows its built-in card. */
+    showcase?: LandingShowcase
   }
 }
 
@@ -168,6 +217,39 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   const landing = obj(raw.landing)
   if (Array.isArray(landing.collections)) out.landing.collections = landing.collections.map(normalizeCollection)
   if (typeof landing.featured === 'object' && landing.featured !== null && !Array.isArray(landing.featured)) out.landing.featured = productRef(landing.featured)
+  if (typeof landing.showcase === 'object' && landing.showcase !== null && !Array.isArray(landing.showcase)) out.landing.showcase = normalizeShowcase(landing.showcase)
+  return out
+}
+
+const asset = (v: unknown): SiteAsset | undefined => (isSiteAsset(v) ? { path: v.path } : undefined)
+const optPair = (v: unknown): { en: string; pt?: string } | undefined => {
+  if (v === undefined) return undefined
+  const p = pair(v)
+  return p.en || p.pt ? p : undefined
+}
+
+function normalizeShowcase(x: unknown): LandingShowcase {
+  const o = obj(x)
+  const out: LandingShowcase = { title: pair(o.title) }
+  const eyebrow = optPair(o.eyebrow)
+  if (eyebrow) out.eyebrow = eyebrow
+  const text = optPair(o.text)
+  if (text) out.text = text
+  const materials = optPair(o.materials)
+  if (materials) out.materials = materials
+  if (typeof o.dimensions === 'string' && o.dimensions) out.dimensions = o.dimensions
+  const price = obj(o.price)
+  if (typeof price.amount === 'number' && Number.isFinite(price.amount)) out.price = { amount: price.amount, currency: 'EUR' }
+  const image = asset(o.image)
+  if (image) out.image = image
+  const m = obj(o.model)
+  const glb = asset(m.glb)
+  if (glb) {
+    out.model = { glb }
+    const usdz = asset(m.usdz)
+    if (usdz) out.model.usdz = usdz
+  }
+  if (typeof o.product === 'object' && o.product !== null && !Array.isArray(o.product)) out.product = productRef(o.product)
   return out
 }
 
@@ -186,7 +268,7 @@ function normalizeCollection(x: unknown): LandingCollection {
   else if (l.kind === 'apply') link = { kind: 'apply' }
   else if (l.kind === 'collection') link = { kind: 'collection' }
   const products = Array.isArray(o.products) ? o.products.map(productRef) : []
-  const out: LandingCollection = { id: str(o.id), slug: str(o.slug), title: pair(o.title), image: str(o.image), link, products }
+  const out: LandingCollection = { id: str(o.id), slug: str(o.slug), title: pair(o.title), image: isSiteAsset(o.image) ? { path: o.image.path } : str(o.image), link, products }
   if (o.text !== undefined) {
     const text = pair(o.text)
     if (text.en || text.pt) out.text = text
@@ -290,6 +372,8 @@ export function validateContentShape(doc: unknown): ContentErrors {
       if (!Array.isArray(c)) return { 'landing.collections': 'invalid_value' }
       if (c.length > MAX_LANDING_COLLECTIONS) return { 'landing.collections': 'too_many' }
     }
+    const sc = (l as Record<string, unknown>).showcase
+    if (sc !== undefined && (typeof sc !== 'object' || sc === null || Array.isArray(sc))) return { 'landing.showcase': 'invalid_value' }
   }
   return e
 }
@@ -359,6 +443,7 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
   }
   validateLandingCollections(doc.landing?.collections ?? [], put)
   if (doc.landing?.featured) validateRef(doc.landing.featured, 'landing.featured', put)
+  if (doc.landing?.showcase) validateShowcase(doc.landing.showcase, put)
   return e
 }
 
@@ -368,6 +453,34 @@ function validateRef(ref: ProductRef, path: string, put: (path: string, key: Con
     if (!v) put(`${path}.${f}`, 'required')
     else if (v.length > MAX_SLUG_LENGTH || !SLUG.test(v)) put(`${path}.${f}`, 'invalid_slug')
   }
+}
+
+function validateAsset(a: SiteAsset | undefined, kind: SiteAssetKind, path: string, put: (path: string, key: ContentErrorKey) => void): void {
+  if (!a) return put(path, 'required')
+  if (siteAssetKind(typeof a.path === 'string' ? a.path : '') !== kind) put(path, 'invalid_value')
+}
+
+function validateShowcase(sc: LandingShowcase, put: (path: string, key: ContentErrorKey) => void): void {
+  const p = 'landing.showcase'
+  if (typeof sc.title?.en !== 'string' || !sc.title.en.trim()) put(`${p}.title.en`, 'required')
+  const caps: [keyof Pick<LandingShowcase, 'eyebrow' | 'title' | 'text' | 'materials'>, number][] = [['eyebrow', MAX_SHOWCASE_EYEBROW], ['title', MAX_SHOWCASE_TITLE], ['text', MAX_SHOWCASE_TEXT], ['materials', MAX_SHOWCASE_MATERIALS]]
+  for (const [k, max] of caps)
+    for (const l of ['en', 'pt'] as const) {
+      const v = sc[k]?.[l]
+      if (v !== undefined && (typeof v !== 'string' || v.length > max)) put(`${p}.${k}.${l}`, typeof v === 'string' ? 'too_long' : 'invalid_value')
+    }
+  if (sc.dimensions !== undefined && (typeof sc.dimensions !== 'string' || sc.dimensions.length > MAX_SHOWCASE_DIMENSIONS)) put(`${p}.dimensions`, typeof sc.dimensions === 'string' ? 'too_long' : 'invalid_value')
+  if (sc.price !== undefined) {
+    const { amount, currency } = sc.price
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > MAX_SHOWCASE_PRICE) put(`${p}.price.amount`, 'invalid_value')
+    if (currency !== 'EUR') put(`${p}.price.currency`, 'invalid_value')
+  }
+  if (sc.image !== undefined) validateAsset(sc.image, 'image', `${p}.image`, put)
+  if (sc.model !== undefined) {
+    validateAsset(sc.model.glb, 'glb', `${p}.model.glb`, put)
+    if (sc.model.usdz !== undefined) validateAsset(sc.model.usdz, 'usdz', `${p}.model.usdz`, put)
+  }
+  if (sc.product !== undefined) validateRef(sc.product, `${p}.product`, put)
 }
 
 function validateLandingCollections(list: LandingCollection[], put: (path: string, key: ContentErrorKey) => void): void {
@@ -392,7 +505,8 @@ function validateLandingCollections(list: LandingCollection[], put: (path: strin
     if ((c.title?.pt ?? '').length > MAX_COLLECTION_TITLE) put(`${p}.title.pt`, 'too_long')
     if ((c.text?.en ?? '').length > MAX_COLLECTION_TEXT) put(`${p}.text.en`, 'too_long')
     if ((c.text?.pt ?? '').length > MAX_COLLECTION_TEXT) put(`${p}.text.pt`, 'too_long')
-    if (!(LANDING_IMAGE_KEYS as readonly string[]).includes(c.image)) put(`${p}.image`, c.image ? 'invalid_value' : 'required')
+    if (isSiteAsset(c.image)) validateAsset(c.image, 'image', `${p}.image`, put)
+    else if (!(LANDING_IMAGE_KEYS as readonly string[]).includes(c.image)) put(`${p}.image`, c.image ? 'invalid_value' : 'required')
     const link = c.link
     if (link?.kind === 'product') {
       for (const f of ['businessSlug', 'productSlug'] as const) {
@@ -426,6 +540,8 @@ export interface ChangeSummary {
   social: number
   /** Landing collection cards added, removed, edited, hidden or shown, plus one when their order changed. */
   landingCollections: number
+  /** The landing 3D showcase card: 1 when it was added, edited or removed. */
+  landingShowcase: number
   total: number
 }
 
@@ -525,6 +641,8 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
 
   if (!same(a.landing?.featured, b.landing?.featured)) landingCollections++
 
+  const landingShowcase = same(a.landing?.showcase, b.landing?.showcase) ? 0 : 1
+
   return {
     pages,
     footer,
@@ -534,6 +652,7 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
     questions,
     social,
     landingCollections,
-    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections,
+    landingShowcase,
+    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase,
   }
 }

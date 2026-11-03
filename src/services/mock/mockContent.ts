@@ -5,11 +5,12 @@
 //
 // The editor calls need the demo viewer to be a platform user holding content.manage (as the database checks it): the
 // Owner and Admin by default, Team only if the Owner granted it. Public reads need no one.
-import { type SiteContent, emptySiteContent, normalizeSiteContent, validateContentShape, validateSiteContent } from '@/domain/siteContent'
+import { type SiteAsset, type SiteContent, emptySiteContent, normalizeSiteContent, validateContentShape, validateSiteContent } from '@/domain/siteContent'
 import { type Result, fail, ok } from '../catalogService'
 import type { ContentDraftState, ContentService, ContentVersionSummary, PublishedApplyForm, PublishedChrome, PublishedPage } from '../contentService'
 import { applyFormOf, chromeOf, pageOf } from '../contentView'
 import type { DemoContent } from './db'
+import { checkSiteAssetFile, newSiteAssetPath, siteAssetExtension } from '../siteAsset'
 import { mockActor } from './mockModelRequestShared'
 import { demoPlatformRole } from './mockTeam'
 import { store } from './store'
@@ -52,6 +53,11 @@ const published = (): SiteContent | null => {
   const c = peek().published
   return c ? normalizeSiteContent(clone(c)) : null
 }
+
+/** Demo uploads, session-only (an object URL per path; nothing is stored, so a reload loses them). */
+const demoAssets = new Map<string, string>()
+/** The object URL of a demo upload, or '' when this session has no such file. */
+export const mockSiteAssetUrl = (asset: SiteAsset): string => demoAssets.get(asset.path) ?? ''
 
 export const mockContentService: ContentService = {
   getPublishedChrome: () => run<PublishedChrome>(() => ok(chromeOf(published(), peek().version))),
@@ -117,6 +123,16 @@ export const mockContentService: ContentService = {
       if (!canEdit()) return forbidden()
       const list = [...peek().versions].reverse().slice(0, HISTORY_LIMIT)
       return ok(list.map((v) => ({ version: v.version, publishedAt: v.publishedAt, publishedByName: v.publishedByName })))
+    }),
+
+  uploadSiteAsset: (file, kind) =>
+    run<SiteAsset>(() => {
+      if (!canEdit()) return forbidden()
+      const bad = checkSiteAssetFile(file, kind)
+      if (bad) return bad
+      const asset = newSiteAssetPath(siteAssetExtension(file, kind)!)
+      demoAssets.set(asset.path, URL.createObjectURL(file))
+      return ok(asset)
     }),
 
   restoreContentVersion: (version, baseUpdatedAt) =>

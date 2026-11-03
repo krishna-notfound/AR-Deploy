@@ -2,7 +2,8 @@
 // collection card may use. The Website Editor stores only the key (ADR-0046); the labels here are the alt text and the
 // names the picture chooser shows. The key list lives in the domain file so the publish checks can use it; this record is
 // typed by it, so adding a photo to one and not the other does not compile.
-import type { LandingImageKey } from '@/domain/siteContent'
+import type { LandingImageKey, SiteAsset } from '@/domain/siteContent'
+import { siteAssetUrl } from '@/services'
 import type { Lang } from '@/domain/types'
 
 export interface LandingImage {
@@ -71,4 +72,11 @@ export const LANDING_IMAGES: Record<LandingImageKey, LandingImage> = {
 }
 
 /** The photo for a stored key; unknown keys (an old or hand-edited draft) show no photo rather than a broken one. */
+/** A collection card's picture: a built-in key, or a file the Owner/Admin uploaded (SiteAsset, resolved to its public URL). Undefined when unknown. */
+export function collectionImage(image: string | SiteAsset): { src: string; focus?: string } | undefined {
+  if (typeof image === 'string') return landingImage(image)
+  const src = siteAssetUrl(image)
+  return src ? { src } : undefined
+}
+
 export const landingImage = (key: string): LandingImage | undefined => (Object.hasOwn(LANDING_IMAGES, key) ? LANDING_IMAGES[key as LandingImageKey] : undefined)

@@ -4,7 +4,8 @@
 // CONFLICT, invalid_content (22023, detail '<document path>|<error key>') to VALIDATION, version_not_found to NOT_FOUND.
 // A failure is always reported; nothing here falls back to demo data.
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { normalizeApplyForm, normalizeSiteContent } from '@/domain/siteContent'
+import { SITE_ASSET_BUCKET, type SiteAssetKind, normalizeApplyForm, normalizeSiteContent } from '@/domain/siteContent'
+import { checkSiteAssetFile, newSiteAssetPath, siteAssetExtension } from '../siteAsset'
 import { type Result, fail, ok } from '../catalogService'
 import type { ContentDraftState, ContentService, ContentVersionSummary, PublishedApplyForm, PublishedChrome, PublishedPage } from '../contentService'
 
@@ -74,13 +75,14 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
           if (!isObj(p) || typeof p.slug !== 'string' || !isObj(p.title) || typeof p.title.en !== 'string') return []
           return [{ slug: p.slug, title: typeof p.title.pt === 'string' ? { en: p.title.en, pt: p.title.pt } : { en: p.title.en } }]
         })
-        const landing = normalizeSiteContent({ landing: { collections: c.landingCollections, featured: c.landingFeatured } }).landing
+        const landing = normalizeSiteContent({ landing: { collections: c.landingCollections, featured: c.landingFeatured, showcase: c.landingShowcase } }).landing
         return ok({
           version,
           footerPages,
           social: normalizeSiteContent({ social: c.social }).social,
           landingCollections: landing.collections,
           ...(landing.featured ? { landingFeatured: landing.featured } : {}),
+          ...(landing.showcase ? { landingShowcase: landing.showcase } : {}),
         })
       }),
 
@@ -146,5 +148,25 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
       call('admin_restore_site_content_version', { p_version: version, p_base: baseUpdatedAt }, (data) =>
         typeof data === 'string' ? ok({ draftUpdatedAt: data }) : fail('UNKNOWN', UNKNOWN_MESSAGE),
       ),
+
+    uploadSiteAsset: async (file, kind) => {
+      const bad = checkSiteAssetFile(file, kind)
+      if (bad) return bad
+      const asset = newSiteAssetPath(siteAssetExtension(file, kind)!)
+      try {
+        const { error } = await sb.storage.from(SITE_ASSET_BUCKET).upload(asset.path, file, { contentType: assetContentType(kind, asset.path, file.type), upsert: false })
+        if (error) {
+          const status = String((error as { statusCode?: string | number }).statusCode ?? '')
+          if (status === '401' || status === '403') return { ok: false, error: { code: 'PERMISSION', message: 'You do not have permission to upload website files. Confirm your sign-in with two-factor authentication.', reason: 'forbidden' } }
+          return fail('UNKNOWN', 'The file could not be uploaded. Try again.')
+        }
+        return ok(asset)
+      } catch {
+        return fail('UNKNOWN', 'The file could not be uploaded. Try again.')
+      }
+    },
   }
 }
+
+const assetContentType = (kind: SiteAssetKind, path: string, type: string): string =>
+  kind === 'glb' ? 'model/gltf-binary' : kind === 'usdz' ? 'model/vnd.usdz+zip' : type || (path.endsWith('.png') ? 'image/png' : path.endsWith('.webp') ? 'image/webp' : 'image/jpeg')

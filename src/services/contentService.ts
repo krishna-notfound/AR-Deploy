@@ -6,7 +6,7 @@
 // (fieldErrors by document path), NOT_FOUND (an unknown custom slug or version). A database without the migration answers
 // UNKNOWN with reason not_enabled; the public pages then fall back to the built-in text.
 import type { ISODate, LocalizedText } from '@/domain/types'
-import type { ApplyFormConfig, Lang, LandingCollection, ProductRef, SiteContent } from '@/domain/siteContent'
+import type { ApplyFormConfig, Lang, LandingCollection, LandingShowcase, ProductRef, SiteAsset, SiteAssetKind, SiteContent } from '@/domain/siteContent'
 import type { Result } from './catalogService'
 
 export interface PublishedChrome {
@@ -19,6 +19,8 @@ export interface PublishedChrome {
   landingCollections: LandingCollection[]
   /** The product the landing page's "Open a live piece in 3D" opens; absent when the admin has not chosen one. */
   landingFeatured?: ProductRef
+  /** The landing page's 3D showcase card (the Owner/Admin's own files and texts); absent when none is published. */
+  landingShowcase?: LandingShowcase
 }
 export type PublishedPage =
   | { kind: 'builtin'; body: Partial<Record<Lang, string>> } // terms | privacy overrides
@@ -61,4 +63,10 @@ export interface ContentService {
   listContentVersions(): Promise<Result<ContentVersionSummary[]>>
   /** Copies that version into the draft; does not publish. */
   restoreContentVersion(version: number, baseUpdatedAt: ISODate): Promise<Result<{ draftUpdatedAt: ISODate }>>
+  /**
+   * Uploads a picture (jpg, png, webp, 5 MB) or a 3D model (.glb 30 MB, .usdz 40 MB) for the landing page. Checks type and size
+   * first (VALIDATION). Supabase: bucket `site-content`, path `landing/<uuid>.<ext>`. Demo: the file only lives in this browser
+   * session (an object URL), so it is gone after a reload.
+   */
+  uploadSiteAsset(file: File, kind: SiteAssetKind): Promise<Result<SiteAsset>>
 }

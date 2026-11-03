@@ -51,6 +51,7 @@ export const enEditor = {
   'editor.summary.questions': 'Extra questions',
   'editor.summary.social': 'Social links',
   'editor.summary.landingCollections': 'Landing page collections',
+  'editor.summary.landingShowcase': 'Landing page 3D showcase',
 
   // Landing collections
   'editor.landing.description':
@@ -226,4 +227,38 @@ export const enEditor = {
   // Audit-log labels of the two new events (applications/labels.tsx needs a 2-line change to read these)
   'editor.audit.site_content_published': 'Website content published',
   'editor.audit.site_content_draft_restored': 'Website draft restored from an earlier version',
+
+  // Landing: the 3D showcase and uploaded pictures (owner decision 2026-11-03)
+  'editor.showcase.title': '3D showcase',
+  'editor.showcase.help': 'The picture, 3D model, texts and price of the 3D card on the landing page. These are your own files; no business is needed.',
+  'editor.showcase.empty': 'Nothing here yet. The landing page shows its built-in card until you publish a showcase of your own.',
+  'editor.showcase.clear': 'Remove the showcase',
+  'editor.showcase.picture': 'Picture',
+  'editor.showcase.pictureAlt': 'The uploaded showcase picture',
+  'editor.showcase.pictureHint': 'JPG, PNG or WebP, up to 5 MB.',
+  'editor.showcase.uploadPicture': 'Upload picture',
+  'editor.showcase.replacePicture': 'Replace picture',
+  'editor.showcase.model': '3D model',
+  'editor.showcase.modelSet': 'Model uploaded: {name}',
+  'editor.showcase.modelHint': 'A .glb file, up to 30 MB.',
+  'editor.showcase.uploadModel': 'Upload 3D model (.glb)',
+  'editor.showcase.replaceModel': 'Replace 3D model',
+  'editor.showcase.remove': 'Remove',
+  'editor.showcase.uploading': 'Uploading...',
+  'editor.showcase.sessionOnly': 'This sample picture only exists in this browser session and is gone after a reload.',
+  'editor.showcase.titleEn': 'Showcase title (English)',
+  'editor.showcase.titlePt': 'Showcase title (Portuguese)',
+  'editor.showcase.textEn': 'Showcase text (English)',
+  'editor.showcase.textPt': 'Showcase text (Portuguese)',
+  'editor.showcase.eyebrowEn': 'Small heading (English)',
+  'editor.showcase.eyebrowPt': 'Small heading (Portuguese)',
+  'editor.showcase.materialsEn': 'Materials (English)',
+  'editor.showcase.materialsPt': 'Materials (Portuguese)',
+  'editor.showcase.dimensions': 'Dimensions',
+  'editor.showcase.dimensionsHint': 'For example 220 x 95 x 78 cm. Up to {max} characters.',
+  'editor.showcase.price': 'Price (EUR)',
+  'editor.showcase.product': 'Link to a business product',
+  'editor.showcase.productHelp': 'Optional. The card then also opens that product page.',
+  'editor.showcase.productNone': 'No product link',
+  'editor.landing.uploadedPicture': 'Uploaded picture in use',
 } as const
