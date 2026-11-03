@@ -6,7 +6,7 @@
 // (fieldErrors by document path), NOT_FOUND (an unknown custom slug or version). A database without the migration answers
 // UNKNOWN with reason not_enabled; the public pages then fall back to the built-in text.
 import type { ISODate, LocalizedText } from '@/domain/types'
-import type { ApplyFormConfig, Lang, LandingCollection, LandingShowcase, ProductRef, SiteAsset, SiteAssetKind, SiteContent } from '@/domain/siteContent'
+import type { ApplyFormConfig, Lang, LandingCollection, LandingHero, LandingShowcase, ProductRef, SiteAsset, SiteAssetKind, SiteContent } from '@/domain/siteContent'
 import type { Result } from './catalogService'
 
 export interface PublishedChrome {
@@ -21,6 +21,8 @@ export interface PublishedChrome {
   landingFeatured?: ProductRef
   /** The admin's piece the hero's "See a live example" opens (ADR-0047); absent when none was chosen. */
   landingExample?: ProductRef
+  /** The landing hero's own picture and optional 3D model; absent when none is published. */
+  landingHero?: LandingHero
   /** The landing page's 3D showcase card (the Owner/Admin's own files and texts); absent when none is published. */
   landingShowcase?: LandingShowcase
 }

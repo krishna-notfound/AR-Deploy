@@ -11,7 +11,7 @@
 // `error` is a failed read, which is not the same thing: show the built-in text and a retry line (spec 9). In draft mode
 // reading needs content.manage, like the Editor itself.
 import { createContext, useContext } from 'react'
-import type { ApplyFormConfig, LandingCollection, LandingShowcase, ProductRef } from '@/domain/siteContent'
+import type { ApplyFormConfig, LandingCollection, LandingHero, LandingShowcase, ProductRef } from '@/domain/siteContent'
 import { type Result, ok } from './catalogService'
 import type { ServiceError } from './catalogService'
 import { content } from './index'
@@ -61,6 +61,12 @@ export function useLandingFeatured(): { featured?: ProductRef; loading: boolean 
 export function useLandingExample(): { example?: ProductRef; loading: boolean } {
   const { chrome, loading } = usePublishedChrome()
   return { example: chrome?.landingExample, loading }
+}
+
+/** The landing hero's own picture and optional 3D model (the published copy, or the draft inside the Editor's preview). */
+export function useLandingHero(): { hero?: LandingHero; loading: boolean } {
+  const { chrome, loading } = usePublishedChrome()
+  return { hero: chrome?.landingHero, loading }
 }
 
 /** The landing page's 3D showcase card from the Editor (the published copy, or the draft inside the Editor's preview). */

@@ -140,6 +140,17 @@ export const MAX_SHOWCASE_DIMENSIONS = 80
 export const MAX_SHOWCASE_MATERIALS = 120
 export const MAX_SHOWCASE_PRICE = 1_000_000
 
+/** The landing hero's own picture and optional 3D model (owner 2026-11-04). Absent: the built-in photo. */
+export interface LandingHero {
+  image?: SiteAsset
+  /** Shown in place of the picture behind a small "3D" switch; 3D only (no AR on the hero). */
+  model?: { glb: SiteAsset }
+  /** Describes the picture: its alt text and the small caption on it. */
+  alt?: { en: string; pt?: string }
+}
+
+export const MAX_HERO_ALT = 120
+
 export const MAX_LANDING_COLLECTIONS = 8
 export const MAX_COLLECTION_TITLE = 60
 export const MAX_COLLECTION_TEXT = 160
@@ -162,6 +173,8 @@ export interface SiteContent {
     example?: ProductRef
     /** The 3D showcase card (picture, model, texts, price). Absent: the page shows its built-in card. */
     showcase?: LandingShowcase
+    /** The first photo of the landing page and its optional in-place 3D model. Absent: the built-in photo. */
+    hero?: LandingHero
   }
 }
 
@@ -224,6 +237,7 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   if (typeof landing.featured === 'object' && landing.featured !== null && !Array.isArray(landing.featured)) out.landing.featured = productRef(landing.featured)
   if (typeof landing.example === 'object' && landing.example !== null && !Array.isArray(landing.example)) out.landing.example = productRef(landing.example)
   if (typeof landing.showcase === 'object' && landing.showcase !== null && !Array.isArray(landing.showcase)) out.landing.showcase = normalizeShowcase(landing.showcase)
+  if (typeof landing.hero === 'object' && landing.hero !== null && !Array.isArray(landing.hero)) out.landing.hero = normalizeHero(landing.hero)
   return out
 }
 
@@ -232,6 +246,18 @@ const optPair = (v: unknown): { en: string; pt?: string } | undefined => {
   if (v === undefined) return undefined
   const p = pair(v)
   return p.en || p.pt ? p : undefined
+}
+
+function normalizeHero(x: unknown): LandingHero {
+  const o = obj(x)
+  const out: LandingHero = {}
+  const image = asset(o.image)
+  if (image) out.image = image
+  const glb = asset(obj(o.model).glb)
+  if (glb) out.model = { glb }
+  const alt = optPair(o.alt)
+  if (alt) out.alt = alt
+  return out
 }
 
 function normalizeShowcase(x: unknown): LandingShowcase {
@@ -380,6 +406,8 @@ export function validateContentShape(doc: unknown): ContentErrors {
     }
     const sc = (l as Record<string, unknown>).showcase
     if (sc !== undefined && (typeof sc !== 'object' || sc === null || Array.isArray(sc))) return { 'landing.showcase': 'invalid_value' }
+    const hero = (l as Record<string, unknown>).hero
+    if (hero !== undefined && (typeof hero !== 'object' || hero === null || Array.isArray(hero))) return { 'landing.hero': 'invalid_value' }
   }
   return e
 }
@@ -451,6 +479,7 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
   if (doc.landing?.featured) validateRef(doc.landing.featured, 'landing.featured', put)
   if (doc.landing?.example) validateRef(doc.landing.example, 'landing.example', put)
   if (doc.landing?.showcase) validateShowcase(doc.landing.showcase, put)
+  if (doc.landing?.hero) validateHero(doc.landing.hero, put)
   return e
 }
 
@@ -465,6 +494,16 @@ function validateRef(ref: ProductRef, path: string, put: (path: string, key: Con
 function validateAsset(a: SiteAsset | undefined, kind: SiteAssetKind, path: string, put: (path: string, key: ContentErrorKey) => void): void {
   if (!a) return put(path, 'required')
   if (siteAssetKind(typeof a.path === 'string' ? a.path : '') !== kind) put(path, 'invalid_value')
+}
+
+function validateHero(h: LandingHero, put: (path: string, key: ContentErrorKey) => void): void {
+  const p = 'landing.hero'
+  if (h.image !== undefined) validateAsset(h.image, 'image', `${p}.image`, put)
+  if (h.model !== undefined) validateAsset(h.model.glb, 'glb', `${p}.model.glb`, put)
+  for (const l of ['en', 'pt'] as const) {
+    const v = h.alt?.[l]
+    if (v !== undefined && (typeof v !== 'string' || v.length > MAX_HERO_ALT)) put(`${p}.alt.${l}`, typeof v === 'string' ? 'too_long' : 'invalid_value')
+  }
 }
 
 function validateShowcase(sc: LandingShowcase, put: (path: string, key: ContentErrorKey) => void): void {
@@ -648,6 +687,7 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
 
   if (!same(a.landing?.featured, b.landing?.featured)) landingCollections++
   if (!same(a.landing?.example, b.landing?.example)) landingCollections++
+  if (!same(a.landing?.hero, b.landing?.hero)) landingCollections++
 
   const landingShowcase = same(a.landing?.showcase, b.landing?.showcase) ? 0 : 1
 

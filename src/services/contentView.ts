@@ -17,6 +17,7 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
     .map((p) => ({ slug: p.slug, title: clone(p.title) }))
   const featured = content.landing?.featured
   const example = content.landing?.example
+  const hero = content.landing?.hero
   const showcase = content.landing?.showcase
   return {
     version,
@@ -25,6 +26,7 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
     landingCollections: clone(content.landing?.collections ?? []),
     ...(featured ? { landingFeatured: clone(featured) } : {}),
     ...(example ? { landingExample: clone(example) } : {}),
+    ...(hero ? { landingHero: clone(hero) } : {}),
     ...(showcase ? { landingShowcase: clone(showcase) } : {}),
   }
 }
