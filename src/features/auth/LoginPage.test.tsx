@@ -22,7 +22,7 @@ vi.mock('@/services', async (importOriginal) => {
   }
 })
 
-function renderLogin(session: SignedInAccount) {
+function renderLogin(session: SignedInAccount | null) {
   const a = fakeAuth(session)
   fake.auth = a.auth
   fake.account = fakeAccount({}, a.fire).account
@@ -63,5 +63,15 @@ describe('LoginPage: signed in without dashboard access', () => {
     renderLogin({ email: 'new@test', user: null })
     expect(await screen.findByText(/does not manage a business/)).toBeInTheDocument()
     expect(screen.queryByText(/turned off by the Owner/)).toBeNull()
+  })
+})
+
+describe('LoginPage: sign-in form', () => {
+  // Owner 2026-11-04: no Google sign-in; the form offers email and password only.
+  it('has no Google button and no "or" divider', async () => {
+    renderLogin(null)
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Google/ })).toBeNull()
+    expect(screen.queryByText('Coming soon')).toBeNull()
   })
 })
