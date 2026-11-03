@@ -1,10 +1,10 @@
-# P11 · Sanctus alignment (client references and requirements)
+﻿# P11 · Sanctus alignment (client references and requirements)
 → design/11, design/21, ADR-0023. Branch `feature/sanctus-brand-design-system` (from `main`). The work is split into five sub-projects, approved by the owner on 2026-10-20 and done in this order.
 
 ## Sub-project 1 · Brand and design system: done (2026-10-20)
 - [x] Reference inventory and transcription: every image in `AR-attachment/` mapped to a page or section (design/21)
 - [x] Tokens from the moodboard palette; Cormorant Garamond + Jost; eyebrow/label styles; 2px corners (`src/index.css`)
-- [x] Wordmark and monogram traced from the brand board (`BrandMark.tsx`, `public/favicon.svg`); "Furnish AR" removed from the UI
+- [x] Wordmark and monogram traced from the brand board (`BrandMark.tsx`, `public/brand/sanctus-logo-source.jpg (now PNG/ICO icons)`); "Furnish AR" removed from the UI
 - [x] Landing page recreated from R3, with the reference copy (PT verbatim, EN translated); every call to action leads to a real catalogue or product, or is not shown
 - [x] Header (overlay/solid, EN/PT, account, `<dialog>` mobile menu) and footer
 - [x] Catalogue page: editorial header, text category filters, 4:5 photo-first cards
