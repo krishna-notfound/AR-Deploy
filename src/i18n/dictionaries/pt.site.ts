@@ -13,4 +13,9 @@ export const ptSite: Partial<Record<TranslationKey, string>> = {
   'site.social.youtube': 'YouTube',
   'site.social.tiktok': 'TikTok',
   'site.social.pinterest': 'Pinterest',
+
+  'landing.show.viewLabel': 'Mostrar a peça como',
+  'landing.show.image': 'Imagem',
+  'landing.show.arLabel': 'Ver na sua sala',
+  'landing.show.by': 'Por {business}. Abra a peça para a ver na sua sala com Realidade Aumentada.',
 }

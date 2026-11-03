@@ -6,11 +6,11 @@ import type { Business, Category, Product } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
-import { useFormat } from '@/lib/useFormat'
 import { APPLY_PATH, catalogLocalPath, productLocalPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { LandingCollections } from './LandingCollections'
+import { LandingShowcase, useShowcaseProduct } from './LandingShowcase'
 import { SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
 
 // Photography: the owner's Stitch set (AI-generated, design/stitch/BRIEF.md), 1200×896 unless noted.
@@ -44,7 +44,7 @@ export default function LandingPage() {
       <main>
         <Hero exampleHref={links.piece3d ?? links.catalog} />
         <HowItWorks />
-        <Experience pieceHref={links.piece3d} catalogHref={links.catalog} />
+        <Experience />
         <LandingCollections />
         <About />
         <Partners />
@@ -180,14 +180,16 @@ function HowItWorks() {
 }
 
 /**
- * 3D and AR, explained. The card on the right is the Linden armchair from the brand references: an illustration with
- * no product record or 3D model, so it is labelled as such and never links anywhere (ADR-0023). The call to action
- * opens a real published product that has a model.
+ * 3D and AR, explained. The card on the right is a real product the admin features (image or live 3D); with no
+ * product that has a model it is the labelled Linden illustration (ADR-0023). The call to action opens that same
+ * product's page, never a catalogue.
  */
-function Experience({ pieceHref, catalogHref }: { pieceHref?: string; catalogHref?: string }) {
+function Experience() {
   const { t } = useI18n()
-  const { money } = useFormat()
-  const href = pieceHref ?? catalogHref
+  // TODO(controller): feed `featured` from useLandingFeatured() (@/services/contentHooks) once that hook is merged.
+  const featured = undefined
+  const showcase = useShowcaseProduct(featured)
+  const href = showcase.href
   return (
     <section id="experiencia" className="scroll-mt-24 bg-obsidian text-chalk" aria-labelledby="xp-title">
       <div className={cn(SECTION, 'grid gap-14 py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-center lg:gap-20 lg:py-28')}>
@@ -212,52 +214,13 @@ function Experience({ pieceHref, catalogHref }: { pieceHref?: string; catalogHre
           </ol>
           {href && (
             <Link to={href} className={cn(CTA, 'mt-10 bg-chalk text-ink hover:bg-limestone')}>
-              {pieceHref ? t('landing.xp.cta') : t('landing.band.cta')}
+              {t('landing.xp.cta')}
               {arrowIcon}
             </Link>
           )}
         </div>
 
-        <figure className="border border-chalk/15 p-4 sm:p-6">
-          <div className="flex items-start justify-between gap-4 border-b border-chalk/15 pb-4">
-            <div>
-              <p className="text-label text-chalk/60">{t('landing.feature.eyebrow')}</p>
-              <p className="mt-1.5 font-display text-[1.75rem] leading-none">{t('landing.feature.name')}</p>
-            </div>
-            {/* What a product page offers; not controls (this piece is an illustration). */}
-            <div className="flex gap-2 text-[10px] leading-none tracking-[0.2em]" aria-hidden>
-              <span className="border border-chalk/30 px-2.5 py-1.5">3D</span>
-              <span className="border border-chalk/30 px-2.5 py-1.5">AR</span>
-            </div>
-          </div>
-          <div className="relative mt-4 sm:mt-6">
-            <img
-              src={IMG('armchair-walnut')}
-              alt={t('landing.feature.imageAlt')}
-              width={1200}
-              height={896}
-              loading="lazy"
-              className="aspect-[4/3] w-full bg-umber object-cover"
-            />
-            <span className="absolute top-3 left-3 bg-obsidian px-2.5 py-1.5 text-[10px] leading-none tracking-[0.18em] text-chalk uppercase">
-              {t('landing.xp.illustration')}
-            </span>
-          </div>
-          <figcaption className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <dl className="grid gap-4 text-[13px] sm:grid-cols-2">
-              <div>
-                <dt className="text-label text-chalk/60">{t('landing.feature.dimsLabel')}</dt>
-                <dd className="mt-1.5 tracking-[0.04em] text-chalk/85">{t('landing.feature.dims')}</dd>
-              </div>
-              <div>
-                <dt className="text-label text-chalk/60">{t('landing.feature.materialsLabel')}</dt>
-                <dd className="mt-1.5 leading-5 text-chalk/85">{t('landing.feature.materials')}</dd>
-              </div>
-            </dl>
-            <p className="font-display text-xl tracking-[0.04em] sm:text-right">{money(249000, 'EUR')}</p>
-            <p className="text-xs leading-5 text-chalk/60 sm:col-span-2">{t('landing.feature.illustrative')}</p>
-          </figcaption>
-        </figure>
+        <LandingShowcase featured={featured} resolved={showcase} />
       </div>
     </section>
   )

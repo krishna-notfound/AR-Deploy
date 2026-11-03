@@ -58,17 +58,22 @@ describe('landing page for a business owner', () => {
     expect(xp).not.toHaveTextContent('Android with Scene Viewer')
   })
 
-  it('shows the illustrative piece in euros, in both languages', () => {
-    const { unmount } = renderLanding()
+  it('shows a real product with a model in the 3D section, and its call to action opens that product page', async () => {
+    renderLanding()
     const xp = document.getElementById('experiencia')!
-    expect(xp).toHaveTextContent('€')
-    expect(xp).not.toHaveTextContent('R$')
-    expect(xp).toHaveTextContent('Illustrative piece')
-    unmount()
+    const three = await within(xp).findByRole('button', { name: '3D' })
+    expect(three).toHaveAttribute('aria-pressed', 'false')
+    expect(xp).not.toHaveTextContent('Illustrative piece')
+    const cta = within(xp).getByRole('link', { name: /Open a live piece in 3D/ })
+    expect(cta.getAttribute('href')).toMatch(/^\/products\/[\w-]+\/[\w-]+$/)
+    expect(within(xp).getByRole('link', { name: 'View in your room' })).toHaveAttribute('href', cta.getAttribute('href'))
+  })
+
+  it('shows the 3D section in Portuguese too', async () => {
     renderLanding('pt')
     const xpPt = document.getElementById('experiencia')!
-    expect(xpPt).toHaveTextContent('€')
-    expect(xpPt).toHaveTextContent('Peça ilustrativa')
+    expect(await within(xpPt).findByRole('button', { name: '3D' })).toBeInTheDocument()
+    expect(within(xpPt).getByRole('button', { name: 'Imagem' })).toBeInTheDocument()
     expect(xpPt).toHaveTextContent('Chrome')
     expect(screen.getAllByRole('link', { name: 'Candidatar a sua empresa' })[0]).toHaveAttribute('href', APPLY_PATH)
   })

@@ -12,4 +12,9 @@ export const enSite = {
   'site.social.youtube': 'YouTube',
   'site.social.tiktok': 'TikTok',
   'site.social.pinterest': 'Pinterest',
+
+  'landing.show.viewLabel': 'Show the piece as',
+  'landing.show.image': 'Image',
+  'landing.show.arLabel': 'View in your room',
+  'landing.show.by': 'By {business}. Open the piece to see it in your room with AR.',
 } as const
