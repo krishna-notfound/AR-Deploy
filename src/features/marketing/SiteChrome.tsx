@@ -119,7 +119,8 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
           </ul>
         </nav>
         <div className="ml-auto flex items-center gap-2 sm:gap-5 xl:ml-0">
-          {hasLang && <LanguageSwitcher className="max-[379px]:hidden" />}
+          {/* On phones the switch lives in the menu, so the wordmark and Apply have room. */}
+          {hasLang && <LanguageSwitcher className="max-sm:hidden" />}
           {cta && (
             // The main action, in the bar at every width (a shorter label on a phone).
             <Link
