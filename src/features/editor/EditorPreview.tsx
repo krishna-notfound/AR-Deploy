@@ -7,7 +7,7 @@ import { ErrorState } from '@/components/ui/States'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { editorApplyPath, editorPagePath, editorPagesPath } from '@/lib/urls'
+import { editorApplyPath, editorLandingPath, editorPagePath, editorPagesPath } from '@/lib/urls'
 import { useContentDraft } from '@/services/contentHooks'
 import CustomPage from '../legal/CustomPage'
 import LegalPage from '../legal/LegalPage'
@@ -17,13 +17,16 @@ import { PREVIEW_REFERENCE, guardApplicationSubmit } from './previewGuard'
 
 const ApplyPage = lazy(() => import('@/features/apply/ApplyPage'))
 
-type Target = { kind: 'page'; key: string } | { kind: 'apply' } | { kind: 'apply-done' } | { kind: 'footer' } | { kind: 'unknown' }
+const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
+
+type Target = { kind: 'page'; key: string } | { kind: 'apply' } | { kind: 'apply-done' } | { kind: 'footer' } | { kind: 'landing' } | { kind: 'unknown' }
 
 function parseTarget(rest: string): Target {
   const parts = rest.split('/').filter(Boolean)
   if (parts[0] === 'page' && parts[1]) return { kind: 'page', key: decodeURIComponent(parts[1]) }
   if (parts[0] === 'apply') return parts[1] === 'done' ? { kind: 'apply-done' } : { kind: 'apply' }
   if (parts[0] === 'footer') return { kind: 'footer' }
+  if (parts[0] === 'landing') return { kind: 'landing' }
   return { kind: 'unknown' }
 }
 
@@ -44,7 +47,14 @@ export default function EditorPreview() {
   const sendsNothing = target.kind === 'apply' || target.kind === 'apply-done'
   useEffect(() => (sendsNothing ? guardApplicationSubmit() : undefined), [sendsNothing])
 
-  const back = target.kind === 'page' ? editorPagePath(target.key) : target.kind === 'apply' || target.kind === 'apply-done' ? editorApplyPath() : editorPagesPath()
+  const back =
+    target.kind === 'page'
+      ? editorPagePath(target.key)
+      : target.kind === 'apply' || target.kind === 'apply-done'
+        ? editorApplyPath()
+        : target.kind === 'landing'
+          ? editorLandingPath()
+          : editorPagesPath()
 
   return (
     <SiteContentProvider source="draft">
@@ -118,6 +128,8 @@ function PreviewBody({ target }: { target: Target }) {
           <SiteFooter />
         </div>
       )
+    case 'landing':
+      return <LandingPage />
     case 'unknown':
       return <Navigate to={editorPagesPath()} replace />
   }

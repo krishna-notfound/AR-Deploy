@@ -32,7 +32,7 @@ describe('mock content service', () => {
     const s = data(await svc.getContentDraft())
     expect(s).toMatchObject({ version: 0, published: null, publishedAt: null, publishedByName: null })
     expect(s.draft).toEqual(emptySiteContent())
-    expect(data(await svc.getPublishedChrome())).toEqual({ version: 0, footerPages: [], social: {} })
+    expect(data(await svc.getPublishedChrome())).toEqual({ version: 0, footerPages: [], social: {}, landingCollections: [] })
     expect(data(await svc.getPublishedPage('terms'))).toBeNull()
     expect(data(await svc.getPublishedPage('privacy'))).toBeNull()
     expect(err(await svc.getPublishedPage('about'))?.code).toBe('NOT_FOUND')
@@ -104,6 +104,28 @@ describe('mock content service', () => {
     expect(err(await svc.saveContentDraft(many, s.draftUpdatedAt))).toMatchObject({ code: 'VALIDATION', fieldErrors: { customPages: 'too_many' } })
   })
 
+  it('landing collections: a draft with cards is not public until published; publish carries them; more than eight cannot be saved; a bad card cannot be published', async () => {
+    const s = data(await svc.getContentDraft())
+    const card = (title: string, over: Record<string, unknown> = {}) => ({ id: crypto.randomUUID(), title: { en: title }, image: 'lamp-vase', link: { kind: 'apply' }, ...over }) as never
+    const cards = [card('First'), card('Second', { hidden: true })]
+    const saved = data(await svc.saveContentDraft(doc((x) => void (x.landing.collections = cards)), s.draftUpdatedAt))
+    expect(data(await svc.getPublishedChrome()).landingCollections).toEqual([])
+    const published = data(await svc.publishContent(saved.draftUpdatedAt))
+    expect(published.version).toBe(1)
+    // The public chrome carries the published cards (hidden ones too: the page skips them).
+    expect(data(await svc.getPublishedChrome()).landingCollections).toEqual(cards)
+
+    // Eight are fine, nine are refused on save.
+    const d = data(await svc.getContentDraft())
+    const nine = doc((x) => void (x.landing.collections = Array.from({ length: 9 }, (_, i) => card(`Card ${i}`))))
+    expect(err(await svc.saveContentDraft(nine, d.draftUpdatedAt))).toMatchObject({ code: 'VALIDATION', fieldErrors: { 'landing.collections': 'too_many' } })
+
+    // An incomplete card is a draft, but cannot be published.
+    const bad = data(await svc.saveContentDraft(doc((x) => void (x.landing.collections = [card('No link yet', { link: { kind: 'product', businessSlug: '', productSlug: '' } })])), d.draftUpdatedAt))
+    expect(err(await svc.publishContent(bad.draftUpdatedAt))).toMatchObject({ code: 'VALIDATION', fieldErrors: { 'landing.collections.0.link.businessSlug': 'required' } })
+    expect(data(await svc.getPublishedChrome()).landingCollections).toEqual(cards)
+  })
+
   it('public reads: chrome lists footer pages in order with social links; custom pages by slug; the apply form; never the draft', async () => {
     const s = data(await svc.getContentDraft())
     const c = doc((x) => {
@@ -112,7 +134,7 @@ describe('mock content service', () => {
       x.applyForm.texts = { 'apply.done.title': { en: 'Thanks' } }
     })
     const saved = data(await svc.saveContentDraft(c, s.draftUpdatedAt))
-    expect(data(await svc.getPublishedChrome())).toEqual({ version: 0, footerPages: [], social: {} })
+    expect(data(await svc.getPublishedChrome())).toEqual({ version: 0, footerPages: [], social: {}, landingCollections: [] })
     data(await svc.publishContent(saved.draftUpdatedAt))
     // A later unpublished edit must not leak.
     const d = data(await svc.getContentDraft())
@@ -122,6 +144,7 @@ describe('mock content service', () => {
       version: 1,
       footerPages: [{ slug: 'a-page', title: { en: 'Alpha', pt: 'Alfa' } }, { slug: 'b-page', title: { en: 'B-PAGE' } }],
       social: { instagram: 'https://instagram.com/sanctus' },
+      landingCollections: [],
     })
     expect(data(await svc.getPublishedPage('a-page'))).toEqual({ kind: 'custom', title: { en: 'Alpha', pt: 'Alfa' }, body: { en: 'Body of a-page' } })
     expect(data(await svc.getPublishedPage('quiet'))).toMatchObject({ kind: 'custom' })

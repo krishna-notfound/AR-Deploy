@@ -1,5 +1,5 @@
 # ADR-0043: Content Editor in the Admin Console: draft, publish, history
-- **Status:** Accepted (owner, 2026-10-29)
+- **Status:** Accepted (owner, 2026-10-29); superseded in part by ADR-0046 (the landing page Collections cards are editable)
 - **Date:** 2026-10-29
 - **Affects:** ADR-0029 (17th permission), ADR-0032 (2FA gate), ADR-0024 (application form), design/19-supabase.md, design/12-features-admin.md, design/24-applications.md, docs/superpowers/specs/2026-10-29-content-editor-and-bilingual-dashboards-design.md
 

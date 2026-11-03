@@ -21,7 +21,7 @@ describe('supabase content service: one rpc per method', () => {
   it('public reads call get_published_site_content with the part, and treat null content as nothing published', async () => {
     const f = fake({ get_published_site_content: { data: { version: 0, content: null } } })
     const svc = createSupabaseContent(f.sb)
-    expect(await svc.getPublishedChrome()).toEqual({ ok: true, data: { version: 0, footerPages: [], social: {} } })
+    expect(await svc.getPublishedChrome()).toEqual({ ok: true, data: { version: 0, footerPages: [], social: {}, landingCollections: [] } })
     expect(await svc.getPublishedPage('terms')).toEqual({ ok: true, data: null })
     expect(await svc.getPublishedPage('privacy')).toEqual({ ok: true, data: null })
     expect(await svc.getPublishedPage('about')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
@@ -40,7 +40,33 @@ describe('supabase content service: one rpc per method', () => {
     const svc = createSupabaseContent(fake({ get_published_site_content: { data: chrome } }).sb)
     expect(await svc.getPublishedChrome()).toEqual({
       ok: true,
-      data: { version: 3, footerPages: [{ slug: 'about', title: { en: 'About', pt: 'Sobre' } }], social: { instagram: 'https://instagram.com/x' } },
+      data: { version: 3, footerPages: [{ slug: 'about', title: { en: 'About', pt: 'Sobre' } }], social: { instagram: 'https://instagram.com/x' }, landingCollections: [] },
+    })
+
+    // The landing cards are cleaned like a draft: unknown keys and link kinds are dropped, a bad link becomes "no link".
+    const landing = {
+      version: 5,
+      content: {
+        footerPages: [],
+        social: {},
+        landingCollections: [
+          { id: 'a', title: { en: 'Sofas', pt: 'Sofás' }, image: 'sofa-travertine', link: { kind: 'catalog', businessSlug: 'acme', category: 'sofa' }, junk: 1 },
+          { id: 'b', title: { en: 'Hidden' }, image: 'lamp-vase', link: { kind: 'javascript', url: 'x' }, hidden: true },
+        ],
+      },
+    }
+    const withCards = createSupabaseContent(fake({ get_published_site_content: { data: landing } }).sb)
+    expect(await withCards.getPublishedChrome()).toEqual({
+      ok: true,
+      data: {
+        version: 5,
+        footerPages: [],
+        social: {},
+        landingCollections: [
+          { id: 'a', title: { en: 'Sofas', pt: 'Sofás' }, image: 'sofa-travertine', link: { kind: 'catalog', businessSlug: 'acme', category: 'sofa' } },
+          { id: 'b', title: { en: 'Hidden' }, image: 'lamp-vase', link: { kind: 'none' }, hidden: true },
+        ],
+      },
     })
 
     const builtin = createSupabaseContent(fake({ get_published_site_content: { data: { version: 2, content: { kind: 'builtin', body: { pt: 'Termos' } } } } }).sb)

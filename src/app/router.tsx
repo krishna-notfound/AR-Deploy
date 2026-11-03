@@ -4,7 +4,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, type RouteObject, createBrowserRouter, useLocation } from 'react-router'
 import { isDemoMode } from '@/services'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { loadApplyScreen, loadEditorLayout, loadPageEditorScreen, loadPagesScreen, loadSocialScreen } from '@/features/editor/preload'
+import { loadApplyScreen, loadEditorLayout, loadLandingScreen, loadPageEditorScreen, loadPagesScreen, loadSocialScreen } from '@/features/editor/preload'
 import { SiteContentProvider } from '@/features/marketing/SiteContentProvider'
 import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
 import { DashboardDictionaries } from '@/i18n/DashboardDictionaries'
@@ -32,6 +32,7 @@ const EditorPagesScreen = lazy(loadPagesScreen)
 const EditorPageScreen = lazy(loadPageEditorScreen)
 const EditorApplyScreen = lazy(loadApplyScreen)
 const EditorSocialScreen = lazy(loadSocialScreen)
+const EditorLandingScreen = lazy(loadLandingScreen)
 
 // The signed-in frames (role guard, 2FA gate, shell) load with the first dashboard route, in parallel with the dashboard text.
 const loadFrames = () => import('./DashboardFrames')
@@ -124,6 +125,7 @@ const adminRoutes: RouteObject = {
         { path: 'pages/:pageKey', element: <EditorPageScreen /> },
         { path: 'apply', element: <EditorApplyScreen /> },
         { path: 'social', element: <EditorSocialScreen /> },
+        { path: 'landing', element: <EditorLandingScreen /> },
       ],
     },
     { path: 'team', element: <RequirePermission need="owner"><TeamPage /></RequirePermission> },

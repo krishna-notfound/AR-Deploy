@@ -129,7 +129,8 @@ export const editorPagesPath = () => `${EDITOR_PATH}/pages`
 export const editorPagePath = (pageKey: string) => `${EDITOR_PATH}/pages/${encodeURIComponent(pageKey)}`
 export const editorApplyPath = (tab?: 'form' | 'messages') => `${EDITOR_PATH}/apply${tab ? `?tab=${tab}` : ''}`
 export const editorSocialPath = () => `${EDITOR_PATH}/social`
-/** Preview of the draft: `page/<pageKey>`, `apply`, `apply/done` or `footer`. */
+export const editorLandingPath = () => `${EDITOR_PATH}/landing`
+/** Preview of the draft: `page/<pageKey>`, `apply`, `apply/done`, `footer` or `landing`. */
 export const editorPreviewPath = (target: string) => `${EDITOR_PATH}/preview/${target}`
 
 export const applicationAdminPath = (id: string) => `/admin/applications/${id}`

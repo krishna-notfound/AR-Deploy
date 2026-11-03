@@ -10,12 +10,12 @@ const hasText = (v: Partial<Record<string, string>> | undefined): v is Partial<R
 
 /** Footer pages (shown ones, by `order` then English title: slug and title only) and social links. `null` = nothing published. */
 export function chromeOf(content: SiteContent | null, version: number): PublishedChrome {
-  if (!content) return { version: 0, footerPages: [], social: {} }
+  if (!content) return { version: 0, footerPages: [], social: {}, landingCollections: [] }
   const footerPages = content.customPages
     .filter((p) => p.showInFooter)
     .sort((a, b) => a.order - b.order || a.title.en.localeCompare(b.title.en))
     .map((p) => ({ slug: p.slug, title: clone(p.title) }))
-  return { version, footerPages, social: clone(content.social) }
+  return { version, footerPages, social: clone(content.social), landingCollections: clone(content.landing?.collections ?? []) }
 }
 
 /**

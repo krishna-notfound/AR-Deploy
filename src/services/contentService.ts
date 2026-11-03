@@ -6,7 +6,7 @@
 // (fieldErrors by document path), NOT_FOUND (an unknown custom slug or version). A database without the migration answers
 // UNKNOWN with reason not_enabled; the public pages then fall back to the built-in text.
 import type { ISODate, LocalizedText } from '@/domain/types'
-import type { ApplyFormConfig, Lang, SiteContent } from '@/domain/siteContent'
+import type { ApplyFormConfig, Lang, LandingCollection, SiteContent } from '@/domain/siteContent'
 import type { Result } from './catalogService'
 
 export interface PublishedChrome {
@@ -15,6 +15,8 @@ export interface PublishedChrome {
   /** Custom pages shown in the footer, in footer order: slug and title only. */
   footerPages: { slug: string; title: LocalizedText }[]
   social: SiteContent['social']
+  /** The landing page's Collections cards, hidden ones included (the page skips them). Empty: show the built-in four. */
+  landingCollections: LandingCollection[]
 }
 export type PublishedPage =
   | { kind: 'builtin'; body: Partial<Record<Lang, string>> } // terms | privacy overrides

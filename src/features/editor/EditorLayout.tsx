@@ -10,7 +10,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { EDITOR_PATH, editorApplyPath, editorPagesPath, editorPreviewPath, editorSocialPath } from '@/lib/urls'
+import { EDITOR_PATH, editorApplyPath, editorLandingPath, editorPagesPath, editorPreviewPath, editorSocialPath } from '@/lib/urls'
 import { useFormat } from '@/lib/useFormat'
 import { EditorContext } from './EditorContext'
 import { EditorAreaSkeleton, EditorSkeleton } from './EditorSkeleton'
@@ -25,6 +25,7 @@ preloadEditorScreens()
 
 const MENU: { to: string; key: TranslationKey }[] = [
   { to: editorPagesPath(), key: 'editor.menu.pages' },
+  { to: editorLandingPath(), key: 'editor.menu.landing' },
   { to: editorApplyPath(), key: 'editor.menu.apply' },
   { to: editorSocialPath(), key: 'editor.menu.social' },
 ]
@@ -37,6 +38,7 @@ function previewTarget(pathname: string): string {
   const page = /^\/admin\/editor\/pages\/([^/]+)$/.exec(pathname)
   if (page) return `page/${page[1]}`
   if (pathname.startsWith(`${EDITOR_PATH}/apply`)) return 'apply'
+  if (pathname.startsWith(editorLandingPath())) return 'landing'
   return 'footer'
 }
 

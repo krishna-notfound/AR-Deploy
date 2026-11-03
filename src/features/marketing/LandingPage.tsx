@@ -4,7 +4,6 @@ import { Link, Navigate, useSearchParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { arrowLinkClasses } from '@/components/ui/Button'
 import type { Business, Category, Product } from '@/domain/types'
-import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
@@ -12,18 +11,11 @@ import { APPLY_PATH, catalogLocalPath, productLocalPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { TAP_TARGET } from '../public/tapTarget'
+import { LandingCollections } from './LandingCollections'
 import { SectionLink, SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
 
 // Photography: the owner's Stitch set (AI-generated, design/stitch/BRIEF.md), 1200×896 unless noted.
 const IMG = (name: string) => `/images/sanctus/v2/${name}.webp`
-
-// The four collection cards of the reference, each tied to a platform category so "Ver coleção" opens real products.
-const COLLECTIONS: { key: 'sofas' | 'tables' | 'armchairs' | 'decor'; category: Category; img: string; focus?: string }[] = [
-  { key: 'sofas', category: 'sofa', img: 'sofa-travertine' },
-  { key: 'tables', category: 'table', img: 'dining-table' },
-  { key: 'armchairs', category: 'chair', img: 'lounge-chair', focus: 'object-[62%_80%]' },
-  { key: 'decor', category: 'decor', img: 'lamp-vase' },
-]
 
 const FEATURES = [
   ['landing.xp.f1Title', 'landing.xp.f1Body'],
@@ -52,7 +44,7 @@ export default function LandingPage() {
       <SiteHeader />
       <main>
         <Hero />
-        <Collections links={links} />
+        <LandingCollections />
         <Experience pieceHref={links.piece3d} catalogHref={links.catalog} />
         <About />
         <Manifesto />
@@ -166,57 +158,6 @@ function Hero() {
             {t('landing.hero.caption')}
           </figcaption>
         </figure>
-      </div>
-    </section>
-  )
-}
-
-function Collections({ links }: { links: ReturnType<typeof useLandingLinks> }) {
-  const { t } = useI18n()
-  return (
-    <section id="colecoes" className="scroll-mt-24" aria-labelledby="col-title">
-      <div className={cn(SECTION, 'py-20 lg:py-28')}>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] lg:items-end lg:gap-14">
-          <div>
-            <Eyebrow>{t('landing.col.eyebrow')}</Eyebrow>
-            <h2 id="col-title" className="mt-4 text-headline">
-              <TwoLines a={t('landing.col.title1')} b={t('landing.col.title2')} />
-            </h2>
-          </div>
-          <p className="max-w-xl text-[15px] leading-7 text-ink-muted">{t('landing.col.body')}</p>
-          {links.catalog && (
-            <ArrowLink to={links.catalog} className="justify-self-start text-ink lg:justify-self-end">
-              {t('landing.col.all')}
-            </ArrowLink>
-          )}
-        </div>
-        <hr className="mt-10 border-line lg:mt-14" />
-        <ul className="mt-10 grid grid-cols-2 gap-3 sm:gap-6 lg:mt-14 lg:grid-cols-4">
-          {COLLECTIONS.map((c, i) => {
-            const href = links.category(c.category)
-            const name = t(`landing.col.${c.key}` as TranslationKey)
-            return (
-              <li key={c.key} className="flex flex-col border border-line bg-surface p-2.5 sm:p-4">
-                <div className="relative">
-                  <img src={IMG(c.img)} alt="" width={1200} height={896} loading="lazy" className={cn('aspect-[4/5] w-full bg-subtle object-cover', c.focus)} />
-                  <span className="absolute top-2 left-2 bg-surface px-2 py-1 text-[9px] leading-none tracking-[0.16em] text-ink-muted uppercase sm:top-3 sm:left-3 sm:text-[10px]">
-                    {`${String(i + 1).padStart(2, '0')} // ${t('landing.col.chip')}`}
-                  </span>
-                </div>
-                <h3 className="mt-4 font-display text-[1.375rem] leading-tight font-normal text-ink sm:mt-5 sm:text-[1.625rem]">{name}</h3>
-                <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t(`landing.col.${c.key}Body` as TranslationKey)}</p>
-                {href && (
-                  <div className="mt-auto pt-5">
-                    <ArrowLink to={href} className="text-ink">
-                      <span className="sr-only">{name}: </span>
-                      {t('landing.col.view')}
-                    </ArrowLink>
-                  </div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
       </div>
     </section>
   )

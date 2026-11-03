@@ -14,6 +14,8 @@ import {
   type Lang,
 } from '../../supabase/functions/_shared/applyForm.ts'
 
+import { CATEGORIES, type Category } from './types'
+
 export type { ApplyFormConfig, ContentErrorKey, ContentErrors, Lang }
 export * from '../../supabase/functions/_shared/applyForm.ts'
 
@@ -37,6 +39,48 @@ export interface CustomPage {
   order: number
 }
 
+/** The built-in landing photos a collection card may use (public/images/sanctus/v2). The labels live in features/marketing/landingImages.ts, which is typed by this list. */
+export const LANDING_IMAGE_KEYS = [
+  'sofa-travertine',
+  'dining-table',
+  'lounge-chair',
+  'lamp-vase',
+  'hero-living',
+  'armchair-walnut',
+  'coffee-table',
+  'detail-joinery',
+  'interior-villa',
+  'ar-phone',
+  'model-wireframe',
+  'showroom-qr',
+] as const
+export type LandingImageKey = (typeof LANDING_IMAGE_KEYS)[number]
+
+/** Where a landing collection card leads. `product` and `catalog` name the business and product by slug (the public address parts). */
+export type LandingCollectionLink =
+  | { kind: 'product'; businessSlug: string; productSlug: string }
+  | { kind: 'catalog'; businessSlug: string; category?: Category }
+  | { kind: 'apply' }
+  | { kind: 'none' }
+
+/** A card of the landing page's Collections section (ADR-0046). */
+export interface LandingCollection {
+  /** crypto.randomUUID(); stable while the card is edited and moved. */
+  id: string
+  /** 1..60 characters. */
+  title: { en: string; pt?: string }
+  /** 0..160 characters. */
+  text?: { en: string; pt?: string }
+  /** A key of LANDING_IMAGE_KEYS. */
+  image: string
+  link: LandingCollectionLink
+  hidden?: boolean
+}
+
+export const MAX_LANDING_COLLECTIONS = 8
+export const MAX_COLLECTION_TITLE = 60
+export const MAX_COLLECTION_TEXT = 160
+
 export interface SiteContent {
   schema: 1
   /** Terms and Privacy. Absent key or absent language = show the built-in text for it. Markdown. */
@@ -46,6 +90,8 @@ export interface SiteContent {
   applyForm: ApplyFormConfig
   /** https URL per network. */
   social: Partial<Record<SocialNetwork, string>>
+  /** The landing page's Collections cards. Empty = the page shows its built-in four. At most 8. */
+  landing: { collections: LandingCollection[] }
 }
 
 export const MAX_CUSTOM_PAGES = 20
@@ -59,7 +105,7 @@ const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
 export function emptySiteContent(): SiteContent {
-  return { schema: 1, builtinPages: {}, customPages: [], applyForm: clone(DEFAULT_APPLY_FORM), social: {} }
+  return { schema: 1, builtinPages: {}, customPages: [], applyForm: clone(DEFAULT_APPLY_FORM), social: {}, landing: { collections: [] } }
 }
 
 // ---- normalize -------------------------------------------------------------------------------------------------------
@@ -102,6 +148,25 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   out.applyForm = normalizeApplyForm(raw.applyForm)
   const social = obj(raw.social)
   for (const n of SOCIAL_NETWORKS) if (typeof social[n] === 'string' && social[n]) out.social[n] = social[n]
+  const collections = obj(raw.landing).collections
+  if (Array.isArray(collections)) out.landing.collections = collections.map(normalizeCollection)
+  return out
+}
+
+function normalizeCollection(x: unknown): LandingCollection {
+  const o = obj(x)
+  const l = obj(o.link)
+  let link: LandingCollectionLink = { kind: 'none' }
+  if (l.kind === 'product') link = { kind: 'product', businessSlug: str(l.businessSlug), productSlug: str(l.productSlug) }
+  else if (l.kind === 'catalog')
+    link = typeof l.category === 'string' && l.category ? { kind: 'catalog', businessSlug: str(l.businessSlug), category: l.category as Category } : { kind: 'catalog', businessSlug: str(l.businessSlug) }
+  else if (l.kind === 'apply') link = { kind: 'apply' }
+  const out: LandingCollection = { id: str(o.id), title: pair(o.title), image: str(o.image), link }
+  if (o.text !== undefined) {
+    const text = pair(o.text)
+    if (text.en || text.pt) out.text = text
+  }
+  if (o.hidden === true) out.hidden = true
   return out
 }
 
@@ -192,10 +257,19 @@ export function validateContentShape(doc: unknown): ContentErrors {
     else if (Array.isArray(af.customQuestions) && af.customQuestions.length > 10) e['applyForm.customQuestions'] = 'too_many'
     else if (Array.isArray(af.fields) && af.fields.length > 40) e['applyForm.fields'] = 'too_many'
   }
+  if ('landing' in d) {
+    const l = d.landing
+    if (typeof l !== 'object' || l === null || Array.isArray(l)) return { landing: 'invalid_value' }
+    const c = (l as Record<string, unknown>).collections
+    if (c !== undefined) {
+      if (!Array.isArray(c)) return { 'landing.collections': 'invalid_value' }
+      if (c.length > MAX_LANDING_COLLECTIONS) return { 'landing.collections': 'too_many' }
+    }
+  }
   return e
 }
 
-// ---- validate --------------------------------------------------------------------------------------------------------
+// ---- validate--------------------------------------------------------------------------------------------------------
 /**
  * Validates the whole document (the editor runs it on every change; publish is disabled while it returns anything).
  * Keys are document paths: `schema`, `builtinPages.terms.pt`, `customPages` (count), `customPages.<i>.slug|title.en|
@@ -258,7 +332,37 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
       if (!c.ok) put(p, c.error === 'too_long' ? 'too_long' : c.error)
     }
   }
+  validateLandingCollections(doc.landing?.collections ?? [], put)
   return e
+}
+
+function validateLandingCollections(list: LandingCollection[], put: (path: string, key: ContentErrorKey) => void): void {
+  if (list.length > MAX_LANDING_COLLECTIONS) put('landing.collections', 'too_many')
+  const ids = new Set<string>()
+  list.forEach((c, i) => {
+    const p = `landing.collections.${i}`
+    if (!c.id) put(`${p}.id`, 'required')
+    else if (ids.has(c.id)) put(`${p}.id`, 'duplicate_id')
+    ids.add(c.id)
+    if (!(c.title?.en ?? '').trim()) put(`${p}.title.en`, 'required')
+    if ((c.title?.en ?? '').length > MAX_COLLECTION_TITLE) put(`${p}.title.en`, 'too_long')
+    if ((c.title?.pt ?? '').length > MAX_COLLECTION_TITLE) put(`${p}.title.pt`, 'too_long')
+    if ((c.text?.en ?? '').length > MAX_COLLECTION_TEXT) put(`${p}.text.en`, 'too_long')
+    if ((c.text?.pt ?? '').length > MAX_COLLECTION_TEXT) put(`${p}.text.pt`, 'too_long')
+    if (!(LANDING_IMAGE_KEYS as readonly string[]).includes(c.image)) put(`${p}.image`, c.image ? 'invalid_value' : 'required')
+    const link = c.link
+    if (link?.kind === 'product') {
+      for (const f of ['businessSlug', 'productSlug'] as const) {
+        const v = link[f]
+        if (!v) put(`${p}.link.${f}`, 'required')
+        else if (v.length > MAX_SLUG_LENGTH || !SLUG.test(v)) put(`${p}.link.${f}`, 'invalid_slug')
+      }
+    } else if (link?.kind === 'catalog') {
+      if (!link.businessSlug) put(`${p}.link.businessSlug`, 'required')
+      else if (link.businessSlug.length > MAX_SLUG_LENGTH || !SLUG.test(link.businessSlug)) put(`${p}.link.businessSlug`, 'invalid_slug')
+      if (link.category !== undefined && !(CATEGORIES as readonly string[]).includes(link.category)) put(`${p}.link.category`, 'invalid_value')
+    } else if (link?.kind !== 'apply' && link?.kind !== 'none') put(`${p}.link`, 'invalid_value')
+  })
 }
 
 // ---- change summary --------------------------------------------------------------------------------------------------
@@ -277,6 +381,8 @@ export interface ChangeSummary {
   questions: number
   /** Social links added, removed or changed. */
   social: number
+  /** Landing collection cards added, removed, edited, hidden or shown, plus one when their order changed. */
+  landingCollections: number
   total: number
 }
 
@@ -366,5 +472,23 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
   let social = 0
   for (const n of SOCIAL_NETWORKS) if ((a.social[n] ?? '') !== (b.social[n] ?? '')) social++
 
-  return { pages, footer, applicationTexts, applicationSteps, applicationFields, questions, social, total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social }
+  // Landing collections: per card by id, then the order of the cards both sides share.
+  let landingCollections = 0
+  const ca = new Map((a.landing?.collections ?? []).map((c) => [c.id, c]))
+  const cb = new Map((b.landing?.collections ?? []).map((c) => [c.id, c]))
+  for (const [id, c] of cb) if (!ca.has(id) || !same(ca.get(id), c)) landingCollections++
+  for (const id of ca.keys()) if (!cb.has(id)) landingCollections++
+  if (!same([...ca.keys()].filter((id) => cb.has(id)), [...cb.keys()].filter((id) => ca.has(id)))) landingCollections++
+
+  return {
+    pages,
+    footer,
+    applicationTexts,
+    applicationSteps,
+    applicationFields,
+    questions,
+    social,
+    landingCollections,
+    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections,
+  }
 }
