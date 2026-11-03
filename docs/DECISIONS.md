@@ -64,3 +64,4 @@ Architecture decision records live in `System_arch/decisions/` (index: `System_a
 | 2026-11-03 | Showcase product page redesigned simpler: no side "Photos" button, the product link and Share as real buttons, one Apply banner at the end; the same small button fixes on business product pages (owner said "okay do it" to the recommendation) | Owner | ADR-0047 |
 | 2026-11-03 | Website Editor: no page builder; a Showcase tab for the admin's products (shared product editor) and a simpler Landing tab (live example, 3D card, collections with picture upload and product picker) | Owner | ADR-0047 |
 | 2026-11-03 | Execute with parallel agents, test, apply the migration and deploy to main ("okay do it run multiagent ... tested and deploy it") | Owner | ADR-0047 |
+| 2026-11-04 | Meshopt-packed GLBs (Tripo "_meshopt" downloads) must work: unpack them on upload, let Build from GLB and the 3D viewer read them, and deploy ("implementaion of this fix") | Owner | ADR-0048 |

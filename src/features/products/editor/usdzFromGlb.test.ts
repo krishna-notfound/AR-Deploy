@@ -2,6 +2,7 @@
 import { Document, WebIO } from '@gltf-transform/core'
 import { describe, expect, it } from 'vitest'
 import { validateModelFile } from '@/lib/files'
+import { packedLikeGltfpack } from './packedGlb.testutil'
 import { buildUsdzFromGlb, usdzNameFor } from './usdzFromGlb'
 
 /** A 2 m x 1 m x 0.5 m box, no textures. */
@@ -17,6 +18,14 @@ async function boxGlb(): Promise<ArrayBuffer> {
 }
 
 describe('buildUsdzFromGlb (owner 2026-10-27, ADR-0039)', () => {
+  it('builds from a meshopt-packed GLB (a gltfpack / Tripo "_meshopt" file stored before uploads were unpacked)', async () => {
+    const plain = new File([await boxGlb()], 'box.glb')
+    const packed = await packedLikeGltfpack(plain)
+    const usdz = await buildUsdzFromGlb(await packed.arrayBuffer())
+    expect(await validateModelFile(new File([usdz as BlobPart], 'box-from-glb.usdz', { type: 'model/vnd.usdz+zip' }), 'usdz')).toEqual({ ok: true })
+    expect(new TextDecoder().decode(usdz)).toContain('point3f[] points')
+  })
+
   it('builds a USDZ that passes the upload checks (zip, USD first, uncompressed, aligned), in metres', async () => {
     const usdz = await buildUsdzFromGlb(await boxGlb())
     const file = new File([usdz as BlobPart], 'box-from-glb.usdz', { type: 'model/vnd.usdz+zip' })

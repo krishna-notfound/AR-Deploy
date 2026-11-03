@@ -5,8 +5,26 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import type { MeasuredSize } from '@/lib/scale'
 
 let loader: Promise<unknown> | null = null
+
+/**
+ * model-viewer and its meshopt decoder, served from this site (the CSP allows only same-origin scripts). Without the
+ * decoder a meshopt-packed GLB (gltfpack, Tripo "_meshopt"), as stored before uploads were unpacked, fails to load
+ * (owner 2026-11-04).
+ */
+async function importModelViewer(): Promise<unknown> {
+  const [mv, decoder] = await Promise.all([
+    import('@google/model-viewer'),
+    // The decoder's classic-script build; the package exports it for require() only, so it is named by its path.
+    import('../../../node_modules/meshoptimizer/meshopt_decoder.cjs?url'),
+  ])
+  // Set on the registered element (defined by the import above), so a stand-in module in tests is left alone.
+  const element = customElements.get('model-viewer') as (CustomElementConstructor & { meshoptDecoderLocation?: string }) | undefined
+  if (element) element.meshoptDecoderLocation = decoder.default
+  return mv
+}
+
 /** Downloads model-viewer once. A failed download is forgotten, so "Try again" fetches it again (AR audit 2026-10-26). */
-export function loadModelViewer(importer: () => Promise<unknown> = () => import('@google/model-viewer')): Promise<unknown> {
+export function loadModelViewer(importer: () => Promise<unknown> = importModelViewer): Promise<unknown> {
   loader ??= importer().catch((e: unknown) => {
     loader = null
     throw e

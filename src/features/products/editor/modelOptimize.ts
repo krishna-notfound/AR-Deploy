@@ -3,12 +3,13 @@
 // WebP or quantization. Lossless cleanup, downscaling textures larger than 2048 px (Google's limit for
 // Android AR) in the texture's own format, and, above 100,000 triangles, mesh simplification
 // (meshoptimizer, the algorithm @gltf-transform/cli uses). The output is re-read and compared with the
-// input; on any doubt the original file is kept.
+// input; on any doubt the original file is kept. A meshopt-packed upload (gltfpack, Tripo "_meshopt") is always unpacked
+// into a plain GLB, even when that is larger: the packed file opens nowhere without a decoder (owner 2026-11-04).
 // Loaded only through modelOptimizeClient.ts (on unless VITE_MODEL_OPTIMIZATION=off; owner 2026-10-26).
-import { type Document, WebIO, getBounds } from '@gltf-transform/core'
-import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions'
+import { type Document, getBounds } from '@gltf-transform/core'
 import { dedup, prune, resample, simplify, weld } from '@gltf-transform/functions'
 import { MeshoptSimplifier } from 'meshoptimizer'
+import { glbIo, unpack } from './glbIo'
 
 /** Scene Viewer's maximum texture size (developers.google.com/ar/develop/scene-viewer). */
 export const MAX_TEXTURE_PX = 2048
@@ -96,9 +97,10 @@ export async function optimizeGlb(file: File, resize: ImageResizer = canvasResiz
   const originalBytes = file.size
   const keep = (reason: string): OptimizeResult => ({ file, optimized: false, originalBytes, outputBytes: originalBytes, reason })
   try {
-    const io = new WebIO().registerExtensions(KHRONOS_EXTENSIONS)
+    const io = await glbIo()
     const doc = await io.readBinary(new Uint8Array(await file.arrayBuffer()))
     const before = summarize(doc)
+    const unpacked = await unpack(doc)
     await doc.transform(dedup(), prune(), resample())
     const simplified = before.triangles > MAX_TRIANGLES
     if (simplified) {
@@ -118,7 +120,7 @@ export async function optimizeGlb(file: File, resize: ImageResizer = canvasResiz
     const counts = { trianglesBefore: before.triangles, trianglesAfter: before.triangles }
     const problem = compareSummaries(before, after, { simplified })
     if (problem) return { ...keep(`Kept the original: optimizing would have meant ${problem}.`), ...counts }
-    if (out.byteLength > originalBytes * (1 - MIN_SAVING)) return { ...keep('Kept the original: it is already compact.'), ...counts }
+    if (!unpacked && out.byteLength > originalBytes * (1 - MIN_SAVING)) return { ...keep('Kept the original: it is already compact.'), ...counts }
     return {
       file: new File([out as BlobPart], file.name, { type: file.type }),
       optimized: true,

@@ -3,25 +3,30 @@
 // GLB and writes the USDZ in metres (metersPerUnit 1), so the true size is kept. Loaded only when the button is used.
 // USDZ stores the shape as text and textures as PNG, so the iPhone file is lighter again than the GLB: about 50,000
 // triangles and 1024 px textures (measured on a real chair: 16 MB at 100,000 triangles and 2048 px).
-import { WebIO } from '@gltf-transform/core'
-import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions'
 import { prune, simplify, weld } from '@gltf-transform/functions'
 import { MeshoptSimplifier } from 'meshoptimizer'
 import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { glbIo, unpack } from './glbIo'
 import { summarize } from './modelOptimize'
 
 export const USDZ_MAX_TRIANGLES = 50_000
 export const USDZ_MAX_TEXTURE_PX = 1024
 
-/** The GLB with at most USDZ_MAX_TRIANGLES triangles (same simplifier and error bound as the upload optimizer). */
+/**
+ * The GLB, plain (a meshopt-packed file stored before uploads were unpacked is decoded, which three.js needs) and with
+ * at most USDZ_MAX_TRIANGLES triangles (same simplifier and error bound as the upload optimizer).
+ */
 async function lighter(glb: ArrayBuffer): Promise<ArrayBuffer> {
-  const io = new WebIO().registerExtensions(KHRONOS_EXTENSIONS)
+  const io = await glbIo()
   const doc = await io.readBinary(new Uint8Array(glb))
   const { triangles } = summarize(doc)
-  if (triangles <= USDZ_MAX_TRIANGLES) return glb
-  await MeshoptSimplifier.ready
-  await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: USDZ_MAX_TRIANGLES / triangles, error: 0.001 }), prune())
+  const unpacked = await unpack(doc)
+  if (triangles <= USDZ_MAX_TRIANGLES && !unpacked) return glb
+  if (triangles > USDZ_MAX_TRIANGLES) {
+    await MeshoptSimplifier.ready
+    await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: USDZ_MAX_TRIANGLES / triangles, error: 0.001 }), prune())
+  }
   const out = await io.writeBinary(doc)
   return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer
 }

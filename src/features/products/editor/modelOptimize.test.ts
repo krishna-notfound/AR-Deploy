@@ -2,6 +2,7 @@
 import { Document, WebIO } from '@gltf-transform/core'
 import { describe, expect, it, vi } from 'vitest'
 import { compareSummaries, optimizeGlb, summarize } from './modelOptimize'
+import { packedLikeGltfpack } from './packedGlb.testutil'
 
 /** PNG bytes whose header says width x height, padded to `bytes` (the pipeline only reads the header). */
 function fakePng(width: number, height: number, bytes: number): Uint8Array {
@@ -61,6 +62,24 @@ async function denseGlb(n: number): Promise<File> {
   const bytes = await new WebIO().writeBinary(doc)
   return new File([bytes as BlobPart], 'dense.glb', { type: 'model/gltf-binary' })
 }
+
+describe('optimizeGlb: meshopt-packed uploads (owner 2026-11-04)', () => {
+  it('unpacks a gltfpack file into a plain GLB that any reader opens, with the same size and triangles', async () => {
+    const input = await packedLikeGltfpack(await glb())
+    const plainReader = new WebIO() // no extensions registered: what Scene Viewer and the other tools can read
+    await expect(plainReader.readBinary(new Uint8Array(await input.arrayBuffer()))).rejects.toThrow(/EXT_meshopt_compression/)
+    const r = await optimizeGlb(input, async () => null)
+    expect(r.optimized).toBe(true)
+    const out = await plainReader.readBinary(new Uint8Array(await r.file.arrayBuffer()))
+    const s = summarize(out)
+    expect(s.extensions).toEqual([])
+    expect(s.triangles).toBe(2)
+    for (let i = 0; i < 3; i++) {
+      expect(s.min[i]).toBeCloseTo([-1, 0, -0.25][i]!, 2)
+      expect(s.max[i]).toBeCloseTo([1, 1, 0.25][i]!, 2)
+    }
+  })
+})
 
 describe('optimizeGlb: triangle reduction (ADR-0038)', () => {
   // Owner 2026-10-26: heavy uploads (a Tripo chair had 440,384 triangles) are made lighter automatically, without
