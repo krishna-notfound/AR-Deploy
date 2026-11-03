@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +6,7 @@ import { App } from '@/app/App'
 import { type LandingCollection, SITE_ASSET_PATH, emptySiteContent } from '@/domain/siteContent'
 import { content, service, siteAssetUrl } from '@/services'
 import { useLandingShowcase } from '@/services/contentHooks'
+import { store } from '@/services/mock/store'
 
 const asAdmin = () => localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
 const file = (name: string, type: string, size = 1024) => new File([new Uint8Array(size)], name, { type })
@@ -57,49 +58,6 @@ describe('content.uploadSiteAsset (demo)', () => {
   })
 })
 
-describe('Landing editor: 3D showcase panel', () => {
-  it('uploads a picture and a 3D model, shows the preview, saves them in the draft, and removes them', { timeout: 40_000 }, async () => {
-    asAdmin()
-    window.history.replaceState(null, '', '/admin/editor/landing')
-    render(<App />)
-    expect(await screen.findByRole('heading', { name: '3D showcase' })).toBeInTheDocument()
-
-    await userEvent.upload(screen.getAllByTestId('upload-image')[0]!, file('sofa.png', 'image/png'))
-    const preview = await screen.findByAltText('The uploaded showcase picture')
-    expect(preview).toHaveAttribute('src', 'blob:test/1')
-    await userEvent.upload(screen.getByTestId('upload-glb'), file('sofa.glb', 'model/gltf-binary'))
-    expect(await screen.findByText(/Model uploaded: /)).toBeInTheDocument()
-    await userEvent.type(screen.getByRole('textbox', { name: /Showcase title \(English\)/ }), 'The Linden sofa')
-
-    await waitFor(
-      async () => {
-        const s = await content.getContentDraft()
-        const sc = s.ok ? s.data.draft.landing.showcase : undefined
-        expect(sc?.title.en).toBe('The Linden sofa')
-        expect(sc?.image?.path).toMatch(SITE_ASSET_PATH)
-        expect(sc?.model?.glb.path.endsWith('.glb')).toBe(true)
-      },
-      { timeout: 8000 },
-    )
-
-    await userEvent.click(screen.getByRole('button', { name: 'Remove the showcase' }))
-    await waitFor(async () => {
-      const s = await content.getContentDraft()
-      expect(s.ok && s.data.draft.landing.showcase).toBeFalsy()
-    }, { timeout: 8000 })
-  })
-
-  it('shows the error when a file is refused and keeps the draft unchanged', { timeout: 30_000 }, async () => {
-    asAdmin()
-    window.history.replaceState(null, '', '/admin/editor/landing')
-    render(<App />)
-    await screen.findByRole('heading', { name: '3D showcase' })
-    await userEvent.upload(screen.getByTestId('upload-glb'), file('sofa.glb', 'model/gltf-binary', 30 * 1024 * 1024 + 1))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/too large/i)
-    expect(screen.queryByText(/Model uploaded: /)).toBeNull()
-  })
-})
-
 describe('published showcase and uploaded collection picture', () => {
   it('useLandingShowcase returns the published showcase, and a collection card shows its uploaded picture', { timeout: 40_000 }, async () => {
     asAdmin()
@@ -121,5 +79,106 @@ describe('published showcase and uploaded collection picture', () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
     await waitFor(() => expect(document.querySelector('a[href="/collections/mine"] img')).toHaveAttribute('src', 'blob:test/1'), { timeout: 10_000 })
+  })
+})
+
+const openAt = (path: string) => {
+  window.history.replaceState(null, '', path)
+  return render(<App />)
+}
+const housePieces = async () => {
+  const r = await service.getShowcase()
+  if (!r.ok) throw new Error('showcase')
+  return r.data
+}
+
+describe('Showcase tab (ADR-0047)', () => {
+  it('lists the four house pieces with status, 3D chip and date, and offers "New piece"', { timeout: 40_000 }, async () => {
+    asAdmin()
+    const { business, products } = await housePieces()
+    expect(products).toHaveLength(4)
+    openAt('/admin/editor/showcase')
+    const list = await screen.findByRole('list', { name: 'Showcase pieces' }, { timeout: 15_000 })
+    const cards = within(list).getAllByRole('listitem')
+    expect(cards).toHaveLength(4)
+    for (const [i, p] of products.entries()) {
+      const link = within(cards[i]!).getByRole('link', { name: `Edit ${p.name.en}` })
+      expect(link).toHaveAttribute('href', `/admin/editor/showcase/${p.id}/edit`)
+      expect(within(cards[i]!).getByText('Published')).toBeInTheDocument()
+      expect(within(cards[i]!).getByText('3D')).toBeInTheDocument()
+      expect(within(cards[i]!).getByText(/^Updated /)).toBeInTheDocument()
+    }
+    expect(screen.getByRole('link', { name: 'New piece' })).toHaveAttribute('href', '/admin/editor/showcase/new')
+    // The tab is in the Editor menu, before Landing page.
+    const menu = screen.getByRole('navigation', { name: 'Editor sections' })
+    expect(within(menu).getAllByRole('link').map((a) => a.textContent)).toEqual(['Pages', 'Showcase', 'Landing page', 'Application form', 'Social media'])
+    expect(business.house).toBe(true)
+  })
+
+  it('shows a draft piece as Draft, and the empty state when there are none', { timeout: 40_000 }, async () => {
+    asAdmin()
+    const { products } = await housePieces()
+    const unpublished = await service.unpublishProduct(products[0]!.id)
+    expect(unpublished.ok).toBe(true)
+    const first = openAt('/admin/editor/showcase')
+    const list = await screen.findByRole('list', { name: 'Showcase pieces' }, { timeout: 15_000 })
+    expect(within(list).getAllByText('Draft')).toHaveLength(1)
+    first.unmount()
+
+    for (const p of products) await service.deleteProduct(p.id)
+    openAt('/admin/editor/showcase')
+    expect(await screen.findByText('Your own pieces for the landing page. Visitors never see them as a business.', {}, { timeout: 15_000 })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'New piece' })).toHaveLength(1) // only the one in the empty state
+  })
+
+  it('shows an error with Try again when the showcase cannot be read', { timeout: 40_000 }, async () => {
+    asAdmin()
+    vi.spyOn(service, 'getShowcase').mockResolvedValue({ ok: false, error: { code: 'UNKNOWN', message: 'boom' } })
+    openAt('/admin/editor/showcase')
+    expect(await screen.findByRole('button', { name: 'Try again' }, { timeout: 15_000 })).toBeInTheDocument()
+  })
+
+  it('hides the tab and the route from someone with content.manage but without products.edit', { timeout: 40_000 }, async () => {
+    store.update((db) => void (db.team!.rolePermissions.team = ['products.view', 'content.manage']))
+    localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    const first = openAt('/admin/editor/pages')
+    const menu = await screen.findByRole('navigation', { name: 'Editor sections' }, { timeout: 15_000 })
+    expect(within(menu).getAllByRole('link').map((a) => a.textContent)).toEqual(['Pages', 'Landing page', 'Application form', 'Social media'])
+    first.unmount()
+    openAt('/admin/editor/showcase')
+    expect(await screen.findByRole('heading', { name: /access/i }, { timeout: 15_000 })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Showcase pieces' })).toBeNull()
+  })
+})
+
+describe('Shared product editor on a showcase piece (scope "house")', () => {
+  it('creates a piece for the house business without a business picker, and opens it at the Showcase edit address', { timeout: 60_000 }, async () => {
+    asAdmin()
+    const { business } = await housePieces()
+    openAt('/admin/editor/showcase/new')
+    const name = await screen.findByRole('textbox', { name: /^Product name/ }, { timeout: 15_000 })
+    expect(screen.queryByRole('combobox', { name: /Business/ })).toBeNull()
+    await userEvent.type(name, 'Showcase armchair')
+    await userEvent.click(within(screen.getByRole('region', { name: 'Save and publish' })).getByRole('button', { name: 'Save draft' }))
+    await waitFor(() => expect(window.location.pathname).toMatch(/^\/admin\/editor\/showcase\/[^/]+\/edit$/), { timeout: 15_000 })
+    const after = await housePieces()
+    const created = after.products.find((p) => p.name.en === 'Showcase armchair')
+    expect(created?.businessId).toBe(business.id)
+    expect(created?.status).toBe('draft')
+    // Never listed under a real business.
+    const all = await service.getProducts()
+    expect(all.ok && all.data.some((p) => p.id === created?.id)).toBe(false)
+  })
+
+  it('opens a house piece, and says "not found" for a product of a real business', { timeout: 60_000 }, async () => {
+    asAdmin()
+    const { products } = await housePieces()
+    const first = openAt(`/admin/editor/showcase/${products[0]!.id}/edit`)
+    expect(await screen.findByDisplayValue(products[0]!.name.en, {}, { timeout: 15_000 })).toBeInTheDocument()
+    first.unmount()
+    const real = await service.getProducts()
+    if (!real.ok) throw new Error('products')
+    openAt(`/admin/editor/showcase/${real.data[0]!.id}/edit`)
+    expect(await screen.findByText('Product not found', {}, { timeout: 15_000 })).toBeInTheDocument()
   })
 })

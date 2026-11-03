@@ -4,7 +4,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, type RouteObject, createBrowserRouter, useLocation } from 'react-router'
 import { isDemoMode } from '@/services'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { loadApplyScreen, loadEditorLayout, loadLandingScreen, loadPageEditorScreen, loadPagesScreen, loadSocialScreen } from '@/features/editor/preload'
+import { loadApplyScreen, loadEditorLayout, loadLandingScreen, loadPageEditorScreen, loadPagesScreen, loadShowcaseScreen, loadSocialScreen } from '@/features/editor/preload'
 import { SiteContentProvider } from '@/features/marketing/SiteContentProvider'
 import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
 import { DashboardDictionaries } from '@/i18n/DashboardDictionaries'
@@ -34,6 +34,7 @@ const EditorPageScreen = lazy(loadPageEditorScreen)
 const EditorApplyScreen = lazy(loadApplyScreen)
 const EditorSocialScreen = lazy(loadSocialScreen)
 const EditorLandingScreen = lazy(loadLandingScreen)
+const EditorShowcaseScreen = lazy(loadShowcaseScreen)
 
 // The signed-in frames (role guard, 2FA gate, shell) load with the first dashboard route, in parallel with the dashboard text.
 const loadFrames = () => import('./DashboardFrames')
@@ -127,8 +128,14 @@ const adminRoutes: RouteObject = {
         { path: 'apply', element: <EditorApplyScreen /> },
         { path: 'social', element: <EditorSocialScreen /> },
         { path: 'landing', element: <EditorLandingScreen /> },
+        // The admin's own showcase pieces (ADR-0047): needs products.edit as well as content.manage.
+        { path: 'showcase', element: <RequirePermission need="products.edit"><EditorShowcaseScreen /></RequirePermission> },
       ],
     },
+    // The shared product editor on a showcase piece. A sibling of the Editor layout on purpose: a piece is saved and
+    // published by the product editor itself, not by the Editor's draft, so the Editor's Publish bar does not apply.
+    { path: 'editor/showcase/new', element: <RequirePermission need="content.manage"><RequirePermission need="products.edit"><ProductEditorPage scope="house" /></RequirePermission></RequirePermission> },
+    { path: 'editor/showcase/:productId/edit', element: <RequirePermission need="content.manage"><RequirePermission need="products.edit"><ProductEditorPage scope="house" /></RequirePermission></RequirePermission> },
     { path: 'team', element: <RequirePermission need="owner"><TeamPage /></RequirePermission> },
     { path: 'team/permissions', element: <RequirePermission need="owner"><RolePermissionsPage /></RequirePermission> },
     { path: 'team/:memberId', element: <RequirePermission need="owner"><MemberDetailPage /></RequirePermission> },

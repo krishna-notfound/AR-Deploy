@@ -7,17 +7,19 @@ import { errorText, fieldText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import type { Vars } from '@/i18n/translate'
 import { copyText } from '@/lib/clipboard'
-import { PUBLIC_URLS_ARE_LIVE, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
+import { PUBLIC_URLS_ARE_LIVE, editorShowcaseEditPath, needsPreview, productLocalPath, productPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import type { ServiceError } from '@/services/catalogService'
 import { deletedToast } from '../shared/storageSweep'
 
-export type EditorScope = 'admin' | 'business'
+/** `house`: the admin's own showcase pieces, edited inside the website Editor (ADR-0047). */
+export type EditorScope = 'admin' | 'business' | 'house'
 
 const hasAnyModel = (p: Pick<Product, 'models' | 'variants'>) =>
   [p.models, ...(p.variants ?? []).map((v) => v.models)].some((m) => !!m?.glb || !!m?.usdz)
 
 export function editPath(scope: EditorScope, p: Pick<Product, 'id'>) {
+  if (scope === 'house') return editorShowcaseEditPath(p.id)
   return scope === 'admin' ? `/admin/products/${p.id}/edit` : `/dashboard/products/${p.id}/edit`
 }
 

@@ -1,16 +1,18 @@
 import { AlertTriangle, Eye, History, Loader2 } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useBlocker, useLocation, useNavigate } from 'react-router'
+import { useCan } from '@/auth/usePermission'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { ErrorState } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
+import type { Permission } from '@/domain/types'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { EDITOR_PATH, editorApplyPath, editorLandingPath, editorPagesPath, editorPreviewPath, editorSocialPath } from '@/lib/urls'
+import { EDITOR_PATH, editorApplyPath, editorLandingPath, editorPagesPath, editorPreviewPath, editorShowcasePath, editorSocialPath } from '@/lib/urls'
 import { useFormat } from '@/lib/useFormat'
 import { EditorContext } from './EditorContext'
 import { EditorAreaSkeleton, EditorSkeleton } from './EditorSkeleton'
@@ -23,15 +25,17 @@ import { type DraftEditor, useDraftEditor } from './useDraftEditor'
 // The layout's chunk has just run: fetch the screens it renders in parallel instead of after the draft arrives.
 preloadEditorScreens()
 
-const MENU: { to: string; key: TranslationKey }[] = [
+const MENU: { to: string; key: TranslationKey; /** Besides content.manage, which the whole Editor needs. */ need?: Permission }[] = [
   { to: editorPagesPath(), key: 'editor.menu.pages' },
+  { to: editorShowcasePath(), key: 'editor.menu.showcase', need: 'products.edit' },
   { to: editorLandingPath(), key: 'editor.menu.landing' },
   { to: editorApplyPath(), key: 'editor.menu.apply' },
   { to: editorSocialPath(), key: 'editor.menu.social' },
 ]
 
-/** Navigation inside the Editor stays in the same working copy; the preview route is a different screen. */
-const staysInEditor = (path: string) => path.startsWith(EDITOR_PATH) && !path.startsWith(`${EDITOR_PATH}/preview`)
+/** Navigation inside the Editor stays in the same working copy; the preview route and the product editor on a showcase piece are different screens. */
+const staysInEditor = (path: string) =>
+  path.startsWith(EDITOR_PATH) && !path.startsWith(`${EDITOR_PATH}/preview`) && !path.startsWith(`${editorShowcasePath()}/`)
 
 /** Which preview the Preview button opens for the screen being edited. */
 function previewTarget(pathname: string): string {
@@ -71,6 +75,7 @@ function EditorFrame({ editor }: { editor: DraftEditor }) {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const { flush, dirty, save } = editor
+  const can = useCan()
 
   // Leaving with something unsaved: save first; ask only if that fails.
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && !staysInEditor(nextLocation.pathname) && currentLocation.pathname !== nextLocation.pathname)
@@ -161,7 +166,7 @@ function EditorFrame({ editor }: { editor: DraftEditor }) {
 
       <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-10">
         <nav aria-label={t('editor.menu.label')} className="mb-6 flex gap-1 overflow-x-auto border-b border-line lg:mb-0 lg:flex-col lg:self-start lg:border-b-0">
-          {MENU.map((m) => (
+          {MENU.filter((m) => !m.need || can(m.need)).map((m) => (
             <NavLink
               key={m.to}
               to={m.to}

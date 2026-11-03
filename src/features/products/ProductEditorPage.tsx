@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { EmptyState, ErrorState } from '@/components/ui/States'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { editorPagesPath, editorShowcasePath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ProductEditorForm } from './editor/ProductEditorForm'
@@ -22,13 +23,22 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
   const [params] = useSearchParams()
   const { business: ownBusiness } = useAccount()
   const businesses = useBusinesses()
+  // The admin's own showcase pieces (ADR-0047): the business is the house business, never chosen.
+  const house = useServiceQuery(() => (scope === 'house' ? service.getShowcase() : Promise.resolve({ ok: true as const, data: null })), [scope])
   const product = useServiceQuery(() => (productId ? service.getProductById(productId) : Promise.resolve({ ok: true as const, data: null })), [productId])
 
-  const base = scope === 'admin' ? '/admin/products' : '/dashboard/products'
-  const crumbs = [
-    { label: t(scope === 'admin' ? 'nav.allProducts' : 'nav.myProducts'), to: base },
-    { label: t(productId ? 'products.editor.editTitle' : 'business.products.add') },
-  ]
+  const base = scope === 'house' ? editorShowcasePath() : scope === 'admin' ? '/admin/products' : '/dashboard/products'
+  const crumbs =
+    scope === 'house'
+      ? [
+          { label: t('editor.title'), to: editorPagesPath() },
+          { label: t('editor.menu.showcase'), to: base },
+          { label: t(productId ? 'products.editor.editTitle' : 'editor.showcase.new') },
+        ]
+      : [
+          { label: t(scope === 'admin' ? 'nav.allProducts' : 'nav.myProducts'), to: base },
+          { label: t(productId ? 'products.editor.editTitle' : 'business.products.add') },
+        ]
 
   // Keep the initially loaded product stable while the user edits (store refetches are ignored).
   const initial = useMemo(() => product.data, [product.data?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -36,10 +46,17 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
   // Right after a new product's first save the id changes one render before the new query starts.
   const stale = productId && product.status === 'success' && product.data?.id !== productId
   if ((product.status === 'loading' && !product.data) || stale) return <FullPageSpinner />
+  if (scope === 'house' && house.status === 'loading' && !house.data) return <FullPageSpinner />
   // A failed background refresh keeps the loaded product, so the form (and unsaved edits) stays mounted.
   if (product.status === 'error' && product.error.code !== 'NOT_FOUND' && !product.data) return <ErrorState message={errorText(product.error, t)} onRetry={product.refetch} retryLabel={t('common.retry')} />
+  if (scope === 'house' && house.status === 'error' && !house.data) return <ErrorState message={errorText(house.error, t)} onRetry={house.refetch} retryLabel={t('common.retry')} />
 
-  const notFound = (productId && !product.data) || (scope === 'business' && product.data && product.data.businessId !== ownBusiness?.id)
+  const houseBusiness = scope === 'house' ? (house.data?.business ?? null) : null
+  // A piece of any other business never opens here (and the other way round: the house is not editable as a business product).
+  const notFound =
+    (productId && !product.data) ||
+    (scope === 'business' && product.data && product.data.businessId !== ownBusiness?.id) ||
+    (scope === 'house' && !!product.data && product.data.businessId !== houseBusiness?.id)
   if (notFound) {
     return (
       <>
@@ -81,8 +98,8 @@ export default function ProductEditorPage({ scope }: { scope: EditorScope }) {
       scope={scope}
       product={initial ?? null}
       currentStatus={product.data?.status ?? 'draft'}
-      businesses={scope === 'admin' ? businesses.list : ownBusiness ? [ownBusiness] : []}
-      fixedBusiness={scope === 'business' ? (ownBusiness ?? undefined) : undefined}
+      businesses={scope === 'admin' ? businesses.list : scope === 'house' ? (houseBusiness ? [houseBusiness] : []) : ownBusiness ? [ownBusiness] : []}
+      fixedBusiness={scope === 'business' ? (ownBusiness ?? undefined) : (houseBusiness ?? undefined)}
       preselectBusinessId={params.get('business') ?? undefined}
       breadcrumbs={crumbs}
     />
