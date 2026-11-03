@@ -216,3 +216,11 @@ describe('editor: a link with no label (R-W4-13)', { timeout: 30_000 }, () => {
     await waitFor(() => expect(screen.getAllByText('Add a button label, or remove the link.').length).toBeGreaterThan(0))
   })
 })
+
+describe('the platform showcase is not a catalogue (ADR-0047)', { timeout: 20_000 }, () => {
+  it('/catalog/sanctus-showcase shows "Catalog not found"', async () => {
+    openApp('/catalog/sanctus-showcase')
+    expect(await screen.findByRole('heading', { name: 'Catalog not found' })).toBeInTheDocument()
+    expect(screen.queryByText('Sanctus', { selector: 'h1' })).not.toBeInTheDocument()
+  })
+})

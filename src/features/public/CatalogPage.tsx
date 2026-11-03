@@ -36,7 +36,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const { user } = useAccount()
 
   const business = useServiceQuery(() => service.getBusinessBySlug(slug), [slug])
-  const b = business.data
+  // The platform's own showcase (ADR-0047) is never a catalogue: its pieces open under /showcase/.
+  const isHouse = !!business.data?.house
+  const b = isHouse ? undefined : business.data
   // Owner preview of a catalogue that is not active yet (DUX-02): only with ?preview=1 AND a signed-in owner of
   // this business or a platform admin. A UX rule, not security: in Supabase mode RLS only returns a non-active
   // business and its products to its members and platform admins; anonymous visitors get "not found".
@@ -83,7 +85,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
     )
 
   if (!b) {
-    const notFound = business.status === 'error' && business.error.code === 'NOT_FOUND'
+    const notFound = isHouse || (business.status === 'error' && business.error.code === 'NOT_FOUND')
     return (
       <PublicShell>
         {notFound ? (
