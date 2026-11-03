@@ -192,10 +192,11 @@ describe('permission matrix (Task 2)', () => {
   }
 
   it('businesses.view: team reads a draft business, deactivated and strangers do not', async () => {
+    // The showcase business (ADR-0047) is active, so every caller reads it: these counts are about the real business.
     await asDraftBusiness(async () => {
-      expect(await count(TEAM_U, 'select count(*)::int as n from public.businesses')).toBe(1)
-      expect(await count(DEACT_U, 'select count(*)::int as n from public.businesses')).toBe(0)
-      expect(await count(STRANGER_U, 'select count(*)::int as n from public.businesses')).toBe(0)
+      expect(await count(TEAM_U, 'select count(*)::int as n from public.businesses where not is_house')).toBe(1)
+      expect(await count(DEACT_U, 'select count(*)::int as n from public.businesses where not is_house')).toBe(0)
+      expect(await count(STRANGER_U, 'select count(*)::int as n from public.businesses where not is_house')).toBe(0)
     })
     expect(await count(TEAM_U, 'select count(*)::int as n from public.business_members')).toBe(1)
   })
@@ -292,7 +293,7 @@ describe('permission matrix (Task 2)', () => {
 
   it('deactivated admin reads zero businesses', async () => {
     await asDraftBusiness(async () => {
-      expect(await count(DEACT_U, 'select count(*)::int as n from public.businesses')).toBe(0)
+      expect(await count(DEACT_U, 'select count(*)::int as n from public.businesses where not is_house')).toBe(0)
     })
   })
 

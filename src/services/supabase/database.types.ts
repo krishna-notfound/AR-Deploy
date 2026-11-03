@@ -245,6 +245,7 @@ export type Database = {
           default_currency: string
           description: string
           id: string
+          is_house: boolean
           logo_url: string | null
           name: string
           slug: string
@@ -262,6 +263,7 @@ export type Database = {
           default_currency?: string
           description?: string
           id?: string
+          is_house?: boolean
           logo_url?: string | null
           name: string
           slug: string
@@ -279,6 +281,7 @@ export type Database = {
           default_currency?: string
           description?: string
           id?: string
+          is_house?: boolean
           logo_url?: string | null
           name?: string
           slug?: string

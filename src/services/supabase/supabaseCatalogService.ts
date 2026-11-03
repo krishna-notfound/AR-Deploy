@@ -69,6 +69,8 @@ export interface BusinessRow {
   accent_color: string
   default_currency: Currency
   allow_own_models: boolean
+  /** The hidden showcase business (ADR-0047). */
+  is_house: boolean
   created_at: string
   updated_at: string
 }
@@ -239,6 +241,7 @@ export const toBusiness = (r: BusinessRow): Business => ({
   branding: { accentColor: r.accent_color },
   defaultCurrency: r.default_currency,
   allowOwnModels: r.allow_own_models === true,
+  ...(r.is_house === true ? { house: true } : {}),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 })
@@ -677,8 +680,22 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     return data ? ok(toBusiness(data)) : fail('NOT_FOUND', 'Business not found.')
   }
 
+  /**
+   * The id of the hidden showcase business (ADR-0047), null when there is none. It never changes (a database trigger locks
+   * is_house), so a found id is kept; "none" is asked again, because the migration may be applied while the page is open.
+   */
+  let houseId: ID | null = null
+  async function houseBusinessId(): Promise<Result<ID | null>> {
+    if (houseId) return ok(houseId)
+    const { data, error } = await sb.from('businesses').select('id').eq('is_house', true).maybeSingle<{ id: ID }>()
+    if (error) return mapDbError(error)
+    houseId = data?.id ?? null
+    return ok(houseId)
+  }
+
   async function catalogs(slug?: string): Promise<Result<BusinessCatalog[]>> {
-    let bq = sb.from('businesses').select('*').order('name')
+    // The showcase business is never a catalog: not listed, and its slug answers "not found".
+    let bq = sb.from('businesses').select('*').eq('is_house', false).order('name')
     if (slug) bq = bq.eq('slug', slug)
     // Exact counts, one row per business (R-W5-6): a plain products read stops at the API's 1000-row cap.
     const [b, c] = await Promise.all([
@@ -828,8 +845,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     }
     const [b, p, c, d] = await Promise.all([
       all((from, to) => {
+        // The platform view leaves the showcase business (ADR-0047) out, with its products and numbers (see `real` below).
         const q = sb.from('businesses').select('id')
-        return (businessId ? q.eq('id', businessId) : q).order('id').range(from, to).returns<{ id: string }[]>()
+        return (businessId ? q.eq('id', businessId) : q.eq('is_house', false)).order('id').range(from, to).returns<{ id: string }[]>()
       }),
       all((from, to) => {
         const q = sb.from('products').select('id, business_id, status')
@@ -858,13 +876,15 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     if (err) return mapDbError(err)
     const businesses = b.data ?? []
     if (businessId && !businesses.length) return fail('NOT_FOUND', 'Business not found.')
+    const listed = new Set(businesses.map((x) => x.id))
+    const real = <T extends { business_id: string }>(rows: T[] | null): T[] => (businessId ? (rows ?? []) : (rows ?? []).filter((x) => listed.has(x.business_id)))
     return ok(
       summarize(
         {
           businesses,
-          products: (p.data ?? []).map((x) => ({ id: x.id, businessId: x.business_id, status: x.status })),
-          productCounts: (c.data ?? []).map((x) => ({ businessId: x.business_id, total: Number(x.total), published: Number(x.published), drafts: Number(x.drafts) })),
-          dailyStats: (d.data ?? []).map((x) => ({
+          products: real(p.data).map((x) => ({ id: x.id, businessId: x.business_id, status: x.status })),
+          productCounts: real(c.data).map((x) => ({ businessId: x.business_id, total: Number(x.total), published: Number(x.published), drafts: Number(x.drafts) })),
+          dailyStats: real(d.data).map((x) => ({
             productId: x.product_id,
             businessId: x.business_id,
             date: x.day,
@@ -910,7 +930,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     // ---------------- businesses ----------------
     getBusinesses: () =>
       guard(async () => {
-        const { data, error } = await sb.from('businesses').select('*').order('updated_at', { ascending: false }).returns<BusinessRow[]>()
+        const { data, error } = await sb.from('businesses').select('*').eq('is_house', false).order('updated_at', { ascending: false }).returns<BusinessRow[]>()
         return error ? mapDbError(error) : ok(data.map(toBusiness))
       }),
     getBusinessById: (id) => guard(() => businessById(id)),
@@ -1002,7 +1022,11 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     // ---------------- products ----------------
     getProducts: (q = {}) =>
       guard(async () => {
+        // The showcase pieces (ADR-0047) are not part of any catalogue list; they come from getShowcase.
+        const house = await houseBusinessId()
+        if (!house.ok) return house
         let query = sb.from('products').select(PRODUCT_SELECT).order('updated_at', { ascending: false })
+        if (house.data) query = query.neq('business_id', house.data)
         if (q.businessId) query = query.eq('business_id', q.businessId)
         if (q.status) query = query.eq('status', q.status)
         if (q.category) query = query.eq('category', q.category)
@@ -1019,8 +1043,17 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         return error ? mapDbError(error) : ok(await hydrate(data))
       }),
     getProductById: (id) => guard(() => productById(id)),
-    // TODO(agent A): read the house business (is_house) and its products once the migration exists.
-    getShowcase: () => guard(async () => fail('NOT_FOUND', 'Showcase not found.')),
+    getShowcase: () =>
+      guard(async () => {
+        const b = await sb.from('businesses').select('*').eq('is_house', true).maybeSingle<BusinessRow>()
+        if (b.error) return mapDbError(b.error)
+        if (!b.data) return fail('NOT_FOUND', 'Showcase not found.')
+        houseId = b.data.id
+        // RLS decides the rows: a visitor gets the published pieces, platform staff (products.edit) get the drafts too.
+        const p = await sb.from('products').select(PRODUCT_SELECT).eq('business_id', b.data.id).order('updated_at', { ascending: false }).returns<ProductRow[]>()
+        if (p.error) return mapDbError(p.error)
+        return ok({ business: toBusiness(b.data), products: await hydrate(p.data) })
+      }),
     getPublicProduct: (businessSlug, productSlug, opts) =>
       guard(async () => {
         const b = await sb.from('businesses').select('*').eq('slug', businessSlug).maybeSingle<BusinessRow>()
