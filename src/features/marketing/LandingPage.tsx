@@ -9,6 +9,7 @@ import { primaryImage } from '@/lib/product'
 import { APPLY_PATH, catalogLocalPath, productLocalPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
+import { useLandingFeatured } from '@/services/contentHooks'
 import { LandingCollections } from './LandingCollections'
 import { LandingShowcase, useShowcaseProduct } from './LandingShowcase'
 import { SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
@@ -186,8 +187,8 @@ function HowItWorks() {
  */
 function Experience() {
   const { t } = useI18n()
-  // TODO(controller): feed `featured` from useLandingFeatured() (@/services/contentHooks) once that hook is merged.
-  const featured = undefined
+  // The featured 3D piece the admin picks in the Editor; without one, the first published piece with a model.
+  const { featured } = useLandingFeatured()
   const showcase = useShowcaseProduct(featured)
   const href = showcase.href
   return (
