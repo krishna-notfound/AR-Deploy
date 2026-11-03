@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/cn'
 import { useInDashboard } from '@/components/layout/dashboardContext'
 
@@ -10,7 +11,38 @@ export interface MenuItem {
   disabled?: boolean
 }
 
-/** Accessible dropdown menu (button + role=menu) with arrow-key navigation. */
+const GAP = 4
+const EDGE = 8
+
+interface MenuPosition {
+  top: number
+  left: number
+  maxHeight: number
+}
+
+/**
+ * Fixed position for a menu next to its trigger: below when it fits (or when there is more room
+ * below than above), otherwise flipped above; the right edge (or left, for `start`) lines up with
+ * the trigger and the menu is clamped EDGE px from the viewport edges.
+ */
+function placeMenu(trigger: DOMRect, menuHeight: number, menuWidth: number, align: 'start' | 'end'): MenuPosition {
+  const vh = window.innerHeight
+  const vw = window.innerWidth
+  const below = vh - trigger.bottom - GAP - EDGE
+  const above = trigger.top - GAP - EDGE
+  const openBelow = menuHeight <= below || below >= above
+  const maxHeight = Math.max(openBelow ? below : above, 0)
+  const height = Math.min(menuHeight, maxHeight)
+  const top = openBelow ? trigger.bottom + GAP : trigger.top - GAP - height
+  const wanted = align === 'end' ? trigger.right - menuWidth : trigger.left
+  const left = Math.max(EDGE, Math.min(wanted, vw - menuWidth - EDGE))
+  return { top, left, maxHeight }
+}
+
+/**
+ * Accessible dropdown menu (button + role=menu) with arrow-key navigation. The menu renders in a
+ * portal on document.body with fixed positioning, so table scroll containers never clip it.
+ */
 export function DropdownMenu({
   trigger,
   items,
@@ -30,16 +62,46 @@ export function DropdownMenu({
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
+  const [pos, setPos] = useState<MenuPosition | null>(null)
+
+  const reposition = useCallback(() => {
+    const btn = btnRef.current
+    const menu = menuRef.current
+    if (!btn || !menu) return
+    const height = menu.scrollHeight || menu.offsetHeight
+    setPos(placeMenu(btn.getBoundingClientRect(), height, menu.offsetWidth, align))
+  }, [align])
+
+  // Position before paint so the menu never flashes in the wrong place.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null)
+      return
+    }
+    reposition()
+  }, [open, reposition])
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (!wrapRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false)
+    }
+    const onScroll = (e: Event) => {
+      // Scrolling inside the menu itself must not move it.
+      if (e.target instanceof Node && menuRef.current?.contains(e.target)) return
+      reposition()
     }
     document.addEventListener('mousedown', onDown)
-    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus()
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', reposition)
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus({ preventScroll: true })
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [open, reposition])
 
   const onMenuKey = (e: React.KeyboardEvent) => {
     const els = [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [])]
@@ -76,46 +138,53 @@ export function DropdownMenu({
       >
         {trigger}
       </button>
-      {open && (
-        <div
-          ref={menuRef}
-          id={menuId}
-          role="menu"
-          tabIndex={-1}
-          aria-label={label}
-          onKeyDown={onMenuKey}
-          className={cn(
-            'absolute z-40 mt-1 min-w-48 animate-fade-in rounded-[var(--radius-card)] bg-surface py-1.5 shadow-[var(--shadow-pop)]',
-            align === 'end' ? 'right-0' : 'left-0',
-          )}
-        >
-          {items.map((item, i) =>
-            item === 'separator' ? (
-              <hr key={`sep-${i}`} className="my-1.5 border-line" />
-            ) : (
-              <button
-                key={item.label}
-                type="button"
-                role="menuitem"
-                tabIndex={-1}
-                disabled={item.disabled}
-                onClick={() => {
-                  setOpen(false)
-                  item.onSelect()
-                }}
-                className={cn(
-                  'flex w-full items-center gap-2.5 px-3 text-left text-sm outline-none hover:bg-subtle focus-visible:bg-subtle disabled:opacity-50',
-                  dash ? 'h-9 whitespace-nowrap' : 'py-2',
-                  item.destructive ? 'text-danger' : 'text-ink',
-                )}
-              >
-                {item.icon && <span className="text-ink-muted [&_svg]:size-4" aria-hidden>{item.icon}</span>}
-                {item.label}
-              </button>
-            ),
-          )}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            id={menuId}
+            role="menu"
+            tabIndex={-1}
+            aria-label={label}
+            onKeyDown={onMenuKey}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: pos?.top ?? 0,
+              left: pos?.left ?? 0,
+              maxHeight: pos?.maxHeight,
+              visibility: pos ? undefined : 'hidden',
+            }}
+            className="z-[55] min-w-48 animate-fade-in overflow-y-auto rounded-[var(--radius-card)] bg-surface py-1.5 shadow-[var(--shadow-pop)]"
+          >
+            {items.map((item, i) =>
+              item === 'separator' ? (
+                <hr key={`sep-${i}`} className="my-1.5 border-line" />
+              ) : (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  disabled={item.disabled}
+                  onClick={() => {
+                    setOpen(false)
+                    item.onSelect()
+                  }}
+                  className={cn(
+                    'flex w-full items-center gap-2.5 px-3 text-left text-sm outline-none hover:bg-subtle focus-visible:bg-subtle disabled:opacity-50',
+                    dash ? 'h-9 whitespace-nowrap' : 'py-2',
+                    item.destructive ? 'text-danger' : 'text-ink',
+                  )}
+                >
+                  {item.icon && <span className="text-ink-muted [&_svg]:size-4" aria-hidden>{item.icon}</span>}
+                  {item.label}
+                </button>
+              ),
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
