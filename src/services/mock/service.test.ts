@@ -186,6 +186,33 @@ describe('analytics', () => {
   })
 })
 
+describe('the house showcase (ADR-0047)', () => {
+  it('getShowcase gives a visitor the four published pieces of the house business', async () => {
+    const { business, products } = unwrap(await svc.getShowcase())
+    expect(business).toMatchObject({ slug: 'sanctus-showcase', house: true })
+    expect(products).toHaveLength(4)
+    expect(products.every((p) => p.businessId === business.id && p.status === 'published')).toBe(true)
+  })
+
+  it('no business list, catalog or product list shows the house or its pieces', async () => {
+    const { business, products } = unwrap(await svc.getShowcase())
+    expect(unwrap(await svc.getBusinesses()).some((b) => b.house || b.id === business.id)).toBe(false)
+    expect(unwrap(await svc.getCatalogs()).some((c) => c.business.id === business.id)).toBe(false)
+    expect((await svc.getCatalog('sanctus-showcase')).ok).toBe(false)
+    const all = unwrap(await svc.getProducts())
+    expect(all.some((p) => p.businessId === business.id)).toBe(false)
+    expect(all.some((p) => products.some((x) => x.id === p.id))).toBe(false)
+    expect(unwrap(await svc.getProducts({ businessId: business.id }))).toEqual([])
+  })
+
+  it('the platform analytics leave the house and its pieces out', async () => {
+    const { business, products } = unwrap(await svc.getShowcase())
+    const a = unwrap(await svc.getAnalytics())
+    expect(a.totals.businesses).toBe(unwrap(await svc.getBusinesses()).length)
+    expect(a.byProduct.some((p) => p.businessId === business.id || products.some((x) => x.id === p.productId))).toBe(false)
+  })
+})
+
 describe('persistence', () => {
   it('round-trips through localStorage', async () => {
     unwrap(await svc.updateBusiness('biz_casa', { name: 'Casa Renamed' }))

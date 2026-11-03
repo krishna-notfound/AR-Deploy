@@ -554,7 +554,14 @@ export const mockCatalogService: CatalogService = {
     }),
 
   // ---------------- analytics ----------------
-  getAnalytics: (opts) => run(() => ok(summarize(store.get(), undefined, new Date(), true, opts?.timeZone ?? deviceTimeZone()))),
+  getAnalytics: (opts) =>
+    run(() => {
+      // The platform view counts real businesses only: the showcase business (ADR-0047) and its pieces are left out.
+      const db = store.get()
+      const house = new Set(db.businesses.filter((b) => b.house).map((b) => b.id))
+      const real = { ...db, businesses: db.businesses.filter((b) => !house.has(b.id)), products: db.products.filter((p) => !house.has(p.businessId)) }
+      return ok(summarize(real, undefined, new Date(), true, opts?.timeZone ?? deviceTimeZone()))
+    }),
 
   getBusinessAnalytics: (businessId, opts) =>
     run(() => {
