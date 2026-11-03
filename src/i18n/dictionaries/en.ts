@@ -73,6 +73,7 @@ export const enCore = {
   'product.translationFallback': 'Shown in English',
   'product.stage3d': 'Interactive 3D',
   'product.stagePhotos': 'Photographs',
+  'product.stageSwitch': 'Show photographs or the 3D model',
   'product.dimsLine': 'W {w} × D {d} × H {h} {unit}',
 
   'embed.arLink': 'View in your space (opens Sanctus)',
