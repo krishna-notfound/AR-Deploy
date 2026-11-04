@@ -1,4 +1,4 @@
-import type { Dimensions } from '@/domain/types'
+import type { Dimensions, LengthUnit } from '@/domain/types'
 import { toMeters } from './format'
 
 export interface MeasuredSize {
@@ -52,4 +52,22 @@ export function checkScale(measured: MeasuredSize | null | undefined, dims: Dime
   if (near(2.54) || near(1 / 2.54)) return { ...mismatch, reason: 'wrong-unit', factor: k }
   if ([100, 1000, 0.01, 0.001, 39.37, 0.0254].some(near)) return { ...mismatch, reason: 'model-units', factor: k }
   return { ...mismatch, reason: 'uniform', factor: k }
+}
+
+/** A real piece measures between these on every side; outside them the model file is wrong, not the dimensions. */
+export const MODEL_SIZE_MIN_M = 0.01
+export const MODEL_SIZE_MAX_M = 10
+
+/**
+ * "Use the model's size" (owner 2026-11-04): when the entered dimensions do not match a plausible model, the model's
+ * measured size as form values in `unit` (half centimetres, quarter inches). Null when there is nothing to fix, or when
+ * the file itself is wrong (in other units, under 1 cm or over 10 m on a side): it must never overwrite good dimensions.
+ */
+export function modelSizeSuggestion(scale: ScaleCheck, unit: LengthUnit): { width: string; height: string; depth: string } | null {
+  if (scale.status !== 'mismatch' || scale.reason === 'model-units') return null
+  const { x, y, z } = scale.measured
+  if (![x, y, z].every((v) => v >= MODEL_SIZE_MIN_M && v <= MODEL_SIZE_MAX_M)) return null
+  const step = unit === 'cm' ? 2 : 4
+  const value = (m: number) => String(Math.round((unit === 'cm' ? m * 100 : (m * 100) / 2.54) * step) / step)
+  return { width: value(x), height: value(y), depth: value(z) }
 }

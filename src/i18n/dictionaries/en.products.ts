@@ -326,6 +326,7 @@ export const enProducts = {
   'products.model.scaleUnverified': 'AR scale unverified: the model does not match the entered dimensions.',
   'products.model.scaleMeasures': 'Model measures W × H × D {measured}. Entered {entered}.',
   'products.model.scaleNever': 'The model is never rescaled automatically. Fix the model file or the dimensions.',
+  'products.model.useModelSize': 'Use the model’s size: {size}',
   'products.model.hint.axisSwap': 'Likely cause: width and depth are swapped. The model is turned 90°; re-export it with its front facing forward (+Z).',
   'products.model.hint.wrongUnit': 'Likely cause: the numbers are in the other unit. Check the centimetres / inches switch.',
   'products.model.hint.modelUnitsLarge': 'Likely cause: the file is not in metres (about {k}× too large). Re-export it in metres.',

@@ -328,6 +328,7 @@ export const ptProducts: Partial<Record<TranslationKey, string>> = {
   'products.model.scaleUnverified': 'Escala de RA não verificada: o modelo não corresponde às dimensões indicadas.',
   'products.model.scaleMeasures': 'O modelo mede L × A × P {measured}. Indicado: {entered}.',
   'products.model.scaleNever': 'O modelo nunca é redimensionado automaticamente. Corrija o ficheiro do modelo ou as dimensões.',
+  'products.model.useModelSize': 'Usar o tamanho do modelo: {size}',
   'products.model.hint.axisSwap': 'Causa provável: a largura e a profundidade estão trocadas. O modelo está rodado 90°; exporte-o de novo com a frente virada para a frente (+Z).',
   'products.model.hint.wrongUnit': 'Causa provável: os números estão na outra unidade. Verifique o seletor de centímetros / polegadas.',
   'products.model.hint.modelUnitsLarge': 'Causa provável: o ficheiro não está em metros (cerca de {k}× demasiado grande). Exporte-o de novo em metros.',

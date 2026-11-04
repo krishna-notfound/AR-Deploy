@@ -657,6 +657,7 @@ export function ProductEditorForm({
                 poster={poster}
                 name={form.input.name.en || 'product'}
                 onRefreshUrls={latest ? onRefreshUrls : undefined}
+                onUseModelSize={(dims) => setForm((f) => ({ ...f, dims }))}
               />
             )}
           </Section>

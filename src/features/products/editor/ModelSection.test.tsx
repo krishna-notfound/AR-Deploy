@@ -123,3 +123,26 @@ describe('3D preview: unavailable files and load failures', () => {
     expect(onRefreshUrls).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('"Use the model\'s size" (owner 2026-11-04)', () => {
+  // The fake viewer measures 0.5 × 0.9 × 0.5 m; these entered dimensions are wrong.
+  const wrong = { width: 100, height: 100, depth: 100, unit: 'cm' as const }
+
+  it('offers the model size when the entered dimensions do not match, and hands it to the form in its unit', async () => {
+    const onUseModelSize = vi.fn()
+    render(<ModelSection models={{ glb }} onChange={() => {}} dimensions={wrong} name="Chair" businessId="b1" onUseModelSize={onUseModelSize} />)
+    const button = await screen.findByRole('button', { name: 'Use the model’s size: 50 × 90 × 50 cm' })
+    fireEvent.click(button)
+    expect(onUseModelSize).toHaveBeenCalledWith({ width: '50', height: '90', depth: '50' })
+  })
+
+  it('is not offered when the scale is verified, nor where the form cannot take it (no handler)', async () => {
+    const { unmount } = render(<ModelSection models={{ glb }} onChange={() => {}} dimensions={dimensions} name="Chair" businessId="b1" onUseModelSize={() => {}} />)
+    expect(await screen.findByText(/Scale verified/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Use the model’s size/ })).toBeNull()
+    unmount()
+    render(<ModelSection models={{ glb }} onChange={() => {}} dimensions={wrong} name="Chair" businessId="b1" />)
+    expect(await screen.findByText(/AR scale unverified/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Use the model’s size/ })).toBeNull()
+  })
+})

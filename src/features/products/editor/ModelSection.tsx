@@ -16,7 +16,7 @@ import { MODEL_RULES, fetchRequiredExtensions, formatMb, isHttpsUrl, isStaleSess
 import { cn } from '@/lib/cn'
 import { formatFileSize } from '@/lib/format'
 import { useFormat } from '@/lib/useFormat'
-import { type ScaleCheck, type ScaleMismatchReason, checkScale } from '@/lib/scale'
+import { type ScaleCheck, type ScaleMismatchReason, checkScale, modelSizeSuggestion } from '@/lib/scale'
 import { MODEL_OPTIMIZATION_ENABLED, optimizeModel, optimizeReasonText, optimizedNote } from './modelOptimizeClient'
 
 type ModelContext = 'product' | 'variant' | 'request'
@@ -43,6 +43,7 @@ export function ModelSection({
   businessId,
   context = 'product',
   onRefreshUrls,
+  onUseModelSize,
 }: {
   models: ProductModels
   /** One format at a time, so the caller merges it into its latest state and parallel uploads both land. */
@@ -54,6 +55,8 @@ export function ModelSection({
   context?: ModelContext
   /** Fetches fresh signed URLs for the stored files (they expire); "Try again" in the preview calls it. */
   onRefreshUrls?: () => void
+  /** "Use the model's size": fills the form's width, height and depth (in its unit). Absent: no button. */
+  onUseModelSize?: (dims: ModelSizeValues) => void
 }) {
   const { t } = useI18n()
   return (
@@ -76,7 +79,7 @@ export function ModelSection({
         ))}
       </div>
       {/* Keyed by the GLB: a replaced file never shows the previous file's measurement or readiness (AR-07). */}
-      <ModelPreview key={models.glb?.url ?? 'none'} glb={models.glb} usdz={models.usdz} dimensions={dimensions} poster={poster} name={name} context={context} onRefreshUrls={onRefreshUrls} />
+      <ModelPreview key={models.glb?.url ?? 'none'} glb={models.glb} usdz={models.usdz} dimensions={dimensions} poster={poster} name={name} context={context} onRefreshUrls={onRefreshUrls} onUseModelSize={onUseModelSize} />
     </div>
   )
 }
@@ -301,6 +304,7 @@ export function ModelPreview({
   name,
   context = 'product',
   onRefreshUrls,
+  onUseModelSize,
 }: {
   glb?: ModelAsset
   usdz?: ModelAsset
@@ -309,6 +313,7 @@ export function ModelPreview({
   name: string
   context?: ModelContext
   onRefreshUrls?: () => void
+  onUseModelSize?: (dims: ModelSizeValues) => void
 }) {
   const { t } = useI18n()
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
@@ -404,7 +409,7 @@ export function ModelPreview({
           </div>
         )}
       </div>
-      {state === 'loaded' && <ScaleReport scale={scale} />}
+      {state === 'loaded' && <ScaleReport scale={scale} unit={dimensions.unit} onUseModelSize={onUseModelSize} />}
       {readiness}
     </div>
   )
@@ -450,8 +455,13 @@ const MISMATCH_HINT: Record<ScaleMismatchReason, (t: T, k?: number) => string> =
   uniform: (t, k) => t('products.model.hint.uniform', { k: k?.toFixed(2) ?? '' }),
 }
 
-function ScaleReport({ scale }: { scale: ScaleCheck }) {
+/** The form's width, height and depth as typed values. */
+export type ModelSizeValues = { width: string; height: string; depth: string }
+
+function ScaleReport({ scale, unit, onUseModelSize }: { scale: ScaleCheck; unit: Dimensions['unit']; onUseModelSize?: (dims: ModelSizeValues) => void }) {
   const { t } = useI18n()
+  // Offered only for a plausible model: a file in other units must not overwrite good dimensions (owner 2026-11-04).
+  const suggestion = onUseModelSize ? modelSizeSuggestion(scale, unit) : null
   const m = (v: number) => `${Math.round(v * 100)} cm`
   if (scale.status === 'unknown')
     return <p className="mt-3 text-[13px] text-ink-muted">{t('products.model.scaleUnknown')}</p>
@@ -470,6 +480,12 @@ function ScaleReport({ scale }: { scale: ScaleCheck }) {
           {scale.status === 'mismatch' && ` ${t('products.model.scaleNever')}`}
         </p>
         {scale.status === 'mismatch' && scale.reason && <p className="mt-0.5 text-ink">{MISMATCH_HINT[scale.reason](t, scale.factor)}</p>}
+        {suggestion && (
+          <Button type="button" variant="secondary" size="sm" className="mt-2.5 h-auto max-w-full py-1.5 max-sm:h-auto" icon={<Wand2 className="size-3.5 shrink-0" aria-hidden />} onClick={() => onUseModelSize?.(suggestion)}>
+            {/* The shared button never wraps; on a phone this label may need two lines. */}
+            <span className="min-w-0 text-left whitespace-normal">{t('products.model.useModelSize', { size: `${suggestion.width} × ${suggestion.height} × ${suggestion.depth} ${unit}` })}</span>
+          </Button>
+        )}
       </div>
     </div>
   )
