@@ -128,6 +128,7 @@ export interface ProductRow {
   material: LocalizedText
   cta_label: LocalizedText
   cta_url: string | null
+  cta_hidden: boolean
   category: Category
   price: number
   currency: Currency
@@ -324,7 +325,7 @@ export function toProduct(r: ProductRow, signed: Map<string, string>): Product {
     variants: [...(r.product_variants ?? [])]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((v) => toVariant(v, resolve)),
-    cta: { label: r.cta_label, url: r.cta_url ?? undefined },
+    cta: { label: r.cta_label, url: r.cta_url ?? undefined, ...(r.cta_hidden ? { hidden: true } : {}) },
     status: r.status,
     publishedAt: r.published_at ?? undefined,
     ...(r.models_changed_at ? { modelsChangedAt: r.models_changed_at } : {}),
@@ -347,6 +348,7 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
       material: p.material,
       cta_label: p.cta.label,
       cta_url: p.cta.url || null,
+      cta_hidden: p.cta.hidden === true,
       category: p.category,
       price: p.price,
       currency: p.currency,

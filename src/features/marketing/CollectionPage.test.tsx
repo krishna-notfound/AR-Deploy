@@ -85,6 +85,8 @@ describe('CollectionPage', () => {
     expect(links[0]).toHaveTextContent(/€/)
     expect(links[0]).toHaveTextContent('3D · AR')
     expect(links[0]).not.toHaveTextContent(business.name)
+    // No picture outside the piece cards (the collection's own picture is gone from this page).
+    expect([...screen.getByRole('main').querySelectorAll('img')].filter((img) => !list.contains(img))).toHaveLength(0)
   })
 
   it('never shows a business product, even when a card points at one', { timeout: 30_000 }, async () => {
@@ -123,6 +125,8 @@ describe('CollectionPage', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Empty one' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Pieces coming soon' })).toBeInTheDocument()
     const main = screen.getByRole('main')
+    // The collection's own picture is not shown on its page (client feedback 2026-11-05); the card on the landing page keeps it.
+    expect(main.querySelectorAll('img')).toHaveLength(0)
     expect(within(main).queryAllByRole('link').filter((l) => /^\/(products|catalog)\//.test(l.getAttribute('href') ?? ''))).toHaveLength(0)
     const banner = within(main).getByRole('region', { name: 'This is how your customers will see your pieces.' })
     expect(within(banner).getByRole('link', { name: 'Apply as a business' })).toHaveAttribute('href', '/apply')

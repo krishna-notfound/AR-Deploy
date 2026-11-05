@@ -192,7 +192,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 {/* With a model, the product's own link sits beside the AR button above; without one it is the main action. */}
                 {!hasCta && <ProductLinkButton product={product} outlined={false} />}
-                {!product.cta.url && hasContact && (
+                {!product.cta.url && !product.cta.hidden && hasContact && (
                   <button type="button" className={textAction} onClick={() => setContactOpen(true)}>
                     {t('product.contactStore')}
                   </button>

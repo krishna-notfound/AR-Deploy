@@ -152,7 +152,7 @@ export function toInput(form: EditorForm, t: (key: TranslationKey, vars?: Vars) 
       dimensions: { ...dims, unit: form.input.dimensions.unit },
       weight,
       variants: cleanVariants,
-      cta: { ...form.input.cta, url: form.input.cta.url?.trim() || undefined },
+      cta: { label: form.input.cta.label, url: form.input.cta.url?.trim() || undefined, ...(form.input.cta.hidden ? { hidden: true } : {}) },
     },
     errors,
   }

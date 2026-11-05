@@ -16,6 +16,7 @@ export function LocalizedField({
   hint,
   maxLength,
   placeholder,
+  disabled,
 }: {
   label: string
   value: LocalizedText
@@ -27,6 +28,7 @@ export function LocalizedField({
   hint?: string
   maxLength?: number
   placeholder?: string
+  disabled?: boolean
 }) {
   const { t } = useI18n()
   const [lang, setLang] = useState<Lang>('en')
@@ -82,6 +84,7 @@ export function LocalizedField({
         maxLength={maxLength}
         placeholder={lang === 'pt' && value.en ? value.en : placeholder}
         lang={lang === 'pt' ? 'pt-PT' : 'en'}
+        disabled={disabled}
       />
     </FormField>
   )

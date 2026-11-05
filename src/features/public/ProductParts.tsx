@@ -43,7 +43,7 @@ export function ArPrimaryAction({ stage, arLabel }: { stage: ProductStage; arLab
 /** The product's own link (label and URL from the product form) as a real button, opening in a new tab. */
 export function ProductLinkButton({ product, outlined }: { product: Product; outlined: boolean }) {
   const { t, localized } = useI18n()
-  if (!product.cta.url) return null
+  if (!product.cta.url || product.cta.hidden) return null
   return (
     <a href={product.cta.url} target="_blank" rel="noopener noreferrer" data-product-link className={outlined ? secondaryAction : primaryAction}>
       {localized(product.cta.label).trim() ? <LocalizedSpan text={product.cta.label} /> : t('product.contactStore')}

@@ -197,6 +197,8 @@ export const enProducts = {
   'products.editor.weight': 'Weight',
   'products.editor.weightUnit': 'Weight unit',
   'products.editor.ctaDescription': 'The main button on the product page, for example a contact form or WhatsApp link.',
+  'products.editor.ctaShow': 'Show the button on the product page',
+  'products.editor.ctaShowHint': 'Off: the product page shows no button and no “Contact the store” link. The label and link below are kept.',
   'products.editor.ctaLabel': 'Button label',
   'products.editor.ctaLink': 'Button link',
   'products.editor.ctaLinkHint': 'If empty, the button shows the store’s contact details.',
