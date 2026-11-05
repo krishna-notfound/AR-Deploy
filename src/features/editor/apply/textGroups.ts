@@ -16,7 +16,7 @@ export const MESSAGE_GROUPS: readonly MessageGroup[] = [
   {
     id: 'errors',
     title: 'applications.builder.group.errors',
-    keys: ['apply.err.required', 'apply.err.too_short', 'apply.err.too_long', 'apply.err.invalid_email', 'apply.err.invalid_url', 'apply.err.invalid_choice', 'apply.err.consent_required', 'apply.err.terms_required'],
+    keys: ['apply.err.required', 'apply.err.too_short', 'apply.err.too_long', 'apply.err.invalid_email', 'apply.err.invalid_url', 'apply.err.invalid_choice', 'apply.err.invalid_file', 'apply.err.consent_required', 'apply.err.terms_required'],
   },
   { id: 'consent', title: 'applications.builder.group.consent', keys: ['apply.f.consent'] },
   {

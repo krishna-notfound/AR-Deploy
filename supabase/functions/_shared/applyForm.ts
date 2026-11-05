@@ -9,7 +9,7 @@ export type ApplyStepKey = 'business' | 'location' | 'contact' | 'catalogue' | '
 export type ApplyBuiltinField =
   | 'businessName' | 'website' | 'category' | 'description' | 'country' | 'city'
   | 'applicantName' | 'applicantRole' | 'applicantEmail' | 'applicantPhone' | 'language'
-  | 'productCount' | 'photoReadiness' | 'modelReadiness' | 'notes'
+  | 'productCount' | 'photoReadiness' | 'modelReadiness' | 'notes' | 'catalogue'
 export type ApplyChoiceField = 'category' | 'productCount' | 'photoReadiness' | 'modelReadiness'
 export const LOCKED_FIELDS = ['businessName', 'applicantName', 'applicantEmail'] as const
 
@@ -97,7 +97,7 @@ export const APPLY_CATEGORY_KEYS = ['furniture', 'lighting', 'decor', 'fashion',
 export const APPLY_BUILTIN_KEYS: readonly ApplyBuiltinField[] = [
   'businessName', 'website', 'category', 'description', 'country', 'city',
   'applicantName', 'applicantRole', 'applicantEmail', 'applicantPhone', 'language',
-  'productCount', 'photoReadiness', 'modelReadiness', 'notes',
+  'productCount', 'photoReadiness', 'modelReadiness', 'notes', 'catalogue',
 ]
 
 export interface BuiltinFieldInfo {
@@ -127,13 +127,15 @@ export const BUILTIN_FIELDS: Readonly<Record<ApplyBuiltinField, BuiltinFieldInfo
   photoReadiness: { defaultStep: 'catalogue', defaultRequired: true, locked: false, options: ['all', 'some', 'none'] },
   modelReadiness: { defaultStep: 'catalogue', defaultRequired: true, locked: false, options: ['glb_usdz', 'some', 'none', 'need_help'] },
   notes: { defaultStep: 'catalogue', defaultRequired: false, locked: false },
+  // The optional PDF catalogue (ADR-0050): uploaded first, the application then carries its path (`cataloguePath`).
+  catalogue: { defaultStep: 'catalogue', defaultRequired: false, locked: false },
 }
 
 const isLocked = (k: string): boolean => (LOCKED_FIELDS as readonly string[]).includes(k)
 const isBuiltin = (k: string): k is ApplyBuiltinField => (APPLY_BUILTIN_KEYS as readonly string[]).includes(k)
 const isChoiceField = (k: string): k is ApplyChoiceField => (CHOICE_FIELDS as readonly string[]).includes(k)
 
-/** Today's five steps and 15 fields on their current steps with today's required flags. */
+/** Today's five steps and 16 fields on their current steps with today's required flags. */
 export const DEFAULT_APPLY_FORM: ApplyFormConfig = {
   texts: {},
   steps: (['business', 'location', 'contact', 'catalogue', 'review'] as const).map((k) => ({ id: k, builtin: k })),
@@ -149,12 +151,12 @@ export const APPLY_EDITABLE_KEYS: readonly string[] = [
   'apply.f.description', 'apply.f.description.hint', 'apply.f.country', 'apply.f.city', 'apply.f.applicantName',
   'apply.f.applicantRole', 'apply.f.applicantEmail', 'apply.f.applicantEmail.hint', 'apply.f.applicantPhone',
   'apply.f.language', 'apply.f.productCount', 'apply.f.photoReadiness', 'apply.f.modelReadiness',
-  'apply.f.modelReadiness.hint', 'apply.f.notes', 'apply.f.consent', 'apply.choose', 'apply.cat.furniture',
+  'apply.f.modelReadiness.hint', 'apply.f.notes', 'apply.f.catalogue', 'apply.f.consent', 'apply.choose', 'apply.cat.furniture',
   'apply.cat.lighting', 'apply.cat.decor', 'apply.cat.fashion', 'apply.cat.jewellery', 'apply.cat.electronics',
   'apply.cat.industrial', 'apply.cat.other', 'apply.count.1-10', 'apply.count.11-50', 'apply.count.51-200',
   'apply.count.200+', 'apply.photos.all', 'apply.photos.some', 'apply.photos.none', 'apply.models.glb_usdz',
   'apply.models.some', 'apply.models.none', 'apply.models.need_help', 'apply.err.required', 'apply.err.too_short',
-  'apply.err.too_long', 'apply.err.invalid_email', 'apply.err.invalid_url', 'apply.err.invalid_choice',
+  'apply.err.too_long', 'apply.err.invalid_email', 'apply.err.invalid_url', 'apply.err.invalid_choice', 'apply.err.invalid_file',
   'apply.err.consent_required', 'apply.fixFields', 'apply.edit', 'apply.notGiven', 'apply.back', 'apply.next',
   'apply.submit', 'apply.retry', 'apply.failed', 'apply.rateLimited', 'apply.duplicate', 'apply.done.title',
   'apply.done.body', 'apply.done.copy', 'apply.done.copied', 'apply.done.keepReference', 'apply.done.nextTitle',

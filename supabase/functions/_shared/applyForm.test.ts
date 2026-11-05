@@ -20,8 +20,8 @@ const form = (): ApplyFormConfig => clone(DEFAULT_APPLY_FORM)
 const tokens = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort()
 
 describe('built-in form model', () => {
-  it('has the 15 built-in fields and the 3 locked ones', () => {
-    expect(APPLY_BUILTIN_KEYS).toHaveLength(15)
+  it('has the 16 built-in fields and the 3 locked ones', () => {
+    expect(APPLY_BUILTIN_KEYS).toHaveLength(16)
     expect([...LOCKED_FIELDS]).toEqual(['businessName', 'applicantName', 'applicantEmail'])
     for (const k of LOCKED_FIELDS) expect(BUILTIN_FIELDS[k].locked).toBe(true)
   })
@@ -38,7 +38,8 @@ describe('built-in form model', () => {
 
   it('APPLY_EDITABLE_KEYS is every apply.* dictionary key except apply.step.* and apply.done.demo, with the same tokens in EN and PT', () => {
     const all = Object.keys(en).filter((k) => k.startsWith('apply.'))
-    const expected = all.filter((k) => !k.startsWith('apply.step.') && k !== 'apply.done.demo')
+    // apply.catalogue.* is the wording of the upload control (choose, uploading, remove, problems): not editable.
+    const expected = all.filter((k) => !k.startsWith('apply.step.') && !k.startsWith('apply.catalogue.') && k !== 'apply.done.demo')
     expect([...APPLY_EDITABLE_KEYS].sort()).toEqual(expected.sort())
     for (const k of APPLY_EDITABLE_KEYS) {
       const want = tokens((en as Record<string, string>)[k]!)
@@ -54,11 +55,11 @@ describe('resolveApplyForm', () => {
     ['business', ['businessName', 'website', 'category', 'description']],
     ['location', ['country', 'city']],
     ['contact', ['applicantName', 'applicantRole', 'applicantEmail', 'applicantPhone', 'language']],
-    ['catalogue', ['productCount', 'photoReadiness', 'modelReadiness', 'notes']],
+    ['catalogue', ['productCount', 'photoReadiness', 'modelReadiness', 'notes', 'catalogue']],
     ['review', []],
   ]
 
-  it('null equals today: 5 steps, 15 fields on their current steps; the default config resolves the same', () => {
+  it('null equals today: 5 steps, 16 fields on their current steps; the default config resolves the same', () => {
     expect(stepsOf(null)).toEqual(today)
     expect(stepsOf(form())).toEqual(today)
   })
@@ -121,7 +122,7 @@ describe('rulesFromConfig', () => {
     expect(r.fields.businessName).toEqual({ hidden: false, required: true })
     expect(r.hiddenOptions).toEqual({ category: ['other'] })
     expect(r.questions.map((q) => [q.id, q.required])).toEqual([['q1', false], ['q2', true]])
-    expect(Object.keys(r.fields)).toHaveLength(15)
+    expect(Object.keys(r.fields)).toHaveLength(16)
   })
 })
 
@@ -160,8 +161,8 @@ describe('validateApplyForm', () => {
   it('refuses a field on Review or on an unknown step, an unknown key, a repeated key', () => {
     expect(bad((c) => void (c.fields[0]!.stepId = 'review'))).toHaveProperty(['fields.0.stepId'], 'review_misplaced')
     expect(bad((c) => void (c.fields[0]!.stepId = 'nope'))).toHaveProperty(['fields.0.stepId'], 'step_unknown')
-    expect(bad((c) => void c.fields.push({ key: 'custom:ghost', stepId: 'business' }))).toHaveProperty(['fields.15.key'], 'unknown_key')
-    expect(bad((c) => void c.fields.push({ key: 'city', stepId: 'business' }))).toHaveProperty(['fields.15.key'], 'duplicate_key')
+    expect(bad((c) => void c.fields.push({ key: 'custom:ghost', stepId: 'business' }))).toHaveProperty(['fields.16.key'], 'unknown_key')
+    expect(bad((c) => void c.fields.push({ key: 'city', stepId: 'business' }))).toHaveProperty(['fields.16.key'], 'duplicate_key')
   })
 
   it('questions: at most 10, one placement each, option counts by type', () => {
