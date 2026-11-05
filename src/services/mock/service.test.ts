@@ -276,6 +276,40 @@ describe('business applications and owner access (demo, ADR-0024)', () => {
     )
   })
 
+  describe('the PDF catalogue (ADR-0050, session-only in demo mode)', () => {
+    const pdf = (name = 'range.pdf', type = 'application/pdf') => new File(['%PDF-1.7'], name, { type })
+
+    it('uploads to pending/<key>/catalogue.pdf, refuses non-PDFs, empty files and more than 20 MB like application-upload', async () => {
+      const key = crypto.randomUUID()
+      expect(unwrap(await svc.uploadApplicationCatalogue(key, pdf()))).toEqual({ path: `pending/${key}/catalogue.pdf` })
+      for (const bad of [pdf('a.png', 'image/png'), new File([], 'e.pdf', { type: 'application/pdf' }), Object.defineProperty(pdf(), 'size', { value: 20 * 1024 * 1024 + 1 })])
+        expect((await svc.uploadApplicationCatalogue(key, bad)).ok).toBe(false)
+      expect((await svc.uploadApplicationCatalogue('not-a-key', pdf())).ok).toBe(false)
+    })
+
+    it('an application keeps the path; staff get a link to the file; one without a catalogue has none', async () => {
+      Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:test/pdf') })
+      const key = crypto.randomUUID()
+      const { path } = unwrap(await svc.uploadApplicationCatalogue(key, pdf()))
+      const { id } = unwrap(await svc.submitApplication(application({ submissionKey: key, cataloguePath: path })))
+      expect(unwrap(await svc.getApplication(id)).cataloguePath).toBe(path)
+      expect(unwrap(await svc.getApplicationCatalogueUrl(id))).toEqual({ url: 'blob:test/pdf' })
+      const plain = unwrap(await svc.submitApplication(application({ businessName: 'Other Co', applicantEmail: 'o@other.test' })))
+      expect(unwrap(await svc.getApplication(plain.id)).cataloguePath).toBeUndefined()
+      const none = await svc.getApplicationCatalogueUrl(plain.id)
+      expect(none.ok === false && none.error.code).toBe('NOT_FOUND')
+    })
+
+    it('refuses a path whose file was never uploaded or belongs to another submission (field catalogue)', async () => {
+      const key = crypto.randomUUID()
+      const missing = await svc.submitApplication(application({ submissionKey: key, cataloguePath: `pending/${key}/catalogue.pdf` }))
+      expect(missing.ok === false && missing.error.fieldErrors).toEqual({ catalogue: 'invalid_file' })
+      const other = await svc.submitApplication(application({ cataloguePath: `pending/${crypto.randomUUID()}/catalogue.pdf` }))
+      expect(other.ok === false && other.error.fieldErrors).toEqual({ catalogue: 'invalid_file' })
+      expect(unwrap(await svc.getApplications()).total).toBe(0)
+    })
+  })
+
   it('reviews through the lifecycle, approving into a private draft business', async () => {
     const { id } = unwrap(await svc.submitApplication(application()))
     const rejectNoReason = await svc.reviewApplication(id, 'reject')

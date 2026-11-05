@@ -121,6 +121,7 @@ export type Database = {
           business_deleted_at: string | null
           business_id: string | null
           business_name: string
+          catalogue_path: string | null
           category: string | null
           city: string | null
           country: string | null
@@ -145,6 +146,7 @@ export type Database = {
           business_deleted_at?: string | null
           business_id?: string | null
           business_name: string
+          catalogue_path?: string | null
           category?: string | null
           city?: string | null
           country?: string | null
@@ -169,6 +171,7 @@ export type Database = {
           business_deleted_at?: string | null
           business_id?: string | null
           business_name?: string
+          catalogue_path?: string | null
           category?: string | null
           city?: string | null
           country?: string | null

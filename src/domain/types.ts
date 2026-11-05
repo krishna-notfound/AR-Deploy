@@ -269,6 +269,8 @@ export interface ApplicationInput {
   photoReadiness: string
   modelReadiness: string
   notes?: string
+  /** The uploaded PDF catalogue (`service.uploadApplicationCatalogue` returns it); optional, the form can hide or require it. */
+  cataloguePath?: string
   consent: boolean
   /** The "I agree to the Terms and the Privacy Policy" tick; submit-application refuses the request without it. */
   acceptedTerms?: boolean
@@ -304,6 +306,8 @@ export interface BusinessApplication {
     /** The published form version used (0 = the built-in form). */
     formVersion?: number
   }
+  /** Storage path of the PDF catalogue the applicant attached (ADR-0050); open it through `service.getApplicationCatalogueUrl`. */
+  cataloguePath?: string
   decisionReason?: string
   reviewedBy?: ID
   reviewedAt?: ISODate

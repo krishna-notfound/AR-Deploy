@@ -20,3 +20,21 @@ describe('S4 Task 2: REQUEST_PHOTO_RULES', () => {
     expect(files.validateImageFile(sized('IMG_1.heic', 'image/heic', 100), rules).ok).toBe(false)
   })
 })
+
+describe('ADR-0050: checkCataloguePdf', () => {
+  const pdf = (name: string, type = 'application/pdf') => new File(['%PDF-1.7\n1 0 obj'], name, { type })
+  it('accepts a real PDF, also when the browser gives no type', async () => {
+    expect(files.CATALOGUE_MAX_BYTES).toBe(20 * files.MB)
+    expect(await files.checkCataloguePdf(pdf('range.pdf'))).toEqual({ ok: true })
+    expect(await files.checkCataloguePdf(pdf('range.PDF', ''))).toEqual({ ok: true })
+  })
+  it('refuses a file that is not a PDF: wrong type or name, or a PDF name on other content', async () => {
+    expect(await files.checkCataloguePdf(new File(['x'], 'a.png', { type: 'image/png' }))).toEqual({ ok: false, reason: 'notPdf' })
+    expect(await files.checkCataloguePdf(new File(['not a pdf at all'], 'a.pdf', { type: 'application/pdf' }))).toEqual({ ok: false, reason: 'notPdf' })
+    expect(await files.checkCataloguePdf(new File([], 'empty.pdf', { type: 'application/pdf' }))).toEqual({ ok: false, reason: 'notPdf' })
+  })
+  it('refuses more than 20 MB (20 MB itself is fine)', async () => {
+    expect(await files.checkCataloguePdf(Object.defineProperty(pdf('ok.pdf'), 'size', { value: 20 * files.MB }))).toEqual({ ok: true })
+    expect(await files.checkCataloguePdf(Object.defineProperty(pdf('big.pdf'), 'size', { value: 20 * files.MB + 1 }))).toEqual({ ok: false, reason: 'tooBig' })
+  })
+})

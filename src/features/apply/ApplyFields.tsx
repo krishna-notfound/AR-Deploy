@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 import { BUILTIN_FIELDS } from '../../../supabase/functions/_shared/applyForm.ts'
 import type { ApplyTexts } from './applyText'
 import type { CustomValue, Draft } from './applyDraft'
+import { CatalogueField } from './CatalogueField'
 
 /** Short inputs sit two to a row from `sm`; the rest take the full width. */
 const HALF = new Set(['country', 'city', 'applicantName', 'applicantRole', 'applicantEmail', 'applicantPhone'])
@@ -26,6 +27,16 @@ export interface FieldCtx {
   errors: Record<string, string>
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void
   setCustom: (id: string, v: CustomValue | undefined) => void
+  /** The PDF catalogue upload (ADR-0050), run by the form: the control only shows its state. */
+  catalogue: {
+    uploading: boolean
+    /** Name of the file being uploaded. */
+    name: string
+    /** The Editor's preview: nothing is sent, so the control is off. */
+    disabled: boolean
+    pick: (file: File) => void
+    remove: () => void
+  }
 }
 
 /** The label of a stored choice value in the visitor's language (the original text, or the Editor's override). */
@@ -155,6 +166,8 @@ export function ApplyField({ field, ctx }: { field: ResolvedField; ctx: FieldCtx
           <Textarea rows={3} maxLength={1000} value={draft.notes} onChange={(e) => set('notes', e.target.value)} />
         </FormField>
       )
+    case 'catalogue':
+      return <CatalogueField field={field} ctx={ctx} />
   }
 }
 

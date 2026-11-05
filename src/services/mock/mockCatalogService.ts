@@ -6,7 +6,7 @@ import { localDayBounds } from '@/lib/format'
 import { newId } from '@/lib/id'
 import { PRODUCT_SLUG_MAX, slugify, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
-import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
+import { MAX_CATALOGUE_BYTES, cataloguePathFor, validateApplication } from '../../../supabase/functions/_shared/application.ts'
 import { rulesFromConfig } from '../../../supabase/functions/_shared/applyForm.ts'
 import { modelRequestError } from '../modelRequestRules'
 import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview, normalizeBusinessName } from '../applicationRules'
@@ -111,6 +111,10 @@ function reserveDemoInvite(db: Db, businessId: ID, recipient: string): { attempt
 function recordDemoInvite(db: Db, businessId: ID, recipient: string, attempt: number): void {
   ;(db.ownerInviteAttempts ??= []).unshift({ businessId, recipient, attempt, outcome: 'accepted', createdAt: nowIso() })
 }
+
+/** Demo mode: the PDF catalogues of this tab's applications, by storage path. Session-only, like every demo upload. */
+const sessionCatalogues = new Map<string, File>()
+const UUID_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Application and/or business scope: with both, entries of either match (an application and the business it created). */
 const matchesScope = (e: { applicationId?: ID; businessId?: ID }, q: { applicationId?: ID; businessId?: ID }) =>
@@ -707,6 +711,8 @@ export const mockCatalogService: CatalogService = {
     const rules = form.data ? rulesFromConfig(form.data.config, form.data.version) : null
     return run(() => {
       const v = validateApplication(input, rules)
+      // submit-application also checks that the file is there (an upload that did not happen, or a reload that lost it).
+      if (v.ok && v.value.cataloguePath && !sessionCatalogues.has(v.value.cataloguePath)) return fail('VALIDATION', 'Please fix the highlighted fields.', { catalogue: 'invalid_file' })
       if (!v.ok && v.stale) return { ok: false, error: { code: 'CONFLICT', message: 'The application form was updated. Check the highlighted fields.', reason: 'form_changed' } }
       if (!v.ok) return fail('VALIDATION', 'Please fix the highlighted fields.', v.errors)
       const a = v.value
@@ -731,6 +737,7 @@ export const mockCatalogService: CatalogService = {
         city: a.city ?? undefined,
         category: a.category ?? undefined,
         language: a.language,
+        cataloguePath: a.cataloguePath ?? undefined,
         answers: {
           description: a.description ?? undefined,
           applicantRole: a.applicantRole ?? undefined,
@@ -754,6 +761,23 @@ export const mockCatalogService: CatalogService = {
       return ok({ id: app.id, reference: app.reference })
     })
   },
+
+  // ADR-0050. Demo mode keeps the PDF in this tab's memory (never sent anywhere, gone on reload), with the same refusals as
+  // application-upload: a PDF, not empty, at most 20 MB.
+  uploadApplicationCatalogue: (submissionKey, file) =>
+    run(() => {
+      if (!UUID_KEY.test(submissionKey) || file.type !== 'application/pdf' || file.size < 1 || file.size > MAX_CATALOGUE_BYTES) return fail('VALIDATION', 'Check the details and try again.')
+      const path = cataloguePathFor(submissionKey)
+      sessionCatalogues.set(path, file)
+      return ok({ path })
+    }),
+
+  getApplicationCatalogueUrl: (id) =>
+    run(() => {
+      const path = store.get().applications?.find((x) => x.id === id)?.cataloguePath
+      const file = path ? sessionCatalogues.get(path) : undefined
+      return file ? ok({ url: URL.createObjectURL(file) }) : fail('NOT_FOUND', 'This application has no catalogue.')
+    }),
 
   getApplications: (q = {}) =>
     run(() => {

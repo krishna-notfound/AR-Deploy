@@ -422,6 +422,11 @@ const MEDIA_TABLES = ['product_images', 'product_models', 'product_variant_image
 // ---------------- applications, audit, email log (20261020091428_applications_and_owner_access) ----------------
 
 const SUBMIT_APPLICATION_FUNCTION = 'submit-application'
+const UPLOAD_APPLICATION_FUNCTION = 'application-upload'
+/** The private bucket of application PDFs (ADR-0050). */
+const APPLICATION_BUCKET = 'application-files'
+/** A staff member opens the PDF right away; the link is not meant to be kept. */
+const CATALOGUE_URL_TTL_SECONDS = 300
 const PROVISION_OWNER_FUNCTION = 'provision-owner'
 const REVIEW_APPLICATION_FUNCTION = 'review-application'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -445,6 +450,7 @@ export interface ApplicationRow {
   reviewed_at: string | null
   business_id: string | null
   business_deleted_at?: string | null
+  catalogue_path?: string | null
   created_at: string
   updated_at: string
 }
@@ -509,6 +515,7 @@ const toApplication = (r: ApplicationRow): BusinessApplication => ({
   category: (r.category ?? undefined) as BusinessApplication['category'],
   language: r.language,
   answers: r.answers ?? {},
+  cataloguePath: r.catalogue_path ?? undefined,
   decisionReason: r.decision_reason ?? undefined,
   reviewedBy: r.reviewed_by ?? undefined,
   reviewedAt: r.reviewed_at ?? undefined,
@@ -1226,6 +1233,28 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
 
     // ---------------- business applications ----------------
     submitApplication: (input) => guard(() => invokeFunction<{ id: string; reference: string }>(SUBMIT_APPLICATION_FUNCTION, input)),
+
+    // ADR-0050: application-upload signs one upload URL (rate-limited like applications); the file then goes straight to the
+    // private bucket with it. The file name is never sent: the object is always pending/<submissionKey>/catalogue.pdf.
+    uploadApplicationCatalogue: (submissionKey, file) =>
+      guard(async () => {
+        const signed = await invokeFunction<{ path: string; token: string }>(UPLOAD_APPLICATION_FUNCTION, { submissionKey, size: file.size, contentType: file.type })
+        if (!signed.ok) return signed
+        const { error } = await sb.storage.from(APPLICATION_BUCKET).uploadToSignedUrl(signed.data.path, signed.data.token, file, { contentType: 'application/pdf' })
+        if (error) return fail('UNKNOWN', 'The file could not be uploaded. Try again.')
+        return ok({ path: signed.data.path })
+      }),
+
+    getApplicationCatalogueUrl: (id) =>
+      guard(async () => {
+        if (!UUID_PATTERN.test(id)) return fail('NOT_FOUND', 'Application not found.')
+        const { data, error } = await sb.from('business_applications').select('catalogue_path').eq('id', id).maybeSingle<{ catalogue_path: string | null }>()
+        if (error) return mapDbError(error)
+        if (!data?.catalogue_path) return fail('NOT_FOUND', 'This application has no catalogue.')
+        const signed = await sb.storage.from(APPLICATION_BUCKET).createSignedUrl(data.catalogue_path, CATALOGUE_URL_TTL_SECONDS)
+        if (signed.error || !signed.data?.signedUrl) return fail('UNKNOWN', 'The catalogue could not be opened. Try again.')
+        return ok({ url: signed.data.signedUrl })
+      }),
 
     getApplications: (q = {}) =>
       guard(async () => {

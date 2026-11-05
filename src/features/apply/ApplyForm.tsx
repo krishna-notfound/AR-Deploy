@@ -10,6 +10,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { translate } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
+import { CATALOGUE_MAX_BYTES, checkCataloguePdf, formatMb } from '@/lib/files'
 import { service } from '@/services'
 import { validateApplication } from '../../../supabase/functions/_shared/application.ts'
 import { rulesFromConfig } from '../../../supabase/functions/_shared/applyForm.ts'
@@ -131,6 +132,34 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
     })
   }
 
+  // The PDF catalogue (ADR-0050): checked here, uploaded at once, and the draft keeps only its storage path and file name.
+  // Sending is held back while it uploads. The Editor's preview sends nothing.
+  const [uploading, setUploading] = useState<string | null>(null)
+  const pickCatalogue = async (file: File) => {
+    if (preview || uploading) return
+    const problem = (text: string) => setErrors((e) => ({ ...e, catalogue: text }))
+    const checked = await checkCataloguePdf(file)
+    if (!checked.ok) return problem(checked.reason === 'notPdf' ? tx.text('apply.catalogue.notPdf', { name: file.name }) : tx.text('apply.catalogue.tooBig', { name: file.name, size: formatMb(file.size), max: formatMb(CATALOGUE_MAX_BYTES) }))
+    setErrors((e) => {
+      const { catalogue: _, ...rest } = e
+      return rest
+    })
+    setUploading(file.name)
+    // Some browsers give a PDF no type; the server wants application/pdf, and the first bytes were checked above.
+    const pdf = file.type === 'application/pdf' ? file : new File([file], file.name, { type: 'application/pdf' })
+    const res = await service.uploadApplicationCatalogue(draft.submissionKey, pdf)
+    setUploading(null)
+    if (res.ok) setDraft((d) => ({ ...d, cataloguePath: res.data.path, catalogueName: file.name }))
+    else problem(res.error.code === 'RATE_LIMITED' ? tx.text('apply.catalogue.rateLimited') : tx.text('apply.catalogue.failed'))
+  }
+  const removeCatalogue = () => {
+    setDraft((d) => ({ ...d, cataloguePath: '', catalogueName: '' }))
+    setErrors((e) => {
+      const { catalogue: _, ...rest } = e
+      return rest
+    })
+  }
+
   const message = (field: string, code: string): string => {
     if (field === 'custom') return tx.text('apply.failed')
     const q = field.startsWith('custom.') ? config?.customQuestions.find((x) => `custom.${x.id}` === field) : undefined
@@ -156,6 +185,7 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
 
   const next = (e: FormEvent) => {
     e.preventDefault()
+    if (uploading) return
     const errs = stepErrors([step])
     setErrors(errs)
     if (Object.keys(errs).length) return
@@ -174,7 +204,7 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (submitting || preview) return
+    if (submitting || preview || uploading) return
     const all = stepErrors(steps)
     setErrors(all)
     if (Object.keys(all).length) {
@@ -215,7 +245,7 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
     setSubmitError(res.error.code === 'RATE_LIMITED' ? tx.text('apply.rateLimited') : res.error.code === 'CONFLICT' ? tx.text('apply.duplicate') : tx.text('apply.failed'))
   }
 
-  const ctx: FieldCtx = { draft: eff, config, tx, errors, set, setCustom }
+  const ctx: FieldCtx = { draft: eff, config, tx, errors, set, setCustom, catalogue: { uploading: !!uploading, name: uploading ?? '', disabled: preview, pick: (f) => void pickCatalogue(f), remove: removeCatalogue } }
   const isReview = step.builtin === 'review'
   const stepHasErrors = !isReview && errorKeysOf(step).some((k) => errors[k])
   const sendLabel = preview ? translate(language, 'applications.apply.preview') : submitError ? tx.text('apply.retry') : tx.text('apply.submit')
@@ -302,11 +332,11 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
             <span />
           )}
           {isReview ? (
-            <Button type="submit" variant="primary" size="lg" loading={submitting} icon={submitError ? <RotateCw className="size-4" aria-hidden /> : <Send className="size-4" aria-hidden />}>
+            <Button type="submit" variant="primary" size="lg" loading={submitting} disabled={!!uploading} icon={submitError ? <RotateCw className="size-4" aria-hidden /> : <Send className="size-4" aria-hidden />}>
               {sendLabel}
             </Button>
           ) : (
-            <Button type="submit" variant="primary" size="lg">
+            <Button type="submit" variant="primary" size="lg" disabled={!!uploading}>
               {tx.text('apply.next')} <ArrowRight className="size-4" aria-hidden />
             </Button>
           )}
@@ -371,6 +401,7 @@ function answerOf(f: ResolvedField, { draft: d, tx }: FieldCtx): ReactNode {
     case 'photoReadiness': return d.photoReadiness && choiceLabel('photoReadiness', d.photoReadiness, tx)
     case 'modelReadiness': return d.modelReadiness && choiceLabel('modelReadiness', d.modelReadiness, tx)
     case 'notes': return d.notes
+    case 'catalogue': return d.cataloguePath ? d.catalogueName || 'catalogue.pdf' : ''
     default: return ''
   }
 }
