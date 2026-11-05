@@ -48,3 +48,9 @@ Other behaviour:
 - **Optimization:** on by default; `VITE_MODEL_OPTIMIZATION=off` disables it (ADR-0019, switched on and extended with triangle reduction by ADR-0038, owner 2026-10-26). It runs in a worker, shows the sizes before and after, and offers "Upload the original instead".
 - **Business locked after uploads:** once files are stored, the business select is locked (files live under `{businessId}/`).
 - **Unit switch:** the cm/in switch labels the numbers; it does not convert them (the section text says so).
+
+## Import many products from a CSV (2026-11-05, ADR-0051)
+
+- Screen `ProductImportPage` (shared; `scope` admin or business) at `/admin/products/import` and `/dashboard/products/import`, opened by an Import button beside Add product. Admin picks the business first.
+- `src/lib/csv.ts` reads and writes CSV; `features/products/import/importRows.ts` maps the columns to `ImportRow[]`, adds the editor's draft rules (`validateProductDraft`) and makes unique slugs. Up to 200 rows; rows with problems are not created.
+- Rows are created one by one with `service.createProduct` as drafts (no photos, no 3D), with progress, Cancel and a created/failed summary. Nothing is published.

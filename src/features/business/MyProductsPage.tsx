@@ -1,4 +1,4 @@
-import { Package, PackagePlus } from 'lucide-react'
+import { FileUp, Package, PackagePlus } from 'lucide-react'
 import { useMemo } from 'react'
 import { useCurrentBusiness } from '@/auth/AccountProvider'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -33,9 +33,14 @@ export default function MyProductsPage() {
       <PageHeader
         title={t('business.products.title')}
         actions={
-          <ButtonLink to="/dashboard/products/new" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
-            {t('business.products.add')}
-          </ButtonLink>
+          <>
+            <ButtonLink to="/dashboard/products/import" icon={<FileUp className="size-4" aria-hidden />}>
+              {t('products.import.button')}
+            </ButtonLink>
+            <ButtonLink to="/dashboard/products/new" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
+              {t('business.products.add')}
+            </ButtonLink>
+          </>
         }
       />
       <Card>
