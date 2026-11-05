@@ -1,4 +1,4 @@
-# Client feedback 2026-11-05: five pieces
+# Client feedback 2026-11-05: four pieces (a fifth, AI reading, dropped)
 
 Source: the client's messages of 05 Nov (relayed by the owner). Owner answers the same day: build all five, in the order 1 → 2 → 3 → 4 → 5, each as its own merge so any piece can be reverted alone; do not touch the per-company "own 3D models" switch; when a product's button is hidden, show nothing; no mobile or page redesign, only the "Sanctus" lettering after the client's logo (`public/brand/sanctus-logo-source.jpg`, the same file the favicon was made from).
 
@@ -29,7 +29,6 @@ Every piece follows the project rules (CLAUDE.md): EN + PT-PT texts through `t()
 - Input: a CSV file or pasted CSV (UTF-8, comma or semicolon, quoted fields; a small parser in `src/lib/csv.ts`, no new dependency). A "Download template" link gives the header row and one example row. Columns: `name_en, name_pt, category, price, currency, width, height, depth, unit, short_en, short_pt, description_en, description_pt, material_en, material_pt, cta_label_en, cta_url`. Unknown columns are ignored; `name_en` and `category` are required, the rest optional.
 - Preview table: one row per product with its own errors (same rules as the product editor's draft validation); rows with errors are not created. "Create N drafts" creates them one by one as drafts (no photos, no 3D), shows progress, and ends with a summary listing what was created (links to each editor) and what failed and why. Nothing is published.
 - At most 200 rows per import. The screen is the shared feature for both dashboards (not duplicated).
-- The preview takes its rows from a typed `ImportRow[]`, so piece 5 can fill the same preview.
 
 ## Piece 4 — "Sanctus" in the client's lettering (ADR-0052)
 
@@ -38,14 +37,10 @@ Every piece follows the project rules (CLAUDE.md): EN + PT-PT texts through `t()
 - Check every place the wordmark shows (site header and footer, sign-in, dashboard sidebar, mobile menu, emails if they use it) at desktop and phone width; re-record the visual baselines that change on purpose.
 - The favicon stays as it is.
 
-## Piece 5 — read products out of the PDF catalogue (ADR-0053)
+## Piece 5 — dropped (owner, 2026-11-05)
 
-- On the Import screen (piece 3), staff only (`products.edit`, staff 2FA): "Read a PDF catalogue" with a PDF upload (at most 20 MB), or "Use the catalogue from the application" when the business came from an application with a catalogue.
-- New Edge Function `catalogue-extract` (verify_jwt true): checks the caller is platform staff with `products.edit` and AAL2; reads the PDF (uploaded to `application-files/imports/<uuid>.pdf` with a signed upload URL, or the application's stored file); sends it to Claude through the official SDK `npm:@anthropic-ai/sdk@1.1.0` (ADR, as for every new dependency): model `claude-opus-5-5`, `output_config.effort: "medium"`, structured JSON output (`output_config.format` with a JSON schema of `{ products: ImportRow-like[] }`), streaming with `finalMessage()`, server-side refusal fallback (`betas: ["server-side-fallback-2026-07-01"]`, `fallbacks: "default"`), the PDF as a base64 `document` block before the instruction text. Checks `stop_reason` (refusal, max_tokens) before reading the output; typed SDK errors mapped to the app's error codes.
-- Returns rows into the preview of piece 3; staff review and edit them; nothing is created until "Create N drafts". The PDF is deleted after reading unless it is the application's own.
-- Needs the secret `ANTHROPIC_API_KEY` in the Supabase project. Without it the function answers `not_configured` and the screen says that reading PDFs is not set up yet. Each catalogue read is billed by Anthropic (input tokens for every page); the owner and client decide on enabling it.
-- Demo mode: the mock returns three sample rows labelled as sample data.
+Reading products out of a PDF catalogue with AI is not built: "no need, it's all manual, no AI needed". Products are added by hand or with the CSV import (piece 3). No Anthropic dependency, function or secret.
 
 ## Order and commits
 
-Pieces 1–4 are built in parallel worktrees and merged in order 1, 2, 3, 4, each with a merge commit (`git revert -m 1 <merge>` removes one piece). Piece 5 starts after piece 3 is merged and is merged last. Migrations are applied and functions deployed after all checks pass, then `main` is pushed when the owner confirms.
+Pieces 1–4 are built in parallel worktrees and merged in order 1, 2, 3, 4, each with a merge commit (`git revert -m 1 <merge>` removes one piece). Migrations are applied and functions deployed after all checks pass, then `main` is pushed when the owner confirms.
