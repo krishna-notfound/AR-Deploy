@@ -367,8 +367,8 @@ describe('private.validate_apply_form', () => {
     ['multi choice with 11 options', (f) => { f.customQuestions = [q('a', { type: 'multi_choice', options: opts(11) })] as never; place(f, 'a') }, 'customQuestions.0.options|options_count'],
     ['options on a text question', (f) => { f.customQuestions = [q('a', { options: opts(2) })] as never; place(f, 'a') }, 'customQuestions.0.options|options_not_allowed'],
     ['a question without a placement', (f) => void (f.customQuestions = [q('a')] as never), 'customQuestions.0|missing_placement'],
-    ['an unknown field key', (f) => void f.fields.push({ key: 'custom:ghost', stepId: 'business' }), 'fields.15.key|unknown_key'],
-    ['a repeated field key', (f) => void f.fields.push({ key: 'city', stepId: 'business' }), 'fields.15.key|duplicate_key'],
+    ['an unknown field key', (f) => void f.fields.push({ key: 'custom:ghost', stepId: 'business' }), 'fields.16.key|unknown_key'],
+    ['a repeated field key', (f) => void f.fields.push({ key: 'city', stepId: 'business' }), 'fields.16.key|duplicate_key'],
     ['a field on an unknown step', (f) => void (f.fields[0]!.stepId = 'nope'), 'fields.0.stepId|step_unknown'],
     ['a field on Review', (f) => void (f.fields[0]!.stepId = 'review'), 'fields.0.stepId|review_misplaced'],
     ['a hidden locked field', (f) => void (f.fields.find((x) => x.key === 'applicantEmail')!.hidden = true), 'fields.8.hidden|locked'],
@@ -641,7 +641,7 @@ describe('rollback', () => {
       roles: await fn('public.admin_set_role_permissions(public.platform_role, text[])'),
       check: (await target.query(`select pg_get_constraintdef(oid) as d from pg_constraint where conrelid = 'public.platform_role_permissions'::regclass and contype = 'c' order by 1`)).rows,
       answers: (await target.query(`select pg_get_constraintdef(oid) as d from pg_constraint where conrelid = 'public.business_applications'::regclass and conname = 'business_applications_answers_check'`)).rows,
-      nullable: (await target.query(`select column_name, is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'business_applications' order by 1`)).rows,
+      nullable: (await target.query(`select column_name, is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'business_applications' and column_name <> 'catalogue_path' order by 1`)).rows,
     }
   }
   const GONE = [

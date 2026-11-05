@@ -369,7 +369,7 @@ describe('ApplyForm: the PDF catalogue (ADR-0050)', () => {
     expect(screen.getByText('Product catalogue (PDF)').nextElementSibling).toHaveTextContent('range.pdf')
     await user.click(screen.getByRole('button', { name: 'Send application' }))
     await screen.findByText(/^Reference:/)
-    const sent = submit.mock.calls[0]![0] as Record<string, unknown>
+    const sent = submit.mock.calls[0]![0] as unknown as Record<string, unknown>
     expect(sent.cataloguePath).toBe(`pending/${KEY}/catalogue.pdf`)
     expect(sent).not.toHaveProperty('catalogueName')
     submit.mockRestore()
