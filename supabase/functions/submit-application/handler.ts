@@ -105,6 +105,19 @@ export async function handleSubmitApplication(req: Request, deps: SubmitDeps): P
   const hashes = await attemptHashes(clientIp(req), deps.salt, now)
   if (!(await deps.allowAttempt(hashes))) return reply(429, { error: 'rate_limited' })
 
+  // The catalogue file must really be there: a PDF of at most 20 MB, uploaded to the one path of this submission.
+  if (app.cataloguePath) {
+    let object: Awaited<ReturnType<SubmitDeps['catalogueObject']>>
+    try {
+      object = await deps.catalogueObject(app.cataloguePath)
+    } catch (e) {
+      console.error(`catalogue lookup failed: ${loggable(e)}`)
+      return reply(503, { error: 'config_unavailable' })
+    }
+    if (!object || object.contentType !== 'application/pdf' || object.size < 1 || object.size > MAX_CATALOGUE_BYTES)
+      return reply(400, { error: 'invalid_application', fields: { catalogue: 'invalid_file' } })
+  }
+
   const dup = await deps.findOpenDuplicate(app.applicantEmail, app.businessName)
   if (dup) return reply(409, { error: 'duplicate_application' })
 

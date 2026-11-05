@@ -93,6 +93,7 @@ function deps(over: Partial<SubmitDeps> = {}) {
     log: async (e) => (logs.push(e), `log-${logs.length}`),
     staffAlertRecipients: async () => [],
     loadApplyRules: async () => null,
+    catalogueObject: async () => ({ size: 1_000_000, contentType: 'application/pdf' }),
     ...over,
   }
   return { d, rows, logs, audits, sends, fetchFn, attempts, clock }
@@ -411,6 +412,85 @@ const askQuestions = (c: ApplyFormConfig) => {
   ]
   c.fields.push({ key: 'custom:q1', stepId: 'catalogue', required: true }, { key: 'custom:q2', stepId: 'catalogue', required: false })
 }
+
+describe('submit-application with a catalogue (ADR-0050)', () => {
+  const PATH = `pending/${VALID.submissionKey}/catalogue.pdf`
+  const PDF = { size: 1_000_000, contentType: 'application/pdf' }
+
+  it('stores the path when the object exists, is a PDF and is at most 20 MB', async () => {
+    const seen: string[] = []
+    const { d, rows } = deps({ catalogueObject: async (p) => (seen.push(p), PDF) })
+    const res = await handleSubmitApplication(post({ ...VALID, cataloguePath: PATH }), d)
+    expect(res.status).toBe(200)
+    expect(seen).toEqual([PATH])
+    expect(rows[0]!.app.cataloguePath).toBe(PATH)
+  })
+
+  it("without a catalogue the storage is not asked and the path is null (today's behaviour)", async () => {
+    const ask = vi.fn(async () => PDF)
+    const { d, rows } = deps({ catalogueObject: ask })
+    expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
+    expect(ask).not.toHaveBeenCalled()
+    expect(rows[0]!.app.cataloguePath).toBeNull()
+  })
+
+  it('refuses a path that is not pending/<submissionKey>/catalogue.pdf with the field catalogue, before storage is asked', async () => {
+    const ask = vi.fn(async () => PDF)
+    const { d, rows } = deps({ catalogueObject: ask })
+    const res = await handleSubmitApplication(post({ ...VALID, cataloguePath: `pending/${key(5)}/catalogue.pdf` }), d)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid_application', fields: { catalogue: 'invalid_file' } })
+    expect(ask).not.toHaveBeenCalled()
+    expect(rows).toHaveLength(0)
+  })
+
+  it.each([
+    ['missing', null],
+    ['not a PDF', { size: 10, contentType: 'image/png' }],
+    ['over 20 MB', { size: 20 * 1024 * 1024 + 1, contentType: 'application/pdf' }],
+    ['empty', { size: 0, contentType: 'application/pdf' }],
+  ])('refuses a catalogue that is %s: 400 invalid_application on catalogue, nothing stored or sent', async (_n, obj) => {
+    const { d, rows, sends } = deps({ catalogueObject: async () => obj })
+    const res = await handleSubmitApplication(post({ ...VALID, cataloguePath: PATH }), d)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid_application', fields: { catalogue: 'invalid_file' } })
+    expect(rows).toHaveLength(0)
+    expect(sends).toHaveLength(0)
+  })
+
+  it('answers 503 config_unavailable when storage cannot be read', async () => {
+    const { d, rows } = deps({
+      catalogueObject: async () => {
+        throw new Error('storage down')
+      },
+    })
+    const res = await handleSubmitApplication(post({ ...VALID, cataloguePath: PATH }), d)
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ error: 'config_unavailable' })
+    expect(rows).toHaveLength(0)
+  })
+
+  it('a form that hides the field ignores a path (nothing checked, null stored); a required one refuses a missing path', async () => {
+    const ask = vi.fn(async () => null)
+    const hidden = deps({ loadApplyRules: async () => formRules((c) => place(c, 'catalogue', { hidden: true })), catalogueObject: ask })
+    expect((await handleSubmitApplication(post({ ...VALID, cataloguePath: PATH }), hidden.d)).status).toBe(200)
+    expect(hidden.rows[0]!.app.cataloguePath).toBeNull()
+    expect(ask).not.toHaveBeenCalled()
+    const required = deps({ loadApplyRules: async () => formRules((c) => place(c, 'catalogue', { required: true })) })
+    const res = await handleSubmitApplication(post(VALID), required.d)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid_application', fields: { catalogue: 'required' } })
+  })
+
+  it('a replay of the same submission key returns the stored row without asking storage again', async () => {
+    const ask = vi.fn(async () => PDF)
+    const { d, rows } = deps({ catalogueObject: ask })
+    await handleSubmitApplication(post({ ...VALID, cataloguePath: PATH }), d)
+    await handleSubmitApplication(post({ ...VALID, cataloguePath: PATH }), d)
+    expect(rows).toHaveLength(1)
+    expect(ask).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe('submit-application: published application form', () => {
   it('no published form behaves as today', async () => {
