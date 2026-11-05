@@ -123,7 +123,8 @@ export interface Product {
   material: LocalizedText
   weight?: { value: number; unit: WeightUnit }
   variants: ProductVariant[]
-  cta: { label: LocalizedText; url?: string }
+  /** `hidden`: the public pages show neither the link button nor "Contact the store" (the label and link are kept). Missing = shown. */
+  cta: { label: LocalizedText; url?: string; hidden?: boolean }
   status: ProductStatus
   publishedAt?: ISODate
   /** When the product's or an option's 3D files last changed (S4 R-S4-17); unset until the first change. */

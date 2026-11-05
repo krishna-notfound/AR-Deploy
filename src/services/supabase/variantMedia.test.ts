@@ -107,6 +107,7 @@ const row: ProductRow = {
   material: { en: '' },
   cta_label: { en: '' },
   cta_url: null,
+  cta_hidden: false,
   category: 'chair',
   price: 12000,
   currency: 'EUR',

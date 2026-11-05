@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { CopyButton } from '@/components/ui/CopyButton'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { FormField, Input, InputAddon, Select } from '@/components/ui/Form'
+import { FormField, Input, InputAddon, Select, Switch } from '@/components/ui/Form'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -276,6 +276,7 @@ export function ProductEditorForm({
   // ---- field helpers ----
   const setInput = (patch: Partial<EditorForm['input']>) => setForm((f) => ({ ...f, input: { ...f.input, ...patch } }))
   const err = (k: string) => errors[k]
+  const ctaHidden = form.input.cta.hidden === true
   const updateImages = (update: (images: EditorForm['input']['images']) => EditorForm['input']['images']) =>
     setForm((f) => ({ ...f, input: { ...f.input, images: update(f.input.images) } }))
 
@@ -738,10 +739,18 @@ export function ProductEditorForm({
           </Section>
 
           <Section id="cta" title={t('products.editor.sections.cta')} description={t('products.editor.ctaDescription')}>
+            <div className="mb-5 max-w-xl">
+              <Switch
+                label={t('products.editor.ctaShow')}
+                description={t('products.editor.ctaShowHint')}
+                checked={!ctaHidden}
+                onChange={(show) => setInput({ cta: { ...form.input.cta, hidden: show ? undefined : true } })}
+              />
+            </div>
             <div className="grid items-start gap-x-6 gap-y-5 sm:grid-cols-2 [&>*:last-child]:sm:pt-1">
-              <LocalizedField label={t('products.editor.ctaLabel')} value={form.input.cta.label} onChange={(label) => setInput({ cta: { ...form.input.cta, label } })} maxLength={40} error={err('cta.label')} />
+              <LocalizedField label={t('products.editor.ctaLabel')} value={form.input.cta.label} onChange={(label) => setInput({ cta: { ...form.input.cta, label } })} maxLength={40} error={err('cta.label')} disabled={ctaHidden} />
               <FormField label={t('products.editor.ctaLink')} optional error={err('cta.url')} hint={t('products.editor.ctaLinkHint')}>
-                <Input type="url" placeholder="https://" value={form.input.cta.url ?? ''} onChange={(e) => setInput({ cta: { ...form.input.cta, url: e.target.value } })} />
+                <Input type="url" placeholder="https://" value={form.input.cta.url ?? ''} onChange={(e) => setInput({ cta: { ...form.input.cta, url: e.target.value } })} disabled={ctaHidden} />
               </FormField>
             </div>
           </Section>

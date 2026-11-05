@@ -15,7 +15,6 @@ import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
 import { usePublishedCollection } from '@/services/contentHooks'
 import { TAP_TARGET } from '../public/tapTarget'
 import { BUILTIN_COLLECTIONS } from './landingBuiltin'
-import { collectionImage, landingImage } from './landingImages'
 import PublicNotFoundPage from './PublicNotFoundPage'
 import { useSiteContent } from './SiteContentProvider'
 import { SiteFooter, SiteHeader } from './SiteChrome'
@@ -31,8 +30,6 @@ const SECTION = 'mx-auto max-w-[1320px] px-5 sm:px-10'
 interface View {
   title: string
   text?: string
-  image: string
-  focus?: string
   /** The curated pieces in order; undefined = every showcase piece of `category`. */
   refs?: ProductRef[]
   category?: Category
@@ -47,13 +44,11 @@ export default function CollectionPage() {
 
   const view: View | null = useMemo(() => {
     if (collection) {
-      const img = collectionImage(collection.image)
-      return { title: localized(collection.title), text: collection.text ? localized(collection.text) || undefined : undefined, image: img?.src ?? '', focus: img?.focus, refs: collection.products }
+      return { title: localized(collection.title), text: collection.text ? localized(collection.text) || undefined : undefined, refs: collection.products }
     }
     const builtin = nothingPublished ? BUILTIN_COLLECTIONS.find((c) => c.key === slug) : undefined
     if (!builtin) return null
-    const img = landingImage(builtin.image)
-    return { title: t(`landing.col.${builtin.key}`), text: t(`landing.col.${builtin.key}Body`), image: img?.src ?? '', focus: img?.focus, category: builtin.category }
+    return { title: t(`landing.col.${builtin.key}`), text: t(`landing.col.${builtin.key}Body`), category: builtin.category }
     // `localized` and `t` change with the language.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collection, nothingPublished, slug, t, localized])
@@ -86,11 +81,6 @@ export default function CollectionPage() {
             {view.text && <p className="mt-5 max-w-xl text-[15px] leading-7 text-ink-muted">{view.text}</p>}
           </header>
         </div>
-        {view.image && (
-          <div className={cn(SECTION, 'mt-10 lg:mt-14')}>
-            <img src={view.image} alt="" width={1200} height={896} className={cn('aspect-[16/10] w-full bg-subtle object-cover sm:aspect-[21/9]', view.focus)} />
-          </div>
-        )}
         <div className={cn(SECTION, 'py-12 lg:py-16')}>
           {showcase.status === 'loading' ? (
             <Grid label={t('common.loading')} busy>
@@ -150,7 +140,6 @@ function Skeletons() {
     <main className={cn(SECTION, 'flex-1 py-12')} aria-busy="true" aria-label={t('common.loading')}>
       <Skeleton className="h-4 w-24" />
       <Skeleton className="mt-6 h-12 w-1/2" />
-      <Skeleton className="mt-6 aspect-[21/9] w-full" />
     </main>
   )
 }

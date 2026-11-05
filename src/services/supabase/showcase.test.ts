@@ -63,6 +63,7 @@ const product = (id: string, business_id: string, over: Partial<ProductRow> = {}
   material: { en: '' },
   cta_label: { en: '' },
   cta_url: null,
+  cta_hidden: false,
   category: 'sofa',
   price: 100,
   currency: 'EUR',

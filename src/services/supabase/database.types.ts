@@ -859,6 +859,7 @@ export type Database = {
           business_id: string
           category: string
           created_at: string
+          cta_hidden: boolean
           cta_label: Json
           cta_url: string | null
           currency: string
@@ -884,6 +885,7 @@ export type Database = {
           business_id: string
           category: string
           created_at?: string
+          cta_hidden?: boolean
           cta_label?: Json
           cta_url?: string | null
           currency: string
@@ -909,6 +911,7 @@ export type Database = {
           business_id?: string
           category?: string
           created_at?: string
+          cta_hidden?: boolean
           cta_label?: Json
           cta_url?: string | null
           currency?: string

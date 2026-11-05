@@ -199,6 +199,8 @@ export const ptProducts: Partial<Record<TranslationKey, string>> = {
   'products.editor.weight': 'Peso',
   'products.editor.weightUnit': 'Unidade de peso',
   'products.editor.ctaDescription': 'O botão principal da página do produto, por exemplo um formulário de contacto ou uma ligação do WhatsApp.',
+  'products.editor.ctaShow': 'Mostrar o botão na página do produto',
+  'products.editor.ctaShowHint': 'Desligado: a página do produto não mostra o botão nem a ligação «Contactar a loja». O texto e a ligação abaixo ficam guardados.',
   'products.editor.ctaLabel': 'Texto do botão',
   'products.editor.ctaLink': 'Ligação do botão',
   'products.editor.ctaLinkHint': 'Se estiver vazio, o botão mostra os contactos da loja.',
