@@ -5,13 +5,15 @@
 // (to the admin inbox and to opted-in staff who can view applications). Nothing after the insert undoes the stored
 // application: an audit failure is logged and the emails still go, and a retry with the same submission key sends
 // the emails that were never logged (S1.5 R-W2-10, R-W2-11).
-import { type NormalizedApplication, validateApplication } from '../_shared/application.ts'
+import { MAX_CATALOGUE_BYTES, type NormalizedApplication, validateApplication } from '../_shared/application.ts'
 import type { ApplyRules } from '../_shared/applyForm.ts'
+import { MAX_SUBMISSIONS_PER_HOUR, attemptHashes, submitterHash } from '../_shared/attempts.ts'
 import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
 import { clientIp, readJsonObject, reply, sha256Hex } from '../_shared/http.ts'
 
-export const MAX_SUBMISSIONS_PER_HOUR = 5
+// Kept exported from here: the tests and index.ts import them from the handler.
+export { MAX_SUBMISSIONS_PER_HOUR, submitterHash }
 /** Room for the answers to up to 10 questions (the custom block itself is capped at 40,000 bytes). */
 const MAX_BODY_BYTES = 48_000
 /** A key replay newer than this is a double click while the first request may still be sending: it sends nothing. */
@@ -52,26 +54,15 @@ export interface SubmitDeps {
    * published. Throws when the read fails: that is not "no form" (spec section 10), the request is answered 503.
    */
   loadApplyRules(): Promise<ApplyRules | null>
+  /**
+   * The stored object at `path` in the application-files bucket (size in bytes and content type), or null when there is
+   * none. Throws when storage cannot be read: that is not "no file", the request is answered 503.
+   */
+  catalogueObject(path: string): Promise<{ size: number; contentType: string } | null>
 }
-
-/** Salted hash of the submitter's IP for one UTC day (`YYYY-MM-DD`): it cannot follow a submitter across days. */
-export async function submitterHash(ip: string, salt: string, day: string): Promise<string> {
-  return sha256Hex(`application|${day}|${ip}|${salt}`)
-}
-
-const utcDay = (d: Date) => d.toISOString().slice(0, 10)
 
 /** An error for console.error: email addresses removed (provider and database messages can quote them), shortened. */
 export const loggable = (e: unknown, max = 200) => String(e).replace(/[^\s@<>"'(),;:]+@[^\s@<>"'(),;:]+/g, '[email]').slice(0, max)
-
-/** Today's hash first; when the hour before `now` started on the previous UTC day, that day's hash as well. */
-async function attemptHashes(ip: string, salt: string, now: Date): Promise<string[]> {
-  const today = utcDay(now)
-  const hourAgo = utcDay(new Date(now.getTime() - 3600_000))
-  const hashes = [await submitterHash(ip, salt, today)]
-  if (hourAgo !== today) hashes.push(await submitterHash(ip, salt, hourAgo))
-  return hashes
-}
 
 export async function handleSubmitApplication(req: Request, deps: SubmitDeps): Promise<Response> {
   if (req.method === 'OPTIONS') return reply(204)
@@ -113,6 +104,19 @@ export async function handleSubmitApplication(req: Request, deps: SubmitDeps): P
   // Every attempt counts, including those the duplicate check refuses, so a 409 probe is limited too.
   const hashes = await attemptHashes(clientIp(req), deps.salt, now)
   if (!(await deps.allowAttempt(hashes))) return reply(429, { error: 'rate_limited' })
+
+  // The catalogue file must really be there: a PDF of at most 20 MB, uploaded to the one path of this submission.
+  if (app.cataloguePath) {
+    let object: Awaited<ReturnType<SubmitDeps['catalogueObject']>>
+    try {
+      object = await deps.catalogueObject(app.cataloguePath)
+    } catch (e) {
+      console.error(`catalogue lookup failed: ${loggable(e)}`)
+      return reply(503, { error: 'config_unavailable' })
+    }
+    if (!object || object.contentType !== 'application/pdf' || object.size < 1 || object.size > MAX_CATALOGUE_BYTES)
+      return reply(400, { error: 'invalid_application', fields: { catalogue: 'invalid_file' } })
+  }
 
   const dup = await deps.findOpenDuplicate(app.applicantEmail, app.businessName)
   if (dup) return reply(409, { error: 'duplicate_application' })

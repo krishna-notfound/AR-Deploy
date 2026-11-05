@@ -276,3 +276,48 @@ describe('ApplicationDetailPage: history gating (R-W7-8)', () => {
     expect(screen.queryByText('Showing application events only.')).not.toBeInTheDocument()
   })
 })
+
+describe('the applicant\'s PDF catalogue (ADR-0050)', () => {
+  it('says "No catalogue attached" when there is none', async () => {
+    const id = await submitApplication()
+    renderPage(id)
+    expect(await screen.findByText('No catalogue attached')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Product catalogue (PDF)' })).not.toBeInTheDocument()
+  })
+
+  it('a button opens the short-lived link in a new tab', async () => {
+    const key = crypto.randomUUID()
+    const up = await service.uploadApplicationCatalogue(key, new File(['%PDF-1.7'], 'range.pdf', { type: 'application/pdf' }))
+    if (!up.ok) throw new Error(up.error.message)
+    const res = await service.submitApplication({ businessName: 'Atelier Norte', description: 'Solid oak furniture made in Porto.', category: 'furniture', country: 'Portugal', city: 'Porto', applicantName: 'Rita Sousa', applicantEmail: 'rita@atelier.test', language: 'en', productCount: '11-50', photoReadiness: 'all', modelReadiness: 'none', consent: true, acceptedTerms: true, submissionKey: key, cataloguePath: up.data.path })
+    if (!res.ok) throw new Error(res.error.message)
+    const link = vi.spyOn(service, 'getApplicationCatalogueUrl').mockResolvedValue(ok({ url: 'https://files.test/signed.pdf' }))
+    const tab = { location: { href: '' }, opener: {}, close: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window)
+    renderPage(res.data.id)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Product catalogue (PDF)' }))
+    await vi.waitFor(() => expect(tab.location.href).toBe('https://files.test/signed.pdf'))
+    expect(link).toHaveBeenCalledWith(res.data.id)
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(tab.opener).toBeNull()
+    expect(screen.queryByText('No catalogue attached')).not.toBeInTheDocument()
+  })
+
+  it('a link that cannot be made closes the empty tab and says so', async () => {
+    const key = crypto.randomUUID()
+    const up = await service.uploadApplicationCatalogue(key, new File(['%PDF-1.7'], 'range.pdf', { type: 'application/pdf' }))
+    if (!up.ok) throw new Error(up.error.message)
+    const res = await service.submitApplication({ businessName: 'Atelier Norte', description: 'Solid oak furniture made in Porto.', category: 'furniture', country: 'Portugal', city: 'Porto', applicantName: 'Rita Sousa', applicantEmail: 'rita@atelier.test', language: 'en', productCount: '11-50', photoReadiness: 'all', modelReadiness: 'none', consent: true, acceptedTerms: true, submissionKey: key, cataloguePath: up.data.path })
+    if (!res.ok) throw new Error(res.error.message)
+    vi.spyOn(service, 'getApplicationCatalogueUrl').mockResolvedValue(fail('UNKNOWN', 'x'))
+    const tab = { location: { href: '' }, opener: {}, close: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window)
+    renderPage(res.data.id)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Product catalogue (PDF)' }))
+    expect(await screen.findByText('The catalogue could not be opened. Try again.')).toBeInTheDocument()
+    expect(tab.close).toHaveBeenCalled()
+    expect(tab.location.href).toBe('')
+  })
+})

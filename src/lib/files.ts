@@ -83,6 +83,20 @@ async function readHeader(file: Blob, length: number): Promise<Uint8Array> {
   )
 }
 
+/** The PDF catalogue of an application (ADR-0050): the bucket's own limit. */
+export const CATALOGUE_MAX_BYTES = 20 * MB
+
+/**
+ * Whether a chosen file can be sent as the catalogue: a PDF by its type or name and by its first bytes ("%PDF-"), at most 20 MB.
+ * The reason is a short code; the form words it (apply.catalogue.*) in the visitor's language.
+ */
+export async function checkCataloguePdf(file: File): Promise<{ ok: true } | { ok: false; reason: 'notPdf' | 'tooBig' }> {
+  if (file.type !== 'application/pdf' && extOf(file.name) !== '.pdf') return { ok: false, reason: 'notPdf' }
+  if (file.size > CATALOGUE_MAX_BYTES) return { ok: false, reason: 'tooBig' }
+  const head = await readHeader(file, 5)
+  return new TextDecoder().decode(head) === '%PDF-' ? { ok: true } : { ok: false, reason: 'notPdf' }
+}
+
 const GLB_MAGIC = 0x46546c67 // "glTF"
 const CHUNK_JSON = 0x4e4f534a
 const CHUNK_BIN = 0x004e4942

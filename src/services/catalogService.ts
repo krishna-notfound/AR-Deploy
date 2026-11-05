@@ -231,6 +231,15 @@ export interface CatalogService {
 
   // business applications: anyone may submit; everything else is for platform admins
   submitApplication(input: ApplicationInput): Promise<Result<{ id: ID; reference: string }>>
+  /**
+   * Uploads the PDF catalogue of an application in progress (ADR-0050) and returns its storage path for
+   * `ApplicationInput.cataloguePath`. One file per `submissionKey`; a new upload replaces the earlier one. Anyone may call it
+   * (rate-limited with the applications). The caller checks type and size first; the server checks again.
+   * Demo mode keeps the file in memory for the session only.
+   */
+  uploadApplicationCatalogue(submissionKey: string, file: File): Promise<Result<{ path: string }>>
+  /** A short-lived link to the application's PDF catalogue (staff with applications.view); NOT_FOUND when it has none. */
+  getApplicationCatalogueUrl(applicationId: ID): Promise<Result<{ url: string }>>
   getApplications(query?: ApplicationQuery): Promise<Result<Page<BusinessApplication>>>
   getApplication(id: ID): Promise<Result<BusinessApplication>>
   /**

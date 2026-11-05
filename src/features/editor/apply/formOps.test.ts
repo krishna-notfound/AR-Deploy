@@ -29,7 +29,7 @@ const keysOf = (c: ApplyFormConfig, stepId: string) => layoutOf(c).find((s) => s
 describe('materialize', () => {
   it('writes every field out in display order without changing what the form looks like', () => {
     const c = materialize(base())
-    expect(c.fields).toHaveLength(15)
+    expect(c.fields).toHaveLength(16)
     expect(layoutOf(c).map((s) => s.fields.map((f) => [f.key, f.hidden, f.required]))).toEqual(layoutOf(base()).map((s) => s.fields.map((f) => [f.key, f.hidden, f.required])))
     expect(validateApplyForm(c)).toEqual({})
   })

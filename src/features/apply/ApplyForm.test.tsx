@@ -274,6 +274,130 @@ describe('ApplyForm review and submit', () => {
   })
 })
 
+describe('ApplyForm: the PDF catalogue (ADR-0050)', () => {
+  const pdf = (name = 'range.pdf') => new File(['%PDF-1.7 body'], name, { type: 'application/pdf' })
+  const KEY = SAVED.submissionKey
+  const catalogueStep = (config: ApplyFormConfig | null = form(), props: Partial<Parameters<typeof Harness>[0]> = {}) => {
+    saveDraft({}, 'catalogue')
+    return renderForm({ initial: config, ...props }, '/apply?step=catalogue')
+  }
+
+  it('is an optional field of the catalogue step: choose a PDF, it uploads once with the submission key, the name shows with Remove', async () => {
+    const upload = vi.spyOn(service, 'uploadApplicationCatalogue')
+    const user = userEvent.setup()
+    catalogueStep()
+    await stepHeading('Your catalogue')
+    const input = screen.getByLabelText(/^Product catalogue \(PDF\) \(optional\)/)
+    expect(screen.getByText(/up to 20 MB/)).toBeInTheDocument()
+    expect(screen.getByText(/Demo only/)).toBeInTheDocument()
+    await user.upload(input, pdf())
+    expect(await screen.findByText('range.pdf')).toBeInTheDocument()
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(upload).toHaveBeenCalledWith(KEY, expect.objectContaining({ name: 'range.pdf', type: 'application/pdf' }))
+    expect(JSON.parse(sessionStorage.getItem('sanctus:apply:draft')!).draft).toMatchObject({ cataloguePath: `pending/${KEY}/catalogue.pdf`, catalogueName: 'range.pdf' })
+    await user.click(screen.getByRole('button', { name: 'Remove range.pdf' }))
+    expect(screen.queryByText('range.pdf')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose a PDF' })).toBeInTheDocument()
+    expect(JSON.parse(sessionStorage.getItem('sanctus:apply:draft')!).draft).toMatchObject({ cataloguePath: '', catalogueName: '' })
+    upload.mockRestore()
+  })
+
+  it('shows the uploading state, holds Continue back meanwhile, and keeps going afterwards', async () => {
+    let finish: (v: ReturnType<typeof ok<{ path: string }>>) => void = () => {}
+    const upload = vi.spyOn(service, 'uploadApplicationCatalogue').mockReturnValue(new Promise((r) => (finish = r)))
+    const user = userEvent.setup()
+    catalogueStep()
+    await stepHeading('Your catalogue')
+    await user.upload(screen.getByLabelText(/^Product catalogue \(PDF\)/), pdf('slow.pdf'))
+    expect(await screen.findByRole('status')).toHaveTextContent('Uploading slow.pdf…')
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await act(async () => finish(ok({ path: `pending/${KEY}/catalogue.pdf` })))
+    expect(await screen.findByText('slow.pdf')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+    upload.mockRestore()
+  })
+
+  it('refuses a file that is not a PDF or is over 20 MB before any upload, with a message naming the file', async () => {
+    const upload = vi.spyOn(service, 'uploadApplicationCatalogue')
+    const user = userEvent.setup({ applyAccept: false })
+    catalogueStep()
+    await stepHeading('Your catalogue')
+    const input = screen.getByLabelText(/^Product catalogue \(PDF\)/)
+    await user.upload(input, new File(['png'], 'photo.png', { type: 'image/png' }))
+    expect(await screen.findByText('photo.png is not a PDF. Choose a PDF file.')).toBeInTheDocument()
+    const big = pdf('huge.pdf')
+    Object.defineProperty(big, 'size', { value: 25 * 1024 * 1024 })
+    await user.upload(input, big)
+    expect(await screen.findByText('huge.pdf is 25 MB. The limit is 20 MB.')).toBeInTheDocument()
+    expect(upload).not.toHaveBeenCalled()
+    upload.mockRestore()
+  })
+
+  it('shows an upload failure and a rate limit as text, and nothing is kept', async () => {
+    const upload = vi.spyOn(service, 'uploadApplicationCatalogue').mockResolvedValueOnce(fail('UNKNOWN', 'x')).mockResolvedValueOnce(fail('RATE_LIMITED', 'x'))
+    const user = userEvent.setup()
+    catalogueStep()
+    await stepHeading('Your catalogue')
+    await user.upload(screen.getByLabelText(/^Product catalogue \(PDF\)/), pdf())
+    expect(await screen.findByText('The file could not be uploaded. Check your connection and try again.')).toBeInTheDocument()
+    await user.upload(screen.getByLabelText(/^Product catalogue \(PDF\)/), pdf())
+    expect(await screen.findByText('Too many uploads. Wait a little and try again.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose a PDF' })).toBeInTheDocument()
+    expect(JSON.parse(sessionStorage.getItem('sanctus:apply:draft')!).draft.cataloguePath).toBe('')
+    upload.mockRestore()
+  })
+
+  it('the form builder can hide it (not rendered, not sent) or make it required (star, blocks Continue)', async () => {
+    const { unmount } = catalogueStep(form((c) => place(c, 'catalogue', { hidden: true })))
+    await stepHeading('Your catalogue')
+    expect(screen.queryByLabelText(/Product catalogue/)).not.toBeInTheDocument()
+    unmount()
+    const user = userEvent.setup()
+    catalogueStep(form((c) => place(c, 'catalogue', { required: true })))
+    await stepHeading('Your catalogue')
+    expect(screen.getByLabelText(/^Product catalogue \(PDF\) \*/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByText('This field is required.')).toBeInTheDocument()
+  })
+
+  it('the review lists the file name, and the application is sent with cataloguePath only (no file name)', async () => {
+    const submit = vi.spyOn(service, 'submitApplication').mockResolvedValue(ok({ id: 'a1', reference: 'REF12345' }))
+    saveDraft({ cataloguePath: `pending/${KEY}/catalogue.pdf`, catalogueName: 'range.pdf' })
+    const user = userEvent.setup()
+    renderForm({ initial: form() }, '/apply?step=review')
+    await stepHeading('Review and send')
+    expect(screen.getByText('Product catalogue (PDF)').nextElementSibling).toHaveTextContent('range.pdf')
+    await user.click(screen.getByRole('button', { name: 'Send application' }))
+    await screen.findByText(/^Reference:/)
+    const sent = submit.mock.calls[0]![0] as unknown as Record<string, unknown>
+    expect(sent.cataloguePath).toBe(`pending/${KEY}/catalogue.pdf`)
+    expect(sent).not.toHaveProperty('catalogueName')
+    submit.mockRestore()
+  })
+
+  it('a server refusal of the catalogue lands on its field on the catalogue step', async () => {
+    vi.spyOn(service, 'submitApplication').mockResolvedValue(fail('VALIDATION', 'x', { catalogue: 'invalid_file' }))
+    saveDraft({ cataloguePath: `pending/${KEY}/catalogue.pdf`, catalogueName: 'range.pdf' })
+    const user = userEvent.setup()
+    renderForm({ initial: form() }, '/apply?step=review')
+    await user.click(await screen.findByRole('button', { name: 'Send application' }))
+    await stepHeading('Your catalogue')
+    expect(await screen.findByText('The catalogue could not be used. Remove it and add the PDF again.')).toBeInTheDocument()
+    vi.restoreAllMocks()
+  })
+
+  it('in Portuguese the field and its texts are Portuguese; in the Editor preview nothing can be chosen', async () => {
+    const { unmount } = catalogueStep(form(), { lang: 'pt' })
+    expect(await screen.findByLabelText(/^Catálogo de produtos \(PDF\) \(opcional\)/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Escolher um PDF' })).toBeInTheDocument()
+    unmount()
+    sessionStorage.clear()
+    renderForm({ initial: form((c) => c.steps.splice(0, 3)), preview: true })
+    await stepHeading('Your catalogue')
+    expect(screen.getByRole('button', { name: 'Choose a PDF' })).toBeDisabled()
+  })
+})
+
 it('preview: moving through the steps uses state, not the URL', async () => {
   const user = userEvent.setup()
   const { router } = renderForm({ initial: form((c) => place(c, 'website', { required: false })), preview: true })

@@ -147,6 +147,33 @@ describe('validateApplication with rules', () => {
     expect(v).toMatchObject({ ok: false, errors: { website: 'required', notes: 'required', applicantPhone: 'required', applicantRole: 'required' } })
   })
 
+  describe('the catalogue (cataloguePath)', () => {
+    const PATH = `pending/${VALID.submissionKey}/catalogue.pdf`
+    it('is null without rules and when left out; the built-in form takes it as optional', () => {
+      expect(validateApplication(VALID)).toMatchObject({ ok: true, value: { cataloguePath: null } })
+      expect(validateApplication({ ...VALID, cataloguePath: '' })).toMatchObject({ ok: true, value: { cataloguePath: null } })
+      expect(validateApplication({ ...VALID, cataloguePath: PATH })).toMatchObject({ ok: true, value: { cataloguePath: PATH } })
+    })
+
+    it('must be exactly pending/<submissionKey>/catalogue.pdf, else the field catalogue is invalid_file', () => {
+      for (const bad of [`pending/00000000-0000-0000-0000-000000000000/catalogue.pdf`, `imports/${VALID.submissionKey}/catalogue.pdf`, `pending/${VALID.submissionKey}/other.pdf`, `/${PATH}`, `${PATH}x`, 'https://evil.test/a.pdf'])
+        expect(validateApplication({ ...VALID, cataloguePath: bad }), bad).toMatchObject({ ok: false, errors: { catalogue: 'invalid_file' } })
+      expect(validateApplication({ ...VALID, cataloguePath: 5 })).toMatchObject({ ok: false, errors: { catalogue: 'invalid_file' } })
+    })
+
+    it('an upper-case submission key still points at the lower-case folder', () => {
+      expect(validateApplication({ ...VALID, submissionKey: VALID.submissionKey.toUpperCase(), cataloguePath: PATH }).ok).toBe(true)
+    })
+
+    it('hidden: ignored and stored as null; required: an empty one is required', () => {
+      const hidden = rulesOf((c) => place(c, 'catalogue', { hidden: true }))
+      expect(validateApplication({ ...VALID, cataloguePath: 'garbage' }, hidden)).toMatchObject({ ok: true, value: { cataloguePath: null } })
+      const required = rulesOf((c) => place(c, 'catalogue', { required: true }))
+      expect(validateApplication({ ...VALID, cataloguePath: '' }, required)).toMatchObject({ ok: false, errors: { catalogue: 'required' } })
+      expect(validateApplication({ ...VALID, cataloguePath: PATH }, required).ok).toBe(true)
+    })
+  })
+
   describe('hidden options', () => {
     it('a hidden built-in option is stale', () => {
       const rules = rulesOf((c) => {

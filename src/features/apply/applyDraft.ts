@@ -5,7 +5,14 @@ import type { ApplicationInput, Lang } from '@/domain/types'
 import { APPLY_CATEGORY_KEYS } from '../../../supabase/functions/_shared/applyForm.ts'
 
 export type CustomValue = string | boolean | string[]
-export type Draft = Omit<ApplicationInput, 'category' | 'custom'> & { categoryKey: string; categoryOther: string; custom: Record<string, CustomValue> }
+export type Draft = Omit<ApplicationInput, 'category' | 'custom'> & {
+  categoryKey: string
+  categoryOther: string
+  custom: Record<string, CustomValue>
+  /** The uploaded catalogue's storage path ('' = none) and the file name the visitor chose, for the form and the review. */
+  cataloguePath: string
+  catalogueName: string
+}
 
 export const emptyDraft = (lang: Lang): Draft => ({
   businessName: '',
@@ -24,6 +31,8 @@ export const emptyDraft = (lang: Lang): Draft => ({
   photoReadiness: '',
   modelReadiness: '',
   notes: '',
+  cataloguePath: '',
+  catalogueName: '',
   consent: false,
   acceptedTerms: false,
   custom: {},
@@ -31,7 +40,7 @@ export const emptyDraft = (lang: Lang): Draft => ({
 })
 
 export const toInput = (d: Draft): ApplicationInput => {
-  const { categoryKey, categoryOther, ...rest } = d
+  const { categoryKey, categoryOther, catalogueName: _name, ...rest } = d
   return { ...rest, category: categoryKey === 'other' ? categoryOther : categoryKey }
 }
 

@@ -432,6 +432,11 @@ verify_jwt = true
 [functions.submit-application]
 verify_jwt = false
 
+# Optional PDF catalogue of an application (ADR-0050): anonymous visitors get a signed upload URL; the handler validates and
+# rate-limits (the same per-IP limit as submit-application).
+[functions.application-upload]
+verify_jwt = false
+
 # Owner invitations (ADR-0024): platform admins only, re-checked in the handler.
 [functions.provision-owner]
 verify_jwt = true

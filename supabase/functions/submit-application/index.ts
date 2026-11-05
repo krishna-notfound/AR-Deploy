@@ -5,13 +5,15 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { normalizeApplyForm, rulesFromConfig } from '../_shared/applyForm.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
-import { serviceKeyFrom, sha256Hex } from '../_shared/http.ts'
+import { applicationSalt } from '../_shared/attempts.ts'
+import { serviceKeyFrom } from '../_shared/http.ts'
 import { MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, handleSubmitApplication, loggable } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
 const key = serviceKeyFrom(env)
 const admin = createClient(env('SUPABASE_URL') ?? '', key, { auth: { persistSession: false, autoRefreshToken: false } })
-const salt = env('APPLICATION_SALT') || (key ? await sha256Hex(`submit-application-salt|${key}`) : '')
+const salt = await applicationSalt(env, key)
+const CATALOGUE_BUCKET = 'application-files'
 
 const OPEN = ['submitted', 'under_review']
 const STORED_COLUMNS = 'id, reference, applicant_email, business_name, language, created_at'
@@ -68,6 +70,18 @@ Deno.serve((req) =>
       if (!published) return null
       return rulesFromConfig(normalizeApplyForm(published.applyForm), Number(data?.published_version) || 0)
     },
+    // The uploaded catalogue (ADR-0050): its size and content type from the object's metadata, null when it is not there.
+    async catalogueObject(path) {
+      const slash = path.lastIndexOf('/')
+      const folder = path.slice(0, slash)
+      const name = path.slice(slash + 1)
+      const { data, error } = await admin.storage.from(CATALOGUE_BUCKET).list(folder, { limit: 5, search: name })
+      if (error) throw new Error(`catalogue lookup failed: ${error.message}`)
+      const file = (data ?? []).find((f) => f.name === name)
+      if (!file) return null
+      const meta = (file.metadata ?? {}) as { size?: unknown; mimetype?: unknown }
+      return { size: Number(meta.size) || 0, contentType: typeof meta.mimetype === 'string' ? meta.mimetype : '' }
+    },
     async insert(a, hash) {
       const { data, error } = await admin
         .from('business_applications')
@@ -91,6 +105,7 @@ Deno.serve((req) =>
             custom: a.custom,
             formVersion: a.formVersion,
           },
+          catalogue_path: a.cataloguePath,
           submission_key: a.submissionKey,
           submitter_hash: hash,
         })

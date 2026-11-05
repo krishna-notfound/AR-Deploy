@@ -13,14 +13,14 @@ export const PRODUCT_COUNT_RANGES = ['1-10', '11-50', '51-200', '200+'] as const
 export const PHOTO_READINESS = ['all', 'some', 'none'] as const
 export const MODEL_READINESS = ['glb_usdz', 'some', 'none', 'need_help'] as const
 
-export type ApplicationErrorCode = 'required' | 'too_short' | 'too_long' | 'invalid_email' | 'invalid_url' | 'invalid_choice' | 'consent_required' | 'terms_required'
+export type ApplicationErrorCode = 'required' | 'too_short' | 'too_long' | 'invalid_email' | 'invalid_url' | 'invalid_choice' | 'invalid_file' | 'consent_required' | 'terms_required'
 
 /** Wizard steps and the fields each one owns. */
 export const APPLICATION_STEPS = {
   business: ['businessName', 'website', 'category', 'description'],
   location: ['country', 'city'],
   contact: ['applicantName', 'applicantRole', 'applicantEmail', 'applicantPhone', 'language'],
-  catalogue: ['productCount', 'photoReadiness', 'modelReadiness', 'notes'],
+  catalogue: ['productCount', 'photoReadiness', 'modelReadiness', 'notes', 'catalogue'],
   review: ['consent', 'acceptedTerms'],
 } as const
 
@@ -47,6 +47,11 @@ export interface NormalizedApplication {
   photoReadiness: (typeof PHOTO_READINESS)[number] | null
   modelReadiness: (typeof MODEL_READINESS)[number] | null
   notes: string | null
+  /**
+   * The uploaded PDF catalogue, `pending/<submissionKey>/catalogue.pdf` (ADR-0050); null when none or the form hides it.
+   * The shape is checked here; that the file exists, is a PDF and is small enough is checked by submit-application.
+   */
+  cataloguePath: string | null
   /** Answers to the form's questions in form order, with label snapshots. */
   custom: CustomAnswer[]
   /** The published form version the rules came from (0 = the built-in form). */
@@ -59,6 +64,11 @@ export type ApplicationValidation = { ok: true; value: NormalizedApplication } |
 
 const EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]{2,}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The storage object the form uploads a catalogue to (bucket application-files). One per submission, replaced on a new upload. */
+export const cataloguePathFor = (submissionKey: string): string => `pending/${submissionKey.toLowerCase()}/catalogue.pdf`
+/** Largest catalogue: the bucket's own limit (20 MB). */
+export const MAX_CATALOGUE_BYTES = 20 * 1024 * 1024
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '')
 const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
@@ -147,13 +157,24 @@ export function validateApplication(input: unknown, rules?: ApplyRules | null): 
   const photoReadiness = choice('photoReadiness', i.photoReadiness, PHOTO_READINESS)
   const modelReadiness = choice('modelReadiness', i.modelReadiness, MODEL_READINESS)
 
+  // The catalogue: the one place the upload goes to is derived from the submission key (lower case: storage folders are).
+  const catalogueRule = rule('catalogue')
+  const submissionKey = typeof i.submissionKey === 'string' && UUID.test(i.submissionKey) ? i.submissionKey : ''
+  let cataloguePath: string | null = null
+  if (!catalogueRule.hidden) {
+    const given = i.cataloguePath
+    if (given === undefined || given === null || given === '') {
+      if (catalogueRule.required) errors.catalogue = 'required'
+    } else if (typeof given !== 'string' || !submissionKey || given !== cataloguePathFor(submissionKey)) errors.catalogue = 'invalid_file'
+    else cataloguePath = given
+  }
+
   const custom = validateCustom(i.custom, rules ?? null, errors, () => {
     stale = true
   })
 
   if (i.consent !== true) errors.consent = 'consent_required'
   if (i.acceptedTerms !== true) errors.acceptedTerms = 'terms_required'
-  const submissionKey = typeof i.submissionKey === 'string' && UUID.test(i.submissionKey) ? i.submissionKey : ''
   if (!submissionKey) errors.submissionKey = 'required'
 
   if (stale) return { ok: false, errors, stale: true }
@@ -176,6 +197,7 @@ export function validateApplication(input: unknown, rules?: ApplyRules | null): 
       photoReadiness,
       modelReadiness,
       notes,
+      cataloguePath,
       custom,
       formVersion: rules?.version ?? 0,
       submissionKey,

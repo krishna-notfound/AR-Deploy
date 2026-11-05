@@ -1,6 +1,6 @@
 import { useCan } from '@/auth/usePermission'
 import { scrollBehavior } from '@/lib/motion'
-import { ArrowDown, Building2, Check, Eye, FileX, RotateCcw, X } from 'lucide-react'
+import { ArrowDown, Building2, Check, Eye, FileText, FileX, RotateCcw, X } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { PageHeader, PanelHeader } from '@/components/layout/PageHeader'
@@ -256,6 +256,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
                   [t('admin.applications.detail.photos'), ready(app.answers.photoReadiness)],
                   [t('admin.applications.detail.models'), ready(app.answers.modelReadiness)],
                   [t('admin.applications.detail.notes'), app.answers.notes],
+                  [t('admin.applications.detail.catalogueRow'), <CatalogueLink key="catalogue" app={app} />],
                 ]}
               />
             </CardBody>
@@ -364,6 +365,35 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
         </div>
       </Modal>
     </>
+  )
+}
+
+/** The applicant's PDF catalogue (ADR-0050): a button that opens a short-lived link in a new tab, or "No catalogue attached". */
+function CatalogueLink({ app }: { app: BusinessApplication }) {
+  const { t } = useI18n()
+  const toast = useToast()
+  const [opening, setOpening] = useState(false)
+  if (!app.cataloguePath) return <span className="text-ink-muted italic">{t('admin.applications.detail.catalogueNone')}</span>
+  const open = async () => {
+    if (opening) return
+    setOpening(true)
+    // The tab is opened inside the click (browsers block a window opened after waiting) and pointed at the link once it is signed.
+    const tab = window.open('', '_blank')
+    const res = await service.getApplicationCatalogueUrl(app.id)
+    setOpening(false)
+    if (!res.ok) {
+      tab?.close()
+      return toast.error(t(res.error.code === 'NOT_FOUND' ? 'admin.applications.detail.catalogueGone' : 'admin.applications.detail.catalogueFailed'))
+    }
+    if (tab) {
+      tab.opener = null
+      tab.location.href = res.data.url
+    } else window.open(res.data.url, '_blank', 'noopener')
+  }
+  return (
+    <Button size="sm" loading={opening} icon={<FileText className="size-4" aria-hidden />} onClick={() => void open()}>
+      {t('admin.applications.detail.catalogueOpen')}
+    </Button>
   )
 }
 
