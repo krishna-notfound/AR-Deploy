@@ -1,9 +1,9 @@
 import { useCan } from '@/auth/usePermission'
-import { Package, PackagePlus } from 'lucide-react'
+import { FileUp, Package, PackagePlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Button } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { FormField, Select } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
@@ -42,9 +42,14 @@ export default function AdminProductsPage() {
         title={t('admin.products.title')}
         actions={
           can('products.edit') && (
-            <Button variant="primary" icon={<PackagePlus className="size-4" aria-hidden />} onClick={addProduct}>
-              {t('admin.products.add')}
-            </Button>
+            <>
+              <ButtonLink to={filters.business ? `/admin/products/import?business=${filters.business}` : '/admin/products/import'} icon={<FileUp className="size-4" aria-hidden />}>
+                {t('products.import.button')}
+              </ButtonLink>
+              <Button variant="primary" icon={<PackagePlus className="size-4" aria-hidden />} onClick={addProduct}>
+                {t('admin.products.add')}
+              </Button>
+            </>
           )
         }
       />

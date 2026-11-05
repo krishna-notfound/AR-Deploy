@@ -61,6 +61,7 @@ const RolePermissionsPage = lazy(() => import('@/features/team/RolePermissionsPa
 const MemberDetailPage = lazy(() => import('@/features/team/MemberDetailPage'))
 const JoinPage = lazy(() => import('@/features/join/JoinPage'))
 const ProductEditorPage = lazy(() => import('@/features/products/ProductEditorPage'))
+const ProductImportPage = lazy(() => import('@/features/products/import/ProductImportPage'))
 
 const BusinessOverviewPage = lazy(() => import('@/features/business/BusinessOverviewPage'))
 const MyProductsPage = lazy(() => import('@/features/business/MyProductsPage'))
@@ -113,6 +114,7 @@ const adminRoutes: RouteObject = {
     { path: 'businesses/:businessId', element: <RequirePermission need="businesses.view"><BusinessDetailPage /></RequirePermission> },
     { path: 'products', element: <RequirePermission need="products.view"><AdminProductsPage /></RequirePermission> },
     { path: 'products/new', element: <RequirePermission need="products.edit"><ProductEditorPage scope="admin" /></RequirePermission> },
+    { path: 'products/import', element: <RequirePermission need="products.edit"><ProductImportPage scope="admin" /></RequirePermission> },
     { path: 'products/:productId/edit', element: <RequirePermission need="products.edit"><ProductEditorPage scope="admin" /></RequirePermission> },
     { path: 'model-requests', element: <RequirePermission need="models.manage"><ModelRequestsPage /></RequirePermission> },
     { path: 'model-requests/:requestId', element: <RequirePermission need="models.manage"><ModelRequestDetailPage /></RequirePermission> },
@@ -156,6 +158,7 @@ const businessRoutes: RouteObject = {
     { index: true, element: <BusinessOverviewPage /> },
     { path: 'products', element: <MyProductsPage /> },
     { path: 'products/new', element: <ProductEditorPage scope="business" /> },
+    { path: 'products/import', element: <ProductImportPage scope="business" /> },
     { path: 'products/:productId/edit', element: <ProductEditorPage scope="business" /> },
     { path: 'analytics', element: <BusinessAnalyticsPage /> },
     { path: 'catalog', element: <MyCatalogPage /> },
