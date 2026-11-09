@@ -16,7 +16,9 @@ import { LOCAL_QR_SWITCH } from '../catalogs/CatalogQrPanel'
 
 /**
  * Per-product QR code (ADR-0025). It encodes the product's PUBLIC URL, separate from and never replacing the
- * catalogue QR code (ADR-0005). Drafts get no code: their page is not public and their address can still change.
+ * catalogue QR code (ADR-0005). Only a publicly visible product gets a code (published, in an active catalogue; ADR-0054):
+ * a draft's page is not public and its address can still change, and a paused catalogue shows "not available". The table offers the
+ * entry only for such products; the dialog repeats the rule for a direct call.
  */
 export function ProductQrDialog({ product, business, onClose }: { product: Product | null; business: Business | undefined; onClose: () => void }) {
   const { t } = useI18n()
@@ -33,6 +35,12 @@ function ProductQrBody({ product: p, business: b }: { product: Product; business
     return (
       <InlineNotice tone="warning" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
         <strong className="font-medium">{t('products.share.notPublicYet')}</strong> {t('products.qr.draftNotice')}
+      </InlineNotice>
+    )
+  if (b.status !== 'active')
+    return (
+      <InlineNotice tone="warning" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
+        <strong className="font-medium">{t('products.share.notPublicYet')}</strong> {t(b.status === 'draft' ? 'products.qr.catalogDraft' : 'products.qr.catalogPaused')}
       </InlineNotice>
     )
   return <PublishedProductQr product={p} business={b} />
@@ -56,11 +64,6 @@ function PublishedProductQr({ product: p, business: b }: { product: Product; bus
   return (
     <div className="space-y-4">
       <p className="text-sm text-ink-muted">{t('products.qr.intro')}</p>
-      {b.status !== 'active' && (
-        <InlineNotice tone="warning" icon={<Info className="mt-0.5 size-4 shrink-0" aria-hidden />}>
-          <strong className="font-medium">{t('products.share.notPublicYet')}</strong> {t(b.status === 'draft' ? 'products.qr.catalogDraft' : 'products.qr.catalogPaused')}
-        </InlineNotice>
-      )}
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
         <div className="w-full max-w-[200px] shrink-0 rounded-lg border border-line bg-white p-3">
           {qr.url ? (

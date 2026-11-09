@@ -32,6 +32,8 @@ export const enProducts = {
   'products.filters.allAr': 'All 3D / AR',
   'products.filters.needsUsdz': 'Needs iPhone file (USDZ)',
   'products.filters.noModel': 'No 3D model',
+  // W3 (ADR-0054): published before the 3D-only rule; staff can unpublish them from this view.
+  'products.filters.publishedNo3d': 'Published without 3D',
   'products.filters.requests': '3D requests',
   'products.filters.byRequests': 'Filter by 3D requests',
   'products.filters.allProducts': 'All products',
@@ -56,7 +58,6 @@ export const enProducts = {
   'products.menu.previewDraft': 'Preview draft',
   'products.menu.copyUrl': 'Copy product URL',
   'products.menu.qr': 'Product QR code',
-  'products.menu.qrDraft': 'Product QR code (not public yet)',
   'products.menu.embed': 'Embed on your website',
   'products.menu.embedDraft': 'Embed on your website (not public yet)',
   'products.menu.duplicate': 'Duplicate',

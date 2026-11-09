@@ -10,16 +10,15 @@ import type { Category, Product } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { errorText } from '@/i18n/errorText'
 import { cn } from '@/lib/cn'
-import { initialPrice, primaryImage } from '@/lib/product'
-import { useFormat } from '@/lib/useFormat'
 import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
 import { usePublishedCollection } from '@/services/contentHooks'
+import { ProductCard } from '../public/ProductCard'
 import { TAP_TARGET } from '../public/tapTarget'
 import { BUILTIN_COLLECTIONS } from './landingBuiltin'
 import PublicNotFoundPage from './PublicNotFoundPage'
 import { useSiteContent } from './SiteContentProvider'
 import { SiteFooter, SiteHeader } from './SiteChrome'
-import { hasGlb, useShowcasePieces } from './useShowcasePieces'
+import { useShowcasePieces } from './useShowcasePieces'
 
 // A collection's own public page, /collections/:slug (owner decisions 2026-11-03, ADR-0047). It lists only the admin's own
 // showcase pieces, each opening its showcase page; no business catalogue or product is ever reachable from here. The Owner/
@@ -113,7 +112,7 @@ export default function CollectionPage() {
             <Grid label={t('site.collection.pieces', { name: view.title })}>
               {pieces.map((product) => (
                 <li key={product.id} className="flex">
-                  <PieceCard product={product} />
+                  <ProductCard product={product} href={showcaseProductPath(product.slug)} />
                 </li>
               ))}
             </Grid>
@@ -145,48 +144,12 @@ function Skeletons() {
   )
 }
 
-/** Two columns on a phone, three on a laptop, four on a wide screen. */
+/** Two columns on a phone, three on a laptop, four on a wide screen (the shared ProductCard, ADR-0054). */
 function Grid({ label, busy, children }: { label: string; busy?: boolean; children: ReactNode }) {
   return (
-    <ul aria-label={label} aria-busy={busy || undefined} className="grid grid-cols-2 gap-x-3 gap-y-9 sm:gap-x-6 lg:grid-cols-3 xl:grid-cols-4">
+    <ul aria-label={label} aria-busy={busy || undefined} className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
       {children}
     </ul>
-  )
-}
-
-/** A photo (4:5), the name and the price; the whole card opens the piece's showcase page. */
-function PieceCard({ product }: { product: Product }) {
-  const { t, localized } = useI18n()
-  const { money } = useFormat()
-  const img = primaryImage(product)
-  return (
-    <Link
-      to={showcaseProductPath(product.slug)}
-      className="group/card flex w-full flex-col focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-ink"
-    >
-      <div className="relative overflow-hidden border border-line bg-subtle">
-        {img ? (
-          <img
-            src={img.url}
-            alt=""
-            width={800}
-            height={1000}
-            loading="lazy"
-            className="aspect-[4/5] w-full object-cover transition-transform duration-500 ease-out group-hover/card:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover/card:scale-100"
-          />
-        ) : (
-          <div className="aspect-[4/5] w-full" aria-hidden />
-        )}
-        {hasGlb(product) && (
-          <span className="absolute top-2 left-2 bg-obsidian px-2.5 py-1.5 text-xs leading-none tracking-[0.14em] text-chalk uppercase sm:top-3 sm:left-3">
-            <span aria-hidden>{t('collection.chip')}</span>
-            <span className="sr-only">{t('collection.chipLabel')}</span>
-          </span>
-        )}
-      </div>
-      <h2 className="mt-4 font-display text-[1.25rem] leading-tight font-normal text-ink sm:text-[1.375rem]">{localized(product.name)}</h2>
-      <p className="mt-1.5 text-[14px] leading-5 text-ink-muted">{money(initialPrice(product), product.currency)}</p>
-    </Link>
   )
 }
 

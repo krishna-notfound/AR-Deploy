@@ -251,6 +251,7 @@ export type Database = {
           is_house: boolean
           logo_url: string | null
           name: string
+          share_enabled: boolean
           slug: string
           status: string
           updated_at: string
@@ -269,6 +270,7 @@ export type Database = {
           is_house?: boolean
           logo_url?: string | null
           name: string
+          share_enabled?: boolean
           slug: string
           status?: string
           updated_at?: string
@@ -287,6 +289,7 @@ export type Database = {
           is_house?: boolean
           logo_url?: string | null
           name?: string
+          share_enabled?: boolean
           slug?: string
           status?: string
           updated_at?: string

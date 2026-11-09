@@ -8,7 +8,6 @@ import type { Business, Product } from '@/domain/types'
 import { pickVariant, variantMedia } from '@/features/ar/variantMedia'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { safeBrandAccent } from '@/lib/color'
-import { formatMoney } from '@/lib/format'
 import { VARIANT_PARAM, embedProductPageUrl, withVariantParam } from '@/lib/urls'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
@@ -109,7 +108,6 @@ function EmbedProductView({ business, product, tenant }: { business: Business; p
     document.title = `${name} · ${business.name}`
   }, [name, business.name])
 
-  const price = product.price + (variant?.priceDelta ?? 0)
   const pageUrl = embedProductPageUrl(business, product, { tenant, variantId, lang })
   const linkClass = 'inline-flex min-h-11 w-full items-center justify-center gap-2 border border-ink px-4 py-2 text-center text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink transition-colors hover:bg-ink hover:text-chalk'
 
@@ -146,7 +144,6 @@ function EmbedProductView({ business, product, tenant }: { business: Business; p
         <div className="shrink-0 px-4 py-4 sm:flex sm:w-[min(42%,380px)] sm:flex-col sm:justify-center sm:px-7">
           <p className="truncate text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink-muted">{business.name}</p>
           <LocalizedSpan as="h1" text={product.name} className="mt-1 font-display text-[1.5rem] leading-[1.1] font-normal text-balance text-ink sm:text-[2rem]" />
-          <p className="mt-1.5 text-[15px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(price, product.currency, lang)}</p>
           <VariantPicker product={product} selectedId={variantId} onSelect={selectVariant} className="mt-4" />
           <div className="mt-4">
             <a href={pageUrl} target="_blank" rel="noopener" className={linkClass}>

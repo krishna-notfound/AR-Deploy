@@ -38,8 +38,8 @@ import { PRODUCT_SLUG_MAX, uniqueSlug } from '@/lib/slug'
 import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import { type AuditEntry, type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, type CreatedBusiness, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type StorageSweep, type UploadKind, fail, ok, teamFail, toAuditEntry } from '../catalogService'
-import { msg } from '@/i18n/fieldMessage'
-import { normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
+import { type FieldMessage, msg } from '@/i18n/fieldMessage'
+import { hasOwnValidGlb, normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
 const REQUEST_PHOTO_BUCKET = 'model-request-photos'
@@ -60,7 +60,8 @@ export interface BusinessRow {
   name: string
   slug: string
   logo_url: string | null
-  description: string
+  /** Internal (ADR-0054): anon cannot select it, so the public reads (PUBLIC_BUSINESS_COLUMNS) leave it out. */
+  description?: string
   contact_email: string | null
   contact_phone: string | null
   contact_website: string | null
@@ -69,6 +70,7 @@ export interface BusinessRow {
   accent_color: string
   default_currency: Currency
   allow_own_models: boolean
+  share_enabled: boolean
   /** The hidden showcase business (ADR-0047). */
   is_house: boolean
   created_at: string
@@ -147,6 +149,14 @@ export interface ProductRow {
   product_models?: ModelRow[]
   product_variants?: VariantRow[]
 }
+/**
+ * The businesses columns a visitor (anon) may read: every one but the internal description (ADR-0054, column privileges in
+ * 20261109120040_catalogue_rules_round2.sql). Public reads must list columns: `select('*')` fails for anon. A column added to
+ * the table later is added here and granted to anon in its migration.
+ */
+export const PUBLIC_BUSINESS_COLUMNS =
+  'id, name, slug, logo_url, contact_email, contact_phone, contact_website, contact_address, status, accent_color, default_currency, allow_own_models, share_enabled, is_house, created_at, updated_at'
+
 const DAILY_PAGE = 1000
 
 /** A row of analytics_daily (R-W5-2); product_id is null for a deleted product. */
@@ -168,7 +178,8 @@ const SLUG_TAKEN = {
 }
 
 /** Rules raised by our own triggers (supabase/migrations), keyed by their exception message. */
-const DB_RULES: Record<string, { field: string; message: string }> = {
+const DB_RULES: Record<string, { field: string; message: string | FieldMessage }> = {
+  publish_needs_model: { field: 'models', message: msg('common.validation.publish.modelRequired') },
   publish_requires_gallery_image: { field: 'images', message: 'Add at least one product image before publishing.' },
   too_many_variants: { field: 'variants', message: 'Use 50 colours or options or fewer.' },
   too_many_variant_images: { field: 'variants', message: 'Each colour or option can have up to 20 photos.' },
@@ -231,7 +242,7 @@ export const toBusiness = (r: BusinessRow): Business => ({
   name: r.name,
   slug: r.slug,
   logoUrl: r.logo_url ?? undefined,
-  description: r.description,
+  description: r.description ?? '',
   contact: {
     email: r.contact_email ?? undefined,
     phone: r.contact_phone ?? undefined,
@@ -242,6 +253,7 @@ export const toBusiness = (r: BusinessRow): Business => ({
   branding: { accentColor: r.accent_color },
   defaultCurrency: r.default_currency,
   allowOwnModels: r.allow_own_models === true,
+  shareEnabled: r.share_enabled !== false,
   ...(r.is_house === true ? { house: true } : {}),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -945,7 +957,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     getBusinessById: (id) => guard(() => businessById(id)),
     getBusinessBySlug: (slug) =>
       guard(async () => {
-        const { data, error } = await sb.from('businesses').select('*').eq('slug', slug).maybeSingle<BusinessRow>()
+        const { data, error } = await sb.from('businesses').select(PUBLIC_BUSINESS_COLUMNS).eq('slug', slug).maybeSingle<BusinessRow>()
         if (error) return mapDbError(error)
         return data ? ok(toBusiness(data)) : fail('NOT_FOUND', 'Business not found.')
       }),
@@ -989,6 +1001,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const oldLogo = ownedLogoPath(current.data.logoUrl, id)
         if (oldLogo && 'logoUrl' in patch && patch.logoUrl !== current.data.logoUrl) await sb.storage.from(LOGO_BUCKET).remove([oldLogo])
         return changed(ok(toBusiness(data)))
+      }),
+    setBusinessShareEnabled: (id, enabled) =>
+      guard(async () => {
+        // The database decides who may (businesses.edit staff only; an owner gets 42501, mapped to "forbidden").
+        const { data, error } = await sb.from('businesses').update({ share_enabled: enabled }).eq('id', id).select('*').maybeSingle<BusinessRow>()
+        if (error) return changed(mapDbError(error))
+        return changed(data ? ok(toBusiness(data)) : await refusedOrMissing<Business>('businesses', { id }, 'Business not found.'))
       }),
     setBusinessStatus: (id, status) =>
       guard(async () => {
@@ -1054,7 +1073,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     getProductById: (id) => guard(() => productById(id)),
     getShowcase: () =>
       guard(async () => {
-        const b = await sb.from('businesses').select('*').eq('is_house', true).maybeSingle<BusinessRow>()
+        const b = await sb.from('businesses').select(PUBLIC_BUSINESS_COLUMNS).eq('is_house', true).maybeSingle<BusinessRow>()
         if (b.error) return mapDbError(b.error)
         if (!b.data) return fail('NOT_FOUND', 'Showcase not found.')
         houseId = b.data.id
@@ -1065,7 +1084,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
       }),
     getPublicProduct: (businessSlug, productSlug, opts) =>
       guard(async () => {
-        const b = await sb.from('businesses').select('*').eq('slug', businessSlug).maybeSingle<BusinessRow>()
+        const b = await sb.from('businesses').select(PUBLIC_BUSINESS_COLUMNS).eq('slug', businessSlug).maybeSingle<BusinessRow>()
         if (b.error) return mapDbError(b.error)
         if (!b.data) return fail('NOT_FOUND', 'Catalog not found.')
         const p = await sb.from('products').select(PRODUCT_SELECT).eq('business_id', b.data.id).eq('slug', productSlug).maybeSingle<ProductRow>()
@@ -1083,7 +1102,8 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         if (!current.ok) return current
         const next: Product = { ...current.data, ...patch, id, businessId: current.data.businessId, status: current.data.status }
         if (next.status === 'published') {
-          const pubErrors = validateForPublish(next)
+          // A product published before the 3D-only rule (ADR-0054) stays editable without a model; one that has a model keeps it.
+        const pubErrors = validateForPublish({ ...next, models: patch.keepModels === true ? current.data.models : next.models }, { requireModel: hasOwnValidGlb(current.data) })
           if (Object.keys(pubErrors).length) return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
         }
         // R-S4-18: an option this save drops takes its requests with it (cascade), so read their files first.

@@ -183,8 +183,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           <div className="mt-10 min-w-0 lg:col-start-1 lg:row-start-1 lg:mt-0 lg:pt-2">
             <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t(`category.${product.category}`)}</p>
             <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
-            <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{stage.priceText}</p>
-            <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
+            <LocalizedSpan as="p" text={product.shortDescription} className="mt-4 max-w-md text-[15px] leading-7 text-ink-muted" />
 
             <VariantPicker product={product} selectedId={stage.variantId} onSelect={stage.selectVariant} className="mt-8 border-t border-line pt-6" />
           </div>
@@ -200,7 +199,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                     {t('product.contactStore')}
                   </button>
                 )}
-                <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
+                {business.shareEnabled && <ShareButton title={t('product.shareTitle', { name, business: business.name })} />}
               </div>
             </div>
 

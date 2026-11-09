@@ -6,6 +6,7 @@ import { SearchInput } from '@/components/ui/SearchInput'
 import { type Business, CATEGORIES, type Category, type Product, type ProductStatus } from '@/domain/types'
 import type { ProductRequestState } from '@/domain/modelRequests'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { hasOwnValidGlb } from '@/services/validation'
 import { type ProductArReadiness, productArReadiness } from './productReadiness'
 
 const AR_FILTERS: readonly ProductArReadiness[] = ['ready', 'android-only', 'android-blocked', 'photos-only']
@@ -13,7 +14,8 @@ const AR_FILTERS: readonly ProductArReadiness[] = ['ready', 'android-only', 'and
 export interface ProductFilterState {
   q: string
   business: string
-  status: '' | ProductStatus
+  /** published-no3d: published products without their own 3D model (published before the 3D-only rule, ADR-0054). */
+  status: '' | ProductStatus | 'published-no3d'
   category: '' | Category
   /** 3D / AR readiness (DUX-05). */
   ar: '' | ProductArReadiness
@@ -34,7 +36,7 @@ function readFilters(params: URLSearchParams): ProductFilterState {
   return {
     q: params.get('q') ?? '',
     business: params.get('business') ?? '',
-    status: status === 'draft' || status === 'published' ? status : '',
+    status: status === 'draft' || status === 'published' || status === 'published-no3d' ? status : '',
     category: CATEGORIES.includes(category as Category) ? (category as Category) : '',
     ar: AR_FILTERS.includes(ar as ProductArReadiness) ? (ar as ProductArReadiness) : '',
     model: params.get('model') === 'open' ? 'open' : '',
@@ -75,7 +77,7 @@ export function applyProductFilters(products: Product[], f: ProductFilterState, 
   return products.filter(
     (p) =>
       (!f.business || p.businessId === f.business) &&
-      (!f.status || p.status === f.status) &&
+      (!f.status || (f.status === 'published-no3d' ? p.status === 'published' && !hasOwnValidGlb(p) : p.status === f.status)) &&
       (!f.category || p.category === f.category) &&
       (!f.ar || productArReadiness(p) === f.ar) &&
       (!f.model || !!states?.[p.id]?.open) &&
@@ -124,11 +126,12 @@ export function ProductFilterBar({
         </FilterField>
       )}
       <div className="grid grid-cols-2 gap-4 sm:contents">
-      <FilterField label={t('common.status')} className="sm:w-[150px]">
+      <FilterField label={t('common.status')} className="sm:w-[210px]">
         <Select aria-label={t('products.filters.byStatus')} value={state.status} onChange={(e) => update({ status: e.target.value as ProductFilterState['status'] })}>
           <option value="">{t('products.filters.allStatuses')}</option>
           <option value="published">{t('products.status.published')}</option>
           <option value="draft">{t('products.status.draft')}</option>
+          <option value="published-no3d">{t('products.filters.publishedNo3d')}</option>
         </Select>
       </FilterField>
       <FilterField label={t('products.filters.category')} className="sm:w-[170px]">

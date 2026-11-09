@@ -99,13 +99,13 @@ describe('landing showcase card', () => {
     data.products = [sofa, chair, table]
   })
 
-  it('shows the featured showcase piece with its category, name, material, dimensions and price in euros', async () => {
+  it('shows the featured showcase piece with its category, name, material and dimensions, and no price', async () => {
     renderCard(house('sofa-one'))
     expect(await screen.findByText('Name sofa-one')).toBeInTheDocument()
     expect(screen.getByText('Sofas')).toBeInTheDocument()
     expect(screen.getByText('Oak')).toBeInTheDocument()
     expect(screen.getByText(/W 80 × H 70 × D 60 cm/)).toBeInTheDocument()
-    expect(screen.getByText(/€/)).toBeInTheDocument()
+    expect(screen.queryByText(/€|EUR/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Illustrative piece/)).not.toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Name sofa-one' })).toHaveAttribute('src', 'https://cdn.example/sofa-one.jpg')
   })
@@ -191,7 +191,6 @@ describe('showcase view', () => {
     text: 'Made by hand.',
     dimensions: 'W 90 x H 80 x D 70 cm',
     materials: 'Walnut',
-    priceLabel: 'EUR 1,234',
     imageUrl: 'https://cdn.example/admin.jpg',
     glbUrl: 'https://cdn.example/admin.glb',
   }
@@ -205,7 +204,7 @@ describe('showcase view', () => {
     expect(await screen.findByText('Hand-made Lounge')).toBeInTheDocument()
     expect(screen.getByText('Made by hand.')).toBeInTheDocument()
     expect(screen.getByText('Walnut')).toBeInTheDocument()
-    expect(screen.getByText('EUR 1,234')).toBeInTheDocument()
+    expect(screen.queryByText(/EUR/)).not.toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Hand-made Lounge' })).toHaveAttribute('src', view.imageUrl)
   })
 

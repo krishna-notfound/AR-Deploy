@@ -10,7 +10,6 @@ import { HOUSE_BUSINESS_SLUG } from '@/domain/siteContent'
 import type { Business, Product } from '@/domain/types'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { primaryImage } from '@/lib/product'
 import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
@@ -19,6 +18,7 @@ import { ArTips } from '../public/ArTips'
 import { InAppNotice } from '../public/InAppNotice'
 import { ProductMedia } from '../public/ProductMedia'
 import { ArPrimaryAction, ArScaleBadge, DimensionsSection, MorePhotos, ProductLinkButton, ProductSpecs } from '../public/ProductParts'
+import { ProductCard } from '../public/ProductCard'
 import { ShareButton } from '../public/ShareActions'
 import { StickyActionBar } from '../public/StickyActionBar'
 import { TAP_TARGET } from '../public/tapTarget'
@@ -119,8 +119,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
             <div className="min-w-0">
               <Eyebrow>{t(`category.${product.category}`)}</Eyebrow>
               <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
-              <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{stage.priceText}</p>
-              <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
+              <LocalizedSpan as="p" text={product.shortDescription} className="mt-4 max-w-md text-[15px] leading-7 text-ink-muted" />
 
               <VariantPicker product={product} selectedId={stage.variantId} onSelect={stage.selectVariant} className="mt-8 border-t border-line pt-6" />
 
@@ -128,7 +127,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
               <div ref={setActionRow} data-ar-cta className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <ArPrimaryAction stage={stage} arLabel={t('showcase.arButton')} />
                 <ProductLinkButton product={product} outlined={hasCta} />
-                <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
+                {business.shareEnabled && <ShareButton title={t('product.shareTitle', { name, business: business.name })} />}
               </div>
               {hasCta && (
                 <div className="mt-5 flex flex-col gap-4">
@@ -155,7 +154,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
 
 /** Up to four other published showcase pieces. Nothing while loading or when the showcase has no other piece. */
 function MorePieces({ currentSlug }: { currentSlug: string }) {
-  const { t, localized } = useI18n()
+  const { t } = useI18n()
   const res = useServiceQuery(() => service.getShowcase(), [])
   const others = (res.data?.products ?? []).filter((p) => p.status === 'published' && p.slug !== currentSlug).slice(0, MORE_PIECES)
   if (others.length === 0) return null
@@ -165,21 +164,11 @@ function MorePieces({ currentSlug }: { currentSlug: string }) {
         {t('showcase.moreTitle')}
       </h2>
       <ul aria-label={t('showcase.moreList')} className="mt-6 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
-        {others.map((p) => {
-          const img = primaryImage(p)
-          return (
-            <li key={p.id} className="flex">
-              <Link
-                to={showcaseProductPath(p.slug)}
-                className="group/card flex w-full flex-col border border-line bg-surface p-2.5 transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-1 hover:border-line-strong hover:shadow-[var(--shadow-card)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-ink motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-4"
-              >
-                {img ? <img src={img.url} alt="" width={800} height={1000} loading="lazy" className="aspect-[4/5] w-full bg-subtle object-cover" /> : <div className="aspect-[4/5] w-full bg-subtle" aria-hidden />}
-                <span className="mt-4 font-display text-[1.25rem] leading-tight font-normal text-ink sm:text-[1.375rem]">{localized(p.name)}</span>
-                <span className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t(`category.${p.category}`)}</span>
-              </Link>
-            </li>
-          )
-        })}
+        {others.map((p) => (
+          <li key={p.id} className="flex">
+            <ProductCard product={p} href={showcaseProductPath(p.slug)} headingLevel="h3" />
+          </li>
+        ))}
       </ul>
     </section>
   )
