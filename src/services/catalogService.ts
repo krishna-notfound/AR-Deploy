@@ -77,8 +77,8 @@ export const fail = <T = never>(code: ServiceErrorCode, message: string, fieldEr
   error: fieldErrors ? { code, message, fieldErrors } : { code, message },
 })
 
-/** `allowOwnModels` is changed only by setBusinessOwnModels (S4 R-S4-2). */
-export type BusinessInput = Omit<Business, 'id' | 'createdAt' | 'updatedAt' | 'allowOwnModels'>
+/** `allowOwnModels` is changed only by setBusinessOwnModels (S4 R-S4-2), `shareEnabled` only by setBusinessShareEnabled (ADR-0054). */
+export type BusinessInput = Omit<Business, 'id' | 'createdAt' | 'updatedAt' | 'allowOwnModels' | 'shareEnabled'>
 export type ProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'status'> & {
   status?: ProductStatus
   /** Leave every stored 3D file of the product and its options as it is (S4 R-S4-3/R-S4-4: own uploads off). */
@@ -188,6 +188,8 @@ export interface CatalogService {
   createBusiness(data: BusinessInput): Promise<Result<CreatedBusiness>>
   updateBusiness(id: ID, data: Partial<BusinessInput>): Promise<Result<Business>>
   setBusinessStatus(id: ID, status: BusinessStatus): Promise<Result<Business>>
+  /** Shows or hides the Share button on the company's product pages. Platform staff with businesses.edit only (ADR-0054). */
+  setBusinessShareEnabled(id: ID, enabled: boolean): Promise<Result<Business>>
   deleteBusiness(id: ID): Promise<Result<StorageSweep>>
   getCatalog(slug: string): Promise<Result<BusinessCatalog>>
   getCatalogs(): Promise<Result<BusinessCatalog[]>>

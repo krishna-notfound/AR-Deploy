@@ -65,12 +65,24 @@ export function validateProductDraft(data: ProductInput, siblings: Product[]): F
   return e
 }
 
-/** Rules a product must satisfy before it can be published (design/04 invariants). */
-export function validateForPublish(p: Product): FieldErrors {
+/**
+ * The product's own valid GLB (not an option's, not a USDZ alone): what publishing needs since ADR-0054. 'session-only' is
+ * a demo upload (a blob URL that works in this session, ADR-0007); a backend stores 'valid'. 'invalid' and 'missing' do not count.
+ */
+export const hasOwnValidGlb = (p: Pick<Product, 'models'>): boolean => p.models?.glb?.status === 'valid' || p.models?.glb?.status === 'session-only'
+
+/**
+ * Rules a product must satisfy before it can be published (design/04 invariants). Since ADR-0054 that includes the
+ * product's own valid 3D model (GLB); the database refuses the transition without a model row too (publish_needs_model).
+ * `requireModel: false` is for saving a product that is already published: one published before the rule stays published
+ * and editable without a model (owner decision 2026-11-09).
+ */
+export function validateForPublish(p: Product, opts: { requireModel?: boolean } = {}): FieldErrors {
   const e: FieldErrors = {}
   if (!p.name.en.trim()) e['name.en'] = msg('common.validation.publish.nameRequired')
   if (!(p.price > 0)) e.price = msg('common.validation.publish.priceRequired')
   if (!p.images.some((i) => i.kind === 'gallery')) e.images = msg('common.validation.publish.imageRequired')
+  if (opts.requireModel !== false && !hasOwnValidGlb(p)) e.models = msg('common.validation.publish.modelRequired')
   for (const k of ['width', 'height', 'depth'] as const) {
     if (!(p.dimensions[k] > 0)) e[`dimensions.${k}`] = msg('common.validation.publish.dimensionsRequired')
   }

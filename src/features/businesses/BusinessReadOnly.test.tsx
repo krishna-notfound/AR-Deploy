@@ -14,6 +14,7 @@ const business: Business = {
   branding: { accentColor: '#7A5C45' },
   defaultCurrency: 'EUR',
   allowOwnModels: false,
+  shareEnabled: true,
   createdAt: '2026-10-01T00:00:00Z',
   updatedAt: '2026-10-01T00:00:00Z',
 }

@@ -26,11 +26,12 @@ beforeAll(async () => {
   await db.exec(`
     insert into auth.users (id, email, email_confirmed_at) values
       ('${MEMBER}', 'cta-member@test', now()), ('${STRANGER}', 'cta-stranger@test', now());
-    insert into public.businesses (id, name, slug, status) values ('${BIZ}', 'Cta Co', 'cta-co', 'active');
+    insert into public.businesses (id, name, slug, status, allow_own_models) values ('${BIZ}', 'Cta Co', 'cta-co', 'active', true);
     insert into public.business_members (business_id, user_id) values ('${BIZ}', '${MEMBER}');
     insert into public.products (id, business_id, slug, name, category, price, currency, status, width, height, depth, dimension_unit) values
       ('${PRODUCT}', '${BIZ}', 'chair', '{"en":"Chair"}', 'sofa', 1000, 'EUR', 'draft', 10, 10, 10, 'cm');
     insert into public.product_images (product_id, url, is_primary) values ('${PRODUCT}', '/a.jpg', true);
+    insert into public.product_models (product_id, format, url, file_name) values ('${PRODUCT}', 'glb', '/a.glb', 'a.glb');
     update public.products set status = 'published' where id = '${PRODUCT}';
   `)
 }, 120_000)

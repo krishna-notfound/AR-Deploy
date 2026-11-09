@@ -38,6 +38,8 @@ export interface Business {
   defaultCurrency: Currency
   /** Whether the business may add, replace or remove its own GLB/USDZ files; only the platform changes it (S4 R-S4-2). */
   allowOwnModels: boolean
+  /** Whether the Share button shows on this company's product pages; only platform staff change it (ADR-0054). Copy link and the AR phone QR stay either way. */
+  shareEnabled: boolean
   /** The platform's own hidden showcase catalogue (ADR-0047): never listed as a business; its pieces open under /showcase/. */
   house?: boolean
   createdAt: ISODate

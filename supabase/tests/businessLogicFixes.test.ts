@@ -1870,6 +1870,7 @@ describe('S1.5 Task 8: catalogue activity from audit events', () => {
     await db.exec(`
       begin;
       insert into public.product_images (product_id, url, kind, is_primary) values ('${P_LIFE}', 'https://example.test/t8.jpg', 'gallery', true);
+      insert into public.product_models (product_id, format, url, file_name) values ('${P_LIFE}', 'glb', 'https://example.test/t8.glb', 't8.glb');
       update public.products set status = 'published' where id = '${P_LIFE}';
       commit;`)
     // An edit that changes neither the status nor the address writes nothing.

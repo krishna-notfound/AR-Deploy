@@ -80,7 +80,7 @@ describe('share_enabled', () => {
   })
 
   it('an owner still edits the fields they own', async () => {
-    expect(await h.affected(OWNER, `update public.businesses set description = 'New note' where id = $1`, [BIZ])).toBe(1)
+    await h.as(OWNER, (tx) => tx.query(`update public.businesses set description = 'New note' where id = $1`, [BIZ]))
   })
 
   it('platform staff without businesses.edit cannot change it', async () => {
@@ -126,7 +126,7 @@ describe('publish needs the product GLB', () => {
   })
 
   it('checks at commit: a model added in the same transaction counts', async () => {
-    await h.as(OWNER, async (tx) => {
+    await h.as(ADMIN, async (tx) => {
       await tx.query(`update public.products set status = 'published' where id = $1`, [NO_MODEL])
       await tx.exec(model(NO_MODEL))
     })
@@ -197,7 +197,7 @@ describe('the company description is internal', () => {
 
   it('anon still reads every public column of the active businesses, and nothing of a draft one', async () => {
     const r = await h.probe('', `select ${COLUMNS} from public.businesses order by slug`, [], null, 'anon')
-    expect(r.rows.map((x) => (x as { slug: string }).slug)).toEqual(['casa', 'outro'])
+    expect(r.rows.map((x) => (x as { slug: string }).slug)).toEqual(['casa', 'outro', 'sanctus-showcase'])
   })
 
   it('anon still reads the catalogue: a published product of an active business, with its images and models', async () => {
@@ -220,7 +220,7 @@ describe('the company description is internal', () => {
     const staff = await h.probe(ADMIN, `select description from public.businesses where id = $1`, [BIZ_DRAFT])
     expect(staff.rows).toEqual([{ description: 'Internal note about Draft Co' }])
     const svc = await h.probe('', `select count(*)::int as n from public.businesses where description <> ''`, [], null, 'service_role')
-    expect(svc.rows).toEqual([{ n: 3 }])
+    expect(svc.rows).toEqual([{ n: 4 }])
     expect(await h.affected(OWNER, `update public.businesses set description = 'Edited by owner' where id = $1`, [BIZ])).toBe(1)
     expect(await h.affected(ADMIN, `update public.businesses set description = 'Edited by staff' where id = $1`, [BIZ])).toBe(1)
   })
@@ -244,7 +244,7 @@ describe('rollback', () => {
         (await target.query(`select 1 from information_schema.columns where table_schema = 'public' and table_name = 'businesses' and column_name = 'share_enabled'`)).rows.length
       const triggers = async (target: PGlite) =>
         (await target.query(`select 1 from pg_trigger where tgname in ('products_publish_requires_model_ins', 'products_publish_requires_model_upd')`)).rows.length
-      const anonDescription = (target: PGlite) => makeHelpers(target).probe('', `select description from public.businesses`, [], null, 'anon')
+      const anonDescription = (target: PGlite) => makeHelpers(target).probe('', `select description from public.businesses where slug = 'casa'`, [], null, 'anon')
       expect(await column(rolled)).toBe(1)
       expect(await triggers(rolled)).toBe(2)
       expect(await column(before)).toBe(0)

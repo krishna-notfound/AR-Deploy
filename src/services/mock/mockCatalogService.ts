@@ -10,7 +10,7 @@ import { MAX_CATALOGUE_BYTES, cataloguePathFor, validateApplication } from '../.
 import { rulesFromConfig } from '../../../supabase/functions/_shared/applyForm.ts'
 import { modelRequestError } from '../modelRequestRules'
 import { MAX_INVITATION_ATTEMPTS, REASON_MAX_LENGTH, RESEND_COOLDOWN_SECONDS, applyReview, normalizeBusinessName } from '../applicationRules'
-import { CLOSURE_PENDING_ERROR, type CatalogService, type ProductInput, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok, toAuditEntry } from '../catalogService'
+import { CLOSURE_PENDING_ERROR, type CatalogService, type ProductInput, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, type ProvisionOutcome, type Result, fail, ok, teamFail, toAuditEntry } from '../catalogService'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import type { Db } from './db'
 import { mockClosureOpen, noteMockClosureStatus, voidMockClosure } from './mockAccount'
@@ -23,7 +23,7 @@ import { createMockModelRequestsStaff } from './mockModelRequestsStaff'
 import { createSeed } from './seed'
 import { store } from './store'
 import { msg } from '@/i18n/fieldMessage'
-import { isSlugTaken, normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
+import { hasOwnValidGlb, isSlugTaken, normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
 
 export const FAIL_RATE_KEY = 'arfurn:debug:failRate'
 /** Demo actor for audit entries (the demo account picker is not authentication). */
@@ -263,6 +263,9 @@ function toCatalog(db: Db, b: Business): BusinessCatalog {
   }
 }
 
+/** A business as the public reads return it: the description is internal (ADR-0054), as the database's column privileges. */
+const publicBusiness = (b: Business): Business => ({ ...b, description: '' })
+
 const byUpdatedDesc = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt)
 
 /** R-W8-2: as the database's RLS, a non-active business is readable by a platform admin or its own business admin only. */
@@ -290,7 +293,7 @@ export const mockCatalogService: CatalogService = {
   getBusinessBySlug: (slug) =>
     run(() => {
       const b = store.get().businesses.find((x) => x.slug === slug)
-      return b && demoCanRead(b) ? ok(b) : fail('NOT_FOUND', 'Business not found.')
+      return b && demoCanRead(b) ? ok(publicBusiness(b)) : fail('NOT_FOUND', 'Business not found.')
     }),
 
   createBusiness: (data) =>
@@ -302,7 +305,7 @@ export const mockCatalogService: CatalogService = {
         return fail(code, 'Please fix the highlighted fields.', errors)
       }
       const ts = nowIso()
-      const business: Business = { ...data, name: data.name.trim(), allowOwnModels: false, id: newId('biz'), createdAt: ts, updatedAt: ts }
+      const business: Business = { ...data, name: data.name.trim(), allowOwnModels: false, shareEnabled: true, id: newId('biz'), createdAt: ts, updatedAt: ts }
       store.update((d) => {
         d.businesses.push(business)
       })
@@ -340,6 +343,20 @@ export const mockCatalogService: CatalogService = {
         if (status === 'active' || status === 'inactive') demoBusinessNotice(d, event, status === 'active' ? 'live' : 'paused')
       })
       noteMockClosureStatus(id, status)
+      return ok(next)
+    }),
+
+  setBusinessShareEnabled: (id, enabled) =>
+    run(() => {
+      // As the database (guard_business_admin_fields + the update policy): platform staff with businesses.edit only; an owner is refused.
+      const actor = mockActor()
+      if (actor.kind === 'owner' || (actor.kind === 'staff' && !actor.can('businesses.edit'))) return teamFail('forbidden')
+      const current = store.get().businesses.find((b) => b.id === id)
+      if (!current) return fail('NOT_FOUND', 'Business not found.')
+      const next: Business = { ...current, shareEnabled: enabled, updatedAt: nowIso() }
+      store.update((d) => {
+        d.businesses = d.businesses.map((b) => (b.id === id ? next : b))
+      })
       return ok(next)
     }),
 
@@ -402,7 +419,7 @@ export const mockCatalogService: CatalogService = {
       const v = demoViewer()
       const staff = v?.role === 'super_admin'
       const products = db.products.filter((p) => p.businessId === business.id && (staff || p.status === 'published')).sort(byUpdatedDesc)
-      return ok({ business, products })
+      return ok({ business: publicBusiness(business), products })
     }),
 
   getProductsByBusiness: (businessId) =>
@@ -423,7 +440,7 @@ export const mockCatalogService: CatalogService = {
       if (!product) return fail('NOT_FOUND', 'Product not found.')
       if (!opts?.allowDraft && (business.status !== 'active' || product.status !== 'published'))
         return fail('NOT_FOUND', 'This product is not available.')
-      return ok({ business, product })
+      return ok({ business: publicBusiness(business), product })
     }),
 
   createProduct: (data) =>
@@ -468,7 +485,8 @@ export const mockCatalogService: CatalogService = {
       const errors = validateProductDraft(next, siblings)
       if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
       if (next.status === 'published') {
-        const pubErrors = validateForPublish(next)
+        // A product published before the 3D-only rule (ADR-0054) stays editable without a model; one that has a model keeps it.
+        const pubErrors = validateForPublish(next, { requireModel: hasOwnValidGlb(current) })
         if (Object.keys(pubErrors).length)
           return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
       }
@@ -826,6 +844,7 @@ export const mockCatalogService: CatalogService = {
             branding: { accentColor: '#7A5C45' },
             defaultCurrency: 'EUR',
             allowOwnModels: false,
+            shareEnabled: true,
             createdAt: ts,
             updatedAt: ts,
           }

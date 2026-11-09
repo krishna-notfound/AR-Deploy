@@ -51,6 +51,7 @@ describe('the house business', () => {
   it('is readable by a visitor (active) and its published pieces are public', async () => {
     await houseProduct(db)
     await db.exec(`insert into public.product_images (product_id, url, kind, is_primary) select id, 'https://example.test/h.jpg', 'gallery', true from public.products where slug = 'linden';
+                   insert into public.product_models (product_id, format, url, file_name) select id, 'glb', 'https://example.test/h.glb', 'h.glb' from public.products where slug = 'linden';
                    update public.products set status = 'published' where slug = 'linden'`)
     expect(await h.count(ANON, `select count(*)::int as n from public.businesses where is_house`, [], null, 'anon')).toBe(1)
     expect(await h.count(ANON, `select count(*)::int as n from public.products p join public.businesses b on b.id = p.business_id where b.is_house`, [], null, 'anon')).toBe(1)

@@ -46,6 +46,7 @@ const business = (over: Partial<BusinessRow> = {}): BusinessRow => ({
   accent_color: '#8A765C',
   default_currency: 'EUR',
   allow_own_models: false,
+  share_enabled: true,
   is_house: false,
   created_at: '2026-01-01',
   updated_at: '2026-01-01',
