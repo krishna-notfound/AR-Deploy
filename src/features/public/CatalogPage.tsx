@@ -146,7 +146,8 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
       </section>
 
       {/* Solid filter bar (no blur), hairline top and bottom. */}
-      <div className="sticky top-16 z-20 border-y border-line bg-canvas sm:top-20">
+      {/* Pinned under the header from tablet width up; on a phone the two stacked rows would cover a third of the screen. */}
+      <div className="z-20 border-y border-line bg-canvas sm:sticky sm:top-20">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-8 sm:px-10">
           {categories.length > 1 && (
             <div role="group" aria-label={t('catalog.categories')} className="-mx-5 -my-1 flex min-w-0 gap-2 overflow-x-auto px-5 py-1 sm:mx-0 sm:px-0">
@@ -158,7 +159,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   onClick={() => setParam('category', c)}
                   className={cn(
                     TAP_TARGET,
-                    'h-9 shrink-0 rounded-[var(--radius-control)] border px-4 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase transition-colors',
+                    'h-11 shrink-0 rounded-[var(--radius-control)] border px-4 text-[12px] sm:h-9 leading-[1.2] font-medium tracking-[0.08em] uppercase transition-colors',
                     cat === c ? 'border-obsidian bg-obsidian text-chalk' : 'border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink',
                   )}
                 >

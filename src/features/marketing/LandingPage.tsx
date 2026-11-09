@@ -1,7 +1,8 @@
 import { ArrowRight } from 'lucide-react'
-import type { ReactNode } from 'react'
-import { Link, Navigate, useSearchParams } from 'react-router'
+import { Navigate, useSearchParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
+import { ButtonLink, buttonClasses } from '@/components/ui/Button'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
@@ -21,11 +22,9 @@ const FEATURES = [
   ['landing.xp.f3Title', 'landing.xp.f3Body'],
 ] as const
 
+/** One frame and one vertical rhythm for every landing section (the same on the collection and showcase pages). */
 const SECTION = 'mx-auto max-w-[1320px] px-5 sm:px-10'
-
-// The references' square call to action (Button lg), composed here because cn() does not merge conflicting colours.
-const CTA = 'inline-flex h-12 items-center justify-center gap-3 whitespace-nowrap rounded-[var(--radius-control)] px-6 text-label uppercase transition-colors select-none'
-const CTA_DARK = cn(CTA, 'bg-ink text-chalk hover:bg-umber')
+const SECTION_Y = 'py-16 sm:py-20 lg:py-28'
 
 export default function LandingPage() {
   const { t } = useI18n()
@@ -76,34 +75,35 @@ function TwoLines({ a, b, italic }: { a: string; b: string; italic?: boolean }) 
 
 const arrowIcon = <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden />
 
-function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn('text-eyebrow text-accent-ink', className)}>{children}</p>
-}
-
+/**
+ * The sign-in page's photo panel as a hero (round 2): the editable picture full width under a dark veil, with the eyebrow, the
+ * serif headline, the text and the one action in white at the foot. On a phone the picture is tall (about 76% of the screen)
+ * and the text sits at the bottom. HeroMedia owns the picture, the veil and the 3D chip; the texts stay here.
+ */
 function Hero({ exampleHref }: { exampleHref?: string }) {
   const { t } = useI18n()
   return (
-    <section aria-labelledby="hero-title">
-      {/* Full-bleed: edge to edge, and on large screens fills the viewport below the 80px header. */}
-      <div className="grid border-b border-line bg-surface lg:min-h-[calc(100dvh-5rem)] lg:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <div className="order-2 flex flex-col justify-center px-5 py-10 sm:px-10 sm:py-14 lg:order-1 lg:px-14 lg:py-16 xl:px-16">
-          <Eyebrow>{t('landing.hero.eyebrow')}</Eyebrow>
-          <h1 id="hero-title" className="mt-5 font-display text-[clamp(2.25rem,1.4rem+1.6vw,3.25rem)] leading-[1.06] font-normal text-ink">
-            <TwoLines a={t('landing.hero.title1')} b={t('landing.hero.title2')} italic />
-          </h1>
-          <p className="mt-6 max-w-md text-[15px] leading-7 text-ink-body">{t('landing.hero.body')}</p>
-          {exampleHref && (
-            <>
-              <Link to={exampleHref} className={cn(CTA_DARK, 'mt-9 self-start')}>
-                {t('landing.hero.cta3d')}
-                {arrowIcon}
-              </Link>
-              <p className="mt-5 max-w-md text-[13px] leading-5 text-ink-muted">{t('landing.hero.note')}</p>
-            </>
-          )}
+    <section aria-labelledby="hero-title" className="relative isolate flex min-h-[max(30rem,76svh)] flex-col overflow-hidden bg-obsidian text-chalk lg:min-h-[calc(100svh-5rem)]">
+      <HeroMedia>
+        <div className={cn(SECTION, 'pt-28 pb-10 sm:pb-14 lg:pb-20')}>
+          <div className="max-w-2xl">
+            <Eyebrow onDark>{t('landing.hero.eyebrow')}</Eyebrow>
+            <h1 id="hero-title" className="mt-5 font-display text-[clamp(2.5rem,1.7rem+3.1vw,4.25rem)] leading-[1.04] font-light text-chalk">
+              <TwoLines a={t('landing.hero.title1')} b={t('landing.hero.title2')} italic />
+            </h1>
+            <p className="mt-5 max-w-md text-base leading-7 text-chalk/90 sm:mt-6">{t('landing.hero.body')}</p>
+            {exampleHref && (
+              <>
+                <ButtonLink to={exampleHref} variant="inverse" size="lg" className="mt-8 w-full sm:w-auto">
+                  {t('landing.hero.cta3d')}
+                  {arrowIcon}
+                </ButtonLink>
+                <p className="mt-4 max-w-md text-sm leading-5 text-chalk/80">{t('landing.hero.note')}</p>
+              </>
+            )}
+          </div>
         </div>
-        <HeroMedia />
-      </div>
+      </HeroMedia>
     </section>
   )
 }
@@ -120,26 +120,26 @@ function HowItWorks() {
   const { t } = useI18n()
   return (
     <section id="como-funciona" className="scroll-mt-24" aria-labelledby="how-title">
-      <div className={cn(SECTION, 'py-20 lg:py-28')}>
+      <div className={cn(SECTION, SECTION_Y)}>
         <Eyebrow>{t('landing.how.eyebrow')}</Eyebrow>
         <h2 id="how-title" className="mt-4 text-headline">
           <TwoLines a={t('landing.how.title1')} b={t('landing.how.title2')} />
         </h2>
-        <ol className="mt-10 grid gap-x-8 border-t border-line sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
+        <ol className="mt-8 grid gap-x-8 border-t border-line sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
           {STEPS.map(([title, body], i) => (
             <li key={title} className="border-b border-line py-6 lg:border-b-0">
               <span className="font-display text-[2rem] leading-none text-accent-ink italic" aria-hidden>
                 {String(i + 1).padStart(2, '0')}
               </span>
               <h3 className="mt-4 text-label text-ink">{t(title)}</h3>
-              <p className="mt-3 text-[14px] leading-6 text-ink-muted">{t(body)}</p>
+              <p className="mt-3 max-w-sm text-[15px] leading-6 text-ink-muted">{t(body)}</p>
             </li>
           ))}
         </ol>
-        <Link to={APPLY_PATH} className={cn(CTA_DARK, 'mt-10')}>
+        <ButtonLink to={APPLY_PATH} variant="primary" size="lg" className="mt-8 w-full sm:mt-10 sm:w-auto">
           {t('site.apply')}
           {arrowIcon}
-        </Link>
+        </ButtonLink>
       </div>
     </section>
   )
@@ -156,9 +156,9 @@ function Experience() {
   const { view, loading } = useShowcaseCardView(featured)
   return (
     <section id="experiencia" className="scroll-mt-24 bg-obsidian text-chalk" aria-labelledby="xp-title">
-      <div className={cn(SECTION, 'grid gap-14 py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-center lg:gap-20 lg:py-28')}>
+      <div className={cn(SECTION, SECTION_Y, 'grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-center lg:gap-20')}>
         <div>
-          <p className="text-eyebrow text-chalk/70">{t('landing.xp.eyebrow')}</p>
+          <Eyebrow onDark>{t('landing.xp.eyebrow')}</Eyebrow>
           <h2 id="xp-title" className="mt-5 text-headline text-chalk">
             {t('landing.xp.title')}
           </h2>
@@ -171,12 +171,12 @@ function Experience() {
                 </span>
                 <div>
                   <h3 className="text-label text-chalk">{t(title)}</h3>
-                  <p className="mt-2 text-[13px] leading-5 text-chalk/70">{t(body)}</p>
+                  <p className="mt-2 text-sm leading-5 text-chalk/75">{t(body)}</p>
                 </div>
               </li>
             ))}
           </ol>
-          <ShowcaseCta view={view} className={cn(CTA, 'mt-10 bg-chalk text-ink hover:bg-limestone')}>
+          <ShowcaseCta view={view} className={buttonClasses('inverse', 'lg', 'mt-8 w-full sm:mt-10 sm:w-auto')}>
             {arrowIcon}
           </ShowcaseCta>
         </div>
@@ -191,13 +191,13 @@ function About() {
   const { t } = useI18n()
   return (
     <section id="sobre" className="scroll-mt-24" aria-labelledby="about-title">
-      <div className={cn(SECTION, 'grid gap-12 py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16 lg:py-28')}>
+      <div className={cn(SECTION, SECTION_Y, 'grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16')}>
         <div>
           <Eyebrow>{t('landing.about.eyebrow')}</Eyebrow>
           <h2 id="about-title" className="mt-5 text-headline">
             <TwoLines a={t('landing.about.title1')} b={t('landing.about.title2')} />
           </h2>
-          <p className="mt-6 max-w-md text-[15px] leading-7 text-ink-muted">{t('landing.about.body')}</p>
+          <p className="mt-5 max-w-md text-base leading-7 text-ink-muted sm:mt-6">{t('landing.about.body')}</p>
         </div>
         <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-3 sm:gap-6">
           <img
@@ -229,7 +229,7 @@ function About() {
 function Partners() {
   const { t } = useI18n()
   return (
-    <section id="parcerias" className={cn(SECTION, 'scroll-mt-24 py-20 lg:py-28')} aria-labelledby="biz-title">
+    <section id="parcerias" className={cn(SECTION, SECTION_Y, 'scroll-mt-24')} aria-labelledby="biz-title">
       <div className="flex flex-col gap-8 border border-line bg-surface px-6 py-10 sm:px-12 sm:py-14 lg:flex-row lg:items-center lg:justify-between lg:gap-16">
         <div className="max-w-2xl">
           <Eyebrow>{t('landing.biz.eyebrow')}</Eyebrow>
@@ -238,10 +238,10 @@ function Partners() {
           </h2>
           <p className="mt-4 text-[15px] leading-7 text-ink-muted">{t('landing.biz.body')}</p>
         </div>
-        <Link to={APPLY_PATH} className={cn(CTA_DARK, 'shrink-0 self-start lg:self-center')}>
+        <ButtonLink to={APPLY_PATH} variant="primary" size="lg" className="shrink-0 self-stretch sm:self-start lg:self-center">
           {t('site.apply')}
           {arrowIcon}
-        </Link>
+        </ButtonLink>
       </div>
     </section>
   )

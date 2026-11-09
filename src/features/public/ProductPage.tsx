@@ -20,6 +20,7 @@ import { ProductMedia } from './ProductMedia'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { ShareButton } from './ShareActions'
+import { StickyActionBar } from './StickyActionBar'
 import { TAP_TARGET } from './tapTarget'
 import { AR_PENDING_MAX_MS, AR_RELAUNCH_MS, MEDIA_REFRESH_MS, useProductStage } from './useProductStage'
 import { VariantPicker } from './VariantPicker'
@@ -99,6 +100,8 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const { t, localized } = useI18n()
   const stage = useProductStage(product, { record: !isPreview })
   const [contactOpen, setContactOpen] = useState(false)
+  // The row of actions, watched so the phone's sticky bar shows only while the row is still below the screen.
+  const [actionRow, setActionRow] = useState<HTMLElement | null>(null)
   const { name, hasCta } = stage
 
   useEffect(() => {
@@ -165,7 +168,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           </div>
 
           {hasCta && (
-            <div data-ar-cta className="mt-6 flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:mt-8">
+            <div ref={setActionRow} data-ar-cta className="mt-6 flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:mt-8">
               {/* The AR / 3D button and the product's own link side by side: both 48px tall, the link outlined. */}
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <ArPrimaryAction stage={stage} arLabel={t('ar.button')} />
@@ -209,6 +212,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
         <MorePhotos stage={stage} />
       </div>
 
+      <StickyActionBar stage={stage} arLabel={t('ar.button')} row={actionRow} />
       <ArTips {...stage.tips} />
 
       <Modal open={contactOpen} onClose={() => setContactOpen(false)} title={business.name} size="sm" closeLabel={t('common.close')}>

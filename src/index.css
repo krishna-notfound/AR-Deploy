@@ -54,12 +54,13 @@
   --text-title--letter-spacing: 0em;
   --text-lead: 1.0625rem;
   --text-lead--line-height: 1.7;
-  --text-eyebrow: 0.6875rem;
+  /* Round 2 (W2, 2026-11-09): 12px minimum on phones (was 11px); the tracking is eased so the captions keep their width. */
+  --text-eyebrow: 0.75rem;
   --text-eyebrow--line-height: 1.4;
-  --text-eyebrow--letter-spacing: 0.24em;
-  --text-label: 0.6875rem;
+  --text-eyebrow--letter-spacing: 0.2em;
+  --text-label: 0.75rem;
   --text-label--line-height: 1.2;
-  --text-label--letter-spacing: 0.2em;
+  --text-label--letter-spacing: 0.16em;
 
   /* Dashboard UI type (design/dashboard/BRIEF.md, Variant A). Used only under useInDashboard(). */
   --text-ui-h1: 2rem;
@@ -122,6 +123,15 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
+    /* Phone feel (W2): no grey flash on tap; taps fire at once (no double-tap-zoom wait). Press feedback is :active. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  a,
+  button,
+  [role='button'],
+  summary,
+  label {
+    touch-action: manipulation;
   }
   body {
     @apply bg-canvas text-ink-body antialiased;

@@ -73,7 +73,7 @@ describe('landing page for a business owner', () => {
     const slug = example.getAttribute('href')!.replace('/showcase/', '')
     expect(example.getAttribute('href')).toMatch(/^\/showcase\//)
     expect(slugs).toContain(slug)
-    expect(example.className).toMatch(/bg-ink/) // the primary (obsidian) button
+    expect(example.className).toMatch(/bg-chalk/) // the shared Button (inverse variant: the primary action on a photograph)
   })
 
   it('"See a live example" opens landing.example when the admin chose one, else the 3D card\'s piece', async () => {
@@ -122,6 +122,22 @@ describe('landing page for a business owner', () => {
     expect(within(how).getAllByRole('listitem')).toHaveLength(4)
     expect(how).toHaveTextContent('3D model request')
     expect(within(how).getByRole('link', { name: /Apply as a business/ })).toHaveAttribute('href', APPLY_PATH)
+  })
+
+  it('uses the sign-in style on every section: an eyebrow with its short rule, and the shared button for each action', async () => {
+    renderLanding()
+    await screen.findByRole('link', { name: 'See a live example' })
+    for (const id of ['como-funciona', 'experiencia', 'colecoes', 'sobre']) {
+      const eyebrow = document.getElementById(id)!.querySelector('p.text-eyebrow')
+      expect(eyebrow, id).not.toBeNull()
+      expect(eyebrow!.querySelector('span.h-px'), id).not.toBeNull() // the short rule before the label
+    }
+    const hero = screen.getByRole('heading', { level: 1 }).closest('section')!
+    expect(hero.querySelector('p.text-eyebrow span.h-px')).not.toBeNull()
+    // Every action is the shared Button (48px tall, square, one text size), not a hand-made class string.
+    const actions = [screen.getByRole('link', { name: 'See a live example' }), ...screen.getAllByRole('link', { name: /Apply as a business/ }).filter((l) => l.closest('main'))]
+    expect(actions.length).toBeGreaterThanOrEqual(3)
+    for (const a of actions) expect(a.className).toMatch(/\bh-12\b/)
   })
 
   it('names Chrome (WebXR) first for Android AR, with Scene Viewer only as the fallback', () => {

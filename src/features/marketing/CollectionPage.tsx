@@ -3,6 +3,7 @@ import { type ReactNode, useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { arrowLinkClasses, Button, ButtonLink } from '@/components/ui/Button'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
 import type { ProductRef } from '@/domain/siteContent'
 import type { Category, Product } from '@/domain/types'
@@ -76,12 +77,12 @@ export default function CollectionPage() {
             {t('site.collection.all')}
           </Link>
           <header className="mt-6 max-w-3xl lg:mt-10">
-            <p className="text-eyebrow text-accent-ink">{t('site.collection.eyebrow')}</p>
-            <h1 className="mt-4 text-display">{view.title}</h1>
-            {view.text && <p className="mt-5 max-w-xl text-[15px] leading-7 text-ink-muted">{view.text}</p>}
+            <Eyebrow>{t('site.collection.eyebrow')}</Eyebrow>
+            <h1 className="mt-4 text-display text-balance break-words">{view.title}</h1>
+            {view.text && <p className="mt-5 max-w-xl text-base leading-7 text-ink-muted">{view.text}</p>}
           </header>
         </div>
-        <div className={cn(SECTION, 'py-12 lg:py-16')}>
+        <div className={cn(SECTION, 'py-10 sm:py-12 lg:py-16')}>
           {showcase.status === 'loading' ? (
             <Grid label={t('common.loading')} busy>
               {[0, 1, 2, 3].map((i) => (
@@ -177,7 +178,7 @@ function PieceCard({ product }: { product: Product }) {
           <div className="aspect-[4/5] w-full" aria-hidden />
         )}
         {hasGlb(product) && (
-          <span className="absolute top-2 left-2 bg-obsidian px-2.5 py-1.5 text-[10px] leading-none tracking-[0.18em] text-chalk uppercase sm:top-3 sm:left-3">
+          <span className="absolute top-2 left-2 bg-obsidian px-2.5 py-1.5 text-xs leading-none tracking-[0.14em] text-chalk uppercase sm:top-3 sm:left-3">
             <span aria-hidden>{t('collection.chip')}</span>
             <span className="sr-only">{t('collection.chipLabel')}</span>
           </span>

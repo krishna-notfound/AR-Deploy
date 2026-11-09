@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 import { type ReactNode, useMemo } from 'react'
 import { Link } from 'react-router'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import type { LandingCollection, LandingCollectionLink } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
@@ -77,19 +78,19 @@ export function LandingCollections() {
 
   return (
     <section id="colecoes" className="scroll-mt-24" aria-labelledby="col-title">
-      <div className={cn(SECTION, 'py-20 lg:py-28')}>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-end lg:gap-14">
+      <div className={cn(SECTION, 'py-16 sm:py-20 lg:py-28')}>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-end lg:gap-14">
           <div>
-            <p className="text-eyebrow text-accent-ink">{t('landing.col.eyebrow')}</p>
+            <Eyebrow>{t('landing.col.eyebrow')}</Eyebrow>
             <h2 id="col-title" className="mt-4 text-headline">
               <span className="block">{t('landing.col.title1')}</span> <span className="block">{t('landing.col.title2')}</span>
             </h2>
           </div>
-          <p className="max-w-xl text-[15px] leading-7 text-ink-muted">{t('landing.col.body')}</p>
+          <p className="max-w-xl text-base leading-7 text-ink-muted">{t('landing.col.body')}</p>
         </div>
-        <hr className="mt-10 border-line lg:mt-14" />
+        <hr className="mt-8 border-line lg:mt-14" />
         {cards.length > 0 && (
-          <ul className={cn('mt-10 grid gap-3 sm:gap-6 lg:mt-14', cards.length === 1 ? 'grid-cols-1' : 'grid-cols-2', COLUMNS[cards.length] ?? 'lg:grid-cols-4')}>
+          <ul className={cn('mt-8 grid gap-3 sm:gap-6 lg:mt-14', cards.length === 1 ? 'grid-cols-1' : 'grid-cols-2', COLUMNS[cards.length] ?? 'lg:grid-cols-4')}>
             {cards.map((c) => (
               <li key={c.id} className="flex">
                 <Card card={c} />
@@ -111,7 +112,7 @@ function Card({ card }: { card: CardView }) {
     <>
       <img src={card.image} alt="" width={1200} height={896} loading="lazy" className={cn('aspect-[4/5] w-full bg-subtle object-cover', card.focus)} />
       <h3 className="mt-4 font-display text-[1.375rem] leading-tight font-normal text-ink sm:mt-5 sm:text-[1.625rem]">{card.title}</h3>
-      {card.text && <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{card.text}</p>}
+      {card.text && <p className="mt-1.5 text-sm leading-5 text-ink-muted">{card.text}</p>}
       {card.href && (
         <span aria-hidden className="mt-auto flex items-center gap-2 pt-5 text-label uppercase text-ink">
           {t('landing.col.view')}

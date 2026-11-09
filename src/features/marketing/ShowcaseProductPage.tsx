@@ -1,7 +1,9 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { ButtonLink } from '@/components/ui/Button'
+import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
 import { HOUSE_BUSINESS_SLUG } from '@/domain/siteContent'
@@ -18,6 +20,7 @@ import { InAppNotice } from '../public/InAppNotice'
 import { ProductMedia } from '../public/ProductMedia'
 import { ArPrimaryAction, ArScaleBadge, DimensionsSection, MorePhotos, ProductLinkButton, ProductSpecs } from '../public/ProductParts'
 import { ShareButton } from '../public/ShareActions'
+import { StickyActionBar } from '../public/StickyActionBar'
 import { TAP_TARGET } from '../public/tapTarget'
 import { MEDIA_REFRESH_MS, useProductStage } from '../public/useProductStage'
 import { VariantPicker } from '../public/VariantPicker'
@@ -90,6 +93,8 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
   const stage = useProductStage(product, { record: false })
   const { name, hasCta } = stage
   useDocumentTitle(name)
+  // The row of actions, watched so the phone's sticky bar shows only while the row is still below the screen.
+  const [actionRow, setActionRow] = useState<HTMLElement | null>(null)
 
   return (
     <Frame>
@@ -112,7 +117,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
             </div>
 
             <div className="min-w-0">
-              <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t(`category.${product.category}`)}</p>
+              <Eyebrow>{t(`category.${product.category}`)}</Eyebrow>
               <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
               <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{stage.priceText}</p>
               <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
@@ -120,7 +125,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
               <VariantPicker product={product} selectedId={stage.variantId} onSelect={stage.selectVariant} className="mt-8 border-t border-line pt-6" />
 
               {/* One row: the main action (AR on a supported phone, else 3D), the piece's own link, Share. Stacked and full width on a phone. */}
-              <div data-ar-cta className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <div ref={setActionRow} data-ar-cta className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <ArPrimaryAction stage={stage} arLabel={t('showcase.arButton')} />
                 <ProductLinkButton product={product} outlined={hasCta} />
                 <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
@@ -142,6 +147,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
           <ClosingBanner />
         </div>
       </main>
+      <StickyActionBar stage={stage} arLabel={t('showcase.arButton')} row={actionRow} />
       <ArTips {...stage.tips} />
     </Frame>
   )
