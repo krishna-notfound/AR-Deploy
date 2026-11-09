@@ -3,6 +3,7 @@ import { ptAdmin } from './pt.admin'
 import { ptApplications } from './pt.applications'
 import { ptBusiness } from './pt.business'
 import { ptEditor } from './pt.editor'
+import { ptNotifications } from './pt.notifications'
 import { ptProducts } from './pt.products'
 import { ptSettings } from './pt.settings'
 import { ptTeam } from './pt.team'
@@ -18,4 +19,5 @@ export const ptDashboard: Partial<Record<TranslationKey, string>> = {
   ...ptSettings,
   ...ptTeam,
   ...ptUi,
+  ...ptNotifications,
 }

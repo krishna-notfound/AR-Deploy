@@ -6,7 +6,7 @@
 // (fieldErrors by document path), NOT_FOUND (an unknown custom slug or version). A database without the migration answers
 // UNKNOWN with reason not_enabled; the public pages then fall back to the built-in text.
 import type { ISODate, LocalizedText } from '@/domain/types'
-import type { ApplyFormConfig, Lang, LandingCollection, LandingHero, LandingShowcase, ProductRef, SiteAsset, SiteAssetKind, SiteContent } from '@/domain/siteContent'
+import type { ApplyFormConfig, Lang, LandingCollection, LandingHero, LandingShowcase, LandingTexts, ProductRef, SiteAsset, SiteAssetKind, SiteContent } from '@/domain/siteContent'
 import type { Result } from './catalogService'
 
 export interface PublishedChrome {
@@ -25,6 +25,10 @@ export interface PublishedChrome {
   landingHero?: LandingHero
   /** The landing page's 3D showcase card (the Owner/Admin's own files and texts); absent when none is published. */
   landingShowcase?: LandingShowcase
+  /** The landing page's text overrides (ADR-0053); absent when none are published. */
+  landingTexts?: LandingTexts
+  /** The site icon (a PNG) that replaces the built-in favicon (ADR-0053); absent when none is published. */
+  favicon?: SiteAsset
 }
 export type PublishedPage =
   | { kind: 'builtin'; body: Partial<Record<Lang, string>> } // terms | privacy overrides

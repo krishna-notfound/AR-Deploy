@@ -7,7 +7,7 @@ import { nativeAr, nativeArRoute } from '@/features/ar/nativeAr'
 import { arLaunchUrl, pickVariant, variantMedia } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { sceneViewerUnsupported } from '@/lib/files'
-import { convertLength, formatMoney } from '@/lib/format'
+import { convertLength } from '@/lib/format'
 import { type MeasuredSize, checkScale } from '@/lib/scale'
 import { AR_FALLBACK_HASH, MODEL_VIEWER_FALLBACK_HASH, VARIANT_PARAM, quickLookHref, sceneViewerIntentUrl, withVariantParam } from '@/lib/urls'
 import { arBrowserName, detectInAppBrowser, isAndroid } from '@/lib/userAgent'
@@ -42,7 +42,7 @@ const freshModel = (key: string): ModelInfo => ({ key, state: key ? 'loading' : 
  * `record` is false for an owner preview and for the showcase: no analytics event is written.
  */
 export function useProductStage(product: Product, { record }: { record: boolean }) {
-  const { t, lang, localized } = useI18n()
+  const { t, localized } = useI18n()
   const toast = useToast()
   const viewerRef = useRef<ModelViewerHandle>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -99,7 +99,6 @@ export function useProductStage(product: Product, { record }: { record: boolean 
     void service.recordEvent({ productId: product.id, businessId: product.businessId, type: 'model_interaction' })
   }
 
-  const price = product.price + (variant?.priceDelta ?? 0)
   // Scale is checked per model: a variant's file is measured on its own, never credited with another's verdict.
   const scale = useMemo(() => checkScale(measured, product.dimensions), [measured, product.dimensions])
   const separateUsdz = !!media.models.usdz
@@ -248,7 +247,6 @@ export function useProductStage(product: Product, { record }: { record: boolean 
     launching,
     onActivate,
     open3d,
-    priceText: formatMoney(price, product.currency, lang),
     additional,
     unit,
     setUnit,

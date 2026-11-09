@@ -18,6 +18,7 @@ import { useServiceQuery } from '@/services/hooks'
 import { useBusinesses } from '../useCatalogData'
 import { describeErrors, editPath } from '../useProductActions'
 import { ImportPreviewTable } from './ImportPreviewTable'
+import { useCategories, useCurrencies } from '@/services/listsHooks'
 import { MAX_IMPORT_ROWS, type PreparedRow, prepareImport, rowsFromCsv, templateCsv } from './importRows'
 
 type ImportScope = 'admin' | 'business'
@@ -117,7 +118,13 @@ function ImportWorkspace({
   // The business's current slugs, so the drafts get free addresses.
   const existing = useServiceQuery(() => service.getProductsByBusiness(business.id), [business.id])
 
-  const parsed = useMemo(() => (text.trim() ? rowsFromCsv(text) : null), [text])
+  // The category and currency lists are managed in the admin console (ADR-0055): the file is read against them.
+  const categoryList = useCategories()
+  const currencyList = useCurrencies()
+  const parsed = useMemo(
+    () => (text.trim() ? rowsFromCsv(text, { categories: categoryList.categories, currencies: currencyList.currencies }) : null),
+    [text, categoryList.categories, currencyList.currencies],
+  )
   const prepared: PreparedRow[] = useMemo(
     () =>
       parsed && existing.data

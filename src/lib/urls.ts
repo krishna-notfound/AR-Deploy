@@ -134,6 +134,7 @@ export const editorPagesPath = () => `${EDITOR_PATH}/pages`
 export const editorPagePath = (pageKey: string) => `${EDITOR_PATH}/pages/${encodeURIComponent(pageKey)}`
 export const editorApplyPath = (tab?: 'form' | 'messages') => `${EDITOR_PATH}/apply${tab ? `?tab=${tab}` : ''}`
 export const editorSocialPath = () => `${EDITOR_PATH}/social`
+export const editorSitePath = () => `${EDITOR_PATH}/site`
 export const editorLandingPath = () => `${EDITOR_PATH}/landing`
 /** The admin's own showcase pieces in the Editor (ADR-0047), and the shared product editor on them. */
 export const editorShowcasePath = () => `${EDITOR_PATH}/showcase`
@@ -141,6 +142,11 @@ export const editorShowcaseNewPath = () => `${EDITOR_PATH}/showcase/new`
 export const editorShowcaseEditPath = (productId: string) => `${EDITOR_PATH}/showcase/${productId}/edit`
 /** Preview of the draft: `page/<pageKey>`, `apply`, `apply/done`, `footer` or `landing`. */
 export const editorPreviewPath = (target: string) => `${EDITOR_PATH}/preview/${target}`
+
+/** The admin-managed product categories and currencies (staff, content.manage; ADR-0055). */
+export const LISTS_PATH = '/admin/lists'
+export const listsCategoriesPath = () => `${LISTS_PATH}/categories`
+export const listsCurrenciesPath = () => `${LISTS_PATH}/currencies`
 
 export const applicationAdminPath = (id: string) => `/admin/applications/${id}`
 /** The applications list, optionally filtered by status (e.g. the overview's "awaiting review" link). */

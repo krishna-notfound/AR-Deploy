@@ -10,6 +10,7 @@ import { MODEL_REQUEST_SELECT, type ModelRequestRow, mapModelRequestError, toMod
 type BusinessMethods = Pick<CatalogService, 'requestModel' | 'cancelModelRequest'>
 
 export const REQUEST_PHOTO_BUCKET = 'model-request-photos'
+export const NOTIFY_STAFF_FUNCTION = 'notify-model-request'
 const FILE_NAME_MAX = 255
 
 const EXT_BY_TYPE: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
@@ -28,6 +29,17 @@ export function createSupabaseModelRequestsBusiness(sb: SupabaseClient, notify: 
       return await fn()
     } catch {
       return fail('UNKNOWN', 'The request could not be completed. Try again in a moment.')
+    }
+  }
+  /**
+   * Fire-and-forget (ADR-0056): asks notify-model-request to tell staff with models.manage (bell and phone push). The request
+   * is already saved, so a failure here changes nothing the owner sees.
+   */
+  const alertStaff = (requestId: string): void => {
+    try {
+      void Promise.resolve(sb.functions.invoke(NOTIFY_STAFF_FUNCTION, { body: { requestId } })).catch(() => {})
+    } catch {
+      // Never reaches the owner.
     }
   }
   /** Best effort; false when the removal failed. */
@@ -76,6 +88,7 @@ export function createSupabaseModelRequestsBusiness(sb: SupabaseClient, notify: 
           return mapModelRequestError(error, { option: !!input.variantId })
         }
         notify()
+        alertStaff(id)
 
         // The request is sent; a failed read-back still reports success with what is known.
         const now = new Date().toISOString()

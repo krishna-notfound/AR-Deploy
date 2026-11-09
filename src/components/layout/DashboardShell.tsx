@@ -25,6 +25,7 @@ import { InlineNotice } from '../ui/States'
 import { DashboardContext, type DashboardContextValue, useDashboard, usePendingApplications, useRequestedModelRequests } from './dashboardContext'
 import { BreadcrumbSlotContext, type BreadcrumbSlot } from './PageHeader'
 import type { NavItem } from './nav'
+import { NotificationBell } from './NotificationBell'
 
 const SIDEBAR_KEY = 'arfurn:sidebar'
 
@@ -450,6 +451,7 @@ function Topbar({
         {isDemoMode && (
           <span className="hidden border border-line-strong px-2.5 py-0.5 text-[12px] leading-tight text-ink-muted sm:inline">{t('ui.shell.demoMode')}</span>
         )}
+        <NotificationBell variant={variant} />
         {variant === 'business' && business && (
           <a
             href={catalogLocalPath(business, { preview: business.status !== 'active' })}

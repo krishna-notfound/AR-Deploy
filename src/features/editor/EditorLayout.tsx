@@ -12,7 +12,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { EDITOR_PATH, editorApplyPath, editorLandingPath, editorPagesPath, editorPreviewPath, editorShowcasePath, editorSocialPath } from '@/lib/urls'
+import { EDITOR_PATH, editorApplyPath, editorLandingPath, editorPagesPath, editorPreviewPath, editorShowcasePath, editorSitePath, editorSocialPath } from '@/lib/urls'
 import { useFormat } from '@/lib/useFormat'
 import { EditorContext } from './EditorContext'
 import { EditorAreaSkeleton, EditorSkeleton } from './EditorSkeleton'
@@ -31,6 +31,7 @@ const MENU: { to: string; key: TranslationKey; /** Besides content.manage, which
   { to: editorLandingPath(), key: 'editor.menu.landing' },
   { to: editorApplyPath(), key: 'editor.menu.apply' },
   { to: editorSocialPath(), key: 'editor.menu.social' },
+  { to: editorSitePath(), key: 'editor.menu.site' },
 ]
 
 /** Navigation inside the Editor stays in the same working copy; the preview route and the product editor on a showcase piece are different screens. */

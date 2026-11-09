@@ -10,9 +10,9 @@ import { HOUSE_BUSINESS_SLUG, type ProductRef } from '@/domain/siteContent'
 import type { Product } from '@/domain/types'
 import { arLaunchUrl, variantMedia } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { cn } from '@/lib/cn'
-import { initialPrice, primaryImage } from '@/lib/product'
-import { useFormat } from '@/lib/useFormat'
+import { primaryImage } from '@/lib/product'
 import { showcaseProductPath } from '@/lib/urls'
 import { InPlaceModel } from './InPlaceModel'
 import { hasGlb, useShowcasePieces } from './useShowcasePieces'
@@ -24,8 +24,6 @@ export interface ShowcaseView {
   text?: string
   dimensions?: string
   materials?: string
-  /** Already formatted. */
-  priceLabel?: string
   imageUrl?: string
   /** The 3D model, plus the iPhone file. */
   glbUrl?: string
@@ -46,11 +44,12 @@ export function pickShowcasePiece(pieces: Product[], featured?: ProductRef): Pro
 type Fmt = {
   t: ReturnType<typeof useI18n>['t']
   localized: ReturnType<typeof useI18n>['localized']
-  money: ReturnType<typeof useFormat>['money']
+  /** The category's name from the managed list (ADR-0055), `useCategoryLabel()`. */
+  categoryLabel: (slug: string) => string
 }
 
 /** A showcase piece as the card's view. */
-export function productToShowcaseView(product: Product, { t, localized, money }: Fmt): ShowcaseView {
+export function productToShowcaseView(product: Product, { t, localized, categoryLabel }: Fmt): ShowcaseView {
   const media = variantMedia(product)
   const image = primaryImage(product)
   const d = product.dimensions
@@ -58,13 +57,12 @@ export function productToShowcaseView(product: Product, { t, localized, money }:
   // "W 60 × H 100 × D 60 cm", with the initials of the language's own words (L, A, P in Portuguese).
   const initial = (word: string) => word.charAt(0).toUpperCase()
   return {
-    eyebrow: t(`category.${product.category}`),
+    eyebrow: categoryLabel(product.category),
     title: localized(product.name),
     dimensions: hasDims
       ? `${initial(t('product.width'))} ${d.width} × ${initial(t('product.height'))} ${d.height} × ${initial(t('product.depth'))} ${d.depth} ${d.unit}`
       : undefined,
     materials: localized(product.material) || undefined,
-    priceLabel: money(initialPrice(product), product.currency),
     imageUrl: image?.url,
     glbUrl: media.models.glb ? arLaunchUrl(media.models.glb) : undefined,
     usdzUrl: media.models.usdz ? arLaunchUrl(media.models.usdz) : undefined,
@@ -75,13 +73,13 @@ export function productToShowcaseView(product: Product, { t, localized, money }:
 /** The 3D card's view: a showcase piece, or undefined (the illustration) when there is none. `loading` while the pieces load. */
 export function useShowcaseCardView(featured?: ProductRef): { view?: ShowcaseView; loading: boolean } {
   const { t, localized } = useI18n()
-  const { money } = useFormat()
+  const categoryLabel = useCategoryLabel()
   const { status, pieces } = useShowcasePieces()
   const slug = featured?.businessSlug === HOUSE_BUSINESS_SLUG ? featured.productSlug : ''
   const view = useMemo(() => {
     const piece = pickShowcasePiece(pieces, slug ? { businessSlug: HOUSE_BUSINESS_SLUG, productSlug: slug } : undefined)
-    return piece ? productToShowcaseView(piece, { t, localized, money }) : undefined
-  }, [pieces, slug, t, localized, money])
+    return piece ? productToShowcaseView(piece, { t, localized, categoryLabel }) : undefined
+  }, [pieces, slug, t, localized, categoryLabel])
   return { view, loading: status === 'loading' }
 }
 
@@ -121,7 +119,8 @@ export function ShowcaseCta({ view, className, children }: { view?: ShowcaseView
 
 const CARD = 'border border-chalk/15 p-4 sm:p-6'
 const STAGE = 'relative mt-4 aspect-[4/3] overflow-hidden bg-umber sm:mt-6'
-const CHIP = 'border px-2.5 py-1.5 text-[10px] leading-none tracking-[0.2em] uppercase transition-colors select-none'
+// 12px label; 44px tall wherever the screen is a touch screen (phones), compact with a mouse.
+const CHIP = 'inline-flex items-center justify-center border px-3 py-1.5 text-xs leading-none tracking-[0.16em] uppercase transition-colors select-none max-sm:min-h-11 max-sm:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
 
 /** `view` is a showcase piece, else nothing (the labelled illustration). */
 export function LandingShowcase({ view, loading }: { view?: ShowcaseView; loading?: boolean }) {
@@ -132,7 +131,7 @@ export function LandingShowcase({ view, loading }: { view?: ShowcaseView; loadin
 
 export function ShowcaseCard({ view }: { view: ShowcaseView }) {
   const { t } = useI18n()
-  const { title, eyebrow, text, dimensions, materials, priceLabel, imageUrl, glbUrl, usdzUrl, productHref } = view
+  const { title, eyebrow, text, dimensions, materials, imageUrl, glbUrl, usdzUrl, productHref } = view
 
   const [mode, setMode] = useState<'image' | '3d'>(!imageUrl && glbUrl ? '3d' : 'image')
   const [loaded, setLoaded] = useState(false)
@@ -184,9 +183,10 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
 
   return (
     <figure id={CARD_ID} className={CARD}>
-      <div className="flex items-start justify-between gap-4 border-b border-chalk/15 pb-4">
+      {/* A phone: the name, then the chips on their own row (three 44px chips do not fit beside a long name). */}
+      <div className="flex flex-col gap-4 border-b border-chalk/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          {eyebrow && <p className="text-label text-chalk/60">{eyebrow}</p>}
+          {eyebrow && <p className="text-label text-chalk/70">{eyebrow}</p>}
           <p className="mt-1.5 font-display text-[1.75rem] leading-none break-words">{title}</p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -250,7 +250,6 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
             </div>
           )}
         </dl>
-        {priceLabel && <p className="font-display text-xl tracking-[0.04em] sm:text-right">{priceLabel}</p>}
         {text && <p className="text-[13px] leading-5 text-chalk/80 sm:col-span-2">{text}</p>}
       </figcaption>
     </figure>
@@ -260,11 +259,10 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
 /** The Linden armchair from the brand references: no product record and no model, so it is labelled and never links. */
 function IllustrationCard() {
   const { t } = useI18n()
-  const { money } = useFormat()
   return (
     <figure className={CARD}>
       <div className="border-b border-chalk/15 pb-4">
-        <p className="text-label text-chalk/60">{t('landing.feature.eyebrow')}</p>
+        <p className="text-label text-chalk/70">{t('landing.feature.eyebrow')}</p>
         <p className="mt-1.5 font-display text-[1.75rem] leading-none">{t('landing.feature.name')}</p>
       </div>
       <div className={STAGE}>
@@ -276,7 +274,7 @@ function IllustrationCard() {
           loading="lazy"
           className="absolute inset-0 size-full object-cover"
         />
-        <span className="absolute top-3 left-3 bg-obsidian px-2.5 py-1.5 text-[10px] leading-none tracking-[0.18em] text-chalk uppercase">
+        <span className="absolute top-3 left-3 bg-obsidian px-2.5 py-1.5 text-xs leading-none tracking-[0.14em] text-chalk uppercase">
           {t('landing.xp.illustration')}
         </span>
       </div>
@@ -291,7 +289,6 @@ function IllustrationCard() {
             <dd className="mt-1.5 leading-5 text-chalk/85">{t('landing.feature.materials')}</dd>
           </div>
         </dl>
-        <p className="font-display text-xl tracking-[0.04em] sm:text-right">{money(249000, 'EUR')}</p>
         <p className="text-xs leading-5 text-chalk/60 sm:col-span-2">{t('landing.feature.illustrative')}</p>
       </figcaption>
     </figure>

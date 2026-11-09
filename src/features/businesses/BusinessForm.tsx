@@ -10,7 +10,8 @@ import { LogoUpload } from '@/components/ui/LogoUpload'
 import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
-import { type Business, type BusinessStatus, CURRENCIES, type Currency } from '@/domain/types'
+import { type Business, type BusinessStatus } from '@/domain/types'
+import { useCurrencies } from '@/services/listsHooks'
 import { errorText, fieldText } from '@/i18n/errorText'
 import type { FieldError } from '@/i18n/fieldMessage'
 import { useI18n } from '@/i18n/LanguageProvider'
@@ -52,6 +53,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
   const toast = useToast()
   const confirm = useConfirm()
   const { t } = useI18n()
+  const currencyLists = useCurrencies()
   // Creating a live business needs businesses.status (R-W3-3; the database refuses it too); otherwise only a draft.
   const can = useCan()
   const canCreateActive = can('businesses.status')
@@ -240,8 +242,9 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                     </FormField>
                   )}
                   <FormField label={t('admin.businesses.form.currency')} hint={t('admin.businesses.form.currencyHint')}>
-                    <Select value={data.defaultCurrency} onChange={(e) => set({ defaultCurrency: e.target.value as Currency })}>
-                      {CURRENCIES.map((c) => (
+                    <Select value={data.defaultCurrency} onChange={(e) => set({ defaultCurrency: e.target.value })}>
+                      {/* The enabled currencies of the managed list (ADR-0055); the business's own stays offered even if switched off. */}
+                      {currencyLists.offered(data.defaultCurrency).map((c) => (
                         <option key={c}>{c}</option>
                       ))}
                     </Select>

@@ -218,7 +218,7 @@ describe('Landing tab: the three blocks (ADR-0047)', () => {
     open()
     const example = await screen.findByRole('radiogroup', { name: 'See a live example' }, { timeout: 15_000 })
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Hero picture', 'See a live example', '3D card', 'Collections'])
+    expect(headings).toEqual(['Hero picture', 'See a live example', '3D card', 'Collections', 'Texts'])
     // Automatic + exactly the house pieces.
     expect(within(example).getAllByRole('radio')).toHaveLength(1 + pieces.length)
     for (const p of pieces) expect(within(example).getByRole('radio', { name: p.name.en })).toBeInTheDocument()

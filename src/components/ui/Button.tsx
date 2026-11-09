@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { useInDashboard } from '@/components/layout/dashboardContext'
 import { cn } from '@/lib/cn'
 
-export type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'brand'
+export type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'brand' | 'inverse'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 const base =
@@ -13,6 +13,8 @@ const base =
 const variants: Record<ButtonVariant, string> = {
   // Obsidian is the default action (the references' dark, square button); bronze marks the one action that matters most.
   primary: 'bg-ink text-chalk hover:bg-umber',
+  // The primary button for a photograph or an obsidian field (landing hero, 3D section): chalk with ink text.
+  inverse: 'bg-chalk text-ink hover:bg-limestone',
   accent: 'bg-accent-bright text-ink hover:bg-limestone',
   // White, not chalk: safeBrandAccent guarantees 4.5:1 against white only.
   brand: 'bg-[var(--brand-accent)] text-white hover:brightness-110',

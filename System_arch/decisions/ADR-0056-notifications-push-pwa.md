@@ -1,0 +1,30 @@
+# ADR-0056: Notifications: in-app bell, phone push and an installable shell
+- **Status:** Accepted
+- **Date:** 2026-11-09
+- **Affects:** design/12-features-admin.md, design/19-supabase.md, design/20-deployment.md, design/23-email.md
+
+## Context
+Round 2 of the client's requests (2026-11-09, `docs/superpowers/specs/2026-11-09-client-requests-round2-design.md`, W5) asks for notifications on the phone and in the app. Today the platform only sends emails (Edge Functions, `_shared/email.ts`): a new application goes to staff with `applications.view`, a decision to the applicant, catalogue and product changes and 3D request results to the business owner. A new 3D model request tells staff nothing. There is no in-app list, no realtime, no manifest, no service worker.
+
+## Decision
+- **In-app:** table `notifications` (recipient, kind, title, body, link, dedupe_key, read_at, created_at). A person reads and marks read (only `read_at`) their own rows through RLS; only the service role inserts (Edge Functions). `dedupe_key` is unique per recipient, so a retried event writes and pushes once. A bell in the dashboard header (admin and business) shows the unread count and the latest 30 with time-ago, mark one or all as read, refetching on focus and every 60 seconds; no realtime.
+- **Phone push:** Web Push with VAPID. Table `push_subscriptions` (user, unique endpoint, keys, user agent) with RLS for the owner's rows; `register_push_subscription` (security definer, caller only) moves a device to the signed-in user and keeps at most 10 per user. Settings → Notifications has a "Phone notifications" card (the permission prompt appears only on the tap on "Turn on", never on load), states unsupported, iPhone "Add to Home Screen first (iOS 16.4+)", not set up, blocked, off, on. The server sends with `npm:web-push@3.6.7` (published 2024-01-16) inside Edge Functions only, never in the browser bundle or `package.json`. A 404 or 410 from the push service deletes that subscription.
+- **Switches:** table `notification_prefs` (per person: `new_application`, `new_model_request`, `company_updates`, `push_enabled`, `language`), default all on, no row = defaults. They gate both the in-app row and the push (`push_enabled` only the push). The language the person was using is saved with them, so notification text is written in it; a business owner without it gets the application language, else English. The existing email switch (`profiles.notify_new_applications`) stays and controls the email only.
+- **Events:** new application (staff with `applications.view` and the Owner), new 3D model request (staff with `models.manage` and the Owner), company updates to the business members (catalogue paused or live, product unpublished or deleted, 3D request delivered or declined). They are created where the emails are sent, through the shared `_shared/notify.ts` (`submit-application`, `review-model-request`, `notify-business-owner`) and a new small Edge Function `notify-model-request` that the business app calls after `request_model` succeeds (the caller reads the request under RLS, must be its sender, the request must be "requested" and at most 10 minutes old). `notify()` never throws and never undoes the event; a failed alert is logged without addresses.
+- **Without keys:** if `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` or `VAPID_SUBJECT` is missing, push is skipped, one line is logged, and the bell still works. If `VITE_VAPID_PUBLIC_KEY` is missing the card says phone notifications are not set up.
+- **Installable shell:** `public/manifest.webmanifest` (name Sanctus, standalone, start_url `/`, icons 192 and 512, theme colour obsidian) and `public/sw.js` that handles `push` and `notificationclick` only: no `fetch` handler and no caching, so the site behaves as before. It is registered only when someone turns phone notifications on, or on a dashboard load for a device already subscribed. `vercel.json`: the SPA rewrite excludes `/sw.js` and `/manifest.webmanifest`; `sw.js` gets `Cache-Control: no-cache, no-store, must-revalidate`; the manifest gets its media type and `no-cache`. The Report-Only CSP already allows `worker-src 'self'`.
+- Secrets (names only): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. Browser variable: `VITE_VAPID_PUBLIC_KEY` (public by design). Keys are made once with `npx web-push generate-vapid-keys`; replacing them later invalidates every saved subscription (people turn notifications on again).
+
+## Consequences
+- Good: staff learn about new applications and 3D requests, and owners about changes to their catalogue, on the phone and in the app; one place (`notify.ts`) for text, preferences, de-duplication and cleanup; no new service, no realtime, no offline cache.
+- Good: works without keys (bell only) and in demo mode (labelled sample notifications, in memory).
+- Trade-off: a new dependency in the Edge Functions (`web-push`, with `jws`, `asn1.js`, `http_ece`, `https-proxy-agent`); it is pinned and has to be verified on a real deploy and a real phone (not testable from here).
+- Trade-off: iPhone push needs the site on the Home Screen (iOS 16.4+); the card says so.
+- Trade-off: notifications are not pruned (a later job can delete rows older than 90 days); a device that stays silent is removed only when the push service says it is gone.
+
+## Alternatives rejected
+- Supabase Realtime for the bell: another moving part; 60-second polling and refetch on focus are enough for this volume.
+- A database trigger plus `pg_net` for the 3D request alert: the other events already live in Edge Functions, so one function is more consistent and testable.
+- Native app or a third-party push service (OneSignal, Firebase): cost, an account and a new data processor for a feature the browser does it itself.
+- Caching the app in the service worker (offline mode): not asked for, and a stale-bundle risk on a site that deploys from `main`.
+- Storing the notification text as keys translated in the browser: owners and staff read it on a phone while the app is closed, so the text must be final when it is sent.

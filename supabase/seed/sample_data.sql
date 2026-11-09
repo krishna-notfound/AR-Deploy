@@ -4,6 +4,14 @@
 -- Apply in the Supabase SQL editor (or psql) as the postgres role. Then run scripts/sample-data/upload-logos.mjs.
 begin;
 
+-- Some sample products are published without a 3D model (they stand for products published before the 3D-only rule,
+-- 20261109120040_catalogue_rules_round2.sql), so the rule's insert trigger is off while this file runs.
+do $$ begin
+  if exists (select 1 from pg_trigger where tgname = 'products_publish_requires_model_ins') then
+    alter table public.products disable trigger products_publish_requires_model_ins;
+  end if;
+end $$;
+
 delete from public.businesses where id in ('8a262eb4-8981-440d-8b35-a834a1893e33', '7f963399-3a96-47ab-8fc0-658709ff73d4', 'fc458dc0-4d9a-485e-85da-dcfe781f1c60', '39a3ec2b-03e4-4ea0-874b-f1719f2f77ed');
 
 insert into public.businesses (id, name, slug, logo_url, description, contact_email, contact_phone, contact_website, contact_address, status, accent_color, default_currency, created_at, updated_at)
@@ -153,5 +161,11 @@ on conflict do nothing;
 insert into public.business_members (business_id, user_id)
 select '7f963399-3a96-47ab-8fc0-658709ff73d4', id from auth.users where email = 'owner.nordhaus@furnish.example'
 on conflict do nothing;
+
+do $$ begin
+  if exists (select 1 from pg_trigger where tgname = 'products_publish_requires_model_ins') then
+    alter table public.products enable trigger products_publish_requires_model_ins;
+  end if;
+end $$;
 
 commit;

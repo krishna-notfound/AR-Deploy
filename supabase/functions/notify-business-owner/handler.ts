@@ -10,6 +10,8 @@ import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.t
 import { type BusinessNoticeEvent, businessNoticeEmail } from '../_shared/email-templates.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
+import { companyNotice } from '../_shared/notificationText.ts'
+import type { NotifyRequest } from '../_shared/notify.ts'
 
 /** How far back the caller's rows are read: the action that triggered the call happened just before it. */
 export const NOTICE_WINDOW_MINUTES = 10
@@ -35,6 +37,8 @@ export interface NotifyDeps {
   /** True when email_log already has a row for this workflow. */
   alreadySent(workflow: string): Promise<boolean>
   log(entry: LogEntry): Promise<string>
+  /** In-app notification and phone push to the business's members (ADR-0056). Never throws; absent in tests that do not need it. */
+  notify?(request: NotifyRequest): Promise<void>
 }
 
 const text = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -73,6 +77,24 @@ export async function handleNotifyBusinessOwner(req: Request, deps: NotifyDeps):
 
   const owner = await deps.recipient(businessId)
   if (!owner) return reply(200, { ok: true, sent: 0, skipped: notices.length })
+
+  // The bell and the phone (ADR-0056): one notification per audit row, whatever happens to the email. The dedupe key
+  // makes a second call (or a retry) write nothing and push nothing.
+  if (deps.notify) {
+    for (const { row, event } of notices) {
+      const copy = companyNotice(event, { businessName: owner.businessName, productName: { en: text(row.metadata.name) } })
+      await deps
+        .notify({
+          audience: { business: businessId },
+          kind: 'company_update',
+          ...copy,
+          link: event === 'paused' || event === 'live' ? '/dashboard' : '/dashboard/products',
+          dedupeKey: `business_notice:${row.id}`,
+          fallbackLang: owner.language,
+        })
+        .catch(() => {})
+    }
+  }
 
   let sent = 0
   let skipped = 0

@@ -102,6 +102,7 @@ function usdzFile(name: string): File {
   return new File([bytes], name)
 }
 const DIM_MSG = 'Dimensions must be greater than zero to publish.'
+const MODEL_MSG = 'Add or request a 3D model (GLB) for this product before publishing. Until then it stays a draft.'
 
 /** uploadAsset calls that stay pending until the test resolves them, in any order. */
 function deferUploads() {
@@ -125,12 +126,13 @@ describe('product editor: publish rules', () => {
     renderNew()
     await user.click(screen.getByRole('button', { name: 'Publish' }))
     const box = summary()
-    expect(within(box).getByText('Fix these 5 issues to continue')).toBeInTheDocument()
+    expect(within(box).getByText('Fix these 6 issues to continue')).toBeInTheDocument()
     expect(within(box).getByText('Product name (English) is required.')).toBeInTheDocument()
+    expect(within(box).getByText(MODEL_MSG)).toBeInTheDocument()
     expect(within(box).getByText('Set a price greater than zero before publishing.')).toBeInTheDocument()
     expect(within(box).getByText('Add at least one product image before publishing.')).toBeInTheDocument()
     expect(within(box).getAllByText(DIM_MSG)).toHaveLength(1)
-    expect(await screen.findByText('Fix the 5 issues listed at the top of the form.')).toBeInTheDocument()
+    expect(await screen.findByText('Fix the 6 issues listed at the top of the form.')).toBeInTheDocument()
   })
 
   it('keeps the publish errors after a new draft is saved and opened for editing (COR-12)', async () => {
@@ -140,8 +142,9 @@ describe('product editor: publish rules', () => {
     await user.click(screen.getByRole('button', { name: 'Publish' }))
     await waitFor(() => expect(router.state.location.pathname).toMatch(/\/edit$/))
     // Wait for the remounted edit-page editor, not the new-product one it replaces (the draft loads in between).
-    await within(await screen.findByTestId('edit-route', {}, { timeout: 10_000 })).findByText('Fix these 3 issues to continue')
+    await within(await screen.findByTestId('edit-route', {}, { timeout: 10_000 })).findByText('Fix these 4 issues to continue')
     expect(within(summary()).getByText('Add at least one product image before publishing.')).toBeInTheDocument()
+    expect(within(summary()).getByText(MODEL_MSG)).toBeInTheDocument()
     expect(within(summary()).getAllByText(DIM_MSG)).toHaveLength(1)
   })
 
@@ -155,9 +158,9 @@ describe('product editor: publish rules', () => {
     expect(screen.getAllByText(DIM_MSG).length).toBeGreaterThan(0)
     await user.type(screen.getByLabelText('Depth'), '57')
     expect(screen.queryByText(DIM_MSG)).not.toBeInTheDocument()
-    expect(within(summary()).getByText('Fix these 4 issues to continue')).toBeInTheDocument()
+    expect(within(summary()).getByText('Fix these 5 issues to continue')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Price'), '10')
-    expect(within(summary()).getByText('Fix these 3 issues to continue')).toBeInTheDocument()
+    expect(within(summary()).getByText('Fix these 4 issues to continue')).toBeInTheDocument()
   })
 })
 
@@ -207,10 +210,10 @@ describe('product editor: section index, language control and publish bar (BRIEF
     expect(within(index).getByRole('link', { name: 'Images (has errors)' })).toBeInTheDocument()
     expect(within(index).getByRole('link', { name: 'Dimensions & specs (has errors)' })).toBeInTheDocument()
     expect(within(index).getByRole('link', { name: 'Call to action' })).toBeInTheDocument()
-    expect(within(index).getByRole('link', { name: '3D models' })).toBeInTheDocument()
-    expect(within(index).queryAllByRole('link', { name: /\(has errors\)$/ })).toHaveLength(3)
+    expect(within(index).getByRole('link', { name: '3D models (has errors)' })).toBeInTheDocument()
+    expect(within(index).queryAllByRole('link', { name: /\(has errors\)$/ })).toHaveLength(4)
     // The COR-12 summary text is unchanged.
-    expect(within(summary()).getByText('Fix these 5 issues to continue')).toBeInTheDocument()
+    expect(within(summary()).getByText('Fix these 6 issues to continue')).toBeInTheDocument()
   })
 
   it('the EN/PT switch is a group named after its field, with two toggle buttons and a "PT ·" marker', async () => {

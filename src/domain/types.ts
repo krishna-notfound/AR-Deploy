@@ -11,12 +11,36 @@ export type BusinessStatus = 'active' | 'inactive' | 'draft'
 export type ProductStatus = 'draft' | 'published'
 export type LengthUnit = 'cm' | 'in'
 export type WeightUnit = 'kg' | 'lb'
-export type Currency = 'EUR' | 'BRL' | 'USD'
+/** An ISO 4217 code from the managed list (ADR-0055). The built-ins are the seed; admins enable others. */
+export type Currency = string
 
-export const CURRENCIES: readonly Currency[] = ['EUR', 'BRL', 'USD']
+export const BUILTIN_CURRENCIES = ['EUR', 'BRL', 'USD'] as const
+/** @deprecated Use the loaded list (`useCurrencies`); this is the seed and the loading fallback. */
+export const CURRENCIES: readonly Currency[] = BUILTIN_CURRENCIES
 
-export const CATEGORIES = ['sofa', 'chair', 'table', 'bed', 'storage', 'lighting', 'decor'] as const
-export type Category = (typeof CATEGORIES)[number]
+/** The seven seeded categories (ADR-0055): the loading fallback, the demo seed and the landing's built-in collections. */
+export const BUILTIN_CATEGORIES = ['sofa', 'chair', 'table', 'bed', 'storage', 'lighting', 'decor'] as const
+/** @deprecated Use the loaded list (`useCategories`). Kept as the seeded set. */
+export const CATEGORIES = BUILTIN_CATEGORIES
+/** A slug from the managed list (ADR-0055). `other` always exists and receives the products of a deleted category. */
+export type Category = string
+export const OTHER_CATEGORY = 'other'
+
+/** A product category as managed in the admin console (table product_categories). */
+export interface CategoryItem {
+  slug: string
+  labelEn: string
+  labelPt: string
+  sort: number
+  active: boolean
+}
+
+/** A currency as managed in the admin console (table currencies). */
+export interface CurrencyItem {
+  code: string
+  enabled: boolean
+  sort: number
+}
 
 export interface BusinessContact {
   email?: string
@@ -38,6 +62,8 @@ export interface Business {
   defaultCurrency: Currency
   /** Whether the business may add, replace or remove its own GLB/USDZ files; only the platform changes it (S4 R-S4-2). */
   allowOwnModels: boolean
+  /** Whether the Share button shows on this company's product pages; only platform staff change it (ADR-0054). Copy link and the AR phone QR stay either way. */
+  shareEnabled: boolean
   /** The platform's own hidden showcase catalogue (ADR-0047): never listed as a business; its pieces open under /showcase/. */
   house?: boolean
   createdAt: ISODate

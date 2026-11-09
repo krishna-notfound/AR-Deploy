@@ -4,7 +4,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, type RouteObject, createBrowserRouter, useLocation } from 'react-router'
 import { isDemoMode } from '@/services'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { loadApplyScreen, loadEditorLayout, loadLandingScreen, loadPageEditorScreen, loadPagesScreen, loadShowcaseScreen, loadSocialScreen } from '@/features/editor/preload'
+import { loadApplyScreen, loadEditorLayout, loadLandingScreen, loadPageEditorScreen, loadPagesScreen, loadShowcaseScreen, loadSiteScreen, loadSocialScreen } from '@/features/editor/preload'
 import { SiteContentProvider } from '@/features/marketing/SiteContentProvider'
 import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
 import { DashboardDictionaries } from '@/i18n/DashboardDictionaries'
@@ -14,7 +14,7 @@ import { RouteError } from './RouteError'
 
 // Lazy route modules per surface so public pages never load admin code. The dashboard routes also wait for the dashboard text
 // (DashboardDictionaries, ADR-0045), which the public pages never download.
-const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
+const LandingPage = lazy(() => import('@/features/marketing/LandingRoute')) // LandingPage plus the editable texts (ADR-0053)
 const DemoEntryPage = lazy(() => import('@/features/demo/DemoEntryPage'))
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
@@ -34,6 +34,7 @@ const EditorPagesScreen = lazy(loadPagesScreen)
 const EditorPageScreen = lazy(loadPageEditorScreen)
 const EditorApplyScreen = lazy(loadApplyScreen)
 const EditorSocialScreen = lazy(loadSocialScreen)
+const EditorSiteScreen = lazy(loadSiteScreen)
 const EditorLandingScreen = lazy(loadLandingScreen)
 const EditorShowcaseScreen = lazy(loadShowcaseScreen)
 
@@ -56,6 +57,9 @@ const ApplicationDetailPage = lazy(() => import('@/features/admin/ApplicationDet
 const AuditLogPage = lazy(() => import('@/features/admin/AuditLogPage'))
 const ModelRequestsPage = lazy(() => import('@/features/admin/ModelRequestsPage'))
 const ModelRequestDetailPage = lazy(() => import('@/features/admin/ModelRequestDetailPage'))
+const ListsLayout = lazy(() => import('@/features/lists/ListsLayout'))
+const CategoriesPage = lazy(() => import('@/features/lists/CategoriesPage'))
+const CurrenciesPage = lazy(() => import('@/features/lists/CurrenciesPage'))
 const TeamPage = lazy(() => import('@/features/team/TeamPage'))
 const RolePermissionsPage = lazy(() => import('@/features/team/RolePermissionsPage'))
 const MemberDetailPage = lazy(() => import('@/features/team/MemberDetailPage'))
@@ -130,6 +134,7 @@ const adminRoutes: RouteObject = {
         { path: 'pages/:pageKey', element: <EditorPageScreen /> },
         { path: 'apply', element: <EditorApplyScreen /> },
         { path: 'social', element: <EditorSocialScreen /> },
+        { path: 'site', element: <EditorSiteScreen /> },
         { path: 'landing', element: <EditorLandingScreen /> },
         // The admin's own showcase pieces (ADR-0047): needs products.edit as well as content.manage.
         { path: 'showcase', element: <RequirePermission need="products.edit"><EditorShowcaseScreen /></RequirePermission> },
@@ -139,6 +144,16 @@ const adminRoutes: RouteObject = {
     // published by the product editor itself, not by the Editor's draft, so the Editor's Publish bar does not apply.
     { path: 'editor/showcase/new', element: <RequirePermission need="content.manage"><RequirePermission need="products.edit"><ProductEditorPage scope="house" /></RequirePermission></RequirePermission> },
     { path: 'editor/showcase/:productId/edit', element: <RequirePermission need="content.manage"><RequirePermission need="products.edit"><ProductEditorPage scope="house" /></RequirePermission></RequirePermission> },
+    // The managed product categories and currencies (ADR-0055): content.manage, like the Editor.
+    {
+      path: 'lists',
+      element: <RequirePermission need="content.manage"><ListsLayout /></RequirePermission>,
+      children: [
+        { index: true, element: <Navigate to="categories" replace /> },
+        { path: 'categories', element: <CategoriesPage /> },
+        { path: 'currencies', element: <CurrenciesPage /> },
+      ],
+    },
     { path: 'team', element: <RequirePermission need="owner"><TeamPage /></RequirePermission> },
     { path: 'team/permissions', element: <RequirePermission need="owner"><RolePermissionsPage /></RequirePermission> },
     { path: 'team/:memberId', element: <RequirePermission need="owner"><MemberDetailPage /></RequirePermission> },

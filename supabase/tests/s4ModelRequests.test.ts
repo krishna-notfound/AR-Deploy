@@ -1147,6 +1147,8 @@ describe('S4 Task 6: staff handling', () => {
     const read = `select count(*)::int as n from storage.objects where bucket_id = '${MEDIA}' and name = $1`
     try {
       await db.query(`insert into public.product_images (product_id, storage_path, is_primary) values ($1, $2, true)`, [f.productP, await stored(f.bizA, 'jpg')])
+      // W3: publishing needs a GLB row; an external-URL one is no storage object, so it leaves the object checks below alone.
+      await db.query(`insert into public.product_models (product_id, format, url, file_name) values ($1, 'glb', 'https://example.test/old.glb', 'old.glb')`, [f.productP])
       await db.query(`update public.products set status = 'published', published_at = now() where id = $1`, [f.productP])
       await insertRequest(db, { id: a, business: f.bizA, product: f.productP, status: 'in_progress' })
       const [glb, usdz] = [await stored(f.bizA, 'glb'), await stored(f.bizA, 'usdz')]

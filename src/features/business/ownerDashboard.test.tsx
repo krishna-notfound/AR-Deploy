@@ -228,10 +228,9 @@ describe('QR codes (ADR-0005, ADR-0025)', () => {
     if (!draft) throw new Error('seed has a Casa Lisboa draft')
     const draftRow = within(table).getByRole('link', { name: draft.name.en }).closest('tr') as HTMLElement
     await user.click(within(draftRow).getByRole('button', { name: `Actions for ${draft.name.en}` }))
-    await user.click(screen.getByRole('menuitem', { name: 'Product QR code (not public yet)' }))
-    const draftDialog = await screen.findByRole('dialog', { name: 'Product QR code' })
-    expect(within(draftDialog).getByText('Not public yet.')).toBeInTheDocument()
-    expect(within(draftDialog).queryByRole('img')).toBeNull()
+    // ADR-0054: a draft is not publicly visible, so its menu offers no QR code at all.
+    expect(screen.getByRole('menuitem', { name: 'Preview draft' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Product QR code/ })).toBeNull()
     expect(qr.encoded).toHaveLength(1)
   })
 })

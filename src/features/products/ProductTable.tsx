@@ -12,6 +12,7 @@ import type { Business, Product, ProductAnalytics } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { primaryImage } from '@/lib/product'
 import { useFormat } from '@/lib/useFormat'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { MODEL_REQUEST_BADGE_KEY, type ModelRequestBadge, modelRequestBadge } from '../modelRequests/badge'
 import { AR_READINESS_HINT_KEY, AR_READINESS_LABEL_KEY, type ProductArReadiness, hasArModel, productArReadiness } from './productReadiness'
 import { EmbedCodeDialog } from './EmbedCodeDialog'
@@ -76,6 +77,7 @@ export function ProductTable({
   onPageChange?: (p: number) => void
 }) {
   const { t, tn } = useI18n()
+  const categoryLabel = useCategoryLabel()
   const fmt = useFormat()
   const actions = useProductActions(scope)
   // Business owners manage their own products; platform users see what their role allows (ADR-0029).
@@ -90,7 +92,8 @@ export function ProductTable({
       ...(allowed('products.edit') ? [{ label: t('common.edit'), icon: <Pencil />, onSelect: () => actions.edit(p) }] : []),
       { label: t(p.status === 'published' ? 'products.menu.open' : 'products.menu.previewDraft'), icon: <ExternalLink />, onSelect: () => actions.openPreview(p, b) },
       { label: t('products.menu.copyUrl'), icon: <Copy />, onSelect: () => void actions.copyUrl(p, b) },
-      { label: t(p.status === 'published' ? 'products.menu.qr' : 'products.menu.qrDraft'), icon: <QrCode />, onSelect: () => setQrFor(p) },
+      // The product QR code only for a publicly visible product: published, in an active catalogue (ADR-0054).
+      ...(p.status === 'published' && b?.status === 'active' ? [{ label: t('products.menu.qr'), icon: <QrCode />, onSelect: () => setQrFor(p) }] : []),
       { label: t(p.status === 'published' ? 'products.menu.embed' : 'products.menu.embedDraft'), icon: <CodeXml />, onSelect: () => setEmbedFor(p) },
       ...(allowed('products.edit') ? [{ label: t('products.menu.duplicate'), icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) }] : []),
       ...(!allowed('products.publish')
@@ -112,7 +115,7 @@ export function ProductTable({
           {p.name.en}
         </Link>
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[length:var(--text-ui-small)] leading-[1.15] text-ink-muted">
-          <span>{t(`products.category.${p.category}`)}</span>
+          <span>{categoryLabel(p.category)}</span>
           <ArReadinessPill product={p} />
           <RequestBadge product={p} state={requestStates?.[p.id]} />
         </span>

@@ -25,6 +25,7 @@ import { editPath } from '@/features/products/useProductActions'
 import { MEDIA_REFRESH_MS, type Result } from '@/services/catalogService'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { formatFileSize } from '@/lib/format'
 import { useFormat } from '@/lib/useFormat'
 import { businessAdminPath, modelRequestsAdminPath } from '@/lib/urls'
@@ -52,6 +53,7 @@ const OPEN = new Set(['requested', 'in_progress'])
 
 function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () => void }) {
   const { t, lang } = useI18n()
+  const categoryLabel = useCategoryLabel()
   const f = useFormat()
   const toast = useToast()
   const can = useCan()
@@ -198,7 +200,7 @@ function RequestView({ r, onChanged }: { r: ModelRequestDetail; onChanged: () =>
                   <Fact label={t('product.height')}>{`${r.product.dimensions.height} ${r.product.dimensions.unit}`}</Fact>
                   <Fact label={t('product.depth')}>{`${r.product.dimensions.depth} ${r.product.dimensions.unit}`}</Fact>
                   <Fact label={t('product.material')}>{r.product.material.en || '—'}</Fact>
-                  <Fact label={t('admin.applications.detail.category')}>{t(`category.${r.product.category}`)}</Fact>
+                  <Fact label={t('admin.applications.detail.category')}>{categoryLabel(r.product.category)}</Fact>
                   <Fact label={t('admin.modelRequests.detail.note')}>{r.note || t('admin.modelRequests.detail.noNote')}</Fact>
                   <Fact label={optionName ? t('admin.modelRequests.detail.currentFilesFor', { name: optionName }) : t('admin.modelRequests.detail.currentFiles')}>
                     {targetModels.glb || targetModels.usdz ? (

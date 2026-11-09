@@ -1,4 +1,4 @@
-import type { AnalyticsEvent, AuditEvent, Business, BusinessApplication, EmailAttempt, ID, Product } from '@/domain/types'
+import type { AnalyticsEvent, AuditEvent, Business, BusinessApplication, CategoryItem, CurrencyItem, EmailAttempt, ID, Product } from '@/domain/types'
 import type { DailyStat } from '../analytics'
 import type { DemoTeam } from './teamSeed'
 import type { ModelRequest, ModelRequestPhoto } from '@/domain/modelRequests'
@@ -63,6 +63,8 @@ export interface Db {
   modelRequests?: DemoModelRequest[]
   /** Content Editor draft, published copy and history (ADR-0043). Optional so demo data saved earlier stays valid. */
   content?: DemoContent
+  /** The managed category and currency lists (ADR-0055). Absent until first changed: the seed lists apply. */
+  lists?: { categories: CategoryItem[]; currencies: CurrencyItem[] }
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)

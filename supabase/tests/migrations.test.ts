@@ -79,8 +79,11 @@ async function saveDraft(over: Partial<ProductInput> = {}, id: string | null = n
   return r.rows[0]!.id
 }
 
-const publish = (id: string, publishedAt = '2000-01-01T00:00:00Z') =>
-  as(OWNER, (tx) => tx.query(`update public.products set status = 'published', published_at = $2 where id = $1`, [id, publishedAt]))
+/** W3 (20261109120040): publishing needs the product's own GLB, so this adds one (as the database owner) unless it has it. */
+const publish = async (id: string, publishedAt = '2000-01-01T00:00:00Z') => {
+  await db.query(`insert into public.product_models (product_id, format, url, file_name) values ($1, 'glb', 'https://models.test/chair.glb', 'chair.glb') on conflict do nothing`, [id])
+  return as(OWNER, (tx) => tx.query(`update public.products set status = 'published', published_at = $2 where id = $1`, [id, publishedAt]))
+}
 
 beforeAll(async () => {
   db = await PGlite.create()
@@ -685,6 +688,8 @@ describe('security hardening (20261024065538_security_hardening)', () => {
     it('refuses ar_activation and model_interaction for a product without a model; views still count', async () => {
       const id = await saveDraft()
       await publish(id)
+      // A product published before the 3D-only rule (W3): the model it needed to be published is removed again.
+      await db.query('delete from public.product_models where product_id = $1', [id])
       expect(await record(id, 'view')).toBe('recorded')
       expect(await record(id, 'ar_activation')).toBe('invalid')
       expect(await record(id, 'model_interaction')).toBe('invalid')

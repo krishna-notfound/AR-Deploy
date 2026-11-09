@@ -1,6 +1,6 @@
-import { ArrowRight, Box, Eye, PauseCircle, SearchX, Store } from 'lucide-react'
+import { Box, Eye, PauseCircle, SearchX, Store } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { Button, ButtonLink } from '@/components/ui/Button'
@@ -8,17 +8,16 @@ import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
-import { CATEGORIES, type Category, type Product } from '@/domain/types'
-import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
+import type { Product } from '@/domain/types'
+import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { formatMoney } from '@/lib/format'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
-import { initialPrice, primaryImage } from '@/lib/product'
+import { useCategories, useCategoryLabel } from '@/services/listsHooks'
 import { catalogLocalPath, productLocalPath, tenantCatalogPath, tenantProductPath } from '@/lib/urls'
-import { hasAny3d } from '@/features/ar/variantMedia'
 import { PublicMessage } from './PublicMessage'
+import { ProductCard } from './ProductCard'
 import { PublicShell } from './PublicShell'
 import { TAP_TARGET } from './tapTarget'
 
@@ -31,7 +30,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const { t, lang, localized } = useI18n()
   const [search, setSearch] = useSearchParams()
   const q = search.get('q') ?? ''
-  const cat = (CATEGORIES as readonly string[]).includes(search.get('category') ?? '') ? (search.get('category') as Category) : ''
+  const catParam = search.get('category') ?? ''
+  const categoryList = useCategories()
+  const categoryLabel = useCategoryLabel()
 
   const { user } = useAccount()
 
@@ -68,7 +69,10 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   }
 
   const all = useMemo(() => [...(products.data ?? [])].sort((a, b2) => localized(a.name).localeCompare(localized(b2.name), lang)), [products.data, lang, localized])
-  const categories = useMemo(() => CATEGORIES.filter((c) => all.some((p) => p.category === c)), [all])
+  // The filter chips are the visible categories (managed in the admin console, ADR-0055) that this catalogue has products in.
+  const categories = useMemo(() => categoryList.active.map((c) => c.slug).filter((c) => all.some((p) => p.category === c)), [all, categoryList.active])
+  // A category in the address that no chip offers (removed, hidden, mistyped) is ignored, as before.
+  const cat = categories.includes(catParam) ? catParam : ''
   const term = q.trim().toLowerCase()
   const visible = all.filter((p) => (!cat || p.category === cat) && (!term || localized(p.name).toLowerCase().includes(term) || p.name.en.toLowerCase().includes(term)))
 
@@ -127,9 +131,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
           </p>
         </div>
       )}
-      {/* Title block as the landing's section headers: eyebrow, serif name and count left, description right, hairline. */}
+      {/* Title block as the landing's section headers: eyebrow, serif name and count. The company description is internal (ADR-0054) and not shown. */}
       <section className="mx-auto max-w-[1320px] px-5 pt-12 pb-10 sm:px-10 sm:pt-20 sm:pb-12">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-end lg:gap-16">
+        <div>
           <div className="flex min-w-0 items-start gap-5">
             {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
             <div className="min-w-0">
@@ -141,12 +145,12 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
               )}
             </div>
           </div>
-          {b.description && <p className="max-w-xl text-[15px] leading-7 text-ink-muted lg:justify-self-end">{b.description}</p>}
         </div>
       </section>
 
       {/* Solid filter bar (no blur), hairline top and bottom. */}
-      <div className="sticky top-16 z-20 border-y border-line bg-canvas sm:top-20">
+      {/* Pinned under the header from tablet width up; on a phone the two stacked rows would cover a third of the screen. */}
+      <div className="z-20 border-y border-line bg-canvas sm:sticky sm:top-20">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-8 sm:px-10">
           {categories.length > 1 && (
             <div role="group" aria-label={t('catalog.categories')} className="-mx-5 -my-1 flex min-w-0 gap-2 overflow-x-auto px-5 py-1 sm:mx-0 sm:px-0">
@@ -158,11 +162,11 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                   onClick={() => setParam('category', c)}
                   className={cn(
                     TAP_TARGET,
-                    'h-9 shrink-0 rounded-[var(--radius-control)] border px-4 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase transition-colors',
+                    'h-11 shrink-0 rounded-[var(--radius-control)] border px-4 text-[12px] sm:h-9 leading-[1.2] font-medium tracking-[0.08em] uppercase transition-colors',
                     cat === c ? 'border-obsidian bg-obsidian text-chalk' : 'border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink',
                   )}
                 >
-                  {c ? t(`category.${c}`) : t('catalog.allCategories')}
+                  {c ? categoryLabel(c) : t('catalog.allCategories')}
                 </button>
               ))}
             </div>
@@ -186,7 +190,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
             action={<Button onClick={clearFilters}>{t('catalog.clearFilters')}</Button>}
           />
         ) : (
-          <ul className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
             {visible.map((p) => (
               <li key={p.id} className="min-w-0">
                 <ProductCard product={p} href={productHref(p)} />
@@ -199,46 +203,16 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   )
 }
 
-/** A catalogue card in the landing's collection-card style: hairline frame, photo with a category chip, serif name. */
-function ProductCard({ product: p, href }: { product: Product; href: string }) {
-  const { t, lang, localized } = useI18n()
-  return (
-    <Link to={href} className="group flex h-full flex-col rounded-[var(--radius-card)] border border-line bg-surface p-3 transition-colors hover:border-line-strong focus-visible:outline-offset-4 sm:p-4">
-      <div className="relative overflow-hidden rounded-[var(--radius-control)] bg-subtle">
-        <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
-        <span className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-[var(--radius-control)] bg-surface px-2 py-1 text-xs leading-4 font-medium tracking-[0.08em] text-ink uppercase">
-          {t(`category.${p.category}`)}
-        </span>
-        {hasAny3d(p) && (
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-surface px-2 py-1 text-xs leading-4 font-medium tracking-[0.08em] text-accent-ink uppercase">
-            <Box className="size-3" strokeWidth={1.5} aria-hidden />
-            {t('catalog.has3d')}
-          </span>
-        )}
-      </div>
-      <LocalizedSpan as="h2" text={p.name} className="mt-5 font-display text-[1.45rem] leading-snug font-normal text-ink" />
-      <LocalizedSpan as="p" text={p.shortDescription} className="mt-1.5 mb-5 line-clamp-2 text-[13px] leading-5 text-ink-muted" />
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-4">
-        <span className="text-[14px] tracking-[0.04em] text-ink tabular-nums">{formatMoney(initialPrice(p), p.currency, lang)}</span>
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-[14px] leading-5 font-medium text-ink transition-colors group-hover:text-accent-ink">
-          {t('catalog.viewPiece')}
-          <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden />
-        </span>
-      </div>
-    </Link>
-  )
-}
-
 /** Loading placeholders shaped like the cards. */
 function CardSkeletons({ label }: { label: string }) {
   return (
-    <div className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4" role="status" aria-label={label}>
+    <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4" role="status" aria-label={label}>
       {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} className="rounded-[var(--radius-card)] border border-line bg-surface p-3 sm:p-4">
+        <div key={i} className="rounded-[var(--radius-card)] border border-line bg-surface p-2.5 sm:p-4">
           <Skeleton className="aspect-[4/5] w-full" />
-          <Skeleton className="mt-5 h-5 w-2/3" />
-          <Skeleton className="mt-2 h-3.5 w-1/2" />
-          <Skeleton className="mt-6 h-3.5 w-1/4" />
+          <Skeleton className="mt-4 h-3 w-1/3" />
+          <Skeleton className="mt-2 h-5 w-2/3" />
+          <Skeleton className="mt-5 h-3.5 w-1/4" />
         </div>
       ))}
     </div>

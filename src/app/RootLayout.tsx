@@ -3,6 +3,7 @@ import { Outlet, ScrollRestoration } from 'react-router'
 import { useToast } from '@/components/ui/ToastProvider'
 import { LanguageProvider, useI18n } from '@/i18n/LanguageProvider'
 import { demoStore as store, isDemoMode } from '@/services'
+import { useSiteFavicon } from './useSiteFavicon'
 
 /** Browser-storage notices (demo mode only), in the person's language. */
 function DemoStorageNotices() {
@@ -22,6 +23,7 @@ function DemoStorageNotices() {
 
 /** Root route: the app-wide language (a no-op when App.tsx already provides it), scroll restoration and demo storage notices. */
 export function RootLayout() {
+  useSiteFavicon()
   return (
     <LanguageProvider>
       <DemoStorageNotices />

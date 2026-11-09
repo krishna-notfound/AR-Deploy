@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/ui/States'
 import type { Business, Product } from '@/domain/types'
 import { HOUSE_BUSINESS_SLUG } from '@/domain/siteContent'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { cn } from '@/lib/cn'
 import { catalogLocalPath, needsPreview, showcaseProductPath, tenantCatalogPath } from '@/lib/urls'
 import { service } from '@/services'
@@ -20,6 +21,7 @@ import { ProductMedia } from './ProductMedia'
 import { PublicMessage } from './PublicMessage'
 import { PublicShell } from './PublicShell'
 import { ShareButton } from './ShareActions'
+import { StickyActionBar } from './StickyActionBar'
 import { TAP_TARGET } from './tapTarget'
 import { AR_PENDING_MAX_MS, AR_RELAUNCH_MS, MEDIA_REFRESH_MS, useProductStage } from './useProductStage'
 import { VariantPicker } from './VariantPicker'
@@ -97,8 +99,11 @@ function BusinessProductPage({ tenantSlug }: { tenantSlug?: string }) {
 
 function ProductView({ business, product, catalogHref, isPreview }: { business: Business; product: Product; catalogHref: string; isPreview: boolean }) {
   const { t, localized } = useI18n()
+  const categoryLabel = useCategoryLabel()
   const stage = useProductStage(product, { record: !isPreview })
   const [contactOpen, setContactOpen] = useState(false)
+  // The row of actions, watched so the phone's sticky bar shows only while the row is still below the screen.
+  const [actionRow, setActionRow] = useState<HTMLElement | null>(null)
   const { name, hasCta } = stage
 
   useEffect(() => {
@@ -165,7 +170,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           </div>
 
           {hasCta && (
-            <div data-ar-cta className="mt-6 flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:mt-8">
+            <div ref={setActionRow} data-ar-cta className="mt-6 flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-start-2 lg:mt-8">
               {/* The AR / 3D button and the product's own link side by side: both 48px tall, the link outlined. */}
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <ArPrimaryAction stage={stage} arLabel={t('ar.button')} />
@@ -178,10 +183,9 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           )}
 
           <div className="mt-10 min-w-0 lg:col-start-1 lg:row-start-1 lg:mt-0 lg:pt-2">
-            <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t(`category.${product.category}`)}</p>
+            <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{categoryLabel(product.category)}</p>
             <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
-            <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{stage.priceText}</p>
-            <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
+            <LocalizedSpan as="p" text={product.shortDescription} className="mt-4 max-w-md text-[15px] leading-7 text-ink-muted" />
 
             <VariantPicker product={product} selectedId={stage.variantId} onSelect={stage.selectVariant} className="mt-8 border-t border-line pt-6" />
           </div>
@@ -197,7 +201,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
                     {t('product.contactStore')}
                   </button>
                 )}
-                <ShareButton title={t('product.shareTitle', { name, business: business.name })} />
+                {business.shareEnabled && <ShareButton title={t('product.shareTitle', { name, business: business.name })} />}
               </div>
             </div>
 
@@ -209,6 +213,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
         <MorePhotos stage={stage} />
       </div>
 
+      <StickyActionBar stage={stage} arLabel={t('ar.button')} row={actionRow} />
       <ArTips {...stage.tips} />
 
       <Modal open={contactOpen} onClose={() => setContactOpen(false)} title={business.name} size="sm" closeLabel={t('common.close')}>
