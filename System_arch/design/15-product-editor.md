@@ -43,7 +43,8 @@ Other behaviour:
 - **Unsaved changes:** guard navigation with React Router `useBlocker`.
 
 ## Model checks and optimization (2026-10-13)
-- **Scale check:** a mismatch names the likely cause: W/D swapped, the other unit, a model in cm/mm, or a uniform factor (`lib/scale.ts`). Tolerance is the larger of 5% and 1 cm. The model is never rescaled.
+- **Scale check:** a mismatch names the likely cause: W/D swapped, the other unit, a model in cm/mm, or a uniform factor (`lib/scale.ts`). Tolerance is the larger of 5% and 1 cm. The model is never rescaled automatically.
+- **Fix the scale at upload (2026-11-09, ADR-0058):** after optimization a GLB is measured in the worker (`measureGlb`); `scaleProposal` (`lib/scale.ts`) triggers on a side over 10 m, a whole model under 1 cm, or a match to the entered dimensions after x0.001 / x0.01 / x0.0254. `ScaleFixPanel` (in `ModelSection`) then offers Convert from mm / cm / inches, a custom factor, or Keep as is, with the resulting size, before anything is uploaded. `applyUniformScale` (worker) puts the default scene's roots under one scale node; geometry is untouched and the result is re-measured. Rescaling only ever happens on that choice.
 - **Scene Viewer check:** a GLB that *requires* a glTF extension Scene Viewer doesn't support gets a warning on upload (`lib/files.ts unsupportedForSceneViewer`).
 - **Optimization:** on by default; `VITE_MODEL_OPTIMIZATION=off` disables it (ADR-0019, switched on and extended with triangle reduction by ADR-0038, owner 2026-10-26). It runs in a worker, shows the sizes before and after, and offers "Upload the original instead".
 - **Business locked after uploads:** once files are stored, the business select is locked (files live under `{businessId}/`).

@@ -1,5 +1,5 @@
 # ADR-0006: Fixed AR scale plus a measured-vs-entered scale check
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0058](ADR-0058-upload-scale-control.md) (the rule "never change the scale" now has one exception: a uniform factor the person chooses at upload)
 - **Date:** 2026-10-12
 - **Affects:** design/09-3d-ar.md, design/15-product-editor.md
 

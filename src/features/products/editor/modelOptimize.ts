@@ -93,6 +93,45 @@ export const canvasResizer: ImageResizer = async (image, mimeType, maxPx) => {
   return blob.type === mimeType ? new Uint8Array(await blob.arrayBuffer()) : null // encoder missing: keep original
 }
 
+/** The model's size in metres on each axis (glTF units), or null when the file cannot be read or has no geometry. */
+export async function measureGlb(glb: Uint8Array): Promise<{ x: number; y: number; z: number } | null> {
+  try {
+    const s = summarize(await (await glbIo()).readBinary(glb))
+    const [x, y, z] = s.max.map((v, i) => v - s.min[i]!) as [number, number, number]
+    return [x, y, z].every((v) => Number.isFinite(v) && v > 0) ? { x, y, z } : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Scales the whole model by one factor (ADR-0058, the upload scale control; only ever called after the person chose it).
+ * The default scene's root nodes are moved under one new root node whose scale is [f, f, f]: proportions, geometry, textures
+ * and animations stay as they are, and a root node's own scale is kept (it multiplies). A packed (meshopt) file is written
+ * plain, as everywhere else. The result is re-read and its bounds and triangle count checked; any doubt throws.
+ */
+export async function applyUniformScale(glb: Uint8Array, factor: number): Promise<Uint8Array> {
+  if (!Number.isFinite(factor) || factor <= 0) throw new Error('The scale factor must be a positive number.')
+  const io = await glbIo()
+  const doc = await io.readBinary(glb)
+  const before = summarize(doc)
+  await unpack(doc)
+  const scene = doc.getRoot().getDefaultScene() ?? doc.getRoot().listScenes()[0]
+  if (!scene) throw new Error('The model has no scene to scale.')
+  const wrapper = doc.createNode('ScaleFix').setScale([factor, factor, factor])
+  for (const child of scene.listChildren()) {
+    scene.removeChild(child)
+    wrapper.addChild(child)
+  }
+  scene.addChild(wrapper)
+  const out = await io.writeBinary(doc)
+  const after = summarize(await io.readBinary(out))
+  const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * 1e-4)
+  const bounds = [...before.min, ...before.max].map((v) => v * factor)
+  if (![...after.min, ...after.max].every((v, i) => close(v, bounds[i]!)) || after.triangles !== before.triangles) throw new Error('The scaled model did not measure as expected.')
+  return out
+}
+
 export async function optimizeGlb(file: File, resize: ImageResizer = canvasResizer): Promise<OptimizeResult> {
   const originalBytes = file.size
   const keep = (reason: string): OptimizeResult => ({ file, optimized: false, originalBytes, outputBytes: originalBytes, reason })

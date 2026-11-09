@@ -16,8 +16,9 @@ import { MODEL_RULES, fetchRequiredExtensions, formatMb, isHttpsUrl, isStaleSess
 import { cn } from '@/lib/cn'
 import { formatFileSize } from '@/lib/format'
 import { useFormat } from '@/lib/useFormat'
-import { type ScaleCheck, type ScaleMismatchReason, checkScale, modelSizeSuggestion } from '@/lib/scale'
-import { MODEL_OPTIMIZATION_ENABLED, optimizeModel, optimizeReasonText, optimizedNote } from './modelOptimizeClient'
+import { type MeasuredSize, type ScaleCheck, type ScaleMismatchReason, type ScaleProposal, checkScale, modelSizeSuggestion, scaleProposal } from '@/lib/scale'
+import { MODEL_OPTIMIZATION_ENABLED, measureModel, optimizeModel, optimizeReasonText, optimizedNote, scaleModel } from './modelOptimizeClient'
+import { ScaleFixPanel, formatMeters, formatSizeMeters } from './ScaleFixPanel'
 
 type ModelContext = 'product' | 'variant' | 'request'
 
@@ -75,7 +76,7 @@ export function ModelSection({
       {/* GLB and USDZ side by side, stacked on phones (BRIEF section 6). */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {(['glb', 'usdz'] as const).map((f) => (
-          <ModelSlot key={f} format={f} businessId={businessId} asset={models[f]} onChange={(a) => onChange(f, a)} allowLink={context === 'product'} buildFrom={f === 'usdz' ? models.glb : undefined} />
+          <ModelSlot key={f} format={f} businessId={businessId} dimensions={dimensions} asset={models[f]} onChange={(a) => onChange(f, a)} allowLink={context === 'product'} buildFrom={f === 'usdz' ? models.glb : undefined} />
         ))}
       </div>
       {/* Keyed by the GLB: a replaced file never shows the previous file's measurement or readiness (AR-07). */}
@@ -89,6 +90,7 @@ function ModelSlot({
   asset,
   onChange,
   businessId,
+  dimensions,
   allowLink,
   buildFrom,
 }: {
@@ -96,23 +98,30 @@ function ModelSlot({
   asset?: ModelAsset
   onChange: (a: ModelAsset | undefined) => void
   businessId?: string
+  /** The product's entered dimensions, compared with the model in the "Fix the scale" step (ADR-0058). */
+  dimensions: Dimensions
   allowLink: boolean
   /** The USDZ slot: the GLB an iPhone file can be built from (ADR-0039). */
   buildFrom?: ModelAsset
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const fmt = useFormat()
   const id = useId()
   const [error, setError] = useState<string | null>(null)
-  const [checking, setChecking] = useState<false | 'checking' | 'optimizing' | 'building'>(false)
+  const [checking, setChecking] = useState<false | 'checking' | 'optimizing' | 'building' | 'scaling'>(false)
   /** Result of the size optimization, and the untouched file so the admin can upload it instead. */
   const [optimizeNote, setOptimizeNote] = useState<{ text: string; original?: File } | null>(null)
+  /** A GLB waiting for the person's scale choice ("Fix the scale", ADR-0058): nothing is uploaded or changed until they pick. */
+  const [pending, setPending] = useState<{ file: File; original: File; note: { text: string; original?: File } | null; measured: MeasuredSize; proposal: ScaleProposal } | null>(null)
+  const [scaleFailed, setScaleFailed] = useState(false)
   const [urlDraft, setUrlDraft] = useState('')
   const info = FORMAT_INFO[format]
   const stale = isStaleSessionAsset(asset)
 
   const onFile = async (original: File, opts: { keepOriginal?: boolean; built?: boolean } = {}) => {
     if (checking) return
+    setPending(null) // picking another file replaces a file that was waiting for its scale choice
+    setScaleFailed(false)
     setChecking('checking')
     const check = await validateModelFile(original, format, t)
     if (!check.ok) {
@@ -120,20 +129,35 @@ function ModelSlot({
       return setError(check.message)
     }
     let file = original
+    let note: { text: string; original?: File } | null
     if (MODEL_OPTIMIZATION_ENABLED && format === 'glb' && !opts.keepOriginal) {
       setChecking('optimizing')
       const r = await optimizeModel(original)
       file = r.file
-      setOptimizeNote(
-        r.optimized
-          ? { text: optimizedNote(r, t), original }
-          : { text: optimizeReasonText(r.reason, t) },
-      )
+      note = r.optimized ? { text: optimizedNote(r, t), original } : { text: optimizeReasonText(r.reason, t) }
     } else {
       // Large textures are accepted but flagged: they make AR slow on phones (AR audit AR-10).
       const notes = [opts.keepOriginal ? t('products.model.originalUploaded') : '', opts.built ? t('products.model.builtNote', { date: fmt.date(new Date().toISOString()) }) : '', check.warning ?? ''].filter(Boolean)
-      setOptimizeNote(notes.length ? { text: notes.join(' ') } : null)
+      note = notes.length ? { text: notes.join(' ') } : null
     }
+    if (format === 'glb') {
+      // "Fix the scale" (ADR-0058): a model of the wrong size is shown to the person before it is uploaded; nothing is rescaled unasked.
+      setChecking('checking')
+      const measured = await measureModel(file)
+      const proposal = measured ? scaleProposal(measured, dimensions) : null
+      if (measured && proposal) {
+        setChecking(false)
+        return setPending({ file, original, note, measured, proposal })
+      }
+    }
+    await finishUpload(file, note)
+  }
+
+  /** Uploads the (possibly scaled) file and tells the parent; `scaleNote` is appended to the note under the slot. */
+  const finishUpload = async (file: File, note: { text: string; original?: File } | null, scaleNote?: string, original?: File) => {
+    const text = [note?.text, scaleNote].filter(Boolean).join(' ')
+    setOptimizeNote(text ? { text, ...(note?.original ?? original ? { original: note?.original ?? original } : {}) } : null)
+    setChecking('checking')
     const res = await service.uploadAsset({ kind: format, file, businessId })
     setChecking(false)
     if (!res.ok) return setError(errorText(res.error, t))
@@ -142,6 +166,27 @@ function ModelSlot({
     const requiredExtensions = format === 'glb' ? await readRequiredExtensions(file) : undefined
     const { url, storagePath, status } = res.data
     onChange({ format, url, fileName: file.name, sizeBytes: file.size, status, ...(storagePath ? { storagePath } : {}), ...(requiredExtensions ? { requiredExtensions } : {}) })
+  }
+
+  const applyScale = async (factor: number) => {
+    if (!pending || checking) return
+    const p = pending
+    setChecking('scaling')
+    setScaleFailed(false)
+    const scaled = await scaleModel(p.file, factor)
+    if (!scaled) {
+      setChecking(false)
+      return setScaleFailed(true)
+    }
+    setPending(null)
+    const size = formatSizeMeters({ x: p.measured.x * factor, y: p.measured.y * factor, z: p.measured.z * factor }, lang)
+    await finishUpload(scaled, p.note, t('products.scaleFix.noteFixed', { factor: formatMeters(factor, lang), size }), p.original)
+  }
+  const keepScale = async () => {
+    if (!pending || checking) return
+    const p = pending
+    setPending(null)
+    await finishUpload(p.file, p.note, t('products.scaleFix.noteKept', { size: formatSizeMeters(p.measured, lang) }))
   }
 
   // "Build from GLB" (owner 2026-10-27, ADR-0039): a real USDZ made in this browser from the stored GLB (already made
@@ -275,6 +320,22 @@ function ModelSlot({
         )}
         <p className="text-[13px] text-ink-muted">{t('products.model.maxSize', { size: formatMb(MODEL_RULES[format].maxBytes) })}</p>
       </div>
+      {pending && (
+        <ScaleFixPanel
+          measured={pending.measured}
+          proposal={pending.proposal}
+          dimensions={dimensions}
+          busy={!!checking}
+          scaling={checking === 'scaling'}
+          failed={scaleFailed}
+          onApply={(f) => void applyScale(f)}
+          onKeep={() => void keepScale()}
+          onCancel={() => {
+            setPending(null)
+            setScaleFailed(false)
+          }}
+        />
+      )}
       {optimizeNote && asset && (
         <p className="mt-2 text-[13px] text-ink-muted">
           {optimizeNote.text}{' '}
