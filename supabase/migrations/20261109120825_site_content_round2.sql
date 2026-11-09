@@ -273,7 +273,7 @@ begin
         end if;
       end loop;
       if (v_link ->> 'kind') = 'catalog' and v_link ? 'category'
-         and (jsonb_typeof(v_link -> 'category') is distinct from 'string' or (v_link ->> 'category') <> all (c_categories)) then
+         and (jsonb_typeof(v_link -> 'category') is distinct from 'string' or (v_link ->> 'category') !~ c_slug) then
         return v_path || '.link.category|invalid_value';
       end if;
     end if;

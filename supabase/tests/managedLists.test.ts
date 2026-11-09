@@ -248,7 +248,10 @@ describe('rollback', () => {
       await expect(rolled.exec(`update public.products set category = 'spaceship'`)).rejects.toThrow(/products_category_check/)
       await expect(rolled.exec(`update public.products set currency = 'GBP'`)).rejects.toThrow(/products_currency_check/)
       await expect(rolled.exec(`update public.businesses set default_currency = 'GBP'`)).rejects.toThrow(/businesses_default_currency_check/)
-      expect(await gateDef(rolled)).toEqual(await gateDef(before))
+      // Later migrations (site_content_round2) also replace this gate, so only the category rule is compared: the rollback puts
+    // back the built-in list check in place of the slug check.
+    expect(await gateDef(rolled)).toContain("(v_link ->> 'category') <> all (c_categories)")
+    expect(await gateDef(rolled)).not.toContain("(v_link ->> 'category') !~ c_slug")
 
       // Re-applying works.
       await rolled.exec(readFileSync(join(MIGRATIONS, LISTS_MIGRATION), 'utf8'))
