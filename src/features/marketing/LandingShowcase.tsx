@@ -121,7 +121,8 @@ export function ShowcaseCta({ view, className, children }: { view?: ShowcaseView
 
 const CARD = 'border border-chalk/15 p-4 sm:p-6'
 const STAGE = 'relative mt-4 aspect-[4/3] overflow-hidden bg-umber sm:mt-6'
-const CHIP = 'border px-2.5 py-1.5 text-[10px] leading-none tracking-[0.2em] uppercase transition-colors select-none'
+// 12px label; 44px tall wherever the screen is a touch screen (phones), compact with a mouse.
+const CHIP = 'inline-flex items-center justify-center border px-3 py-1.5 text-xs leading-none tracking-[0.16em] uppercase transition-colors select-none max-sm:min-h-11 max-sm:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
 
 /** `view` is a showcase piece, else nothing (the labelled illustration). */
 export function LandingShowcase({ view, loading }: { view?: ShowcaseView; loading?: boolean }) {
@@ -184,9 +185,10 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
 
   return (
     <figure id={CARD_ID} className={CARD}>
-      <div className="flex items-start justify-between gap-4 border-b border-chalk/15 pb-4">
+      {/* A phone: the name, then the chips on their own row (three 44px chips do not fit beside a long name). */}
+      <div className="flex flex-col gap-4 border-b border-chalk/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          {eyebrow && <p className="text-label text-chalk/60">{eyebrow}</p>}
+          {eyebrow && <p className="text-label text-chalk/70">{eyebrow}</p>}
           <p className="mt-1.5 font-display text-[1.75rem] leading-none break-words">{title}</p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -264,7 +266,7 @@ function IllustrationCard() {
   return (
     <figure className={CARD}>
       <div className="border-b border-chalk/15 pb-4">
-        <p className="text-label text-chalk/60">{t('landing.feature.eyebrow')}</p>
+        <p className="text-label text-chalk/70">{t('landing.feature.eyebrow')}</p>
         <p className="mt-1.5 font-display text-[1.75rem] leading-none">{t('landing.feature.name')}</p>
       </div>
       <div className={STAGE}>
@@ -276,7 +278,7 @@ function IllustrationCard() {
           loading="lazy"
           className="absolute inset-0 size-full object-cover"
         />
-        <span className="absolute top-3 left-3 bg-obsidian px-2.5 py-1.5 text-[10px] leading-none tracking-[0.18em] text-chalk uppercase">
+        <span className="absolute top-3 left-3 bg-obsidian px-2.5 py-1.5 text-xs leading-none tracking-[0.14em] text-chalk uppercase">
           {t('landing.xp.illustration')}
         </span>
       </div>

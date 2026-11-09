@@ -71,7 +71,7 @@ describe('landing hero picture', () => {
     renderHero()
     const img = await screen.findByRole('img', { name: /bouclé sofa/ })
     expect(img).toHaveAttribute('src', '/images/sanctus/v2/hero-living.webp')
-    expect(img).toHaveClass('aspect-[4/3]', 'sm:aspect-[16/9]', 'object-cover')
+    expect(img).toHaveClass('size-full', 'object-cover') // full width behind the hero text (round 2)
     expect(screen.getByText('Concrete and travertine living room')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /3D|Photo/ })).not.toBeInTheDocument()
   })
@@ -81,7 +81,7 @@ describe('landing hero picture', () => {
     renderHero()
     const img = await screen.findByRole('img', { name: 'Our showroom in Porto' })
     expect(img).toHaveAttribute('src', 'blob:hero/1')
-    expect(img).toHaveClass('aspect-[4/3]', 'sm:aspect-[16/9]', 'object-cover')
+    expect(img).toHaveClass('size-full', 'object-cover')
     expect(screen.getByText('Our showroom in Porto', { selector: 'figcaption' })).toBeInTheDocument()
   })
 
@@ -134,6 +134,26 @@ describe('landing hero picture', () => {
     await waitFor(() => expect(screen.queryByTestId('viewer')).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'false')
     expect(document.querySelector('figcaption')).not.toHaveAttribute('aria-hidden')
+  })
+
+  it('keeps the hero text over the picture and steps it aside (inert, invisible) while the model is shown', async () => {
+    await publishHero({ image: true, model: true })
+    localStorage.setItem(LANG_KEY, 'en')
+    render(
+      <LanguageProvider>
+        <HeroMedia>
+          <h1>Hero headline</h1>
+        </HeroMedia>
+      </LanguageProvider>,
+    )
+    const text = screen.getByRole('heading', { name: 'Hero headline' }).parentElement!
+    expect(text).not.toHaveAttribute('inert')
+    expect(text.className).not.toMatch(/opacity-0/)
+    await userEvent.click(await screen.findByRole('button', { name: '3D' }))
+    expect(text).toHaveAttribute('inert')
+    expect(text.className).toMatch(/pointer-events-none/)
+    await userEvent.click(screen.getByRole('button', { name: 'Photo' }))
+    expect(text).not.toHaveAttribute('inert')
   })
 
   it('a model that fails to load offers Retry and the way back to the photo', async () => {

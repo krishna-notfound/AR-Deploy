@@ -126,7 +126,7 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
             <Link
               to={APPLY_PATH}
               aria-label={t('site.apply')}
-              className="inline-flex h-10 items-center justify-center rounded-[var(--radius-control)] bg-ink px-4 text-label whitespace-nowrap text-chalk uppercase transition-colors select-none hover:bg-umber sm:h-11 sm:px-5"
+              className="inline-flex h-11 items-center justify-center rounded-[var(--radius-control)] bg-ink px-4 text-label whitespace-nowrap text-chalk uppercase transition-colors select-none hover:bg-umber active:bg-umber sm:px-5"
             >
               <span className="sm:hidden">{t('site.applyShort')}</span>
               <span className="hidden sm:inline">{t('site.apply')}</span>
@@ -163,10 +163,10 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
               <X className="size-5" strokeWidth={1.4} aria-hidden />
             </button>
           </div>
-          <ul className="mt-14 space-y-2 text-label">
+          <ul className="mt-12 text-label">
             {NAV.map((n) => (
               <li key={n.key}>
-                <SectionLink href={n.href} onClick={() => menuRef.current?.close()} className="block py-3">
+                <SectionLink href={n.href} onClick={() => menuRef.current?.close()} className="flex min-h-12 items-center">
                   {t(n.key)}
                 </SectionLink>
               </li>
@@ -176,10 +176,10 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
             {hasLang && <LanguageSwitcher />}
             {cta && (
               <>
-                <Link to={APPLY_PATH} className="mt-4 block py-1 text-label">
+                <Link to={APPLY_PATH} onClick={() => menuRef.current?.close()} className="mt-2 flex min-h-12 items-center text-label">
                   {t('site.apply')}
                 </Link>
-                <Link to={account.href} className="mt-4 block py-1 text-label">
+                <Link to={account.href} onClick={() => menuRef.current?.close()} className="flex min-h-12 items-center text-label">
                   {account.label}
                 </Link>
               </>
