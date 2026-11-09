@@ -11,6 +11,8 @@ import { MAX_SUBMISSIONS_PER_HOUR, attemptHashes, submitterHash } from '../_shar
 import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
 import { clientIp, readJsonObject, reply, sha256Hex } from '../_shared/http.ts'
+import type { NotifyRequest } from '../_shared/notify.ts'
+import { applicationNotice } from '../_shared/notificationText.ts'
 
 // Kept exported from here: the tests and index.ts import them from the handler.
 export { MAX_SUBMISSIONS_PER_HOUR, submitterHash }
@@ -59,6 +61,8 @@ export interface SubmitDeps {
    * none. Throws when storage cannot be read: that is not "no file", the request is answered 503.
    */
   catalogueObject(path: string): Promise<{ size: number; contentType: string } | null>
+  /** In-app notification and phone push to staff with applications.view (ADR-0056). Never throws; absent in tests that do not need it. */
+  notify?(request: NotifyRequest): Promise<void>
 }
 
 /** An error for console.error: email addresses removed (provider and database messages can quote them), shortened. */
@@ -165,6 +169,7 @@ async function recordSubmitted(deps: SubmitDeps, applicationId: string) {
  * Skips the workflows in `skip` (already logged, whatever their status). Logs each outcome; never throws.
  */
 async function sendApplicationEmails(deps: SubmitDeps, stored: StoredApplication, skip: Set<string>) {
+  await notifyStaff(deps, stored)
   const inbox = deps.config.ok ? deps.config.config.adminNotificationEmail : ''
   const jobs: { kind: 'application_confirmation' | 'admin_notification'; to: string; lang: 'en' | 'pt'; workflow: string }[] = [
     { kind: 'application_confirmation', to: stored.applicantEmail, lang: stored.language, workflow: `application:${stored.id}:application_confirmation` },
@@ -206,6 +211,16 @@ async function sendApplicationEmails(deps: SubmitDeps, stored: StoredApplication
       // The application is stored; a logging failure must not turn the response into an error.
       console.error(`application email ${job.kind} failed: ${loggable(e)}`)
     }
+  }
+}
+
+/** The bell and the phone: one notification per staff member per application (the dedupe key covers replays). */
+async function notifyStaff(deps: SubmitDeps, stored: StoredApplication) {
+  if (!deps.notify) return
+  try {
+    await deps.notify({ audience: { staff: 'applications.view' }, kind: 'new_application', ...applicationNotice(stored.businessName), link: `/admin/applications/${stored.id}`, dedupeKey: `application:${stored.id}` })
+  } catch (e) {
+    console.error(`application notification failed: ${loggable(e)}`)
   }
 }
 

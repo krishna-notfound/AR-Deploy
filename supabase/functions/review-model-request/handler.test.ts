@@ -216,3 +216,50 @@ describe('S4 Task 7: review-model-request (R-S4-15)', () => {
     expect([res.status, await json(res)]).toEqual([500, { error: 'unknown' }])
   })
 })
+
+
+describe('review-model-request notifications (ADR-0056)', () => {
+  const PRODUCT = '33333333-3333-4333-8333-333333333333'
+
+  it('deliver → a company_update for the business members, linking to the product, once per request', async () => {
+    const notify = vi.fn(async () => {})
+    const { d } = setup({ notify }, { productId: PRODUCT })
+    const res = await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), d)
+    expect(res.status).toBe(200)
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith({
+      audience: { business: BIZ },
+      kind: 'company_update',
+      title: { en: 'Your 3D model is ready', pt: 'O seu modelo 3D está pronto' },
+      body: { en: 'The Sanctus team finished the 3D model for Oslo sofa.', pt: 'A equipa Sanctus terminou o modelo 3D de Sofá Oslo.' },
+      link: `/dashboard/products/${PRODUCT}/edit`,
+      dedupeKey: `model_request:${REQ}:delivered`,
+      fallbackLang: 'en',
+    })
+  })
+
+  it('reject → the declined wording and its own dedupe key; start → nothing', async () => {
+    const notify = vi.fn(async () => {})
+    const { d } = setup({ notify }, {}, { ok: true, status: 'rejected' })
+    await handleReviewModelRequest(post({ requestId: REQ, action: 'reject', reason: 'Photos too dark' }), d)
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ title: expect.objectContaining({ en: 'Your 3D model request was declined' }), dedupeKey: `model_request:${REQ}:rejected`, link: '/dashboard/products' }))
+    notify.mockClear()
+    const started = setup({ notify }, {}, { ok: true, status: 'in_progress' })
+    await handleReviewModelRequest(post({ requestId: REQ, action: 'start' }), started.d)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('still notifies when email is not configured or the business has no owner address, and a failing notifier changes nothing', async () => {
+    const notify = vi.fn(async () => {})
+    const noEmail = setup({ notify, config: { ok: false, missing: ['RESEND_API_KEY'] } })
+    const res = await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), noEmail.d)
+    expect([res.status, await json(res)]).toMatchObject([200, { ok: true, email: { status: 'blocked' } }])
+    expect(notify).toHaveBeenCalledTimes(1)
+    notify.mockClear()
+    const noOwner = setup({ notify }, { recipient: null })
+    expect((await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), noOwner.d)).status).toBe(200)
+    expect(notify).toHaveBeenCalledWith(expect.not.objectContaining({ fallbackLang: expect.anything() }))
+    const failing = setup({ notify: async () => Promise.reject(new Error('down')) })
+    expect((await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), failing.d)).status).toBe(200)
+  })
+})

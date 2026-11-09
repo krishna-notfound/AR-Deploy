@@ -12,6 +12,8 @@ import { type ConfigResult, type EmailStatus, type LogEntry, SAFE_EMAIL_REASONS,
 import { type EmailLang, type ModelRequestEmailEvent, REASON_MAX_LENGTH, modelRequestUpdateEmail } from '../_shared/email-templates.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
+import { modelUpdateNotice } from '../_shared/notificationText.ts'
+import type { NotifyRequest } from '../_shared/notify.ts'
 
 export type ModelRequestAction = 'start' | 'deliver' | 'reject'
 export type { ModelRequestEmailEvent }
@@ -37,6 +39,8 @@ export type ActOutcome =
 type Localized = { en: string; pt?: string }
 export interface EmailContext {
   businessId: string
+  /** The product the request is for (the notification links to its editor). */
+  productId?: string
   /** The business owner's address and the source application's language; null when the business has no owner. */
   recipient: { email: string; language: 'en' | 'pt' } | null
   productName: Localized
@@ -64,6 +68,8 @@ export interface ReviewModelRequestDeps {
   /** True when email_log already has a row for this workflow. */
   alreadySent(workflow: string): Promise<boolean>
   log(entry: LogEntry): Promise<string>
+  /** In-app notification and phone push to the business's members (ADR-0056). Never throws; absent in tests that do not need it. */
+  notify?(request: NotifyRequest): Promise<void>
 }
 
 type OwnerEmail = { status: EmailStatus | 'skipped'; error?: string }
@@ -136,6 +142,20 @@ async function notifyOwner(
   const log = async (e: LogEntry) => deps.log(e).catch(() => '')
   try {
     const ctx = await deps.emailContext(a.requestId)
+    // The bell and the phone work without an email address and without email being configured (ADR-0056).
+    if (ctx && deps.notify) {
+      const text = modelUpdateNotice(a.action === 'deliver' ? 'delivered' : 'declined', ctx.productName)
+      await deps
+        .notify({
+          audience: { business: ctx.businessId },
+          kind: 'company_update',
+          ...text,
+          link: ctx.productId ? `/dashboard/products/${ctx.productId}/edit` : '/dashboard/products',
+          dedupeKey: `model_request:${a.requestId}:${a.action === 'deliver' ? 'delivered' : 'rejected'}`,
+          ...(ctx.recipient ? { fallbackLang: ctx.recipient.language } : {}),
+        })
+        .catch(() => {})
+    }
     if (!ctx?.recipient) return { status: 'skipped' }
     const workflow = `model_request:${a.requestId}:${a.action === 'deliver' ? 'delivered' : 'rejected'}`
     if (await deps.alreadySent(workflow)) return null

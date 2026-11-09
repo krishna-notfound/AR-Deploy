@@ -106,7 +106,7 @@ describe('push_subscriptions', () => {
 
   it('a user adds, reads and deletes only their own subscriptions directly', async () => {
     const insert = (uid: string) => `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ('${uid}', 'https://push.example/direct-${uid}', 'k', 'a')`
-    expect(await h.affected(ANA, insert(ANA))).toBe(1)
+    await h.call(ANA, `with r as (${insert(ANA)} returning id) select to_jsonb(count(*)) as r from r`)
     await expect(h.probe(ANA, insert(BEN))).rejects.toThrow()
     expect(await h.affected(ANA, `delete from public.push_subscriptions where user_id = '${BEN}'`)).toBe(0)
     expect(await h.affected(ANA, `delete from public.push_subscriptions where user_id = '${ANA}'`)).toBe(1)

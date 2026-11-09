@@ -1,18 +1,22 @@
 // Supabase Edge Function: public business application (ADR-0024). verify_jwt is off (anonymous visitors apply);
 // the handler validates, rate-limits and writes with the service role. Browsers can never insert applications directly.
 // Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS, ADMIN_NOTIFICATION_EMAIL (design/23-email.md);
+// VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT turn on phone push (optional; the in-app list works without them);
 // APPLICATION_SALT is optional (without it the salt is derived from the service key, which never leaves the server).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { normalizeApplyForm, rulesFromConfig } from '../_shared/applyForm.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
 import { applicationSalt } from '../_shared/attempts.ts'
 import { serviceKeyFrom } from '../_shared/http.ts'
+import { createNotifier } from '../_shared/notifyAdmin.ts'
 import { MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, handleSubmitApplication, loggable } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
 const key = serviceKeyFrom(env)
 const admin = createClient(env('SUPABASE_URL') ?? '', key, { auth: { persistSession: false, autoRefreshToken: false } })
 const salt = await applicationSalt(env, key)
+// In-app notifications and phone push (ADR-0056); secrets VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT are optional.
+const notify = createNotifier(admin, env)
 const CATALOGUE_BUCKET = 'application-files'
 
 const OPEN = ['submitted', 'under_review']
@@ -40,6 +44,7 @@ Deno.serve((req) =>
     config: readEmailConfig(env),
     fetch,
     salt,
+    notify,
     async findByKey(submissionKey) {
       const { data, error } = await admin.from('business_applications').select(STORED_COLUMNS).eq('submission_key', submissionKey).maybeSingle()
       if (error) throw new Error(`lookup failed: ${error.message}`)
