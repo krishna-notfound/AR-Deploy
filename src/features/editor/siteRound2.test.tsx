@@ -127,8 +127,11 @@ describe('Landing tab: the Texts block', () => {
     expect(block.getAllByText((_, el) => el?.tagName === 'SPAN' && names.includes(el.textContent ?? '') && el.closest('summary') !== null).map((e) => e.textContent)).toEqual(names)
     expect(block.getByRole('status')).toHaveTextContent('Every text is the original wording.')
 
-    const hero = within(heading.closest('section')!.querySelector('[data-section="hero"]') as HTMLElement)
-    const en = hero.getByRole('textbox', { name: '3D and AR catalogues (English)' })
+    const heroSection = heading.closest('section')!.querySelector('[data-section="hero"]') as HTMLElement
+    const hero = within(heroSection)
+    // A section's boxes are built only once it is opened.
+    await userEvent.click(heroSection.querySelector('summary')!)
+    const en = await hero.findByRole('textbox', { name: '3D and AR catalogues (English)' })
     expect(en).toHaveAttribute('placeholder', '3D and AR catalogues')
     expect(hero.getByRole('textbox', { name: '3D and AR catalogues (Portuguese)' })).toHaveAttribute('placeholder', 'Catálogos 3D e RA')
     expect(en).toHaveAttribute('maxlength', '200')
@@ -144,8 +147,10 @@ describe('Landing tab: the Texts block', () => {
     open('/admin/editor/landing')
     const heading = await screen.findByRole('heading', { level: 3, name: 'Texts' }, { timeout: 15_000 })
     const section = heading.closest('section')!
-    const hero = within(section.querySelector('[data-section="hero"]') as HTMLElement)
-    await userEvent.type(hero.getByRole('textbox', { name: '3D and AR catalogues (English)' }), 'One')
+    const heroSection = section.querySelector('[data-section="hero"]') as HTMLElement
+    const hero = within(heroSection)
+    await userEvent.click(heroSection.querySelector('summary')!)
+    await userEvent.type(await hero.findByRole('textbox', { name: '3D and AR catalogues (English)' }), 'One')
     await userEvent.type(hero.getByRole('textbox', { name: 'for furniture brands. (English)' }), 'Two')
     await waitFor(async () => expect(Object.keys((await saved()).landing.texts ?? {})).toHaveLength(2), { timeout: 8000 })
     expect(within(section).getByRole('status')).toHaveTextContent('2 texts changed')

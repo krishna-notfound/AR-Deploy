@@ -1,6 +1,7 @@
 // The Landing tab's "Texts" block (ADR-0053): every editable text of the landing page, grouped by section, in English and
 // Portuguese. The original wording is the placeholder; an empty box means the original. Edits go through siteOps.
 import { RotateCcw } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { FormField, Input, Textarea } from '@/components/ui/Form'
 import { LANDING_TEXT_GROUPS, LANDING_TEXT_KINDS, type LandingTextKind, type LandingTextSection } from '@/domain/siteContent'
@@ -60,13 +61,15 @@ function Section({ id }: { id: LandingTextSection }) {
   const group = LANDING_TEXT_GROUPS.find((g) => g.id === id)!
   const changed = changedTexts(draft, sectionKeys(id))
   const name = t(`editor.landing.texts.section.${id}` as TranslationKey)
+  // The boxes are built only while the section is open: about a hundred inputs at once made the whole Landing tab slow.
+  const [open, setOpen] = useState(false)
   return (
-    <details className="group border border-line bg-canvas" data-section={id}>
+    <details className="group border border-line bg-canvas" data-section={id} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary className="flex min-h-11 cursor-pointer flex-wrap items-center justify-between gap-2 px-4 py-2 text-ui-body font-medium text-ink">
         <span>{name}</span>
         {changed > 0 && <span className="text-ui-small font-normal text-accent-ink">{tn('editor.landing.texts.changed', changed)}</span>}
       </summary>
-      <div className="space-y-6 border-t border-line px-4 py-5">
+      {open && <div className="space-y-6 border-t border-line px-4 py-5">
         {id === 'collections' && <p className="text-ui-small text-ink-muted">{t('editor.landing.texts.collectionsNote')}</p>}
         <div>
           <Button size="sm" disabled={changed === 0} aria-label={t('editor.landing.texts.resetSectionNamed', { name })} icon={<RotateCcw className="size-3.5" aria-hidden />} onClick={() => setDraft((d) => resetLandingSection(d, id))}>
@@ -76,7 +79,7 @@ function Section({ id }: { id: LandingTextSection }) {
         {group.keys.map(([key, kind]) => (
           <TextRow key={key} textKey={key} kind={kind} />
         ))}
-      </div>
+      </div>}
     </details>
   )
 }
