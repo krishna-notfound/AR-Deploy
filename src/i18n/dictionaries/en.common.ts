@@ -35,6 +35,7 @@ export const enCommon = {
   'nav.modelRequests': '3D requests',
   'nav.analytics': 'Analytics',
   'nav.catalogsQr': 'Catalogs & QR Codes',
+  'nav.lists': 'Categories & currencies', // W4 (ADR-0055)
   'nav.team': 'Team & Access',
   'nav.auditLog': 'Audit log',
   'nav.settings': 'Settings',
@@ -55,6 +56,10 @@ export const enCommon = {
   'common.error.reason.not_allowed': "You don't have permission to do this.",
   'common.error.reason.aal2_required': 'This needs 2FA. Sign in with your authenticator code first.',
   'common.error.reason.not_enabled': "This feature isn't switched on yet.",
+  'common.error.reason.category_protected': '"Other" is permanent: it cannot be deleted or hidden.', // W4 (ADR-0055)
+  'common.error.reason.category_not_found': 'That category no longer exists. Reload the list.',
+  'common.error.reason.category_exists': 'A category with that name already exists.',
+  'common.error.reason.last_currency': 'At least one currency must stay on.',
   'common.error.reason.already_member': 'This email already has platform access.',
   'common.error.reason.business_owner': "This email owns a business. Business owners can't join the platform team.",
   'common.error.reason.owner_protected': "The platform owner can't be changed here.",
@@ -92,6 +97,8 @@ export const enCommon = {
 
   // Messages of services/validation.ts (field errors the forms show next to the field).
   'common.validation.tooLong': 'Use {n} characters or fewer.',
+  'common.validation.categoryNameEnRequired': 'Enter the English name.', // W4 (ADR-0055)
+  'common.validation.categoryNamePtRequired': 'Enter the Portuguese name.', // W4 (ADR-0055)
   'common.validation.slugFormat': 'Use lowercase letters, numbers and single hyphens only.',
   'common.validation.emailInvalid': 'Enter a valid email address.',
   'common.validation.urlInvalid': 'Enter a full URL starting with https://',

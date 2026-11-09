@@ -5,6 +5,7 @@ import type { Product } from '@/domain/types'
 import { hasAny3d } from '@/features/ar/variantMedia'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { primaryImage } from '@/lib/product'
+import { useCategoryLabel } from '@/services/listsHooks'
 
 // The one product card of the public pages (ADR-0054): the company catalogue, a collection page and the showcase's
 // "More pieces". Sanctus style: a hairline frame, the whole piece on a subtle ground in a fixed 4:5 frame (object-contain,
@@ -37,6 +38,7 @@ function CardImage({ src, alt }: { src?: string; alt: string }) {
 
 export function ProductCard({ product, href, headingLevel = 'h2' }: { product: Product; href: string; headingLevel?: 'h2' | 'h3' }) {
   const { t, localized } = useI18n()
+  const categoryLabel = useCategoryLabel()
   const name = localized(product.name)
   return (
     <Link
@@ -52,7 +54,7 @@ export function ProductCard({ product, href, headingLevel = 'h2' }: { product: P
           </span>
         )}
       </div>
-      <p className="mt-4 text-xs leading-4 font-medium tracking-[0.08em] text-accent-ink uppercase">{t(`category.${product.category}`)}</p>
+      <p className="mt-4 text-xs leading-4 font-medium tracking-[0.08em] text-accent-ink uppercase">{categoryLabel(product.category)}</p>
       <LocalizedSpan as={headingLevel} text={product.name} className="mt-1.5 font-display text-[1.2rem] leading-snug font-normal break-words text-ink sm:text-[1.4rem]" />
       <span className="mt-auto inline-flex items-center gap-1.5 pt-4 text-[14px] leading-5 font-medium text-ink transition-colors group-hover/card:text-accent-ink">
         {t('catalog.viewPiece')}

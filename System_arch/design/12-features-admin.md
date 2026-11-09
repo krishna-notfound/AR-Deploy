@@ -82,3 +82,7 @@ Read when: building `/` or any `/admin/*` page. For the shared editor, see [15-p
 - Preview uses the real public components with the draft as the source, under a fixed "Preview of the draft. Not live." bar; the application form cannot send from there.
 - Spec: `docs/superpowers/specs/2026-10-29-content-editor-and-bilingual-dashboards-design.md`. Playwright: `tests/e2e/content-editor.spec.ts` and `.mobile.spec.ts`.
 - The dashboards are bilingual (EN and PT-PT) through `t()`, with the same language switch in the top bar as on the public pages (ADR-0044, design/10).
+
+## Categories and currencies (ADR-0055)
+
+Admin console entry "Categories & currencies" (`/admin/lists`, `content.manage`) with two tabs. Categories: add (English and Portuguese name), rename, move up and down, show or hide, delete with a confirmation (the products move to "Other"). Currencies: a searchable list with a switch each; at least one stays on. The product editor, the product filters, the CSV import, the business form and the public catalogue read the lists through `useCategories` / `useCategoryLabel` / `useCurrencies` (`src/services/listsHooks.ts`); the built-ins are the fallback while the lists load.

@@ -32,13 +32,14 @@ export const ptCore: Partial<Record<TranslationKey, string>> = {
   'catalog.eyebrow': 'Catálogo',
   'catalog.viewPiece': 'Ver peça',
 
-  'category.sofa': 'Sofás',
-  'category.chair': 'Cadeiras',
-  'category.table': 'Mesas',
-  'category.bed': 'Camas',
+  'category.sofa': 'Sofá',
+  'category.chair': 'Cadeira',
+  'category.table': 'Mesa',
+  'category.bed': 'Cama',
   'category.storage': 'Arrumação',
   'category.lighting': 'Iluminação',
   'category.decor': 'Decoração',
+  'category.other': 'Outro',
 
   'product.dimensions': 'Dimensões',
   'product.width': 'Largura',

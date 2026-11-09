@@ -6,6 +6,7 @@ import {
   FilePenLine,
   History,
   LayoutDashboard,
+  ListChecks,
   type LucideIcon,
   Package,
   QrCode,
@@ -44,6 +45,7 @@ export const adminNav: NavItem[] = [
   { to: '/admin/analytics', labelKey: 'nav.analytics', icon: BarChart3, requires: 'analytics.view' },
   { to: '/admin/catalogs', labelKey: 'nav.catalogsQr', icon: QrCode, requires: 'products.view' },
   { to: '/admin/editor', labelKey: 'editor.nav', icon: FilePenLine, requires: 'content.manage', preload: preloadEditor },
+  { to: '/admin/lists', labelKey: 'nav.lists', icon: ListChecks, requires: 'content.manage' },
   { to: '/admin/team', labelKey: 'nav.team', icon: Users, requires: 'owner' },
   { to: '/admin/activity', labelKey: 'nav.auditLog', icon: History, requires: ['records.view', 'access.view'] },
   // Every platform role has account settings; the Owner-only sections are hidden inside the hub.

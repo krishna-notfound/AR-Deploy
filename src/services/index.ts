@@ -101,6 +101,8 @@ export type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, P
 export type { AuthError, AuthResult, AuthService, SignedInAccount } from './supabase/auth'
 export type { CatalogService, Result, ServiceError, BusinessInput, ProductInput, ProductQuery } from './catalogService'
 export type { AppNotification, NotificationKind, NotificationList, NotificationPrefs, NotificationService, PushSubscriptionInput } from './notificationService'
+export { lists, unavailableLists } from './listsInstance'
+export type { CategoryInput, ListsService } from './listsService'
 export type { ContentDraftState, ContentService, ContentVersionSummary, PublishedApplyForm, PublishedChrome, PublishedPage } from './contentService'
 
 // Demo-mode helpers the UI needs (failure injection, sample-data credits, store notices), re-exported here so

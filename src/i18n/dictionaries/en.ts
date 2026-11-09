@@ -33,13 +33,15 @@ export const enCore = {
   'catalog.eyebrow': 'Catalog',
   'catalog.viewPiece': 'View piece',
 
-  'category.sofa': 'Sofas',
-  'category.chair': 'Chairs',
-  'category.table': 'Tables',
-  'category.bed': 'Beds',
+  // The built-in category names, singular like the managed list's seed (ADR-0055): the fallback while the list loads.
+  'category.sofa': 'Sofa',
+  'category.chair': 'Chair',
+  'category.table': 'Table',
+  'category.bed': 'Bed',
   'category.storage': 'Storage',
   'category.lighting': 'Lighting',
   'category.decor': 'Decor',
+  'category.other': 'Other',
 
   'product.dimensions': 'Dimensions',
   'product.width': 'Width',

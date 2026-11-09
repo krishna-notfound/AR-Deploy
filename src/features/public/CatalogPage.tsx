@@ -8,12 +8,13 @@ import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
-import { CATEGORIES, type Category, type Product } from '@/domain/types'
+import type { Product } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
+import { useCategories, useCategoryLabel } from '@/services/listsHooks'
 import { catalogLocalPath, productLocalPath, tenantCatalogPath, tenantProductPath } from '@/lib/urls'
 import { PublicMessage } from './PublicMessage'
 import { ProductCard } from './ProductCard'
@@ -29,7 +30,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const { t, lang, localized } = useI18n()
   const [search, setSearch] = useSearchParams()
   const q = search.get('q') ?? ''
-  const cat = (CATEGORIES as readonly string[]).includes(search.get('category') ?? '') ? (search.get('category') as Category) : ''
+  const catParam = search.get('category') ?? ''
+  const categoryList = useCategories()
+  const categoryLabel = useCategoryLabel()
 
   const { user } = useAccount()
 
@@ -66,7 +69,10 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   }
 
   const all = useMemo(() => [...(products.data ?? [])].sort((a, b2) => localized(a.name).localeCompare(localized(b2.name), lang)), [products.data, lang, localized])
-  const categories = useMemo(() => CATEGORIES.filter((c) => all.some((p) => p.category === c)), [all])
+  // The filter chips are the visible categories (managed in the admin console, ADR-0055) that this catalogue has products in.
+  const categories = useMemo(() => categoryList.active.map((c) => c.slug).filter((c) => all.some((p) => p.category === c)), [all, categoryList.active])
+  // A category in the address that no chip offers (removed, hidden, mistyped) is ignored, as before.
+  const cat = categories.includes(catParam) ? catParam : ''
   const term = q.trim().toLowerCase()
   const visible = all.filter((p) => (!cat || p.category === cat) && (!term || localized(p.name).toLowerCase().includes(term) || p.name.en.toLowerCase().includes(term)))
 
@@ -160,7 +166,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                     cat === c ? 'border-obsidian bg-obsidian text-chalk' : 'border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink',
                   )}
                 >
-                  {c ? t(`category.${c}`) : t('catalog.allCategories')}
+                  {c ? categoryLabel(c) : t('catalog.allCategories')}
                 </button>
               ))}
             </div>

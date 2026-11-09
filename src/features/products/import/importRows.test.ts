@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { BUILTIN_CATEGORY_ITEMS, BUILTIN_CURRENCY_ITEMS } from '@/domain/lists'
+import type { CategoryItem } from '@/domain/types'
 import { parseCsv } from '@/lib/csv'
 import { IMPORT_COLUMNS, MAX_IMPORT_ROWS, prepareImport, rowsFromCsv, templateCsv } from './importRows'
 
@@ -142,5 +144,53 @@ describe('prepareImport', () => {
   it('keeps a row with an unknown category as having errors', () => {
     const { rows, problems } = rowsFromCsv('name_en,category\nA,spaceship')
     expect(prepareImport(rows, problems, ctx)[0]!.errors).toHaveLength(1)
+  })
+})
+
+describe('the managed lists (ADR-0055)', () => {
+  const rugs: CategoryItem = { slug: 'rugs', labelEn: 'Rugs', labelPt: 'Tapetes', sort: 80, active: true }
+  const categories = [...BUILTIN_CATEGORY_ITEMS, rugs]
+  const ctx = { businessId: 'b1', defaultCurrency: 'EUR', existingSlugs: [] }
+
+  it('maps a category by slug, name in either language or plural against the loaded list', () => {
+    const r = rowsFromCsv('name_en,category\nA,rugs\nB,Tapetes\nC,Rugs\nD,Sofás\nE,Outro', { categories })
+    expect(r.problems).toEqual([])
+    expect(r.rows.map((x) => x.category)).toEqual(['rugs', 'rugs', 'rugs', 'sofa', 'other'])
+    expect(prepareImport(r.rows, r.problems, ctx).map((p) => p.input.category)).toEqual(['rugs', 'rugs', 'rugs', 'sofa', 'other'])
+  })
+
+  it('a category added in the admin console is unknown until the list has it', () => {
+    expect(rowsFromCsv('name_en,category\nA,rugs').problems).toHaveLength(1)
+    expect(rowsFromCsv('name_en,category\nA,rugs', { categories }).problems).toEqual([])
+  })
+
+  it('a hidden category is not offered to imports: the row has an error that lists the visible ones', () => {
+    const hidden = categories.map((c) => (c.slug === 'rugs' ? { ...c, active: false } : c))
+    const r = rowsFromCsv('name_en,category\nA,rugs', { categories: hidden })
+    expect(r.problems[0]!.errors[0]).toMatchObject({ key: 'products.import.problem.categoryUnknown' })
+    expect(String(r.problems[0]!.errors[0]!.vars?.list)).not.toContain('rugs')
+    expect(String(r.problems[0]!.errors[0]!.vars?.list)).toContain('other')
+  })
+
+  it('an unknown category never becomes a real one: the row keeps its error and would fall back to Other, not Decor', () => {
+    const { rows, problems } = rowsFromCsv('name_en,category\nA,spaceship', { categories })
+    const [p] = prepareImport(rows, problems, ctx)
+    expect(p!.errors).toHaveLength(1)
+    expect(p!.input.category).toBe('other')
+    expect(p!.row).toMatchObject({ category: 'spaceship', categoryUnknown: true })
+  })
+
+  it('a blank category stays an error and is not guessed', () => {
+    const { rows, problems } = rowsFromCsv('name_en,category\nA,', { categories })
+    const [p] = prepareImport(rows, problems, ctx)
+    expect(p!.errors.map((e) => e.key)).toContain('products.import.problem.categoryRequired')
+    expect(p!.input.category).toBe('other')
+  })
+
+  it('only enabled currencies are accepted', () => {
+    const currencies = [...BUILTIN_CURRENCY_ITEMS, { code: 'GBP', enabled: true, sort: 100 }, { code: 'JPY', enabled: false, sort: 101 }]
+    const r = rowsFromCsv('name_en,category,currency\nA,sofa,GBP\nB,sofa,jpy\nC,sofa,eur', { currencies })
+    expect(r.rows.map((x) => x.currency)).toEqual(['GBP', undefined, 'EUR'])
+    expect(r.problems).toEqual([{ index: 1, errors: [expect.objectContaining({ key: 'products.import.problem.currencyUnknown', vars: { value: 'jpy', list: 'EUR, BRL, USD, GBP' } })] }])
   })
 })

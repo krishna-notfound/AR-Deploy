@@ -1,4 +1,4 @@
-# 19 Â· Supabase backend (foundation)
+# 19 Ã‚Â· Supabase backend (foundation)
 Decisions: ADR-0015 (dual mode), ADR-0016 (routes). This file is the setup guide.
 
 ## Status (2026-10-27): the live project is the client's `zggylkbgajamhriebdrg` (18 migrations applied, 13 Edge Functions active; see `System_arch/HANDOFF.md` Live state). `pmnjchhrgvajtjpadpqo` is the old dev project and is not used. The sections below are dated records of the old project (2026-10-13/20) and of the first 7 migrations.
@@ -45,13 +45,13 @@ Applied with owner approval through the Supabase MCP. Recorded versions: `202610
 | unset / `demo` | ignored | Demo mode: mock service, localStorage, demo account picker. No Supabase client is created. |
 | `supabase` | both valid | Supabase mode: real data, `/login`, Storage. |
 | `supabase` | missing / invalid / secret key | **Misconfigured:** full-page setup error; every service call returns `CONFIG`. Never falls back to demo data. |
-| anything else | â€“ | Misconfigured. |
+| anything else | Ã¢â‚¬â€œ | Misconfigured. |
 
 The mode is read once at build/dev-server start (`src/services/backend.ts`). Restart `npm run dev` after editing env files.
 
 ## 1. Create or select a project
 1. Create a project at supabase.com, or reuse the linked one.
-2. Copy the **Project URL** and the **publishable key** (`sb_publishable_â€¦`) from **Connect** or **Settings â†’ API Keys**.
+2. Copy the **Project URL** and the **publishable key** (`sb_publishable_Ã¢â‚¬Â¦`) from **Connect** or **Settings Ã¢â€ â€™ API Keys**.
 3. **Never** put the secret / `service_role` key in any `VITE_*` variable; the app refuses to start with one.
 
 ## 2. Environment
@@ -68,9 +68,9 @@ The files are in `supabase/migrations/` (created with `supabase migration new`):
 
 | File | What it does |
 |---|---|
-| `â€¦_init_schema.sql` | Creates the tables, indexes, `product_analytics_daily` view (security_invoker), helper functions, triggers, RLS and explicit grants (new tables are not exposed automatically since 2026). |
-| `â€¦_storage.sql` | Creates the `business-logos` (public) and `product-media` (private) buckets and their `storage.objects` policies. |
-| `â€¦_save_product.sql` | Creates the `save_product()` RPC, which saves a product and its children in one transaction. |
+| `Ã¢â‚¬Â¦_init_schema.sql` | Creates the tables, indexes, `product_analytics_daily` view (security_invoker), helper functions, triggers, RLS and explicit grants (new tables are not exposed automatically since 2026). |
+| `Ã¢â‚¬Â¦_storage.sql` | Creates the `business-logos` (public) and `product-media` (private) buckets and their `storage.objects` policies. |
+| `Ã¢â‚¬Â¦_save_product.sql` | Creates the `save_product()` RPC, which saves a product and its children in one transaction. |
 
 The files contain no drops and no data changes. Each one fails as a whole (it runs in a transaction) if an object with the same name already exists. Deployment steps:
 1. **Approve the target project and this plan.** No step below runs without that approval.
@@ -86,18 +86,18 @@ The files contain no drops and no data changes. Each one fails as a whole (it ru
    Use the CLI rather than pasting into the SQL editor or the MCP `apply_migration` tool, so the recorded versions match these filenames.
 5. **Check:** run the advisors (security and performance), then confirm RLS is on for all 8 tables and the 9 storage policies exist.
 6. **Auth:**
-   - Set the Site URL and Redirect URLs (Â§5).
+   - Set the Site URL and Redirect URLs (Ã‚Â§5).
    - Turn off public sign-ups (accounts are admin-created).
    - Turn on leaked-password protection.
-7. **Accounts:** create the first users, then add platform admins and memberships with SQL (Â§4).
-8. **App:** set `.env.local` (Â§2), then run `npm run db:types` with `SUPABASE_PROJECT_REF=<ref>`.
+7. **Accounts:** create the first users, then add platform admins and memberships with SQL (Ã‚Â§4).
+8. **App:** set `.env.local` (Ã‚Â§2), then run `npm run db:types` with `SUPABASE_PROJECT_REF=<ref>`.
 
 **Required permissions:** a Supabase access token (or the DB password) with database-write access on the target project. The migrations run as `postgres`, which can create policies on `storage.objects`.
 
 **Rollback:** run `supabase/rollback/20261012_p8_rollback.sql`. It is **destructive** (drops the tables and all their rows). Buckets are dropped only when empty; stored files must be deleted through the Storage API first. Afterwards, mark the versions reverted with `supabase migration repair --status reverted <version>`. There are no down-migrations, and Auth users are untouched.
 
 ## 4. First accounts
-1. Create users in **Authentication â†’ Users** (email + password).
+1. Create users in **Authentication Ã¢â€ â€™ Users** (email + password).
 2. Make someone a platform admin (only possible with SQL; there is no client write path):
    ```sql
    insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';
@@ -110,7 +110,7 @@ The files contain no drops and no data changes. Each one fails as a whole (it ru
 4. A signed-in user without either row sees "not linked yet" on `/login`.
 
 ## 5. Auth redirects
-- In **Authentication â†’ URL Configuration**:
+- In **Authentication Ã¢â€ â€™ URL Configuration**:
   - Set **Site URL** to the deployed origin.
   - Add `https://<your-domain>/login` (and `http://localhost:5173/login` for development) to **Redirect URLs**.
 - Local CLI settings are already in `supabase/config.toml`.
@@ -141,14 +141,14 @@ The old dev project `pmnjchhrgvajtjpadpqo` (not used by the live site; as of 202
   - Rio Sideboard has no Portuguese (fallback)
 - **Accounts:**
   - `admin@furnish.example`: platform admin (login email changed 2026-10-14)
-  - `owner.casa@furnish.example` â†’ Casa Lisboa
-  - `owner.nordhaus@furnish.example` â†’ Nordhaus
+  - `owner.casa@furnish.example` Ã¢â€ â€™ Casa Lisboa
+  - `owner.nordhaus@furnish.example` Ã¢â€ â€™ Nordhaus
   - Passwords were given to the owner in chat and are never stored in the repo. Change them via `/reset-password` while signed in.
 - **Re-seed (resets only the sample businesses):**
   1. Run `npm run db:sample-sql`.
   2. Run `supabase/seed/sample_data.sql` in the SQL editor.
-  3. Run `SEED_ADMIN_EMAIL=â€¦ SEED_ADMIN_PASSWORD=â€¦ npm run db:sample-logos`.
-- **Remove the sample data:** run the `delete from public.businesses where id in (â€¦)` line at the top of the SQL file. It cascades to products, events and memberships; logos stay until deleted from the bucket.
+  3. Run `SEED_ADMIN_EMAIL=Ã¢â‚¬Â¦ SEED_ADMIN_PASSWORD=Ã¢â‚¬Â¦ npm run db:sample-logos`.
+- **Remove the sample data:** run the `delete from public.businesses where id in (Ã¢â‚¬Â¦)` line at the top of the SQL file. It cascades to products, events and memberships; logos stay until deleted from the bucket.
 
 ## 7. Generated types
 After the schema is applied:
@@ -165,7 +165,7 @@ npm run db:types   # npx supabase gen types typescript --project-id <ref> > src/
 | create / update / duplicate product | `rpc('save_product')` | Caller's RLS, inside one transaction. |
 | publish / unpublish / delete | `products` update or delete | RLS, plus a DB check that published products have a price, dimensions and a name. |
 | analytics | `product_analytics_daily` view + `summarize()` | View is security_invoker; RLS lets only members and admins read events. |
-| `recordEvent` | `functions.invoke('track-event')` â†’ `record_event_limited()` (after migration 20261012200810; before it, a direct insert) | Rate limit 30/min per hashed visitor; published products of active businesses only; direct inserts closed; no personal data stored. |
+| `recordEvent` | `functions.invoke('track-event')` Ã¢â€ â€™ `record_event_limited()` (after migration 20261012200810; before it, a direct insert) | Rate limit 30/min per hashed visitor; published products of active businesses only; direct inserts closed; no personal data stored. |
 | `uploadAsset` | Storage upload + public URL or signed URL | Bucket policies (above). |
 | sign-in / role | `auth.signInWithPassword`, `auth.getUser`, `platform_admins`, `business_members` | Rows that users cannot write. |
 
@@ -201,15 +201,15 @@ Rollback: `supabase/rollback/20261026_business_logic_fixes_rollback.sql`. Releas
 - `profiles`: "Platform members read profiles" is replaced (own row, the Owner, staff profiles for `access.view` or `records.view`, owner profiles for `businesses.view`).
 - `storage.objects`: "Platform members delete media" needs `products.edit`, `products.delete` or `businesses.delete`; "Platform members delete logos" needs `businesses.edit` or `businesses.delete`.
 
-**Permission prerequisites** (`private.permission_prerequisites()`, mirrored by `PERMISSION_PREREQUISITES` in `src/domain/permissions.ts`): `businesses.edit` â† `businesses.view`; `businesses.status` â† `businesses.edit`; `businesses.delete` â† `businesses.edit` and `products.delete`; `owners.manage` â† `businesses.view`; `applications.approve` and `applications.reject` â† `applications.view`; `products.edit` â† `products.view`; `products.publish` and `products.delete` â† `products.edit`. The closure is transitive and stored.
+**Permission prerequisites** (`private.permission_prerequisites()`, mirrored by `PERMISSION_PREREQUISITES` in `src/domain/permissions.ts`): `businesses.edit` Ã¢â€ Â `businesses.view`; `businesses.status` Ã¢â€ Â `businesses.edit`; `businesses.delete` Ã¢â€ Â `businesses.edit` and `products.delete`; `owners.manage` Ã¢â€ Â `businesses.view`; `applications.approve` and `applications.reject` Ã¢â€ Â `applications.view`; `products.edit` Ã¢â€ Â `products.view`; `products.publish` and `products.delete` Ã¢â€ Â `products.edit`. The closure is transitive and stored.
 
 **Access map additions**
 | Service method | Supabase call | Protected by |
 |---|---|---|
-| review an application | `functions.invoke('review-application')` â†’ `admin_review_application` | 2FA gate, then the permission for the action; sends the rejection email. |
+| review an application | `functions.invoke('review-application')` Ã¢â€ â€™ `admin_review_application` | 2FA gate, then the permission for the action; sends the rejection email. |
 | possible duplicates | `rpc('admin_application_duplicates')` | `applications.view` or the Owner. |
 | owner state per business | `rpc('admin_list_owner_states')` | `businesses.view`. |
-| remove a team member | `functions.invoke('manage-member', {action:'remove'})` â†’ `admin_remove_member` | Owner (SQL `owner_or_deny`). |
+| remove a team member | `functions.invoke('manage-member', {action:'remove'})` Ã¢â€ â€™ `admin_remove_member` | Owner (SQL `owner_or_deny`). |
 | analytics by day | `rpc('analytics_daily')` and `business_product_counts` | security invoker: RLS decides what is counted. |
 | owner notices | `functions.invoke('notify-business-owner')` | 2FA gate, staff only; deduped by `email_log.workflow`. |
 
@@ -272,3 +272,6 @@ Fixed in the migration files (none had been applied anywhere):
 - `businesses.share_enabled boolean not null default true`: the Share button of a company's product pages. Writable only by platform staff with `businesses.edit` (column grant + `guard_business_admin_fields` allow-list + staff update policy; an owner gets `business_field_admin_only`).
 - `anon` has **no table-level select** on `businesses`: it may select every column except `description` (internal). Public reads use `PUBLIC_BUSINESS_COLUMNS` (`supabaseCatalogService.ts`); `select('*')` as anon fails. A column added later needs `grant select (col) on public.businesses to anon` and an entry in that list.
 - Publishing: the transition to `published` needs a `product_models` glb row (`publish_needs_model`, deferred constraint triggers `products_publish_requires_model_ins/_upd`). Rows already published are untouched. Rollback: `supabase/rollback/20261109_catalogue_rules_round2_rollback.sql`.
+## Managed lists: categories and currencies (ADR-0055)
+
+Migration `managed_lists` (not applied; rollback in `supabase/rollback/20261109_managed_lists_rollback.sql`). Tables `product_categories` and `currencies` are readable by `anon` and `authenticated`; insert, update and delete need `public.can_manage_site_content()` (staff 2FA + `content.manage`). `products.category`, `products.currency` and `businesses.default_currency` are foreign keys (`on update cascade`) instead of check constraints. `other` cannot be deleted, hidden or re-slugged; `admin_delete_category(slug)` moves products to `other` first. The last enabled currency cannot be switched off. `private.validate_site_content` is patched in place so a landing collection's catalogue link accepts any slug-shaped category.

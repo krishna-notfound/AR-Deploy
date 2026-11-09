@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/ui/States'
 import { HOUSE_BUSINESS_SLUG } from '@/domain/siteContent'
 import type { Business, Product } from '@/domain/types'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { cn } from '@/lib/cn'
 import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
 import { service } from '@/services'
@@ -89,6 +90,7 @@ function PageSkeleton() {
 
 function ShowcaseView({ business, product }: { business: Business; product: Product }) {
   const { t, localized } = useI18n()
+  const categoryLabel = useCategoryLabel()
   // No analytics: the showcase belongs to the platform, not to a business.
   const stage = useProductStage(product, { record: false })
   const { name, hasCta } = stage
@@ -117,7 +119,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
             </div>
 
             <div className="min-w-0">
-              <Eyebrow>{t(`category.${product.category}`)}</Eyebrow>
+              <Eyebrow>{categoryLabel(product.category)}</Eyebrow>
               <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
               <LocalizedSpan as="p" text={product.shortDescription} className="mt-4 max-w-md text-[15px] leading-7 text-ink-muted" />
 

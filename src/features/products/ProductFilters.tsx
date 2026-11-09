@@ -3,10 +3,11 @@ import { useSearchParams } from 'react-router'
 import { Select } from '@/components/ui/Form'
 import { cn } from '@/lib/cn'
 import { SearchInput } from '@/components/ui/SearchInput'
-import { type Business, CATEGORIES, type Category, type Product, type ProductStatus } from '@/domain/types'
+import { type Business, type Category, type Product, type ProductStatus } from '@/domain/types'
 import type { ProductRequestState } from '@/domain/modelRequests'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { hasOwnValidGlb } from '@/services/validation'
+import { useCategories, useCategoryLabel } from '@/services/listsHooks'
 import { type ProductArReadiness, productArReadiness } from './productReadiness'
 
 const AR_FILTERS: readonly ProductArReadiness[] = ['ready', 'android-only', 'android-blocked', 'photos-only']
@@ -37,7 +38,8 @@ function readFilters(params: URLSearchParams): ProductFilterState {
     q: params.get('q') ?? '',
     business: params.get('business') ?? '',
     status: status === 'draft' || status === 'published' || status === 'published-no3d' ? status : '',
-    category: CATEGORIES.includes(category as Category) ? (category as Category) : '',
+    // Any slug: the list is managed (ADR-0055). An unknown one shows no products and a "clear filters" button.
+    category: category ?? '',
     ar: AR_FILTERS.includes(ar as ProductArReadiness) ? (ar as ProductArReadiness) : '',
     model: params.get('model') === 'open' ? 'open' : '',
     page: Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1),
@@ -108,6 +110,8 @@ export function ProductFilterBar({
   requestFilter?: boolean
 }) {
   const { t } = useI18n()
+  const { categories } = useCategories()
+  const categoryLabel = useCategoryLabel()
   return (
     <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-6">
       <FilterField label={t('common.search')} className="sm:w-[260px]">
@@ -137,9 +141,9 @@ export function ProductFilterBar({
       <FilterField label={t('products.filters.category')} className="sm:w-[170px]">
         <Select aria-label={t('products.filters.byCategory')} value={state.category} onChange={(e) => update({ category: e.target.value as ProductFilterState['category'] })}>
           <option value="">{t('products.filters.allCategories')}</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {t(`products.category.${c}`)}
+          {categories.map((c) => (
+            <option key={c.slug} value={c.slug}>
+              {categoryLabel(c.slug)}
             </option>
           ))}
         </Select>

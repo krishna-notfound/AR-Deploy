@@ -34,6 +34,7 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'nav.modelRequests': 'Pedidos 3D',
   'nav.analytics': 'Análises',
   'nav.catalogsQr': 'Catálogos e códigos QR',
+  'nav.lists': 'Categorias e moedas', // W4 (ADR-0055)
   'nav.team': 'Equipa e acessos',
   'nav.auditLog': 'Registo de atividade',
   'nav.settings': 'Definições',
@@ -53,6 +54,10 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'common.error.reason.not_allowed': 'Não tem permissão para fazer isto.',
   'common.error.reason.aal2_required': 'Isto exige a verificação em dois passos (2FA). Inicie sessão primeiro com o código da aplicação de autenticação.',
   'common.error.reason.not_enabled': 'Esta funcionalidade ainda não está ativada.',
+  'common.error.reason.category_protected': '"Outro" é permanente: não pode ser eliminada nem ocultada.', // W4 (ADR-0055)
+  'common.error.reason.category_not_found': 'Essa categoria já não existe. Volte a carregar a lista.',
+  'common.error.reason.category_exists': 'Já existe uma categoria com esse nome.',
+  'common.error.reason.last_currency': 'Pelo menos uma moeda tem de ficar ativa.',
   'common.error.reason.already_member': 'Este email já tem acesso à plataforma.',
   'common.error.reason.business_owner': 'Este email pertence ao responsável de uma empresa. Os responsáveis de empresas não podem integrar a equipa da plataforma.',
   'common.error.reason.owner_protected': 'O proprietário da plataforma não pode ser alterado aqui.',
@@ -89,6 +94,8 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'common.error.reason.form_changed': 'O formulário foi atualizado enquanto o preenchia. Reveja as respostas e envie novamente.',
 
   'common.validation.tooLong': 'Use {n} caracteres ou menos.',
+  'common.validation.categoryNameEnRequired': 'Indique o nome em inglês.', // W4 (ADR-0055)
+  'common.validation.categoryNamePtRequired': 'Indique o nome em português.', // W4 (ADR-0055)
   'common.validation.slugFormat': 'Use apenas letras minúsculas, números e hífens simples.',
   'common.validation.emailInvalid': 'Introduza um endereço de email válido.',
   'common.validation.urlInvalid': 'Introduza um URL completo, começado por https://',

@@ -10,6 +10,7 @@ import { HOUSE_BUSINESS_SLUG, type ProductRef } from '@/domain/siteContent'
 import type { Product } from '@/domain/types'
 import { arLaunchUrl, variantMedia } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
 import { showcaseProductPath } from '@/lib/urls'
@@ -43,10 +44,12 @@ export function pickShowcasePiece(pieces: Product[], featured?: ProductRef): Pro
 type Fmt = {
   t: ReturnType<typeof useI18n>['t']
   localized: ReturnType<typeof useI18n>['localized']
+  /** The category's name from the managed list (ADR-0055), `useCategoryLabel()`. */
+  categoryLabel: (slug: string) => string
 }
 
 /** A showcase piece as the card's view. */
-export function productToShowcaseView(product: Product, { t, localized }: Fmt): ShowcaseView {
+export function productToShowcaseView(product: Product, { t, localized, categoryLabel }: Fmt): ShowcaseView {
   const media = variantMedia(product)
   const image = primaryImage(product)
   const d = product.dimensions
@@ -54,7 +57,7 @@ export function productToShowcaseView(product: Product, { t, localized }: Fmt): 
   // "W 60 × H 100 × D 60 cm", with the initials of the language's own words (L, A, P in Portuguese).
   const initial = (word: string) => word.charAt(0).toUpperCase()
   return {
-    eyebrow: t(`category.${product.category}`),
+    eyebrow: categoryLabel(product.category),
     title: localized(product.name),
     dimensions: hasDims
       ? `${initial(t('product.width'))} ${d.width} × ${initial(t('product.height'))} ${d.height} × ${initial(t('product.depth'))} ${d.depth} ${d.unit}`
@@ -70,12 +73,13 @@ export function productToShowcaseView(product: Product, { t, localized }: Fmt): 
 /** The 3D card's view: a showcase piece, or undefined (the illustration) when there is none. `loading` while the pieces load. */
 export function useShowcaseCardView(featured?: ProductRef): { view?: ShowcaseView; loading: boolean } {
   const { t, localized } = useI18n()
+  const categoryLabel = useCategoryLabel()
   const { status, pieces } = useShowcasePieces()
   const slug = featured?.businessSlug === HOUSE_BUSINESS_SLUG ? featured.productSlug : ''
   const view = useMemo(() => {
     const piece = pickShowcasePiece(pieces, slug ? { businessSlug: HOUSE_BUSINESS_SLUG, productSlug: slug } : undefined)
-    return piece ? productToShowcaseView(piece, { t, localized }) : undefined
-  }, [pieces, slug, t, localized])
+    return piece ? productToShowcaseView(piece, { t, localized, categoryLabel }) : undefined
+  }, [pieces, slug, t, localized, categoryLabel])
   return { view, loading: status === 'loading' }
 }
 
