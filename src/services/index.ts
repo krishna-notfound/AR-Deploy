@@ -3,9 +3,7 @@ import type { AccountService } from './accountService'
 import { backend } from './backend'
 import { type CatalogService, fail } from './catalogService'
 import type { ContentService } from './contentService'
-import type { ListsService } from './listsService'
 import { mockContentService, mockSiteAssetUrl } from './mock/mockContent'
-import { mockListsService } from './mock/mockLists'
 import { SITE_ASSET_BUCKET, type SiteAsset } from '@/domain/siteContent'
 import { mockAccountService } from './mock/mockAccount'
 import { mockCatalogService } from './mock/mockCatalogService'
@@ -14,7 +12,6 @@ import { createPasswordCheckClient, getSupabaseClient } from './supabase/client'
 import { createSupabaseAccount, makeVerifyCurrentPassword } from './supabase/supabaseAccount'
 import { createSupabaseCatalogService } from './supabase/supabaseCatalogService'
 import { createSupabaseContent } from './supabase/supabaseContent'
-import { createSupabaseLists } from './supabase/supabaseLists'
 
 /** Every call fails with the configuration problem, so a half-configured app never shows fake data. */
 export function unavailableService(problem: string): CatalogService {
@@ -70,20 +67,6 @@ export const content: ContentService = SUPABASE_BUILD
     ? mockContentService
     : unavailableContent(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
 
-/** Every lists call fails with the configuration problem (never demo data in a half-configured Supabase build). */
-export function unavailableLists(problem: string): ListsService {
-  return new Proxy({} as ListsService, { get: (_, key) => (key === 'then' ? undefined : key === 'subscribe' ? () => () => {} : async () => fail('CONFIG', problem)) })
-}
-
-/** The admin-managed product categories and currencies (ADR-0055). Demo: the seed lists in the demo store. */
-export const lists: ListsService = SUPABASE_BUILD
-  ? backend.mode === 'supabase'
-    ? createSupabaseLists(getSupabaseClient(backend))
-    : unavailableLists(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
-  : backend.mode === 'demo'
-    ? mockListsService
-    : unavailableLists(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
-
 /**
  * The public URL of a file uploaded in the Website Editor. Supabase: the public bucket `site-content`
  * (`${VITE_SUPABASE_URL}/storage/v1/object/public/site-content/<path>`). Demo: the session-only object URL ('' after a reload).
@@ -100,6 +83,7 @@ export { ACCOUNT_ERRORS, AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, PASSWORD_MAX, PASSW
 export type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, SettingsSection, TotpEnrollment } from '@/domain/types'
 export type { AuthError, AuthResult, AuthService, SignedInAccount } from './supabase/auth'
 export type { CatalogService, Result, ServiceError, BusinessInput, ProductInput, ProductQuery } from './catalogService'
+export { lists, unavailableLists } from './listsInstance'
 export type { CategoryInput, ListsService } from './listsService'
 export type { ContentDraftState, ContentService, ContentVersionSummary, PublishedApplyForm, PublishedChrome, PublishedPage } from './contentService'
 

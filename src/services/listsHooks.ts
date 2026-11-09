@@ -11,7 +11,7 @@ import { BUILTIN_CATEGORY_ITEMS, BUILTIN_CURRENCY_ITEMS, BUILTIN_SLUGS, category
 import type { CategoryItem, CurrencyItem } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import type { ServiceError } from './catalogService'
-import { lists } from './index'
+import { lists } from './listsInstance'
 
 interface Snapshot {
   categories: CategoryItem[] | null

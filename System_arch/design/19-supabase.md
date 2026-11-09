@@ -262,3 +262,7 @@ Fixed in the migration files (none had been applied anywhere):
 - `business_applications`: `country`, `city`, `category` nullable; answers limit 65,536 bytes.
 - Audit events: `site_content_published`, `site_content_draft_restored`.
 - Rollback: `supabase/rollback/20261029_site_content_rollback.sql`. Tests: `supabase/tests/siteContent.test.ts` (PGlite).
+
+## Managed lists: categories and currencies (ADR-0055)
+
+Migration `managed_lists` (not applied; rollback in `supabase/rollback/20261109_managed_lists_rollback.sql`). Tables `product_categories` and `currencies` are readable by `anon` and `authenticated`; insert, update and delete need `public.can_manage_site_content()` (staff 2FA + `content.manage`). `products.category`, `products.currency` and `businesses.default_currency` are foreign keys (`on update cascade`) instead of check constraints. `other` cannot be deleted, hidden or re-slugged; `admin_delete_category(slug)` moves products to `other` first. The last enabled currency cannot be switched off. `private.validate_site_content` is patched in place so a landing collection's catalogue link accepts any slug-shaped category.

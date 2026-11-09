@@ -14,8 +14,10 @@ export const MAX_IMPORT_ROWS = 200
 /** One product to create. Everything but the name and the category is optional. */
 export interface ImportRow {
   name: { en: string; pt?: string }
-  /** Kept as typed (lower case) so an unknown value can be reported; a known one is a `Category`. */
+  /** The slug the typed value matched in the managed list; kept as typed (lower case) when it matched none, so it can be reported. */
   category: string
+  /** True when the typed category matched none (the row then has an error and would fall back to Other, never to a real category). */
+  categoryUnknown?: true
   /** Minor units (cents), as `Product.price`. */
   price?: number
   /** The business's default currency when empty. */
@@ -155,9 +157,13 @@ export function rowsFromCsv(text: string, defaults: ImportDefaults = {}): Parsed
 
     if (!row.name.en) errors.push(msg('common.validation.product.nameRequired'))
     const category = categoryFrom(row.category, categories)
-    if (!row.category) errors.push(msg('products.import.problem.categoryRequired'))
-    else if (!category) errors.push(msg('products.import.problem.categoryUnknown', { value: row.category, list: categories.filter((c) => c.active).map((c) => c.slug).join(', ') }))
-    else row.category = category
+    if (!row.category) {
+      errors.push(msg('products.import.problem.categoryRequired'))
+      row.categoryUnknown = true
+    } else if (!category) {
+      errors.push(msg('products.import.problem.categoryUnknown', { value: row.category, list: categories.filter((c) => c.active).map((c) => c.slug).join(', ') }))
+      row.categoryUnknown = true
+    } else row.category = category
 
     if (get('price')) {
       const p = price(get('price'))
@@ -213,7 +219,7 @@ export function toProductInput(row: ImportRow, businessId: string, defaultCurren
     description: text(row.description),
     // rowsFromCsv resolved the category against the list. An unknown one never reaches the service (the row has errors), and
     // would land in Other, the catch-all, never in a real category.
-    category: row.category || OTHER_CATEGORY,
+    category: row.categoryUnknown || !row.category ? OTHER_CATEGORY : row.category,
     price: row.price ?? 0,
     currency: row.currency ?? defaultCurrency,
     images: [],

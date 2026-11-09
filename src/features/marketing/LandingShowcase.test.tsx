@@ -102,7 +102,7 @@ describe('landing showcase card', () => {
   it('shows the featured showcase piece with its category, name, material, dimensions and price in euros', async () => {
     renderCard(house('sofa-one'))
     expect(await screen.findByText('Name sofa-one')).toBeInTheDocument()
-    expect(screen.getByText('Sofas')).toBeInTheDocument()
+    expect(screen.getByText('Sofa')).toBeInTheDocument()
     expect(screen.getByText('Oak')).toBeInTheDocument()
     expect(screen.getByText(/W 80 × H 70 × D 60 cm/)).toBeInTheDocument()
     expect(screen.getByText(/€/)).toBeInTheDocument()

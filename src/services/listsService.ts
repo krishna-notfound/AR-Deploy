@@ -19,8 +19,11 @@ export interface CategoryInput {
 export function categoryFieldErrors(labelEn: string, labelPt: string): Record<string, FieldError> | undefined {
   const p = categoryLabelProblems(labelEn, labelPt)
   const out: Record<string, FieldError> = {}
-  if (p.labelEn) out.labelEn = msg(`admin.lists.err.${p.labelEn}`, { max: CATEGORY_LABEL_MAX })
-  if (p.labelPt) out.labelPt = msg(`admin.lists.err.${p.labelPt}`, { max: CATEGORY_LABEL_MAX })
+  // The texts live in the common dictionary: this file is imported by public pages through '@/services', which may not name dashboard-only keys.
+  const text = (problem: string, required: 'common.validation.categoryNameEnRequired' | 'common.validation.categoryNamePtRequired') =>
+    problem === 'labelTooLong' ? msg('common.validation.tooLong', { n: CATEGORY_LABEL_MAX }) : msg(required)
+  if (p.labelEn) out.labelEn = text(p.labelEn, 'common.validation.categoryNameEnRequired')
+  if (p.labelPt) out.labelPt = text(p.labelPt, 'common.validation.categoryNamePtRequired')
   return Object.keys(out).length ? out : undefined
 }
 
