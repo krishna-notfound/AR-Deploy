@@ -510,7 +510,7 @@ describe('landing collections (20261103095519_landing_collections)', () => {
     await refuses(withCards(card({ link: { kind: 'product', businessSlug: 'acme', productSlug: '-x' } })), 'landing.collections.0.link.productSlug|invalid_slug')
     await refuses(withCards(card({ link: { kind: 'product', businessSlug: 'acme' } })), 'landing.collections.0.link.productSlug|required')
     await refuses(withCards(card({ link: { kind: 'catalog', businessSlug: '' } })), 'landing.collections.0.link.businessSlug|required')
-    await refuses(withCards(card({ link: { kind: 'catalog', businessSlug: 'acme', category: 'spaceship' } })), 'landing.collections.0.link.category|invalid_value')
+    await refuses(withCards(card({ link: { kind: 'catalog', businessSlug: 'acme', category: 'Space Ship' } })), 'landing.collections.0.link.category|invalid_value')
   })
 
   it('refuses a bad or repeated slug, too many products, a bad product reference and a bad featured piece', async () => {
