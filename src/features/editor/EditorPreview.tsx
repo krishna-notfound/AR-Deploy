@@ -17,7 +17,7 @@ import { PREVIEW_REFERENCE, guardApplicationSubmit } from './previewGuard'
 
 const ApplyPage = lazy(() => import('@/features/apply/ApplyPage'))
 
-const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
+const LandingPage = lazy(() => import('@/features/marketing/LandingRoute')) // LandingPage plus the editable texts (ADR-0053)
 
 type Target = { kind: 'page'; key: string } | { kind: 'apply' } | { kind: 'apply-done' } | { kind: 'footer' } | { kind: 'landing' } | { kind: 'unknown' }
 

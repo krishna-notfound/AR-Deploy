@@ -5,10 +5,23 @@ import type { SiteAsset, SiteAssetKind } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { content } from '@/services'
 
-const ACCEPT: Record<SiteAssetKind, string> = { image: 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', glb: '.glb,model/gltf-binary', usdz: '.usdz' }
+const ACCEPT: Record<SiteAssetKind, string> = { image: 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', glb: '.glb,model/gltf-binary', usdz: '.usdz', favicon: 'image/png,.png' }
 
-/** One upload button with its own "Uploading..." and error state. */
-export function UploadButton({ kind, label, onUploaded }: { kind: SiteAssetKind; label: string; onUploaded: (asset: SiteAsset) => void }) {
+/**
+ * One upload button with its own "Uploading..." and error state. `precheck` may refuse the file before it is sent (a sentence
+ * for the person, or null to go on).
+ */
+export function UploadButton({
+  kind,
+  label,
+  onUploaded,
+  precheck,
+}: {
+  kind: SiteAssetKind
+  label: string
+  onUploaded: (asset: SiteAsset) => void
+  precheck?: (file: File) => Promise<string | null>
+}) {
   const { t } = useI18n()
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -18,6 +31,12 @@ export function UploadButton({ kind, label, onUploaded }: { kind: SiteAssetKind;
     if (!file) return
     setBusy(true)
     setError(null)
+    const refusal = precheck ? await precheck(file) : null
+    if (refusal) {
+      setBusy(false)
+      setError(refusal)
+      return
+    }
     const r = await content.uploadSiteAsset(file, kind)
     setBusy(false)
     if (r.ok) onUploaded(r.data)

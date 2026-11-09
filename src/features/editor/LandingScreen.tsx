@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { CollectionsBlock } from './CollectionsBlock'
 import { useEditor } from './EditorContext'
 import { HeroPictureBlock } from './HeroPictureBlock'
+import { LandingTextsBlock } from './LandingTextsBlock'
 import { NoPiecesPrompt, PiecePicker } from './PiecePicker'
 import { setExample, setFeatured } from './landingOps'
 import { useShowcasePieces } from './useShowcasePieces'
@@ -108,6 +109,10 @@ export default function LandingScreen() {
           <CollectionsBlock pieces={pieces} />
         </>
       )}
+
+      <Block id="landing-texts-heading" title={t('editor.landing.texts.title')} help={t('editor.landing.texts.help')}>
+        <LandingTextsBlock />
+      </Block>
 
       <p className="text-ui-small text-ink-muted">{t('editor.landing.previewHint')}</p>
     </div>

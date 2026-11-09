@@ -111,7 +111,7 @@ describe('Showcase tab (ADR-0047)', () => {
     expect(screen.getByRole('link', { name: 'New piece' })).toHaveAttribute('href', '/admin/editor/showcase/new')
     // The tab is in the Editor menu, before Landing page.
     const menu = screen.getByRole('navigation', { name: 'Editor sections' })
-    expect(within(menu).getAllByRole('link').map((a) => a.textContent)).toEqual(['Pages', 'Showcase', 'Landing page', 'Application form', 'Social media'])
+    expect(within(menu).getAllByRole('link').map((a) => a.textContent)).toEqual(['Pages', 'Showcase', 'Landing page', 'Application form', 'Social media', 'Site'])
     expect(business.house).toBe(true)
   })
 
@@ -143,7 +143,7 @@ describe('Showcase tab (ADR-0047)', () => {
     localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
     const first = openAt('/admin/editor/pages')
     const menu = await screen.findByRole('navigation', { name: 'Editor sections' }, { timeout: 15_000 })
-    expect(within(menu).getAllByRole('link').map((a) => a.textContent)).toEqual(['Pages', 'Landing page', 'Application form', 'Social media'])
+    expect(within(menu).getAllByRole('link').map((a) => a.textContent)).toEqual(['Pages', 'Landing page', 'Application form', 'Social media', 'Site'])
     first.unmount()
     openAt('/admin/editor/showcase')
     expect(await screen.findByRole('heading', { name: /access/i }, { timeout: 15_000 })).toBeInTheDocument()

@@ -3,7 +3,7 @@
 import { SOCIAL_NETWORKS, type ContentErrors, type SiteContent } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import type { Vars } from '@/i18n/translate'
-import { editorApplyPath, editorLandingPath, editorPagePath, editorSocialPath } from '@/lib/urls'
+import { editorApplyPath, editorLandingPath, editorPagePath, editorSitePath, editorSocialPath } from '@/lib/urls'
 
 type T = (key: TranslationKey, vars?: Vars) => string
 
@@ -58,11 +58,13 @@ export function describeProblem(path: string, key: string, draft: SiteContent, t
     const where = t('editor.menu.landing')
     if (parts[1] === 'featured') return { path, what, where: `${where}: ${t('editor.landing.card3d.title')}`, to: editorLandingPath() }
     if (parts[1] === 'example') return { path, what, where: `${where}: ${t('editor.landing.example.title')}`, to: editorLandingPath() }
+    if (parts[1] === 'texts') return { path, what, where: `${where}: ${t('editor.landing.texts.title')}`, to: editorLandingPath() }
     if (!card) return { path, what, where, to: editorLandingPath() }
     const field = LANDING_FIELD_KEYS[parts.slice(3).join('.')]
     const name = card.title.en.trim() || t('editor.landing.untitled')
     return { path, what, where: `${where}: ${field ? `${name}, ${t(field).toLowerCase()}` : name}`, to: editorLandingPath() }
   }
+  if (parts[0] === 'chrome') return { path, what, where: `${t('editor.menu.site')}: ${t('editor.site.favicon.title')}`, to: editorSitePath() }
   if (parts[0] === 'applyForm') return { path, what, where: t('editor.menu.apply'), to: editorApplyPath('form') }
   if (parts[0] === 'social') {
     const net = SOCIAL_NETWORKS.find((n) => n === parts[1])

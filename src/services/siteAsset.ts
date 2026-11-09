@@ -7,8 +7,14 @@ const MIME: Record<SiteAssetKind, readonly string[]> = {
   image: ['image/jpeg', 'image/png', 'image/webp'],
   glb: ['model/gltf-binary', 'application/octet-stream'],
   usdz: ['model/vnd.usdz+zip', 'application/octet-stream'],
+  favicon: ['image/png'],
 }
-const LABEL: Record<SiteAssetKind, string> = { image: 'a JPG, PNG or WebP picture up to 5 MB', glb: 'a .glb 3D model up to 30 MB', usdz: 'a .usdz file up to 40 MB' }
+const LABEL: Record<SiteAssetKind, string> = {
+  image: 'a JPG, PNG or WebP picture up to 5 MB',
+  glb: 'a .glb 3D model up to 30 MB',
+  usdz: 'a .usdz file up to 40 MB',
+  favicon: 'a square PNG picture up to 1 MB',
+}
 
 /** The lowercase extension to store the file under ('jpeg' becomes 'jpg'), or null when the name does not fit the kind. */
 export function siteAssetExtension(file: Pick<File, 'name'>, kind: SiteAssetKind): string | null {

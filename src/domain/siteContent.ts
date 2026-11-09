@@ -14,10 +14,12 @@ import {
   type Lang,
 } from '../../supabase/functions/_shared/applyForm.ts'
 
+import { LANDING_TEXT_LIMITS, type LandingTexts } from './landingTexts'
 import { CATEGORIES, type Category } from './types'
 
 export type { ApplyFormConfig, ContentErrorKey, ContentErrors, Lang }
 export * from '../../supabase/functions/_shared/applyForm.ts'
+export * from './landingTexts'
 
 export const SITE_CONTENT_SCHEMA = 1
 
@@ -61,12 +63,16 @@ export interface SiteAsset {
   /** `landing/<name>.<ext>`, matching SITE_ASSET_PATH. */
   path: string
 }
-export type SiteAssetKind = 'image' | 'glb' | 'usdz'
+/**
+ * What an upload is checked as. `favicon` (ADR-0053) is a PNG up to 1 MB stored like any other picture: the same bucket, the same
+ * `landing/<name>.png` path rule, so no storage change is needed; `siteAssetKind` never returns it (a .png path is an 'image').
+ */
+export type SiteAssetKind = 'image' | 'glb' | 'usdz' | 'favicon'
 export const SITE_ASSET_BUCKET = 'site-content'
 export const SITE_ASSET_PATH = /^landing\/[a-z0-9-]+\.(webp|jpg|jpeg|png|glb|usdz)$/
-export const SITE_ASSET_EXTENSIONS: Record<SiteAssetKind, readonly string[]> = { image: ['webp', 'jpg', 'jpeg', 'png'], glb: ['glb'], usdz: ['usdz'] }
-/** Upload limits in bytes; the bucket repeats them (migration site_content_assets). */
-export const SITE_ASSET_MAX_BYTES: Record<SiteAssetKind, number> = { image: 5 * 1024 * 1024, glb: 30 * 1024 * 1024, usdz: 40 * 1024 * 1024 }
+export const SITE_ASSET_EXTENSIONS: Record<SiteAssetKind, readonly string[]> = { image: ['webp', 'jpg', 'jpeg', 'png'], glb: ['glb'], usdz: ['usdz'], favicon: ['png'] }
+/** Upload limits in bytes; the bucket repeats them (migration site_content_assets). The favicon's 1 MB is held by the Editor only. */
+export const SITE_ASSET_MAX_BYTES: Record<SiteAssetKind, number> = { image: 5 * 1024 * 1024, glb: 30 * 1024 * 1024, usdz: 40 * 1024 * 1024, favicon: 1024 * 1024 }
 
 export const isSiteAsset = (v: unknown): v is SiteAsset => typeof v === 'object' && v !== null && !Array.isArray(v) && typeof (v as { path?: unknown }).path === 'string'
 /** The kind of file an asset path names (by extension), or null when it is not a valid asset path. */
@@ -75,6 +81,8 @@ export function siteAssetKind(path: string): SiteAssetKind | null {
   const ext = path.slice(path.lastIndexOf('.') + 1)
   return (Object.keys(SITE_ASSET_EXTENSIONS) as SiteAssetKind[]).find((k) => SITE_ASSET_EXTENSIONS[k].includes(ext)) ?? null
 }
+/** Whether the path names a favicon: an uploaded PNG. */
+export const isFaviconPath = (path: string): boolean => siteAssetKind(path) === 'image' && path.endsWith('.png')
 
 /** A product named by the public address parts: the business slug and the product slug. */
 /** The slug of the platform's own showcase catalogue (ADR-0047). Landing refs to it are the admin's own pieces. */
@@ -175,7 +183,17 @@ export interface SiteContent {
     showcase?: LandingShowcase
     /** The first photo of the landing page and its optional in-place 3D model. Absent: the built-in photo. */
     hero?: LandingHero
+    /** Overrides of the landing page's own wording (ADR-0053): dictionary key (LANDING_EDITABLE_KEYS) to the text per language. Absent: the built-in wording. */
+    texts?: LandingTexts
   }
+  /** Site-wide settings (ADR-0053). Absent: the built-in icons. */
+  chrome?: SiteChrome
+}
+
+/** Site-wide settings of the Website Editor. */
+export interface SiteChrome {
+  /** The browser-tab icon (a PNG, at most 1 MB, square). Replaces the built-in icon and the apple-touch-icon at run time. */
+  favicon?: SiteAsset
 }
 
 export const MAX_CUSTOM_PAGES = 20
@@ -238,7 +256,24 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   if (typeof landing.example === 'object' && landing.example !== null && !Array.isArray(landing.example)) out.landing.example = productRef(landing.example)
   if (typeof landing.showcase === 'object' && landing.showcase !== null && !Array.isArray(landing.showcase)) out.landing.showcase = normalizeShowcase(landing.showcase)
   if (typeof landing.hero === 'object' && landing.hero !== null && !Array.isArray(landing.hero)) out.landing.hero = normalizeHero(landing.hero)
+  const texts = normalizeLandingTexts(landing.texts)
+  if (texts) out.landing.texts = texts
+  const favicon = asset(obj(raw.chrome).favicon)
+  if (favicon) out.chrome = { favicon }
   return out
+}
+
+/** Keeps the entries that have text in at least one language; undefined when none are left. Unknown keys are kept (validateSiteContent refuses them). */
+function normalizeLandingTexts(v: unknown): LandingTexts | undefined {
+  const out: LandingTexts = {}
+  for (const [key, value] of Object.entries(obj(v))) {
+    const o = obj(value)
+    const entry: { en?: string; pt?: string } = {}
+    if (typeof o.en === 'string' && o.en) entry.en = o.en
+    if (typeof o.pt === 'string' && o.pt) entry.pt = o.pt
+    if (entry.en !== undefined || entry.pt !== undefined) out[key] = entry
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 const asset = (v: unknown): SiteAsset | undefined => (isSiteAsset(v) ? { path: v.path } : undefined)
@@ -408,6 +443,12 @@ export function validateContentShape(doc: unknown): ContentErrors {
     if (sc !== undefined && (typeof sc !== 'object' || sc === null || Array.isArray(sc))) return { 'landing.showcase': 'invalid_value' }
     const hero = (l as Record<string, unknown>).hero
     if (hero !== undefined && (typeof hero !== 'object' || hero === null || Array.isArray(hero))) return { 'landing.hero': 'invalid_value' }
+    const texts = (l as Record<string, unknown>).texts
+    if (texts !== undefined && (typeof texts !== 'object' || texts === null || Array.isArray(texts))) return { 'landing.texts': 'invalid_value' }
+  }
+  if ('chrome' in d) {
+    const c = d.chrome
+    if (typeof c !== 'object' || c === null || Array.isArray(c)) return { chrome: 'invalid_value' }
   }
   return e
 }
@@ -480,7 +521,34 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
   if (doc.landing?.example) validateRef(doc.landing.example, 'landing.example', put)
   if (doc.landing?.showcase) validateShowcase(doc.landing.showcase, put)
   if (doc.landing?.hero) validateHero(doc.landing.hero, put)
+  if (doc.landing?.texts) validateLandingTexts(doc.landing.texts, put)
+  if (doc.chrome?.favicon !== undefined) {
+    const f = doc.chrome.favicon
+    if (!isSiteAsset(f) || !isFaviconPath(f.path)) put('chrome.favicon', 'invalid_value')
+  }
   return e
+}
+
+/** landing.texts: only keys of LANDING_EDITABLE_KEYS, each language a string within the key's limit. Paths: `landing.texts.<key>[.en|.pt]`. */
+function validateLandingTexts(texts: LandingTexts, put: (path: string, key: ContentErrorKey) => void): void {
+  for (const [key, entry] of Object.entries(texts)) {
+    const p = `landing.texts.${key}`
+    const max = Object.hasOwn(LANDING_TEXT_LIMITS, key) ? LANDING_TEXT_LIMITS[key]! : undefined
+    if (max === undefined) {
+      put(p, 'unknown_key')
+      continue
+    }
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      put(p, 'invalid_value')
+      continue
+    }
+    for (const l of ['en', 'pt'] as const) {
+      const v = entry[l]
+      if (v === undefined) continue
+      if (typeof v !== 'string') put(`${p}.${l}`, 'invalid_value')
+      else if (v.length > max) put(`${p}.${l}`, 'too_long')
+    }
+  }
 }
 
 function validateRef(ref: ProductRef, path: string, put: (path: string, key: ContentErrorKey) => void): void {
@@ -588,6 +656,10 @@ export interface ChangeSummary {
   landingCollections: number
   /** The landing 3D showcase card: 1 when it was added, edited or removed. */
   landingShowcase: number
+  /** Landing page texts overridden, changed or reset (per key and language). */
+  landingTexts: number
+  /** The site icon (favicon): 1 when it was set, replaced or removed. */
+  siteFavicon: number
   total: number
 }
 
@@ -691,6 +763,14 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
 
   const landingShowcase = same(a.landing?.showcase, b.landing?.showcase) ? 0 : 1
 
+  let landingTexts = 0
+  const ta = a.landing?.texts ?? {}
+  const tb = b.landing?.texts ?? {}
+  for (const key of new Set([...Object.keys(ta), ...Object.keys(tb)]))
+    for (const l of ['en', 'pt'] as const) if ((ta[key]?.[l] ?? '') !== (tb[key]?.[l] ?? '')) landingTexts++
+
+  const siteFavicon = same(a.chrome?.favicon, b.chrome?.favicon) ? 0 : 1
+
   return {
     pages,
     footer,
@@ -701,6 +781,8 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
     social,
     landingCollections,
     landingShowcase,
-    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase,
+    landingTexts,
+    siteFavicon,
+    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase + landingTexts + siteFavicon,
   }
 }

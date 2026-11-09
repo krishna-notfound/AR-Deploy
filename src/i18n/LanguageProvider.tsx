@@ -115,6 +115,27 @@ export function useI18n(): LangCtx {
   return useContext(Ctx)
 }
 
+/**
+ * Puts text overrides on top of `t` for the components below (ADR-0053: the landing page's wording from the Website Editor).
+ * `override(lang, key)` returns the replacement text, or undefined to use the dictionary. `override` must be stable
+ * (memoized) or every render builds a new context value.
+ */
+export function TextOverrideProvider({ override, children }: { override: (lang: Lang, key: string) => string | undefined; children: ReactNode }) {
+  const base = useContext(Ctx)
+  const value = useMemo<LangCtx>(
+    () => ({
+      ...base,
+      t: (key, vars) => {
+        const own = override(base.lang, key)
+        if (own === undefined) return base.t(key, vars)
+        return vars ? own.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : own
+      },
+    }),
+    [base, override],
+  )
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+}
+
 /** @deprecated The provider is app-wide now; use `useI18n()`. Kept so public-site files owned by other tracks keep compiling. */
 export function useMaybeI18n(): LangCtx {
   return useContext(Ctx)
