@@ -8,7 +8,7 @@ import { Document, WebIO } from '@gltf-transform/core'
 export async function boxGlb(w: number, h: number, d: number, opts: { roots?: number; name?: string } = {}): Promise<File> {
   const doc = new Document()
   const buffer = doc.createBuffer()
-  const [x, y, z] = [w / 2, h / 2, d / 2]
+  const [x, z] = [w / 2, d / 2]
   const corners = [
     [-x, 0, -z], [x, 0, -z], [x, h, -z], [-x, h, -z],
     [-x, 0, z], [x, 0, z], [x, h, z], [-x, h, z],
