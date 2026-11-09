@@ -19,6 +19,8 @@ const GROUPS = [
   ['social', 'editor.summary.social'],
   ['landingCollections', 'editor.summary.landingCollections'],
   ['landingShowcase', 'editor.summary.landingShowcase'],
+  ['landingTexts', 'editor.summary.landingTexts'],
+  ['siteFavicon', 'editor.summary.siteFavicon'],
 ] as const satisfies readonly (readonly [string, TranslationKey])[]
 
 /** "Publish N changes to the live site?": the counts by group and the placeholders still to be completed. */

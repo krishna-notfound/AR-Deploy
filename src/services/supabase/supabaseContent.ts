@@ -75,7 +75,8 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
           if (!isObj(p) || typeof p.slug !== 'string' || !isObj(p.title) || typeof p.title.en !== 'string') return []
           return [{ slug: p.slug, title: typeof p.title.pt === 'string' ? { en: p.title.en, pt: p.title.pt } : { en: p.title.en } }]
         })
-        const landing = normalizeSiteContent({ landing: { collections: c.landingCollections, featured: c.landingFeatured, example: c.landingExample, showcase: c.landingShowcase, hero: c.landingHero } }).landing
+        const normalized = normalizeSiteContent({ landing: { collections: c.landingCollections, featured: c.landingFeatured, example: c.landingExample, showcase: c.landingShowcase, hero: c.landingHero, texts: c.landingTexts }, chrome: { favicon: c.favicon } })
+        const landing = normalized.landing
         return ok({
           version,
           footerPages,
@@ -85,6 +86,8 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
           ...(landing.example ? { landingExample: landing.example } : {}),
           ...(landing.hero ? { landingHero: landing.hero } : {}),
           ...(landing.showcase ? { landingShowcase: landing.showcase } : {}),
+          ...(landing.texts ? { landingTexts: landing.texts } : {}),
+          ...(normalized.chrome?.favicon ? { favicon: normalized.chrome.favicon } : {}),
         })
       }),
 
@@ -171,4 +174,4 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
 }
 
 const assetContentType = (kind: SiteAssetKind, path: string, type: string): string =>
-  kind === 'glb' ? 'model/gltf-binary' : kind === 'usdz' ? 'model/vnd.usdz+zip' : type || (path.endsWith('.png') ? 'image/png' : path.endsWith('.webp') ? 'image/webp' : 'image/jpeg')
+  kind === 'glb' ? 'model/gltf-binary' : kind === 'usdz' ? 'model/vnd.usdz+zip' : kind === 'favicon' ? 'image/png' : type || (path.endsWith('.png') ? 'image/png' : path.endsWith('.webp') ? 'image/webp' : 'image/jpeg')

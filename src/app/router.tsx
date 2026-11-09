@@ -4,7 +4,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, type RouteObject, createBrowserRouter, useLocation } from 'react-router'
 import { isDemoMode } from '@/services'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
-import { loadApplyScreen, loadEditorLayout, loadLandingScreen, loadPageEditorScreen, loadPagesScreen, loadShowcaseScreen, loadSocialScreen } from '@/features/editor/preload'
+import { loadApplyScreen, loadEditorLayout, loadLandingScreen, loadPageEditorScreen, loadPagesScreen, loadShowcaseScreen, loadSiteScreen, loadSocialScreen } from '@/features/editor/preload'
 import { SiteContentProvider } from '@/features/marketing/SiteContentProvider'
 import { LowercaseSlugs } from '@/features/public/LowercaseSlugs'
 import { DashboardDictionaries } from '@/i18n/DashboardDictionaries'
@@ -14,7 +14,7 @@ import { RouteError } from './RouteError'
 
 // Lazy route modules per surface so public pages never load admin code. The dashboard routes also wait for the dashboard text
 // (DashboardDictionaries, ADR-0045), which the public pages never download.
-const LandingPage = lazy(() => import('@/features/marketing/LandingPage'))
+const LandingPage = lazy(() => import('@/features/marketing/LandingRoute')) // LandingPage plus the editable texts (ADR-0053)
 const DemoEntryPage = lazy(() => import('@/features/demo/DemoEntryPage'))
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
@@ -34,6 +34,7 @@ const EditorPagesScreen = lazy(loadPagesScreen)
 const EditorPageScreen = lazy(loadPageEditorScreen)
 const EditorApplyScreen = lazy(loadApplyScreen)
 const EditorSocialScreen = lazy(loadSocialScreen)
+const EditorSiteScreen = lazy(loadSiteScreen)
 const EditorLandingScreen = lazy(loadLandingScreen)
 const EditorShowcaseScreen = lazy(loadShowcaseScreen)
 
@@ -130,6 +131,7 @@ const adminRoutes: RouteObject = {
         { path: 'pages/:pageKey', element: <EditorPageScreen /> },
         { path: 'apply', element: <EditorApplyScreen /> },
         { path: 'social', element: <EditorSocialScreen /> },
+        { path: 'site', element: <EditorSiteScreen /> },
         { path: 'landing', element: <EditorLandingScreen /> },
         // The admin's own showcase pieces (ADR-0047): needs products.edit as well as content.manage.
         { path: 'showcase', element: <RequirePermission need="products.edit"><EditorShowcaseScreen /></RequirePermission> },

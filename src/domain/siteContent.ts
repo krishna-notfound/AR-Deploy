@@ -443,6 +443,12 @@ export function validateContentShape(doc: unknown): ContentErrors {
     if (sc !== undefined && (typeof sc !== 'object' || sc === null || Array.isArray(sc))) return { 'landing.showcase': 'invalid_value' }
     const hero = (l as Record<string, unknown>).hero
     if (hero !== undefined && (typeof hero !== 'object' || hero === null || Array.isArray(hero))) return { 'landing.hero': 'invalid_value' }
+    const texts = (l as Record<string, unknown>).texts
+    if (texts !== undefined && (typeof texts !== 'object' || texts === null || Array.isArray(texts))) return { 'landing.texts': 'invalid_value' }
+  }
+  if ('chrome' in d) {
+    const c = d.chrome
+    if (typeof c !== 'object' || c === null || Array.isArray(c)) return { chrome: 'invalid_value' }
   }
   return e
 }
@@ -515,7 +521,34 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
   if (doc.landing?.example) validateRef(doc.landing.example, 'landing.example', put)
   if (doc.landing?.showcase) validateShowcase(doc.landing.showcase, put)
   if (doc.landing?.hero) validateHero(doc.landing.hero, put)
+  if (doc.landing?.texts) validateLandingTexts(doc.landing.texts, put)
+  if (doc.chrome?.favicon !== undefined) {
+    const f = doc.chrome.favicon
+    if (!isSiteAsset(f) || !isFaviconPath(f.path)) put('chrome.favicon', 'invalid_value')
+  }
   return e
+}
+
+/** landing.texts: only keys of LANDING_EDITABLE_KEYS, each language a string within the key's limit. Paths: `landing.texts.<key>[.en|.pt]`. */
+function validateLandingTexts(texts: LandingTexts, put: (path: string, key: ContentErrorKey) => void): void {
+  for (const [key, entry] of Object.entries(texts)) {
+    const p = `landing.texts.${key}`
+    const max = Object.hasOwn(LANDING_TEXT_LIMITS, key) ? LANDING_TEXT_LIMITS[key]! : undefined
+    if (max === undefined) {
+      put(p, 'unknown_key')
+      continue
+    }
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      put(p, 'invalid_value')
+      continue
+    }
+    for (const l of ['en', 'pt'] as const) {
+      const v = entry[l]
+      if (v === undefined) continue
+      if (typeof v !== 'string') put(`${p}.${l}`, 'invalid_value')
+      else if (v.length > max) put(`${p}.${l}`, 'too_long')
+    }
+  }
 }
 
 function validateRef(ref: ProductRef, path: string, put: (path: string, key: ContentErrorKey) => void): void {
@@ -623,6 +656,10 @@ export interface ChangeSummary {
   landingCollections: number
   /** The landing 3D showcase card: 1 when it was added, edited or removed. */
   landingShowcase: number
+  /** Landing page texts overridden, changed or reset (per key and language). */
+  landingTexts: number
+  /** The site icon (favicon): 1 when it was set, replaced or removed. */
+  siteFavicon: number
   total: number
 }
 
@@ -726,6 +763,14 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
 
   const landingShowcase = same(a.landing?.showcase, b.landing?.showcase) ? 0 : 1
 
+  let landingTexts = 0
+  const ta = a.landing?.texts ?? {}
+  const tb = b.landing?.texts ?? {}
+  for (const key of new Set([...Object.keys(ta), ...Object.keys(tb)]))
+    for (const l of ['en', 'pt'] as const) if ((ta[key]?.[l] ?? '') !== (tb[key]?.[l] ?? '')) landingTexts++
+
+  const siteFavicon = same(a.chrome?.favicon, b.chrome?.favicon) ? 0 : 1
+
   return {
     pages,
     footer,
@@ -736,6 +781,8 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
     social,
     landingCollections,
     landingShowcase,
-    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase,
+    landingTexts,
+    siteFavicon,
+    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase + landingTexts + siteFavicon,
   }
 }

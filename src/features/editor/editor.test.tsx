@@ -79,6 +79,7 @@ describe('Editor shell', () => {
       ['Landing page', '/admin/editor/landing'],
       ['Application form', '/admin/editor/apply'],
       ['Social media', '/admin/editor/social'],
+      ['Site', '/admin/editor/site'],
     ])
   })
 

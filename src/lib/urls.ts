@@ -134,6 +134,7 @@ export const editorPagesPath = () => `${EDITOR_PATH}/pages`
 export const editorPagePath = (pageKey: string) => `${EDITOR_PATH}/pages/${encodeURIComponent(pageKey)}`
 export const editorApplyPath = (tab?: 'form' | 'messages') => `${EDITOR_PATH}/apply${tab ? `?tab=${tab}` : ''}`
 export const editorSocialPath = () => `${EDITOR_PATH}/social`
+export const editorSitePath = () => `${EDITOR_PATH}/site`
 export const editorLandingPath = () => `${EDITOR_PATH}/landing`
 /** The admin's own showcase pieces in the Editor (ADR-0047), and the shared product editor on them. */
 export const editorShowcasePath = () => `${EDITOR_PATH}/showcase`
