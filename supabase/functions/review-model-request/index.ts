@@ -8,6 +8,7 @@ import { callerRpc } from '../_shared/caller.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
 import { gateCaller } from '../_shared/gate.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
+import { createNotifier } from '../_shared/notifyAdmin.ts'
 import { ownerRecipient } from '../_shared/owner.ts'
 import { handleReviewModelRequest } from './handler.ts'
 
@@ -15,6 +16,9 @@ const env = (n: string) => Deno.env.get(n)
 const url = env('SUPABASE_URL') ?? ''
 const anonKey = env('SUPABASE_ANON_KEY') ?? ''
 const admin = createClient(url, serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
+
+// In-app notifications and phone push to the business's members (ADR-0056); VAPID_* secrets are optional.
+const notify = createNotifier(admin, env)
 
 /** The admin_*_model_request refusals, by the message they raise; everything else is a 500. */
 const KNOWN = new Set(['reason_required', 'invalid_transition', 'model_request_needs_glb', 'model_request_not_found', 'aal2_required', 'forbidden'])
@@ -30,6 +34,7 @@ Deno.serve((req) =>
   handleReviewModelRequest(req, {
     config: readEmailConfig(env),
     fetch,
+    notify,
     async userIdFromToken(token) {
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)
@@ -70,7 +75,7 @@ Deno.serve((req) =>
     async emailContext(requestId) {
       const { data, error } = await admin
         .from('model_requests')
-        .select('business_id, reason, products(name, status), product_variants(name)')
+        .select('business_id, product_id, reason, products(name, status), product_variants(name)')
         .eq('id', requestId)
         .maybeSingle()
       if (error) throw new Error(`request lookup failed: ${error.code ?? 'unknown'}`)
@@ -80,6 +85,7 @@ Deno.serve((req) =>
       const owner = await ownerRecipient(admin, data.business_id)
       return {
         businessId: data.business_id,
+        ...(data.product_id ? { productId: data.product_id as string } : {}),
         recipient: owner ? { email: owner.email, language: owner.language } : null,
         productName: localized(product?.name),
         ...(option ? { optionName: localized(option.name) } : {}),

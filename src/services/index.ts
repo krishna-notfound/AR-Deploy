@@ -7,6 +7,9 @@ import { mockContentService, mockSiteAssetUrl } from './mock/mockContent'
 import { SITE_ASSET_BUCKET, type SiteAsset } from '@/domain/siteContent'
 import { mockAccountService } from './mock/mockAccount'
 import { mockCatalogService } from './mock/mockCatalogService'
+import { mockNotificationService } from './mock/mockNotifications'
+import type { NotificationService } from './notificationService'
+import { createSupabaseNotifications } from './supabase/supabaseNotifications'
 import { type AuthService, createSupabaseAuthService } from './supabase/auth'
 import { createPasswordCheckClient, getSupabaseClient } from './supabase/client'
 import { createSupabaseAccount, makeVerifyCurrentPassword } from './supabase/supabaseAccount'
@@ -67,6 +70,20 @@ export const content: ContentService = SUPABASE_BUILD
     ? mockContentService
     : unavailableContent(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
 
+/** Every notification call fails with the configuration problem (never demo data in a half-configured Supabase build). */
+export function unavailableNotifications(problem: string): NotificationService {
+  return new Proxy({} as NotificationService, { get: (_, key) => (key === 'then' ? undefined : async () => fail('CONFIG', problem)) })
+}
+
+/** In-app notifications and phone push (ADR-0056). Demo: an in-memory harness with two labelled sample notifications. */
+export const notifications: NotificationService = SUPABASE_BUILD
+  ? backend.mode === 'supabase'
+    ? createSupabaseNotifications(getSupabaseClient(backend))
+    : unavailableNotifications(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
+  : backend.mode === 'demo'
+    ? mockNotificationService
+    : unavailableNotifications(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
+
 /**
  * The public URL of a file uploaded in the Website Editor. Supabase: the public bucket `site-content`
  * (`${VITE_SUPABASE_URL}/storage/v1/object/public/site-content/<path>`). Demo: the session-only object URL ('' after a reload).
@@ -83,6 +100,7 @@ export { ACCOUNT_ERRORS, AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, PASSWORD_MAX, PASSW
 export type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, SettingsSection, TotpEnrollment } from '@/domain/types'
 export type { AuthError, AuthResult, AuthService, SignedInAccount } from './supabase/auth'
 export type { CatalogService, Result, ServiceError, BusinessInput, ProductInput, ProductQuery } from './catalogService'
+export type { AppNotification, NotificationKind, NotificationList, NotificationPrefs, NotificationService, PushSubscriptionInput } from './notificationService'
 export type { ContentDraftState, ContentService, ContentVersionSummary, PublishedApplyForm, PublishedChrome, PublishedPage } from './contentService'
 
 // Demo-mode helpers the UI needs (failure injection, sample-data credits, store notices), re-exported here so

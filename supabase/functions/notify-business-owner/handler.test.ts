@@ -149,3 +149,42 @@ describe('notify-business-owner (R-W7-2)', () => {
     expect(blocked.fetchFn).not.toHaveBeenCalled()
   })
 })
+
+
+describe('notify-business-owner notifications (ADR-0056)', () => {
+  it('an Admin pause → a company_update for the business members, in the owner language when none is saved', async () => {
+    const notify = vi.fn(async () => {})
+    const { d } = deps([PAUSE], { notify })
+    await handleNotifyBusinessOwner(post({ businessId: BIZ }), d)
+    expect(notify).toHaveBeenCalledWith({
+      audience: { business: BIZ },
+      kind: 'company_update',
+      title: { en: 'Your catalog was paused', pt: 'O seu catálogo foi pausado' },
+      body: { en: 'The Sanctus team paused the public catalog of Casa Lisboa.', pt: 'A equipa Sanctus pausou o catálogo público de Casa Lisboa.' },
+      link: '/dashboard',
+      dedupeKey: 'business_notice:aud-1',
+      fallbackLang: 'en',
+    })
+    notify.mockClear()
+    const pt = deps([PAUSE], { notify })
+    await handleNotifyBusinessOwner(post({ businessId: PT_BIZ }), pt.d)
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ fallbackLang: 'pt', audience: { business: PT_BIZ } }))
+  })
+
+  it('product events link to the products page and name the product; email not configured does not stop the notification', async () => {
+    const notify = vi.fn(async () => {})
+    const rows: Row[] = [{ id: 'aud-2', eventType: 'product_deleted', metadata: { actor_label: 'Owner', name: 'Oslo sofa' } }]
+    const { d } = deps(rows, { notify, config: { ok: false, missing: ['RESEND_API_KEY'] } })
+    await handleNotifyBusinessOwner(post({ businessId: BIZ }), d)
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ link: '/dashboard/products', body: expect.objectContaining({ en: 'The Sanctus team deleted Oslo sofa.' }), dedupeKey: 'business_notice:aud-2' }))
+  })
+
+  it('a failing notifier does not change the email result, and no rows or no owner means no notification', async () => {
+    const failing = deps([PAUSE], { notify: async () => Promise.reject(new Error('down')) })
+    expect(await json(await handleNotifyBusinessOwner(post({ businessId: BIZ }), failing.d))).toEqual({ ok: true, sent: 1, skipped: 0 })
+    const notify = vi.fn(async () => {})
+    await handleNotifyBusinessOwner(post({ businessId: BIZ }), deps([], { notify }).d)
+    await handleNotifyBusinessOwner(post({ businessId: '33333333-3333-4333-8333-333333333333' }), deps([PAUSE], { notify }).d)
+    expect(notify).not.toHaveBeenCalled()
+  })
+})

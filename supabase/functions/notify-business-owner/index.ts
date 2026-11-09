@@ -7,6 +7,7 @@ import { callerRpc } from '../_shared/caller.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
 import { gateCaller } from '../_shared/gate.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
+import { createNotifier } from '../_shared/notifyAdmin.ts'
 import { ownerRecipient } from '../_shared/owner.ts'
 import { STAFF_LABELS, handleNotifyBusinessOwner } from './handler.ts'
 
@@ -15,12 +16,16 @@ const url = env('SUPABASE_URL') ?? ''
 const anonKey = env('SUPABASE_ANON_KEY') ?? ''
 const admin = createClient(url, serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
 
+// In-app notifications and phone push to the business's members (ADR-0056); VAPID_* secrets are optional.
+const notify = createNotifier(admin, env)
+
 type AuditRow = { id: string; event_type: string; to_status: string | null; metadata: Record<string, unknown> | null }
 
 Deno.serve((req) =>
   handleNotifyBusinessOwner(req, {
     config: readEmailConfig(env),
     fetch,
+    notify,
     async userIdFromToken(token) {
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)

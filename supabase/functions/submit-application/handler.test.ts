@@ -610,3 +610,48 @@ describe('submit-application: published application form', () => {
     expect(rows).toHaveLength(1)
   })
 })
+
+
+describe('submit-application notifications (ADR-0056)', () => {
+  it('asks to notify staff with applications.view, with the applicant business, a link and a dedupe key', async () => {
+    const notify = vi.fn(async () => {})
+    const { d } = deps({ notify })
+    const res = await handleSubmitApplication(post(VALID), d)
+    expect(res.status).toBe(200)
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith({
+      audience: { staff: 'applications.view' },
+      kind: 'new_application',
+      title: { en: 'New business application', pt: 'Nova candidatura' },
+      body: { en: 'Atelier Cão applied to join Sanctus.', pt: 'Atelier Cão candidatou-se à Sanctus.' },
+      link: '/admin/applications/app-1',
+      dedupeKey: 'application:app-1',
+    })
+  })
+
+  it('a notifier that rejects never fails the submission or the emails', async () => {
+    const notify = vi.fn(async () => Promise.reject(new Error('push down')))
+    const { d, sends } = deps({ notify })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await handleSubmitApplication(post(VALID), d)
+    expect(res.status).toBe(200)
+    expect(sends).toHaveLength(2)
+  })
+
+  it('a refused (invalid) application notifies nobody', async () => {
+    const notify = vi.fn(async () => {})
+    const { d } = deps({ notify })
+    const res = await handleSubmitApplication(post({ ...VALID, applicantEmail: 'nope' }), d)
+    expect(res.status).toBe(400)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('a key replay after the settle time asks again with the same dedupe key (the notifier writes nothing twice)', async () => {
+    const notify = vi.fn(async () => {})
+    const { d, clock } = deps({ notify })
+    await handleSubmitApplication(post(VALID), d)
+    clock.at = new Date(clock.at.getTime() + 60_000)
+    await handleSubmitApplication(post(VALID), d)
+    expect(notify.mock.calls.map((c) => (c as unknown as [{ dedupeKey: string }])[0].dedupeKey)).toEqual(['application:app-1', 'application:app-1'])
+  })
+})
