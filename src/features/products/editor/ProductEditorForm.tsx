@@ -51,6 +51,7 @@ const FIELD_SECTION: Record<string, (typeof SECTIONS)[number]['id']> = {
   slug: 'basics',
   price: 'basics',
   images: 'images',
+  models: 'models',
   'dimensions.width': 'specs',
   'dimensions.height': 'specs',
   'dimensions.depth': 'specs',
@@ -76,6 +77,7 @@ function fieldValue(f: EditorForm, key: string): string {
   if (key === 'cta.label') return f.input.cta.label.en
   if (key.startsWith('dimensions.')) return f.dims[key.slice(11) as (typeof DIMS)[number]] ?? ''
   if (key === 'images') return JSON.stringify(f.input.images.filter((i) => i.kind === 'gallery').map((i) => i.id))
+  if (key === 'models') return JSON.stringify(f.input.models.glb?.url ?? '')
   if (key === 'variants') return JSON.stringify(f.input.variants)
   if (key === 'businessId' || key === 'slug') return f.input[key]
   return ''
@@ -619,7 +621,7 @@ export function ProductEditorForm({
             </div>
           </Section>
 
-          <Section id="models" title={t('products.editor.sections.models')} description={t('products.editor.modelsDescription')}>
+          <Section id="models" title={t('products.editor.sections.models')} description={t('products.editor.modelsDescription')} error={err('models')}>
             {scope === 'admin' && latest && can('models.manage') && <OpenModelRequests productId={latest.id} />}
             {ownerChoice && (
               <Segmented

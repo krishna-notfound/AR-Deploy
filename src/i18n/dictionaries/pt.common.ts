@@ -116,5 +116,5 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'common.validation.publish.imageRequired': 'Adicione pelo menos uma imagem do produto antes de publicar.',
   'common.validation.publish.dimensionsRequired': 'As dimensões têm de ser superiores a zero para publicar.',
   // W3 (ADR-0054): publishing needs the product's own 3D model.
-  'common.validation.publish.modelRequired': 'Adicione um modelo 3D (GLB) ao produto antes de publicar. Sem ele, fica em rascunho.',
+  'common.validation.publish.modelRequired': 'Adicione ou peça um modelo 3D (GLB) para este produto antes de publicar. Até lá, fica em rascunho.',
 }

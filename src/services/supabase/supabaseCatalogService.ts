@@ -1103,7 +1103,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const next: Product = { ...current.data, ...patch, id, businessId: current.data.businessId, status: current.data.status }
         if (next.status === 'published') {
           // A product published before the 3D-only rule (ADR-0054) stays editable without a model; one that has a model keeps it.
-        const pubErrors = validateForPublish(next, { requireModel: hasOwnValidGlb(current.data) })
+        const pubErrors = validateForPublish({ ...next, models: patch.keepModels === true ? current.data.models : next.models }, { requireModel: hasOwnValidGlb(current.data) })
           if (Object.keys(pubErrors).length) return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
         }
         // R-S4-18: an option this save drops takes its requests with it (cascade), so read their files first.

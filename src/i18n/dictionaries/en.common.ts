@@ -119,5 +119,5 @@ export const enCommon = {
   'common.validation.publish.imageRequired': 'Add at least one product image before publishing.',
   'common.validation.publish.dimensionsRequired': 'Dimensions must be greater than zero to publish.',
   // W3 (ADR-0054): publishing needs the product's own 3D model.
-  'common.validation.publish.modelRequired': 'Add a 3D model (GLB) to the product before publishing. Without one it stays a draft.',
+  'common.validation.publish.modelRequired': 'Add or request a 3D model (GLB) for this product before publishing. Until then it stays a draft.',
 } as const

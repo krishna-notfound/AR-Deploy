@@ -34,6 +34,8 @@ export const ptProducts: Partial<Record<TranslationKey, string>> = {
   'products.filters.allAr': 'Todos (3D / RA)',
   'products.filters.needsUsdz': 'Precisa de ficheiro para iPhone (USDZ)',
   'products.filters.noModel': 'Sem modelo 3D',
+  // W3 (ADR-0054): published before the 3D-only rule; staff can unpublish them from this view.
+  'products.filters.publishedNo3d': 'Publicados sem 3D',
   'products.filters.requests': 'Pedidos 3D',
   'products.filters.byRequests': 'Filtrar por pedidos 3D',
   'products.filters.allProducts': 'Todos os produtos',
@@ -58,7 +60,6 @@ export const ptProducts: Partial<Record<TranslationKey, string>> = {
   'products.menu.previewDraft': 'Pré-visualizar rascunho',
   'products.menu.copyUrl': 'Copiar URL do produto',
   'products.menu.qr': 'Código QR do produto',
-  'products.menu.qrDraft': 'Código QR do produto (ainda não público)',
   'products.menu.embed': 'Incorporar no seu site',
   'products.menu.embedDraft': 'Incorporar no seu site (ainda não público)',
   'products.menu.duplicate': 'Duplicar',

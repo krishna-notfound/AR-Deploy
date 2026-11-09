@@ -262,3 +262,8 @@ Fixed in the migration files (none had been applied anywhere):
 - `business_applications`: `country`, `city`, `category` nullable; answers limit 65,536 bytes.
 - Audit events: `site_content_published`, `site_content_draft_restored`.
 - Rollback: `supabase/rollback/20261029_site_content_rollback.sql`. Tests: `supabase/tests/siteContent.test.ts` (PGlite).
+
+## Public catalogue rules (ADR-0054, migration `20261109120040_catalogue_rules_round2`)
+- `businesses.share_enabled boolean not null default true`: the Share button of a company's product pages. Writable only by platform staff with `businesses.edit` (column grant + `guard_business_admin_fields` allow-list + staff update policy; an owner gets `business_field_admin_only`).
+- `anon` has **no table-level select** on `businesses`: it may select every column except `description` (internal). Public reads use `PUBLIC_BUSINESS_COLUMNS` (`supabaseCatalogService.ts`); `select('*')` as anon fails. A column added later needs `grant select (col) on public.businesses to anon` and an entry in that list.
+- Publishing: the transition to `published` needs a `product_models` glb row (`publish_needs_model`, deferred constraint triggers `products_publish_requires_model_ins/_upd`). Rows already published are untouched. Rollback: `supabase/rollback/20261109_catalogue_rules_round2_rollback.sql`.

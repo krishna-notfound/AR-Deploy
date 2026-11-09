@@ -28,6 +28,7 @@ import { BusinessReadOnly } from '../businesses/BusinessReadOnly'
 import { AuditTimeline } from '../applications/AuditTimeline'
 import { EmailActivity } from '../applications/EmailActivity'
 import { BusinessModelsCard } from '../businesses/BusinessModelsCard'
+import { BusinessShareCard } from '../businesses/BusinessShareCard'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 import { closureByBusiness } from '../businesses/closure'
 import { useBusinessActions } from '../businesses/useBusinessActions'
@@ -174,6 +175,7 @@ export default function BusinessDetailPage() {
       {tab === 'details' && (
         <div className="space-y-6">
           {can('businesses.edit') ? <BusinessForm business={b} mode="edit" /> : <BusinessReadOnly business={b} />}
+          <BusinessShareCard business={b} onChanged={business.refetch} />
           <BusinessModelsCard business={b} onChanged={business.refetch} />
         </div>
       )}

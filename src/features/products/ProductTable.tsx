@@ -90,7 +90,8 @@ export function ProductTable({
       ...(allowed('products.edit') ? [{ label: t('common.edit'), icon: <Pencil />, onSelect: () => actions.edit(p) }] : []),
       { label: t(p.status === 'published' ? 'products.menu.open' : 'products.menu.previewDraft'), icon: <ExternalLink />, onSelect: () => actions.openPreview(p, b) },
       { label: t('products.menu.copyUrl'), icon: <Copy />, onSelect: () => void actions.copyUrl(p, b) },
-      { label: t(p.status === 'published' ? 'products.menu.qr' : 'products.menu.qrDraft'), icon: <QrCode />, onSelect: () => setQrFor(p) },
+      // The product QR code only for a publicly visible product: published, in an active catalogue (ADR-0054).
+      ...(p.status === 'published' && b?.status === 'active' ? [{ label: t('products.menu.qr'), icon: <QrCode />, onSelect: () => setQrFor(p) }] : []),
       { label: t(p.status === 'published' ? 'products.menu.embed' : 'products.menu.embedDraft'), icon: <CodeXml />, onSelect: () => setEmbedFor(p) },
       ...(allowed('products.edit') ? [{ label: t('products.menu.duplicate'), icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) }] : []),
       ...(!allowed('products.publish')

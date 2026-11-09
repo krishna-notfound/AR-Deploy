@@ -80,9 +80,9 @@ describe('CollectionPage', () => {
     const list = await screen.findByRole('list', { name: 'Pieces in My picks' })
     const links = within(list).getAllByRole('link')
     expect(links.map((l) => l.getAttribute('href'))).toEqual([`/showcase/${b.slug}`, `/showcase/${a.slug}`])
-    // Name and price; the "3D · AR" chip when the piece has a model; never a business name.
+    // Name, category and no price; the "3D · AR" chip when the piece has a model; never a business name.
     expect(links[0]).toHaveTextContent(b.name.en)
-    expect(links[0]).toHaveTextContent(/€/)
+    expect(links[0]).not.toHaveTextContent(/€|EUR/)
     expect(links[0]).toHaveTextContent('3D · AR')
     expect(links[0]).not.toHaveTextContent(business.name)
     // No picture outside the piece cards (the collection's own picture is gone from this page).

@@ -11,8 +11,7 @@ import type { Product } from '@/domain/types'
 import { arLaunchUrl, variantMedia } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { initialPrice, primaryImage } from '@/lib/product'
-import { useFormat } from '@/lib/useFormat'
+import { primaryImage } from '@/lib/product'
 import { showcaseProductPath } from '@/lib/urls'
 import { InPlaceModel } from './InPlaceModel'
 import { hasGlb, useShowcasePieces } from './useShowcasePieces'
@@ -24,8 +23,6 @@ export interface ShowcaseView {
   text?: string
   dimensions?: string
   materials?: string
-  /** Already formatted. */
-  priceLabel?: string
   imageUrl?: string
   /** The 3D model, plus the iPhone file. */
   glbUrl?: string
@@ -46,11 +43,10 @@ export function pickShowcasePiece(pieces: Product[], featured?: ProductRef): Pro
 type Fmt = {
   t: ReturnType<typeof useI18n>['t']
   localized: ReturnType<typeof useI18n>['localized']
-  money: ReturnType<typeof useFormat>['money']
 }
 
 /** A showcase piece as the card's view. */
-export function productToShowcaseView(product: Product, { t, localized, money }: Fmt): ShowcaseView {
+export function productToShowcaseView(product: Product, { t, localized }: Fmt): ShowcaseView {
   const media = variantMedia(product)
   const image = primaryImage(product)
   const d = product.dimensions
@@ -64,7 +60,6 @@ export function productToShowcaseView(product: Product, { t, localized, money }:
       ? `${initial(t('product.width'))} ${d.width} × ${initial(t('product.height'))} ${d.height} × ${initial(t('product.depth'))} ${d.depth} ${d.unit}`
       : undefined,
     materials: localized(product.material) || undefined,
-    priceLabel: money(initialPrice(product), product.currency),
     imageUrl: image?.url,
     glbUrl: media.models.glb ? arLaunchUrl(media.models.glb) : undefined,
     usdzUrl: media.models.usdz ? arLaunchUrl(media.models.usdz) : undefined,
@@ -75,13 +70,12 @@ export function productToShowcaseView(product: Product, { t, localized, money }:
 /** The 3D card's view: a showcase piece, or undefined (the illustration) when there is none. `loading` while the pieces load. */
 export function useShowcaseCardView(featured?: ProductRef): { view?: ShowcaseView; loading: boolean } {
   const { t, localized } = useI18n()
-  const { money } = useFormat()
   const { status, pieces } = useShowcasePieces()
   const slug = featured?.businessSlug === HOUSE_BUSINESS_SLUG ? featured.productSlug : ''
   const view = useMemo(() => {
     const piece = pickShowcasePiece(pieces, slug ? { businessSlug: HOUSE_BUSINESS_SLUG, productSlug: slug } : undefined)
-    return piece ? productToShowcaseView(piece, { t, localized, money }) : undefined
-  }, [pieces, slug, t, localized, money])
+    return piece ? productToShowcaseView(piece, { t, localized }) : undefined
+  }, [pieces, slug, t, localized])
   return { view, loading: status === 'loading' }
 }
 
@@ -132,7 +126,7 @@ export function LandingShowcase({ view, loading }: { view?: ShowcaseView; loadin
 
 export function ShowcaseCard({ view }: { view: ShowcaseView }) {
   const { t } = useI18n()
-  const { title, eyebrow, text, dimensions, materials, priceLabel, imageUrl, glbUrl, usdzUrl, productHref } = view
+  const { title, eyebrow, text, dimensions, materials, imageUrl, glbUrl, usdzUrl, productHref } = view
 
   const [mode, setMode] = useState<'image' | '3d'>(!imageUrl && glbUrl ? '3d' : 'image')
   const [loaded, setLoaded] = useState(false)
@@ -250,7 +244,6 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
             </div>
           )}
         </dl>
-        {priceLabel && <p className="font-display text-xl tracking-[0.04em] sm:text-right">{priceLabel}</p>}
         {text && <p className="text-[13px] leading-5 text-chalk/80 sm:col-span-2">{text}</p>}
       </figcaption>
     </figure>
@@ -260,7 +253,6 @@ export function ShowcaseCard({ view }: { view: ShowcaseView }) {
 /** The Linden armchair from the brand references: no product record and no model, so it is labelled and never links. */
 function IllustrationCard() {
   const { t } = useI18n()
-  const { money } = useFormat()
   return (
     <figure className={CARD}>
       <div className="border-b border-chalk/15 pb-4">
@@ -291,7 +283,6 @@ function IllustrationCard() {
             <dd className="mt-1.5 leading-5 text-chalk/85">{t('landing.feature.materials')}</dd>
           </div>
         </dl>
-        <p className="font-display text-xl tracking-[0.04em] sm:text-right">{money(249000, 'EUR')}</p>
         <p className="text-xs leading-5 text-chalk/60 sm:col-span-2">{t('landing.feature.illustrative')}</p>
       </figcaption>
     </figure>

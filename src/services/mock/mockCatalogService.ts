@@ -486,7 +486,7 @@ export const mockCatalogService: CatalogService = {
       if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
       if (next.status === 'published') {
         // A product published before the 3D-only rule (ADR-0054) stays editable without a model; one that has a model keeps it.
-        const pubErrors = validateForPublish(next, { requireModel: hasOwnValidGlb(current) })
+        const pubErrors = validateForPublish({ ...next, models: data.keepModels === true ? current.models : next.models }, { requireModel: hasOwnValidGlb(current) })
         if (Object.keys(pubErrors).length)
           return fail('VALIDATION', 'This product is published. Unpublish it first or keep the required fields complete.', pubErrors)
       }

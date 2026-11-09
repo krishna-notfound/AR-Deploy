@@ -103,12 +103,20 @@ describe('products', () => {
     expect((await svc.createProduct(draftInput({ businessId: 'biz_nord' }))).ok).toBe(true)
   })
 
-  it('blocks publishing without an image, then publishes', async () => {
+  it('blocks publishing without an image or a 3D model (ADR-0054), then publishes', async () => {
     const p = unwrap(await svc.createProduct(draftInput()))
     const blocked = await svc.publishProduct(p.id)
     expect(blocked.ok).toBe(false)
-    if (!blocked.ok) expect(blocked.error.fieldErrors?.images).toBeDefined()
+    if (!blocked.ok) {
+      expect(blocked.error.fieldErrors?.images).toBeDefined()
+      expect(blocked.error.fieldErrors?.models).toBeDefined()
+    }
     unwrap(await svc.updateProduct(p.id, { images: [{ id: 'i1', url: 'https://x/y.jpg', isPrimary: false, kind: 'gallery' }] }))
+    // A photo is not enough: a USDZ alone is not the product's GLB either.
+    unwrap(await svc.updateProduct(p.id, { models: { usdz: { format: 'usdz', url: 'blob:x', fileName: 'x.usdz', status: 'session-only' } } }))
+    const noGlb = await svc.publishProduct(p.id)
+    expect(noGlb.ok ? undefined : noGlb.error.fieldErrors?.models).toBeDefined()
+    unwrap(await svc.updateProduct(p.id, { models: { glb: { format: 'glb', url: 'https://x/y.glb', fileName: 'y.glb', status: 'valid' } } }))
     const published = unwrap(await svc.publishProduct(p.id))
     expect(published.status).toBe('published')
     expect(published.publishedAt).toBeDefined()
@@ -749,12 +757,12 @@ describe('S4 Task 3: own 3D uploads and stale model saves (demo, R-S4-3, R-S4-17
     expect(saved.modelsChangedAt).toBeDefined()
     // An editor that loaded the product before that change (an older value, or none) is refused for a model change only.
     for (const stale of [undefined, '2000-01-01T00:00:00.000Z']) {
-      expect(await svc.updateProduct(src.id, { models: {}, modelsChangedAt: stale })).toMatchObject({ ok: false, error: { code: 'CONFLICT', reason: 'models_changed_elsewhere' } })
+      expect(await svc.updateProduct(src.id, { models: { glb: saved.models.glb }, modelsChangedAt: stale })).toMatchObject({ ok: false, error: { code: 'CONFLICT', reason: 'models_changed_elsewhere' } })
       expect(unwrap(await svc.updateProduct(src.id, { name: { en: 'Text only' }, models: saved.models, modelsChangedAt: stale })).models).toEqual(saved.models)
     }
     asAdmin()
     const casa = unwrap(await svc.getProductById('prd_glam_sofa'))
-    expect(unwrap(await svc.updateProduct(casa.id, { models: {}, modelsChangedAt: casa.modelsChangedAt })).modelsChangedAt).toBeDefined()
+    expect(unwrap(await svc.updateProduct(casa.id, { models: { ...casa.models, usdz }, modelsChangedAt: casa.modelsChangedAt })).modelsChangedAt).toBeDefined()
   })
 
   it('Review Focus 1: duplicateProduct for a switch-off business copies no 3D rows and the original keeps its GLB', async () => {

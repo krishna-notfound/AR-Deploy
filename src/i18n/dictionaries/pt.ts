@@ -213,7 +213,7 @@ export const ptCore: Partial<Record<TranslationKey, string>> = {
   'landing.feature.materialsLabel': 'Materiais',
   'landing.feature.materials': 'Madeira maciça, linho e espuma de alta densidade.',
   'landing.feature.textureCaption': 'Texturas que contam histórias.',
-  'landing.feature.illustrative': 'Peça ilustrativa: a imagem e o preço são exemplos, não um produto à venda.',
+  'landing.feature.illustrative': 'Peça ilustrativa: a imagem é um exemplo, não um produto à venda.',
   'landing.feature.imageAlt': 'Poltrona Linden: estofado bouclé sobre estrutura de nogueira',
   'landing.band.cta': 'Ver catálogo',
   'collection.emptyBody': 'Estamos a escolher as primeiras peças desta coleção. Volte em breve.',

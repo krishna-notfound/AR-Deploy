@@ -214,7 +214,7 @@ export const enCore = {
   'landing.feature.materialsLabel': 'Materials',
   'landing.feature.materials': 'Solid wood, linen and high-density foam.',
   'landing.feature.textureCaption': 'Textures that tell stories.',
-  'landing.feature.illustrative': 'Illustrative piece: the image and the price are examples, not a product for sale.',
+  'landing.feature.illustrative': 'Illustrative piece: the image is an example, not a product for sale.',
   'landing.feature.imageAlt': 'The Linden armchair: bouclé upholstery on a walnut frame',
   'landing.band.cta': 'View catalogue',
   'collection.emptyBody': 'We are choosing the first pieces for this collection. Please check back soon.',
