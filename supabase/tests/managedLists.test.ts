@@ -1,4 +1,4 @@
-﻿// @vitest-environment node
+// @vitest-environment node
 // Client requests round 2, W4 (ADR-0055): the managed category and currency lists. The seeds, the foreign keys that replace the
 // old check constraints, who reads and writes (content.manage + 2FA), "other" being permanent, admin_delete_category moving
 // products, a disabled currency staying on its rows, the landing-link category check, and the rollback. PGlite only.
@@ -59,7 +59,7 @@ describe('managed_lists migration: seeds', () => {
     const rows = await cats()
     expect(rows.map((r) => r.slug)).toEqual(['sofa', 'chair', 'table', 'bed', 'storage', 'lighting', 'decor', 'other'])
     expect(rows.every((r) => r.active)).toBe(true)
-    expect(rows[0]).toMatchObject({ label_en: 'Sofa', label_pt: 'SofÃ¡' })
+    expect(rows[0]).toMatchObject({ label_en: 'Sofa', label_pt: 'Sofá' })
     expect(rows[7]).toMatchObject({ slug: 'other', label_en: 'Other', label_pt: 'Outro' })
   })
 
