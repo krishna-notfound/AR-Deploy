@@ -13,7 +13,8 @@ import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
 import { OPEN_REQUEST_STATUSES } from '@/domain/modelRequests'
-import { type Business, CATEGORIES, CURRENCIES, type Category, type Currency, type Product, type ProductStatus } from '@/domain/types'
+import { type Business, type Product, type ProductStatus } from '@/domain/types'
+import { useCategories, useCategoryLabel, useCurrencies } from '@/services/listsHooks'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { errorText, fieldTexts } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
@@ -189,6 +190,22 @@ export function ProductEditorForm({
 
   const [form, setForm] = useState<EditorForm>(initialForm)
   const [snapshot, setSnapshot] = useState(() => JSON.stringify(initialForm))
+  const categoryLists = useCategories()
+  const currencyLists = useCurrencies()
+  const categoryLabel = useCategoryLabel()
+  // A new product starts on a category and currency that are still offered (the defaults may have been hidden or removed in the
+  // admin console). Untouched forms stay "not changed": the snapshot moves with them.
+  useEffect(() => {
+    if (!isNew || !categoryLists.loaded || !currencyLists.loaded) return
+    const category = categoryLists.active.some((c) => c.slug === form.input.category) ? form.input.category : (categoryLists.active[0]?.slug ?? form.input.category)
+    const offeredCurrencies = currencyLists.offered()
+    const currency = offeredCurrencies.includes(form.input.currency) ? form.input.currency : (offeredCurrencies[0] ?? form.input.currency)
+    if (category === form.input.category && currency === form.input.currency) return
+    const next: EditorForm = { ...form, input: { ...form.input, category, currency } }
+    if (JSON.stringify(form) === snapshot) setSnapshot(JSON.stringify(next))
+    setForm(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryLists.loaded, currencyLists.loaded])
   const navState = location.state as NavState
   const [errors, setErrors] = useState<Errors>(() => navState?.publishErrors ?? {})
   const [busy, setBusy] = useState<null | 'save' | 'publish' | 'unpublish' | 'preview' | 'delete'>(null)
@@ -587,10 +604,11 @@ export function ProductEditorForm({
             {/* Below sm: Category on its own row, then Price and a 96px Currency side by side. */}
             <div className="grid grid-cols-[1fr_96px] gap-4 sm:grid-cols-[2fr_1fr_1fr] [&>*:first-child]:max-sm:col-span-2">
               <FormField label={t('products.filters.category')}>
-                <Select value={form.input.category} onChange={(e) => setInput({ category: e.target.value as Category })}>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {t(`products.category.${c}`)}
+                {/* The categories are managed in the admin console (ADR-0055); this product's own stays offered even if hidden. */}
+                <Select value={form.input.category} onChange={(e) => setInput({ category: e.target.value })}>
+                  {categoryLists.offered(form.input.category).map((c) => (
+                    <option key={c.slug} value={c.slug}>
+                      {categoryLabel(c.slug)}
                     </option>
                   ))}
                 </Select>
@@ -599,8 +617,8 @@ export function ProductEditorForm({
                 <Input inputMode="decimal" placeholder="0.00" className="tabular-nums" value={form.priceText} onChange={(e) => setForm((f) => ({ ...f, priceText: e.target.value }))} />
               </FormField>
               <FormField label={t('products.editor.currency')}>
-                <Select value={form.input.currency} onChange={(e) => setInput({ currency: e.target.value as Currency })}>
-                  {CURRENCIES.map((c) => (
+                <Select value={form.input.currency} onChange={(e) => setInput({ currency: e.target.value })}>
+                  {currencyLists.offered(form.input.currency).map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>

@@ -10,6 +10,7 @@ import { HOUSE_BUSINESS_SLUG, type ProductRef } from '@/domain/siteContent'
 import type { Product } from '@/domain/types'
 import { arLaunchUrl, variantMedia } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { cn } from '@/lib/cn'
 import { initialPrice, primaryImage } from '@/lib/product'
 import { useFormat } from '@/lib/useFormat'
@@ -47,10 +48,12 @@ type Fmt = {
   t: ReturnType<typeof useI18n>['t']
   localized: ReturnType<typeof useI18n>['localized']
   money: ReturnType<typeof useFormat>['money']
+  /** The category's name from the managed list (ADR-0055), `useCategoryLabel()`. */
+  categoryLabel: (slug: string) => string
 }
 
 /** A showcase piece as the card's view. */
-export function productToShowcaseView(product: Product, { t, localized, money }: Fmt): ShowcaseView {
+export function productToShowcaseView(product: Product, { t, localized, money, categoryLabel }: Fmt): ShowcaseView {
   const media = variantMedia(product)
   const image = primaryImage(product)
   const d = product.dimensions
@@ -58,7 +61,7 @@ export function productToShowcaseView(product: Product, { t, localized, money }:
   // "W 60 × H 100 × D 60 cm", with the initials of the language's own words (L, A, P in Portuguese).
   const initial = (word: string) => word.charAt(0).toUpperCase()
   return {
-    eyebrow: t(`category.${product.category}`),
+    eyebrow: categoryLabel(product.category),
     title: localized(product.name),
     dimensions: hasDims
       ? `${initial(t('product.width'))} ${d.width} × ${initial(t('product.height'))} ${d.height} × ${initial(t('product.depth'))} ${d.depth} ${d.unit}`
@@ -76,12 +79,13 @@ export function productToShowcaseView(product: Product, { t, localized, money }:
 export function useShowcaseCardView(featured?: ProductRef): { view?: ShowcaseView; loading: boolean } {
   const { t, localized } = useI18n()
   const { money } = useFormat()
+  const categoryLabel = useCategoryLabel()
   const { status, pieces } = useShowcasePieces()
   const slug = featured?.businessSlug === HOUSE_BUSINESS_SLUG ? featured.productSlug : ''
   const view = useMemo(() => {
     const piece = pickShowcasePiece(pieces, slug ? { businessSlug: HOUSE_BUSINESS_SLUG, productSlug: slug } : undefined)
-    return piece ? productToShowcaseView(piece, { t, localized, money }) : undefined
-  }, [pieces, slug, t, localized, money])
+    return piece ? productToShowcaseView(piece, { t, localized, money, categoryLabel }) : undefined
+  }, [pieces, slug, t, localized, money, categoryLabel])
   return { view, loading: status === 'loading' }
 }
 

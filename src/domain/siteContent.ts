@@ -14,7 +14,7 @@ import {
   type Lang,
 } from '../../supabase/functions/_shared/applyForm.ts'
 
-import { CATEGORIES, type Category } from './types'
+import type { Category } from './types'
 
 export type { ApplyFormConfig, ContentErrorKey, ContentErrors, Lang }
 export * from '../../supabase/functions/_shared/applyForm.ts'
@@ -563,7 +563,8 @@ function validateLandingCollections(list: LandingCollection[], put: (path: strin
     } else if (link?.kind === 'catalog') {
       if (!link.businessSlug) put(`${p}.link.businessSlug`, 'required')
       else if (link.businessSlug.length > MAX_SLUG_LENGTH || !SLUG.test(link.businessSlug)) put(`${p}.link.businessSlug`, 'invalid_slug')
-      if (link.category !== undefined && !(CATEGORIES as readonly string[]).includes(link.category)) put(`${p}.link.category`, 'invalid_value')
+      // Any slug-shaped value: the category list is managed in the admin console (ADR-0055), so a custom category is a valid target.
+      if (link.category !== undefined && (typeof link.category !== 'string' || !SLUG.test(link.category))) put(`${p}.link.category`, 'invalid_value')
     } else if (link?.kind !== 'apply' && link?.kind !== 'none' && link?.kind !== 'collection') put(`${p}.link`, 'invalid_value')
   })
 }

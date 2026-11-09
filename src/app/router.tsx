@@ -56,6 +56,9 @@ const ApplicationDetailPage = lazy(() => import('@/features/admin/ApplicationDet
 const AuditLogPage = lazy(() => import('@/features/admin/AuditLogPage'))
 const ModelRequestsPage = lazy(() => import('@/features/admin/ModelRequestsPage'))
 const ModelRequestDetailPage = lazy(() => import('@/features/admin/ModelRequestDetailPage'))
+const ListsLayout = lazy(() => import('@/features/lists/ListsLayout'))
+const CategoriesPage = lazy(() => import('@/features/lists/CategoriesPage'))
+const CurrenciesPage = lazy(() => import('@/features/lists/CurrenciesPage'))
 const TeamPage = lazy(() => import('@/features/team/TeamPage'))
 const RolePermissionsPage = lazy(() => import('@/features/team/RolePermissionsPage'))
 const MemberDetailPage = lazy(() => import('@/features/team/MemberDetailPage'))
@@ -139,6 +142,16 @@ const adminRoutes: RouteObject = {
     // published by the product editor itself, not by the Editor's draft, so the Editor's Publish bar does not apply.
     { path: 'editor/showcase/new', element: <RequirePermission need="content.manage"><RequirePermission need="products.edit"><ProductEditorPage scope="house" /></RequirePermission></RequirePermission> },
     { path: 'editor/showcase/:productId/edit', element: <RequirePermission need="content.manage"><RequirePermission need="products.edit"><ProductEditorPage scope="house" /></RequirePermission></RequirePermission> },
+    // The managed product categories and currencies (ADR-0055): content.manage, like the Editor.
+    {
+      path: 'lists',
+      element: <RequirePermission need="content.manage"><ListsLayout /></RequirePermission>,
+      children: [
+        { index: true, element: <Navigate to="categories" replace /> },
+        { path: 'categories', element: <CategoriesPage /> },
+        { path: 'currencies', element: <CurrenciesPage /> },
+      ],
+    },
     { path: 'team', element: <RequirePermission need="owner"><TeamPage /></RequirePermission> },
     { path: 'team/permissions', element: <RequirePermission need="owner"><RolePermissionsPage /></RequirePermission> },
     { path: 'team/:memberId', element: <RequirePermission need="owner"><MemberDetailPage /></RequirePermission> },

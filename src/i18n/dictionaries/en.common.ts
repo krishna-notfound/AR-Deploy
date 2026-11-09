@@ -35,6 +35,7 @@ export const enCommon = {
   'nav.modelRequests': '3D requests',
   'nav.analytics': 'Analytics',
   'nav.catalogsQr': 'Catalogs & QR Codes',
+  'nav.lists': 'Categories & currencies', // W4 (ADR-0055)
   'nav.team': 'Team & Access',
   'nav.auditLog': 'Audit log',
   'nav.settings': 'Settings',

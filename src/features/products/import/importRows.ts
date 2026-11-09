@@ -1,5 +1,6 @@
 // Bulk product import (ADR-0051): CSV text → typed rows → product drafts. Pure functions, no service calls.
-import { CATEGORIES, CURRENCIES, type Category, type Currency, type LengthUnit, type LocalizedText } from '@/domain/types'
+import { BUILTIN_CATEGORY_ITEMS, BUILTIN_CURRENCY_ITEMS, matchCategory, offeredCurrencies } from '@/domain/lists'
+import { type Category, type CategoryItem, type Currency, type CurrencyItem, type LengthUnit, type LocalizedText, OTHER_CATEGORY } from '@/domain/types'
 import { type FieldMessage, msg } from '@/i18n/fieldMessage'
 import { parseCsv, toCsv } from '@/lib/csv'
 import { parseMoneyInput } from '@/lib/format'
@@ -91,6 +92,10 @@ export interface ParsedImport {
 export interface ImportDefaults {
   /** Used when a row has dimensions but no unit. Default 'cm'. */
   unit?: LengthUnit
+  /** The managed category list (ADR-0055); the built-in seven and Other when omitted. Only visible categories can be used. */
+  categories?: readonly CategoryItem[]
+  /** The managed currency list; EUR, BRL and USD when omitted. Only enabled currencies can be used. */
+  currencies?: readonly CurrencyItem[]
 }
 
 const columnKey = (h: string) => h.trim().toLowerCase().replace(/[\s-]+/g, '_')
@@ -104,12 +109,12 @@ function length(s: string): number {
   return Number.isFinite(v) ? Math.round(v * 10) / 10 : Number.NaN
 }
 
-/** A category typed as its key ("sofa") or its English name ("Sofas"); undefined when it is neither. */
-export function categoryFrom(value: string): Category | undefined {
-  const v = value.trim().toLowerCase()
-  if ((CATEGORIES as readonly string[]).includes(v)) return v as Category
-  const plural: Record<string, Category> = { sofas: 'sofa', chairs: 'chair', tables: 'table', beds: 'bed', lights: 'lighting' }
-  return plural[v]
+/**
+ * A category typed as its slug ("sofa"), its English or Portuguese name ("Sofa", "Sofá"), a plural ("Sofas") or an old spelling,
+ * matched against the visible categories of the managed list (ADR-0055); undefined when it is none of them.
+ */
+export function categoryFrom(value: string, categories: readonly CategoryItem[] = BUILTIN_CATEGORY_ITEMS): Category | undefined {
+  return matchCategory(categories.filter((c) => c.active), value)
 }
 
 const loc = (en: string, pt: string): { en: string; pt?: string } | undefined => (en || pt ? { en, ...(pt ? { pt } : {}) } : undefined)
@@ -119,6 +124,8 @@ const loc = (en: string, pt: string): { en: string; pt?: string } | undefined =>
  * A row with a problem is still returned (so the preview can show it); `prepareImport` marks it as not ready.
  */
 export function rowsFromCsv(text: string, defaults: ImportDefaults = {}): ParsedImport {
+  const categories = defaults.categories ?? BUILTIN_CATEGORY_ITEMS
+  const offeredCodes = offeredCurrencies(defaults.currencies ?? BUILTIN_CURRENCY_ITEMS)
   const table = parseCsv(text)
   const header = table[0]
   if (!header) return { rows: [], problems: [], fileProblem: msg('products.import.file.noRows') }
@@ -147,9 +154,9 @@ export function rowsFromCsv(text: string, defaults: ImportDefaults = {}): Parsed
     const row: ImportRow = { name: { en: get('name_en'), ...(get('name_pt') ? { pt: get('name_pt') } : {}) }, category: get('category').toLowerCase() }
 
     if (!row.name.en) errors.push(msg('common.validation.product.nameRequired'))
-    const category = categoryFrom(row.category)
+    const category = categoryFrom(row.category, categories)
     if (!row.category) errors.push(msg('products.import.problem.categoryRequired'))
-    else if (!category) errors.push(msg('products.import.problem.categoryUnknown', { value: row.category, list: CATEGORIES.join(', ') }))
+    else if (!category) errors.push(msg('products.import.problem.categoryUnknown', { value: row.category, list: categories.filter((c) => c.active).map((c) => c.slug).join(', ') }))
     else row.category = category
 
     if (get('price')) {
@@ -159,8 +166,8 @@ export function rowsFromCsv(text: string, defaults: ImportDefaults = {}): Parsed
     }
     if (get('currency')) {
       const c = get('currency').toUpperCase()
-      if ((CURRENCIES as readonly string[]).includes(c)) row.currency = c as Currency
-      else errors.push(msg('products.import.problem.currencyUnknown', { value: get('currency'), list: CURRENCIES.join(', ') }))
+      if (offeredCodes.includes(c)) row.currency = c
+      else errors.push(msg('products.import.problem.currencyUnknown', { value: get('currency'), list: offeredCodes.join(', ') }))
     }
 
     let unit: LengthUnit = defaults.unit ?? 'cm'
@@ -204,8 +211,9 @@ export function toProductInput(row: ImportRow, businessId: string, defaultCurren
     name: text(row.name),
     shortDescription: text(row.short),
     description: text(row.description),
-    // An unknown category never reaches the service: prepareImport marks the row as having errors.
-    category: (categoryFrom(row.category) ?? 'decor') as Category,
+    // rowsFromCsv resolved the category against the list. An unknown one never reaches the service (the row has errors), and
+    // would land in Other, the catch-all, never in a real category.
+    category: row.category || OTHER_CATEGORY,
     price: row.price ?? 0,
     currency: row.currency ?? defaultCurrency,
     images: [],

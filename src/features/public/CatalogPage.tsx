@@ -8,13 +8,14 @@ import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/States'
-import { CATEGORIES, type Category, type Product } from '@/domain/types'
+import type { Product } from '@/domain/types'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
+import { useCategories, useCategoryLabel } from '@/services/listsHooks'
 import { initialPrice, primaryImage } from '@/lib/product'
 import { catalogLocalPath, productLocalPath, tenantCatalogPath, tenantProductPath } from '@/lib/urls'
 import { hasAny3d } from '@/features/ar/variantMedia'
@@ -31,7 +32,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const { t, lang, localized } = useI18n()
   const [search, setSearch] = useSearchParams()
   const q = search.get('q') ?? ''
-  const cat = (CATEGORIES as readonly string[]).includes(search.get('category') ?? '') ? (search.get('category') as Category) : ''
+  const catParam = search.get('category') ?? ''
+  const categoryList = useCategories()
+  const categoryLabel = useCategoryLabel()
 
   const { user } = useAccount()
 
@@ -68,7 +71,10 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   }
 
   const all = useMemo(() => [...(products.data ?? [])].sort((a, b2) => localized(a.name).localeCompare(localized(b2.name), lang)), [products.data, lang, localized])
-  const categories = useMemo(() => CATEGORIES.filter((c) => all.some((p) => p.category === c)), [all])
+  // The filter chips are the visible categories (managed in the admin console, ADR-0055) that this catalogue has products in.
+  const categories = useMemo(() => categoryList.active.map((c) => c.slug).filter((c) => all.some((p) => p.category === c)), [all, categoryList.active])
+  // A category in the address that no chip offers (removed, hidden, mistyped) is ignored, as before.
+  const cat = categories.includes(catParam) ? catParam : ''
   const term = q.trim().toLowerCase()
   const visible = all.filter((p) => (!cat || p.category === cat) && (!term || localized(p.name).toLowerCase().includes(term) || p.name.en.toLowerCase().includes(term)))
 
@@ -162,7 +168,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
                     cat === c ? 'border-obsidian bg-obsidian text-chalk' : 'border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink',
                   )}
                 >
-                  {c ? t(`category.${c}`) : t('catalog.allCategories')}
+                  {c ? categoryLabel(c) : t('catalog.allCategories')}
                 </button>
               ))}
             </div>
@@ -202,12 +208,13 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
 /** A catalogue card in the landing's collection-card style: hairline frame, photo with a category chip, serif name. */
 function ProductCard({ product: p, href }: { product: Product; href: string }) {
   const { t, lang, localized } = useI18n()
+  const categoryLabel = useCategoryLabel()
   return (
     <Link to={href} className="group flex h-full flex-col rounded-[var(--radius-card)] border border-line bg-surface p-3 transition-colors hover:border-line-strong focus-visible:outline-offset-4 sm:p-4">
       <div className="relative overflow-hidden rounded-[var(--radius-control)] bg-subtle">
         <SmartImage src={primaryImage(p)?.url} alt={localized(p.name)} className="aspect-[4/5] w-full transition-transform duration-700 group-hover:scale-[1.02]" />
         <span className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-[var(--radius-control)] bg-surface px-2 py-1 text-xs leading-4 font-medium tracking-[0.08em] text-ink uppercase">
-          {t(`category.${p.category}`)}
+          {categoryLabel(p.category)}
         </span>
         {hasAny3d(p) && (
           <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-surface px-2 py-1 text-xs leading-4 font-medium tracking-[0.08em] text-accent-ink uppercase">

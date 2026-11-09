@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/ui/States'
 import type { Business, Product } from '@/domain/types'
 import { HOUSE_BUSINESS_SLUG } from '@/domain/siteContent'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { cn } from '@/lib/cn'
 import { catalogLocalPath, needsPreview, showcaseProductPath, tenantCatalogPath } from '@/lib/urls'
 import { service } from '@/services'
@@ -97,6 +98,7 @@ function BusinessProductPage({ tenantSlug }: { tenantSlug?: string }) {
 
 function ProductView({ business, product, catalogHref, isPreview }: { business: Business; product: Product; catalogHref: string; isPreview: boolean }) {
   const { t, localized } = useI18n()
+  const categoryLabel = useCategoryLabel()
   const stage = useProductStage(product, { record: !isPreview })
   const [contactOpen, setContactOpen] = useState(false)
   const { name, hasCta } = stage
@@ -178,7 +180,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
           )}
 
           <div className="mt-10 min-w-0 lg:col-start-1 lg:row-start-1 lg:mt-0 lg:pt-2">
-            <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t(`category.${product.category}`)}</p>
+            <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{categoryLabel(product.category)}</p>
             <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
             <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{stage.priceText}</p>
             <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />

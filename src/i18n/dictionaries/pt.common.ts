@@ -34,6 +34,7 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'nav.modelRequests': 'Pedidos 3D',
   'nav.analytics': 'Análises',
   'nav.catalogsQr': 'Catálogos e códigos QR',
+  'nav.lists': 'Categorias e moedas', // W4 (ADR-0055)
   'nav.team': 'Equipa e acessos',
   'nav.auditLog': 'Registo de atividade',
   'nav.settings': 'Definições',

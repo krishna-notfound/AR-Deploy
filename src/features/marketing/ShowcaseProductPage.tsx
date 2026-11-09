@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/ui/States'
 import { HOUSE_BUSINESS_SLUG } from '@/domain/siteContent'
 import type { Business, Product } from '@/domain/types'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
+import { useCategoryLabel } from '@/services/listsHooks'
 import { cn } from '@/lib/cn'
 import { primaryImage } from '@/lib/product'
 import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
@@ -86,6 +87,7 @@ function PageSkeleton() {
 
 function ShowcaseView({ business, product }: { business: Business; product: Product }) {
   const { t, localized } = useI18n()
+  const categoryLabel = useCategoryLabel()
   // No analytics: the showcase belongs to the platform, not to a business.
   const stage = useProductStage(product, { record: false })
   const { name, hasCta } = stage
@@ -112,7 +114,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
             </div>
 
             <div className="min-w-0">
-              <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t(`category.${product.category}`)}</p>
+              <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{categoryLabel(product.category)}</p>
               <LocalizedSpan as="h1" text={product.name} className="mt-3 font-display text-[2.4rem] leading-[1.05] font-light text-balance break-words text-ink sm:text-[2.9rem]" />
               <p className="mt-4 text-[17px] tracking-[0.04em] text-ink tabular-nums">{stage.priceText}</p>
               <LocalizedSpan as="p" text={product.shortDescription} className="mt-5 max-w-md text-[15px] leading-7 text-ink-muted" />
@@ -150,6 +152,7 @@ function ShowcaseView({ business, product }: { business: Business; product: Prod
 /** Up to four other published showcase pieces. Nothing while loading or when the showcase has no other piece. */
 function MorePieces({ currentSlug }: { currentSlug: string }) {
   const { t, localized } = useI18n()
+  const categoryLabel = useCategoryLabel()
   const res = useServiceQuery(() => service.getShowcase(), [])
   const others = (res.data?.products ?? []).filter((p) => p.status === 'published' && p.slug !== currentSlug).slice(0, MORE_PIECES)
   if (others.length === 0) return null
@@ -169,7 +172,7 @@ function MorePieces({ currentSlug }: { currentSlug: string }) {
               >
                 {img ? <img src={img.url} alt="" width={800} height={1000} loading="lazy" className="aspect-[4/5] w-full bg-subtle object-cover" /> : <div className="aspect-[4/5] w-full bg-subtle" aria-hidden />}
                 <span className="mt-4 font-display text-[1.25rem] leading-tight font-normal text-ink sm:text-[1.375rem]">{localized(p.name)}</span>
-                <span className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t(`category.${p.category}`)}</span>
+                <span className="mt-1.5 text-[13px] leading-5 text-ink-muted">{categoryLabel(p.category)}</span>
               </Link>
             </li>
           )

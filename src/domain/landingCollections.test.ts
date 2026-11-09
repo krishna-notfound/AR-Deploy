@@ -75,7 +75,9 @@ describe('landing collections: validation', () => {
     expect(validateSiteContent(withCards(card({ link: { kind: 'product', businessSlug: 'Bad Slug', productSlug: 'ok' } })))).toEqual({ [at(0, 'link.businessSlug')]: 'invalid_slug' })
     expect(validateSiteContent(withCards(card({ link: { kind: 'product', businessSlug: 'acme', productSlug: '-x-' } })))).toEqual({ [at(0, 'link.productSlug')]: 'invalid_slug' })
     expect(validateSiteContent(withCards(card({ link: { kind: 'catalog', businessSlug: '' } })))).toEqual({ [at(0, 'link.businessSlug')]: 'required' })
-    expect(validateSiteContent(withCards(card({ link: { kind: 'catalog', businessSlug: 'acme', category: 'spaceship' as never } })))).toEqual({ [at(0, 'link.category')]: 'invalid_value' })
+    expect(validateSiteContent(withCards(card({ link: { kind: 'catalog', businessSlug: 'acme', category: 'Space Ship' as never } })))).toEqual({ [at(0, 'link.category')]: 'invalid_value' })
+    // The category list is managed (ADR-0055): any slug-shaped value is a valid link target.
+    expect(validateSiteContent(withCards(card({ link: { kind: 'catalog', businessSlug: 'acme', category: 'rugs' } })))).toEqual({})
     expect(validateSiteContent(withCards(card({ link: { kind: 'external' } as never })))).toEqual({ [at(0, 'link')]: 'invalid_value' })
   })
 })

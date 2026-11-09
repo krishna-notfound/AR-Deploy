@@ -2,6 +2,7 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { fieldText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { formatDimensions, formatMoney } from '@/lib/format'
+import { useCategoryLabel } from '@/services/listsHooks'
 import type { PreparedRow } from './importRows'
 
 /**
@@ -10,6 +11,7 @@ import type { PreparedRow } from './importRows'
  */
 export function ImportPreviewTable({ rows }: { rows: readonly PreparedRow[] }) {
   const { t, lang } = useI18n()
+  const categoryLabel = useCategoryLabel()
   return (
     <div className="max-h-[28rem] overflow-auto rounded-[var(--radius-control)] border border-line" tabIndex={0} role="region" aria-label={t('products.import.preview.region')}>
       <table className="w-full min-w-[52rem] border-collapse text-left text-ui-body" aria-label={t('products.import.preview.table')}>
@@ -67,7 +69,7 @@ export function ImportPreviewTable({ rows }: { rows: readonly PreparedRow[] }) {
                   <div className="font-medium text-ink [overflow-wrap:anywhere]">{p.row.name.en || <span className="text-ink-muted">{t('products.import.noName')}</span>}</div>
                   {p.row.name.pt && <div className="text-ui-small text-ink-muted [overflow-wrap:anywhere]">{p.row.name.pt}</div>}
                 </td>
-                <td className="px-3 py-2.5 text-ink-body">{p.input.category === p.row.category ? t(`category.${p.input.category}`) : p.row.category || '–'}</td>
+                <td className="px-3 py-2.5 text-ink-body">{p.input.category === p.row.category ? categoryLabel(p.input.category) : p.row.category || '–'}</td>
                 <td className="px-3 py-2.5 text-right whitespace-nowrap text-ink-body tabular-nums">{p.row.price !== undefined ? formatMoney(p.input.price, p.input.currency, lang) : '–'}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap text-ink-body tabular-nums">{hasSize ? formatDimensions(d) : '–'}</td>
               </tr>

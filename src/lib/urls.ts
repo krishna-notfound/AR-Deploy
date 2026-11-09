@@ -142,6 +142,11 @@ export const editorShowcaseEditPath = (productId: string) => `${EDITOR_PATH}/sho
 /** Preview of the draft: `page/<pageKey>`, `apply`, `apply/done`, `footer` or `landing`. */
 export const editorPreviewPath = (target: string) => `${EDITOR_PATH}/preview/${target}`
 
+/** The admin-managed product categories and currencies (staff, content.manage; ADR-0055). */
+export const LISTS_PATH = '/admin/lists'
+export const listsCategoriesPath = () => `${LISTS_PATH}/categories`
+export const listsCurrenciesPath = () => `${LISTS_PATH}/currencies`
+
 export const applicationAdminPath = (id: string) => `/admin/applications/${id}`
 /** The applications list, optionally filtered by status (e.g. the overview's "awaiting review" link). */
 export const applicationsAdminPath = (status?: string) => `/admin/applications${status ? `?status=${encodeURIComponent(status)}` : ''}`
