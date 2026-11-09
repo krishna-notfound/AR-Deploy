@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { Document, WebIO } from '@gltf-transform/core'
 import { describe, expect, it, vi } from 'vitest'
-import { compareSummaries, optimizeGlb, summarize } from './modelOptimize'
+import { applyUniformScale, compareSummaries, measureGlb, optimizeGlb, summarize } from './modelOptimize'
 import { packedLikeGltfpack } from './packedGlb.testutil'
+import { boxGlb } from './scaledGlb.testutil'
 
 /** PNG bytes whose header says width x height, padded to `bytes` (the pipeline only reads the header). */
 function fakePng(width: number, height: number, bytes: number): Uint8Array {
@@ -134,6 +135,70 @@ describe('optimizeGlb', () => {
     const r = await optimizeGlb(new File([new Uint8Array([1, 2, 3])], 'bad.glb'))
     expect(r.optimized).toBe(false)
     expect(r.file.name).toBe('bad.glb')
+  })
+})
+
+describe('measureGlb and applyUniformScale (upload scale control, ADR-0058)', () => {
+  const bytesOf = async (f: File) => new Uint8Array(await f.arrayBuffer())
+
+  it('measures a model in metres: a dresser modelled in millimetres reads as 602 x 1800 x 798 m', async () => {
+    const m = await measureGlb(await bytesOf(await boxGlb(602, 1800, 798)))
+    expect(m).not.toBeNull()
+    expect(m!.x).toBeCloseTo(602, 3)
+    expect(m!.y).toBeCloseTo(1800, 3)
+    expect(m!.z).toBeCloseTo(798, 3)
+  })
+
+  it('scales the bounds by exactly the factor, keeps the triangles, and any plain reader opens the result', async () => {
+    const input = await bytesOf(await boxGlb(602, 1800, 798))
+    const out = await applyUniformScale(input, 0.001)
+    const plain = new WebIO() // no extensions registered: what Scene Viewer and other tools can read
+    const [a, b] = [summarize(await plain.readBinary(input)), summarize(await plain.readBinary(out))]
+    for (let i = 0; i < 3; i++) {
+      expect(b.min[i]).toBeCloseTo(a.min[i]! * 0.001, 9)
+      expect(b.max[i]).toBeCloseTo(a.max[i]! * 0.001, 9)
+    }
+    expect(b.triangles).toBe(a.triangles)
+    expect(b.materials).toBe(a.materials)
+    expect(b.extensions).toEqual([])
+    const m = await measureGlb(out)
+    expect(m!.y).toBeCloseTo(1.8, 6)
+  })
+
+  it('leaves the geometry untouched: positions are identical, the scale lives on one new root node', async () => {
+    const input = await bytesOf(await boxGlb(100, 50, 40))
+    const out = await applyUniformScale(input, 0.01)
+    const [before, after] = [await new WebIO().readBinary(input), await new WebIO().readBinary(out)]
+    const positions = (d: Document) => Array.from(d.getRoot().listMeshes()[0]!.listPrimitives()[0]!.getAttribute('POSITION')!.getArray()!)
+    expect(positions(after)).toEqual(positions(before))
+    const scene = after.getRoot().listScenes()[0]!
+    expect(scene.listChildren()).toHaveLength(1)
+    expect(scene.listChildren()[0]!.getScale()).toEqual([0.01, 0.01, 0.01])
+  })
+
+  it('wraps a scene with several root nodes, one with its own scale, in the same single scale', async () => {
+    const input = await bytesOf(await boxGlb(100, 50, 40, { roots: 3 }))
+    const out = await applyUniformScale(input, 0.0254)
+    const [a, b] = [summarize(await new WebIO().readBinary(input)), summarize(await new WebIO().readBinary(out))]
+    expect(b.max[1]! - b.min[1]!).toBeCloseTo((a.max[1]! - a.min[1]!) * 0.0254, 9)
+    expect((await new WebIO().readBinary(out)).getRoot().listScenes()[0]!.listChildren()).toHaveLength(1)
+  })
+
+  it('unpacks a meshopt-packed file while scaling, so the result opens in any reader', async () => {
+    const packed = await packedLikeGltfpack(await boxGlb(602, 1800, 798))
+    const out = await applyUniformScale(await bytesOf(packed), 0.001)
+    const s = summarize(await new WebIO().readBinary(out))
+    expect(s.extensions).toEqual([])
+    expect(s.max[1]! - s.min[1]!).toBeCloseTo(1.8, 2)
+  })
+
+  it('rejects a factor that is not a positive finite number', async () => {
+    const input = await bytesOf(await boxGlb(1, 1, 1))
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) await expect(applyUniformScale(input, bad)).rejects.toThrow(/factor/)
+  })
+
+  it('measureGlb returns null for a file it cannot read', async () => {
+    expect(await measureGlb(new Uint8Array([1, 2, 3]))).toBeNull()
   })
 })
 

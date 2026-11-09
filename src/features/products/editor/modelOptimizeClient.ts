@@ -4,6 +4,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { type Vars, translate } from '@/i18n/translate'
 import { formatFileSize } from '@/lib/format'
 import type { OptimizeResult } from './modelOptimize'
+import type { WorkerRequest } from './modelOptimize.worker'
 
 type T = (key: TranslationKey, vars?: Vars) => string
 const tEn: T = (key, vars) => translate('en', key, vars)
@@ -29,18 +30,33 @@ export function optimizeReasonText(reason: string | undefined, t: T = tEn): stri
   return t('products.model.keptUnsafe')
 }
 
-/** Optimizes in a worker. Any worker failure keeps the original file: the upload must never break. */
-export function optimizeModel(file: File): Promise<OptimizeResult> {
-  const keep = (): OptimizeResult => ({ file, optimized: false, originalBytes: file.size, outputBytes: file.size, reason: 'Kept the original: the optimizer could not run in this browser.' })
-  if (typeof Worker === 'undefined') return Promise.resolve(keep())
+/** One request to a fresh worker; `fallback` is the answer when workers are missing or the worker fails. */
+function inWorker<T>(request: WorkerRequest, fallback: () => T): Promise<T> {
+  if (typeof Worker === 'undefined') return Promise.resolve(fallback())
   return new Promise((resolve) => {
     const worker = new Worker(new URL('./modelOptimize.worker.ts', import.meta.url), { type: 'module' })
-    const done = (r: OptimizeResult) => {
+    const done = (r: T) => {
       worker.terminate()
       resolve(r)
     }
-    worker.onmessage = (e: MessageEvent<OptimizeResult>) => done(e.data)
-    worker.onerror = () => done(keep())
-    worker.postMessage(file)
+    worker.onmessage = (e: MessageEvent<T>) => done(e.data)
+    worker.onerror = () => done(fallback())
+    worker.postMessage(request)
   })
+}
+
+/** Optimizes in a worker. Any worker failure keeps the original file: the upload must never break. */
+export function optimizeModel(file: File): Promise<OptimizeResult> {
+  const keep = (): OptimizeResult => ({ file, optimized: false, originalBytes: file.size, outputBytes: file.size, reason: 'Kept the original: the optimizer could not run in this browser.' })
+  return inWorker({ op: 'optimize', file }, keep)
+}
+
+/** The GLB's size in metres, or null when it cannot be measured (then no scale step is offered; the preview still checks). */
+export function measureModel(file: File): Promise<{ x: number; y: number; z: number } | null> {
+  return inWorker({ op: 'measure', file }, () => null)
+}
+
+/** The GLB scaled uniformly by `factor` (ADR-0058; only on the person's choice), or null when that failed. */
+export function scaleModel(file: File, factor: number): Promise<File | null> {
+  return inWorker<File | null>({ op: 'scale', file, factor }, () => null)
 }

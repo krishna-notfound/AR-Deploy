@@ -27,7 +27,7 @@ export const MIN_TOLERANCE_M = 0.01
 
 /**
  * Compares the model's measured bounding box (meters, from model-viewer getDimensions())
- * with the entered product dimensions. Never used to rescale the model (ADR-0006).
+ * with the entered product dimensions. Never rescales by itself (ADR-0006); only the upload step does, on the user's choice (ADR-0058).
  */
 export function checkScale(measured: MeasuredSize | null | undefined, dims: Dimensions, tolerance = SCALE_TOLERANCE): ScaleCheck {
   if (!measured) return { status: 'unknown' }
@@ -70,4 +70,57 @@ export function modelSizeSuggestion(scale: ScaleCheck, unit: LengthUnit): { widt
   const step = unit === 'cm' ? 2 : 4
   const value = (m: number) => String(Math.round((unit === 'cm' ? m * 100 : (m * 100) / 2.54) * step) / step)
   return { width: value(x), height: value(y), depth: value(z) }
+}
+
+/** The unit conversions a file authored in millimetres, centimetres or inches needs to reach metres (ADR-0058). */
+export const UNIT_SCALE_FACTORS = { mm: 0.001, cm: 0.01, in: 0.0254 } as const
+export type ScaleUnitLabel = 'mm' | 'cm' | 'in' | 'custom'
+
+export interface ScaleProposal {
+  /** units: the entered dimensions match after a known conversion; too-large / too-small: the size is outside 1 cm to 10 m. */
+  kind: 'too-large' | 'too-small' | 'units'
+  suggested: { factor: number; label: ScaleUnitLabel }
+  reason: 'dimensions-match' | 'over-10m' | 'under-1cm'
+}
+
+const labelFor = (factor: number): ScaleUnitLabel => {
+  const hit = (Object.entries(UNIT_SCALE_FACTORS) as [keyof typeof UNIT_SCALE_FACTORS, number][]).find(([, f]) => Math.abs(f - factor) < 1e-9)
+  return hit ? hit[0] : 'custom'
+}
+
+/** A furniture piece's longest side sits in this range (m); it picks between mm, cm and inches when nothing else decides. */
+const PLAUSIBLE_LONGEST_M = [0.3, 3] as const
+
+/**
+ * Whether a freshly measured GLB (metres, as glTF defines them) needs a "Fix the scale" step before upload, and the
+ * factor to suggest. Triggers when a side is over 10 m, when the longest side is under 1 cm (a thin rug or panel is not
+ * a unit mistake, so one thin side alone does not count), or when the product's entered dimensions match after
+ * x0.001 / x0.01 / x0.0254 (the 'model-units' test checkScale uses). Never rescales anything: the caller applies a
+ * factor only on the person's choice (ADR-0058, amending ADR-0006).
+ */
+export function scaleProposal(measured: MeasuredSize, dims?: Dimensions): ScaleProposal | null {
+  const sides = [measured.x, measured.y, measured.z]
+  if (!sides.every((v) => Number.isFinite(v) && v > 0)) return null
+  const longest = Math.max(...sides)
+
+  if (dims) {
+    const check = checkScale(measured, dims)
+    if (check.status === 'mismatch' && check.reason === 'model-units' && check.factor) {
+      // check.factor = how many times larger the model is than the entered size; the fix is its inverse, snapped to a known one.
+      const fix = [UNIT_SCALE_FACTORS.mm, UNIT_SCALE_FACTORS.cm, UNIT_SCALE_FACTORS.in, 100, 1000].find((f) => Math.abs(check.factor! * f - 1) < 0.08)
+      if (fix) return { kind: 'units', suggested: { factor: fix, label: labelFor(fix) }, reason: 'dimensions-match' }
+    }
+  }
+
+  if (longest > MODEL_SIZE_MAX_M) {
+    const units = [UNIT_SCALE_FACTORS.mm, UNIT_SCALE_FACTORS.cm, UNIT_SCALE_FACTORS.in]
+    const fits = units.find((f) => longest * f >= PLAUSIBLE_LONGEST_M[0] && longest * f <= PLAUSIBLE_LONGEST_M[1])
+    const factor = fits ?? 10 ** -Math.ceil(Math.log10(longest / PLAUSIBLE_LONGEST_M[1]))
+    return { kind: 'too-large', suggested: { factor, label: labelFor(factor) }, reason: 'over-10m' }
+  }
+  if (longest < MODEL_SIZE_MIN_M) {
+    const factor = 10 ** Math.ceil(Math.log10(PLAUSIBLE_LONGEST_M[0] / longest))
+    return { kind: 'too-small', suggested: { factor, label: 'custom' }, reason: 'under-1cm' }
+  }
+  return null
 }
