@@ -262,3 +262,9 @@ Fixed in the migration files (none had been applied anywhere):
 - `business_applications`: `country`, `city`, `category` nullable; answers limit 65,536 bytes.
 - Audit events: `site_content_published`, `site_content_draft_restored`.
 - Rollback: `supabase/rollback/20261029_site_content_rollback.sql`. Tests: `supabase/tests/siteContent.test.ts` (PGlite).
+
+## Notifications (ADR-0056, migration `notifications`)
+- `notifications` (recipient, kind, title, body, link, dedupe_key, read_at): RLS select own, update `read_at` only; inserts by the service role (Edge Functions through `_shared/notify.ts`); unique (recipient, dedupe_key).
+- `push_subscriptions` (user_id, unique endpoint, p256dh, auth, user_agent): RLS own rows select/insert/delete; `register_push_subscription` (security definer, caller only) moves a device to the caller, at most 10 per user.
+- `notification_prefs` (user_id pk; new_application, new_model_request, company_updates, push_enabled, language): RLS own row; no row = all on.
+- Rollback: `supabase/rollback/20261109_notifications_rollback.sql`. PGlite test: `supabase/tests/notifications.test.ts`.

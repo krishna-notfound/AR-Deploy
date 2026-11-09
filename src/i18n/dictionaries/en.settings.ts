@@ -231,7 +231,7 @@ export const enSettings = {
   'settings.profile.remove': 'Remove photo',
   'settings.profile.demo': 'Demo: the photo is kept in this tab only and is gone when you reload.',
   // Notifications
-  'settings.notifications.description': 'Which emails you get from the platform.',
+  'settings.notifications.description': 'Which emails and notifications you get from the platform.',
   'settings.notifications.securityTitle': 'Account security',
   'settings.notifications.securityDescription': 'Sent to your sign-in email address.',
   'settings.notifications.securityEmails': 'Security emails',

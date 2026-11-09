@@ -142,3 +142,7 @@ Written for the old dev project `pmnjchhrgvajtjpadpqo` (2026-10-13; not used by 
 | No AR button on a phone | Device/browser lacks AR (`canActivateAR` false), or an in-app browser | Open in Safari/Chrome; iOS needs a USDZ for best results |
 | Analytics not counting | Rate limit (30/min/visitor), unpublished product, or the function is down | Edge Function logs in the Supabase dashboard |
 | Password reset email never arrives | Default SMTP only mails org members (about 2/h) | Configure custom SMTP (Auth table above) |
+
+## Service worker and manifest (ADR-0056)
+- `public/sw.js` handles push and notification clicks only (no fetch handler, no cache); `public/manifest.webmanifest` makes the site installable. `vercel.json` keeps both out of the SPA rewrite, serves `sw.js` with `Cache-Control: no-cache, no-store, must-revalidate` and the manifest with its media type.
+- Edge Function secrets for push: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (keys: `npx web-push generate-vapid-keys`). Browser variable `VITE_VAPID_PUBLIC_KEY` (the same public key). Function `notify-model-request` is new; `submit-application`, `review-model-request` and `notify-business-owner` are redeployed.

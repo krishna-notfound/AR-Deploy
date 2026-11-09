@@ -233,7 +233,7 @@ export const ptSettings: Partial<Record<TranslationKey, string>> = {
   'settings.profile.remove': 'Remover fotografia',
   'settings.profile.demo': 'Demonstração: a fotografia fica apenas neste separador e desaparece ao recarregar.',
   // Notifications
-  'settings.notifications.description': 'Os emails que recebe da plataforma.',
+  'settings.notifications.description': 'Os emails e as notificações que recebe da plataforma.',
   'settings.notifications.securityTitle': 'Segurança da conta',
   'settings.notifications.securityDescription': 'Enviados para o email de início de sessão.',
   'settings.notifications.securityEmails': 'Emails de segurança',

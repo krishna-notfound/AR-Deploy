@@ -4,6 +4,7 @@ import { enAdmin } from './en.admin'
 import { enApplications } from './en.applications'
 import { enBusiness } from './en.business'
 import { enEditor } from './en.editor'
+import { enNotifications } from './en.notifications'
 import { enProducts } from './en.products'
 import { enSettings } from './en.settings'
 import { enTeam } from './en.team'
@@ -18,4 +19,5 @@ export const enDashboard = {
   ...enSettings,
   ...enTeam,
   ...enUi,
+  ...enNotifications,
 } as const

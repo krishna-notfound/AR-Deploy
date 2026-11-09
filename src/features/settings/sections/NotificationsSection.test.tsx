@@ -55,7 +55,8 @@ describe('Notifications section', () => {
     await screen.findByRole('switch', { name: 'New business applications' })
     expect(screen.getByText('Security emails')).toBeInTheDocument()
     expect(screen.getByText('Always on')).toBeInTheDocument()
-    expect(screen.getAllByRole('switch')).toHaveLength(1)
+    // The security emails have no switch; the only switches are the email one and the W5 event switches (ADR-0056).
+    expect(screen.queryByRole('switch', { name: /security/i })).toBeNull()
   })
 
   it('rolls the switch back and says so when saving fails', { timeout: 20_000 }, async () => {

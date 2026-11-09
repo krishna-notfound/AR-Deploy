@@ -10,6 +10,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { useProfileSettings } from '@/lib/preferences'
 import { useSettingsScope } from '../sections'
 import { SectionHeader, SettingsCard } from '../SettingsUi'
+import { NotificationChannels } from './PhoneNotifications'
 
 // Spec 8: the new-applications email is for platform staff who can see applications; security emails always go out.
 export default function NotificationsSection() {
@@ -22,6 +23,7 @@ export default function NotificationsSection() {
     <>
       <SectionHeader title={t('settings.section.notifications')} description={t('settings.notifications.description')} />
       <div className="space-y-6">
+        <NotificationChannels />
         {staffWithApplications && <ApplicationsEmail />}
         <SettingsCard title={t('settings.notifications.securityTitle')} description={t('settings.notifications.securityDescription')}>
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
