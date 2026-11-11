@@ -31,14 +31,16 @@ export const MAX_LONG_ANSWER = 1000
 export const MAX_CUSTOM_BYTES = 40_000
 
 export interface NormalizedApplication {
-  businessName: string
+  /** Null when the form hides or deletes the field, or makes it optional and the visitor left it empty (ADR-0057). */
+  businessName: string | null
   website: string | null
   /** The seven fields below are null when the form hides them (and, with rules, when optional and left empty). */
   description: string | null
   category: string | null
   country: string | null
   city: string | null
-  applicantName: string
+  /** Null in the same cases as businessName. */
+  applicantName: string | null
   applicantRole: string | null
   applicantEmail: string
   applicantPhone: string | null
@@ -80,7 +82,7 @@ export function normalizeWebsite(v: unknown): string | null {
   return /^https?:\/\//i.test(s) ? s : `https://${s}`
 }
 
-const LOCKED: readonly string[] = ['businessName', 'applicantName', 'applicantEmail']
+const LOCKED: readonly string[] = ['applicantEmail']
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 export function validateApplication(input: unknown, rules?: ApplyRules | null): ApplicationValidation {
@@ -88,7 +90,7 @@ export function validateApplication(input: unknown, rules?: ApplyRules | null): 
   const errors: Record<string, ApplicationErrorCode> = {}
   let stale = false
 
-  /** The effective rule of a built-in field. Locked fields ignore the rules; no rules is today's form. */
+  /** The effective rule of a built-in field. The locked email ignores the rules; no rules is today's form. */
   const rule = (k: ApplyBuiltinField) => {
     if (LOCKED.includes(k)) return { hidden: false, required: true }
     const r = rules?.fields[k]
@@ -120,7 +122,7 @@ export function validateApplication(input: unknown, rules?: ApplyRules | null): 
     return value as T
   }
 
-  const businessName = field('businessName', str(i.businessName), 2, 80) ?? ''
+  const businessName = field('businessName', str(i.businessName), 2, 80)
   const description = field('description', text(i.description), 20, 1000)
   const category = field('category', str(i.category), 2, 80)
   if (category !== null && !errors.category) {
@@ -130,7 +132,7 @@ export function validateApplication(input: unknown, rules?: ApplyRules | null): 
   }
   const country = field('country', str(i.country), 2, 80)
   const city = field('city', str(i.city), 1, 80)
-  const applicantName = field('applicantName', str(i.applicantName), 2, 120) ?? ''
+  const applicantName = field('applicantName', str(i.applicantName), 2, 120)
   const applicantRole = field('applicantRole', str(i.applicantRole), 1, 80)
   const applicantPhone = field('applicantPhone', str(i.applicantPhone), 1, 50)
   const notes = field('notes', text(i.notes), 1, 1000)

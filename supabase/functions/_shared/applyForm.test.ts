@@ -9,6 +9,9 @@ import {
   BUILTIN_FIELDS,
   DEFAULT_APPLY_FORM,
   LOCKED_FIELDS,
+  normalizeApplyForm,
+  removedFieldsOf,
+  removedStepsOf,
   resolveApplyForm,
   rulesFromConfig,
   validateApplyForm,
@@ -20,9 +23,10 @@ const form = (): ApplyFormConfig => clone(DEFAULT_APPLY_FORM)
 const tokens = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort()
 
 describe('built-in form model', () => {
-  it('has the 16 built-in fields and the 3 locked ones', () => {
+  it('has the 16 built-in fields and one locked one: the applicant email (ADR-0057)', () => {
     expect(APPLY_BUILTIN_KEYS).toHaveLength(16)
-    expect([...LOCKED_FIELDS]).toEqual(['businessName', 'applicantName', 'applicantEmail'])
+    expect([...LOCKED_FIELDS]).toEqual(['applicantEmail'])
+    expect(APPLY_BUILTIN_KEYS.filter((k) => BUILTIN_FIELDS[k].locked)).toEqual(['applicantEmail'])
     for (const k of LOCKED_FIELDS) expect(BUILTIN_FIELDS[k].locked).toBe(true)
   })
 
@@ -138,24 +142,55 @@ describe('validateApplyForm', () => {
   it('accepts the default form', () => expect(validateApplyForm(form())).toEqual({}))
 
   it('refuses a hidden or optional locked field', () => {
-    expect(Object.keys(bad((c) => void (c.fields.find((f) => f.key === 'businessName')!.hidden = true)))).toContain('fields.0.hidden')
+    expect(Object.keys(bad((c) => void (c.fields.find((f) => f.key === 'applicantEmail')!.hidden = true)))).toContain('fields.8.hidden')
     expect(Object.values(bad((c) => void (c.fields.find((f) => f.key === 'applicantEmail')!.required = false)))).toContain('locked')
   })
 
-  it('Review must be last and unique; 1 to 8 steps', () => {
+  it('accepts the business and applicant names hidden, optional or deleted (ADR-0057)', () => {
+    const f = (c: ApplyFormConfig, key: string) => c.fields.find((x) => x.key === key)!
+    expect(validateApplyForm(Object.assign(form(), {}))).toEqual({})
+    const c = form()
+    f(c, 'businessName').hidden = true
+    f(c, 'applicantName').required = false
+    expect(validateApplyForm(c)).toEqual({})
+    const d = form()
+    d.removedFields = ['businessName', 'applicantName']
+    d.fields = d.fields.filter((x) => x.key !== 'businessName' && x.key !== 'applicantName')
+    expect(validateApplyForm(d)).toEqual({})
+  })
+
+  it('refuses a bad removedFields list: the email, an unknown key, a repeat, a field that is still placed, a non-list', () => {
+    const gone = (c: ApplyFormConfig, ...keys: string[]) => void (c.fields = c.fields.filter((x) => !keys.includes(x.key)))
+    expect(bad((c) => { c.removedFields = ['applicantEmail']; gone(c, 'applicantEmail') })).toEqual({ 'removedFields.0': 'locked' })
+    expect(bad((c) => void (c.removedFields = ['nope'] as never))).toEqual({ 'removedFields.0': 'unknown_key' })
+    expect(bad((c) => { c.removedFields = ['city', 'city']; gone(c, 'city') })).toEqual({ 'removedFields.1': 'duplicate_key' })
+    expect(bad((c) => void (c.removedFields = ['city']))).toEqual({ 'fields.5.key': 'duplicate_key' })
+    expect(bad((c) => void (c.removedFields = 'city' as never))).toEqual({ removedFields: 'invalid_value' })
+  })
+
+  it('needs a step before Review', () => {
+    expect(bad((c) => { c.steps = c.steps.filter((s) => s.builtin === 'review'); c.fields = [] })).toEqual({ steps: 'required' })
+    // A built-in step may be deleted when its fields moved.
+    const c = form()
+    c.steps = c.steps.filter((s) => s.id !== 'location')
+    c.fields = c.fields.map((x) => (x.stepId === 'location' ? { ...x, stepId: 'business' } : x))
+    expect(validateApplyForm(c)).toEqual({})
+  })
+
+  it('Review must be last and unique; 1 to 12 steps (ADR-0057)', () => {
     expect(bad((c) => void c.steps.reverse())).toHaveProperty('steps')
     expect(bad((c) => void c.steps.pop())).toHaveProperty('steps')
     expect(bad((c) => void c.steps.splice(1, 0, { id: 'dup', builtin: 'review' }))).toHaveProperty('steps')
     expect(
       bad((c) => {
-        for (let i = 0; i < 4; i++) c.steps.splice(1, 0, { id: `s${i}`, title: { en: `S${i}` } })
+        for (let i = 0; i < 8; i++) c.steps.splice(1, 0, { id: `s${i}`, title: { en: `S${i}` } })
       }),
-    ).toHaveProperty('steps') // 9 steps
+    ).toHaveProperty('steps') // 13 steps
     expect(
       bad((c) => {
-        for (let i = 0; i < 3; i++) c.steps.splice(1, 0, { id: `s${i}`, title: { en: `S${i}` } })
+        for (let i = 0; i < 7; i++) c.steps.splice(1, 0, { id: `s${i}`, title: { en: `S${i}` } })
       }),
-    ).toEqual({}) // 8 steps
+    ).toEqual({}) // 12 steps
   })
 
   it('refuses a field on Review or on an unknown step, an unknown key, a repeated key', () => {
@@ -165,16 +200,16 @@ describe('validateApplyForm', () => {
     expect(bad((c) => void c.fields.push({ key: 'city', stepId: 'business' }))).toHaveProperty(['fields.16.key'], 'duplicate_key')
   })
 
-  it('questions: at most 10, one placement each, option counts by type', () => {
+  it('questions: at most 30 (ADR-0057), one placement each, option counts by type', () => {
     expect(
       bad((c) => {
-        c.customQuestions = Array.from({ length: 10 }, (_, i) => q(`q${i}`))
+        c.customQuestions = Array.from({ length: 30 }, (_, i) => q(`q${i}`))
         place(c, ...c.customQuestions.map((x) => x.id))
       }),
     ).toEqual({})
     expect(
       bad((c) => {
-        c.customQuestions = Array.from({ length: 11 }, (_, i) => q(`q${i}`))
+        c.customQuestions = Array.from({ length: 31 }, (_, i) => q(`q${i}`))
         place(c, ...c.customQuestions.map((x) => x.id))
       }),
     ).toHaveProperty('customQuestions')
@@ -206,3 +241,64 @@ describe('validateApplyForm', () => {
     expect(bad((c) => void c.steps.splice(1, 0, { id: 'n1' }))).toHaveProperty(['steps.1.title.en'], 'required')
   })
 })
+
+describe('deleted fields and steps (ADR-0057)', () => {
+  const without = (c: ApplyFormConfig, ...keys: string[]) => void (c.fields = c.fields.filter((x) => !keys.includes(x.key)))
+
+  it('the resolver leaves a deleted built-in field out, with or without hidden fields, and never drops the email', () => {
+    const c = form()
+    c.removedFields = ['businessName', 'city', 'applicantEmail']
+    without(c, 'businessName', 'city')
+    for (const includeHidden of [false, true]) {
+      const keys = resolveApplyForm(c, { includeHidden }).flatMap((s) => s.fields).map((f) => f.key)
+      expect(keys).not.toContain('businessName')
+      expect(keys).not.toContain('city')
+      expect(keys).toContain('applicantEmail') // a hostile document cannot delete the locked field
+      expect(keys).toHaveLength(14)
+    }
+    // Even without a placement a deleted key does not come back as a default.
+    c.fields = []
+    expect(resolveApplyForm(c).flatMap((s) => s.fields).map((f) => f.key)).not.toContain('businessName')
+  })
+
+  it('a step with only deleted fields is dropped from the public form, and kept (empty) for the builder', () => {
+    const c = form()
+    c.removedFields = ['country', 'city']
+    without(c, 'country', 'city')
+    expect(resolveApplyForm(c).map((s) => s.id)).toEqual(['business', 'contact', 'catalogue', 'review'])
+    expect(resolveApplyForm(c, { includeHidden: true }).map((s) => s.id)).toEqual(['business', 'location', 'contact', 'catalogue', 'review'])
+  })
+
+  it('removedFieldsOf lists them in the order of the built-ins, ignoring the email and unknown keys; removedStepsOf lists missing built-in steps', () => {
+    const c = form()
+    c.removedFields = ['city', 'businessName', 'applicantEmail', 'ghost'] as never
+    expect(removedFieldsOf(c)).toEqual(['businessName', 'city'])
+    expect(removedFieldsOf(null)).toEqual([])
+    expect(removedStepsOf(c)).toEqual([])
+    c.steps = c.steps.filter((s) => s.id !== 'location' && s.id !== 'business')
+    expect(removedStepsOf(c)).toEqual(['business', 'location'])
+    expect(removedStepsOf(null)).toEqual([])
+  })
+
+  it('the server rules treat a deleted field as hidden and optional', () => {
+    const c = form()
+    c.removedFields = ['businessName']
+    without(c, 'businessName')
+    const rules = rulesFromConfig(c, 5)!
+    expect(rules.fields.businessName).toEqual({ hidden: true, required: false })
+    expect(rules.fields.applicantName).toEqual({ hidden: false, required: true })
+  })
+
+  it('normalizeApplyForm keeps removedFields only when there are some, and an old document stays as it was', () => {
+    expect(normalizeApplyForm({ ...form(), removedFields: ['city'] }).removedFields).toEqual(['city'])
+    expect(normalizeApplyForm({ ...form(), removedFields: [] })).not.toHaveProperty('removedFields')
+    expect(normalizeApplyForm(form())).toEqual(form())
+    expect(normalizeApplyForm({ ...form(), removedFields: 'city' })).not.toHaveProperty('removedFields')
+  })
+
+  it('an old published form that locked the names (no flags on them) still resolves as before: both visible and required', () => {
+    const f = resolveApplyForm(form()).flatMap((s) => s.fields)
+    expect(f.find((x) => x.key === 'businessName')).toMatchObject({ hidden: false, required: true, locked: false })
+    expect(f.find((x) => x.key === 'applicantName')).toMatchObject({ hidden: false, required: true, locked: false })
+  })
+})
