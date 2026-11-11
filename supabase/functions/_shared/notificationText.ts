@@ -11,13 +11,15 @@ const both = (build: (lang: 'en' | 'pt') => { title: string; body: string }): Te
   return { title: L(en.title, pt.title), body: L(en.body, pt.body) }
 }
 
-/** A business applied to join (staff with applications.view). */
-export const applicationNotice = (businessName: string): Text =>
-  both((lang) =>
+/** A business applied to join (staff with applications.view). The form may not ask for a company name (ADR-0057): then the text is generic. */
+export const applicationNotice = (name: string | null | undefined): Text => {
+  const businessName = name?.trim() ?? ''
+  return both((lang) =>
     lang === 'en'
       ? { title: 'New business application', body: businessName ? `${businessName} applied to join Sanctus.` : 'A business applied to join Sanctus.' }
       : { title: 'Nova candidatura', body: businessName ? `${businessName} candidatou-se à Sanctus.` : 'Uma empresa candidatou-se à Sanctus.' },
   )
+}
 
 /** A business asked for a 3D model (staff with models.manage). */
 export const modelRequestNotice = (businessName: string, productName: Localized): Text =>

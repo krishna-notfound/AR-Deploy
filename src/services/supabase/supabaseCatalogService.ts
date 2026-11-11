@@ -190,6 +190,9 @@ const ACCOUNT_RULES: Record<string, ServiceError> = {
   sign_in_required: { code: 'PERMISSION', message: 'Sign in first.' },
   platform_admin_only: { code: 'PERMISSION', message: 'Only platform admins can do this.' },
   application_not_found: { code: 'NOT_FOUND', message: 'Application not found.' },
+  // ADR-0057: an application whose form did not ask for a company name is approved with the name typed in the dialog.
+  business_name_required: { code: 'VALIDATION', message: 'Enter the company name.' },
+  business_name_invalid: { code: 'VALIDATION', message: 'The company name must be 2 to 80 characters.' },
   business_not_found: { code: 'NOT_FOUND', message: 'This business no longer exists.' },
   closure_pending: CLOSURE_PENDING_ERROR,
   invalid_timezone: { code: 'VALIDATION', message: "Your time zone setting isn't recognised. Choose it again in Preferences." },
@@ -449,8 +452,8 @@ export interface ApplicationRow {
   id: string
   reference: string
   status: ApplicationStatus
-  business_name: string
-  applicant_name: string
+  business_name: string | null
+  applicant_name: string | null
   applicant_email: string
   applicant_phone: string | null
   website: string | null
@@ -501,7 +504,7 @@ export interface EmailRow {
 type DuplicatesAnswer =
   | { error: 'forbidden' | 'not_found' }
   | {
-      applications: { id: string; reference: string; business_name: string; status: ApplicationStatus; created_at: string; match: 'email' | 'name' | 'both' }[]
+      applications: { id: string; reference: string; business_name: string | null; status: ApplicationStatus; created_at: string; match: 'email' | 'name' | 'both' }[]
       businesses: { id: string; name: string; status: BusinessStatus; match: 'owner_email' | 'name' | 'both' }[]
     }
 
@@ -601,6 +604,9 @@ const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string 
   invalid_transition: { code: 'CONFLICT', message: 'This application can no longer change to that status.' },
   reopen_not_allowed: REOPEN_NOT_ALLOWED_ERROR,
   application_not_found: { code: 'NOT_FOUND', message: 'Application not found.' },
+  // ADR-0057: an application whose form did not ask for a company name is approved with the name typed in the dialog.
+  business_name_required: { code: 'VALIDATION', message: 'Enter the company name.' },
+  business_name_invalid: { code: 'VALIDATION', message: 'The company name must be 2 to 80 characters.' },
   // submit-application with the form builder (ADR-0043): the form was republished while the visitor typed, or the
   // published form could not be read. Both keep their reason so the page can react (reload the form, or retry).
   form_changed: { code: 'CONFLICT', message: 'The form was updated. Please check the new questions.' },
@@ -1316,6 +1322,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           action,
           reason: reason ?? null,
           includeReason: opts?.includeReason === true,
+          ...(opts?.businessName?.trim() ? { businessName: opts.businessName.trim() } : {}),
         })
         if (!r.ok) return r
         listeners.forEach((l) => l())

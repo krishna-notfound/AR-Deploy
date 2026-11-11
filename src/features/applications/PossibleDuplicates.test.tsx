@@ -97,6 +97,16 @@ describe('PossibleDuplicates (R-W2-9)', () => {
     expect(screen.getByText('Business Casa · Inactive · same business name, and its owner uses this email')).toBeInTheDocument()
   })
 
+  it('a duplicate application without a company name reads "Company name not given" (ADR-0057)', async () => {
+    vi.spyOn(service, 'getApplicationDuplicates').mockResolvedValue(ok({
+      applications: [{ id: 'n', reference: 'N1', businessName: null, status: 'submitted', createdAt: '2026-10-20T10:00:00Z', match: 'email' }],
+      businesses: [],
+    }))
+    renderPanel()
+    expect(await screen.findByText('Application N1 · Company name not given · Submitted · same email')).toBeInTheDocument()
+    expect(screen.queryByText(/null/)).not.toBeInTheDocument()
+  })
+
   it('a business row links to businessAdminPath(id) only with businesses.view; without it the name is plain text', async () => {
     vi.spyOn(service, 'getApplicationDuplicates').mockResolvedValue(ok(FOUND))
     const first = renderPanel(['applications.view', 'businesses.view'])

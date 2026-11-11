@@ -16,7 +16,7 @@ import { useFormat } from '@/lib/useFormat'
 import { applicationAdminPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
-import { ApplicationStatusBadge, joinPlace } from '../applications/labels'
+import { ApplicationStatusBadge, applicationTitle, joinPlace } from '../applications/labels'
 import { Monogram } from '../applications/Monogram'
 
 const PAGE_SIZE = 20
@@ -117,10 +117,10 @@ export default function ApplicationsPage() {
             <ul className="divide-y divide-subtle sm:hidden" aria-label={t('admin.applications.list')}>
               {q.data.items.map((a) => (
                 <li key={a.id} className="flex items-start gap-3 px-4 py-3 break-words [overflow-wrap:anywhere]">
-                  <Monogram name={a.businessName} />
+                  <Monogram name={applicationTitle(a)} />
                   <div className="min-w-0 flex-1">
                     <Link to={applicationAdminPath(a.id)} className="block text-sm leading-5 font-medium text-ink hover:underline">
-                      {a.businessName}
+                      {applicationTitle(a)}
                     </Link>
                     <p className="text-[13px] leading-[18px] text-ink-muted">
                       {[a.applicantName, joinPlace(a.city, a.country)].filter(Boolean).join(' · ')}
@@ -179,10 +179,10 @@ function ApplicationRow({ a }: { a: BusinessApplication }) {
     <tr className="h-[60px] transition-colors hover:bg-canvas/70">
       <td className="min-w-0 py-[11px] pr-4 pl-6 align-middle break-words [overflow-wrap:anywhere]">
         <div className="flex items-center gap-3">
-          <Monogram name={a.businessName} />
+          <Monogram name={applicationTitle(a)} />
           <div className="min-w-0">
             <Link id={nameId} to={applicationAdminPath(a.id)} className="text-sm leading-5 font-medium text-ink hover:underline">
-              {a.businessName}
+              {applicationTitle(a)}
             </Link>
             <p className="text-[13px] leading-[18px] text-ink-muted">
               #{a.reference} · <span className="capitalize">{a.category}</span>
@@ -192,7 +192,7 @@ function ApplicationRow({ a }: { a: BusinessApplication }) {
         </div>
       </td>
       <td className="px-4 py-[11px] align-middle">
-        <p className="text-sm leading-5 text-ink">{a.applicantName}</p>
+        {a.applicantName && <p className="text-sm leading-5 text-ink">{a.applicantName}</p>}
         <p className="max-w-[16rem] truncate text-[13px] leading-[18px] text-ink-muted">{a.applicantEmail}</p>
       </td>
       <td className="px-4 py-[11px] align-middle">

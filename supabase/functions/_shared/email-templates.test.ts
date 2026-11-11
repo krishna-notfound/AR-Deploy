@@ -183,3 +183,30 @@ describe('S4 Task 7: model_request_update (R-S4-15, §9.2)', () => {
     expect(e.html).toContain('&lt;i&gt;Sofa&lt;/i&gt; (A&amp;B)')
   })
 })
+
+describe('emails for an application without a company name (ADR-0057)', () => {
+  it('the rejection leaves the name out in both languages, for null, undefined and blank', () => {
+    for (const name of [null, undefined, '  ']) {
+      const en = applicationDecisionEmail('en', name)
+      expect(en.subject).toBe('Your Sanctus application')
+      expect(en.text).toContain('Thank you for applying to Sanctus.')
+      const pt = applicationDecisionEmail('pt', name)
+      expect(pt.subject).toBe('A sua candidatura à Sanctus')
+      expect(pt.text).toContain('Obrigado pela sua candidatura à Sanctus.')
+      for (const e of [en, pt]) expect(e.text + e.html).not.toMatch(/null|undefined/)
+    }
+  })
+
+  it('the team alert names the applicant email instead of the company', () => {
+    const en = renderEmail('admin_notification', 'en', { applicantEmail: 'ana@studio.test' })
+    expect(en.subject).toBe('New business awaiting review: ana@studio.test')
+    expect(en.text).toContain('A business without a company name (ana@studio.test) is waiting for review.')
+    const pt = renderEmail('admin_notification', 'pt', { applicantEmail: 'ana@studio.test' })
+    expect(pt.text).toContain('Uma empresa sem nome (ana@studio.test) aguarda análise.')
+    expect(renderEmail('admin_notification', 'en', {}).subject).toBe('New business awaiting review: unnamed')
+  })
+
+  it('the applicant confirmation never carries a name', () => {
+    expect(renderEmail('application_confirmation', 'en', {}).text).not.toMatch(/null|undefined/)
+  })
+})

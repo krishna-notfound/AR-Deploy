@@ -241,6 +241,61 @@ export function registerEditorFlows(mobile: boolean) {
     await expectToast(page, 'Application approved')
   })
 
+  test('application form: start from blank, add own questions, publish, apply with only those plus email and consent, then approve with a typed company name', async ({ page }) => {
+    await signInAsPlatform(page, 'admin')
+    await page.goto('/admin/editor/apply')
+    await expect(page.getByRole('button', { name: 'Preview the form' })).toBeVisible()
+
+    // Start from blank (asks first): one section with the email, then Review.
+    await page.getByRole('button', { name: 'Form options' }).click()
+    await page.getByRole('menuitem', { name: 'Start from blank' }).click()
+    await confirmDialog(page, 'Start from blank')
+    await expect(page.getByText('2 of 12 sections · 0 of 30 own questions')).toBeVisible()
+    await expect(page.locator('[data-row="applicantEmail"]')).toBeVisible()
+    await expect(page.locator('[data-row="businessName"]')).toHaveCount(0)
+
+    // Two own questions.
+    await page.getByRole('button', { name: 'Add question' }).click()
+    await page.getByRole('menuitem', { name: 'Short answer' }).click()
+    const first = page.locator('[data-row^="custom:"]').first()
+    await first.getByRole('textbox', { name: 'Question (English)' }).fill('Studio name')
+    await first.getByRole('switch', { name: 'Required' }).click()
+    await first.getByRole('button', { name: 'Done' }).click()
+    await page.getByRole('button', { name: 'Add question' }).click()
+    await page.getByRole('menuitem', { name: 'Paragraph' }).click()
+    await page.locator('[data-row^="custom:"]').last().getByRole('textbox', { name: 'Question (English)' }).fill('Tell us about your pieces')
+    await publishDraft(page)
+
+    // The public form asks only those and the email, then the consent ticks.
+    await page.goto('/apply?lang=en')
+    await expect(page.getByLabel('Business name')).toHaveCount(0)
+    await expect(page.getByLabel('Country')).toHaveCount(0)
+    await page.getByLabel(/^Studio name/).fill('Atelier Solo')
+    await page.getByLabel(/^Tell us about your pieces/).fill('Oak tables.')
+    await page.getByRole('textbox', { name: /^Email/ }).fill('solo@atelier.test')
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByLabel(/I confirm the information is accurate/).check()
+    await page.getByRole('checkbox', { name: /^I agree to the Terms/ }).check()
+    await page.getByRole('button', { name: 'Send application' }).click()
+    await expect(page.getByRole('heading', { name: 'Application received' })).toBeVisible()
+
+    // The reviewer sees the email as the title (no company name) and must type the name to approve.
+    await signInAsSuperAdmin(page)
+    await page.goto('/admin/applications')
+    await page.getByRole('link', { name: 'solo@atelier.test' }).first().click()
+    await expect(page.getByRole('heading', { level: 1, name: 'solo@atelier.test' })).toBeVisible()
+    await page.getByRole('button', { name: 'Approve' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Approve' }).click()
+    await expect(dialog.getByText('Enter the company name, 2 to 80 characters.')).toBeVisible()
+    await dialog.getByRole('textbox', { name: /Company name/ }).fill('Atelier Solo Lda')
+    await dialog.getByRole('button', { name: 'Approve' }).click()
+    await expect(dialog).toBeHidden()
+    await expectToast(page, 'Application approved')
+    await page.goto('/admin/businesses')
+    await expect(page.getByRole('link', { name: 'Atelier Solo Lda' }).first()).toBeVisible()
+  })
+
   test('the dashboards switch to Portuguese from the top bar, keep it across a reload, and switch back', async ({ page }) => {
     await signInAsSuperAdmin(page)
     await switchDashboardLang(page, mobile, 'pt')

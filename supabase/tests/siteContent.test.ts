@@ -230,7 +230,7 @@ describe('draft, publish, history, restore', () => {
     await attempt({ schema: 1, customPages: 'x' }, 'customPages|invalid_value')
     await attempt(doc((c) => void (c.builtinPages = { terms: { en: 'x'.repeat(524_288) } })), 'document|too_long')
     await attempt(doc((c) => void (c.customPages = Array.from({ length: 21 }, (_, i) => page({ slug: `p-${i}` })) as never)), 'customPages|too_many')
-    await attempt(doc((c) => void c.applyForm.customQuestions.push(...(Array.from({ length: 11 }, (_, i) => ({ id: `q${i}`, type: 'short_text', label: { en: 'q' } })) as never))), 'applyForm.customQuestions|too_many')
+    await attempt(doc((c) => void c.applyForm.customQuestions.push(...(Array.from({ length: 31 }, (_, i) => ({ id: `q${i}`, type: 'short_text', label: { en: 'q' } })) as never))), 'applyForm.customQuestions|too_many')
     await attempt(doc((c) => void c.applyForm.steps.push(...(Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, title: { en: 's' } })) as never))), 'applyForm.steps|too_many')
   })
 
@@ -323,7 +323,7 @@ describe('publish validation (slugs, social, size)', () => {
   })
 
   it('a form problem is reported with the applyForm. prefix', async () => {
-    await refuses(doc((c) => void (c.applyForm.fields[0]!.hidden = true)), 'applyForm.fields.0.hidden|locked')
+    await refuses(doc((c) => void (c.applyForm.fields.find((x) => x.key === 'applicantEmail')!.hidden = true)), 'applyForm.fields.8.hidden|locked')
   })
 })
 
@@ -354,13 +354,13 @@ describe('private.validate_apply_form', () => {
 
   const bad: [string, (f: ApplyFormConfig) => void, string][] = [
     ['no steps', (f) => void (f.steps = []), 'steps|required'],
-    ['9 steps', (f) => void f.steps.splice(1, 0, ...(Array.from({ length: 4 }, (_, i) => ({ id: `s${i}`, title: { en: 's' } })) as never)), 'steps|too_many'],
+    ['13 steps', (f) => void f.steps.splice(1, 0, ...(Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, title: { en: 's' } })) as never)), 'steps|too_many'],
     ['duplicate step ids', (f) => void f.steps.splice(1, 0, { id: 'business', title: { en: 'x' } }), 'steps.1.id|duplicate_id'],
     ['Review not last', (f) => void f.steps.reverse(), 'steps|review_position'],
     ['two Review steps', (f) => void f.steps.splice(1, 0, { id: 'r2', builtin: 'review' }), 'steps|review_position'],
     ['no Review step', (f) => void f.steps.pop(), 'steps|review_position'],
     ['a new step without an English title', (f) => void f.steps.splice(1, 0, { id: 'n1' }), 'steps.1.title.en|required'],
-    ['11 questions', (f) => { f.customQuestions = Array.from({ length: 11 }, (_, i) => q(`q${i}`)) as never; place(f, ...f.customQuestions.map((x) => x.id)) }, 'customQuestions|too_many'],
+    ['31 questions', (f) => { f.customQuestions = Array.from({ length: 31 }, (_, i) => q(`q${i}`)) as never; place(f, ...f.customQuestions.map((x) => x.id)) }, 'customQuestions|too_many'],
     ['duplicate question ids', (f) => { f.customQuestions = [q('a'), q('a')] as never; place(f, 'a') }, 'customQuestions.1.id|duplicate_id'],
     ['unknown question type', (f) => { f.customQuestions = [q('a', { type: 'file_upload' })] as never; place(f, 'a') }, 'customQuestions.0.type|invalid_value'],
     ['single choice with 1 option', (f) => { f.customQuestions = [q('a', { type: 'single_choice', options: opts(1) })] as never; place(f, 'a') }, 'customQuestions.0.options|options_count'],
@@ -372,7 +372,7 @@ describe('private.validate_apply_form', () => {
     ['a field on an unknown step', (f) => void (f.fields[0]!.stepId = 'nope'), 'fields.0.stepId|step_unknown'],
     ['a field on Review', (f) => void (f.fields[0]!.stepId = 'review'), 'fields.0.stepId|review_misplaced'],
     ['a hidden locked field', (f) => void (f.fields.find((x) => x.key === 'applicantEmail')!.hidden = true), 'fields.8.hidden|locked'],
-    ['an optional locked field', (f) => void (f.fields.find((x) => x.key === 'applicantName')!.required = false), 'fields.6.required|locked'],
+    ['an optional locked field', (f) => void (f.fields.find((x) => x.key === 'applicantEmail')!.required = false), 'fields.8.required|locked'],
     ['every option of a choice field hidden', (f) => void (f.hiddenOptions = { modelReadiness: ['glb_usdz', 'some', 'none', 'need_help'] }), 'hiddenOptions.modelReadiness|last_option'],
     ['a hidden option value outside the set', (f) => void (f.hiddenOptions = { productCount: ['1-10', 'lots'] }), 'hiddenOptions.productCount|invalid_value'],
     ['hidden options on a field without options', (f) => void (f.hiddenOptions = { website: ['x'] } as never), 'hiddenOptions.website|invalid_value'],
@@ -390,9 +390,9 @@ describe('private.validate_apply_form', () => {
         f.customQuestions = [q('a', { type: 'single_choice', options: opts(3) })] as never
         place(f, 'a')
       }),
-      form((f) => void (f.fields[0]!.hidden = true)),
+      form((f) => void (f.fields.find((x) => x.key === 'applicantEmail')!.hidden = true)),
       form((f) => void f.steps.reverse()),
-      form((f) => void f.steps.splice(1, 0, ...(Array.from({ length: 4 }, (_, i) => ({ id: `s${i}`, title: { en: 's' } })) as never))),
+      form((f) => void f.steps.splice(1, 0, ...(Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, title: { en: 's' } })) as never))),
       form((f) => void (f.hiddenOptions = { photoReadiness: ['all', 'some', 'none'] })),
     ]
     const verdicts = await Promise.all(fixtures.map(async (f) => [(await sql(f)) === null, Object.keys(validateApplyForm(f)).length === 0] as const))
@@ -414,13 +414,13 @@ describe('business_applications', () => {
     await expect(
       db.query(`insert into public.business_applications (business_name, applicant_name, applicant_email, country, submission_key) values ('Acme', 'Ana', 'ana@acme.test', 'X', gen_random_uuid())`),
     ).rejects.toMatchObject({ code: '23514' })
-    // Unchanged: the locked columns and language stay required.
-    await expect(db.query(`insert into public.business_applications (applicant_name, applicant_email, submission_key) values ('Ana', 'ana@acme.test', gen_random_uuid())`)).rejects.toMatchObject({ code: '23502' })
+    // The email and the language stay required (ADR-0057 made the two names nullable).
+    await expect(db.query(`insert into public.business_applications (business_name, applicant_name, submission_key) values ('Acme', 'Ana', gen_random_uuid())`)).rejects.toMatchObject({ code: '23502' })
     const { rows } = await db.query<{ column_name: string; is_nullable: string }>(
       `select column_name, is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'business_applications' and column_name in ('country','city','category','language','business_name','applicant_name','applicant_email')`,
     )
     expect(Object.fromEntries(rows.map((r) => [r.column_name, r.is_nullable]))).toEqual({
-      country: 'YES', city: 'YES', category: 'YES', language: 'NO', business_name: 'NO', applicant_name: 'NO', applicant_email: 'NO',
+      country: 'YES', city: 'YES', category: 'YES', language: 'NO', business_name: 'YES', applicant_name: 'YES', applicant_email: 'NO',
     })
   })
 
@@ -641,7 +641,7 @@ describe('rollback', () => {
       roles: await fn('public.admin_set_role_permissions(public.platform_role, text[])'),
       check: (await target.query(`select pg_get_constraintdef(oid) as d from pg_constraint where conrelid = 'public.platform_role_permissions'::regclass and contype = 'c' order by 1`)).rows,
       answers: (await target.query(`select pg_get_constraintdef(oid) as d from pg_constraint where conrelid = 'public.business_applications'::regclass and conname = 'business_applications_answers_check'`)).rows,
-      nullable: (await target.query(`select column_name, is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'business_applications' and column_name <> 'catalogue_path' order by 1`)).rows,
+      nullable: (await target.query(`select column_name, is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'business_applications' and column_name not in ('catalogue_path', 'business_name', 'applicant_name') order by 1`)).rows,
     }
   }
   const GONE = [

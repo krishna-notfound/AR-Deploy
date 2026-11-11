@@ -16,7 +16,7 @@ import { service } from '@/services'
 import type { AuditEntry } from '@/services/catalogService'
 import { useServiceQuery } from '@/services/hooks'
 import { actorText } from '../applications/AuditTimeline'
-import { eventLabel, statusWord } from '../applications/labels'
+import { applicationTitle, eventLabel, statusWord } from '../applications/labels'
 
 const PAGE_SIZE = 30
 
@@ -76,7 +76,7 @@ export default function AuditLogPage() {
         ? t('admin.audit.application')
         : e.businessId && bizName(e.businessId)
           ? t('admin.audit.applicationRef', { ref: a.reference })
-          : t('admin.audit.nameApplicationRef', { name: a.businessName, ref: a.reference })
+          : t('admin.audit.nameApplicationRef', { name: applicationTitle(a), ref: a.reference })
       parts.push(
         <Link key="application" to={applicationAdminPath(e.applicationId)} className="text-accent-ink hover:underline">
           {text}

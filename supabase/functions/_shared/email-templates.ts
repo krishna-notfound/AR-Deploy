@@ -168,22 +168,28 @@ const closureRequest = (d: TemplateData): Copy => d.closureCancelled ? {
 // Application decision (R-W2-1, §11.2): sent on rejection only. The reason is the reviewer's text, so it is escaped in
 // the HTML (white-space keeps its line breaks) and kept as written in the text version.
 const applicationDecision: Record<EmailLang, (d: TemplateData) => Copy> = {
-  en: (d) => ({
-    subject: `Your Sanctus application for ${d.businessName ?? ''}`,
-    heading: `Your Sanctus application for ${d.businessName ?? ''}`,
-    body: `Thank you for applying to list ${d.businessName ?? ''} on Sanctus. After review, we are not able to approve this application.`,
-    quote: d.reason ? `Reason: ${d.reason}` : undefined,
-    closing: 'You are welcome to apply again if your situation changes.',
-  }),
-  pt: (d) => ({
-    subject: `A sua candidatura à Sanctus para ${d.businessName ?? ''}`,
-    heading: `A sua candidatura à Sanctus para ${d.businessName ?? ''}`,
-    body: `Obrigado pela sua candidatura para apresentar ${d.businessName ?? ''} na Sanctus. Após análise, não nos é possível aprovar esta candidatura.`,
-    quote: d.reason ? `Motivo: ${d.reason}` : undefined,
-    closing: 'Pode candidatar-se novamente se a sua situação mudar.',
-  }),
+  // The form may not ask for a company name (ADR-0057): the subject and text then leave it out.
+  en: (d) => {
+    const name = d.businessName?.trim()
+    return {
+      subject: name ? `Your Sanctus application for ${name}` : 'Your Sanctus application',
+      heading: name ? `Your Sanctus application for ${name}` : 'Your Sanctus application',
+      body: name ? `Thank you for applying to list ${name} on Sanctus. After review, we are not able to approve this application.` : 'Thank you for applying to Sanctus. After review, we are not able to approve this application.',
+      quote: d.reason ? `Reason: ${d.reason}` : undefined,
+      closing: 'You are welcome to apply again if your situation changes.',
+    }
+  },
+  pt: (d) => {
+    const name = d.businessName?.trim()
+    return {
+      subject: name ? `A sua candidatura à Sanctus para ${name}` : 'A sua candidatura à Sanctus',
+      heading: name ? `A sua candidatura à Sanctus para ${name}` : 'A sua candidatura à Sanctus',
+      body: name ? `Obrigado pela sua candidatura para apresentar ${name} na Sanctus. Após análise, não nos é possível aprovar esta candidatura.` : 'Obrigado pela sua candidatura à Sanctus. Após análise, não nos é possível aprovar esta candidatura.',
+      quote: d.reason ? `Motivo: ${d.reason}` : undefined,
+      closing: 'Pode candidatar-se novamente se a sua situação mudar.',
+    }
+  },
 }
-
 // Business notice (R-W7-2, §11.2): the platform team changed the owner's catalogue. No link: the footer names the
 // dashboard card where the change is listed.
 const BUSINESS_NOTICE: Record<EmailLang, Record<BusinessNoticeEvent, (d: TemplateData) => { subject: string; body: string }>> = {
@@ -338,15 +344,15 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
   },
   admin_notification: {
     en: (d) => ({
-      subject: `New business awaiting review: ${d.businessName ?? 'unnamed'}`,
+      subject: `New business awaiting review: ${d.businessName?.trim() || d.applicantEmail || 'unnamed'}`,
       heading: 'A business is waiting for approval',
-      body: `${d.businessName ?? 'A business'}${d.applicantEmail ? ` (${d.applicantEmail})` : ''} is waiting for review.`,
+      body: `${d.businessName?.trim() || (d.applicantEmail ? 'A business without a company name' : 'A business')}${d.applicantEmail ? ` (${d.applicantEmail})` : ''} is waiting for review.`,
       cta: 'Open the review',
     }),
     pt: (d) => ({
-      subject: `Nova empresa aguardando análise: ${d.businessName ?? 'sem nome'}`,
+      subject: `Nova empresa aguardando análise: ${d.businessName?.trim() || d.applicantEmail || 'sem nome'}`,
       heading: 'Uma empresa aguarda aprovação',
-      body: `${d.businessName ?? 'Uma empresa'}${d.applicantEmail ? ` (${d.applicantEmail})` : ''} aguarda análise.`,
+      body: `${d.businessName?.trim() || (d.applicantEmail ? 'Uma empresa sem nome' : 'Uma empresa')}${d.applicantEmail ? ` (${d.applicantEmail})` : ''} aguarda análise.`,
       cta: 'Abrir a análise',
     }),
   },
@@ -403,8 +409,8 @@ ${data.actionUrl ? `<p style="margin:24px 0 0;font-size:12px;color:#6E6559;word-
 }
 
 /** The rejection notice to an applicant (R-W2-1), in the application's language; the reason only when the reviewer ticked it. */
-export const applicationDecisionEmail = (lang: EmailLang, businessName: string, reason?: string): RenderedEmail =>
-  renderEmail('application_decision', lang, { businessName, reason })
+export const applicationDecisionEmail = (lang: EmailLang, businessName: string | null | undefined, reason?: string): RenderedEmail =>
+  renderEmail('application_decision', lang, { businessName: businessName?.trim() || undefined, reason })
 
 /** A platform-team change, told to the business owner (R-W7-2), in the application's language. */
 export const businessNoticeEmail = (lang: EmailLang, event: BusinessNoticeEvent, d: { businessName: string; productName?: string }): RenderedEmail =>

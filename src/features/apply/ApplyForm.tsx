@@ -66,6 +66,9 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
   const tx = useMemo(() => makeApplyTexts(config, language), [config, language])
   const steps = useMemo(() => resolveApplyForm(config), [config])
   const rules = useMemo(() => rulesFromConfig(config, version), [config, version])
+  // A form that does not ask for the language (hidden or deleted, ADR-0057) stores the language the visitor used it in.
+  const asksLanguage = useMemo(() => steps.some((s) => s.fields.some((f) => f.key === 'language')), [steps])
+  const inputOf = (d: Draft) => toInput(asksLanguage ? d : { ...d, language })
 
   const [initial] = useState(() => (preview ? null : loadDraft(language)))
   const [draft, setDraft] = useState<Draft>(() => initial?.draft ?? emptyDraft(language))
@@ -170,7 +173,7 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
   /** Errors of the given steps only, as translated messages. */
   const stepErrors = (targets: ResolvedStep[]): Record<string, string> => {
     const review = targets.some((s) => s.builtin === 'review')
-    const v = validateApplication({ ...toInput(eff), consent: review ? eff.consent : true, acceptedTerms: review ? eff.acceptedTerms : true }, rules)
+    const v = validateApplication({ ...inputOf(eff), consent: review ? eff.consent : true, acceptedTerms: review ? eff.acceptedTerms : true }, rules)
     if (v.ok) return {}
     const own = new Set(targets.flatMap(errorKeysOf))
     return Object.fromEntries(Object.entries(v.errors).filter(([f]) => own.has(f)).map(([f, c]) => [f, message(f, c)]))
@@ -214,7 +217,7 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
     }
     setSubmitting(true)
     setSubmitError(null)
-    const res = await service.submitApplication({ ...toInput(eff), ...(honeypot ? { hp: honeypot } : {}) } as Parameters<typeof service.submitApplication>[0])
+    const res = await service.submitApplication({ ...inputOf(eff), ...(honeypot ? { hp: honeypot } : {}) } as Parameters<typeof service.submitApplication>[0])
     setSubmitting(false)
     if (res.ok) {
       try {

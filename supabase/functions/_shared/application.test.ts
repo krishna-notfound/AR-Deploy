@@ -109,14 +109,42 @@ describe('validateApplication with rules', () => {
     expect(ok(undefined)).toBe('en')
   })
 
-  it('locked fields stay required and visible whatever the rules say', () => {
-    const rules = rulesOf((c) => c.fields.forEach((f) => ['businessName', 'applicantName', 'applicantEmail'].includes(f.key) && Object.assign(f, { hidden: true, required: false })))
+  it('the applicant email stays required and visible whatever the rules say (the only locked field, ADR-0057)', () => {
+    const rules = rulesOf((c) => c.fields.forEach((f) => f.key === 'applicantEmail' && Object.assign(f, { hidden: true, required: false })))
     // rulesFromConfig already ignores a hostile config; build hostile rules directly too.
-    const hostile = { ...rules, fields: { ...rules.fields, businessName: { hidden: true, required: false }, applicantName: { hidden: true, required: false }, applicantEmail: { hidden: true, required: false } } }
+    const hostile = { ...rules, fields: { ...rules.fields, applicantEmail: { hidden: true, required: false } } }
     for (const r of [rules, hostile]) {
-      const v = validateApplication({ ...VALID, businessName: '', applicantName: '', applicantEmail: '' }, r)
-      expect(v).toMatchObject({ ok: false, errors: { businessName: 'required', applicantName: 'required', applicantEmail: 'required' } })
+      const v = validateApplication({ ...VALID, applicantEmail: '' }, r)
+      expect(v).toMatchObject({ ok: false, errors: { applicantEmail: 'required' } })
     }
+  })
+
+  it('the business and applicant names are ordinary fields: hidden, optional or deleted they are stored as null (ADR-0057)', () => {
+    const empty = { ...VALID, businessName: '', applicantName: '' }
+    for (const change of [
+      (c: ApplyFormConfig) => (place(c, 'businessName', { hidden: true }), place(c, 'applicantName', { hidden: true })),
+      (c: ApplyFormConfig) => (place(c, 'businessName', { required: false }), place(c, 'applicantName', { required: false })),
+      (c: ApplyFormConfig) => {
+        c.removedFields = ['businessName', 'applicantName']
+        c.fields = c.fields.filter((f) => f.key !== 'businessName' && f.key !== 'applicantName')
+      },
+    ]) {
+      const v = validateApplication(empty, rulesOf(change))
+      expect(v.ok, JSON.stringify(v)).toBe(true)
+      if (v.ok) expect(v.value).toMatchObject({ businessName: null, applicantName: null, applicantEmail: 'ana@studio.test' })
+    }
+    // Hidden or deleted: whatever a stale client still sends is ignored. Optional: a value that is sent is kept (and checked).
+    const gone = rulesOf((c) => place(c, 'businessName', { hidden: true }))
+    const v = validateApplication({ ...VALID, businessName: 'Typed anyway' }, gone)
+    expect(v.ok && v.value.businessName).toBeNull()
+    const optional = rulesOf((c) => place(c, 'businessName', { required: false }))
+    expect(validateApplication({ ...VALID, businessName: 'Kept Co' }, optional)).toMatchObject({ ok: true, value: { businessName: 'Kept Co' } })
+    expect(validateApplication({ ...VALID, businessName: 'X' }, optional)).toMatchObject({ ok: false, errors: { businessName: 'too_short' } })
+  })
+
+  it('still required when the form keeps them (and with no rules at all)', () => {
+    expect(validateApplication({ ...VALID, businessName: '', applicantName: '' })).toMatchObject({ ok: false, errors: { businessName: 'required', applicantName: 'required' } })
+    expect(validateApplication({ ...VALID, businessName: '', applicantName: '' }, rulesOf(() => {}))).toMatchObject({ ok: false, errors: { businessName: 'required', applicantName: 'required' } })
   })
 
   it('consent and Terms stay required with any rules', () => {

@@ -21,6 +21,9 @@ export function ApplicationStatusBadge({ status }: { status: ApplicationStatus }
   )
 }
 
+/** What to call an application in a title, breadcrumb or list when the form did not ask for a company name (ADR-0057): the applicant's email. */
+export const applicationTitle = (a: { businessName: string | null; applicantEmail: string }): string => a.businessName?.trim() || a.applicantEmail
+
 export const applicationStatusLabel = (s: ApplicationStatus, lang: Lang = 'en') => translate(lang, `applications.status.${s}`)
 
 // Only statuses backed by provider evidence say anything about delivery (design/23-email.md).

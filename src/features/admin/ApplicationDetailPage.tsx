@@ -8,8 +8,7 @@ import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
 import { BusinessStatusBadge } from '@/components/ui/Badge'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
-import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { Checkbox, FormField, Textarea } from '@/components/ui/Form'
+import { Checkbox, FormField, Input, Textarea } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState, ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -26,7 +25,7 @@ import { AuditTimeline } from '../applications/AuditTimeline'
 import { ExtraQuestionsCard } from '../applications/ExtraQuestionsCard'
 import { EmailActivity } from '../applications/EmailActivity'
 import { PossibleDuplicates } from '../applications/PossibleDuplicates'
-import { ApplicationStatusBadge, joinPlace, knownEmailReason } from '../applications/labels'
+import { ApplicationStatusBadge, applicationTitle, joinPlace, knownEmailReason } from '../applications/labels'
 import { BusinessOwnersPanel } from '../businesses/BusinessOwnersPanel'
 
 const READINESS: Record<string, TranslationKey> = {
@@ -66,9 +65,10 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   const { t, lang } = useI18n()
   const f = useFormat()
   const ready = (v?: string) => (v && Object.hasOwn(READINESS, v) ? t(READINESS[v]!) : v)
-  const confirm = useConfirm()
   const toast = useToast()
-  const review = useServiceMutation((action: ReviewAction, reason?: string, includeReason?: boolean) => service.reviewApplication(app.id, action, reason, { includeReason: includeReason === true }))
+  const review = useServiceMutation((action: ReviewAction, reason?: string, includeReason?: boolean, businessName?: string) =>
+    service.reviewApplication(app.id, action, reason, { includeReason: includeReason === true, ...(businessName ? { businessName } : {}) }),
+  )
   const can = useCan()
   // R-W2-6: the business and its owner are shown only to a role that can open businesses (no "Business not found"),
   // and the owner invitation is pointed to only for a role that can send it.
@@ -102,6 +102,10 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
   // R-W2-1: off by default; the applicant then hears only that the application was not approved.
   const [includeReason, setIncludeReason] = useState(false)
   const includeHintId = useId()
+  // ADR-0057: Approve asks for the company name (prefilled when the form had one), because the form may not ask for it.
+  const [approveOpen, setApproveOpen] = useState(false)
+  const [companyName, setCompanyName] = useState('')
+  const [nameError, setNameError] = useState<string | null>(null)
   const actions = availableActions(app.status, { businessId: app.businessId ?? null })
   const canStartReview = actions.includes('start_review') && can('applications.approve')
   const canReject = actions.includes('reject') && can('applications.reject')
@@ -120,13 +124,15 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
     toast.error(t('admin.applications.detail.rejectedNoEmail', { why }))
   }
 
-  const run = async (action: ReviewAction, why?: string) => {
-    const res = await review.mutate(action, why, action === 'reject' && includeReason)
+  const run = async (action: ReviewAction, why?: string, name?: string) => {
+    const res = await review.mutate(action, why, action === 'reject' && includeReason, name)
     if (!res.ok) {
+      if (action === 'approve' && (res.error.fieldErrors?.businessName || res.error.message.includes('company name'))) return setNameError(t('admin.applications.detail.companyNameInvalid'))
       if (action === 'reject' && res.error.fieldErrors?.reason) return setReasonError(fieldText(res.error.fieldErrors.reason, t) ?? null)
       return toast.error(t('admin.applications.detail.notUpdated'), errorText(res.error, t))
     }
     setRejectOpen(false)
+    setApproveOpen(false)
     onChanged()
     if (action === 'approve') {
       if (canInviteOwner) {
@@ -138,20 +144,22 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
     else toast.success(t('admin.applications.detail.markedReview'))
   }
 
-  const approve = async () => {
-    const ok = await confirm({
-      title: t('admin.applications.detail.approveTitle', { name: app.businessName }),
-      body: t('admin.applications.detail.approveBody'),
-      confirmLabel: t('admin.applications.detail.approve'),
-    })
-    if (ok) await run('approve')
+  const openApprove = () => {
+    setCompanyName(app.businessName ?? '')
+    setNameError(null)
+    setApproveOpen(true)
+  }
+  const confirmApprove = () => {
+    const name = companyName.trim()
+    if (name.length < 2 || name.length > 80) return setNameError(t('admin.applications.detail.companyNameInvalid'))
+    void run('approve', undefined, name)
   }
 
   return (
     <>
       <PageHeader
-        title={app.businessName}
-        breadcrumbs={[{ label: t('nav.applications'), to: '/admin/applications' }, { label: app.businessName }]}
+        title={applicationTitle(app)}
+        breadcrumbs={[{ label: t('nav.applications'), to: '/admin/applications' }, { label: applicationTitle(app) }]}
         meta={
           <>
             <ApplicationStatusBadge status={app.status} />
@@ -191,7 +199,7 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
               </Button>
             )}
             {canApprove && (
-              <Button variant="primary" icon={<Check className="size-4" aria-hidden />} loading={review.pending} onClick={() => void approve()}>
+              <Button variant="primary" icon={<Check className="size-4" aria-hidden />} loading={review.pending} onClick={openApprove}>
                 {t('admin.applications.detail.approve')}
               </Button>
             )}
@@ -327,9 +335,42 @@ function ApplicationView({ app, onChanged }: { app: BusinessApplication; onChang
       </div>
 
       <Modal
+        open={approveOpen}
+        onClose={() => setApproveOpen(false)}
+        title={t('admin.applications.detail.approveTitle', { name: applicationTitle(app) })}
+        description={t('admin.applications.detail.approveBody')}
+        footer={
+          <>
+            <Button onClick={() => setApproveOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" loading={review.pending} onClick={confirmApprove}>
+              {t('admin.applications.detail.approve')}
+            </Button>
+          </>
+        }
+      >
+        <FormField label={t('admin.applications.detail.companyName')} required hint={t('admin.applications.detail.companyNameHint')} error={nameError ?? undefined}>
+          <Input
+            value={companyName}
+            maxLength={80}
+            autoComplete="organization"
+            onChange={(e) => {
+              setCompanyName(e.target.value)
+              setNameError(null)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                confirmApprove()
+              }
+            }}
+          />
+        </FormField>
+      </Modal>
+
+      <Modal
         open={rejectOpen}
         onClose={() => setRejectOpen(false)}
-        title={t('admin.applications.detail.rejectTitle', { name: app.businessName })}
+        title={t('admin.applications.detail.rejectTitle', { name: applicationTitle(app) })}
         description={t('admin.applications.detail.rejectBody')}
         footer={
           <>

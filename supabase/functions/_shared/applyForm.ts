@@ -1,4 +1,4 @@
-// The application form model (Content Editor, spec section 6 and 10): the document the Editor saves, the defaults that
+﻿// The application form model (Content Editor, spec section 6 and 10): the document the Editor saves, the defaults that
 // reproduce today's form, the resolver the page/preview/review use, the rules the validator consumes, and the TypeScript
 // twin of the SQL gate private.validate_apply_form. Pure TypeScript with NO imports, like application.ts, so the page,
 // the demo service and the submit-application Edge Function (Deno) share it. Keep it in step with the migration.
@@ -11,7 +11,12 @@ export type ApplyBuiltinField =
   | 'applicantName' | 'applicantRole' | 'applicantEmail' | 'applicantPhone' | 'language'
   | 'productCount' | 'photoReadiness' | 'modelReadiness' | 'notes' | 'catalogue'
 export type ApplyChoiceField = 'category' | 'productCount' | 'photoReadiness' | 'modelReadiness'
-export const LOCKED_FIELDS = ['businessName', 'applicantName', 'applicantEmail'] as const
+/**
+ * Never hidden, optional or deleted (ADR-0057, owner 2026-11-09: "all except Email + Consent"): the applicant's email is
+ * how the team answers and where the owner invitation goes. The consent tick lives on the Review step and is not a field.
+ * Before ADR-0057 the business and applicant names were locked too; old forms that still place them stay valid.
+ */
+export const LOCKED_FIELDS = ['applicantEmail'] as const
 
 export interface ApplyStep {
   /** Built-in: the ApplyStepKey; new step: crypto.randomUUID(). */
@@ -47,14 +52,20 @@ export interface CustomQuestion {
 export interface ApplyFormConfig {
   /** Overrides on top of the `apply.*` dictionary. Key = a member of APPLY_EDITABLE_KEYS. */
   texts: Record<string, Partial<Record<Lang, string>>>
-  /** 1..8 steps in display order. The last one is the Review step. Array order is the order. */
+  /** 1..12 steps in display order. The last one is the Review step. Array order is the order. */
   steps: ApplyStep[]
   /** One placement per built-in field and per question. Array order is the order inside a step. A built-in key left out gets its default placement. */
   fields: ApplyFieldPlacement[]
-  /** At most 10. */
+  /** At most 30. */
   customQuestions: CustomQuestion[]
   /** Option values to hide in a built-in choice field. At least one stays visible. */
   hiddenOptions: Partial<Record<ApplyChoiceField, string[]>>
+  /**
+   * Built-in fields the client deleted from the form (ADR-0057); never `applicantEmail`. A removed field is not asked, is
+   * stored as null and has no placement; "Add a removed field" takes it out of this list again. Absent in forms saved
+   * before ADR-0057 (nothing removed). A deleted built-in step is simply missing from `steps`.
+   */
+  removedFields?: ApplyBuiltinField[]
 }
 /** Stored in business_applications.answers.custom. */
 export interface CustomAnswer {
@@ -69,8 +80,10 @@ export interface CustomAnswer {
 }
 
 // ---- limits (the SQL gate repeats the ones marked SQL) ---------------------------------------------------------------
-export const MAX_APPLY_STEPS = 8 // SQL
-export const MAX_CUSTOM_QUESTIONS = 10 // SQL
+export const MAX_APPLY_STEPS = 12 // SQL (was 8 before ADR-0057)
+export const MAX_CUSTOM_QUESTIONS = 30 // SQL (was 10 before ADR-0057)
+/** Placements in the draft: the 16 built-in fields, 30 own questions and a little slack (private.check_site_content_shape). */
+export const MAX_APPLY_FIELDS = 50 // SQL
 export const MIN_CHOICE_OPTIONS = 2 // SQL
 export const MAX_CHOICE_OPTIONS = 10 // SQL
 export const MAX_TEXT_OVERRIDE = 600 // SQL
@@ -105,20 +118,20 @@ export interface BuiltinFieldInfo {
   defaultStep: Exclude<ApplyStepKey, 'review'>
   /** Today's required flag. `language` is always preselected, so it has no switch (true). */
   defaultRequired: boolean
-  /** Approval creates the company account from these: never hidden, never optional. */
+  /** Never hidden, optional or deleted (only the applicant's email, ADR-0057). */
   locked: boolean
   /** The stored option values of a choice field (the fixed set the database and the review screen know). */
   options?: readonly string[]
 }
 // The option values equal the constants in application.ts (a unit test checks it); application.ts stays untouched.
 export const BUILTIN_FIELDS: Readonly<Record<ApplyBuiltinField, BuiltinFieldInfo>> = {
-  businessName: { defaultStep: 'business', defaultRequired: true, locked: true },
+  businessName: { defaultStep: 'business', defaultRequired: true, locked: false },
   website: { defaultStep: 'business', defaultRequired: false, locked: false },
   category: { defaultStep: 'business', defaultRequired: true, locked: false, options: APPLY_CATEGORY_KEYS },
   description: { defaultStep: 'business', defaultRequired: true, locked: false },
   country: { defaultStep: 'location', defaultRequired: true, locked: false },
   city: { defaultStep: 'location', defaultRequired: true, locked: false },
-  applicantName: { defaultStep: 'contact', defaultRequired: true, locked: true },
+  applicantName: { defaultStep: 'contact', defaultRequired: true, locked: false },
   applicantRole: { defaultStep: 'contact', defaultRequired: false, locked: false },
   applicantEmail: { defaultStep: 'contact', defaultRequired: true, locked: true },
   applicantPhone: { defaultStep: 'contact', defaultRequired: false, locked: false },
@@ -176,6 +189,24 @@ export const APPLY_TEXT_TOKENS: Readonly<Record<string, readonly string[]>> = {
 const tokensOf = (text: string): string[] => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!)
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
+/** The deleted built-in fields of a form as a set. The locked email is never in it, whatever the document says. */
+function removedBuiltinSet(cfg: ApplyFormConfig): Set<ApplyBuiltinField> {
+  return new Set((cfg.removedFields ?? []).filter((k): k is ApplyBuiltinField => isBuiltin(k) && !isLocked(k)))
+}
+
+/** The built-in fields deleted from the form, in the order of APPLY_BUILTIN_KEYS (what "Add a removed field" lists). */
+export function removedFieldsOf(config: ApplyFormConfig | null): ApplyBuiltinField[] {
+  if (!config) return []
+  const removed = removedBuiltinSet(config)
+  return APPLY_BUILTIN_KEYS.filter((k) => removed.has(k))
+}
+
+/** The built-in steps (never Review) that are not in the form: what "Restore a removed step" lists, in the original order. */
+export function removedStepsOf(config: ApplyFormConfig | null): Exclude<ApplyStepKey, 'review'>[] {
+  const present = new Set((config?.steps ?? DEFAULT_APPLY_FORM.steps).map((st) => st.builtin))
+  return (['business', 'location', 'contact', 'catalogue'] as const).filter((k) => !present.has(k))
+}
+
 // ---- resolver --------------------------------------------------------------------------------------------------------
 export interface ResolvedField {
   key: ApplyBuiltinField | `custom:${string}`
@@ -211,6 +242,7 @@ export function resolveApplyForm(config: ApplyFormConfig | null, opts: { include
   const questions = new Map((cfg.customQuestions ?? []).map((q) => [q.id, q]))
   const buckets = new Map<string, ResolvedField[]>(steps.map((st) => [st.id, []]))
   const seen = new Set<string>()
+  const removed = removedBuiltinSet(cfg)
 
   const add = (key: ResolvedField['key'], stepId: string, p?: ApplyFieldPlacement) => {
     if (seen.has(key)) return
@@ -219,6 +251,8 @@ export function resolveApplyForm(config: ApplyFormConfig | null, opts: { include
       question = questions.get(key.slice(7)) ?? null
       if (!question) return
     } else if (!isBuiltin(key)) return
+    // A deleted built-in field is not on the form at all (the locked email can never be deleted).
+    if (isBuiltin(key) && removed.has(key)) return
     const info = isBuiltin(key) ? BUILTIN_FIELDS[key] : null
     const locked = !!info?.locked
     const where = stepIds.has(stepId) ? stepId : firstStep
@@ -269,8 +303,9 @@ export function rulesFromConfig(config: ApplyFormConfig | null, version = 0): Ap
   const resolved = resolveApplyForm(config, { includeHidden: true }).flatMap((st) => st.fields)
   const fields = {} as ApplyRules['fields']
   for (const k of APPLY_BUILTIN_KEYS) {
-    const f = resolved.find((x) => x.key === k)!
-    fields[k] = { hidden: f.hidden, required: f.required }
+    const f = resolved.find((x) => x.key === k)
+    // A deleted field is not on the form: the server treats it as hidden (ignored, stored as null).
+    fields[k] = f ? { hidden: f.hidden, required: f.required } : { hidden: true, required: false }
   }
   const questions = resolved.filter((f) => f.question).map((f): RuledQuestion => ({ ...f.question!, required: f.required }))
   const hiddenOptions: ApplyRules['hiddenOptions'] = {}
@@ -337,7 +372,15 @@ export function normalizeApplyForm(input: unknown): ApplyFormConfig {
   })
   const hiddenOptions: ApplyFormConfig['hiddenOptions'] = {}
   for (const [k, v] of Object.entries(obj(raw.hiddenOptions))) if (isChoiceField(k)) hiddenOptions[k] = arr(v).filter((x): x is string => typeof x === 'string')
-  return { texts, steps: steps.length ? steps : clone(DEFAULT_APPLY_FORM).steps, fields, customQuestions, hiddenOptions }
+  const removed = arr(raw.removedFields).filter((x): x is ApplyBuiltinField => typeof x === 'string')
+  return {
+    texts,
+    steps: steps.length ? steps : clone(DEFAULT_APPLY_FORM).steps,
+    fields,
+    customQuestions,
+    hiddenOptions,
+    ...(removed.length ? { removedFields: removed } : {}),
+  }
 }
 
 // ---- validate (TypeScript twin of private.validate_apply_form, plus the editor-only length and token checks) ---------
@@ -373,6 +416,8 @@ export function validateApplyForm(config: ApplyFormConfig): ContentErrors {
   })
   const reviews = steps.filter((st) => st.builtin === 'review').length
   if (reviews !== 1 || steps[steps.length - 1]?.builtin !== 'review') put('steps', 'review_position')
+  // The form needs a step before Review: the applicant's email (locked) has to sit somewhere (ADR-0057).
+  else if (steps.length < 2) put('steps', 'required')
   const reviewId = steps.find((st) => st.builtin === 'review')?.id
 
   // questions
@@ -405,13 +450,26 @@ export function validateApplyForm(config: ApplyFormConfig): ContentErrors {
     } else if (opts.length > 0) put(`${p}.options`, 'options_not_allowed')
   })
 
+  // removed built-in fields: known, not the locked email, once each (ADR-0057)
+  const removedRaw = config.removedFields
+  const removedKeys = new Set<string>()
+  if (removedRaw !== undefined && !Array.isArray(removedRaw)) put('removedFields', 'invalid_value')
+  else
+    (removedRaw ?? []).forEach((k, i) => {
+      const p = `removedFields.${i}`
+      if (typeof k !== 'string' || !isBuiltin(k)) put(p, 'unknown_key')
+      else if (isLocked(k)) put(p, 'locked')
+      else if (removedKeys.has(k)) put(p, 'duplicate_key')
+      removedKeys.add(k as string)
+    })
+
   // fields
   const keys = new Set<string>()
   ;(config.fields ?? []).forEach((f, i) => {
     const p = `fields.${i}`
     const known = isBuiltin(f.key) || (typeof f.key === 'string' && f.key.startsWith('custom:') && qIds.has(f.key.slice(7)))
     if (!known) put(`${p}.key`, 'unknown_key')
-    else if (keys.has(f.key)) put(`${p}.key`, 'duplicate_key')
+    else if (keys.has(f.key) || removedKeys.has(f.key)) put(`${p}.key`, 'duplicate_key')
     keys.add(f.key)
     if (!stepIds.has(f.stepId)) put(`${p}.stepId`, 'step_unknown')
     else if (f.stepId === reviewId) put(`${p}.stepId`, 'review_misplaced')

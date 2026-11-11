@@ -116,3 +116,45 @@ describe('ApplyPage with published content', () => {
     expect(approved.ok).toBe(true)
   })
 })
+
+describe('ApplyPage: a form with questions deleted (ADR-0057)', () => {
+  const ALL_BUT_EMAIL = ['businessName', 'website', 'category', 'description', 'country', 'city', 'applicantName', 'applicantRole', 'applicantPhone', 'language', 'productCount', 'photoReadiness', 'modelReadiness', 'notes', 'catalogue'] as const
+  /** Start from blank: one section with the email, Review, and one own question. */
+  const blank = (c: ApplyFormConfig) => {
+    c.steps = [{ id: 'contact', builtin: 'contact' }, { id: 'review', builtin: 'review' }] as ApplyFormConfig['steps']
+    c.removedFields = [...ALL_BUT_EMAIL]
+    c.customQuestions = [{ id: 'q1', type: 'short_text', label: { en: 'How did you hear about us?' } }]
+    c.fields = [{ key: 'custom:q1', stepId: 'contact', required: true }, { key: 'applicantEmail', stepId: 'contact', required: true }]
+    c.hiddenOptions = {}
+  }
+
+  it('asks only the own question and the email, then Review with the consent ticks; the application is stored without names, in the language used, and approval needs a name', async () => {
+    await publishForm(blank)
+    localStorage.setItem('arfurn:lang', 'pt')
+    const user = userEvent.setup()
+    renderApply(['/apply'])
+    expect(await screen.findByLabelText(/^How did you hear about us?/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^E-mail|^Email|^O seu e-mail|^O seu email/i)).toBeInTheDocument()
+    for (const gone of [/^Nome da empresa/, /^O seu nome/, /^País/, /^Website|^Sítio/i]) expect(screen.queryByLabelText(gone)).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText(/^How did you hear about us?/), 'A friend')
+    await user.type(screen.getByLabelText(/^E-mail|^Email|^O seu e-mail|^O seu email/i), 'solo@example.com')
+    await user.click(screen.getByRole('button', { name: /^(Continuar|Continue|Seguinte|Next)/ }))
+    for (const box of await screen.findAllByRole('checkbox')) await user.click(box)
+    await user.click(await screen.findByRole('button', { name: /^(Enviar candidatura|Send application)/ }))
+    expect(await screen.findByText(/^(Referência|Reference):/)).toBeInTheDocument()
+
+    asStaff()
+    const list = await service.getApplications({})
+    if (!list.ok) throw new Error('list')
+    const app = list.data.items[0]!
+    expect(app).toMatchObject({ businessName: null, applicantName: null, applicantEmail: 'solo@example.com', language: 'pt' })
+    expect(app.answers.custom).toEqual([expect.objectContaining({ id: 'q1', value: 'A friend' })])
+
+    const refused = await service.reviewApplication(app.id, 'approve')
+    expect(refused.ok === false && refused.error.fieldErrors?.businessName).toBe('required')
+    const approved = await service.reviewApplication(app.id, 'approve', undefined, { businessName: 'Solo Studio' })
+    expect(approved.ok).toBe(true)
+    const biz = await service.getBusinesses()
+    expect(biz.ok && biz.data.map((b) => b.name)).toContain('Solo Studio')
+  })
+})

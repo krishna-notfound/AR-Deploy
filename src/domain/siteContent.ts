@@ -5,6 +5,9 @@
 import {
   APPLY_BUILTIN_KEYS,
   DEFAULT_APPLY_FORM,
+  MAX_APPLY_FIELDS,
+  MAX_APPLY_STEPS,
+  MAX_CUSTOM_QUESTIONS,
   normalizeApplyForm,
   resolveApplyForm,
   validateApplyForm,
@@ -600,9 +603,9 @@ export function validateContentShape(doc: unknown): ContentErrors {
     const f = d.applyForm
     if (typeof f !== 'object' || f === null || Array.isArray(f)) return { applyForm: 'invalid_value' }
     const af = f as Record<string, unknown>
-    if (Array.isArray(af.steps) && af.steps.length > 8) e['applyForm.steps'] = 'too_many'
-    else if (Array.isArray(af.customQuestions) && af.customQuestions.length > 10) e['applyForm.customQuestions'] = 'too_many'
-    else if (Array.isArray(af.fields) && af.fields.length > 40) e['applyForm.fields'] = 'too_many'
+    if (Array.isArray(af.steps) && af.steps.length > MAX_APPLY_STEPS) e['applyForm.steps'] = 'too_many'
+    else if (Array.isArray(af.customQuestions) && af.customQuestions.length > MAX_CUSTOM_QUESTIONS) e['applyForm.customQuestions'] = 'too_many'
+    else if (Array.isArray(af.fields) && af.fields.length > MAX_APPLY_FIELDS) e['applyForm.fields'] = 'too_many'
   }
   if ('landing' in d) {
     const l = d.landing

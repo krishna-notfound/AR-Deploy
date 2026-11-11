@@ -76,7 +76,7 @@ describe('the cards', () => {
     expect(orderIn(/^Section 2/)).toEqual(['country', 'city'])
     expect(orderIn(/^Section 3/)).toEqual(['applicantName', 'applicantRole', 'applicantEmail', 'applicantPhone', 'language'])
     expect(orderIn(/^Section 4/)).toEqual(['productCount', 'photoReadiness', 'modelReadiness', 'notes', 'catalogue'])
-    expect(screen.getByText('5 of 8 sections · 0 of 10 own questions')).toBeInTheDocument()
+    expect(screen.getByText('5 of 12 sections · 0 of 30 own questions')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -111,19 +111,23 @@ describe('the cards', () => {
     expect(latest.applyForm.texts['apply.f.website']).toBeUndefined()
   })
 
-  it('a locked question shows its lock and reason and has no Hide and no Required switch', async () => {
+  it('the email question is the one locked question: its lock and reason, no Hide, no Delete, no Required switch; its wording can be edited', async () => {
     const user = userEvent.setup()
     renderEditor()
-    const row = rowOf('businessName')
+    const row = rowOf('applicantEmail')
     expect(within(row).getByRole('img', { name: 'Locked' })).toBeInTheDocument()
-    expect(within(row).getByText('Needed to create the company account')).toBeInTheDocument()
-    await user.click(within(row).getByRole('button', { name: 'Edit Business name' }))
+    expect(within(row).getByText('We reply to this address and invite the owner here.')).toBeInTheDocument()
+    await user.click(within(row).getByRole('button', { name: /^Actions for/ }))
+    expect(screen.queryByRole('menuitem', { name: 'Delete question' })).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await user.click(within(row).getByRole('button', { name: 'Edit Email' }))
     expect(within(row).queryByRole('button', { name: /^Hide/ })).not.toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument()
     expect(within(row).queryByRole('switch')).not.toBeInTheDocument()
-    expect(within(row).getByText('Needed to create the company account')).toBeInTheDocument()
+    expect(within(row).getByText('We reply to this address and invite the owner here.')).toBeInTheDocument()
     // The wording can still be edited.
-    await user.type(within(row).getByRole('textbox', { name: 'Question (English)' }), 'Company')
-    expect(latest.applyForm.texts['apply.f.businessName']).toEqual({ en: 'Company' })
+    await user.type(within(row).getByRole('textbox', { name: 'Question (English)' }), 'Your email')
+    expect(latest.applyForm.texts['apply.f.applicantEmail']).toEqual({ en: 'Your email' })
     expect(validateApplyForm(latest.applyForm)).toEqual({})
   })
 
@@ -299,18 +303,18 @@ describe('sections', () => {
     expect(latest.applyForm.steps.at(-1)!.builtin).toBe('review')
   })
 
-  it('adds sections up to eight and then Add section is disabled with the reason', async () => {
+  it('adds sections up to twelve and then Add section is disabled with the reason', async () => {
     const user = userEvent.setup()
     renderEditor()
-    for (let i = 0; i < 3; i++) await user.click(screen.getByRole('button', { name: 'Add section' }))
-    expect(latest.applyForm.steps).toHaveLength(8)
+    for (let i = 0; i < 7; i++) await user.click(screen.getByRole('button', { name: 'Add section' }))
+    expect(latest.applyForm.steps).toHaveLength(12)
     expect(screen.getByRole('button', { name: 'Add section' })).toBeDisabled()
-    expect(screen.getByText('8 sections is the most')).toBeInTheDocument()
-    expect(screen.getByText('8 of 8 sections · 0 of 10 own questions')).toBeInTheDocument()
+    expect(screen.getByText('12 sections is the most')).toBeInTheDocument()
+    expect(screen.getByText('12 of 12 sections · 0 of 30 own questions')).toBeInTheDocument()
     expect(latest.applyForm.steps.at(-1)!.builtin).toBe('review')
   })
 
-  it('a section can move; only one the client added can be deleted, after a confirmation, and its questions move up', async () => {
+  it('a section can move; any section can be deleted, after a confirmation, and its questions move up', async () => {
     const user = userEvent.setup()
     renderEditor()
     await menu(user, 'Actions for section 2', 'Move section up')
@@ -318,7 +322,7 @@ describe('sections', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Section moved to position 1 of 5')
     await user.click(screen.getByRole('button', { name: 'Actions for section 1' }))
     expect(screen.getByRole('menuitem', { name: 'Move section up' })).toBeDisabled()
-    expect(screen.queryByRole('menuitem', { name: 'Delete section' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Delete section' })).toBeEnabled()
     await user.keyboard('{Escape}')
     // A new section holding a question: deleting it moves the question to the section above.
     await menu(user, 'Actions for section 4', 'Add section below')
@@ -344,7 +348,7 @@ describe('sections', () => {
     const review = screen.getByRole('region', { name: /^Section 5/ })
     expect(within(review).queryByRole('button', { name: /Actions for/ })).not.toBeInTheDocument()
     expect(within(review).getByText('Always last')).toBeInTheDocument()
-    expect(within(review).getAllByText('Always asked (legal)')).toHaveLength(2)
+    expect(within(review).getAllByText('Required by law.')).toHaveLength(2)
     expect(within(review).getByText('Agreement to the Terms and the Privacy Policy')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Actions for section 4' }))
     expect(screen.getByRole('menuitem', { name: 'Move section down' })).toBeDisabled()
@@ -365,7 +369,7 @@ describe('sections', () => {
 })
 
 describe('own questions', () => {
-  it('adds a question by choosing its kind first, opens it, and stops at ten', async () => {
+  it('adds a question by choosing its kind first and opens it', async () => {
     const user = userEvent.setup()
     renderEditor()
     await addQuestion(user, 'Checkboxes')
@@ -386,14 +390,14 @@ describe('own questions', () => {
     expect(validateApplyForm(latest.applyForm)).toEqual({})
   })
 
-  it('stops at ten own questions: Add question is disabled and says why', async () => {
+  it('stops at thirty own questions: Add question is disabled and says why', async () => {
     const user = userEvent.setup()
-    renderEditor('/admin/editor/apply', 'en', draftWithQuestions(9))
+    renderEditor('/admin/editor/apply', 'en', draftWithQuestions(29))
     await addQuestion(user, 'Short answer')
-    expect(latest.applyForm.customQuestions).toHaveLength(10)
+    expect(latest.applyForm.customQuestions).toHaveLength(30)
     const add = screen.getByRole('button', { name: 'Add question' })
     expect(add).toBeDisabled()
-    expect(add).toHaveAccessibleDescription('10 own questions is the most')
+    expect(add).toHaveAccessibleDescription('30 own questions is the most')
     expect(validateApplyForm(latest.applyForm)).toEqual({})
   })
 
@@ -420,7 +424,7 @@ describe('own questions', () => {
     expect(within(rowOf(`custom:${id}`)).getByText('Multiple choice')).toBeInTheDocument()
   })
 
-  it('duplicates a question below itself with "(copy)", and is disabled with a reason at ten', async () => {
+  it('duplicates a question below itself with "(copy)", and is disabled with a reason at thirty', async () => {
     const user = userEvent.setup()
     renderEditor()
     await addQuestion(user, 'Short answer')
@@ -437,15 +441,15 @@ describe('own questions', () => {
     expect(within(rowOf(`custom:${copy.id}`)).getByRole('textbox', { name: 'Question (English)' })).toHaveFocus()
   })
 
-  it('Duplicate is disabled with the reason at ten own questions', async () => {
+  it('Duplicate is disabled with the reason at thirty own questions', async () => {
     const user = userEvent.setup()
-    const start = draftWithQuestions(10)
+    const start = draftWithQuestions(30)
     renderEditor('/admin/editor/apply', 'en', start)
     await user.click(screen.getByRole('button', { name: 'Edit Question 1' }))
     const duplicate = screen.getByRole('button', { name: 'Duplicate' })
     expect(duplicate).toBeDisabled()
-    expect(duplicate).toHaveAccessibleDescription('10 own questions is the most')
-    expect(latest.applyForm.customQuestions).toHaveLength(10)
+    expect(duplicate).toHaveAccessibleDescription('30 own questions is the most')
+    expect(latest.applyForm.customQuestions).toHaveLength(30)
   })
 
   it('deleting a question asks first; Cancel keeps it', async () => {
@@ -650,11 +654,169 @@ describe('in Portuguese', () => {
     const user = userEvent.setup()
     renderEditor('/admin/editor/apply', 'pt')
     expect(screen.getByRole('button', { name: 'Adicionar secção' })).toBeInTheDocument()
-    expect(screen.getByText('5 de 8 secções · 0 de 10 perguntas próprias')).toBeInTheDocument()
+    expect(screen.getByText('5 de 12 secções · 0 de 30 perguntas próprias')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Mover Website: arraste ou use as teclas de seta' })).toBeInTheDocument()
     expect(screen.getByText('Sempre a última')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Textos de botões e mensagens/ })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Adicionar pergunta' }))
     expect(await screen.findByRole('menuitem', { name: 'Caixas de seleção' })).toBeInTheDocument()
+  })
+})
+
+describe('delete anything (ADR-0057)', () => {
+  const confirmIn = async (user: ReturnType<typeof userEvent.setup>, name: string | RegExp) => user.click(within(await screen.findByRole('dialog')).getByRole('button', { name }))
+
+  it('every standard question except the email has Delete (in its menu and open); it asks first, Cancel keeps it', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    for (const key of APPLY_BUILTIN_KEYS) {
+      const row = rowOf(key)
+      await user.click(within(row).getByRole('button', { name: /^Actions for/ }))
+      if (key === 'applicantEmail') expect(screen.queryByRole('menuitem', { name: 'Delete question' })).not.toBeInTheDocument()
+      else expect(screen.getByRole('menuitem', { name: 'Delete question' })).toBeInTheDocument()
+      await user.keyboard('{Escape}')
+    }
+    await user.click(screen.getByRole('button', { name: 'Edit Website' }))
+    await user.click(within(rowOf('website')).getByRole('button', { name: 'Delete Website' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Delete “Website”?' })
+    expect(dialog).toHaveTextContent('Restore a standard question')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(rowOf('website')).not.toBeNull()
+    expect(latest.applyForm.removedFields).toBeUndefined()
+  })
+
+  it('deleting a standard question removes its card, lists it under Restore a standard question, and Restore brings it back on the section in view', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await menu(user, 'Actions for Website', 'Delete question')
+    await confirmIn(user, 'Delete question')
+    expect(rowOf('website')).toBeNull()
+    expect(latest.applyForm.removedFields).toEqual(['website'])
+    expect(latest.applyForm.fields.some((f) => f.key === 'website')).toBe(false)
+    expect(validateApplyForm(latest.applyForm)).toEqual({})
+    // The neighbour takes keyboard focus.
+    expect(document.activeElement).toBe(rowOf('category').querySelector('[data-handle]'))
+    await user.click(screen.getByRole('button', { name: 'Add question' }))
+    expect(await screen.findByText('Restore a standard question')).toBeInTheDocument()
+    await user.click(screen.getByRole('menuitem', { name: 'Website' }))
+    expect(rowOf('website')).not.toBeNull()
+    expect(latest.applyForm.removedFields).toBeUndefined()
+    expect(within(rowOf('website')).getByRole('textbox', { name: 'Question (English)' })).toBeInTheDocument()
+    expect(validateApplyForm(latest.applyForm)).toEqual({})
+  })
+
+  it('the Add question menu has no Restore group while nothing is deleted', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await user.click(screen.getByRole('button', { name: 'Add question' }))
+    expect(await screen.findByRole('menuitem', { name: 'Short answer' })).toBeInTheDocument()
+    expect(screen.queryByText('Restore a standard question')).not.toBeInTheDocument()
+  })
+
+  it('deleting the business name warns that the name is typed at approval; deleting the language says the used language is kept', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await menu(user, 'Actions for Business name', 'Delete question')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('You will type the company name yourself when you approve an application.')
+    await confirmIn(user, 'Cancel')
+    await menu(user, 'Actions for Preferred language for emails', 'Delete question')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('keeps the language the applicant used the form in')
+    await confirmIn(user, 'Cancel')
+  })
+
+  it('the limits are 30 own questions and 12 sections; deleted questions can still be restored when the own-question limit is reached', async () => {
+    const user = userEvent.setup()
+    renderEditor('/admin/editor/apply', 'en', draftWithQuestions(30))
+    await menu(user, 'Actions for Website', 'Delete question')
+    await confirmIn(user, 'Delete question')
+    const add = screen.getByRole('button', { name: 'Add question' })
+    expect(add).toBeEnabled()
+    await user.click(add)
+    expect(await screen.findByRole('menuitem', { name: 'Short answer' })).toBeDisabled()
+    await user.click(screen.getByRole('menuitem', { name: 'Website' }))
+    expect(latest.applyForm.removedFields).toBeUndefined()
+    expect(latest.applyForm.customQuestions).toHaveLength(30)
+  })
+
+  it('a built-in section can be deleted: its questions move up, and the first section moves them to the next', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await menu(user, 'Actions for section 2', 'Delete section')
+    expect(await screen.findByRole('dialog', { name: 'Delete section 2?' })).toHaveTextContent('move to the section above')
+    await confirmIn(user, 'Delete section')
+    expect(latest.applyForm.steps.map((s) => s.id)).toEqual(['business', 'contact', 'catalogue', 'review'])
+    expect(orderIn(/^Section 1/)).toEqual(['businessName', 'website', 'category', 'description', 'country', 'city'])
+    await menu(user, 'Actions for section 1', 'Delete section')
+    expect(await screen.findByRole('dialog', { name: 'Delete section 1?' })).toHaveTextContent('move to the next section')
+    await confirmIn(user, 'Delete section')
+    expect(latest.applyForm.steps.map((s) => s.id)).toEqual(['contact', 'catalogue', 'review'])
+    expect(orderIn(/^Section 1/)).toEqual(['businessName', 'website', 'category', 'description', 'country', 'city', 'applicantName', 'applicantRole', 'applicantEmail', 'applicantPhone', 'language'])
+    expect(validateApplyForm(latest.applyForm)).toEqual({})
+  })
+
+  it('the last section before Review cannot be deleted, and its menu says why; Review has no menu', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    for (const n of [1, 1, 1]) {
+      await menu(user, `Actions for section ${n}`, 'Delete section')
+      await confirmIn(user, 'Delete section')
+    }
+    expect(latest.applyForm.steps.map((s) => s.id)).toEqual(['catalogue', 'review'])
+    await user.click(screen.getByRole('button', { name: 'Actions for section 1' }))
+    expect(screen.getByRole('menuitem', { name: 'Can’t delete: the email question needs a section' })).toBeDisabled()
+    expect(screen.queryByRole('menuitem', { name: 'Delete section' })).not.toBeInTheDocument()
+  })
+
+  it('Start from blank asks first; Cancel changes nothing; confirmed it leaves one section with the email and Review, and keeps the texts', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await user.type(screen.getByRole('textbox', { name: 'Form title (English)' }), 'Join us')
+    await addQuestion(user, 'Short answer')
+    await menu(user, 'Form options', 'Start from blank')
+    expect(await screen.findByRole('dialog', { name: 'Start from blank?' })).toBeInTheDocument()
+    await confirmIn(user, 'Cancel')
+    expect(latest.applyForm.steps).toHaveLength(5)
+    await menu(user, 'Form options', 'Start from blank')
+    await confirmIn(user, 'Start from blank')
+    expect(latest.applyForm.steps.map((s) => s.builtin ?? s.id)).toEqual(['contact', 'review'])
+    expect(latest.applyForm.customQuestions).toEqual([])
+    expect(orderIn(/^Section 1/)).toEqual(['applicantEmail'])
+    expect(latest.applyForm.texts['apply.title']).toEqual({ en: 'Join us' })
+    expect(screen.getByText('2 of 12 sections · 0 of 30 own questions')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    // Own questions can be added to the blank form, and any deleted standard question comes back from Add question.
+    await addQuestion(user, 'Paragraph')
+    expect(orderIn(/^Section 1/)).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Add question' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Country' }))
+    expect(orderIn(/^Section 1/)).toContain('country')
+  })
+
+  it('Restore the original form is off while the form is original; after changes it puts the original back (texts stay) after a confirmation', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await user.click(screen.getByRole('button', { name: 'Form options' }))
+    expect(screen.getByRole('menuitem', { name: 'Restore the original form' })).toBeDisabled()
+    await user.keyboard('{Escape}')
+    await user.type(screen.getByRole('textbox', { name: 'Form title (English)' }), 'Join us')
+    await menu(user, 'Form options', 'Start from blank')
+    await confirmIn(user, 'Start from blank')
+    await menu(user, 'Form options', 'Restore the original form')
+    expect(await screen.findByRole('dialog', { name: 'Restore the original form?' })).toBeInTheDocument()
+    await confirmIn(user, 'Restore the original')
+    expect(latest.applyForm.steps).toHaveLength(5)
+    expect(latest.applyForm.removedFields).toBeUndefined()
+    expect(orderIn(/^Section 3/)).toEqual(['applicantName', 'applicantRole', 'applicantEmail', 'applicantPhone', 'language'])
+    expect(latest.applyForm.texts['apply.title']).toEqual({ en: 'Join us' })
+  })
+
+  it('the new controls are in Portuguese', async () => {
+    const user = userEvent.setup()
+    renderEditor('/admin/editor/apply', 'pt')
+    await user.click(screen.getByRole('button', { name: 'Opções do formulário' }))
+    expect(screen.getByRole('menuitem', { name: 'Começar do zero' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Repor o formulário original' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.getByText('Respondemos a este endereço e é aqui que convidamos o proprietário.')).toBeInTheDocument()
   })
 })

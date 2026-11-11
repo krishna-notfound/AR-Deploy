@@ -22,6 +22,7 @@ function deps(over: Partial<ReviewDeps> = {}, start: Record<string, string> = { 
   const logs: LogEntry[] = []
   const sent: { to: string; subject: string; html: string; text: string }[] = []
   const calls: { action: Action; reason: string | null }[] = []
+  const names: (string | null | undefined)[] = []
   const fetchFn = vi.fn(async (_u: string, init?: RequestInit) => {
     sent.push(JSON.parse(String(init?.body)) as { to: string; subject: string; html: string; text: string })
     return new Response(JSON.stringify({ id: `msg-${sent.length}` }), { status: 200 })
@@ -32,8 +33,9 @@ function deps(over: Partial<ReviewDeps> = {}, start: Record<string, string> = { 
     userIdFromToken: async (t) => ({ 'staff-token': 'staff-id', 'aal1-token': 'staff-id', 'owner-token': 'owner-id' })[t] ?? null,
     gate: async (t) => (t === 'staff-token' ? 'ok' : t === 'aal1-token' ? 'aal2_required' : 'forbidden'),
     // A stand-in for admin_review_application: its transitions, the reason rule and a no-op repeat.
-    reviewAsCaller: async (_t, id, action, reason) => {
+    reviewAsCaller: async (_t, id, action, reason, businessName) => {
       calls.push({ action, reason })
+      names.push(businessName)
       const from = status[id]
       if (!from) return { error: 'application_not_found' }
       // Reopen: only an approved application (whose business was deleted) goes back to under_review.
@@ -54,7 +56,7 @@ function deps(over: Partial<ReviewDeps> = {}, start: Record<string, string> = { 
     log: async (e) => (logs.push(e), `log-${logs.length}`),
     ...over,
   }
-  return { d, logs, sent, calls, fetchFn, status }
+  return { d, logs, sent, calls, names, fetchFn, status }
 }
 
 const post = (body: unknown, token = 'staff-token') =>
@@ -254,5 +256,38 @@ describe('review-application (R-W2-1)', () => {
     // Exactly the limit is fine.
     const at = await handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'x'.repeat(REASON_MAX_LENGTH), includeReason: true }), d)
     expect(at.status).toBe(200)
+  })
+})
+
+describe('review-application: the company name typed at approval (ADR-0057)', () => {
+  it('passes a trimmed businessName to the review, and nothing when none is typed', async () => {
+    const { d, names } = deps()
+    expect((await handleReviewApplication(post({ applicationId: APP, action: 'approve', businessName: '  Typed Co  ' }), d)).status).toBe(200)
+    expect(names.at(-1)).toBe('Typed Co')
+    await handleReviewApplication(post({ applicationId: PT_APP, action: 'start_review' }), d)
+    expect(names.at(-1)).toBeNull()
+  })
+
+  it('refuses a businessName that is not text', async () => {
+    const { d, calls } = deps()
+    expect((await handleReviewApplication(post({ applicationId: APP, action: 'approve', businessName: 5 }), d)).status).toBe(400)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('maps the database refusals business_name_required and business_name_invalid to 422', async () => {
+    for (const error of ['business_name_required', 'business_name_invalid']) {
+      const { d } = deps({ reviewAsCaller: async () => ({ error }) })
+      const res = await handleReviewApplication(post({ applicationId: APP, action: 'approve' }), d)
+      expect(res.status).toBe(422)
+      expect(await json(res)).toEqual({ error })
+    }
+  })
+
+  it('a rejection email for an application without a company name leaves the name out', async () => {
+    const { d, logs, sent } = deps({ getApplicant: async () => ({ businessName: null, email: 'rita@shop.test', language: 'en', status: 'under_review' }) })
+    expect((await handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'Outside our region' }), d)).status).toBe(200)
+    expect(logs[0]!.subject).toBe('Your Sanctus application')
+    expect(sent[0]!.text).toContain('Thank you for applying to Sanctus. After review, we are not able to approve this application.')
+    expect(sent[0]!.text).not.toContain('null')
   })
 })

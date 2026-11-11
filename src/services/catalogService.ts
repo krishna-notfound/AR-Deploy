@@ -246,9 +246,10 @@ export interface CatalogService {
   getApplication(id: ID): Promise<Result<BusinessApplication>>
   /**
    * Status transition through the database (approve creates the draft business in the same transaction). A rejection
-   * emails the applicant, with the reason only when `includeReason` is set (R-W2-1).
+   * emails the applicant, with the reason only when `includeReason` is set (R-W2-1). `businessName` is the company name typed in
+   * the Approve dialog (ADR-0057): it names the new business and is required when the application has none.
    */
-  reviewApplication(id: ID, action: ReviewAction, reason?: string, opts?: { includeReason?: boolean }): Promise<Result<ReviewedApplication>>
+  reviewApplication(id: ID, action: ReviewAction, reason?: string, opts?: { includeReason?: boolean; businessName?: string }): Promise<Result<ReviewedApplication>>
   /** Possible duplicates of an application (R-W2-9): only a warning for the reviewer, never a block. */
   getApplicationDuplicates(id: ID): Promise<Result<ApplicationDuplicates>>
   getAuditEvents(query?: AuditQuery): Promise<Result<Page<AuditEntry>>>

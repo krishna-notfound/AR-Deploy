@@ -116,11 +116,11 @@ export type Database = {
         Row: {
           answers: Json
           applicant_email: string
-          applicant_name: string
+          applicant_name: string | null
           applicant_phone: string | null
           business_deleted_at: string | null
           business_id: string | null
-          business_name: string
+          business_name: string | null
           catalogue_path: string | null
           category: string | null
           city: string | null
@@ -141,11 +141,11 @@ export type Database = {
         Insert: {
           answers?: Json
           applicant_email: string
-          applicant_name: string
+          applicant_name?: string | null
           applicant_phone?: string | null
           business_deleted_at?: string | null
           business_id?: string | null
-          business_name: string
+          business_name?: string | null
           catalogue_path?: string | null
           category?: string | null
           city?: string | null
@@ -166,11 +166,11 @@ export type Database = {
         Update: {
           answers?: Json
           applicant_email?: string
-          applicant_name?: string
+          applicant_name?: string | null
           applicant_phone?: string | null
           business_deleted_at?: string | null
           business_id?: string | null
-          business_name?: string
+          business_name?: string | null
           catalogue_path?: string | null
           category?: string | null
           city?: string | null
@@ -1146,15 +1146,15 @@ export type Database = {
         Returns: string
       }
       admin_review_application: {
-        Args: { p_action: string; p_application_id: string; p_reason?: string }
+        Args: { p_action: string; p_application_id: string; p_business_name?: string; p_reason?: string }
         Returns: {
           answers: Json
           applicant_email: string
-          applicant_name: string
+          applicant_name: string | null
           applicant_phone: string | null
           business_deleted_at: string | null
           business_id: string | null
-          business_name: string
+          business_name: string | null
           category: string | null
           city: string | null
           country: string | null

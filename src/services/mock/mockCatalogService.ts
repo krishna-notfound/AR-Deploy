@@ -738,7 +738,7 @@ export const mockCatalogService: CatalogService = {
       const dup = (db.applications ?? []).find((x) => (x as BusinessApplication & { submissionKey?: string }).submissionKey === a.submissionKey)
       if (dup) return ok({ id: dup.id, reference: dup.reference })
       const open = (db.applications ?? []).find(
-        (x) => (x.status === 'submitted' || x.status === 'under_review') && x.applicantEmail.toLowerCase() === a.applicantEmail.toLowerCase() && x.businessName.toLowerCase() === a.businessName.toLowerCase(),
+        (x) => (x.status === 'submitted' || x.status === 'under_review') && x.applicantEmail.toLowerCase() === a.applicantEmail.toLowerCase() && (x.businessName?.toLowerCase() ?? null) === (a.businessName?.toLowerCase() ?? null),
       )
       if (open) return fail('CONFLICT', 'An application for this business from this email is already being reviewed.')
       const ts = nowIso()
@@ -774,7 +774,7 @@ export const mockCatalogService: CatalogService = {
         ;(d.applications ??= []).unshift(app)
         audit(d, { eventType: 'application_submitted', applicationId: app.id, toStatus: 'submitted' })
         demoEmail(d, { kind: 'application_confirmation', recipient: app.applicantEmail, subject: 'We received your application', applicationId: app.id, workflow: `application:${app.id}:confirmation` })
-        demoEmail(d, { kind: 'admin_notification', recipient: 'platform admins', subject: `New business awaiting review: ${app.businessName}`, applicationId: app.id, workflow: `application:${app.id}:admin_notification` })
+        demoEmail(d, { kind: 'admin_notification', recipient: 'platform admins', subject: `New business awaiting review: ${app.businessName ?? app.applicantEmail}`, applicationId: app.id, workflow: `application:${app.id}:admin_notification` })
       })
       return ok({ id: app.id, reference: app.reference })
     })
@@ -804,7 +804,7 @@ export const mockCatalogService: CatalogService = {
         .filter((a) => !q.status || a.status === q.status)
         .filter((a) => !q.from || a.createdAt >= localDayBounds(q.from).start)
         .filter((a) => !q.to || a.createdAt < localDayBounds(q.to).end)
-        .filter((a) => !term || [a.businessName, a.applicantName, a.applicantEmail, a.reference, a.id].some((f) => f.toLowerCase().includes(term)))
+        .filter((a) => !term || [a.businessName, a.applicantName, a.applicantEmail, a.reference, a.id].some((f) => (f ?? '').toLowerCase().includes(term)))
       return ok(page(list, q.page, q.pageSize))
     }),
 
@@ -814,7 +814,7 @@ export const mockCatalogService: CatalogService = {
       return a ? ok(a) : fail('NOT_FOUND', 'Application not found.')
     }),
 
-  reviewApplication: (id, action, reason) =>
+  reviewApplication: (id, action, reason, opts) =>
     run<ReviewedApplication>(() => {
       const db = store.get()
       const current = db.applications?.find((x) => x.id === id)
@@ -829,6 +829,12 @@ export const mockCatalogService: CatalogService = {
             ? { ok: false, error: REOPEN_NOT_ALLOWED_ERROR }
             : fail('CONFLICT', 'This application can no longer change to that status.')
       if (t.noop) return ok(current)
+      // ADR-0057: approval needs a company name (the one typed in the dialog wins, else the application's own), 2 to 80 characters.
+      const companyName = t.status === 'approved' && action === 'approve' ? opts?.businessName?.trim() || current.businessName?.trim() || '' : ''
+      if (action === 'approve' && t.status === 'approved') {
+        if (!companyName) return fail('VALIDATION', 'Enter the company name.', { businessName: 'required' })
+        if (companyName.length < 2 || companyName.length > 80) return fail('VALIDATION', 'The company name must be 2 to 80 characters.', { businessName: 'invalid' })
+      }
       let next!: Extract<ReviewedApplication, BusinessApplication>
       store.update((d) => {
         let businessId = current.businessId
@@ -836,8 +842,8 @@ export const mockCatalogService: CatalogService = {
           const ts = nowIso()
           const business: Business = {
             id: newId('biz'),
-            name: current.businessName,
-            slug: uniqueSlug(slugify(current.businessName), d.businesses.map((b) => b.slug), 55),
+            name: companyName,
+            slug: uniqueSlug(slugify(companyName), d.businesses.map((b) => b.slug), 55),
             description: current.answers.description ?? '',
             contact: {},
             status: 'draft',
@@ -861,6 +867,8 @@ export const mockCatalogService: CatalogService = {
           reviewedAt: nowIso(),
           updatedAt: nowIso(),
           decisionReason: decided ? reason?.trim() || undefined : current.decisionReason,
+          // As the database: the application row carries the name the business was created with.
+          ...(t.status === 'approved' ? { businessName: companyName } : {}),
         }
         d.applications = d.applications!.map((a) => (a.id === id ? next : a))
         audit(d, {
@@ -875,7 +883,8 @@ export const mockCatalogService: CatalogService = {
         // R-W2-1: a rejection emails the applicant in their language (the reason only when ticked). Demo mode records
         // the attempt as not sent; nothing leaves the browser.
         if (t.status === 'rejected') {
-          const subject = current.language === 'pt' ? `A sua candidatura à Sanctus para ${current.businessName}` : `Your Sanctus application for ${current.businessName}`
+          const named = current.businessName?.trim()
+          const subject = current.language === 'pt' ? (named ? `A sua candidatura à Sanctus para ${named}` : 'A sua candidatura à Sanctus') : named ? `Your Sanctus application for ${named}` : 'Your Sanctus application'
           const sent = demoEmail(d, { kind: 'application_decision', recipient: current.applicantEmail, subject, applicationId: id, workflow: `application:${id}:decision` })
           next = { ...next, decisionEmail: { status: sent.status, error: sent.error } }
         }
@@ -891,8 +900,8 @@ export const mockCatalogService: CatalogService = {
       const current = db.applications?.find((x) => x.id === id)
       if (!current) return fail('NOT_FOUND', 'Application not found.')
       const email = current.applicantEmail.toLowerCase()
-      const name = normalizeBusinessName(current.businessName)
-      const sameName = (n: string) => name !== '' && normalizeBusinessName(n) === name
+      const name = normalizeBusinessName(current.businessName ?? '')
+      const sameName = (n: string | null) => name !== '' && n !== null && normalizeBusinessName(n) === name
       const newest = <T extends { createdAt: string; id: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)
       const applications: ApplicationDuplicates['applications'] = (db.applications ?? [])
         .filter((a) => a.id !== id && a.status !== 'rejected')

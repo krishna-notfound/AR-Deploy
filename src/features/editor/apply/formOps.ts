@@ -1,14 +1,17 @@
 // Pure edits of the application form document (ApplyFormConfig) for the builder. Every function returns a new config and
-// leaves its input alone; a change the rules refuse (a locked field hidden, an eleventh question, the last visible option,
+// leaves its input alone; a change the rules refuse (the email hidden or deleted, a 31st question, the last visible option,
 // a field on Review) returns the same config. The document keeps one placement per field in array order, so these first
 // write every field out explicitly (`materialize`) and then move entries around.
 import {
+  APPLY_BUILTIN_KEYS,
+  type ApplyBuiltinField,
   type ApplyChoiceField,
   type ApplyFieldPlacement,
   type ApplyFormConfig,
   type ApplyStep,
   type CustomQuestion,
   type CustomQuestionType,
+  DEFAULT_APPLY_FORM,
   type Lang,
   LOCKED_FIELDS,
   MAX_APPLY_STEPS,
@@ -18,6 +21,7 @@ import {
   MIN_CHOICE_OPTIONS,
   type ResolvedField,
   type ResolvedStep,
+  removedFieldsOf,
   resolveApplyForm,
 } from '@/domain/siteContent'
 import { BUILTIN_FIELDS } from '../../../../supabase/functions/_shared/applyForm.ts'
@@ -134,6 +138,83 @@ export function setHidden(c: ApplyFormConfig, key: string, hidden: boolean): App
   })
 }
 
+// ---- deleting and restoring standard questions (ADR-0057) ---------------------------------------------------------------
+/** The standard questions that can be deleted: all of them except the locked email. */
+export const isDeletableField = (key: string): key is ApplyBuiltinField => (APPLY_BUILTIN_KEYS as readonly string[]).includes(key) && !isLockedField(key)
+
+/**
+ * Deletes a standard question: it is no longer on the form, no longer has a place, and applications store it as null. The
+ * wording the client gave it stays (restoring brings it back). A choice question forgets its hidden options.
+ */
+export function deleteField(c: ApplyFormConfig, key: string): ApplyFormConfig {
+  if (!isDeletableField(key) || removedFieldsOf(c).includes(key)) return c
+  const next = materialize(c)
+  next.fields = next.fields.filter((f) => f.key !== key)
+  next.removedFields = [...(next.removedFields ?? []), key]
+  if (next.hiddenOptions[key as ApplyChoiceField]) {
+    next.hiddenOptions = { ...next.hiddenOptions }
+    delete next.hiddenOptions[key as ApplyChoiceField]
+  }
+  return next
+}
+
+/**
+ * Brings a deleted standard question back, last on a section (never Review). Without `stepId` it goes to the section it
+ * started on, or to the first section when that one is gone. It comes back visible, with its original Required flag.
+ */
+export function restoreField(c: ApplyFormConfig, key: string, stepId?: string): ApplyFormConfig {
+  if (!isDeletableField(key) || !removedFieldsOf(c).includes(key)) return c
+  const placeable = placeableSteps(c)
+  if (stepId !== undefined && !placeable.some((s) => s.id === stepId)) return c
+  const info = BUILTIN_FIELDS[key]
+  const home = stepId ?? placeable.find((s) => s.id === info.defaultStep || s.builtin === info.defaultStep)?.id ?? placeable[0]?.id
+  if (!home) return c
+  const next = materialize(c)
+  const left = removedFieldsOf(next).filter((k) => k !== key)
+  if (left.length) next.removedFields = left
+  else delete next.removedFields
+  let last = -1
+  next.fields.forEach((f, i) => {
+    if (f.stepId === home) last = i
+  })
+  next.fields.splice(last + 1, 0, { key, stepId: home, required: info.defaultRequired })
+  return next
+}
+
+/**
+ * Start from blank: one section holding the email card, then Review. Every other standard question is deleted, own questions
+ * and hidden options are gone, and the texts stay. The section that held the email (with its title) is the one kept.
+ */
+export function startFromBlank(c: ApplyFormConfig): ApplyFormConfig {
+  const next = clone(c)
+  const holder = layoutOf(c).find((s) => s.builtin !== 'review' && s.fields.some((f) => f.key === 'applicantEmail'))
+  const kept = (holder && c.steps.find((s) => s.id === holder.id)) ?? placeableSteps(c)[0] ?? clone(DEFAULT_APPLY_FORM.steps.find((s) => s.builtin === 'contact')!)
+  const review = reviewStepOf(c) ?? clone(DEFAULT_APPLY_FORM.steps.find((s) => s.builtin === 'review')!)
+  next.steps = [clone(kept), clone(review)]
+  next.fields = [{ key: 'applicantEmail', stepId: kept.id, required: true }]
+  next.customQuestions = []
+  next.hiddenOptions = {}
+  next.removedFields = APPLY_BUILTIN_KEYS.filter((k) => !isLockedField(k))
+  return next
+}
+
+/** Back to the original form: its sections, questions, hidden options and removed questions. The texts stay. */
+export function restoreOriginal(c: ApplyFormConfig): ApplyFormConfig {
+  return { ...clone(DEFAULT_APPLY_FORM), texts: clone(c.texts) }
+}
+
+/** Whether the sections, questions and options already are the original ones (so "Restore the original form" would change nothing). */
+export function isOriginalForm(c: ApplyFormConfig): boolean {
+  const shape = (x: ApplyFormConfig) =>
+    JSON.stringify([
+      layoutOf(x).map((s) => [s.id, s.builtin ?? null, x.steps.find((y) => y.id === s.id)?.title ?? null, x.steps.find((y) => y.id === s.id)?.hint ?? null, s.fields.map((fl) => [fl.key, !!fl.hidden, fl.required])]),
+      x.customQuestions,
+      Object.entries(x.hiddenOptions).filter(([, v]) => v && v.length).sort(),
+      removedFieldsOf(x),
+    ])
+  return shape(c) === shape(DEFAULT_APPLY_FORM)
+}
+
 // ---- options of the built-in choice fields -------------------------------------------------------------------------
 export const visibleOptionCount = (c: ApplyFormConfig, field: ApplyChoiceField): number =>
   (BUILTIN_FIELDS[field].options ?? []).filter((v) => !c.hiddenOptions[field]?.includes(v)).length
@@ -192,15 +273,29 @@ export function setStepText(c: ApplyFormConfig, id: string, field: 'title' | 'hi
   return next
 }
 
-/** Removes a step the client added; its fields move to the step before it (or the first step). Built-in steps stay. */
+/** Whether a section can be deleted: not Review, and not the last section before Review (the email card needs one). */
+export function canDeleteStep(c: ApplyFormConfig, id: string): boolean {
+  const step = c.steps.find((s) => s.id === id)
+  return !!step && step.builtin !== 'review' && placeableSteps(c).length >= 2
+}
+
+/**
+ * Removes a section, built-in ones included (ADR-0057). Its questions move to the section above, at its end; the first
+ * section's questions go to the start of the next one. Review and the last section before Review stay.
+ */
 export function deleteStep(c: ApplyFormConfig, id: string): ApplyFormConfig {
+  if (!canDeleteStep(c, id)) return c
   const at = c.steps.findIndex((s) => s.id === id)
-  const step = c.steps[at]
-  if (!step || step.builtin) return c
   const next = materialize(c)
-  const target = next.steps.slice(0, at).reverse().find((s) => s.builtin !== 'review') ?? next.steps.find((s, i) => i > at && s.builtin !== 'review')
+  const before = next.steps.slice(0, at).reverse().find((s) => s.builtin !== 'review')
+  const target = before ?? next.steps.find((s, i) => i > at && s.builtin !== 'review')
   if (!target) return c
-  next.fields = next.fields.map((f) => (f.stepId === id ? { ...f, stepId: target.id } : f))
+  const moved = next.fields.filter((f) => f.stepId === id).map((f) => ({ ...f, stepId: target.id }))
+  const rest = next.fields.filter((f) => f.stepId !== id)
+  const onTarget = rest.map((f, i) => [f, i] as const).filter(([f]) => f.stepId === target.id)
+  const insertAt = !onTarget.length ? rest.length : before ? onTarget[onTarget.length - 1]![1] + 1 : onTarget[0]![1]
+  rest.splice(insertAt, 0, ...moved)
+  next.fields = rest
   next.steps = next.steps.filter((s) => s.id !== id)
   return next
 }

@@ -26,7 +26,7 @@ interface StoredRow {
   id: string
   reference: string
   applicant_email: string
-  business_name: string
+  business_name: string | null
   language: string
   created_at: string
 }
@@ -51,13 +51,13 @@ Deno.serve((req) =>
       return data ? stored(data as StoredRow) : null
     },
     async findOpenDuplicate(email, businessName) {
-      const { data, error } = await admin
+      let query = admin
         .from('business_applications')
         .select('id, reference')
         .ilike('applicant_email', email.replace(/[\\%_]/g, (c) => `\\${c}`))
-        .ilike('business_name', businessName.replace(/[\\%_]/g, (c) => `\\${c}`))
-        .in('status', OPEN)
-        .limit(1)
+      // A form without a company name (ADR-0057): a second open application from the same email without a name is the duplicate.
+      query = businessName === null ? query.is('business_name', null) : query.ilike('business_name', businessName.replace(/[\\%_]/g, (c) => `\\${c}`))
+      const { data, error } = await query.in('status', OPEN).limit(1)
       if (error) throw new Error(`duplicate check failed: ${error.message}`)
       return data?.[0] ?? null
     },
