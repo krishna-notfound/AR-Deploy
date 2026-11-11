@@ -20,6 +20,19 @@ const perms = vi.hoisted(() => ({ deny: [] as string[] }))
 vi.mock('./ModelRequestPanel', () => ({
   ModelRequestPanel: (p: { product?: { id: string } }) => <div data-testid="request-panel" data-product={p.product?.id ?? ''} />,
 }))
+// The crop dialog needs a laid-out browser; here it is a stand-in whose Save sends an edited copy (its own tests: components/image).
+vi.mock('@/components/image/ImageCropDialog', () => ({
+  ImageCropDialog: (p: { title: string; onSave: (r: { blob: Blob; crop: { x: number; y: number; width: number; height: number }; whole: boolean }) => void; onCancel: () => void }) => (
+    <div role="dialog" aria-label={p.title}>
+      <button type="button" onClick={() => void p.onSave({ blob: new Blob(['e'], { type: 'image/webp' }), crop: { x: 0, y: 0, width: 10, height: 10 }, whole: false })}>
+        Save crop
+      </button>
+      <button type="button" onClick={p.onCancel}>
+        Cancel crop
+      </button>
+    </div>
+  ),
+}))
 vi.mock('@/auth/usePermission', async (orig) => ({
   ...(await orig<typeof import('@/auth/usePermission')>()),
   useCan: () => (need: string) => !perms.deny.includes(need),
@@ -254,11 +267,17 @@ describe('product editor: uploads and units', () => {
     const user = userEvent.setup()
     const resolveUpload = deferUploads()
     renderNew()
+    // Each picture goes through the crop dialog; its original and its edited copy are then uploaded, in that order.
     await user.upload(screen.getByLabelText('Upload product images'), new File(['a'], 'front.png', { type: 'image/png' }))
+    await user.click(await screen.findByRole('button', { name: 'Save crop' }))
     await user.upload(screen.getByLabelText('Upload additional photos'), new File(['b'], 'detail.png', { type: 'image/png' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Save crop' })).toHaveLength(2)) // the first stays open while its uploads wait
+    await user.click(screen.getAllByRole('button', { name: 'Save crop' })[1]!)
     expect(screen.getByLabelText('Upload product images')).toBeDisabled()
     await resolveUpload('detail.png')
+    await resolveUpload('detail.webp')
     await resolveUpload('front.png')
+    await resolveUpload('front.webp')
     expect(await screen.findByRole('img', { name: 'front' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'detail' })).toBeInTheDocument()
   })

@@ -967,6 +967,9 @@ export const mockCatalogService: CatalogService = {
     return res.ok ? ok({ url: res.url, status: 'valid' }) : fail('STORAGE', res.message)
   },
 
+  // Demo pictures are data URLs or site assets, never storage paths: there is nothing to sign.
+  getMediaUrl: async (storagePath) => ok(storagePath),
+
   subscribe: (listener) => store.subscribe(listener),
 
   resetDemoData: () =>

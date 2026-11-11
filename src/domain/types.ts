@@ -79,14 +79,32 @@ export interface BusinessCatalog {
   totalProductCount: number
 }
 
+/** A rectangle of an original picture, in its pixels (EXIF orientation applied). It may reach past the picture ("whole picture" saves). */
+export interface ImageCrop {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export interface ProductImage {
   id: ID
+  /** The picture the pages show: the cropped copy, or (a photo from before the crop dialog) the file as uploaded. */
   url: string
   alt?: string
   isPrimary: boolean
   kind: 'gallery' | 'additional'
   /** Object path in Supabase Storage (private bucket); `url` is then a short-lived signed URL. */
   storagePath?: string
+  /**
+   * Image crop on upload (ADR-0063). The untouched upload `url` was cut from, so "Edit picture" can start again from it.
+   * Absent on a photo from before the dialog: its shown file is then its own original. Never shown to visitors.
+   */
+  originalPath?: string
+  /** Where to open the original now: a data URL (demo) or a fresh signed link; not stored by Supabase mode (see originalPath). */
+  originalUrl?: string
+  /** What of the original the shown copy holds. Absent: the picture was never cropped (shown whole). */
+  crop?: ImageCrop
 }
 
 export type ModelFormat = 'glb' | 'usdz'

@@ -35,6 +35,11 @@ test('create a product, publish it, duplicate and delete it', async ({ page }) =
   await page.getByLabel('Upload product images').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') })
   await expect(page.getByText(/notes\.txt: unsupported file type/)).toBeVisible()
   await page.getByLabel('Upload product images').setInputFiles({ name: 'chair.png', mimeType: 'image/png', buffer: PNG_1PX })
+  // Every photo goes through the crop dialog first (ADR-0063); saving it untouched keeps the whole picture.
+  const crop = page.getByRole('dialog', { name: 'Adjust the photo' })
+  await expect(crop).toBeVisible()
+  await crop.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(crop).toBeHidden()
   await expect(page.getByText('Primary', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Publish' }).click()

@@ -5,6 +5,8 @@ import type { Lang } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { localeOf } from '@/i18n/locale'
 import { translate } from '@/i18n/translate'
+import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { useFormat } from '@/lib/useFormat'
 import { primaryImage } from '@/lib/product'
 import { hasArModel } from '../products/productReadiness'
@@ -33,6 +35,8 @@ export function mostViewed(rows: ProductAnalytics[], products: Map<string, Produ
 }
 
 const NAME_CLASS = 'block truncate text-ui-body font-medium text-ink max-sm:whitespace-normal max-sm:[overflow-wrap:anywhere]'
+
+const PRODUCT_FRAME = imageFrame('product')
 
 /**
  * Ranked list of the most viewed products (index, thumbnail, name, views and AR launch attempts). Shared by both
@@ -69,7 +73,7 @@ export function MostViewedList({
               <span className="text-ui-body text-ink-muted tabular-nums" aria-hidden>
                 {i + 1}
               </span>
-              <SmartImage src={primaryImage(p)?.url} alt="" className="size-11 shrink-0 border border-line" />
+              <SmartImage src={primaryImage(p)?.url} alt="" className={cn('h-11 shrink-0 border border-line', PRODUCT_FRAME.aspectClass, PRODUCT_FRAME.fitClass)} />
               <div className="min-w-0">
                 {editBase ? (
                   <Link to={`${editBase}/${p.id}/edit`} className={`${NAME_CLASS} hover:underline`}>

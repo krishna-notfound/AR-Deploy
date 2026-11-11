@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
 import type { ModelAsset, ProductImage } from '@/domain/types'
 import type { ProductInput } from '../catalogService'
-import { type ProductRow, createSupabaseCatalogService, mediaPaths, toSaveProductArgs } from './supabaseCatalogService'
+import { type ProductRow, createSupabaseCatalogService, mediaPaths, toProduct, toSaveProductArgs } from './supabaseCatalogService'
 
 const photo = (path: string, isPrimary = false): ProductImage => ({ id: path, url: `https://signed.test/${path}?token=1`, storagePath: path, isPrimary, kind: 'gallery' })
 const model = (format: 'glb' | 'usdz', path: string, requiredExtensions?: string[]): ModelAsset => ({
@@ -39,8 +39,8 @@ describe('save_product arguments for variant media', () => {
     const { p_variants } = toSaveProductArgs('p1', base)
     expect(p_variants[0]).toMatchObject({ id: '11111111-1111-4111-8111-111111111111', sort_order: 0 })
     expect(p_variants[0]!.images).toEqual([
-      { storage_path: 'b1/d1.jpg', alt: null, is_primary: true },
-      { storage_path: 'b1/d2.jpg', alt: null, is_primary: false },
+      { storage_path: 'b1/d1.jpg', original_path: null, crop: null, alt: null, is_primary: true },
+      { storage_path: 'b1/d2.jpg', original_path: null, crop: null, alt: null, is_primary: false },
     ])
     expect(p_variants[0]!.models).toEqual([
       { format: 'glb', storage_path: 'b1/d.glb', file_name: 'm.glb', size_bytes: null, required_extensions: ['EXT_texture_webp'] },
@@ -51,6 +51,34 @@ describe('save_product arguments for variant media', () => {
 
   it('orphan cleanup and signing cover variant files too', () => {
     expect(mediaPaths({ ...base })).toEqual(['b1/main.jpg', 'b1/main.glb', 'b1/d1.jpg', 'b1/d2.jpg', 'b1/d.glb', 'b1/d.usdz'])
+  })
+})
+
+describe('photo originals and crops (ADR-0063)', () => {
+  const crop = { x: -10, y: 0, width: 800, height: 1000 }
+  const cropped: ProductImage = { ...photo('b1/shown.webp', true), originalPath: 'b1/orig.jpg', originalUrl: 'https://signed.test/orig', crop }
+
+  it('sends original_path and crop per photo and per option photo, and never the signed link', () => {
+    const args = toSaveProductArgs('p1', { ...base, images: [cropped, photo('b1/old.jpg')], variants: [{ id: 'var_1', name: { en: 'A' }, images: [cropped] }] })
+    expect(args.p_images[0]).toMatchObject({ storage_path: 'b1/shown.webp', original_path: 'b1/orig.jpg', crop })
+    expect(args.p_images[1]).toMatchObject({ storage_path: 'b1/old.jpg', original_path: null, crop: null })
+    expect(args.p_variants[0]!.images[0]).toEqual({ storage_path: 'b1/shown.webp', original_path: 'b1/orig.jpg', crop, alt: null, is_primary: true })
+    expect(JSON.stringify(args)).not.toContain('signed.test/orig')
+  })
+
+  it('reads them back from the rows (a stray crop is ignored) and leaves the original unsigned', () => {
+    const row = (over: object) => ({ id: 'i1', url: null, storage_path: 'b1/shown.webp', alt: null, is_primary: true, kind: 'gallery', sort_order: 0, ...over })
+    const product = (images: object[]) => toProduct({ ...row, product_images: images } as ProductRow, new Map([['b1/shown.webp', 'https://signed.test/shown']]))
+    expect(product([row({ original_path: 'b1/orig.jpg', crop })]).images[0]).toMatchObject({ url: 'https://signed.test/shown', originalPath: 'b1/orig.jpg', crop })
+    expect(product([row({ original_path: 'b1/orig.jpg', crop })]).images[0]!.originalUrl).toBeUndefined()
+    const plain = product([row({ original_path: null, crop: null })]).images[0]!
+    expect('originalPath' in plain || 'crop' in plain).toBe(false)
+    expect(product([row({ crop: { x: 0, y: 0, width: 0, height: 5 } })]).images[0]!.crop).toBeUndefined()
+    expect(product([row({ crop: 'wide' })]).images[0]!.crop).toBeUndefined()
+  })
+
+  it('orphan cleanup and signing cover the originals too', () => {
+    expect(mediaPaths({ ...base, images: [cropped], models: {}, variants: [{ id: 'v', name: { en: 'A' }, images: [{ ...cropped, storagePath: 'b1/v.webp', originalPath: 'b1/vo.png' }] }] })).toEqual(['b1/shown.webp', 'b1/orig.jpg', 'b1/v.webp', 'b1/vo.png'])
   })
 })
 
@@ -75,7 +103,7 @@ function fakeClient(opts: { row: ProductRow; stillUsed?: Record<string, string[]
       Promise.resolve(
         table === 'products' && deleting
           ? { data: [{ id: opts.row.id }], error: null }
-          : { data: (opts.stillUsed?.[table] ?? []).map((storage_path) => ({ storage_path })), error: null },
+          : { data: (opts.stillUsed?.[table] ?? []).map((p) => ({ storage_path: p, original_path: p })), error: null },
       ).then(ok)
     return b
   }
@@ -163,6 +191,16 @@ describe('Supabase service: variant media', () => {
     expect(checked).toEqual(expect.arrayContaining(['product_images', 'product_models', 'product_variant_images', 'product_variant_models']))
     const removed = calls.find((c) => c.op === 'remove')?.args[0] as string[]
     expect(removed.sort()).toEqual(['b1/d1.jpg', 'b1/d2.jpg', 'b1/main.glb'])
+  })
+
+  it('deleting a product removes its photos’ originals too, except one a duplicate still uses', async () => {
+    const withOriginals: ProductRow = { ...row, product_images: [{ ...row.product_images![0]!, original_path: 'b1/main-orig.jpg' }, { id: 'i2', url: null, storage_path: 'b1/side.jpg', original_path: 'b1/side-orig.jpg', alt: null, is_primary: false, kind: 'additional', sort_order: 1 }] }
+    const calls: Call[] = []
+    const svc = createSupabaseCatalogService(fakeClient({ row: withOriginals, stillUsed: { product_images: ['b1/side-orig.jpg'] } }, calls))
+    expect((await svc.deleteProduct('p1')).ok).toBe(true)
+    const removed = calls.find((c) => c.op === 'remove')?.args[0] as string[]
+    expect(removed).toContain('b1/main-orig.jpg')
+    expect(removed).not.toContain('b1/side-orig.jpg')
   })
 
   it('refuses variant files that were not uploaded to storage', async () => {

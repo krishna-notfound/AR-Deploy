@@ -4,21 +4,25 @@ import { Link } from 'react-router'
 import type { Product } from '@/domain/types'
 import { hasAny3d } from '@/features/ar/variantMedia'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
+import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { primaryImage } from '@/lib/product'
 import { useCategoryLabel } from '@/services/listsHooks'
 
 // The one product card of the public pages (ADR-0054): the company catalogue, a collection page and the showcase's
-// "More pieces". Sanctus style: a hairline frame, the whole piece on a subtle ground in a fixed 4:5 frame (object-contain,
-// never cropped), the category label, the serif name and a "3D · AR" chip when the piece has a model. No price: prices are
+// "More pieces". Sanctus style: a hairline frame, the whole piece on a subtle ground in the product photo frame, 4:5 (object-contain,
+// so a cropped file fills it exactly and an uncropped one shows whole), the category label, the serif name and a "3D · AR" chip when the piece has a model. No price: prices are
 // not shown on public pages. The grid around it is two columns on a phone.
 
 /** The 4:5 picture frame (keyed by its source, so a new source tries again). The photo is contained, so a tall wardrobe and a low table both show whole. */
+const FRAME = imageFrame('product')
+
 function CardImage({ src, alt }: { src?: string; alt: string }) {
   const { t } = useI18n()
   const [failed, setFailed] = useState(!src)
   if (failed)
     return (
-      <div role="img" aria-label={alt || t('ui.image.unavailable')} className="flex aspect-[4/5] w-full items-center justify-center text-ink-faint">
+      <div role="img" aria-label={alt || t('ui.image.unavailable')} className={cn('flex w-full items-center justify-center text-ink-faint', FRAME.aspectClass)}>
         <ImageOff className="size-5" aria-hidden />
       </div>
     )
@@ -31,7 +35,11 @@ function CardImage({ src, alt }: { src?: string; alt: string }) {
       loading="lazy"
       decoding="async"
       onError={() => setFailed(true)}
-      className="aspect-[4/5] w-full object-contain p-2 transition-transform duration-500 ease-out group-hover/card:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover/card:scale-100"
+      className={cn(
+        'w-full transition-transform duration-500 ease-out group-hover/card:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover/card:scale-100',
+        FRAME.aspectClass,
+        FRAME.fitClass,
+      )}
     />
   )
 }
