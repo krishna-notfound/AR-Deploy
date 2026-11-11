@@ -3,6 +3,7 @@ import { Menu, UserRound, X } from 'lucide-react'
 import { type ComponentProps, type ReactNode, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigationType } from 'react-router'
 import { Wordmark } from '@/components/ui/BrandMark'
+import type { BuiltinSectionId } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useMaybeI18n } from '@/i18n/LanguageProvider'
 import { type Vars, translate } from '@/i18n/translate'
@@ -13,6 +14,7 @@ import { isDemoMode } from '@/services'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { TAP_TARGET } from '../public/tapTarget'
 import { SocialLinks } from './SocialLinks'
+import { useSiteContent } from './SiteContentProvider'
 
 type NavItem = { key: TranslationKey; href: string }
 
@@ -33,6 +35,19 @@ const FOOTER_EXPLORE: NavItem[] = [
 const FOOTER_BRAND: NavItem[] = [{ key: 'site.nav.about', href: '/#sobre' }]
 
 const YEAR = new Date().getFullYear()
+
+/** Which built-in landing section a nav link jumps to; a link to a section the Website Editor hides is left out (no link to nowhere). */
+const NAV_SECTION: Record<string, BuiltinSectionId> = { '/#como-funciona': 'how', '/#experiencia': 'experience', '/#colecoes': 'collections', '/#sobre': 'about' }
+function useVisibleNav(items: NavItem[]): NavItem[] {
+  const sections = useSiteContent().chrome?.landingSections
+  if (!sections) return items
+  const hidden = new Set(sections.filter((s) => s.hidden).map((s) => s.id))
+  const present = new Set(sections.map((s) => s.id))
+  return items.filter((n) => {
+    const id = NAV_SECTION[n.href]
+    return !id || (present.has(id) && !hidden.has(id))
+  })
+}
 
 /**
  * A link to a landing-page section ("/#sobre"). It goes through the router, whose ScrollRestoration scrolls the
@@ -99,6 +114,7 @@ function useAccountLink() {
 export function SiteHeader({ cta = true }: { cta?: boolean }) {
   const { t, hasLang } = useSiteText()
   const account = useAccountLink()
+  const nav = useVisibleNav(NAV)
   const menuRef = useRef<HTMLDialogElement>(null)
 
   return (
@@ -109,7 +125,7 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
         </Link>
         <nav aria-label={t('site.nav.label')} className="mx-auto hidden xl:block">
           <ul className="flex gap-8 text-label">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <li key={n.key}>
                 <SectionLink href={n.href} className="py-2 text-ink-muted transition-colors hover:text-ink">
                   {t(n.key)}
@@ -164,7 +180,7 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
             </button>
           </div>
           <ul className="mt-12 text-label">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <li key={n.key}>
                 <SectionLink href={n.href} onClick={() => menuRef.current?.close()} className="flex min-h-12 items-center">
                   {t(n.key)}
@@ -211,6 +227,8 @@ const footerLink = cn(TAP_TARGET, 'transition-colors hover:text-ink')
 export function SiteFooter() {
   const { t } = useSiteText()
   const account = useAccountLink()
+  const explore = useVisibleNav(FOOTER_EXPLORE)
+  const brand = useVisibleNav(FOOTER_BRAND)
   const sections = (items: NavItem[]) =>
     items.map((n) => (
       <li key={n.key}>
@@ -230,8 +248,8 @@ export function SiteFooter() {
           <SocialLinks className="mt-3 -ml-3" />
         </div>
         <nav aria-label={t('site.footer.nav')} className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3">
-          <FooterColumn title={t('site.footer.explore')}>{sections(FOOTER_EXPLORE)}</FooterColumn>
-          <FooterColumn title={t('site.footer.brand')}>{sections(FOOTER_BRAND)}</FooterColumn>
+          <FooterColumn title={t('site.footer.explore')}>{sections(explore)}</FooterColumn>
+          {brand.length > 0 && <FooterColumn title={t('site.footer.brand')}>{sections(brand)}</FooterColumn>}
           <FooterColumn title={t('site.footer.business')}>
             <li>
               <Link to={APPLY_PATH} className={footerLink}>

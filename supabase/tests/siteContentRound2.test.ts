@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { MIGRATIONS, freshDb, ids, makeHelpers, type Helpers } from './harness'
-import { LANDING_EDITABLE_KEYS, LANDING_TEXT_LIMITS, emptySiteContent, type SiteContent } from '../../src/domain/siteContent'
+import { LANDING_EDITABLE_KEYS, LANDING_LEGACY_TEXT_LIMITS, LANDING_TEXT_LIMITS, emptySiteContent, type SiteContent } from '../../src/domain/siteContent'
 
 const R2_MIGRATION = readdirSync(MIGRATIONS).find((n) => n.endsWith('_site_content_round2.sql'))!
 const R2_ROLLBACK_SQL = join(__dirname, '..', 'rollback', '20261109_site_content_round2_rollback.sql')
@@ -56,7 +56,8 @@ describe('the whitelist', () => {
   it('private.landing_text_limits() has exactly the keys and limits of LANDING_TEXT_LIMITS', async () => {
     const { rows } = await db.query<{ l: Record<string, number> }>('select private.landing_text_limits() as l')
     expect(rows[0]!.l).toEqual({ ...LANDING_TEXT_LIMITS })
-    expect(Object.keys(rows[0]!.l).sort()).toEqual([...LANDING_EDITABLE_KEYS].sort())
+    // The editable keys plus the legacy ones (landing.hero.body, ADR-0061), which the database still accepts.
+    expect(Object.keys(rows[0]!.l).sort()).toEqual([...LANDING_EDITABLE_KEYS, ...Object.keys(LANDING_LEGACY_TEXT_LIMITS)].sort())
   })
 
   it('is not callable by the API roles', async () => {

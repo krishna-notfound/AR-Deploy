@@ -75,7 +75,7 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
           if (!isObj(p) || typeof p.slug !== 'string' || !isObj(p.title) || typeof p.title.en !== 'string') return []
           return [{ slug: p.slug, title: typeof p.title.pt === 'string' ? { en: p.title.en, pt: p.title.pt } : { en: p.title.en } }]
         })
-        const normalized = normalizeSiteContent({ landing: { collections: c.landingCollections, featured: c.landingFeatured, example: c.landingExample, showcase: c.landingShowcase, hero: c.landingHero, texts: c.landingTexts }, chrome: { favicon: c.favicon } })
+        const normalized = normalizeSiteContent({ landing: { collections: c.landingCollections, featured: c.landingFeatured, example: c.landingExample, showcase: c.landingShowcase, hero: c.landingHero, texts: c.landingTexts, sections: c.landingSections, qr: c.landingQr, about: c.landingAbout }, chrome: { favicon: c.favicon } })
         const landing = normalized.landing
         return ok({
           version,
@@ -87,6 +87,9 @@ export function createSupabaseContent(sb: SupabaseClient): ContentService {
           ...(landing.hero ? { landingHero: landing.hero } : {}),
           ...(landing.showcase ? { landingShowcase: landing.showcase } : {}),
           ...(landing.texts ? { landingTexts: landing.texts } : {}),
+          ...(landing.sections ? { landingSections: landing.sections } : {}),
+          ...(landing.qr ? { landingQr: landing.qr } : {}),
+          ...(landing.about ? { landingAbout: landing.about } : {}),
           ...(normalized.chrome?.favicon ? { favicon: normalized.chrome.favicon } : {}),
         })
       }),

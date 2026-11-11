@@ -1,6 +1,6 @@
 // Turns a path of validateSiteContent (e.g. `customPages.2.slug`) into where it is and what is wrong, for the problem list
 // of the top bar and the publish dialog.
-import { SOCIAL_NETWORKS, type ContentErrors, type SiteContent } from '@/domain/siteContent'
+import { SOCIAL_NETWORKS, type ContentErrors, type SiteContent, resolveLandingSections } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import type { Vars } from '@/i18n/translate'
 import { editorApplyPath, editorLandingPath, editorPagePath, editorSitePath, editorSocialPath } from '@/lib/urls'
@@ -59,6 +59,13 @@ export function describeProblem(path: string, key: string, draft: SiteContent, t
     if (parts[1] === 'featured') return { path, what, where: `${where}: ${t('editor.landing.card3d.title')}`, to: editorLandingPath() }
     if (parts[1] === 'example') return { path, what, where: `${where}: ${t('editor.landing.example.title')}`, to: editorLandingPath() }
     if (parts[1] === 'texts') return { path, what, where: `${where}: ${t('editor.landing.texts.title')}`, to: editorLandingPath() }
+    if (parts[1] === 'qr') return { path, what, where: `${where}: ${t('editor.sections.qr.title')}`, to: editorLandingPath() }
+    if (parts[1] === 'about') return { path, what, where: `${where}: ${t('editor.sections.about.title')}`, to: editorLandingPath() }
+    if (parts[1] === 'sections') {
+      const s = parts[2] !== undefined ? resolveLandingSections(draft.landing)[Number(parts[2])] : undefined
+      const name = !s ? '' : s.kind === 'builtin' ? t(`editor.sections.builtin.${s.id}` as TranslationKey) : ((s.kind === 'banner' ? s.title?.en : s.title.en)?.trim() || t('editor.sections.untitled'))
+      return { path, what, where: `${where}: ${t('editor.sections.title')}${name ? `, ${name}` : ''}`, to: editorLandingPath() }
+    }
     if (!card) return { path, what, where, to: editorLandingPath() }
     const field = LANDING_FIELD_KEYS[parts.slice(3).join('.')]
     const name = card.title.en.trim() || t('editor.landing.untitled')

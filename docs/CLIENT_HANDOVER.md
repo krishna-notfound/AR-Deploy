@@ -282,6 +282,17 @@ You never change the live site by accident. Everything you type is saved as a **
 
 If the box says some text is still marked "to be completed", those are placeholders in the legal text (such as the company name or the date). You can still publish, but visitors will see the marker. Fill them in first.
 
+### The home page: sections, the QR section and the About photographs
+
+Open **Website editor**, then **Landing**. The first block is **Sections**: one row for every section under the first picture, in the order visitors see them.
+
+- **Move and hide.** Use the arrows to move a section up or down, and the eye to hide it (a hidden section shows a "Hidden" label and disappears from the page and from the menu links; press the eye again to bring it back). The built-in sections (QR code, How it works, Experience, Collections, About, Partners) can be moved and hidden, never deleted.
+- **Add your own section.** Press **Add section** and choose a design: **Text** (a centred heading and text), **Picture and text** (a picture beside the text, on the left or the right) or **Banner** (a full-width picture with white text over it). Fill the heading (English is required, Portuguese is optional), the text, and for the picture designs upload a picture (JPG, PNG or WebP, up to 5 MB) and describe it for screen readers. A button is optional: give it a text and a link, either a page of this site such as `/apply` or a full address starting with `https://`. The optional **Address fragment** lets a link such as `/#our-story` jump to the section. You can have up to 10 sections of your own (16 sections in all). A new section cannot be published until it has a heading (and a picture, for the picture designs); the problem list at the top says what is missing.
+- **Delete.** The bin button asks for confirmation and removes only your own sections.
+- **The QR section.** The text that used to sit under the first picture now has its own section, right below it. Change its wording under **Texts**, in the new "QR section" group. Open the QR row (the arrow button) to add a picture and choose whether it appears on the left or the right of the text; with no picture the text is centred.
+- **The About photographs.** Open the About row to replace the two photographs (the main one and the detail). **Use the built-in photo** puts the original back.
+- As everywhere in the Editor, nothing is live until you press **Publish**.
+
 ### Pages
 
 - **Terms** and **Privacy** start from the text we supplied. Edit a language to publish your own version of it. **Reset to original** puts our text back.

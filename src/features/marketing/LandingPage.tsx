@@ -1,16 +1,23 @@
 import { ArrowRight } from 'lucide-react'
+import { Fragment, type ReactNode } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { ButtonLink, buttonClasses } from '@/components/ui/Button'
 import { Eyebrow } from '@/components/ui/Eyebrow'
+import { type BuiltinSectionId, type SiteImage, resolveLandingSections } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
+import { siteAssetUrl } from '@/services'
 import { useLandingExample, useLandingFeatured } from '@/services/contentHooks'
 import { HeroMedia } from './HeroMedia'
 import { LandingCollections } from './LandingCollections'
+import { LandingQr } from './LandingQr'
 import { LandingShowcase, ShowcaseCta, useShowcaseCardView } from './LandingShowcase'
+import { OwnSectionView } from './LandingOwnSections'
+import { SECTION, SECTION_Y } from './landingFrame'
 import { SiteFooter, SiteHeader, useSectionScroll } from './SiteChrome'
+import { useSiteContent } from './SiteContentProvider'
 import { useShowcasePieces } from './useShowcasePieces'
 
 // Photography: the owner's Stitch set (AI-generated, design/stitch/BRIEF.md), 1200×896 unless noted.
@@ -22,16 +29,13 @@ const FEATURES = [
   ['landing.xp.f3Title', 'landing.xp.f3Body'],
 ] as const
 
-/** One frame and one vertical rhythm for every landing section (the same on the collection and showcase pages). */
-const SECTION = 'mx-auto max-w-[1320px] px-5 sm:px-10'
-const SECTION_Y = 'py-16 sm:py-20 lg:py-28'
-
 export default function LandingPage() {
   const { t } = useI18n()
   useDocumentTitle(t('landing.title'))
   const [params] = useSearchParams()
   const example = useExampleHref()
   useSectionScroll(example.settled)
+  const sections = resolveLandingSections({ sections: useSiteContent().chrome?.landingSections })
   // Old links sent people to "/?next=…" for the account picker, which now lives at /demo.
   if (params.has('next')) return <Navigate to={`/demo?${params.toString()}`} replace />
   return (
@@ -39,15 +43,21 @@ export default function LandingPage() {
       <SiteHeader />
       <main>
         <Hero exampleHref={example.href} />
-        <HowItWorks />
-        <Experience />
-        <LandingCollections />
-        <About />
-        <Partners />
+        {/* The Website Editor's list (ADR-0061): in its order, hidden ones skipped. The hero is always first. */}
+        {sections.map((s) => (s.hidden ? null : s.kind === 'builtin' ? <Fragment key={s.id}>{BUILTIN_VIEWS[s.id]}</Fragment> : <OwnSectionView key={s.id} section={s} />))}
       </main>
       <SiteFooter />
     </div>
   )
+}
+
+const BUILTIN_VIEWS: Record<BuiltinSectionId, ReactNode> = {
+  qr: <LandingQr />,
+  how: <HowItWorks />,
+  experience: <Experience />,
+  collections: <LandingCollections />,
+  about: <About />,
+  partners: <Partners />,
 }
 
 /**
@@ -91,7 +101,6 @@ function Hero({ exampleHref }: { exampleHref?: string }) {
             <h1 id="hero-title" className="mt-5 font-display text-[clamp(2.5rem,1.7rem+3.1vw,4.25rem)] leading-[1.04] font-light text-chalk">
               <TwoLines a={t('landing.hero.title1')} b={t('landing.hero.title2')} italic />
             </h1>
-            <p className="mt-5 max-w-md text-base leading-7 text-chalk/90 sm:mt-6">{t('landing.hero.body')}</p>
             {exampleHref && (
               <>
                 <ButtonLink to={exampleHref} variant="inverse" size="lg" className="mt-8 w-full sm:w-auto">
@@ -187,8 +196,17 @@ function Experience() {
   )
 }
 
+/** An About photograph: the Owner/Admin's upload with its own description, else the built-in photo with its description. */
+function aboutPicture(own: SiteImage | undefined, builtin: { src: string; alt: string }, localized: ReturnType<typeof useI18n>['localized']) {
+  const url = own ? siteAssetUrl(own) : ''
+  return url ? { src: url, alt: localized(own!.alt) } : builtin
+}
+
 function About() {
-  const { t } = useI18n()
+  const { t, localized } = useI18n()
+  const about = useSiteContent().chrome?.landingAbout
+  const main = aboutPicture(about?.image, { src: IMG('coffee-table'), alt: t('landing.about.imageAlt') }, localized)
+  const detail = aboutPicture(about?.detail, { src: IMG('detail-joinery'), alt: t('landing.about.detailAlt') }, localized)
   return (
     <section id="sobre" className="scroll-mt-24" aria-labelledby="about-title">
       <div className={cn(SECTION, SECTION_Y, 'grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16')}>
@@ -201,16 +219,16 @@ function About() {
         </div>
         <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-3 sm:gap-6">
           <img
-            src={IMG('coffee-table')}
-            alt={t('landing.about.imageAlt')}
+            src={main.src}
+            alt={main.alt}
             width={1200}
             height={896}
             loading="lazy"
             className="row-span-2 aspect-[4/5] size-full border border-line bg-subtle object-cover"
           />
           <img
-            src={IMG('detail-joinery')}
-            alt={t('landing.about.detailAlt')}
+            src={detail.src}
+            alt={detail.alt}
             width={1024}
             height={1024}
             loading="lazy"

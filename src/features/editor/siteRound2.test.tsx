@@ -53,11 +53,11 @@ describe('siteOps', () => {
     let doc = emptySiteContent()
     doc = setLandingText(doc, 'landing.hero.title1', 'en', 'A')
     doc = setLandingText(doc, 'landing.hero.title1', 'pt', 'B')
-    doc = setLandingText(doc, 'landing.hero.body', 'en', 'C')
+    doc = setLandingText(doc, 'landing.hero.note', 'en', 'C')
     doc = setLandingText(doc, 'landing.biz.title', 'pt', 'D')
     expect(changedTexts(doc, sectionKeys('hero'))).toBe(2) // a text counts once, whichever languages are set
     expect(changedTexts(doc, LANDING_TEXT_GROUPS.flatMap((g) => g.keys.map(([k]) => k)))).toBe(3)
-    expect(resetLandingText(doc, 'landing.hero.title1').landing.texts).toEqual({ 'landing.hero.body': { en: 'C' }, 'landing.biz.title': { pt: 'D' } })
+    expect(resetLandingText(doc, 'landing.hero.title1').landing.texts).toEqual({ 'landing.hero.note': { en: 'C' }, 'landing.biz.title': { pt: 'D' } })
     expect(resetLandingSection(doc, 'hero').landing.texts).toEqual({ 'landing.biz.title': { pt: 'D' } })
     expect(resetLandingText(doc, 'landing.about.body')).toBe(doc)
     expect(resetLandingSection(resetLandingSection(doc, 'hero'), 'partners')).toEqual(emptySiteContent())
@@ -123,7 +123,7 @@ describe('Landing tab: the Texts block', () => {
     open('/admin/editor/landing')
     const heading = await screen.findByRole('heading', { level: 3, name: 'Texts' }, { timeout: 15_000 })
     const block = within(heading.closest('section')!)
-    const names = ['Hero', 'How it works', 'Experience', 'Collections', 'About', 'Partners']
+    const names = ['Hero', 'QR section', 'How it works', 'Experience', 'Collections', 'About', 'Partners']
     expect(block.getAllByText((_, el) => el?.tagName === 'SPAN' && names.includes(el.textContent ?? '') && el.closest('summary') !== null).map((e) => e.textContent)).toEqual(names)
     expect(block.getByRole('status')).toHaveTextContent('Every text is the original wording.')
 

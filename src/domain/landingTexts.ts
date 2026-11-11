@@ -12,7 +12,7 @@
 export const LANDING_TEXT_KINDS = { eyebrow: 60, button: 40, title: 200, body: 600 } as const
 export type LandingTextKind = keyof typeof LANDING_TEXT_KINDS
 
-export type LandingTextSection = 'hero' | 'how' | 'experience' | 'collections' | 'about' | 'partners'
+export type LandingTextSection = 'hero' | 'qr' | 'how' | 'experience' | 'collections' | 'about' | 'partners'
 
 export interface LandingTextGroup {
   id: LandingTextSection
@@ -28,9 +28,17 @@ export const LANDING_TEXT_GROUPS: readonly LandingTextGroup[] = [
       ['landing.hero.eyebrow', 'eyebrow'],
       ['landing.hero.title1', 'title'],
       ['landing.hero.title2', 'title'],
-      ['landing.hero.body', 'body'],
       ['landing.hero.cta3d', 'button'],
       ['landing.hero.note', 'body'],
+    ],
+  },
+  {
+    // The QR section (ADR-0061) under the hero; its body is the old hero text.
+    id: 'qr',
+    keys: [
+      ['landing.qr.eyebrow', 'eyebrow'],
+      ['landing.qr.title', 'title'],
+      ['landing.qr.body', 'body'],
     ],
   },
   {
@@ -102,11 +110,21 @@ export const LANDING_TEXT_GROUPS: readonly LandingTextGroup[] = [
   },
 ]
 
-/** Every key the Editor may override, with its limit. */
-export const LANDING_TEXT_LIMITS: Readonly<Record<string, number>> = Object.fromEntries(
-  LANDING_TEXT_GROUPS.flatMap((g) => g.keys.map(([key, kind]) => [key, LANDING_TEXT_KINDS[kind]] as const)),
-)
-export const LANDING_EDITABLE_KEYS: readonly string[] = Object.keys(LANDING_TEXT_LIMITS)
+/**
+ * Keys that are still allowed in a saved document but are no longer shown in the Editor or on the page. `landing.hero.body` (the
+ * text under the hero title, before ADR-0061) is moved into `landing.qr.body` when a document is normalized; the database keeps
+ * accepting it so that an older draft or published copy still publishes and reads.
+ */
+export const LANDING_LEGACY_TEXT_LIMITS: Readonly<Record<string, number>> = { 'landing.hero.body': LANDING_TEXT_KINDS.body }
+
+/** The keys the Editor lists, in page order. */
+export const LANDING_EDITABLE_KEYS: readonly string[] = LANDING_TEXT_GROUPS.flatMap((g) => g.keys.map(([key]) => key))
+
+/** Every key a document may hold (the editable ones and the legacy ones), with its limit; the twin of private.landing_text_limits(). */
+export const LANDING_TEXT_LIMITS: Readonly<Record<string, number>> = {
+  ...Object.fromEntries(LANDING_TEXT_GROUPS.flatMap((g) => g.keys.map(([key, kind]) => [key, LANDING_TEXT_KINDS[kind]] as const))),
+  ...LANDING_LEGACY_TEXT_LIMITS,
+}
 
 /** The overrides of the document: dictionary key to the text per language. An empty text is not stored (= the original). */
 export type LandingTexts = Record<string, { en?: string; pt?: string }>

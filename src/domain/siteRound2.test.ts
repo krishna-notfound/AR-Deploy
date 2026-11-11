@@ -37,10 +37,17 @@ describe('the landing text list', () => {
   })
 
   it('the original wording of every key fits its limit (so "reset" can never produce a refused text)', () => {
-    for (const [key, max] of Object.entries(LANDING_TEXT_LIMITS)) {
+    for (const key of LANDING_EDITABLE_KEYS) {
+      const max = LANDING_TEXT_LIMITS[key]!
       expect((enCore as Record<string, string>)[key]!.length, key).toBeLessThanOrEqual(max)
       expect((ptCore as Record<string, string>)[key]!.length, key).toBeLessThanOrEqual(max)
     }
+  })
+
+  it('landing.hero.body is no longer editable but is still accepted from an older document (ADR-0061)', () => {
+    expect(LANDING_EDITABLE_KEYS).not.toContain('landing.hero.body')
+    expect(LANDING_TEXT_LIMITS['landing.hero.body']).toBe(600)
+    expect(enCore).not.toHaveProperty(['landing.hero.body'])
   })
 })
 

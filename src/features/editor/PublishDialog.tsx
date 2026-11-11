@@ -20,6 +20,7 @@ const GROUPS = [
   ['landingCollections', 'editor.summary.landingCollections'],
   ['landingShowcase', 'editor.summary.landingShowcase'],
   ['landingTexts', 'editor.summary.landingTexts'],
+  ['landingSections', 'editor.summary.landingSections'],
   ['siteFavicon', 'editor.summary.siteFavicon'],
 ] as const satisfies readonly (readonly [string, TranslationKey])[]
 
