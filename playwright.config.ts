@@ -19,6 +19,8 @@ export default defineConfig({
   projects: [
     { name: 'desktop', testIgnore: [/\.mobile\.spec\.ts$/, /tests[\\/]visual[\\/]/], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
     { name: 'mobile', testMatch: /\.mobile\.spec\.ts$/, testIgnore: /tests[\\/]visual[\\/]/, use: { ...devices['Pixel 7'] } },
+    // Dashboard dark mode screenshots (ADR-0060): written to test-results/dark-mode/ for looking at; nothing is compared.
+    { name: 'dark-mode', testDir: './tests/visual', testMatch: /visual[\\/]dark-mode\.spec\.ts$/, timeout: 240_000, use: { ...devices['Desktop Chrome'] } },
     // Pixel guard for the pages the dashboard redesign must not touch (ADR-0031). Run it with `--project=guard`.
     {
       name: 'guard',

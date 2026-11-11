@@ -74,6 +74,15 @@ The platform owner may require two-step sign-in for everyone. If so, you will be
 
 ---
 
+### Dark mode
+
+The dashboards (the Admin Console and your company dashboard, including Settings) can be shown in a dark theme.
+
+1. Open the account menu at the bottom of the left sidebar (your name), and under **Appearance** choose **Light**, **Dark** or **System**. Or open **Settings > Preferences** and use the **Appearance** card.
+2. **Light** is the default. **Dark** is always dark. **System** follows your device and changes with it (for example at sunset).
+3. The choice is applied at once and remembered on this device and browser only. It is not part of your account, so set it again on another device.
+4. The public website, the catalogue pages your customers see, and the sign-in pages always stay light. Previews of public pages inside the dashboard (the Website Editor preview, the catalogue preview when you create a business) also stay light, so you see what customers see.
+
 ## 3. Creating a business (Super Admin)
 
 Go to **Businesses**, then **New business**. Fill in:
