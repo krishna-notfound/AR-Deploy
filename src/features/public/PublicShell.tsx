@@ -6,6 +6,7 @@ import type { Business } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { safeBrandAccent } from '@/lib/color'
+import { platformHomeUrl } from '@/lib/urls'
 import { LegalLinks } from '../legal/LegalLinks'
 import { InAppNotice } from './InAppNotice'
 import { TAP_TARGET } from './tapTarget'
@@ -14,15 +15,23 @@ import { TAP_TARGET } from './tapTarget'
 export function PublicShell({ business, children }: { business?: Business | null; children: ReactNode }) {
   const { t } = useI18n()
   const accent = safeBrandAccent(business?.branding.accentColor)
+  const home = platformHomeUrl()
+  const homeClass = 'flex min-h-11 shrink-0 items-center text-ink'
   return (
     <div className="public-soft flex min-h-dvh flex-col bg-canvas" style={{ '--brand-accent': accent } as React.CSSProperties}>
       {/* Solid header with a hairline (no blur or translucency), as the Sanctus landing. */}
       <header className="sticky top-0 z-30 border-b border-line bg-canvas">
         <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-3 px-5 sm:h-20 sm:px-10">
           {/* The platform's wordmark, as the landing header; the company's name and logo are on the catalogue photo (ADR-0062). */}
-          <Link to="/" aria-label={t('site.home')} className="flex min-h-11 shrink-0 items-center text-ink">
-            <Wordmark size={15} />
-          </Link>
+          {home === '/' ? (
+            <Link to="/" aria-label={t('site.home')} className={homeClass}>
+              <Wordmark size={15} />
+            </Link>
+          ) : (
+            <a href={home} aria-label={t('site.home')} className={homeClass}>
+              <Wordmark size={15} />
+            </a>
+          )}
           <LanguageSwitcher clear className="ml-auto text-ink" />
         </div>
       </header>

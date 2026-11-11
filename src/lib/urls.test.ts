@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AR_FALLBACK_HASH, AR_PROXY_PATH, AR_PROXY_SOURCE, arProxyUrl, catalogLocalPath, needsPreview, quickLookHref, sceneViewerIntentUrl, settingsPath } from './urls'
 
 describe('needsPreview', () => {
@@ -97,7 +97,7 @@ describe('native AR launch URLs', () => {
 
 describe('arProxyUrl (phone AR files from the site domain)', () => {
   const pub = `${AR_PROXY_SOURCE}b1/p1/base/glb-m.glb`
-  it('maps a public ar-models copy to /ar/… when the rewrite is on, and leaves it alone otherwise', () => {
+  it('maps a public ar-models copy to /ar/â€¦ when the rewrite is on, and leaves it alone otherwise', () => {
     expect(arProxyUrl(pub, true)).toBe('/ar/b1/p1/base/glb-m.glb')
     expect(arProxyUrl(pub, false)).toBe(pub)
   })
@@ -111,5 +111,24 @@ describe('arProxyUrl (phone AR files from the site domain)', () => {
     const spa = cfg.rewrites.find((r) => r.destination === '/index.html')!
     expect(new RegExp(`^${spa.source}$`).test('/ar/b1/p1/base/glb-m.glb')).toBe(false)
     expect(new RegExp(`^${spa.source}$`).test('/products/b/p')).toBe(true)
+  })
+})
+
+describe('platformHomeUrl', () => {
+  it('is / when the site serves catalogues on paths', async () => {
+    const { platformHomeUrl } = await import('./urls')
+    expect(platformHomeUrl()).toBe('/')
+  })
+
+  it('is the root domain on a business subdomain, where / is the catalogue itself', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_ROOT_DOMAIN', 'sanctus.example')
+    try {
+      const { platformHomeUrl } = await import('./urls')
+      expect(platformHomeUrl()).toBe('https://sanctus.example/')
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
   })
 })

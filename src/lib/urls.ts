@@ -23,6 +23,11 @@ export const PUBLIC_URLS_ARE_TEMPORARY = PUBLIC_URL_MODE === 'path' && __DEPLOY_
 
 export const ROOT_DOMAIN: string = ROOT || 'example.com'
 
+/** The Sanctus home page. On a business subdomain "/" is that catalogue, so the platform home is the root domain. */
+export function platformHomeUrl(): string {
+  return PUBLIC_URL_MODE === 'subdomain' ? `https://${ROOT_DOMAIN}/` : '/'
+}
+
 /** Public catalog URL. Used by QR codes and "Copy catalog URL". */
 export function catalogPublicUrl(b: Sluggable): string {
   return PUBLIC_URL_MODE === 'path' ? absoluteLocalUrl(catalogLocalPath(b)) : `https://${b.slug}.${ROOT_DOMAIN}`
