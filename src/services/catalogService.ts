@@ -92,7 +92,11 @@ export interface ProductQuery {
   category?: Category
 }
 
-export type UploadKind = 'logo' | 'image' | 'glb' | 'usdz'
+/**
+ * What an upload is. `logo`, `banner` and `bannerOriginal` go to the public bucket business-logos (`banner`: the edited copy of a
+ * catalogue banner, `bannerOriginal`: the untouched upload it was cut from; both need `businessId`, ADR-0065).
+ */
+export type UploadKind = 'logo' | 'banner' | 'bannerOriginal' | 'image' | 'glb' | 'usdz'
 
 /** What a delete's file clean-up did: files storage could not list or remove are counted, never hidden (R-W3-4). */
 export interface StorageSweep {

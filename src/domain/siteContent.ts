@@ -307,6 +307,11 @@ export interface SiteContent {
 export interface SiteChrome {
   /** The browser-tab icon (a PNG, at most 1 MB, square). Replaces the built-in icon and the apple-touch-icon at run time. */
   favicon?: SiteAsset
+  /**
+   * The picture at the top of a catalogue whose company has not set its own (ADR-0065): an uploaded picture (cropped on upload like
+   * the others, ADR-0063). Decorative, so it has no description. Absent: the built-in Sanctus photograph.
+   */
+  catalogBanner?: SiteAsset
 }
 
 export const MAX_CUSTOM_PAGES = 20
@@ -376,7 +381,8 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   const about = normalizeAbout(landing.about)
   if (about) out.landing.about = about
   const favicon = asset(obj(raw.chrome).favicon)
-  if (favicon) out.chrome = { favicon }
+  const catalogBanner = picture(obj(raw.chrome).catalogBanner)
+  if (favicon || catalogBanner) out.chrome = { ...(favicon ? { favicon } : {}), ...(catalogBanner ? { catalogBanner } : {}) }
   return out
 }
 
@@ -739,6 +745,7 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
     const f = doc.chrome.favicon
     if (!isSiteAsset(f) || !isFaviconPath(f.path)) put('chrome.favicon', 'invalid_value')
   }
+  if (doc.chrome?.catalogBanner !== undefined) validateAsset(doc.chrome.catalogBanner, 'image', 'chrome.catalogBanner', put)
   return e
 }
 
@@ -993,6 +1000,8 @@ export interface ChangeSummary {
   landingSections: number
   /** The site icon (favicon): 1 when it was set, replaced or removed. */
   siteFavicon: number
+  /** The default catalogue banner (ADR-0065): 1 when it was set, replaced, edited or removed. */
+  catalogBanner: number
   total: number
 }
 
@@ -1117,6 +1126,7 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
   if (!same(a.landing?.about?.third, b.landing?.about?.third)) landingSections++
 
   const siteFavicon = same(a.chrome?.favicon, b.chrome?.favicon) ? 0 : 1
+  const catalogBanner = same(a.chrome?.catalogBanner, b.chrome?.catalogBanner) ? 0 : 1
 
   return {
     pages,
@@ -1131,6 +1141,7 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
     landingTexts,
     landingSections,
     siteFavicon,
-    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase + landingTexts + landingSections + siteFavicon,
+    catalogBanner,
+    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase + landingTexts + landingSections + siteFavicon + catalogBanner,
   }
 }

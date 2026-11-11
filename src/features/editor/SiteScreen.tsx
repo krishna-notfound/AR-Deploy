@@ -1,4 +1,4 @@
-// /admin/editor/site: settings of the whole website. For now the site icon (favicon), ADR-0053.
+// /admin/editor/site: settings of the whole website: the default catalogue banner (ADR-0065) and the site icon (favicon, ADR-0053).
 import { ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { SITE_ASSET_MAX_BYTES } from '@/domain/siteContent'
@@ -6,6 +6,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import type { Vars } from '@/i18n/translate'
 import { siteAssetUrl } from '@/services'
+import { CatalogBannerBlock } from './CatalogBannerBlock'
 import { useEditor } from './EditorContext'
 import { UploadButton } from './UploadButton'
 import { setFavicon } from './siteOps'
@@ -48,6 +49,8 @@ export default function SiteScreen() {
         <h2 className="text-ui-card font-medium text-ink">{t('editor.menu.site')}</h2>
         <p className="mt-1 max-w-xl text-ui-small text-ink-muted">{t('editor.site.description')}</p>
       </div>
+
+      <CatalogBannerBlock />
 
       <section aria-labelledby="site-favicon-heading" className="border border-line bg-surface p-4 sm:p-5">
         <h3 id="site-favicon-heading" className="text-ui-card font-medium text-ink">

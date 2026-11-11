@@ -12,6 +12,7 @@ import type {
   AuditEvent,
   Business,
   BusinessApplication,
+  BusinessBanner,
   BusinessCatalog,
   BusinessStatus,
   Category,
@@ -61,6 +62,13 @@ export interface BusinessRow {
   name: string
   slug: string
   logo_url: string | null
+  /**
+   * The company's own catalogue banner (ADR-0065). A visitor reads banner_url only (column privileges), so the public reads
+   * (PUBLIC_BUSINESS_COLUMNS) leave the original and the crop out.
+   */
+  banner_url?: string | null
+  banner_original_url?: string | null
+  banner_crop?: ImageCrop | null
   /** Internal (ADR-0054): anon cannot select it, so the public reads (PUBLIC_BUSINESS_COLUMNS) leave it out. */
   description?: string
   contact_email: string | null
@@ -161,7 +169,7 @@ export interface ProductRow {
  * the table later is added here and granted to anon in its migration.
  */
 export const PUBLIC_BUSINESS_COLUMNS =
-  'id, name, slug, logo_url, contact_email, contact_phone, contact_website, contact_address, status, accent_color, default_currency, allow_own_models, share_enabled, is_house, created_at, updated_at'
+  'id, name, slug, logo_url, banner_url, contact_email, contact_phone, contact_website, contact_address, status, accent_color, default_currency, allow_own_models, share_enabled, is_house, created_at, updated_at'
 
 const DAILY_PAGE = 1000
 
@@ -251,6 +259,9 @@ export const toBusiness = (r: BusinessRow): Business => ({
   name: r.name,
   slug: r.slug,
   logoUrl: r.logo_url ?? undefined,
+  ...(r.banner_url
+    ? { banner: { url: r.banner_url, ...(r.banner_original_url ? { originalUrl: r.banner_original_url } : {}), ...(r.banner_crop ? { crop: r.banner_crop } : {}) } }
+    : {}),
   description: r.description ?? '',
   contact: {
     email: r.contact_email ?? undefined,
@@ -273,6 +284,12 @@ function fromBusinessInput(d: Partial<BusinessInput>): Partial<BusinessRow> {
   if (d.name !== undefined) row.name = d.name.trim()
   if (d.slug !== undefined) row.slug = d.slug
   if ('logoUrl' in d) row.logo_url = d.logoUrl ?? null
+  // The banner is three columns that go together: removing it clears all three (the database refuses an original without a banner).
+  if ('banner' in d) {
+    row.banner_url = d.banner?.url ?? null
+    row.banner_original_url = d.banner?.originalUrl ?? null
+    row.banner_crop = d.banner?.crop ?? null
+  }
   if (d.description !== undefined) row.description = d.description
   if (d.contact) {
     row.contact_email = d.contact.email || null
@@ -441,6 +458,17 @@ export function logoPath(url: string | undefined): string | null {
 export function ownedLogoPath(url: string | undefined, businessId: ID): string | null {
   const path = logoPath(url)
   return path && path.startsWith(`${businessId}/`) && !path.includes('..') ? path : null
+}
+
+/**
+ * The files of a catalogue banner that a change leaves unused (ADR-0065): the paths of the old banner's copy and original that the
+ * new banner does not use, limited to this business's own folder (banner_url is writable by members, so it could name another
+ * business's file, as logo_url could; security audit P1-07). An empty list when nothing is left over.
+ */
+export function replacedBannerPaths(before: BusinessBanner | undefined, after: BusinessBanner | undefined, businessId: ID): string[] {
+  const own = (b: BusinessBanner | undefined) => [b?.url, b?.originalUrl].map((u) => ownedLogoPath(u, businessId)).filter((p): p is string => !!p)
+  const kept = new Set(own(after))
+  return [...new Set(own(before))].filter((p) => !kept.has(p))
 }
 
 /** `new/<file>` for a logo uploaded before its business existed (a logo-bucket URL directly in new/), else null. */
@@ -1031,6 +1059,9 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         // writable by members, so it could point at another business's file (security audit P1-07).
         const oldLogo = ownedLogoPath(current.data.logoUrl, id)
         if (oldLogo && 'logoUrl' in patch && patch.logoUrl !== current.data.logoUrl) await sb.storage.from(LOGO_BUCKET).remove([oldLogo])
+        // Same for the banner (ADR-0065): a copy or an original that the saved banner no longer points at goes, if it is in this
+        // business's own folder. Edit picture keeps the original, so only the replaced copy goes; Remove or a new upload takes both.
+        if ('banner' in patch) await sb.storage.from(LOGO_BUCKET).remove(replacedBannerPaths(current.data.banner, toBusiness(data).banner, id))
         return changed(ok(toBusiness(data)))
       }),
     setBusinessShareEnabled: (id, enabled) =>
@@ -1440,11 +1471,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     // ---------------- files ----------------
     uploadAsset: ({ kind, file, businessId }) =>
       guard(async () => {
-        const bucket = kind === 'logo' ? LOGO_BUCKET : MEDIA_BUCKET
+        // Logos and catalogue banners (the edited copy and its untouched original, ADR-0065) live in the public bucket business-logos.
+        const bucket = kind === 'logo' || kind === 'banner' || kind === 'bannerOriginal' ? LOGO_BUCKET : MEDIA_BUCKET
         if (!businessId && kind !== 'logo') return fail('VALIDATION', 'Choose the business before uploading files.')
         const named = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() : 'bin'
         // Images keep a known extension: the variant-media path rule accepts png, jpg/jpeg and webp only.
-        const ext = kind === 'image' && !IMAGE_EXTENSIONS.includes(named) ? (IMAGE_EXT_BY_TYPE[file.type] ?? named) : named
+        const isPicture = kind === 'image' || kind === 'banner' || kind === 'bannerOriginal'
+        const ext = isPicture && !IMAGE_EXTENSIONS.includes(named) ? (IMAGE_EXT_BY_TYPE[file.type] ?? named) : named
         // Path convention (design/19): {business_id}/{uuid}.{ext}; logos for a business not yet created go under new/.
         const path = `${businessId ?? 'new'}/${crypto.randomUUID()}.${ext}`
         // supabase-js sends a File with its own type (browsers report '' for .glb/.usdz, stored as

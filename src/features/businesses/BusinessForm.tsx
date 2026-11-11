@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useBlocker } from 'react-router'
 import { useCan } from '@/auth/usePermission'
 import { Button } from '@/components/ui/Button'
+import { BannerUpload } from '@/components/ui/BannerUpload'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FormField, Input, InputAddon, Select, Textarea } from '@/components/ui/Form'
@@ -29,11 +30,11 @@ const ACCENTS = ['#B4441A', '#36564A', '#7A5C45', '#2F5D62', '#4F6B3A', '#5A4636
 
 function toInput(b: Business | null): BusinessInput {
   return b
-    ? { name: b.name, slug: b.slug, logoUrl: b.logoUrl, description: b.description, contact: { ...b.contact }, status: b.status, branding: { ...b.branding }, defaultCurrency: b.defaultCurrency }
+    ? { name: b.name, slug: b.slug, logoUrl: b.logoUrl, banner: b.banner, description: b.description, contact: { ...b.contact }, status: b.status, branding: { ...b.branding }, defaultCurrency: b.defaultCurrency }
     : { name: '', slug: '', logoUrl: undefined, description: '', contact: {}, status: 'draft', branding: { accentColor: ACCENTS[0]! }, defaultCurrency: 'EUR' }
 }
 
-const OWNER_FIELDS: (keyof BusinessInput)[] = ['name', 'logoUrl', 'description', 'contact']
+const OWNER_FIELDS: (keyof BusinessInput)[] = ['name', 'logoUrl', 'banner', 'description', 'contact']
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 /**
@@ -168,6 +169,9 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
             </FormField>
             <FormField label={t('admin.businesses.form.logo')}>
               <LogoUpload value={data.logoUrl} onChange={(logoUrl) => set({ logoUrl })} name={data.name} businessId={business?.id} />
+            </FormField>
+            <FormField label={t('admin.businesses.form.banner')}>
+              <BannerUpload value={data.banner} onChange={(banner) => set({ banner })} businessId={business?.id} />
             </FormField>
             <FormField label={t('admin.businesses.form.description')} hint={t('admin.businesses.form.descriptionHint')} error={fx('description')}>
               <Textarea value={data.description} maxLength={BUSINESS_LIMITS.description} rows={3} onChange={(e) => set({ description: e.target.value })} />

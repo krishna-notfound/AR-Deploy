@@ -1,10 +1,25 @@
-// Pure edits of the site icon and the landing page texts of a SiteContent document (ADR-0053).
-import { LANDING_TEXT_GROUPS, type LandingTextSection, type Lang, type SiteAsset, type SiteContent } from '@/domain/siteContent'
+// Pure edits of the site icon, the default catalogue banner (ADR-0065) and the landing page texts of a SiteContent document (ADR-0053).
+import { LANDING_TEXT_GROUPS, type LandingTextSection, type Lang, type SiteAsset, type SiteChrome, type SiteContent } from '@/domain/siteContent'
 
-/** The site icon; `undefined` goes back to the built-in icons. `chrome` is dropped when nothing is left in it. */
-export function setFavicon(doc: SiteContent, favicon: SiteAsset | undefined): SiteContent {
+/** Sets or clears keys of `chrome` (`undefined` clears one); `chrome` is dropped when nothing is left in it, so it equals one never set. */
+function withChrome(doc: SiteContent, patch: Partial<Record<keyof SiteChrome, SiteAsset | undefined>>): SiteContent {
+  const next: SiteChrome = { ...(doc.chrome ?? {}) }
+  for (const [key, value] of Object.entries(patch) as [keyof SiteChrome, SiteAsset | undefined][]) {
+    if (value === undefined) delete next[key]
+    else next[key] = value
+  }
   const { chrome: _old, ...rest } = doc
-  return favicon ? { ...rest, chrome: { ...(doc.chrome ?? {}), favicon } } : rest
+  return Object.keys(next).length ? { ...rest, chrome: next } : rest
+}
+
+/** The site icon; `undefined` goes back to the built-in icons. */
+export function setFavicon(doc: SiteContent, favicon: SiteAsset | undefined): SiteContent {
+  return withChrome(doc, { favicon })
+}
+
+/** The default catalogue banner; `undefined` goes back to the built-in photograph (ADR-0065). */
+export function setCatalogBanner(doc: SiteContent, banner: SiteAsset | undefined): SiteContent {
+  return withChrome(doc, { catalogBanner: banner })
 }
 
 const withTexts = (doc: SiteContent, texts: NonNullable<SiteContent['landing']['texts']>): SiteContent => {

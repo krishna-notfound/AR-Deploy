@@ -240,6 +240,9 @@ export type Database = {
         Row: {
           accent_color: string
           allow_own_models: boolean
+          banner_crop: Json | null
+          banner_original_url: string | null
+          banner_url: string | null
           contact_address: string | null
           contact_email: string | null
           contact_phone: string | null
@@ -259,6 +262,9 @@ export type Database = {
         Insert: {
           accent_color?: string
           allow_own_models?: boolean
+          banner_crop?: Json | null
+          banner_original_url?: string | null
+          banner_url?: string | null
           contact_address?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -278,6 +284,9 @@ export type Database = {
         Update: {
           accent_color?: string
           allow_own_models?: boolean
+          banner_crop?: Json | null
+          banner_original_url?: string | null
+          banner_url?: string | null
           contact_address?: string | null
           contact_email?: string | null
           contact_phone?: string | null

@@ -49,11 +49,26 @@ export interface BusinessContact {
   address?: string
 }
 
+/**
+ * A company's own catalogue banner (ADR-0065): the picture at the top of its public catalogue. Stored in the public bucket
+ * business-logos; the pages show `url` (the cropped copy) and the editor reopens `originalUrl` with the `crop` it had.
+ * Absent: the catalogue shows the platform's default banner, else the built-in photograph.
+ */
+export interface BusinessBanner {
+  url: string
+  /** The untouched upload `url` was cut from. Absent on a banner from before the crop dialog: `url` is then its own original. */
+  originalUrl?: string
+  /** What of the original the shown copy holds. Absent: never cropped. */
+  crop?: ImageCrop
+}
+
 export interface Business {
   id: ID
   name: string
   slug: string
   logoUrl?: string
+  /** The company's own catalogue banner (ADR-0065). Visitors get `url` only. */
+  banner?: BusinessBanner
   description: string
   contact: BusinessContact
   status: BusinessStatus

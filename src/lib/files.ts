@@ -353,3 +353,15 @@ export function isHttpUrl(value: string): boolean {
     return false
   }
 }
+
+/** Demo mode: the picture as the demo will keep it (a data URL no bigger than 1600 px), as a file; or why it cannot be kept. */
+export async function demoSized(file: File, t: TFn): Promise<{ ok: true; file: File } | { ok: false; message: string }> {
+  const res = await imageToPersistableDataUrl(file, 1600, t)
+  if (!res.ok) return res
+  try {
+    const blob = await (await fetch(res.url)).blob()
+    return { ok: true, file: new File([blob], file.name, { type: blob.type || file.type }) }
+  } catch {
+    return { ok: true, file }
+  }
+}

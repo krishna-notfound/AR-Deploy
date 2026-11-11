@@ -134,6 +134,7 @@ export const enAdmin = {
   'admin.businesses.form.profile': 'Business profile',
   'admin.businesses.form.name': 'Business name',
   'admin.businesses.form.logo': 'Logo',
+  'admin.businesses.form.banner': 'Catalogue banner',
   'admin.businesses.form.description': 'Description',
   'admin.businesses.form.descriptionHint': 'Shown at the top of the public catalog.',
   'admin.businesses.form.contact': 'Contact',

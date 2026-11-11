@@ -16,15 +16,14 @@ import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { useCategories, useCategoryLabel } from '@/services/listsHooks'
 import { productLocalPath, tenantProductPath } from '@/lib/urls'
+import { useSiteContent } from '../marketing/SiteContentProvider'
+import { CATALOG_PHOTO_POSITION, chooseCatalogBanner } from './catalogBanner'
 import { PublicMessage } from './PublicMessage'
 import { ProductCard } from './ProductCard'
 import { PublicShell } from './PublicShell'
 import { TAP_TARGET } from './tapTarget'
 
 /** Signed media URLs last MEDIA_URL_TTL_SECONDS; refetch on return to the tab once half of that has passed. */
-/** The catalogue top's photograph: a Sanctus brand photo (not the landing hero's or the sign-in pages'), dark enough for white text. */
-const CATALOG_PHOTO = '/images/sanctus/v2/lamp-vase.webp'
-
 const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
 
 export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
@@ -38,6 +37,7 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const categoryLabel = useCategoryLabel()
 
   const { user } = useAccount()
+  const site = useSiteContent()
 
   const business = useServiceQuery(() => service.getBusinessBySlug(slug), [slug])
   // The platform's own showcase (ADR-0047) is never a catalogue: its pieces open under /showcase/.
@@ -123,6 +123,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
     )
   }
 
+  // The picture: the company's own banner, else the platform's default banner, else the built-in photograph (ADR-0065).
+  const banner = chooseCatalogBanner(b, { loading: site.loading, defaultBanner: site.chrome?.catalogBanner })
+
   return (
     <PublicShell business={b}>
       {isPreview && (
@@ -133,11 +136,12 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
           </p>
         </div>
       )}
-      {/* Catalogue top (ADR-0062), in the landing hero's and sign-in panel's style: a Sanctus photograph under a dark veil with the
-          company's logo, the eyebrow, its name (the only place the name is written on this page) and the piece count in white.
-          The company description is internal (ADR-0054) and not shown. */}
+      {/* Catalogue top (ADR-0062), in the landing hero's and sign-in panel's style: a picture under a dark veil with the company's
+          logo, the eyebrow, its name (the only place the name is written on this page) and the piece count in white. The picture is the
+          company's own banner, else the platform's default, else a Sanctus photograph (ADR-0065); the veil keeps the text readable on
+          any of them. The company description is internal (ADR-0054) and not shown. */}
       <section aria-labelledby="catalog-title" className="relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden bg-obsidian text-chalk sm:min-h-[24rem] lg:min-h-[30rem]">
-        <img src={CATALOG_PHOTO} alt="" width={1200} height={896} fetchPriority="high" className="absolute inset-0 -z-10 size-full object-cover object-[50%_44%]" />
+        {banner && <img src={banner.src} alt="" width={1200} height={896} fetchPriority="high" data-banner={banner.source} className={cn('absolute inset-0 -z-10 size-full object-cover', banner.source === 'builtin' ? CATALOG_PHOTO_POSITION : 'object-center')} />}
         <div className="absolute inset-0 -z-10 bg-obsidian/45" aria-hidden />
         <div className="absolute inset-x-0 bottom-0 -z-10 h-[80%] bg-linear-to-t from-obsidian/85 via-obsidian/40 to-transparent" aria-hidden />
         <div className="mx-auto w-full max-w-[1320px] px-5 pt-16 pb-9 sm:px-10 sm:pb-12 lg:pb-16">

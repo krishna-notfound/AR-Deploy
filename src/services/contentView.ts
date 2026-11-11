@@ -21,6 +21,7 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
   const showcase = content.landing?.showcase
   const texts = content.landing?.texts
   const favicon = content.chrome?.favicon
+  const catalogBanner = content.chrome?.catalogBanner
   return {
     version,
     footerPages,
@@ -35,6 +36,7 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
     ...(content.landing?.qr ? { landingQr: clone(content.landing.qr) } : {}),
     ...(content.landing?.about ? { landingAbout: clone(content.landing.about) } : {}),
     ...(favicon ? { favicon: clone(favicon) } : {}),
+    ...(catalogBanner ? { catalogBanner: clone(catalogBanner) } : {}),
   }
 }
 
