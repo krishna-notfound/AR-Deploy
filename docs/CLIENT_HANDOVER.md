@@ -62,7 +62,7 @@ To remove an owner, use the remove (bin) icon next to their email on the **Owner
 
 Open **Settings** from the dashboard menu. Everything about you is in the "Your account" group, and your business details are in **Settings → Business profile**.
 
-- **Your details.** Add your name and a photo, and choose your time zone and how dates look.
+- **Your details.** Add your name and a photo, and choose your time zone and how dates look. After you choose a profile photo, a window opens with a square frame: drag and zoom the picture (**Fill the frame**, **Show whole picture**), then press **Save**. The photo is saved at up to 512 px and the original is not kept.
 - **Email and password.** To change your email, enter your password and the new address, then confirm from both inboxes. To change your password, enter the current one first. We email you whenever either changes, so you notice if it was not you.
 - **Two-step sign-in (2FA).** Under **Security & 2FA** you can turn on a second check with an authenticator app on your phone. Scan the code on screen, type the 6 digits the app shows, and you are done. From then on you enter a fresh code each time you sign in.
 - **Recovery codes.** When you turn on two-step sign-in you get 8 recovery codes. Each works once if you lose your phone. Keep them somewhere safe, such as a password manager or a printed copy. You see them only once, but you can make a new set later (the old set then stops working).
@@ -89,7 +89,7 @@ Go to **Businesses**, then **New business**. Fill in:
 
 - **Business name** (required).
 - **Catalog address:** the short name used in the link, for example `oak-and-linen`. Use lowercase letters, numbers and hyphens. Some words are reserved and can't be used: `www`, `admin`, `app`, `api`, `demo`, `login`, `mail`, `assets`, `static`, `cdn`.
-- **Logo:** PNG, JPEG or WebP, up to 2 MB.
+- **Logo:** PNG, JPEG or WebP, up to 2 MB. After you choose the file, a window opens with a square frame: drag and zoom the logo to fit, then press **Save** (a logo that does not fill the square shows whole, with plain space around it). Only the adjusted logo is kept: to change the framing, upload the file again.
 - **Description:** shown at the top of the catalog.
 - **Catalog accent colour:** pick one of the swatches or choose your own colour.
 - **Default currency:** used for new products.
@@ -297,7 +297,8 @@ Open **Website editor**, then **Landing**. The first block is **Sections**: one 
 - **Add your own section.** Press **Add section** and choose a design: **Text** (a centred heading and text), **Picture and text** (a picture beside the text, on the left or the right) or **Banner** (a full-width picture with white text over it). Fill the heading (English is required, Portuguese is optional), the text, and for the picture designs upload a picture (JPG, PNG or WebP, up to 5 MB) and describe it for screen readers. A button is optional: give it a text and a link, either a page of this site such as `/apply` or a full address starting with `https://`. The optional **Address fragment** lets a link such as `/#our-story` jump to the section. You can have up to 10 sections of your own (16 sections in all). A new section cannot be published until it has a heading (and a picture, for the picture designs); the problem list at the top says what is missing.
 - **Delete.** The bin button asks for confirmation and removes only your own sections.
 - **The QR section.** The text that used to sit under the first picture now has its own section, right below it. Change its wording under **Texts**, in the new "QR section" group. Open the QR row (the arrow button) to add a picture and choose whether it appears on the left or the right of the text; with no picture the text is centred.
-- **The About photographs.** Open the About row to replace the two photographs (the main one and the detail). **Use the built-in photo** puts the original back.
+- **The About photographs.** Open the About row to replace the main photograph and the detail photograph, or to add an optional **third picture**. **Use the built-in photo** puts the original back; **Remove the third picture** shows the italic caption in the third box again. Without a third picture the box keeps its caption.
+- **Adjusting website pictures.** Every picture you upload in the Website editor (the first picture, collection cards, your own sections, the QR section and the About photographs) opens a window first, showing the **whole picture** in the shape that place uses: the first picture and banners are wide (16:9), collection cards and the About main photograph are a little taller than wide (4:5), the About detail and third pictures are square, and picture + text sections and the QR section are 4:3. Drag, zoom, **Fill the frame**, **Show whole picture**, then **Save**. Nothing is cut unless you choose to; a picture that does not fill its frame shows whole with plain space around it. Both the original and the adjusted copy are uploaded. Press **Edit picture** next to a picture to reopen your original with the framing you chose (for a picture added before this change it opens the picture as it is). Pictures added before this change are not touched. In the demo, uploaded pictures only last until the page is reloaded, so **Edit picture** needs a fresh upload after a reload.
 - As everywhere in the Editor, nothing is live until you press **Publish**.
 
 ### Pages

@@ -17,12 +17,14 @@ import {
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { slugInput } from '@/lib/slug'
 import { siteAssetUrl } from '@/services'
 import { BUILTIN_COLLECTIONS, builtinAsCollections } from '../marketing/landingBuiltin'
 import { LANDING_IMAGES, collectionImage } from '../marketing/landingImages'
 import { useEditor } from './EditorContext'
 import { NoPiecesPrompt, PieceChecklist, PieceThumb } from './PiecePicker'
+import { EditPictureButton } from './EditPictureButton'
 import { UploadButton } from './UploadButton'
 import {
   addCollection,
@@ -162,7 +164,11 @@ function CardEditor({
   return (
     <li className={cn('border bg-surface', card.hidden ? 'border-dashed border-line-strong' : 'border-line')}>
       <div className="flex flex-wrap items-center gap-3 p-3">
-        {photo ? <img src={photo.src} alt="" width={64} height={48} className="h-12 w-16 shrink-0 object-cover" /> : <PieceThumb piece={{}} className="h-12 w-16 shrink-0" />}
+        {photo ? (
+          <img src={photo.src} alt="" width={48} height={60} className={cn('h-[3.75rem] w-12 shrink-0 bg-subtle', photo.uploaded ? imageFrame('collection').fitClass : 'object-cover')} />
+        ) : (
+          <PieceThumb piece={{}} className="h-[3.75rem] w-12 shrink-0" />
+        )}
         <button type="button" aria-expanded={open} aria-controls={panelId} onClick={onToggle} className="flex min-h-11 min-w-0 flex-1 basis-40 items-center gap-2 text-left">
           <span className="min-w-0">
             <span className="block text-ui-small text-ink-muted">{t('editor.landing.card', { n: index + 1 })}</span>
@@ -229,12 +235,13 @@ function PictureArea({ value, error, onChange }: { value: string | SiteAsset; er
   const photo = collectionImage(value)
   const uploaded = isSiteAsset(value)
   const sessionOnly = uploaded && !siteAssetUrl(value)
+  const shape = imageFrame('collection')
   return (
     <fieldset>
       <legend className="text-ui-small font-medium text-ink">{t('editor.landing.picture')}</legend>
-      <div className="mt-2 aspect-[4/3] w-full overflow-hidden border border-line bg-subtle">
+      <div className={cn('mt-2 w-full overflow-hidden border border-line bg-subtle', shape.aspectClass)}>
         {photo && !sessionOnly ? (
-          <img src={photo.src} alt={t('editor.landing.pictureCurrent')} className={cn('size-full object-cover', photo.focus)} />
+          <img src={photo.src} alt={t('editor.landing.pictureCurrent')} className={cn('size-full', photo.uploaded ? shape.fitClass : 'object-cover', photo.focus)} />
         ) : (
           <span className="flex size-full flex-col items-center justify-center gap-2 px-4 text-center text-ui-small text-ink-muted">
             <ImageIcon className="size-5" aria-hidden />
@@ -243,7 +250,8 @@ function PictureArea({ value, error, onChange }: { value: string | SiteAsset; er
         )}
       </div>
       <div className="mt-3 flex flex-wrap items-start gap-2">
-        <UploadButton kind="image" label={t(uploaded ? 'editor.showcase.replacePicture' : 'editor.showcase.uploadPicture')} onUploaded={onChange} />
+        <UploadButton kind="image" frame="collection" label={t(uploaded ? 'editor.showcase.replacePicture' : 'editor.showcase.uploadPicture')} onUploaded={onChange} />
+        {uploaded && !sessionOnly && <EditPictureButton image={value} frame="collection" label={t('editor.crop.editFor', { name: t('editor.landing.picture') })} onEdited={onChange} />}
         <Button size="sm" aria-expanded={choosing} onClick={() => setChoosing((v) => !v)}>
           {t('editor.landing.chooseBuiltin')}
         </Button>
@@ -253,7 +261,9 @@ function PictureArea({ value, error, onChange }: { value: string | SiteAsset; er
           </Button>
         )}
       </div>
-      <p className="mt-1 text-ui-small text-ink-muted">{t('editor.showcase.pictureHint')}</p>
+      <p className="mt-1 text-ui-small text-ink-muted">
+        {t('editor.showcase.pictureHint')} {t('editor.crop.hint')}
+      </p>
       {choosing && (
         <div role="radiogroup" aria-label={t('editor.landing.chooseBuiltin')} className="mt-3 grid grid-cols-3 gap-2">
           {LANDING_IMAGE_KEYS.map((key) => {

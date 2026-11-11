@@ -7,9 +7,23 @@ import { ACCOUNT_ERRORS, account, service } from '@/services'
 import { resetMockAccount } from '@/services/mock/mockAccount'
 import { resetMyProfileStore } from '../useMyProfile'
 
+// The crop dialog (needs a canvas) is replaced by a stand-in with its Save and Cancel; what the page does with its result is under test.
 const resized = new Blob([new Uint8Array(2048)], { type: 'image/webp' })
-vi.mock('@/lib/image', async (original) => ({ ...(await original<typeof import('@/lib/image')>()), squareResize: vi.fn(async () => resized) }))
-const { ImageTooLargeError, squareResize } = await import('@/lib/image')
+const CROP = { x: 10, y: 20, width: 300, height: 300 }
+const dialogProps = vi.hoisted(() => ({ last: null as null | { aspect: number; output?: { maxSide?: number; quality?: number }; title: string; file?: File } }))
+vi.mock('@/components/image/ImageCropDialog', () => ({
+  ImageCropDialog: (props: { aspect: number; output?: { maxSide?: number; quality?: number }; title: string; file?: File; onSave: (r: { blob: Blob; crop: typeof CROP; whole: boolean }) => void; onCancel: () => void }) => {
+    dialogProps.last = props
+    return (
+      <div role="dialog" aria-label={props.title}>
+        <button type="button" onClick={() => props.onSave({ blob: resized, crop: CROP, whole: false })}>Save crop</button>
+        <button type="button" onClick={props.onCancel}>Cancel crop</button>
+      </div>
+    )
+  },
+}))
+const renderCrop = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/imageCrop', async (original) => ({ ...(await original<typeof import('@/lib/imageCrop')>()), renderCrop }))
 
 function open(url = '/dashboard/settings/profile') {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'business_admin', businessId: 'biz_casa' }))
@@ -39,6 +53,11 @@ const preview = () => photoCard().querySelector('[data-avatar]')!
 const hubIdentity = () => document.querySelector('[data-settings-identity]') as HTMLElement
 const fail = (reason: string, message: string) => ({ ok: false as const, error: { code: 'VALIDATION' as const, reason, message } })
 const goodPhoto = () => new File([new Uint8Array(900 * 1024)], 'me.png', { type: 'image/png' })
+/** Chooses a photo and saves the crop dialog it opens. */
+async function uploadPhoto(user: ReturnType<typeof userEvent.setup>, file = goodPhoto()) {
+  await user.upload(await screen.findByLabelText('Upload photo'), file)
+  await user.click(await screen.findByRole('button', { name: 'Save crop' }))
+}
 
 describe('ProfileSection', () => {
   it('name: empty and 81-character names are refused; save updates the sidebar name', async () => {
@@ -83,7 +102,7 @@ describe('ProfileSection', () => {
     await waitFor(() => expect(preview().textContent).not.toBe('N'))
   })
 
-  it('photo: a non-image or a file over 5 MB before resize is refused with a message; a valid image is resized and uploaded; Remove returns to initials', async () => {
+  it('photo: a non-image or a file over 5 MB before resize is refused with a message; a valid image opens the square crop dialog and is uploaded as the person cropped it; Remove returns to initials', async () => {
     const user = userEvent.setup({ applyAccept: false })
     open()
     const input = (await screen.findByLabelText('Upload photo')) as HTMLInputElement
@@ -94,14 +113,19 @@ describe('ProfileSection', () => {
 
     await user.upload(input, new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'huge.jpg', { type: 'image/jpeg' }))
     expect(await screen.findByText('That image is larger than 5 MB. Choose a smaller one.')).toBeInTheDocument()
-    expect(squareResize).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(upload).not.toHaveBeenCalled()
 
     const good = new File([new Uint8Array(900 * 1024)], 'me.png', { type: 'image/png' })
     await user.upload(input, good)
+    // The dialog opens first, 1:1, writing at most 512 px; nothing is uploaded until the person saves.
+    expect(await screen.findByRole('dialog', { name: 'Adjust your profile photo' })).toBeInTheDocument()
+    expect(dialogProps.last).toMatchObject({ aspect: 1, output: { maxSide: 512 }, file: good })
+    expect(upload).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Save crop' }))
     expect(await screen.findByText('Photo updated')).toBeInTheDocument()
-    expect(squareResize).toHaveBeenCalledWith(good, 256)
     expect(upload).toHaveBeenCalledWith(resized)
+    expect(screen.queryByRole('dialog')).toBeNull()
     await waitFor(() => expect(preview().querySelector('img')).not.toBeNull())
     expect(screen.queryByText('Choose a JPEG, PNG or WebP image.')).toBeNull()
 
@@ -126,40 +150,58 @@ describe('ProfileSection', () => {
     await user.type(field, 'Marta Silva')
     await user.click(screen.getByRole('button', { name: 'Save name' }))
     await screen.findByText('Name saved')
-    await user.upload(screen.getByLabelText('Upload photo'), goodPhoto())
+    await uploadPhoto(user)
     await screen.findByText('Photo updated')
     await waitFor(() => expect(within(hubIdentity()).getByText('Marta Silva')).toBeInTheDocument())
     expect(hubIdentity().querySelector('[data-avatar] img')).not.toBeNull()
   })
 
-  it('photo: says so when the image cannot be decoded, and uploads nothing', async () => {
+  it('photo: cancelling the crop dialog uploads nothing and keeps the current photo', async () => {
     const user = userEvent.setup()
     open()
     const upload = vi.spyOn(account, 'uploadAvatar')
-    vi.mocked(squareResize).mockRejectedValueOnce(new Error('decode'))
     await user.upload(await screen.findByLabelText('Upload photo'), goodPhoto())
-    expect(await screen.findByText("That image couldn't be read. Try another file.")).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Cancel crop' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(upload).not.toHaveBeenCalled()
     expect(preview().querySelector('img')).toBeNull()
   })
 
-  it('photo: a photo over the size cap says it is too large, and uploads nothing', async () => {
+  it('photo: a crop that is still over the 512 KB upload limit is written again, smaller', async () => {
     const user = userEvent.setup()
     open()
+    const big = new Blob([new Uint8Array(600 * 1024)], { type: 'image/webp' })
+    const small = new Blob([new Uint8Array(100 * 1024)], { type: 'image/webp' })
+    renderCrop.mockReset()
+    renderCrop.mockResolvedValueOnce(small)
     const upload = vi.spyOn(account, 'uploadAvatar')
-    vi.mocked(squareResize).mockRejectedValueOnce(new ImageTooLargeError())
-    await user.upload(await screen.findByLabelText('Upload photo'), goodPhoto())
-    expect(await screen.findByText('This photo is too large to process. Try a smaller one.')).toBeInTheDocument()
-    expect(screen.queryByText("That image couldn't be read. Try another file.")).toBeNull()
-    expect(upload).not.toHaveBeenCalled()
+    const original = resized
+    Object.defineProperty(original, 'size', { value: big.size, configurable: true })
+    await uploadPhoto(user)
+    await screen.findByText('Photo updated')
+    expect(renderCrop).toHaveBeenCalledWith(expect.anything(), CROP, { maxSide: 384, quality: 0.8 })
+    expect(upload).toHaveBeenCalledWith(small)
+    Object.defineProperty(original, 'size', { value: 2048, configurable: true })
   })
 
+  it('photo: says so when writing the smaller copy fails, and uploads nothing', async () => {
+    const user = userEvent.setup()
+    open()
+    renderCrop.mockReset()
+    renderCrop.mockRejectedValue(new Error('decode'))
+    Object.defineProperty(resized, 'size', { value: 600 * 1024, configurable: true })
+    const upload = vi.spyOn(account, 'uploadAvatar')
+    await uploadPhoto(user)
+    expect(await screen.findByText("That image couldn't be read. Try another file.")).toBeInTheDocument()
+    expect(upload).not.toHaveBeenCalled()
+    Object.defineProperty(resized, 'size', { value: 2048, configurable: true })
+  })
   it('photo: shows the service message when the upload is refused', async () => {
     const user = userEvent.setup()
     open()
     const message = ACCOUNT_ERRORS.invalid_avatar!.message
     vi.spyOn(account, 'uploadAvatar').mockResolvedValue(fail('invalid_avatar', message))
-    await user.upload(await screen.findByLabelText('Upload photo'), goodPhoto())
+    await uploadPhoto(user)
     expect(await screen.findByText(message)).toBeInTheDocument()
     expect(screen.queryByText('Photo updated')).toBeNull()
     expect(preview().querySelector('img')).toBeNull()
@@ -168,7 +210,7 @@ describe('ProfileSection', () => {
   it('photo: keeps the photo and says why when Remove fails', async () => {
     const user = userEvent.setup()
     open()
-    await user.upload(await screen.findByLabelText('Upload photo'), goodPhoto())
+    await uploadPhoto(user)
     await screen.findByText('Photo updated')
     vi.spyOn(account, 'removeAvatar').mockResolvedValue(fail('unknown', 'Could not remove the photo. Try again.'))
     await user.click(screen.getByRole('button', { name: 'Remove photo' }))

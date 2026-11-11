@@ -1,8 +1,10 @@
 // Profile: the person's name and photo (spec section 8). Both show in the sidebar at once (useMyProfile), and on
-// Team & Access for platform staff. The photo is cropped and resized in the browser before upload (lib/image.ts).
+// Team & Access for platform staff. The photo is cropped to a square by the person in the crop dialog (ADR-0063) and
+// resized in the browser before upload (512 px, or smaller when it would pass the 512 KB limit).
 import { Trash2, Upload } from 'lucide-react'
 import { type FormEvent, useId, useState } from 'react'
 import { useAccount } from '@/auth/AccountProvider'
+import { ImageCropDialog } from '@/components/image/ImageCropDialog'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -13,14 +15,21 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { accountErrorText } from '../accountError'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { MB } from '@/lib/files'
-import { ImageTooLargeError, squareResize } from '@/lib/image'
-import { DISPLAY_NAME_MAX, type Profile, account, isDemoMode } from '@/services'
+import { renderCrop } from '@/lib/imageCrop'
+import { imageFrame } from '@/lib/imageFrames'
+import { AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, type Profile, account, isDemoMode } from '@/services'
 import { SectionHeader, SettingsCard } from '../SettingsUi'
 import { useMyProfile } from '../useMyProfile'
 
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-/** Before resizing: the upload itself is at most 512 KB once it is 256 px square. */
+/** Before cropping: the upload itself is at most 512 KB once it is cropped and resized. */
 const PHOTO_MAX_BYTES = 5 * MB
+/** The crop is written at 512 px; a picture that still passes the upload limit is written again smaller. */
+const AVATAR_STEPS = [
+  { maxSide: 512, quality: 0.85 },
+  { maxSide: 384, quality: 0.8 },
+  { maxSide: 256, quality: 0.7 },
+] as const
 
 export default function ProfileSection() {
   const { t } = useI18n()
@@ -125,26 +134,37 @@ function PhotoCard({ profile, setProfile }: CardProps) {
   const errorId = useId()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'upload' | 'remove' | null>(null)
+  /** The photo chosen and waiting in the crop dialog. */
+  const [pending, setPending] = useState<File | null>(null)
   const name = profile.displayName || user?.name || ''
 
-  const onFile = async (file: File) => {
+  const onFile = (file: File) => {
     if (!PHOTO_TYPES.includes(file.type)) return setError(t('settings.profile.photoType'))
     if (file.size > PHOTO_MAX_BYTES) return setError(t('settings.profile.photoSize', { n: PHOTO_MAX_BYTES / MB }))
     setError(null)
+    setPending(file)
+  }
+
+  /** Uploads the person's crop. Kept within the upload limit by writing it again smaller when needed. */
+  const save = async (file: File, crop: Parameters<typeof renderCrop>[1], first: Blob) => {
     setBusy('upload')
-    let square: Blob
     try {
-      square = await squareResize(file, 256)
-    } catch (err) {
+      let square = first
+      for (const step of AVATAR_STEPS.slice(1)) {
+        if (square.size <= AVATAR_MAX_BYTES) break
+        square = await renderCrop(file, crop, step)
+      }
+      const r = await account.uploadAvatar(square)
+      if (r.ok) {
+        setProfile(r.data)
+        toast.success(t('settings.profile.photoUpdated'))
+      } else setError(accountErrorText(r.error, t))
+    } catch {
+      setError(t('settings.profile.photoUnreadable'))
+    } finally {
       setBusy(null)
-      return setError(err instanceof ImageTooLargeError ? t('settings.profile.photoTooLarge') : t('settings.profile.photoUnreadable'))
+      setPending(null)
     }
-    const r = await account.uploadAvatar(square)
-    setBusy(null)
-    if (r.ok) {
-      setProfile(r.data)
-      toast.success(t('settings.profile.photoUpdated'))
-    } else setError(accountErrorText(r.error, t))
   }
 
   const remove = async () => {
@@ -179,7 +199,7 @@ function PhotoCard({ profile, setProfile }: CardProps) {
               aria-describedby={error ? errorId : undefined}
               onChange={(e) => {
                 const f = e.target.files?.[0]
-                if (f) void onFile(f)
+                if (f) onFile(f)
                 e.target.value = ''
               }}
             />
@@ -197,6 +217,17 @@ function PhotoCard({ profile, setProfile }: CardProps) {
         </p>
       )}
       {isDemoMode && <p className="mt-3 text-ui-small text-ink-muted">{t('settings.profile.demo')}</p>}
+      {pending && (
+        <ImageCropDialog
+          key={`--`}
+          file={pending}
+          aspect={imageFrame('avatar').aspect}
+          title={t('settings.profile.cropTitle')}
+          output={AVATAR_STEPS[0]}
+          onCancel={() => setPending(null)}
+          onSave={(result) => save(pending, result.crop, result.blob)}
+        />
+      )}
     </SettingsCard>
   )
 }

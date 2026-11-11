@@ -9,16 +9,11 @@ import type { TFn } from '@/i18n/translate'
 import { IMAGE_RULES, imageToPersistableDataUrl, validateImageFile } from '@/lib/files'
 import { formatFileSize } from '@/lib/format'
 import { newId } from '@/lib/id'
+import { editedFile } from '@/lib/imageCrop'
 import { type ImageFrameKey, imageFrame } from '@/lib/imageFrames'
 import { isDemoMode, service } from '@/services'
 import { IconButton } from './Button'
 import { SmartImage } from './SmartImage'
-
-/** The edited copy as a file for upload: WebP (JPEG where the browser could not write WebP). */
-function editedFile(blob: Blob, original: string): File {
-  const base = original.replace(/\.[^.]+$/, '') || 'photo'
-  return new File([blob], `${base}.${blob.type === 'image/jpeg' ? 'jpg' : 'webp'}`, { type: blob.type })
-}
 
 /** Demo mode: the picture as the demo will keep it (a data URL no bigger than 1600 px), as a file; or why it cannot be kept. */
 async function demoSized(file: File, t: TFn): Promise<{ ok: true; file: File } | { ok: false; message: string }> {

@@ -32,6 +32,8 @@ export const enUi = {
   'ui.logo.upload': 'Upload logo',
   'ui.logo.remove': 'Remove',
   'ui.logo.help': 'Square image works best. PNG, JPG or WebP up to 2 MB.',
+  'ui.logo.cropTitle': 'Adjust the logo',
+  'ui.logo.cropHelp': 'After you choose a file you can move and zoom it to fit the square.',
   'ui.chart.views': 'Page and embed views',
   'ui.chart.ar': 'AR launch attempts',
   'ui.chart.last30': '{label}, last 30 days',

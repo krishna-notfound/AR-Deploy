@@ -1,7 +1,7 @@
 // One module for the shape of every picture frame (ADR-0063, ADR-0064). Components take their aspect and fit from here,
 // never from a hardcoded `aspect-[…]` class, so a frame changes in one place and the crop dialog crops to the same shape.
 
-export type ImageFrameKey = 'product' | 'hero' | 'banner' | 'collection' | 'aboutMain' | 'aboutDetail' | 'imageText' | 'qr' | 'logo' | 'avatar'
+export type ImageFrameKey = 'product' | 'hero' | 'banner' | 'collection' | 'aboutMain' | 'aboutDetail' | 'aboutThird' | 'imageText' | 'qr' | 'logo' | 'avatar'
 
 export interface ImageFrame {
   /** Width divided by height: what the crop dialog and the stored crop use. */
@@ -28,6 +28,7 @@ export const IMAGE_FRAMES: Record<ImageFrameKey, ImageFrame> = {
   collection: contain(4 / 5, 'aspect-[4/5]'),
   aboutMain: contain(4 / 5, 'aspect-[4/5]'),
   aboutDetail: contain(1, 'aspect-square'),
+  aboutThird: contain(1, 'aspect-square'),
   imageText: contain(4 / 3, 'aspect-[4/3]'),
   qr: contain(4 / 3, 'aspect-[4/3]'),
   logo: contain(1, 'aspect-square'),

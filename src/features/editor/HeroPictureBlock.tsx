@@ -6,12 +6,16 @@ import { FormField, Input } from '@/components/ui/Form'
 import { MAX_HERO_ALT } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { siteAssetUrl } from '@/services'
+import { EditPictureButton } from './EditPictureButton'
 import { useEditor } from './EditorContext'
 import { UploadButton } from './UploadButton'
 import { setHeroAlt, setHeroImage, setHeroModel } from './landingOps'
 
 const BUILTIN = '/images/sanctus/v2/hero-living.webp'
+const shape = imageFrame('hero')
 
 export function HeroPictureBlock() {
   const { t } = useI18n()
@@ -29,30 +33,36 @@ export function HeroPictureBlock() {
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
       <fieldset className="min-w-0">
         <legend className="text-ui-small font-medium text-ink">{t('editor.landing.hero.picture')}</legend>
-        <div className="mt-2 aspect-video w-full overflow-hidden border border-line bg-subtle">
+        <div className={cn('mt-2 w-full overflow-hidden border border-line bg-subtle', shape.aspectClass)}>
           {sessionOnly ? (
             <span className="flex size-full flex-col items-center justify-center gap-2 px-4 text-center text-ui-small text-ink-muted">
               <ImageIcon className="size-5" aria-hidden />
               {t('editor.showcase.sessionOnly')}
             </span>
           ) : (
-            <img src={uploaded || BUILTIN} alt={t('editor.landing.hero.pictureCurrent')} className="size-full object-cover" />
+            <img src={uploaded || BUILTIN} alt={t('editor.landing.hero.pictureCurrent')} className={cn('size-full', shape.fitClass)} />
           )}
         </div>
         {!hero?.image && <p className="mt-2 text-ui-small text-ink-muted">{t('editor.landing.hero.builtin')}</p>}
         <div className="mt-3 flex flex-wrap items-start gap-2">
           <UploadButton
             kind="image"
+            frame="hero"
             label={t(hero?.image ? 'editor.showcase.replacePicture' : 'editor.showcase.uploadPicture')}
             onUploaded={(asset) => setDraft((d) => setHeroImage(d, asset))}
           />
+          {hero?.image && !sessionOnly && (
+            <EditPictureButton image={hero.image} frame="hero" label={t('editor.crop.editFor', { name: t('editor.landing.hero.picture') })} onEdited={(asset) => setDraft((d) => setHeroImage(d, asset))} />
+          )}
           {hero?.image && (
             <Button size="sm" aria-label={`${t('editor.showcase.remove')}: ${t('editor.landing.hero.picture')}`} onClick={() => setDraft((d) => setHeroImage(d, undefined))}>
               {t('editor.showcase.remove')}
             </Button>
           )}
         </div>
-        <p className="mt-1 text-ui-small text-ink-muted">{t('editor.showcase.pictureHint')}</p>
+        <p className="mt-1 text-ui-small text-ink-muted">
+          {t('editor.showcase.pictureHint')} {t('editor.crop.hint')} {t('editor.crop.heroNote')}
+        </p>
         {err('image') && (
           <p role="alert" className="mt-2 text-ui-small text-danger">
             {err('image')}

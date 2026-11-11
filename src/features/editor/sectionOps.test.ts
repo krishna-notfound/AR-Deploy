@@ -160,3 +160,54 @@ describe('About pictures', () => {
     expect(setAboutAlt(emptySiteContent(), 'detail', 'en', 'x')).toEqual(emptySiteContent())
   })
 })
+
+describe('pictures made by the crop dialog (ADR-0063)', () => {
+  const CROPPED = { path: 'landing/0a1b2c3d-1111-4222-8333-aaaabbbbcccc.webp', originalPath: A.path, crop: { x: 5, y: 6, width: 700, height: 875 } }
+
+  it('keeps the original and the crop with the picture in every place, and a new upload never inherits the old crop', () => {
+    let doc = setAboutImage(emptySiteContent(), 'image', CROPPED)
+    expect(doc.landing.about!.image).toEqual({ ...CROPPED, alt: { en: '' } })
+    doc = setAboutImage(doc, 'image', B) // replaced by a plain upload
+    expect(doc.landing.about!.image).toEqual({ path: B.path, alt: { en: '' } })
+
+    doc = setQrImage(emptySiteContent(), CROPPED)
+    expect(doc.landing.qr!.image).toEqual({ ...CROPPED, alt: { en: '' } })
+    expect(setQrImage(doc, B).landing.qr!.image).toEqual({ path: B.path, alt: { en: '' } })
+
+    let withSection = addSection(emptySiteContent(), 'imageText')
+    withSection = setSectionImage(withSection, 'section-1', CROPPED)
+    expect((sectionsOf(withSection).at(-1) as unknown as { image: unknown }).image).toEqual({ ...CROPPED, alt: { en: '' } })
+    withSection = setSectionImage(withSection, 'section-1', B)
+    expect((sectionsOf(withSection).at(-1) as unknown as { image: unknown }).image).toEqual({ path: B.path, alt: { en: '' } })
+    withSection = setSectionImage(setSectionImage(withSection, 'section-1', CROPPED), 'section-1', undefined)
+    expect((sectionsOf(withSection).at(-1) as unknown as { image: unknown }).image).toEqual({ path: '', alt: { en: '' } })
+  })
+
+  it('the description is kept when the picture is edited again', () => {
+    let doc = setAboutImage(emptySiteContent(), 'detail', CROPPED)
+    doc = setAboutAlt(doc, 'detail', 'en', 'A joint')
+    doc = setAboutImage(doc, 'detail', { ...CROPPED, path: 'landing/0a1b2c3d-1111-4222-8333-ddddeeeeffff.webp', crop: { x: 0, y: 0, width: 100, height: 100 } })
+    expect(doc.landing.about!.detail).toMatchObject({ originalPath: A.path, crop: { width: 100 }, alt: { en: 'A joint' } })
+  })
+
+  it('the third About picture is its own slot: set, described, removed (an emptied about is dropped)', () => {
+    let doc = setAboutImage(emptySiteContent(), 'third', CROPPED)
+    expect(doc.landing.about).toEqual({ third: { ...CROPPED, alt: { en: '' } } })
+    doc = setAboutAlt(doc, 'third', 'en', 'A bowl')
+    doc = setAboutAlt(doc, 'third', 'pt', 'Uma tigela')
+    expect(doc.landing.about!.third!.alt).toEqual({ en: 'A bowl', pt: 'Uma tigela' })
+    expect(validateSiteContent(doc)).toEqual({})
+    expect(setAboutImage(doc, 'third', undefined)).toEqual(emptySiteContent())
+    // The other two pictures are untouched by it.
+    const all = setAboutImage(setAboutImage(doc, 'image', A), 'detail', B)
+    expect(Object.keys(all.landing.about!)).toEqual(['third', 'image', 'detail'])
+    expect(setAboutImage(all, 'third', undefined).landing.about).toEqual({ image: { path: A.path, alt: { en: '' } }, detail: { path: B.path, alt: { en: '' } } })
+  })
+
+  it('a bad original or crop makes the draft invalid, so publishing stays disabled', () => {
+    const doc = setAboutImage(emptySiteContent(), 'third', { ...CROPPED, crop: { x: 0, y: 0, width: 0, height: 5 } })
+    expect(validateSiteContent(doc)).toEqual({ 'landing.about.third.crop': 'invalid_value' })
+    const bad = setAboutImage(emptySiteContent(), 'image', { ...CROPPED, originalPath: 'landing/a.glb' })
+    expect(validateSiteContent(bad)).toEqual({ 'landing.about.image.originalPath': 'invalid_value' })
+  })
+})

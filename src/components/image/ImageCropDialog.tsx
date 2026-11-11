@@ -48,6 +48,8 @@ export interface ImageCropDialogProps {
   aspect: number
   initialCrop?: CropArea
   title: string
+  /** Smaller output than the default (long side 2000, quality 0.85): the logo and the profile photo. */
+  output?: { maxSide?: number; quality?: number }
   onSave: (result: { blob: Blob; crop: CropArea; whole: boolean }) => void | Promise<void>
   onCancel: () => void
 }
@@ -71,7 +73,7 @@ function frameIn(box: { width: number; height: number } | null, aspect: number) 
   return w / h > aspect ? { width: h * aspect, height: h } : { width: w, height: w / aspect }
 }
 
-export function ImageCropDialog({ file, src, aspect, initialCrop, title, onSave, onCancel }: ImageCropDialogProps) {
+export function ImageCropDialog({ file, src, aspect, initialCrop, title, output, onSave, onCancel }: ImageCropDialogProps) {
   const { t } = useI18n()
   const hintId = useId()
   const stageRef = useRef<HTMLDivElement>(null)
@@ -189,7 +191,7 @@ export function ImageCropDialog({ file, src, aspect, initialCrop, title, onSave,
     setBusy(true)
     setError('')
     try {
-      const blob = await renderCrop(source.blob, crop)
+      const blob = await (output ? renderCrop(source.blob, crop, output) : renderCrop(source.blob, crop))
       await onSave({ blob, crop, whole: !coversFrame(crop, natural.width, natural.height) })
     } catch (e) {
       if (mounted.current) setError(e instanceof ImageTooLargeError ? t('ui.crop.tooLarge') : t('ui.crop.saveFailed'))

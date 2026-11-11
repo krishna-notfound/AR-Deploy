@@ -3,9 +3,12 @@
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { siteAssetUrl } from '@/services'
 import { SECTION, SECTION_Y } from './landingFrame'
 import { useSiteContent } from './SiteContentProvider'
+
+const frame = imageFrame('qr')
 
 export function LandingQr() {
   const { t, localized } = useI18n()
@@ -30,7 +33,7 @@ export function LandingQr() {
               src={src}
               alt={localized(qr.image.alt)}
               loading="lazy"
-              className={cn('aspect-[4/3] w-full border border-line bg-subtle object-contain', side === 'right' && 'lg:order-last')}
+              className={cn('w-full border border-line bg-subtle', frame.aspectClass, frame.fitClass, side === 'right' && 'lg:order-last')}
             />
             {text}
           </>
