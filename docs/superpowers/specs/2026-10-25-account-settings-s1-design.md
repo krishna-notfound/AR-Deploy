@@ -264,6 +264,10 @@ Every function:
     - deletes the auth user;
     - logs `account_closure_completed` (with the name and email removed);
     - emails a final notice to the person's address, captured before deletion.
+- **`change_password {current_password, new_password, code}`** (ADR-0066, 2026-11-11):
+  - **Gate:** aal2 when the caller has a verified factor or the policy covers them; with a verified TOTP factor, a `totp` entry in the JWT `amr` from the last 5 minutes (`totp_required`); 12 to 128 characters and not the current one (`weak_password`, `same_password`); a valid emailed code (`change_password`); then the current password on a throwaway anon sign-in (`current_password_mismatch`).
+  - **Result:** sets the password with the Auth admin API, ends every session (`service_end_sessions`), voids the codes, logs `account_password_changed` and emails a `password_changed` notice.
+- **`reset_password {new_password}`** (ADR-0066): only a session whose JWT `amr` shows an emailed-code sign-in (`otp`, `recovery`, `magiclink`) in the last 15 minutes (`reset_expired`), at aal2 when the caller has a verified factor; same password rules; then the same set, end every session, `account_password_reset` event and `password_reset` notice.
 - **`restore_closure {target_user_id}`:**
   - **Gate:** the Owner at aal2.
   - **Result:** restores the business status, deletes the request, logs the event and emails the person.
@@ -297,8 +301,7 @@ Every function:
   - fields: current, new and confirm;
   - the minimum is 12 and the maximum 128, with paste allowed;
   - a strength hint only, with no composition rules.
-  - The call is `updateUser({ password, current_password })`. The errors `current_password_mismatch` and `same_password` are mapped to messages.
-  - It is followed by `signOut({ scope: 'others' })`, a log entry and the Supabase "password changed" notice.
+  - ~~The call is `updateUser({ password, current_password })`, followed by `signOut({ scope: 'others' })` and a log entry.~~ Superseded by ADR-0066 (2026-11-11): the current password is checked first, then the `ActionCodeDialog` (purpose `change_password`) takes the emailed code and, with 2FA on, the authenticator code (verified with `challengeAndVerify` just before the call); the `account-security` action `change_password` does the change. Every session ends, this one too, and the person signs in again.
 - **2FA setup:**
   1. `mfa.enroll({ factorType: 'totp', friendlyName: 'Authenticator' })`.
   2. Show the `qr_code` SVG and the setup key with a copy button.
@@ -341,7 +344,7 @@ Every function:
 ## 9. Supabase dashboard settings (the owner sets these, with exact steps in the runbook)
 
 - **Authentication → Multi-Factor:** TOTP enrolment and verification enabled. Default 10 factors.
-- **Authentication → Email:** "Secure email change" on, "Require current password when updating" on, and "Secure password change" on.
+- **Authentication → Email:** "Secure email change" on, "Require current password when updating" on, and "Secure password change" on. ADR-0066 adds minimum password length 12 and explains what these switches cannot close (docs/SECURITY_REVIEW.md "ADR-0066").
 - **Authentication → Emails → Security notifications:** turn on "password changed", "email changed", "MFA method added" and "MFA method removed".
 - **Authentication → URL Configuration:** add `https://sanctus.warpkit.online/dashboard/settings/account` and `https://sanctus.warpkit.online/admin/settings/account` to the redirect URLs.
 - **Never** run `supabase config push`.

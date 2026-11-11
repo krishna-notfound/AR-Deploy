@@ -3,9 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type LogoutResult, AccountProvider, SupabaseAccountProvider, useAccount } from '@/auth/AccountProvider'
-import { ToastProvider } from '@/components/ui/ToastProvider'
 import AcceptInvitePage from '@/features/auth/AcceptInvitePage'
-import ResetPasswordPage from '@/features/auth/ResetPasswordPage'
 import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
 import { type AuthService, type SignedInAccount, service } from '@/services'
 import { fail, ok } from '@/services/catalogService'
@@ -348,28 +346,4 @@ describe('AcceptInvitePage: invitation code (ADR-0027)', () => {
   })
 })
 
-describe('ResetPasswordPage: reset code (ADR-0027)', () => {
-  it('requests a code, verifies it and shows the new-password form', async () => {
-    const { auth } = fakeAuth()
-    fake.auth = auth
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter initialEntries={['/reset-password']}>
-        <LanguageProvider>
-          <ToastProvider>
-            <Routes>
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-            </Routes>
-          </ToastProvider>
-        </LanguageProvider>
-      </MemoryRouter>,
-    )
-    await user.type(await screen.findByLabelText(/^Email/), 'rui@test.pt')
-    await user.click(screen.getByRole('button', { name: 'Send code' }))
-    expect(auth.requestPasswordReset).toHaveBeenCalledWith('rui@test.pt', expect.stringMatching(/\/reset-password$/))
-    await user.type(await screen.findByLabelText(/^Code from the email/), '48213907')
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
-    expect(auth.verifyEmailCode).toHaveBeenCalledWith('rui@test.pt', '48213907', 'recovery')
-    expect(await screen.findByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
-  })
-})
+// The reset page (ADR-0027, ADR-0066) has its own suite: src/features/auth/ResetPasswordPage.test.tsx.

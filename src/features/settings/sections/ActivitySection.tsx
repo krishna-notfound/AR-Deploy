@@ -15,6 +15,7 @@ import { SectionHeader } from '../SettingsUi'
 const LABELS: Record<string, TranslationKey> = {
   account_signed_in: 'settings.activity.event.signedIn',
   account_password_changed: 'settings.activity.event.passwordChanged',
+  account_password_reset: 'settings.activity.event.passwordReset',
   account_email_change_requested: 'settings.activity.event.emailChangeRequested',
   account_2fa_enabled: 'settings.activity.event.twoFaOn',
   account_2fa_disabled: 'settings.activity.event.twoFaOff',

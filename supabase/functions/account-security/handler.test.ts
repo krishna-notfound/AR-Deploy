@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { type EmailConfig, type LogEntry, sendAndLog } from '../_shared/email'
 import { sha256Hex } from '../_shared/http'
-import { type AccountSecurityDeps, type Factor, SWEEP_BUCKETS, aalFromJwt, handleAccountSecurity, removeBusinessFolder } from './handler'
+import { type AccountSecurityDeps, type AmrEntry, type Factor, SWEEP_BUCKETS, aalFromJwt, amrFromJwt, handleAccountSecurity, removeBusinessFolder } from './handler'
 
 const OWNER = '00000000-0000-4000-8000-000000000001'
 const STAFF = '00000000-0000-4000-8000-000000000002'
@@ -61,6 +61,13 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
     /** Task 13: the business row as the service role reads it, and calls made with the caller's own JWT. */
     businesses: { [BUSINESS_ID]: { name: 'Casa Maria', status: 'active' } } as Record<string, { name: string; status: string }>,
     callerCalls: [] as { token: string; fn: string }[],
+    /** ADR-0066: the amr claim per token, each account's password, and what the password steps did. */
+    amr: {} as Record<string, AmrEntry[]>,
+    passwords: Object.fromEntries(Object.values(USERS).map((u) => [u.email, 'old-password-123'])) as Record<string, string>,
+    passwordChecks: [] as string[],
+    setPasswords: [] as { user: string; password: string }[],
+    endedSessions: [] as string[],
+    authRefusesPassword: false,
   }
   const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
     const b = JSON.parse(String(init?.body)) as { to: string[]; subject: string; text: string; html: string }
@@ -152,6 +159,21 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
     adminNotificationEmail: CONFIG.adminNotificationEmail,
     userIdFromToken: async (t) => (t.startsWith('tok:') ? t.split(':')[1]! : null),
     aalFromToken: (t) => (t.endsWith(':aal2') ? 'aal2' : 'aal1'),
+    amrFromToken: (t) => s.amr[t] ?? [{ method: 'password', at: NOW.getTime() - 60 * 60_000 }],
+    checkPassword: async (email, password) => {
+      s.passwordChecks.push(email)
+      return s.passwords[email] === password ? 'ok' : 'password_incorrect'
+    },
+    setPassword: async (user, password) => {
+      if (s.authRefusesPassword) return 'weak_password'
+      s.setPasswords.push({ user, password })
+      s.order.push(`setPassword:${user}`)
+      return 'ok'
+    },
+    endSessions: async (user) => {
+      s.endedSessions.push(user)
+      s.order.push(`endSessions:${user}`)
+    },
     rpc,
     listFactors: async (u) => s.factors[u] ?? [],
     deleteFactor: async (u, id) => {
@@ -855,5 +877,188 @@ describe('account-security: S1.5 Task 13 (R-W6-3, R-W7-6, R-W7-7, R-W7-9)', () =
     expect(await json(await call(failing, tok(STAFF_2, 'aal2'), { action: 'request_closure', code: await codeFor(d, s, STAFF_2, 'request_closure') }))).toEqual({ ok: false, error: 'unknown' })
     quiet.mockRestore()
     expect(s.logs.filter((l) => l.kind === 'team_notice')).toEqual([])
+  })
+})
+
+// ADR-0066: changing the password needs the emailed code and, with 2FA on, a fresh authenticator code; the reset's
+// last step needs a fresh emailed-code session and never skips 2FA.
+describe('account-security: password change and reset (ADR-0066)', () => {
+  const at = (minutesAgo: number) => NOW.getTime() - minutesAgo * 60_000
+  const NEW = 'a-brand-new-passphrase'
+  const change = (d: AccountSecurityDeps, token: string, over: Record<string, unknown> = {}) =>
+    call(d, token, { action: 'change_password', current_password: 'old-password-123', new_password: NEW, ...over })
+
+  it('change_password: a 2FA account needs aal2 and an authenticator code from the last 5 minutes; nothing is spent before', async () => {
+    const { d, s } = deps()
+    const code = await codeFor(d, s, BIZ_OWNER, 'change_password', 'aal1')
+    const aal1 = await change(d, tok(BIZ_OWNER, 'aal1'), { code })
+    expect(aal1.status).toBe(403)
+    expect(await json(aal1)).toEqual({ ok: false, error: 'aal2_required' })
+
+    // aal2 from the sign-in an hour ago is not enough: the authenticator code must be fresh.
+    s.amr[tok(BIZ_OWNER, 'aal2')] = [{ method: 'password', at: at(60) }, { method: 'totp', at: at(59) }]
+    const stale = await change(d, tok(BIZ_OWNER, 'aal2'), { code })
+    expect(stale.status).toBe(403)
+    expect(await json(stale)).toEqual({ ok: false, error: 'totp_required' })
+    // The bare amr form carries no time, so it never counts as fresh.
+    s.amr[tok(BIZ_OWNER, 'aal2')] = [{ method: 'totp', at: null }]
+    expect(await json(await change(d, tok(BIZ_OWNER, 'aal2'), { code }))).toEqual({ ok: false, error: 'totp_required' })
+
+    expect(s.passwordChecks).toEqual([])
+    expect(s.setPasswords).toEqual([])
+    expect(s.codes.filter((c) => c.purpose === 'change_password' && !c.consumed)).toHaveLength(1)
+
+    s.amr[tok(BIZ_OWNER, 'aal2')] = [{ method: 'password', at: at(60) }, { method: 'totp', at: at(2) }]
+    expect(await json(await change(d, tok(BIZ_OWNER, 'aal2'), { code }))).toEqual({ ok: true, signedOut: true })
+    expect(s.setPasswords).toEqual([{ user: BIZ_OWNER, password: NEW }])
+  })
+
+  it('change_password: wrong, expired and overused codes are refused and nothing changes', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    const code = await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    const wrong = code === '000000' ? '111111' : '000000'
+    const bad = await change(d, tok(STAFF), { code: wrong })
+    expect(bad.status).toBe(400)
+    expect(await json(bad)).toEqual({ ok: false, error: 'invalid_code' })
+    expect(await json(await change(d, tok(STAFF), { code: 'abc' }))).toEqual({ ok: false, error: 'invalid_code' })
+    expect(await json(await change(d, tok(STAFF), {}))).toEqual({ ok: false, error: 'invalid_code' })
+    for (let i = 0; i < 4; i++) await change(d, tok(STAFF), { code: wrong })
+    const tooMany = await change(d, tok(STAFF), { code })
+    expect(tooMany.status).toBe(429)
+    expect(await json(tooMany)).toEqual({ ok: false, error: 'too_many_attempts' })
+
+    await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    s.codes.at(-1)!.expired = true
+    expect(await json(await change(d, tok(STAFF), { code: lastCode(s) }))).toEqual({ ok: false, error: 'code_expired' })
+
+    // A code for another purpose does not work here.
+    await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    const other = await codeFor(d, s, STAFF, 'request_closure', 'aal1')
+    expect(await json(await change(d, tok(STAFF), { code: other }))).toEqual({ ok: false, error: 'invalid_code' })
+
+    expect(s.passwordChecks).toEqual([])
+    expect(s.setPasswords).toEqual([])
+    expect(s.events.filter((e) => e.event === 'account_password_changed')).toEqual([])
+  })
+
+  it('change_password: the new password rules and same_password are checked before the code, which stays usable', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    const code = await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    expect(await json(await change(d, tok(STAFF), { code, new_password: 'short' }))).toEqual({ ok: false, error: 'weak_password' })
+    expect(await json(await change(d, tok(STAFF), { code, new_password: 'x'.repeat(129) }))).toEqual({ ok: false, error: 'weak_password' })
+    expect(await json(await change(d, tok(STAFF), { code, new_password: 'old-password-123' }))).toEqual({ ok: false, error: 'same_password' })
+    expect(await json(await change(d, tok(STAFF), { code, current_password: '' }))).toEqual({ ok: false, error: 'invalid_request' })
+    expect(s.codes.filter((c) => c.purpose === 'change_password' && !c.consumed)).toHaveLength(1)
+    expect(await json(await change(d, tok(STAFF), { code }))).toEqual({ ok: true, signedOut: true })
+  })
+
+  it('change_password: a wrong current password is refused after the code (no password oracle without the inbox)', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    // Without a valid code the password is never tried.
+    expect(await json(await change(d, tok(STAFF), { code: '000000', current_password: 'guess-1' }))).toEqual({ ok: false, error: 'invalid_code' })
+    expect(s.passwordChecks).toEqual([])
+    const code = await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    const r = await change(d, tok(STAFF), { code, current_password: 'not-my-password' })
+    expect(r.status).toBe(400)
+    expect(await json(r)).toEqual({ ok: false, error: 'current_password_mismatch' })
+    expect(s.passwordChecks).toEqual(['staff@sanctus.test'])
+    expect(s.setPasswords).toEqual([])
+    expect(s.endedSessions).toEqual([])
+  })
+
+  it('change_password: success sets the password with the service role, ends every session, voids the codes, audits and emails a notice', async () => {
+    const { d, s } = deps()
+    s.amr[tok(BIZ_OWNER, 'aal2')] = [{ method: 'password', at: at(30) }, { method: 'mfa/totp', at: at(1) }]
+    const code = await codeFor(d, s, BIZ_OWNER, 'change_password')
+    s.sends.length = 0
+    s.logs.length = 0
+    const r = await change(d, tok(BIZ_OWNER, 'aal2'), { code })
+    expect(r.status).toBe(200)
+    expect(await json(r)).toEqual({ ok: true, signedOut: true })
+    expect(s.order).toEqual([`setPassword:${BIZ_OWNER}`, `endSessions:${BIZ_OWNER}`])
+    expect(s.codes.filter((c) => c.user === BIZ_OWNER && !c.consumed)).toEqual([])
+    expect(s.rpcCalls.some((c) => c.fn === 'service_void_action_codes' && c.args.p_purpose === 'change_password')).toBe(true)
+    expect(s.events).toEqual([{ user: BIZ_OWNER, event: 'account_password_changed', metadata: {}, ip: '203.0.113.7' }])
+    expect(s.sends).toEqual([expect.objectContaining({ to: 'maria@studio.pt', subject: 'Your Sanctus password was changed' })])
+    expect(s.logs.map((l) => [l.kind, l.status])).toEqual([['security_notice', 'accepted']])
+    // The passwords are never in a database call, a log row or an email.
+    const everything = JSON.stringify([s.rpcCalls, s.logs, s.sends])
+    expect(everything).not.toContain(NEW)
+    expect(everything).not.toContain('old-password-123')
+    // The same code does not work twice.
+    expect(await json(await change(d, tok(BIZ_OWNER, 'aal2'), { code }))).toEqual({ ok: false, error: 'invalid_code' })
+  })
+
+  it('change_password: a group that requires 2FA needs aal2 even without a factor; Auth refusing the password is weak_password', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    s.requires2fa[STAFF] = true
+    const code = await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    expect(await json(await change(d, tok(STAFF), { code }))).toEqual({ ok: false, error: 'aal2_required' })
+    s.authRefusesPassword = true
+    expect(await json(await change(d, tok(STAFF, 'aal2'), { code }))).toEqual({ ok: false, error: 'weak_password' })
+    expect(s.endedSessions).toEqual([])
+    expect(s.events).toEqual([])
+  })
+
+  it('change_password: a failure to end the sessions keeps the new password, and is still audited', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    const code = await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failing = { ...d, endSessions: async () => Promise.reject(new Error('db down')) }
+    expect(await json(await change(failing, tok(STAFF), { code }))).toEqual({ ok: true, signedOut: true })
+    quiet.mockRestore()
+    expect(s.setPasswords).toHaveLength(1)
+    expect(s.events.map((e) => e.event)).toEqual(['account_password_changed'])
+  })
+
+  it('reset_password: needs a session started with an emailed code in the last 15 minutes', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    const reset = (token: string, password = NEW) => call(d, token, { action: 'reset_password', new_password: password })
+    // A normal password sign-in can't set a password without the current one.
+    const normal = await reset(tok(STAFF))
+    expect(normal.status).toBe(403)
+    expect(await json(normal)).toEqual({ ok: false, error: 'reset_expired' })
+    s.amr[tok(STAFF)] = [{ method: 'otp', at: at(20) }]
+    expect(await json(await reset(tok(STAFF)))).toEqual({ ok: false, error: 'reset_expired' })
+    s.amr[tok(STAFF)] = [{ method: 'otp', at: at(3) }]
+    expect(await json(await reset(tok(STAFF), 'short'))).toEqual({ ok: false, error: 'weak_password' })
+    expect(s.setPasswords).toEqual([])
+
+    s.amr[tok(STAFF)] = [{ method: 'recovery', at: at(3) }]
+    expect(await json(await reset(tok(STAFF)))).toEqual({ ok: true, signedOut: true })
+    expect(s.order).toEqual([`setPassword:${STAFF}`, `endSessions:${STAFF}`])
+    expect(s.events).toEqual([{ user: STAFF, event: 'account_password_reset', metadata: {}, ip: '203.0.113.7' }])
+    expect(s.sends.map((m) => [m.to, m.subject])).toEqual([['staff@sanctus.test', 'Your Sanctus password was reset']])
+    expect(JSON.stringify([s.rpcCalls, s.logs, s.sends])).not.toContain(NEW)
+  })
+
+  it('reset_password: an account with 2FA must pass its second step first (the reset never skips 2FA)', async () => {
+    const { d, s } = deps()
+    s.amr[tok(BIZ_OWNER, 'aal1')] = [{ method: 'otp', at: at(2) }]
+    const r = await call(d, tok(BIZ_OWNER, 'aal1'), { action: 'reset_password', new_password: NEW })
+    expect(r.status).toBe(403)
+    expect(await json(r)).toEqual({ ok: false, error: 'aal2_required' })
+    expect(s.setPasswords).toEqual([])
+    s.amr[tok(BIZ_OWNER, 'aal2')] = [{ method: 'otp', at: at(2) }, { method: 'totp', at: at(1) }]
+    expect(await json(await call(d, tok(BIZ_OWNER, 'aal2'), { action: 'reset_password', new_password: NEW }))).toEqual({ ok: true, signedOut: true })
+  })
+
+  it('reads the amr claim from a JWT payload', () => {
+    const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const jwt = (p: unknown) => `${b64({ alg: 'HS256' })}.${b64(p)}.sig`
+    expect(amrFromJwt(jwt({ amr: [{ method: 'password', timestamp: 1700000000 }, { method: 'totp', timestamp: 1700000100 }] }))).toEqual([
+      { method: 'password', at: 1700000000000 },
+      { method: 'totp', at: 1700000100000 },
+    ])
+    expect(amrFromJwt(jwt({ amr: ['otp'] }))).toEqual([{ method: 'otp', at: null }])
+    expect(amrFromJwt(jwt({ amr: [{ timestamp: 1 }, null, 5] }))).toEqual([])
+    expect(amrFromJwt(jwt({ sub: 'x' }))).toEqual([])
+    expect(amrFromJwt('not-a-jwt')).toEqual([])
   })
 })

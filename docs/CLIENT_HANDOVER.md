@@ -26,7 +26,7 @@ The public pages pick English or Portuguese from the visitor's phone or browser 
 ## 2. Signing in and accounts
 
 - **Sign in:** go to `/login` and enter your email and password.
-- **Forgot your password:** use the "Forgot your password?" link on the sign-in page (or go to `/reset-password`). Enter your email and you'll get a reset link. Open it and choose a new password of at least 12 characters.
+- **Forgot your password:** use the "Forgot your password?" link on the sign-in page (or go to `/reset-password`). Enter your email: if it belongs to an account, we email it a code (you can ask for a new one after a minute). Type the code, then, if your account has two-step sign-in, the code from your authenticator app (or a recovery code), and choose a new password of 12 to 128 characters. Every device is signed out and we email you that the password was reset; sign in with the new password.
 
 **There is no public sign-up.** Businesses apply, and the Sanctus team decides:
 
@@ -63,7 +63,7 @@ To remove an owner, use the remove (bin) icon next to their email on the **Owner
 Open **Settings** from the dashboard menu. Everything about you is in the "Your account" group, and your business details are in **Settings → Business profile**.
 
 - **Your details.** Add your name and a photo, and choose your time zone and how dates look. After you choose a profile photo, a window opens with a square frame: drag and zoom the picture (**Fill the frame**, **Show whole picture**), then press **Save**. The photo is saved at up to 512 px and the original is not kept.
-- **Email and password.** To change your email, enter your password and the new address, then confirm from both inboxes. To change your password, enter the current one first. We email you whenever either changes, so you notice if it was not you.
+- **Email and password.** To change your email, enter your password and the new address, then confirm from both inboxes. To change your password (My account → Password), enter the current one and the new one; we email you a 6-digit code, and if two-step sign-in is on we also ask for the code from your authenticator app. Your password changes only when the codes are right; then every device, including this one, is signed out and you sign in with the new password. We email you whenever either changes, so you notice if it was not you.
 - **Two-step sign-in (2FA).** Under **Security & 2FA** you can turn on a second check with an authenticator app on your phone. Scan the code on screen, type the 6 digits the app shows, and you are done. From then on you enter a fresh code each time you sign in.
 - **Recovery codes.** When you turn on two-step sign-in you get 8 recovery codes. Each works once if you lose your phone. Keep them somewhere safe, such as a password manager or a printed copy. You see them only once, but you can make a new set later (the old set then stops working).
 - **Extra check for big actions.** Turning 2FA off, making new recovery codes and closing your account each need a 6-digit code that we email you. It lasts 10 minutes.

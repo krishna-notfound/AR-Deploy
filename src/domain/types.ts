@@ -525,7 +525,7 @@ export interface InviteInspection {
 // Account settings, security and 2FA (S1). The service interface is in services/accountService.ts.
 export type SettingsSection = 'account' | 'profile' | 'security' | 'notifications' | 'preferences' | 'activity' | 'business' | 'platform' | 'security-policy'
 /** What an emailed 6-digit action code unlocks. */
-export type ActionPurpose = 'disable_2fa' | 'regenerate_recovery' | 'request_closure' | 'owner_reset_2fa' | 'complete_closure'
+export type ActionPurpose = 'disable_2fa' | 'regenerate_recovery' | 'request_closure' | 'owner_reset_2fa' | 'complete_closure' | 'change_password'
 export type DateFormatPref = 'd MMM yyyy' | 'dd/MM/yyyy' | 'yyyy-MM-dd'
 export interface Profile {
   userId: ID

@@ -6,6 +6,9 @@ import type { ContentService } from './contentService'
 import { mockContentService, mockSiteAssetUrl } from './mock/mockContent'
 import { SITE_ASSET_BUCKET, type SiteAsset } from '@/domain/siteContent'
 import { mockAccountService } from './mock/mockAccount'
+import { mockPasswordReset } from './mock/mockPasswordReset'
+import type { PasswordResetService } from './passwordResetService'
+import { createSupabasePasswordReset } from './supabase/supabasePasswordReset'
 import { mockCatalogService } from './mock/mockCatalogService'
 import { mockNotificationService } from './mock/mockNotifications'
 import type { NotificationService } from './notificationService'
@@ -56,6 +59,20 @@ export const account: AccountService = SUPABASE_BUILD
     ? mockAccountService
     : unavailableAccount(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
 
+/** Every reset call fails with the configuration problem (never the demo harness in a half-configured Supabase build). */
+export function unavailablePasswordReset(problem: string): PasswordResetService {
+  return new Proxy({} as PasswordResetService, { get: (_, key) => (key === 'then' ? undefined : async () => fail('CONFIG', problem)) })
+}
+
+/** "Forgot password" (ADR-0027, ADR-0066): Supabase Auth, or a labelled in-memory harness in demo mode. */
+export const passwordReset: PasswordResetService = SUPABASE_BUILD
+  ? backend.mode === 'supabase'
+    ? createSupabasePasswordReset(getSupabaseClient(backend))
+    : unavailablePasswordReset(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
+  : backend.mode === 'demo'
+    ? mockPasswordReset
+    : unavailablePasswordReset(backend.mode === 'misconfigured' ? backend.problem : 'Unknown backend configuration.')
+
 /** Every content call fails with the configuration problem (never demo data in a half-configured Supabase build). */
 export function unavailableContent(problem: string): ContentService {
   return new Proxy({} as ContentService, { get: (_, key) => (key === 'then' ? undefined : async () => fail('CONFIG', problem)) })
@@ -96,7 +113,8 @@ export function siteAssetUrl(asset: SiteAsset): string {
 
 export { checkSiteAssetFile } from './siteAsset'
 export { backend, isDemoMode } from './backend'
-export type { AccountService, AssuranceLevels, NoticeOutcome, ProfilePatch } from './accountService'
+export type { AccountService, AssuranceLevels, NoticeOutcome, PasswordChange, ProfilePatch } from './accountService'
+export { DEMO_RESET_CODE, type PasswordResetService } from './passwordResetService'
 export { ACCOUNT_ERRORS, AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, PASSWORD_MAX, PASSWORD_MIN } from './accountService'
 export type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, SettingsSection, TotpEnrollment } from '@/domain/types'
 export type { AuthError, AuthResult, AuthService, SignedInAccount } from './supabase/auth'

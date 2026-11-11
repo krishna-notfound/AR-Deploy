@@ -11,7 +11,9 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { isDemoMode } from '@/services'
+import { RESET_PASSWORD_PATH } from '@/lib/urls'
 import { useAccount } from './AccountProvider'
+import { isRecoveryPending } from './recoveryPending'
 
 /** Where to go to choose an account: the demo picker, or the real sign-in page in Supabase mode. */
 export const SIGN_IN_PATH = isDemoMode ? '/demo' : '/login'
@@ -55,6 +57,8 @@ export function RequireRole({ allow: role, children }: { allow: Role; children: 
     )
   }
   if (user === null) return <Navigate to={`${SIGN_IN_PATH}?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
+  // ADR-0066: a session opened with a reset code chooses a new password first (UX only; see recoveryPending.ts).
+  if (isRecoveryPending()) return <Navigate to={RESET_PASSWORD_PATH} replace />
   if (user.role !== role) {
     return (
       <main className="grid min-h-dvh place-items-center bg-canvas p-6">

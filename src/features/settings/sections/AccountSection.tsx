@@ -55,7 +55,7 @@ export default function AccountSection() {
           <InlineNotice tone="neutral">{t('settings.account.demoNotice')}</InlineNotice>
         )}
         <EmailCard currentEmail={user?.email ?? ''} security={security} />
-        <PasswordCard />
+        <PasswordCard security={security} />
         <ClosureCard security={security} />
       </div>
     </>
@@ -225,14 +225,27 @@ function lengthHint(n: number, t: ReturnType<typeof useI18n>['t'], tn: ReturnTyp
   return t('settings.account.pw.strong')
 }
 
-function PasswordCard() {
+/** Failures that belong to a field of the form, not to the code dialog: the dialog closes and the field shows it. */
+const FIELD_ERRORS: Record<string, 'current' | 'next'> = { current_password_mismatch: 'current', same_password: 'next', weak_password: 'next' }
+
+/**
+ * ADR-0066: current and new password here → the current password is checked → a code is emailed (ActionCodeDialog,
+ * with the authenticator code too when the account has 2FA) → the account-security function changes it and ends every
+ * session, this one too → the person signs in again.
+ */
+function PasswordCard({ security }: { security: Security }) {
   const { t, tn } = useI18n()
   const toast = useToast()
+  const navigate = useNavigate()
+  const { logout } = useAccount()
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirmNext, setConfirmNext] = useState('')
   const [errors, setErrors] = useState<{ current?: string; next?: string; confirm?: string; form?: string }>({})
   const [pending, setPending] = useState(false)
+  const [dialog, setDialog] = useState(false)
+  // A failed security read leaves this unknown: the server then answers totp_required, and a reload shows the field.
+  const has2fa = security.data?.hasVerifiedFactor === true
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -241,27 +254,55 @@ function PasswordCard() {
     if (next.length < PASSWORD_MIN) found.next = t('settings.account.pw.min', { n: PASSWORD_MIN })
     else if (next.length > PASSWORD_MAX) found.next = t('settings.account.pw.max', { n: PASSWORD_MAX })
     else if (confirmNext !== next) found.confirm = t('settings.account.pw.mismatch')
+    else if (current && next === current) found.next = t('settings.err.same_password')
     setErrors(found)
     if (Object.keys(found).length) return
+    // Checked before a code is emailed, so a typo doesn't cost a code (the server checks it again).
     setPending(true)
-    const r = await account.changePassword(current, next)
+    const r = await account.checkCurrentPassword(current)
     setPending(false)
+    if (!r.ok) {
+      setErrors(r.error.reason === 'current_password_mismatch' ? { current: accountErrorText(r.error, t) } : { form: accountErrorText(r.error, t) })
+      return
+    }
+    setDialog(true)
+  }
+
+  const confirmChange = async (code: string, totp?: string) => {
+    const r = await account.changePassword({ current, next, code, ...(has2fa ? { totp: totp ?? '' } : {}) })
     if (r.ok) {
+      setDialog(false)
       setCurrent('')
       setNext('')
       setConfirmNext('')
-      toast.success(t('settings.account.pw.changed'))
-      return
+      toast.success(t('settings.account.pw.changed'), t('settings.account.pw.changedBody'))
+      // Every session has ended on the server; this ends the one in this browser, then on to sign-in.
+      await logout()
+      navigate(SIGN_IN_PATH, { replace: true })
+      return r
     }
-    const reason = r.error.reason
-    if (reason === 'current_password_mismatch') setErrors({ current: accountErrorText(r.error, t) })
-    else if (reason === 'same_password') setErrors({ next: accountErrorText(r.error, t) })
-    else if (reason === 'weak_password') setErrors({ next: accountErrorText(r.error, t) })
-    else setErrors({ form: accountErrorText(r.error, t) })
+    const field = r.error.reason ? FIELD_ERRORS[r.error.reason] : undefined
+    if (field) {
+      setDialog(false)
+      setErrors({ [field]: accountErrorText(r.error, t) })
+    }
+    // A 2FA account whose security state was not loaded: show the authenticator field from now on.
+    if (r.error.reason === 'totp_required' && !has2fa) security.refetch()
+    return r
   }
 
   return (
     <SettingsCard title={t('settings.account.pw.title')} description={t('settings.account.pw.description')}>
+      <ActionCodeDialog
+        open={dialog}
+        purpose="change_password"
+        title={t('settings.account.pw.dialogTitle')}
+        description={t(has2fa ? 'settings.account.pw.dialogBody2fa' : 'settings.account.pw.dialogBody')}
+        confirmLabel={t('settings.account.pw.confirmChange')}
+        totp={has2fa}
+        onClose={() => setDialog(false)}
+        onConfirm={confirmChange}
+      />
       <form onSubmit={(e) => void submit(e)} noValidate className="space-y-4">
         <FormField label={t('settings.account.currentPassword')} error={errors.current}>
           <Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />

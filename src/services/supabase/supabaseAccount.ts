@@ -209,7 +209,12 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     if (!(await once())) await once()
   }
   /** Client-side audit events; a logging failure never undoes the change the user made. */
-  const logEvent = (p_event: 'account_password_changed' | 'account_email_change_requested') => sb.rpc('log_account_event', { p_event }).then(() => undefined, () => undefined)
+  const logEvent = (p_event: 'account_email_change_requested') => sb.rpc('log_account_event', { p_event }).then(() => undefined, () => undefined)
+  /**
+   * After a password change or reset the server has ended every session of the account; this clears the one in this
+   * browser (local scope: the server-side session is already gone, so there is nothing else to revoke).
+   */
+  const endLocalSession = () => sb.auth.signOut({ scope: 'local' }).then(() => undefined, () => undefined)
   const voidOf = (r: Result<unknown>): Result<void> => (r.ok ? ok(undefined) : r)
   /** The notice outcome of an Owner action (R-W7-6). An answer without one is never read as "emailed". */
   const withNotice = (r: Result<FnAnswer>): Result<{ notice: NoticeOutcome }> => {
@@ -367,23 +372,40 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
       )
     },
 
-    async changePassword(current, next) {
+    async checkCurrentPassword(password) {
+      if (!password) return accountFail('current_password_mismatch')
+      const me = await currentUser()
+      if (!me.ok) return me
+      // A throwaway client: signing in on the main one would replace this session (and drop aal2).
+      const check = await deps.verifyCurrentPassword(me.data.email, password)
+      if (check === 'ok') return ok(undefined)
+      return accountFail(check === 'password_incorrect' ? 'current_password_mismatch' : check)
+    },
+
+    // ADR-0066: never updateUser({ password }) from here; the account-security function checks the emailed code, the
+    // 2FA step and the current password, sets the password and ends every session (this one too).
+    async changePassword({ current, next, code, totp }) {
       if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) return accountFail('weak_password')
-      try {
-        const { error } = await sb.auth.updateUser({ password: next, current_password: current })
-        if (error) {
-          const code = (error as AuthErr)?.code ?? ''
-          if (code === 'current_password_mismatch' || code === 'current_password_required') return accountFail('current_password_mismatch')
-          if (code === 'same_password' || code === 'weak_password' || code === 'reauthentication_needed') return accountFail(code)
-          if (code === 'over_request_rate_limit') return accountFail('rate_limited')
-          return accountFail('unknown')
-        }
-      } catch {
-        return accountFail('unknown')
+      if (totp !== undefined) {
+        const factors = await listTotp()
+        if (!factors.ok) return factors
+        const factor = factors.data.verified[0]
+        if (!factor) return accountFail('unknown')
+        // A fresh verification: the session's token now carries a new authenticator time (amr), which the server checks.
+        const verified = await verifyTotp(factor.id, totp)
+        if (!verified.ok) return verified.error.reason === 'invalid_code' ? accountFail('invalid_totp') : verified
       }
-      // Every other session ends now. If this fails the password change still stands.
-      await sb.auth.signOut({ scope: 'others' }).catch(() => undefined)
-      await logEvent('account_password_changed')
+      const r = await invoke('change_password', { current_password: current, new_password: next, code })
+      if (!r.ok) return r
+      await endLocalSession()
+      return ok(undefined)
+    },
+
+    async resetPassword(next) {
+      if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) return accountFail('weak_password')
+      const r = await invoke('reset_password', { new_password: next })
+      if (!r.ok) return r
+      await endLocalSession()
       return ok(undefined)
     },
 

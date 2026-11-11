@@ -210,3 +210,50 @@ describe('ActionCodeDialog', () => {
     }
   })
 })
+
+// ADR-0066: changing the password with 2FA on asks for the authenticator code in the same dialog.
+describe('ActionCodeDialog with the authenticator code', () => {
+  function renderTotp(onConfirm = vi.fn(async (_code: string, _totp?: string): Promise<Result<unknown>> => ok(undefined))) {
+    render(
+      <ActionCodeDialog open purpose="change_password" title="Confirm the password change" confirmLabel="Change password" totp onClose={vi.fn()} onConfirm={onConfirm} />,
+    )
+    return onConfirm
+  }
+  const totpInput = () => screen.getByLabelText('Authenticator code')
+
+  it('needs both 6-digit codes and passes both to onConfirm', async () => {
+    const user = userEvent.setup()
+    const send = vi.spyOn(account, 'sendActionCode')
+    const onConfirm = renderTotp()
+    await screen.findByText(/We emailed a 6-digit code to/)
+    expect(send).toHaveBeenCalledWith('change_password')
+    expect(totpInput()).toHaveAttribute('autocomplete', 'one-time-code')
+    await user.type(codeInput(), '123456')
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText('Enter the 6-digit code from your authenticator app.')).toBeInTheDocument()
+    expect(onConfirm).not.toHaveBeenCalled()
+    await user.type(totpInput(), '65 43 21')
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith('123456', '654321'))
+  })
+
+  it('an authenticator refusal shows on its field and clears it; the emailed code stays', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn().mockResolvedValueOnce(accountFail('invalid_totp')).mockResolvedValueOnce(accountFail('totp_required')).mockResolvedValueOnce(accountFail('invalid_code'))
+    renderTotp(onConfirm)
+    await screen.findByText(/We emailed a 6-digit code to/)
+    await user.type(codeInput(), '123456')
+    await user.type(totpInput(), '000000')
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText("That authenticator code isn't right. Enter the newest code from the app.")).toBeInTheDocument()
+    expect(totpInput()).toHaveValue('')
+    expect(codeInput()).toHaveValue('123456')
+    await user.type(totpInput(), '111111')
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText('Enter a new code from your authenticator app and try again.')).toBeInTheDocument()
+    await user.type(totpInput(), '222222')
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText("That code isn't right. Check it and try again.")).toBeInTheDocument()
+    expect(totpInput()).toHaveValue('222222')
+  })
+})

@@ -69,8 +69,10 @@ describe('My account section', () => {
     await waitFor(() => expect(within(card('Email')).queryByRole('status')).toBeNull())
   })
 
-  it("change password: under 12 characters is refused before sending; mismatch confirm is refused; success toasts 'Password changed. Other devices were signed out.'", { timeout: 20_000 }, async () => {
+  it('change password: rules first; then the current password is checked, a code is emailed, and success signs out to sign-in (ADR-0066)', { timeout: 30_000 }, async () => {
     const user = userEvent.setup()
+    const check = vi.spyOn(account, 'checkCurrentPassword')
+    const send = vi.spyOn(account, 'sendActionCode')
     const change = vi.spyOn(account, 'changePassword')
     open(BUSINESS, '/dashboard/settings/account')
     await screen.findByRole('heading', { level: 1, name: 'My account' })
@@ -88,7 +90,6 @@ describe('My account section', () => {
     await user.type(confirm, 'short')
     await user.click(within(pw).getByRole('button', { name: 'Change password' }))
     expect(await within(pw).findByText('Use at least 12 characters.')).toBeInTheDocument()
-    expect(change).not.toHaveBeenCalled()
 
     await user.clear(next)
     await user.type(next, 'a-much-longer-password')
@@ -96,14 +97,55 @@ describe('My account section', () => {
     await user.type(confirm, 'a-different-password')
     await user.click(within(pw).getByRole('button', { name: 'Change password' }))
     expect(await within(pw).findByText("The passwords don't match.")).toBeInTheDocument()
-    expect(change).not.toHaveBeenCalled()
+    expect(check).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalled()
 
     await user.clear(confirm)
     await user.type(confirm, 'a-much-longer-password')
     await user.click(within(pw).getByRole('button', { name: 'Change password' }))
-    expect(await screen.findByText('Password changed. Other devices were signed out.')).toBeInTheDocument()
-    expect(change).toHaveBeenCalledWith('old-password-123', 'a-much-longer-password')
-    expect(within(pw).getByLabelText('New password')).toHaveValue('')
+    expect(check).toHaveBeenCalledWith('old-password-123')
+    const dialog = await screen.findByRole('dialog', { name: 'Confirm the password change' })
+    await within(dialog).findByText(/We emailed a 6-digit code to/)
+    expect(send).toHaveBeenCalledWith('change_password')
+    // No 2FA on this account: no authenticator field.
+    expect(within(dialog).queryByLabelText('Authenticator code')).toBeNull()
+
+    await user.type(within(dialog).getByLabelText('6-digit code'), '111111')
+    await user.click(within(dialog).getByRole('button', { name: 'Change password' }))
+    expect(await within(dialog).findByText("That code isn't right. Check it and try again.")).toBeInTheDocument()
+    await user.clear(within(dialog).getByLabelText('6-digit code'))
+    await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(within(dialog).getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText('Every device was signed out. Sign in with your new password.')).toBeInTheDocument()
+    expect(change).toHaveBeenLastCalledWith({ current: 'old-password-123', next: 'a-much-longer-password', code: DEMO_CODE })
+    await waitFor(() => expect(window.location.pathname).toBe(SIGN_IN_PATH))
+    expect(localStorage.getItem(ACCOUNT_KEY)).toBeNull()
+  })
+
+  it('change password with 2FA on: the dialog also asks for the authenticator code, and both go to the service', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const enrol = await account.startTotpEnrollment()
+    if (!enrol.ok) throw new Error('enrol failed')
+    await account.confirmTotpEnrollment(enrol.data.factorId, DEMO_CODE)
+    const change = vi.spyOn(account, 'changePassword')
+    open(BUSINESS, '/dashboard/settings/account')
+    await screen.findByRole('heading', { level: 1, name: 'My account' })
+    const pw = card('Password')
+    await user.type(within(pw).getByLabelText('Current password'), 'old-password-123')
+    await user.type(within(pw).getByLabelText('New password'), 'a-much-longer-password')
+    await user.type(within(pw).getByLabelText('Confirm new password'), 'a-much-longer-password')
+    await user.click(within(pw).getByRole('button', { name: 'Change password' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Confirm the password change' })
+    expect(within(dialog).getByText(/and the code your authenticator app shows now/)).toBeInTheDocument()
+    await within(dialog).findByText(/We emailed a 6-digit code to/)
+    await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.type(within(dialog).getByLabelText('Authenticator code'), '000000')
+    await user.click(within(dialog).getByRole('button', { name: 'Change password' }))
+    expect(await within(dialog).findByText("That authenticator code isn't right. Enter the newest code from the app.")).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Authenticator code'), DEMO_CODE)
+    await user.click(within(dialog).getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText('Every device was signed out. Sign in with your new password.')).toBeInTheDocument()
+    expect(change).toHaveBeenLastCalledWith({ current: 'old-password-123', next: 'a-much-longer-password', code: DEMO_CODE, totp: DEMO_CODE })
   })
 
   it("business owner: Request closure explains the effect, then opens the action-code dialog; afterwards shows 'Closure requested' with Cancel request", { timeout: 30_000 }, async () => {
@@ -206,9 +248,11 @@ describe('My account section', () => {
     expect(screen.queryByText('Closure requested')).toBeNull()
   })
 
-  it('change password: current_password_mismatch shows on the current field, same_password on the new field', { timeout: 20_000 }, async () => {
+  it('change password: a wrong current password shows on its field (before a code, or from the server); the same password on the new field', { timeout: 30_000 }, async () => {
     const user = userEvent.setup()
-    vi.spyOn(account, 'changePassword').mockResolvedValueOnce(accountFail('current_password_mismatch')).mockResolvedValueOnce(accountFail('same_password'))
+    const check = vi.spyOn(account, 'checkCurrentPassword').mockResolvedValueOnce(accountFail('current_password_mismatch'))
+    vi.spyOn(account, 'changePassword').mockResolvedValueOnce(accountFail('current_password_mismatch'))
+    const send = vi.spyOn(account, 'sendActionCode')
     open(BUSINESS, '/dashboard/settings/account')
     await screen.findByRole('heading', { level: 1, name: 'My account' })
     const pw = card('Password')
@@ -218,13 +262,30 @@ describe('My account section', () => {
     await user.type(next, 'a-much-longer-password')
     await user.type(within(pw).getByLabelText('Confirm new password'), 'a-much-longer-password')
 
+    // Checked before a code is emailed.
     await user.click(within(pw).getByRole('button', { name: 'Change password' }))
     await waitFor(() => expect(current).toHaveAccessibleDescription('Your current password is incorrect.'))
     expect(next).not.toHaveAttribute('aria-invalid')
+    expect(send).not.toHaveBeenCalled()
 
+    // The server's own check: the dialog closes and the field says it.
+    await user.click(within(pw).getByRole('button', { name: 'Change password' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Confirm the password change' })
+    await within(dialog).findByText(/We emailed a 6-digit code to/)
+    await user.type(within(dialog).getByLabelText('6-digit code'), DEMO_CODE)
+    await user.click(within(dialog).getByRole('button', { name: 'Change password' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Confirm the password change' })).toBeNull())
+    await waitFor(() => expect(current).toHaveAccessibleDescription('Your current password is incorrect.'))
+    expect(check).toHaveBeenCalledTimes(2)
+
+    // The same password is refused in the browser, before anything is sent.
+    await user.clear(next)
+    await user.type(next, 'old-password-123')
+    await user.clear(within(pw).getByLabelText('Confirm new password'))
+    await user.type(within(pw).getByLabelText('Confirm new password'), 'old-password-123')
     await user.click(within(pw).getByRole('button', { name: 'Change password' }))
     await waitFor(() => expect(next).toHaveAccessibleDescription('Choose a password different from your current one.'))
-    expect(current).not.toHaveAttribute('aria-invalid')
+    expect(check).toHaveBeenCalledTimes(2)
   })
 
   it('change email: email_taken shows on the email field, rate_limited as a form message', { timeout: 20_000 }, async () => {
