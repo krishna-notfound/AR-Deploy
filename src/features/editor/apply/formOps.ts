@@ -14,6 +14,7 @@ import {
   MAX_APPLY_STEPS,
   MAX_CHOICE_OPTIONS,
   MAX_CUSTOM_QUESTIONS,
+  MAX_QUESTION_LABEL,
   MIN_CHOICE_OPTIONS,
   type ResolvedField,
   type ResolvedStep,
@@ -90,6 +91,30 @@ export function moveFieldToStep(c: ApplyFormConfig, key: string, stepId: string)
   return next
 }
 
+/**
+ * Moves a field into a section at a position: `index` counts the fields the section already has once this one is taken
+ * out (0 = first, anything past the end = last). Works inside a section and across sections (drag and drop, the keyboard
+ * and the move menu). Never onto Review. The same config when the field would stay where it is.
+ */
+export function moveFieldTo(c: ApplyFormConfig, key: string, stepId: string, index: number): ApplyFormConfig {
+  if (!placeableSteps(c).some((s) => s.id === stepId)) return c
+  const next = materialize(c)
+  const at = next.fields.findIndex((f) => f.key === key)
+  if (at < 0) return c
+  const from = next.fields[at]!
+  const oldSlot = from.stepId === stepId ? next.fields.filter((f) => f.stepId === stepId).findIndex((f) => f.key === key) : -1
+  const [moved] = next.fields.splice(at, 1)
+  const siblings = next.fields.map((f, i) => [f, i] as const).filter(([f]) => f.stepId === stepId)
+  const slot = Math.max(0, Math.min(Math.floor(index), siblings.length))
+  if (slot === oldSlot) return c
+  moved!.stepId = stepId
+  let insertAt: number
+  if (slot < siblings.length) insertAt = siblings[slot]![1]
+  else insertAt = siblings.length ? siblings[siblings.length - 1]![1] + 1 : next.fields.length
+  next.fields.splice(insertAt, 0, moved!)
+  return next
+}
+
 export function setRequired(c: ApplyFormConfig, key: string, required: boolean): ApplyFormConfig {
   if (isLockedField(key) || key === 'language') return c
   return withFields(c, (fields) => {
@@ -127,13 +152,18 @@ export function setOptionHidden(c: ApplyFormConfig, field: ApplyChoiceField, val
 }
 
 // ---- steps ----------------------------------------------------------------------------------------------------------
-/** Adds a step before Review (7 new steps at most). `title` is the English title the new step starts with. */
-export function addStep(c: ApplyFormConfig, title: string): { config: ApplyFormConfig; id: string | null } {
+/**
+ * Adds a step before Review (7 new steps at most). `title` is the English title the new step starts with. With `afterId` it
+ * goes right after that step; Review, or a step that does not exist, means just before Review.
+ */
+export function addStep(c: ApplyFormConfig, title: string, afterId?: string): { config: ApplyFormConfig; id: string | null } {
   if (c.steps.length >= MAX_APPLY_STEPS) return { config: c, id: null }
   const id = uuid()
   const next = materialize(c)
   const review = next.steps.findIndex((s) => s.builtin === 'review')
-  next.steps.splice(review < 0 ? next.steps.length : review, 0, { id, title: { en: title } })
+  const after = afterId === undefined ? -1 : next.steps.findIndex((s) => s.id === afterId && s.builtin !== 'review')
+  const at = after >= 0 ? after + 1 : review < 0 ? next.steps.length : review
+  next.steps.splice(at, 0, { id, title: { en: title } })
   return { config: next, id }
 }
 
@@ -183,19 +213,48 @@ const defaultOptions = (): NonNullable<CustomQuestion['options']> => [
   { id: uuid(), label: { en: '' } },
 ]
 
-/** Adds a question at the end of a step (never Review; 10 at most). `label` is the English text it starts with. */
-export function addQuestion(c: ApplyFormConfig, stepId: string, type: CustomQuestionType, label: string): { config: ApplyFormConfig; id: string | null } {
+/**
+ * Adds a question at the end of a step (never Review; 10 at most). `label` is the English text it starts with. With
+ * `afterKey` (a field that sits on a section you can place on) it goes right below that field instead, on its section.
+ */
+export function addQuestion(c: ApplyFormConfig, stepId: string, type: CustomQuestionType, label: string, afterKey?: string): { config: ApplyFormConfig; id: string | null } {
   if (c.customQuestions.length >= MAX_CUSTOM_QUESTIONS || !placeableSteps(c).some((s) => s.id === stepId)) return { config: c, id: null }
   const id = uuid()
   const next = materialize(c)
   const q: CustomQuestion = { id, type, label: { en: label }, ...(isChoiceQuestion(type) ? { options: defaultOptions() } : {}) }
   next.customQuestions.push(q)
+  const anchor = afterKey === undefined ? -1 : next.fields.findIndex((f) => f.key === afterKey)
+  if (anchor >= 0) {
+    next.fields.splice(anchor + 1, 0, { key: `custom:${id}`, stepId: next.fields[anchor]!.stepId, required: false })
+    return { config: next, id }
+  }
   let last = -1
   next.fields.forEach((f, i) => {
     if (f.stepId === stepId) last = i
   })
   next.fields.splice(last + 1, 0, { key: `custom:${id}`, stepId, required: false })
   return { config: next, id }
+}
+
+/**
+ * Copies an own question right below itself: a new id, new option ids, the label with `suffix` added (cut so the label stays
+ * within its limit; an empty Portuguese label gets none) and the same Required flag. Refused at ten own questions.
+ */
+export function duplicateQuestion(c: ApplyFormConfig, id: string, suffix: { en: string; pt: string }): { config: ApplyFormConfig; id: string | null } {
+  const source = c.customQuestions.find((q) => q.id === id)
+  if (!source || c.customQuestions.length >= MAX_CUSTOM_QUESTIONS) return { config: c, id: null }
+  const next = materialize(c)
+  const copyId = uuid()
+  const withSuffix = (text: string, add: string): string => (text.length + add.length > MAX_QUESTION_LABEL ? text.slice(0, MAX_QUESTION_LABEL - add.length) : text) + add
+  const copy = clone(source)
+  copy.id = copyId
+  copy.label = { en: withSuffix(source.label.en, suffix.en), ...(source.label.pt ? { pt: withSuffix(source.label.pt, suffix.pt) } : {}) }
+  if (copy.options) copy.options = copy.options.map((o) => ({ ...o, id: uuid() }))
+  next.customQuestions.push(copy)
+  const at = next.fields.findIndex((f) => f.key === `custom:${id}`)
+  const required = next.fields[at]?.required ?? false
+  next.fields.splice(at < 0 ? next.fields.length : at + 1, 0, { key: `custom:${copyId}`, stepId: next.fields[at]?.stepId ?? placeableSteps(next)[0]!.id, required })
+  return { config: next, id: copyId }
 }
 
 export function deleteQuestion(c: ApplyFormConfig, id: string): ApplyFormConfig {

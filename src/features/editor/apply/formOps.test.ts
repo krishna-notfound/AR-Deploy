@@ -6,9 +6,11 @@ import {
   addStep,
   deleteQuestion,
   deleteStep,
+  duplicateQuestion,
   layoutOf,
   materialize,
   moveField,
+  moveFieldTo,
   moveFieldToStep,
   moveOption,
   moveStep,
@@ -85,6 +87,48 @@ describe('moveFieldToStep', () => {
   })
 })
 
+describe('moveFieldTo (drag and drop: any section, any place)', () => {
+  it('moves a field to a position in the same section', () => {
+    const c = moveFieldTo(base(), 'businessName', 'business', 2)
+    expect(keysOf(c, 'business')).toEqual(['website', 'category', 'businessName', 'description'])
+    expect(keysOf(moveFieldTo(base(), 'description', 'business', 0), 'business')).toEqual(['description', 'businessName', 'website', 'category'])
+  })
+
+  it('moves a field into another section at an index, counted among the fields already there', () => {
+    const c = moveFieldTo(base(), 'applicantPhone', 'location', 1)
+    expect(keysOf(c, 'location')).toEqual(['country', 'applicantPhone', 'city'])
+    expect(keysOf(c, 'contact')).not.toContain('applicantPhone')
+    expect(keysOf(moveFieldTo(base(), 'applicantPhone', 'location', 0), 'location')).toEqual(['applicantPhone', 'country', 'city'])
+    expect(keysOf(moveFieldTo(base(), 'applicantPhone', 'location', 99), 'location')).toEqual(['country', 'city', 'applicantPhone'])
+    expect(validateApplyForm(c)).toEqual({})
+  })
+
+  it('can fill an empty section', () => {
+    const added = addStep(base(), 'Extra')
+    const c = moveFieldTo(added.config, 'notes', added.id!, 0)
+    expect(keysOf(c, added.id!)).toEqual(['notes'])
+    expect(keysOf(c, 'catalogue')).not.toContain('notes')
+  })
+
+  it('returns the same config when nothing changes, and refuses Review, an unknown section or an unknown field', () => {
+    const c = base()
+    expect(moveFieldTo(c, 'businessName', 'business', 0)).toBe(c)
+    expect(moveFieldTo(c, 'website', 'business', 1)).toBe(c)
+    expect(moveFieldTo(c, 'notes', 'review', 0)).toBe(c)
+    expect(moveFieldTo(c, 'notes', 'nowhere', 0)).toBe(c)
+    expect(moveFieldTo(c, 'ghost', 'business', 0)).toBe(c)
+  })
+
+  it('moves an own question like any field and leaves the input alone', () => {
+    const r = addQuestion(base(), 'business', 'short_text', 'Q')
+    const before = JSON.stringify(r.config)
+    const c = moveFieldTo(r.config, `custom:${r.id}`, 'contact', 0)
+    expect(keysOf(c, 'contact')[0]).toBe(`custom:${r.id}`)
+    expect(JSON.stringify(r.config)).toBe(before)
+    expect(validateApplyForm(c)).toEqual({})
+  })
+})
+
 describe('required and hidden', () => {
   it('flips required for an ordinary field and keeps the rest', () => {
     const c = setRequired(base(), 'website', true)
@@ -146,6 +190,16 @@ describe('steps', () => {
     expect(full.id).toBeNull()
     expect(full.config).toBe(c)
     expect(validateApplyForm(c)).toEqual({})
+  })
+
+  it('adds a step right after a given section (Review stays last)', () => {
+    const r = addStep(base(), 'Mine', 'location')
+    expect(r.config.steps.map((s) => s.id)).toEqual(['business', 'location', r.id, 'contact', 'catalogue', 'review'])
+    const afterReview = addStep(base(), 'Mine', 'review')
+    expect(afterReview.config.steps.map((s) => s.id).at(-1)).toBe('review')
+    expect(afterReview.config.steps).toHaveLength(6)
+    const unknown = addStep(base(), 'Mine', 'nowhere')
+    expect(unknown.config.steps.at(-2)!.id).toBe(unknown.id)
   })
 
   it('moves a step but never Review and never past it', () => {
@@ -228,6 +282,56 @@ describe('questions', () => {
     expect(moveOption(c, id!, second!, -1)).toBe(c)
     while (ids().length > 2) c = removeOption(c, id!, ids()[0]!)
     expect(removeOption(c, id!, ids()[0]!)).toBe(c)
+  })
+
+  it('adds a question right below another field, on that field\'s section', () => {
+    const r = addQuestion(base(), 'location', 'short_text', 'Q', 'website')
+    expect(keysOf(r.config, 'business')).toEqual(['businessName', 'website', `custom:${r.id}`, 'category', 'description'])
+    expect(keysOf(r.config, 'location')).not.toContain(`custom:${r.id}`)
+    // An unknown anchor falls back to the end of the named section.
+    const fallback = addQuestion(base(), 'location', 'short_text', 'Q', 'ghost')
+    expect(keysOf(fallback.config, 'location').at(-1)).toBe(`custom:${fallback.id}`)
+  })
+
+  it('duplicates a question right below itself: new id, "(copy)" label, options with new ids, same required flag', () => {
+    let c = addQuestion(base(), 'business', 'single_choice', 'Pick one').config
+    const id = c.customQuestions[0]!.id
+    c = updateQuestion(c, id, { label: { en: 'Pick one', pt: 'Escolha uma' }, help: { en: 'Any', pt: 'Qualquer' }, options: [{ id: 'a', label: { en: 'Wood', pt: 'Madeira' } }, { id: 'b', label: { en: 'Metal' } }] })
+    c = setRequired(c, `custom:${id}`, true)
+    const r = duplicateQuestion(c, id, { en: ' (copy)', pt: ' (cópia)' })
+    expect(r.id).toBeTruthy()
+    expect(r.id).not.toBe(id)
+    const copy = r.config.customQuestions.find((q) => q.id === r.id)!
+    expect(copy.label).toEqual({ en: 'Pick one (copy)', pt: 'Escolha uma (cópia)' })
+    expect(copy.help).toEqual({ en: 'Any', pt: 'Qualquer' })
+    expect(copy.options!.map((o) => o.label)).toEqual([{ en: 'Wood', pt: 'Madeira' }, { en: 'Metal' }])
+    expect(copy.options!.map((o) => o.id)).not.toContain('a')
+    expect(new Set(copy.options!.map((o) => o.id)).size).toBe(2)
+    const keys = keysOf(r.config, 'business')
+    expect(keys.indexOf(`custom:${r.id}`)).toBe(keys.indexOf(`custom:${id}`) + 1)
+    expect(layoutOf(r.config)[0]!.fields.find((f) => f.key === `custom:${r.id}`)!.required).toBe(true)
+    // The original is untouched.
+    expect(r.config.customQuestions.find((q) => q.id === id)!.label).toEqual({ en: 'Pick one', pt: 'Escolha uma' })
+    expect(validateApplyForm(r.config)).toEqual({})
+  })
+
+  it('a duplicate keeps the label within 200 characters and skips an empty Portuguese label', () => {
+    const r = addQuestion(base(), 'business', 'short_text', 'x'.repeat(200))
+    const d = duplicateQuestion(r.config, r.id!, { en: ' (copy)', pt: ' (cópia)' })
+    const copy = d.config.customQuestions.find((q) => q.id === d.id)!
+    expect(copy.label.en).toHaveLength(200)
+    expect(copy.label.en.endsWith(' (copy)')).toBe(true)
+    expect(copy.label.pt).toBeUndefined()
+    expect(validateApplyForm(d.config)).toEqual({})
+  })
+
+  it('stops duplicating at ten own questions and for an unknown question', () => {
+    let c = base()
+    for (let i = 0; i < 10; i++) c = addQuestion(c, 'business', 'short_text', `Q${i}`).config
+    const full = duplicateQuestion(c, c.customQuestions[0]!.id, { en: ' (copy)', pt: ' (cópia)' })
+    expect(full.id).toBeNull()
+    expect(full.config).toBe(c)
+    expect(duplicateQuestion(base(), 'ghost', { en: ' (copy)', pt: ' (cópia)' }).id).toBeNull()
   })
 
   it('deletes a question and its placement', () => {

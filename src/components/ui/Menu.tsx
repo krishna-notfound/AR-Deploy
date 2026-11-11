@@ -59,12 +59,15 @@ export function DropdownMenu({
   label,
   align = 'end',
   triggerClassName,
+  triggerTitle,
 }: {
   trigger: ReactNode
   items: (MenuItem | MenuHeading | 'separator')[]
   label: string
   align?: 'start' | 'end'
   triggerClassName?: string
+  /** A tooltip for a trigger that shows only an icon. */
+  triggerTitle?: string
 }) {
   const dash = useInDashboard()
   const [open, setOpen] = useState(false)
@@ -137,6 +140,7 @@ export function DropdownMenu({
         ref={btnRef}
         type="button"
         aria-label={label}
+        title={triggerTitle}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

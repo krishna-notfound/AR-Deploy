@@ -142,31 +142,36 @@ export function registerEditorFlows(mobile: boolean) {
 
     await signInAsPlatform(page, 'admin')
     await page.goto('/admin/editor/apply')
-    await expect(page.getByRole('tab', { name: 'Form' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Preview the form' })).toBeVisible()
+    const typing = page.getByRole('radiogroup', { name: 'Language you are typing in' })
 
-    // Move "Phone" from the contact step to the location step (step 2).
-    await page.getByRole('combobox', { name: 'Move Phone to another step' }).selectOption('location')
-    await expect(page.getByRole('status').filter({ hasText: 'Moved to step 2, position 3' })).toBeAttached()
+    // Move "Phone" from the contact section to the location section (section 2) with the card menu.
+    await page.getByRole('button', { name: 'Actions for Phone' }).click()
+    await page.getByRole('menuitem', { name: 'Move to section 2: Location' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Moved to section 2, position 3' })).toBeAttached()
 
-    // Hide the optional "Website" field.
+    // Hide the optional "Website" question, in place on its card.
     await page.getByRole('button', { name: 'Edit Website' }).click()
-    const hideDialog = page.getByRole('dialog', { name: 'Website' })
-    await hideDialog.getByRole('switch', { name: 'Hidden' }).click()
-    await hideDialog.getByRole('button', { name: 'Close' }).click()
+    await page.getByRole('button', { name: 'Hide Website' }).click()
+    await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: 'Show Website' })).toBeVisible()
 
-    // Add a required short-text question on step 2, worded in English and Portuguese.
-    await page.getByRole('button', { name: 'Add question to step 2' }).click()
-    const question = page.getByRole('dialog')
-    await question.getByRole('textbox', { name: 'Label (English)' }).fill(QUESTION_EN)
-    await question.getByRole('textbox', { name: 'Label (Português)' }).fill(QUESTION_PT)
+    // Add a required short-answer question below "Country" (section 2), worded in English and Portuguese.
+    await page.getByRole('button', { name: 'Edit Country' }).click()
+    await page.getByRole('button', { name: 'Add question' }).click()
+    await page.getByRole('menuitem', { name: 'Short answer' }).click()
+    const question = page.locator('[data-row^="custom:"]')
+    await question.getByRole('textbox', { name: 'Question (English)' }).fill(QUESTION_EN)
+    await typing.getByRole('radio', { name: 'PT' }).click()
+    await question.getByRole('textbox', { name: 'Question (Português)' }).fill(QUESTION_PT)
     await question.getByRole('switch', { name: 'Required' }).click()
-    await question.getByRole('button', { name: 'Close' }).click()
-    await expect(page.getByRole('region', { name: /^Step 2/ }).getByText(QUESTION_EN)).toBeVisible()
+    await question.getByRole('button', { name: 'Done' }).click()
+    await typing.getByRole('radio', { name: 'EN' }).click()
+    await expect(page.getByRole('region', { name: /^Section 2/ }).getByText(QUESTION_EN)).toBeVisible()
 
-    // The consent sentence in Portuguese (Messages tab).
-    await page.getByRole('tab', { name: 'Messages' }).click()
-    await page.locator('[data-text-key="apply.f.consent"] textarea[lang="pt"]').fill(CONSENT_PT)
+    // The consent sentence in Portuguese, on the Review section's own card.
+    await typing.getByRole('radio', { name: 'PT' }).click()
+    await page.locator('[data-text-key="apply.f.consent"] textarea').fill(CONSENT_PT)
 
     await publishDraft(page)
 

@@ -292,12 +292,16 @@ If the box says some text is still marked "to be completed", those are placehold
 
 ### The application form
 
-- Each step is a card. Use the arrows to move a question up or down, and **Move to step** to put it on another step.
-- **Edit** opens the question's wording (English and Portuguese), whether it is required, and whether it is hidden. A hidden question is not asked. For questions with choices (such as the number of products) you can hide some of the choices, but at least one must stay.
-- Three questions are locked because we create your company account from them: **business name**, **contact name** and **contact email**. They are always asked and always required. The confirmation tick box and the agreement to the Terms are also fixed on the last step.
-- **Add question** adds your own question to a step: short text, long text, yes or no, one choice or several choices. You can add up to 10, and add steps (8 steps at most; the last step, Review, always stays last).
-- The **Messages** tab holds every other text on the page: buttons, error messages, the tick box sentence and the thank-you screen. The original wording is shown in grey in each box. **Reset** brings it back.
-- On a wide screen the form is shown live on the right as you change it.
+- The form is a column of cards, like Google Forms. At the top is the page title and introduction; then one **section** (a step of the form) after another, each with its questions as cards. Click a title or a description to type in it.
+- **Click a question** (or press Enter on it) to open it in place. Change its wording, its description and whether it is **Required**. Click away or press Esc to close it. Only one question is open at a time.
+- **EN | PT** at the top is the language you are typing in. A Portuguese box that is empty shows the English text in grey; the form then shows the English text.
+- **Move a question:** drag it by the dots on its left, inside its section or into another one. Without a mouse, use its **⋮** menu (Move up, Move down, Move to section…) or the arrow keys on the dots. The same **⋮** menu on a section moves it, adds a section below it, or deletes it (only sections you added; its questions move to the section above).
+- The questions that come with the form are marked **Standard**. You can reword them and **Reset to default**, and **Hide** them (a hidden question is not asked; Show brings it back). For questions with choices (such as the number of products) you can rename and hide some of the choices, but at least one must stay.
+- Three questions are locked because we create your company account from them: **business name**, **contact name** and **contact email**. They show a lock, are always asked and always required, and cannot be hidden. The confirmation tick box and the agreement to the Terms are always asked on the last section, **Review and send**; you can reword the confirmation sentence.
+- **Add question** (on the right of the open question, or at the bottom on a phone) lets you choose the kind first: short answer, paragraph, yes or no, multiple choice or checkboxes. The new question goes below the open one. You can add up to 10 of your own. **Duplicate** copies one of your questions, and **Delete** removes it after you confirm. **Add section** adds a section (8 at most; Review always stays last).
+- **After sending** holds the thank-you texts, with a link to preview that screen. **Button & message texts**, at the bottom, holds every other text: buttons, progress labels, warnings and error messages. Type in the search box to find one. The original wording is shown in grey in each box and **Reset** brings it back.
+- **Preview the form** shows the real form with your changes (nothing is sent), in English or Portuguese, as on a computer or a phone.
+- If something has to be fixed before you can publish, a yellow box at the top lists each problem; click one to jump to it.
 - When an application arrives, the answers to your own questions are shown on its page under **Extra questions**, worded as they were on the day it was sent. A question you hide or delete later does not change old applications.
 - A hidden question shows "Not given" on applications received after you hid it.
 
