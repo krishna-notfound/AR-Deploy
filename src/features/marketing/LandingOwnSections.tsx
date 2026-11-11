@@ -1,4 +1,4 @@
-﻿// The sections the Owner/Admin adds in the Website Editor (ADR-0061), in three designs that follow the Sanctus rhythm of the rest
+// The sections the Owner/Admin adds in the Website Editor (ADR-0061), in three designs that follow the Sanctus rhythm of the rest
 // of the landing page: serif headings, the shared eyebrow and Button, pictures contained (except in the banner, which is a
 // photograph under a veil like the hero). Hidden sections are skipped by the page, not here.
 import { ArrowRight } from 'lucide-react'

@@ -18,7 +18,7 @@ const savedLanding = async () => {
   return s.data.draft.landing
 }
 const block = async () => within(await screen.findByRole('region', { name: 'Sections' }, { timeout: 15_000 }))
-const rowNames = (b: ReturnType<typeof within>) => b.getAllByRole('listitem').map((li) => li.querySelector('.truncate')?.textContent)
+const rowNames = (b: ReturnType<typeof within>) => b.getAllByRole('listitem').map((li: HTMLElement) => li.querySelector('.truncate')?.textContent)
 
 beforeEach(async () => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
@@ -117,7 +117,7 @@ describe('Landing tab: Sections', () => {
     await waitFor(async () => expect((await savedLanding()).sections?.at(-1)).toMatchObject({ imageSide: 'right', image: { alt: { en: 'A walnut table' } } }), { timeout: 8000 })
 
     await userEvent.click(b.getByRole('button', { name: 'Remove: Picture' }))
-    await waitFor(async () => expect(((await savedLanding()).sections?.at(-1) as { image: { path: string } }).image.path).toBe(''), { timeout: 8000 })
+    await waitFor(async () => expect(((await savedLanding()).sections ?? []).at(-1)).toMatchObject({ image: { path: '' } }), { timeout: 8000 })
   })
 
   it('hides and moves an own section, and deletes it only after a confirm', { timeout: 90_000 }, async () => {

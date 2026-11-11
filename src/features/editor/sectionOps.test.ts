@@ -25,6 +25,8 @@ import {
 
 const A = { path: 'landing/0a1b2c3d-1111-4222-8333-444455556666.webp' }
 const B = { path: 'landing/0a1b2c3d-1111-4222-8333-777788889999.png' }
+type Pair = { en: string; pt?: string }
+type Loose = { title: Pair; button: { label: Pair; href: string }; anchor?: string; image: { path: string; alt: Pair }; imageSide: string }
 const ids = (doc = emptySiteContent()) => sectionsOf(doc).map((s) => s.id)
 
 describe('sections: add, move, hide, remove', () => {
@@ -75,7 +77,7 @@ describe('sections: add, move, hide, remove', () => {
 
 describe('sections: editing an own section', () => {
   const base = () => addSection(emptySiteContent(), 'text')
-  const first = (doc = base()) => sectionsOf(doc).at(-1) as unknown as Record<string, any>
+  const first = (doc = base()) => sectionsOf(doc).at(-1) as unknown as Loose
 
   it('sets texts per language; an optional text emptied in both languages is removed, the title stays', () => {
     let doc = setSectionText(base(), 'section-1', 'title', 'en', 'Welcome')
