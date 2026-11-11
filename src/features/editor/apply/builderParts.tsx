@@ -1,13 +1,10 @@
-// Small pieces shared by the builder screens: the side drawer, the English | Portuguese pair of inputs, error text.
-import { Lock, X } from 'lucide-react'
-import { type ReactNode, useEffect, useId, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { IconButton } from '@/components/ui/Button'
-import { FormField, Input, Textarea } from '@/components/ui/Form'
-import { useFocusTrap } from '@/components/ui/Modal'
-import type { ContentErrors, Lang } from '@/domain/siteContent'
+// Small pieces shared by the builder cards: the typing-language context, one editable text in place, the lock note, error text.
+import { Lock } from 'lucide-react'
+import { type PointerEvent as ReactPointerEvent, type ReactNode, createContext, useContext } from 'react'
+import type { ApplyFormConfig, ContentErrors, CustomQuestionType, Lang } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { cn } from '@/lib/cn'
 
 /** The text of a validation error for a document path (the validator gives a code; this is its sentence). */
 export function useErrorText() {
@@ -18,47 +15,81 @@ export function useErrorText() {
   }
 }
 
-/** A right-hand drawer (full screen on phones) with the dialog behaviour of Modal: focus trapped, Escape closes. */
-export function Drawer({ open, onClose, title, description, children }: { open: boolean; onClose: () => void; title: ReactNode; description?: ReactNode; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const titleId = useId()
-  const { t } = useI18n()
-  useFocusTrap(ref, open, onClose)
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [open])
-  if (!open) return null
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 animate-fade-in bg-ink/40" onClick={onClose} aria-hidden />
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="relative flex h-full w-full flex-col bg-surface shadow-[var(--shadow-pop)] sm:max-w-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-ui-card font-semibold text-ink [overflow-wrap:anywhere]">
-              {title}
-            </h2>
-            {description && <p className="mt-1 text-ui-small text-ink-muted">{description}</p>}
-          </div>
-          <IconButton aria-label={t('common.close')} size="sm" onClick={onClose} className="-mt-1 -mr-2">
-            <X className="size-4" aria-hidden />
-          </IconButton>
-        </div>
-        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
-      </div>
-    </div>,
-    document.body,
-  )
+/** What every card of the builder shares: the document, how to change it, and which language is being typed. */
+export interface BuilderContextValue {
+  config: ApplyFormConfig
+  onChange: (next: ApplyFormConfig) => void
+  errors: ContentErrors
+  /** The language being typed (the EN | PT switch at the top). */
+  lang: Lang
+  setLang: (lang: Lang) => void
+  /** The one question card that is open in place (`businessName`, `custom:<id>`), or null. */
+  openKey: string | null
+  setOpenKey: (key: string | null) => void
+  /** Asks for a card to be scrolled to and its first field (or the first with a problem) focused. */
+  requestFocus: (card: string, opts?: { select?: boolean }) => void
+}
+/** A request to focus a card; `nonce` tells a new request from one already carried out. */
+export interface FocusRequest {
+  card: string
+  select: boolean
+  nonce: number
+}
+export const BuilderContext = createContext<BuilderContextValue | null>(null)
+export function useBuilder(): BuilderContextValue {
+  const ctx = useContext(BuilderContext)
+  if (!ctx) throw new Error('useBuilder must be used inside the application form builder')
+  return ctx
+}
+
+/** The error for a text at `base` in the language being typed; a problem in the other language is named by its language. */
+export function useLangError() {
+  const errorText = useErrorText()
+  const { errors, lang } = useBuilder()
+  return (base: string): string | undefined => {
+    const other: Lang = lang === 'en' ? 'pt' : 'en'
+    const here = errorText(errors, `${base}.${lang}`)
+    if (here) return here
+    const there = errorText(errors, `${base}.${other}`)
+    return there ? `${LANG_NAMES[other]}: ${there}` : undefined
+  }
+}
+
+/** A `{ en, pt? }` pair with one language changed: an empty Portuguese text is removed (the form then shows English). */
+export function withLang<T extends { en: string; pt?: string }>(v: T, lang: Lang, text: string): T {
+  const next = { ...v }
+  if (lang === 'en') next.en = text
+  else if (text) next.pt = text
+  else delete next.pt
+  return next
+}
+
+/** What the cards need from the list they sit in: moving, dragging, focusing and the add bar. */
+export interface CardsContextValue {
+  /** Moves a card one place inside its section (`up`/`down`). */
+  move: (key: string, act: 'up' | 'down') => void
+  moveTo: (key: string, stepId: string) => void
+  /** Tells screen readers a section moved. */
+  announceSection: (position: number, total: number) => void
+  startDrag: (e: ReactPointerEvent<HTMLElement>, key: string) => void
+  drag: { key: string; stepId: string | null; index: number; dy: number } | null
+  /** Scrolls to a card and focuses its first field (or the first one with a problem). */
+  focusCard: BuilderContextValue['requestFocus']
+  /** The floating add bar, drawn next to the open card on a wide screen. */
+  addBar: ReactNode
+  addQuestionBelow: (type: CustomQuestionType) => void
+}
+export const CardsContext = createContext<CardsContextValue | null>(null)
+export function useCards(): CardsContextValue {
+  const ctx = useContext(CardsContext)
+  if (!ctx) throw new Error('useCards must be used inside the application form builder')
+  return ctx
 }
 
 /** The lock icon with the reason a field cannot be changed. */
-export function LockNote({ children }: { children: ReactNode }) {
+export function LockNote({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <p className="flex items-start gap-1.5 text-ui-small text-ink-muted">
+    <p className={cn('flex items-start gap-1.5 text-ui-small text-ink-muted', className)}>
       <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
       <span>{children}</span>
     </p>
@@ -67,38 +98,74 @@ export function LockNote({ children }: { children: ReactNode }) {
 
 export const LANG_NAMES: Record<Lang, string> = { en: 'English', pt: 'Português' }
 
+const SIZES = {
+  /** The form title and section titles: serif, large. */
+  title: 'font-display text-[1.5rem] leading-tight',
+  /** A question's wording. */
+  question: 'text-[16px] leading-snug font-medium',
+  /** A description or any other text (16px on phones so iOS does not zoom into the field). */
+  plain: 'text-[16px] leading-normal sm:text-[0.875rem]',
+} as const
+
 /**
- * One text in English and Portuguese side by side (stacked under `md`). Empty Portuguese falls back to English on the
- * public form; `placeholders` shows what the original says. `name` names the pair for screen readers.
+ * One text edited in place, in the language being typed: no box until it is hovered or focused, like a Google Forms
+ * question. An empty field shows `placeholder` greyed (the original wording, or the English text for Portuguese).
+ * `name` names the field for screen readers; the language is added to it.
  */
-export function LangPair({
+export function LangField({
   name,
+  lang,
   value,
   onChange,
-  placeholders,
-  errors,
+  placeholder,
+  error,
   multiline = false,
   maxLength,
+  size = 'plain',
+  className,
+  inputRef,
+  focusMark = false,
 }: {
   name: string
-  value: { en?: string; pt?: string }
-  onChange: (lang: Lang, text: string) => void
-  placeholders?: { en?: string; pt?: string }
-  errors?: { en?: string; pt?: string }
+  lang: Lang
+  value: string
+  onChange: (text: string) => void
+  placeholder?: string
+  error?: string
   multiline?: boolean
   maxLength?: number
+  size?: keyof typeof SIZES
+  className?: string
+  inputRef?: (el: HTMLInputElement | HTMLTextAreaElement | null) => void
+  /** Marks the field the card focuses first. */
+  focusMark?: boolean
 }) {
+  const shared = {
+    'data-autofocus': focusMark ? '' : undefined,
+    lang,
+    'aria-label': `${name} (${LANG_NAMES[lang]})`,
+    'aria-invalid': error ? true : undefined,
+    value,
+    placeholder,
+    maxLength,
+    'data-field-error': error ? 'true' : undefined,
+    className: cn(
+      // Quiet by default (a baseline line shows on hover and focus); a problem keeps its line in the danger colour.
+      'block w-full rounded-[var(--radius-control)] border-0 border-b bg-transparent px-1 py-1.5 pointer-coarse:min-h-11 text-ink placeholder:text-ink-faint transition-colors focus:outline-none',
+      error ? 'border-danger' : 'border-transparent hover:border-line-strong focus:border-ink',
+      SIZES[size],
+      className,
+    ),
+  }
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {(['en', 'pt'] as const).map((lang) => (
-        <FormField key={lang} label={LANG_NAMES[lang]} error={errors?.[lang]}>
-          {multiline ? (
-            <Textarea rows={2} lang={lang} aria-label={`${name} (${LANG_NAMES[lang]})`} value={value[lang] ?? ''} placeholder={placeholders?.[lang]} maxLength={maxLength} onChange={(e) => onChange(lang, e.target.value)} />
-          ) : (
-            <Input lang={lang} aria-label={`${name} (${LANG_NAMES[lang]})`} value={value[lang] ?? ''} placeholder={placeholders?.[lang]} maxLength={maxLength} onChange={(e) => onChange(lang, e.target.value)} />
-          )}
-        </FormField>
-      ))}
+    <div className="min-w-0">
+      {multiline ? (
+        // field-sizing grows the box with its text where the browser supports it; rows is the fallback.
+        <textarea rows={2} ref={inputRef} {...shared} className={cn(shared.className, 'resize-none [field-sizing:content]')} onChange={(e) => onChange(e.target.value)} />
+      ) : (
+        <input type="text" ref={inputRef} {...shared} onChange={(e) => onChange(e.target.value)} />
+      )}
+      {error && <p className="px-1 pt-1 text-ui-small text-danger">{error}</p>}
     </div>
   )
 }

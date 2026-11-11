@@ -1,16 +1,19 @@
-// Which wording the client edits where. The Messages tab shows the groups below; the field panel shows the label, hint and
-// option wording of one field. Together they cover every APPLY_EDITABLE_KEYS entry (a test checks it).
+// Which wording the client edits where. The form header card edits the `header` group, the Review card the `consent` text,
+// the "After sending" card the `thanks` group, and the "Button & message texts" panel the rest (PANEL_GROUP_IDS); the
+// question cards edit the label, hint and option wording of one field. Together they cover every APPLY_EDITABLE_KEYS entry
+// (a test checks it).
 import type { ApplyBuiltinField, ApplyChoiceField } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 
 export interface MessageGroup {
-  id: 'page' | 'buttons' | 'sending' | 'errors' | 'consent' | 'thanks'
+  id: 'header' | 'page' | 'buttons' | 'sending' | 'errors' | 'consent' | 'thanks'
   title: TranslationKey
   keys: readonly string[]
 }
 
 export const MESSAGE_GROUPS: readonly MessageGroup[] = [
-  { id: 'page', title: 'applications.builder.group.page', keys: ['apply.eyebrow', 'apply.title', 'apply.intro', 'apply.progress', 'apply.stepOf', 'apply.optional', 'apply.choose', 'apply.notGiven', 'apply.edit'] },
+  { id: 'header', title: 'applications.builder.headerCard', keys: ['apply.eyebrow', 'apply.title', 'apply.intro'] },
+  { id: 'page', title: 'applications.builder.group.page', keys: ['apply.progress', 'apply.stepOf', 'apply.optional', 'apply.choose', 'apply.notGiven', 'apply.edit'] },
   { id: 'buttons', title: 'applications.builder.group.buttons', keys: ['apply.back', 'apply.next', 'apply.submit', 'apply.retry'] },
   { id: 'sending', title: 'applications.builder.group.sending', keys: ['apply.failed', 'apply.rateLimited', 'apply.duplicate', 'apply.fixFields'] },
   {
@@ -39,6 +42,21 @@ export const MESSAGE_GROUPS: readonly MessageGroup[] = [
     ],
   },
 ]
+
+/** The groups the "Button & message texts" panel shows (the others have a card of their own). */
+export const PANEL_GROUP_IDS: readonly MessageGroup['id'][] = ['page', 'buttons', 'sending', 'errors']
+export const groupKeys = (id: MessageGroup['id']): readonly string[] => MESSAGE_GROUPS.find((g) => g.id === id)?.keys ?? []
+
+/** Which card a wording key is edited in: used to send a problem to the right place. */
+export function cardOfTextKey(key: string): { card: 'header' | 'review' | 'after' | 'panel' } | { card: 'field'; field: string } {
+  if (groupKeys('header').includes(key)) return { card: 'header' }
+  if (key === 'apply.f.consent') return { card: 'review' }
+  if (groupKeys('thanks').includes(key)) return { card: 'after' }
+  const f = /^apply\.f\.(\w+?)(?:\.hint)?$/.exec(key)
+  if (f) return { card: 'field', field: f[1] === 'categoryOther' ? 'category' : f[1]! }
+  for (const [field, prefix] of Object.entries(OPTION_PREFIX)) if (key.startsWith(`${prefix}.`)) return { card: 'field', field }
+  return { card: 'panel' }
+}
 
 const OPTION_PREFIX: Record<ApplyChoiceField, string> = { category: 'apply.cat', productCount: 'apply.count', photoReadiness: 'apply.photos', modelReadiness: 'apply.models' }
 
