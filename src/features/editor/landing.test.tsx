@@ -176,12 +176,12 @@ describe('landingOps: hero picture, 3D model and description (ADR-0049)', () => 
 })
 
 describe('Landing tab: the hero picture block (ADR-0049)', () => {
-  it('is the first block; uploads and removes the picture and the model, and sets the description in both languages', { timeout: 60_000 }, async () => {
+  it('is the block after the sections; uploads and removes the picture and the model, and sets the description in both languages', { timeout: 60_000 }, async () => {
     let seq = 0
     Object.assign(URL, { createObjectURL: vi.fn(() => `blob:hero/${++seq}`) })
     open()
     const block = await screen.findByRole('region', { name: 'Hero picture' }, { timeout: 15_000 })
-    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('Hero picture')
+    expect(screen.getAllByRole('heading', { level: 3 })[1]).toHaveTextContent('Hero picture')
     // Built-in at first.
     expect(within(block).getByRole('img', { name: 'The hero picture' })).toHaveAttribute('src', '/images/sanctus/v2/hero-living.webp')
     expect(within(block).getByText('No 3D model, so the picture has no 3D button.')).toBeInTheDocument()
@@ -218,7 +218,7 @@ describe('Landing tab: the three blocks (ADR-0047)', () => {
     open()
     const example = await screen.findByRole('radiogroup', { name: 'See a live example' }, { timeout: 15_000 })
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Hero picture', 'See a live example', '3D card', 'Collections', 'Texts'])
+    expect(headings).toEqual(['Sections', 'Hero picture', 'See a live example', '3D card', 'Collections', 'Texts'])
     // Automatic + exactly the house pieces.
     expect(within(example).getAllByRole('radio')).toHaveLength(1 + pieces.length)
     for (const p of pieces) expect(within(example).getByRole('radio', { name: p.name.en })).toBeInTheDocument()

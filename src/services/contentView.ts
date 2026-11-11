@@ -31,6 +31,9 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
     ...(hero ? { landingHero: clone(hero) } : {}),
     ...(showcase ? { landingShowcase: clone(showcase) } : {}),
     ...(texts && Object.keys(texts).length ? { landingTexts: clone(texts) } : {}),
+    ...(content.landing?.sections ? { landingSections: clone(content.landing.sections) } : {}),
+    ...(content.landing?.qr ? { landingQr: clone(content.landing.qr) } : {}),
+    ...(content.landing?.about ? { landingAbout: clone(content.landing.about) } : {}),
     ...(favicon ? { favicon: clone(favicon) } : {}),
   }
 }

@@ -159,6 +159,104 @@ export interface LandingHero {
 
 export const MAX_HERO_ALT = 120
 
+// ---- homepage sections, the QR section and the About pictures (ADR-0061) --------------------------------------------------
+type Pair = { en: string; pt?: string }
+
+/** An uploaded picture with its description (alt text; empty = decorative). */
+export interface SiteImage extends SiteAsset {
+  alt: Pair
+}
+
+/** The sections of the landing page the Website Editor can move and hide; the hero is always first and is not in the list. */
+export const BUILTIN_SECTION_IDS = ['qr', 'how', 'experience', 'collections', 'about', 'partners'] as const
+export type BuiltinSectionId = (typeof BUILTIN_SECTION_IDS)[number]
+export const OWN_SECTION_KINDS = ['text', 'imageText', 'banner'] as const
+export type OwnSectionKind = (typeof OWN_SECTION_KINDS)[number]
+
+/** An optional button of an own section: the label (EN, PT optional) and where it goes (a site path starting with `/`, or an https URL). */
+export interface SectionButton {
+  label: Pair
+  href: string
+}
+interface OwnSectionBase {
+  /** A slug, unique among all sections. */
+  id: string
+  hidden?: boolean
+  /** The address fragment of the section (`/#anchor`): a slug, unique, never one of the page's own ids. */
+  anchor?: string
+}
+export interface BuiltinSection {
+  kind: 'builtin'
+  id: BuiltinSectionId
+  hidden?: boolean
+}
+/** A centred text block. */
+export interface TextSection extends OwnSectionBase {
+  kind: 'text'
+  eyebrow?: Pair
+  title: Pair
+  subtitle?: Pair
+  body?: Pair
+  button?: SectionButton
+}
+/** A picture beside a text. */
+export interface ImageTextSection extends OwnSectionBase {
+  kind: 'imageText'
+  eyebrow?: Pair
+  title: Pair
+  body?: Pair
+  image: SiteImage
+  imageSide: 'left' | 'right'
+  button?: SectionButton
+}
+/** A full-width picture under a soft dark veil with white text, like the hero. */
+export interface BannerSection extends OwnSectionBase {
+  kind: 'banner'
+  image: SiteImage
+  title?: Pair
+  body?: Pair
+  button?: SectionButton
+}
+export type OwnSection = TextSection | ImageTextSection | BannerSection
+export type LandingSection = BuiltinSection | OwnSection
+
+/** The QR section's picture and layout. `none` (the default) shows centred text. */
+export interface LandingQr {
+  image?: SiteImage
+  imageSide: 'left' | 'right' | 'none'
+}
+export const QR_SIDES = ['left', 'right', 'none'] as const
+
+/** The two photographs of the About section. Absent: the built-in photos. */
+export interface LandingAbout {
+  image?: SiteImage
+  detail?: SiteImage
+}
+
+export const MAX_LANDING_SECTIONS = 16
+export const MAX_OWN_SECTIONS = 10
+export const MAX_SECTION_EYEBROW = 60
+export const MAX_SECTION_TITLE = 200
+export const MAX_SECTION_SUBTITLE = 200
+export const MAX_SECTION_BODY = 1200
+export const MAX_SECTION_BUTTON = 40
+export const MAX_SECTION_HREF = 300
+export const MAX_IMAGE_ALT = 120
+/** Page ids an own section's anchor may not take (the sections' own ids and their headings). Same list in the SQL gate. */
+export const RESERVED_SECTION_ANCHORS: readonly string[] = [
+  'qr', 'como-funciona', 'experiencia', 'colecoes', 'sobre', 'parcerias',
+  'hero-title', 'qr-title', 'how-title', 'xp-title', 'col-title', 'about-title', 'biz-title',
+]
+
+/** The sections of a page nothing was saved for: the six built-in ones in today's order (QR under the hero), none hidden. */
+export const defaultLandingSections = (): BuiltinSection[] => BUILTIN_SECTION_IDS.map((id) => ({ kind: 'builtin', id }))
+
+/** The list the page shows and the Editor edits: the saved one, else the default. */
+export const resolveLandingSections = (landing: Pick<SiteContent['landing'], 'sections'> | undefined): LandingSection[] => landing?.sections ?? defaultLandingSections()
+
+/** A site path (`/…`, not `//host`) or an https URL, without spaces, at most 300 characters. The twin of the pattern in the SQL gate. */
+export const isAllowedSectionHref = (href: string): boolean => href.length <= MAX_SECTION_HREF && /^(?:\/(?:[^/\s]\S*)?|https:\/\/\S+)$/.test(href)
+
 export const MAX_LANDING_COLLECTIONS = 8
 export const MAX_COLLECTION_TITLE = 60
 export const MAX_COLLECTION_TEXT = 160
@@ -185,6 +283,12 @@ export interface SiteContent {
     hero?: LandingHero
     /** Overrides of the landing page's own wording (ADR-0053): dictionary key (LANDING_EDITABLE_KEYS) to the text per language. Absent: the built-in wording. */
     texts?: LandingTexts
+    /** The order and visibility of the sections under the hero, plus the Owner/Admin's own sections (ADR-0061). Absent: the default list. */
+    sections?: LandingSection[]
+    /** The QR section's picture and layout. Absent: centred text. */
+    qr?: LandingQr
+    /** The About section's two photographs. Absent: the built-in photos. */
+    about?: LandingAbout
   }
   /** Site-wide settings (ADR-0053). Absent: the built-in icons. */
   chrome?: SiteChrome
@@ -258,6 +362,10 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   if (typeof landing.hero === 'object' && landing.hero !== null && !Array.isArray(landing.hero)) out.landing.hero = normalizeHero(landing.hero)
   const texts = normalizeLandingTexts(landing.texts)
   if (texts) out.landing.texts = texts
+  if (Array.isArray(landing.sections)) out.landing.sections = landing.sections.flatMap(normalizeSection)
+  if (typeof landing.qr === 'object' && landing.qr !== null && !Array.isArray(landing.qr)) out.landing.qr = normalizeQr(landing.qr)
+  const about = normalizeAbout(landing.about)
+  if (about) out.landing.about = about
   const favicon = asset(obj(raw.chrome).favicon)
   if (favicon) out.chrome = { favicon }
   return out
@@ -273,6 +381,12 @@ function normalizeLandingTexts(v: unknown): LandingTexts | undefined {
     if (typeof o.pt === 'string' && o.pt) entry.pt = o.pt
     if (entry.en !== undefined || entry.pt !== undefined) out[key] = entry
   }
+  // The text under the hero title moved to the QR section (ADR-0061): per language, a QR text that exists wins.
+  const legacy = out['landing.hero.body']
+  if (legacy) {
+    delete out['landing.hero.body']
+    out['landing.qr.body'] = { ...legacy, ...out['landing.qr.body'] }
+  }
   return Object.keys(out).length ? out : undefined
 }
 
@@ -281,6 +395,65 @@ const optPair = (v: unknown): { en: string; pt?: string } | undefined => {
   if (v === undefined) return undefined
   const p = pair(v)
   return p.en || p.pt ? p : undefined
+}
+
+/** A picture with its description; the path may be empty (a picture design not uploaded yet). Undefined when there is no path string. */
+function siteImage(v: unknown): SiteImage | undefined {
+  const o = obj(v)
+  return typeof o.path === 'string' ? { path: o.path, alt: pair(o.alt) } : undefined
+}
+
+function normalizeButton(v: unknown): SectionButton | undefined {
+  if (v === undefined) return undefined
+  const o = obj(v)
+  const label = pair(o.label)
+  const href = str(o.href)
+  return label.en || label.pt || href ? { label, href } : undefined
+}
+
+/** One entry of landing.sections; nothing for an entry that is not a known design (or an unknown built-in id). */
+function normalizeSection(x: unknown): LandingSection[] {
+  const o = obj(x)
+  const hidden = o.hidden === true
+  if (o.kind === 'builtin') {
+    return (BUILTIN_SECTION_IDS as readonly unknown[]).includes(o.id) ? [{ kind: 'builtin', id: o.id as BuiltinSectionId, ...(hidden ? { hidden } : {}) }] : []
+  }
+  const base = { id: str(o.id), ...(hidden ? { hidden } : {}), ...(typeof o.anchor === 'string' && o.anchor ? { anchor: o.anchor } : {}) }
+  const optional = (keys: readonly ('eyebrow' | 'subtitle' | 'body')[]) => {
+    const r: Partial<Record<'eyebrow' | 'subtitle' | 'body', Pair>> = {}
+    for (const k of keys) {
+      const p = optPair(o[k])
+      if (p) r[k] = p
+    }
+    return r
+  }
+  const button = normalizeButton(o.button)
+  const withButton = button ? { button } : {}
+  const emptyImage: SiteImage = { path: '', alt: { en: '' } }
+  if (o.kind === 'text') return [{ kind: 'text', ...base, title: pair(o.title), ...optional(['eyebrow', 'subtitle', 'body']), ...withButton }]
+  if (o.kind === 'imageText')
+    return [{ kind: 'imageText', ...base, title: pair(o.title), ...optional(['eyebrow', 'body']), image: siteImage(o.image) ?? emptyImage, imageSide: o.imageSide === 'right' ? 'right' : 'left', ...withButton }]
+  if (o.kind === 'banner') {
+    const title = optPair(o.title)
+    return [{ kind: 'banner', ...base, image: siteImage(o.image) ?? emptyImage, ...(title ? { title } : {}), ...optional(['body']), ...withButton }]
+  }
+  return []
+}
+
+function normalizeQr(x: unknown): LandingQr {
+  const o = obj(x)
+  const image = siteImage(o.image)
+  return { ...(image ? { image } : {}), imageSide: (QR_SIDES as readonly unknown[]).includes(o.imageSide) ? (o.imageSide as LandingQr['imageSide']) : 'none' }
+}
+
+function normalizeAbout(x: unknown): LandingAbout | undefined {
+  const o = obj(x)
+  const out: LandingAbout = {}
+  const image = siteImage(o.image)
+  if (image) out.image = image
+  const detail = siteImage(o.detail)
+  if (detail) out.detail = detail
+  return out.image || out.detail ? out : undefined
 }
 
 function normalizeHero(x: unknown): LandingHero {
@@ -445,6 +618,15 @@ export function validateContentShape(doc: unknown): ContentErrors {
     if (hero !== undefined && (typeof hero !== 'object' || hero === null || Array.isArray(hero))) return { 'landing.hero': 'invalid_value' }
     const texts = (l as Record<string, unknown>).texts
     if (texts !== undefined && (typeof texts !== 'object' || texts === null || Array.isArray(texts))) return { 'landing.texts': 'invalid_value' }
+    const sections = (l as Record<string, unknown>).sections
+    if (sections !== undefined) {
+      if (!Array.isArray(sections)) return { 'landing.sections': 'invalid_value' }
+      if (sections.length > MAX_LANDING_SECTIONS) return { 'landing.sections': 'too_many' }
+    }
+    for (const k of ['qr', 'about'] as const) {
+      const v = (l as Record<string, unknown>)[k]
+      if (v !== undefined && (typeof v !== 'object' || v === null || Array.isArray(v))) return { [`landing.${k}`]: 'invalid_value' }
+    }
   }
   if ('chrome' in d) {
     const c = d.chrome
@@ -522,6 +704,9 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
   if (doc.landing?.showcase) validateShowcase(doc.landing.showcase, put)
   if (doc.landing?.hero) validateHero(doc.landing.hero, put)
   if (doc.landing?.texts) validateLandingTexts(doc.landing.texts, put)
+  if (doc.landing?.sections !== undefined) validateSections(doc.landing.sections, put)
+  if (doc.landing?.qr !== undefined) validateQr(doc.landing.qr, put)
+  if (doc.landing?.about !== undefined) validateAbout(doc.landing.about, put)
   if (doc.chrome?.favicon !== undefined) {
     const f = doc.chrome.favicon
     if (!isSiteAsset(f) || !isFaviconPath(f.path)) put('chrome.favicon', 'invalid_value')
@@ -549,6 +734,105 @@ function validateLandingTexts(texts: LandingTexts, put: (path: string, key: Cont
       else if (v.length > max) put(`${p}.${l}`, 'too_long')
     }
   }
+}
+
+type Put = (path: string, key: ContentErrorKey) => void
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+/** A text pair: `en`/`pt`, strings within `max`; with `requireEn` the English must have text. Paths: `<path>`, `<path>.en|pt`. */
+function checkPair(v: unknown, path: string, max: number, requireEn: boolean, put: Put): void {
+  if (v === undefined) {
+    if (requireEn) put(`${path}.en`, 'required')
+    return
+  }
+  if (!isRecord(v)) return put(path, 'invalid_value')
+  if (requireEn && (typeof v.en !== 'string' || !v.en.trim())) put(`${path}.en`, 'required')
+  for (const l of ['en', 'pt'] as const) {
+    const t = v[l]
+    if (t === undefined) continue
+    if (typeof t !== 'string') put(`${path}.${l}`, 'invalid_value')
+    else if (t.length > max) put(`${path}.${l}`, 'too_long')
+  }
+}
+
+/** An uploaded picture with its description: an image path of the site-content bucket, alt texts of at most 120 characters. */
+function checkImage(img: unknown, path: string, required: boolean, put: Put): void {
+  if (img === undefined) {
+    if (required) put(path, 'required')
+    return
+  }
+  if (!isRecord(img)) return put(path, 'invalid_value')
+  if (img.path === '') put(path, 'required')
+  else if (typeof img.path !== 'string' || siteAssetKind(img.path) !== 'image') put(path, 'invalid_value')
+  checkPair(img.alt, `${path}.alt`, MAX_IMAGE_ALT, false, put)
+}
+
+function checkButton(b: unknown, path: string, put: Put): void {
+  if (b === undefined) return
+  if (!isRecord(b)) return put(path, 'invalid_value')
+  checkPair(b.label, `${path}.label`, MAX_SECTION_BUTTON, true, put)
+  if (typeof b.href !== 'string') put(`${path}.href`, b.href === undefined ? 'required' : 'invalid_value')
+  else if (b.href === '') put(`${path}.href`, 'required')
+  else if (b.href.length > MAX_SECTION_HREF) put(`${path}.href`, 'too_long')
+  else if (!isAllowedSectionHref(b.href)) put(`${path}.href`, 'invalid_link')
+}
+
+/** landing.sections: the order list. Paths: `landing.sections` (count) and `landing.sections.<i>.<field>`. */
+function validateSections(list: LandingSection[], put: Put): void {
+  if (!Array.isArray(list)) return put('landing.sections', 'invalid_value')
+  const own = list.filter((s) => s?.kind !== 'builtin').length
+  if (list.length > MAX_LANDING_SECTIONS || own > MAX_OWN_SECTIONS) put('landing.sections', 'too_many')
+  const ids = new Set<string>()
+  const anchors = new Set<string>()
+  list.forEach((raw, i) => {
+    const p = `landing.sections.${i}`
+    if (!isRecord(raw)) return put(p, 'invalid_value')
+    const s = raw as Record<string, unknown>
+    if (s.hidden !== undefined && typeof s.hidden !== 'boolean') put(`${p}.hidden`, 'invalid_value')
+    const id = typeof s.id === 'string' ? s.id : ''
+    if (s.kind === 'builtin') {
+      if (!(BUILTIN_SECTION_IDS as readonly string[]).includes(id)) put(`${p}.id`, 'invalid_value')
+      else if (ids.has(id)) put(`${p}.id`, 'duplicate_id')
+      ids.add(id)
+      return
+    }
+    if (s.kind !== 'text' && s.kind !== 'imageText' && s.kind !== 'banner') return put(`${p}.kind`, 'invalid_value')
+    if (!id) put(`${p}.id`, 'required')
+    else if (id.length > MAX_SLUG_LENGTH) put(`${p}.id`, 'too_long')
+    else if (!SLUG.test(id)) put(`${p}.id`, 'invalid_slug')
+    else if ((BUILTIN_SECTION_IDS as readonly string[]).includes(id)) put(`${p}.id`, 'slug_reserved')
+    else if (ids.has(id)) put(`${p}.id`, 'duplicate_id')
+    ids.add(id)
+    if (s.anchor !== undefined) {
+      const a = s.anchor
+      if (typeof a !== 'string' || !a) put(`${p}.anchor`, 'invalid_value')
+      else if (a.length > MAX_SLUG_LENGTH) put(`${p}.anchor`, 'too_long')
+      else if (!SLUG.test(a)) put(`${p}.anchor`, 'invalid_slug')
+      else if (RESERVED_SECTION_ANCHORS.includes(a)) put(`${p}.anchor`, 'slug_reserved')
+      else if (anchors.has(a)) put(`${p}.anchor`, 'slug_duplicate')
+      if (typeof a === 'string') anchors.add(a)
+    }
+    const titled = s.kind !== 'banner'
+    if (s.kind !== 'banner') checkPair(s.eyebrow, `${p}.eyebrow`, MAX_SECTION_EYEBROW, false, put)
+    checkPair(s.title, `${p}.title`, MAX_SECTION_TITLE, titled, put)
+    if (s.kind === 'text') checkPair(s.subtitle, `${p}.subtitle`, MAX_SECTION_SUBTITLE, false, put)
+    checkPair(s.body, `${p}.body`, MAX_SECTION_BODY, false, put)
+    if (s.kind !== 'text') checkImage(s.image, `${p}.image`, true, put)
+    if (s.kind === 'imageText' && s.imageSide !== 'left' && s.imageSide !== 'right') put(`${p}.imageSide`, 'invalid_value')
+    checkButton(s.button, `${p}.button`, put)
+  })
+}
+
+function validateQr(qr: LandingQr, put: Put): void {
+  if (!isRecord(qr)) return put('landing.qr', 'invalid_value')
+  if (qr.imageSide !== undefined && !(QR_SIDES as readonly unknown[]).includes(qr.imageSide)) put('landing.qr.imageSide', 'invalid_value')
+  checkImage(qr.image, 'landing.qr.image', false, put)
+}
+
+function validateAbout(about: LandingAbout, put: Put): void {
+  if (!isRecord(about)) return put('landing.about', 'invalid_value')
+  checkImage(about.image, 'landing.about.image', false, put)
+  checkImage(about.detail, 'landing.about.detail', false, put)
 }
 
 function validateRef(ref: ProductRef, path: string, put: (path: string, key: ContentErrorKey) => void): void {
@@ -659,6 +943,8 @@ export interface ChangeSummary {
   landingShowcase: number
   /** Landing page texts overridden, changed or reset (per key and language). */
   landingTexts: number
+  /** Homepage sections added, removed, edited, hidden, shown or moved, plus the QR section layout and each About picture changed (ADR-0061). */
+  landingSections: number
   /** The site icon (favicon): 1 when it was set, replaced or removed. */
   siteFavicon: number
   total: number
@@ -770,6 +1056,19 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
   for (const key of new Set([...Object.keys(ta), ...Object.keys(tb)]))
     for (const l of ['en', 'pt'] as const) if ((ta[key]?.[l] ?? '') !== (tb[key]?.[l] ?? '')) landingTexts++
 
+  // Homepage sections: per section by id, then the order of the sections both sides share; the QR layout and each About picture count once.
+  let landingSections = 0
+  const la = resolveLandingSections(a.landing)
+  const lb = resolveLandingSections(b.landing)
+  const secA = new Map(la.map((s) => [s.id, s]))
+  const secB = new Map(lb.map((s) => [s.id, s]))
+  for (const [id, s] of secB) if (!secA.has(id) || !same(secA.get(id), s)) landingSections++
+  for (const id of secA.keys()) if (!secB.has(id)) landingSections++
+  if (!same([...secA.keys()].filter((id) => secB.has(id)), [...secB.keys()].filter((id) => secA.has(id)))) landingSections++
+  if (!same(a.landing?.qr, b.landing?.qr)) landingSections++
+  if (!same(a.landing?.about?.image, b.landing?.about?.image)) landingSections++
+  if (!same(a.landing?.about?.detail, b.landing?.about?.detail)) landingSections++
+
   const siteFavicon = same(a.chrome?.favicon, b.chrome?.favicon) ? 0 : 1
 
   return {
@@ -783,7 +1082,8 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
     landingCollections,
     landingShowcase,
     landingTexts,
+    landingSections,
     siteFavicon,
-    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase + landingTexts + siteFavicon,
+    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase + landingTexts + landingSections + siteFavicon,
   }
 }

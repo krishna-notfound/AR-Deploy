@@ -8,6 +8,7 @@ import { useEditor } from './EditorContext'
 import { HeroPictureBlock } from './HeroPictureBlock'
 import { LandingTextsBlock } from './LandingTextsBlock'
 import { NoPiecesPrompt, PiecePicker } from './PiecePicker'
+import { SectionsBlock } from './SectionsBlock'
 import { setExample, setFeatured } from './landingOps'
 import { useShowcasePieces } from './useShowcasePieces'
 
@@ -46,6 +47,10 @@ export default function LandingScreen() {
         <h2 className="text-ui-card font-medium text-ink">{t('editor.menu.landing')}</h2>
         <p className="mt-1 max-w-xl text-ui-small text-ink-muted">{t('editor.landing.description')}</p>
       </div>
+
+      <Block id="landing-sections-heading" title={t('editor.sections.title')} help={t('editor.sections.help')}>
+        <SectionsBlock />
+      </Block>
 
       <Block id="landing-hero-heading" title={t('editor.landing.hero.title')} help={t('editor.landing.hero.help')}>
         <HeroPictureBlock />
