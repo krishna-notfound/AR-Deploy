@@ -225,13 +225,15 @@ describe('the company description is internal', () => {
     expect(await h.affected(ADMIN, `update public.businesses set description = 'Edited by staff' where id = $1`, [BIZ])).toBe(1)
   })
 
-  it('every column but description is granted to anon, and a column added later is not', async () => {
+  it('every column but description is granted to anon (and the banner original and crop, ADR-0065), and a column added later is not', async () => {
     const granted = await db.query<{ c: string }>(
       `select column_name as c from information_schema.column_privileges
         where table_schema = 'public' and table_name = 'businesses' and grantee = 'anon' and privilege_type = 'SELECT' order by 1`,
     )
     const all = await db.query<{ c: string }>(`select column_name as c from information_schema.columns where table_schema = 'public' and table_name = 'businesses' order by 1`)
-    expect(granted.rows.map((r) => r.c)).toEqual(all.rows.map((r) => r.c).filter((c) => c !== 'description'))
+    // description is internal (ADR-0054); banner_original_url and banner_crop are for the people who edit the banner (ADR-0065, catalogueBanner.test.ts).
+    const notForAnon = ['description', 'banner_original_url', 'banner_crop']
+    expect(granted.rows.map((r) => r.c)).toEqual(all.rows.map((r) => r.c).filter((c) => !notForAnon.includes(c)))
   })
 })
 

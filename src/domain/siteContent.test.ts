@@ -141,7 +141,7 @@ describe('isAllowedSocialUrl', () => {
 })
 
 describe('summarizeChanges', () => {
-  const zero = { pages: 0, footer: 0, applicationTexts: 0, applicationSteps: 0, applicationFields: 0, questions: 0, social: 0, landingCollections: 0, landingShowcase: 0, landingTexts: 0, landingSections: 0, siteFavicon: 0, total: 0 }
+  const zero = { pages: 0, footer: 0, applicationTexts: 0, applicationSteps: 0, applicationFields: 0, questions: 0, social: 0, landingCollections: 0, landingShowcase: 0, landingTexts: 0, landingSections: 0, siteFavicon: 0, catalogBanner: 0, total: 0 }
 
   it('no change is all zeros, and null counts as empty', () => {
     expect(summarizeChanges(emptySiteContent(), emptySiteContent())).toEqual(zero)

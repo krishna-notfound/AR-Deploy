@@ -5,8 +5,7 @@ import type { ImageCrop, ProductImage } from '@/domain/types'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import type { TFn } from '@/i18n/translate'
-import { IMAGE_RULES, imageToPersistableDataUrl, validateImageFile } from '@/lib/files'
+import { IMAGE_RULES, demoSized, validateImageFile } from '@/lib/files'
 import { formatFileSize } from '@/lib/format'
 import { newId } from '@/lib/id'
 import { editedFile } from '@/lib/imageCrop'
@@ -14,18 +13,6 @@ import { type ImageFrameKey, imageFrame } from '@/lib/imageFrames'
 import { isDemoMode, service } from '@/services'
 import { IconButton } from './Button'
 import { SmartImage } from './SmartImage'
-
-/** Demo mode: the picture as the demo will keep it (a data URL no bigger than 1600 px), as a file; or why it cannot be kept. */
-async function demoSized(file: File, t: TFn): Promise<{ ok: true; file: File } | { ok: false; message: string }> {
-  const res = await imageToPersistableDataUrl(file, 1600, t)
-  if (!res.ok) return res
-  try {
-    const blob = await (await fetch(res.url)).blob()
-    return { ok: true, file: new File([blob], file.name, { type: blob.type || file.type }) }
-  } catch {
-    return { ok: true, file }
-  }
-}
 
 /** A photo being edited: where its original opens from, and the crop it started with. */
 interface Editing {

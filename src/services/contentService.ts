@@ -49,6 +49,8 @@ export interface PublishedChrome {
   landingAbout?: LandingAbout
   /** The site icon (a PNG) that replaces the built-in favicon (ADR-0053); absent when none is published. */
   favicon?: SiteAsset
+  /** The default picture at the top of a catalogue whose company has no banner of its own (ADR-0065); absent when none is published. */
+  catalogBanner?: SiteAsset
 }
 export type PublishedPage =
   | { kind: 'builtin'; body: Partial<Record<Lang, string>> } // terms | privacy overrides

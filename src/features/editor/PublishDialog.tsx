@@ -22,6 +22,7 @@ const GROUPS = [
   ['landingTexts', 'editor.summary.landingTexts'],
   ['landingSections', 'editor.summary.landingSections'],
   ['siteFavicon', 'editor.summary.siteFavicon'],
+  ['catalogBanner', 'editor.summary.catalogBanner'],
 ] as const satisfies readonly (readonly [string, TranslationKey])[]
 
 /** "Publish N changes to the live site?": the counts by group and the placeholders still to be completed. */

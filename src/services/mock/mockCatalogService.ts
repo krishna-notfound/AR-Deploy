@@ -264,7 +264,11 @@ function toCatalog(db: Db, b: Business): BusinessCatalog {
 }
 
 /** A business as the public reads return it: the description is internal (ADR-0054), as the database's column privileges. */
-const publicBusiness = (b: Business): Business => ({ ...b, description: '' })
+// As the database for a visitor: no description (ADR-0054), and of the banner only the picture (ADR-0065), not its original or crop.
+const publicBusiness = (b: Business): Business => {
+  const { banner, ...rest } = b
+  return { ...rest, description: '', ...(banner ? { banner: { url: banner.url } } : {}) }
+}
 
 const byUpdatedDesc = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt)
 
@@ -963,6 +967,7 @@ export const mockCatalogService: CatalogService = {
       const asset = createSessionModelAsset(file, kind)
       return ok({ url: asset.url, status: asset.status })
     }
+    // A catalogue banner (ADR-0065) and its original are kept like a photo (a data URL of at most 1600 px); a logo at 512 px.
     const res = await imageToPersistableDataUrl(file, kind === 'logo' ? 512 : 1600)
     return res.ok ? ok({ url: res.url, status: 'valid' }) : fail('STORAGE', res.message)
   },

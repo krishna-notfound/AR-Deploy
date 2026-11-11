@@ -1,7 +1,7 @@
 // One module for the shape of every picture frame (ADR-0063, ADR-0064). Components take their aspect and fit from here,
 // never from a hardcoded `aspect-[…]` class, so a frame changes in one place and the crop dialog crops to the same shape.
 
-export type ImageFrameKey = 'product' | 'hero' | 'banner' | 'collection' | 'aboutMain' | 'aboutDetail' | 'aboutThird' | 'imageText' | 'qr' | 'logo' | 'avatar'
+export type ImageFrameKey = 'product' | 'hero' | 'banner' | 'collection' | 'aboutMain' | 'aboutDetail' | 'aboutThird' | 'catalogBanner' | 'imageText' | 'qr' | 'logo' | 'avatar'
 
 export interface ImageFrame {
   /** Width divided by height: what the crop dialog and the stored crop use. */
@@ -31,6 +31,9 @@ export const IMAGE_FRAMES: Record<ImageFrameKey, ImageFrame> = {
   // The About grid's third box takes the height the 4:5 main photo leaves under the square detail: about 2:3 (a gap less).
   // Cover, so the few pixels of the gap are trimmed instead of showing as bars.
   aboutThird: cover(2 / 3, 'aspect-[2/3]'),
+  // The catalogue top (ADR-0065): a full-width band whose height follows the screen, so its box is not 2:1. The picture is cropped to
+  // 2:1 and covers the band, which trims its sides on a narrow screen (and its top and bottom on a very wide one).
+  catalogBanner: cover(2 / 1, 'aspect-[2/1]'),
   imageText: contain(4 / 3, 'aspect-[4/3]'),
   qr: contain(4 / 3, 'aspect-[4/3]'),
   logo: contain(1, 'aspect-square'),

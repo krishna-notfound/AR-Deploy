@@ -135,6 +135,7 @@ export const ptAdmin: Partial<Record<TranslationKey, string>> = {
   'admin.businesses.form.profile': 'Perfil da empresa',
   'admin.businesses.form.name': 'Nome da empresa',
   'admin.businesses.form.logo': 'Logótipo',
+  'admin.businesses.form.banner': 'Faixa do catálogo',
   'admin.businesses.form.description': 'Descrição',
   'admin.businesses.form.descriptionHint': 'Apresentada no topo do catálogo público.',
   'admin.businesses.form.contact': 'Contacto',

@@ -71,7 +71,7 @@ export function describeProblem(path: string, key: string, draft: SiteContent, t
     const name = card.title.en.trim() || t('editor.landing.untitled')
     return { path, what, where: `${where}: ${field ? `${name}, ${t(field).toLowerCase()}` : name}`, to: editorLandingPath() }
   }
-  if (parts[0] === 'chrome') return { path, what, where: `${t('editor.menu.site')}: ${t('editor.site.favicon.title')}`, to: editorSitePath() }
+  if (parts[0] === 'chrome') return { path, what, where: `${t('editor.menu.site')}: ${t(parts[1] === 'catalogBanner' ? 'editor.site.banner.title' : 'editor.site.favicon.title')}`, to: editorSitePath() }
   if (parts[0] === 'applyForm') return { path, what, where: t('editor.menu.apply'), to: editorApplyPath('form') }
   if (parts[0] === 'social') {
     const net = SOCIAL_NETWORKS.find((n) => n === parts[1])
