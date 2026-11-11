@@ -234,6 +234,8 @@ export const ptApplications: Partial<Record<TranslationKey, string>> = {
   // add bar
   'applications.builder.addBar': 'Adicionar ao formulário',
   'applications.builder.addQuestion': 'Adicionar pergunta',
+  'applications.builder.addQuestionTo': 'Adicionar uma pergunta à secção {n}',
+  'applications.builder.sectionAddQuestion': 'Adicionar uma pergunta aqui',
   'applications.builder.addSection': 'Adicionar secção',
   'applications.builder.newQuestion': 'Nova pergunta',
   'applications.builder.questionsFull': '{max} perguntas próprias é o máximo',

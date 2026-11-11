@@ -1,6 +1,7 @@
 // Small pieces shared by the builder cards: the typing-language context, one editable text in place, the lock note, error text.
 import { Lock } from 'lucide-react'
 import { type PointerEvent as ReactPointerEvent, type ReactNode, createContext, useContext } from 'react'
+import type { MenuHeading, MenuItem } from '@/components/ui/Menu'
 import type { ApplyFormConfig, ContentErrors, CustomQuestionType, Lang } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
@@ -78,6 +79,11 @@ export interface CardsContextValue {
   /** The floating add bar, drawn next to the open card on a wide screen. */
   addBar: ReactNode
   addQuestionBelow: (type: CustomQuestionType) => void
+  /** Adds a question at the end of one section and opens it (the section menu and an empty section's note). */
+  addQuestionIn: (stepId: string, type: CustomQuestionType) => void
+  /** The Add question menu for one section: the kinds, then the deleted standard questions to restore there. */
+  questionMenu: (stepId: string) => (MenuItem | MenuHeading | 'separator')[]
+  questionsFull: boolean
 }
 export const CardsContext = createContext<CardsContextValue | null>(null)
 export function useCards(): CardsContextValue {

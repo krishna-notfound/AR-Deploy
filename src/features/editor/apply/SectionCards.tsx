@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronDown, Lock, MoreVertical, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, LayoutList, Lock, MoreVertical, Plus, Trash2 } from 'lucide-react'
 import { type ReactElement, useState } from 'react'
 import { Link } from 'react-router'
 import { Badge } from '@/components/ui/Badge'
@@ -78,7 +78,9 @@ export function SectionCard({ step, n, total, sections }: { step: ResolvedStep; 
     { label: t('applications.builder.sectionUp'), icon: <ArrowUp />, disabled: n === 1, onSelect: () => shift(-1) },
     { label: t('applications.builder.sectionDown'), icon: <ArrowDown />, disabled: n >= total - 1, onSelect: () => shift(1) },
     'separator',
-    { label: atLimit ? t('applications.builder.sectionAddFull', { max: MAX_APPLY_STEPS }) : t('applications.builder.sectionAddBelow'), icon: <Plus />, disabled: atLimit, onSelect: addBelow },
+    // A short answer to start with: the card opens, and its kind can be changed there.
+    { label: t('applications.builder.sectionAddQuestion'), icon: <Plus />, disabled: cards.questionsFull, onSelect: () => cards.addQuestionIn(step.id, 'short_text') },
+    { label: atLimit ? t('applications.builder.sectionAddFull', { max: MAX_APPLY_STEPS }) : t('applications.builder.sectionAddBelow'), icon: <LayoutList />, disabled: atLimit, onSelect: addBelow },
     { label: canDelete ? t('applications.builder.sectionDelete') : t('applications.builder.sectionDeleteLast'), icon: <Trash2 />, destructive: true, disabled: !canDelete, onSelect: () => void remove() },
   ]
 
@@ -135,7 +137,21 @@ export function SectionCard({ step, n, total, sections }: { step: ResolvedStep; 
       {isReview ? (
         <ReviewRows />
       ) : step.fields.length === 0 ? (
-        <div className={cn('rounded-[var(--radius-card)] border border-dashed p-4 text-ui-body text-ink-muted', dropHere ? 'border-accent bg-accent-soft' : 'border-line-strong')}>{t('applications.builder.emptySection')}</div>
+        <div className={cn('space-y-3 rounded-[var(--radius-card)] border border-dashed p-4 text-ui-body text-ink-muted', dropHere ? 'border-accent bg-accent-soft' : 'border-line-strong')}>
+          <p>{t('applications.builder.emptySection')}</p>
+          <DropdownMenu
+            label={t('applications.builder.addQuestionTo', { n })}
+            align="start"
+            triggerClassName="w-auto! h-11! gap-2 border border-line-strong bg-surface px-3! text-ui-body font-medium text-ink hover:border-ink"
+            trigger={
+              <>
+                <Plus className="size-4" aria-hidden />
+                <span aria-hidden>{t('applications.builder.addQuestion')}</span>
+              </>
+            }
+            items={cards.questionMenu(step.id)}
+          />
+        </div>
       ) : (
         <ul className="space-y-3">{rows}</ul>
       )}

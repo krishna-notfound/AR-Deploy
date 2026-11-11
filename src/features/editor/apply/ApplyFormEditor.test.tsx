@@ -80,6 +80,23 @@ describe('the cards', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it("every section's menu adds a question at the end of that section, opened to edit", async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await menu(user, 'Actions for section 2', 'Add a question here')
+    expect(orderIn(/^Section 2/)).toEqual(['country', 'city', expect.stringMatching(/^custom:/)])
+    expect(screen.getByDisplayValue('New question')).toBeInTheDocument()
+  })
+
+  it('a new, empty section offers Add question inside its empty note', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await menu(user, 'Actions for section 4', 'Add section below')
+    await user.click(screen.getByRole('button', { name: 'Add a question to section 5' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Short answer' }))
+    expect(orderIn(/^Section 5/)).toEqual([expect.stringMatching(/^custom:/)])
+  })
+
   it('a closed card looks like the question; Enter or a click opens it in place, one at a time', async () => {
     const user = userEvent.setup()
     renderEditor()

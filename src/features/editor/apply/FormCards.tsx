@@ -3,7 +3,7 @@ import { type ApplyBuiltinField, MAX_APPLY_STEPS, MAX_CUSTOM_QUESTIONS, type Cus
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { translate } from '@/i18n/translate'
-import { AddBar } from './AddBar'
+import { AddBar, questionMenuItems } from './AddBar'
 import { CardsContext, type CardsContextValue, type FocusRequest, useBuilder } from './builderParts'
 import { useFieldDrag } from './dragReorder'
 import { addQuestion, addStep, layoutOf, moveField, moveFieldTo, moveFieldToStep, placeableSteps, positionOf, restoreField } from './formOps'
@@ -106,12 +106,20 @@ export function FormCards({ panelOpen, onPanelToggle, focusRequest }: { panelOpe
     focusCard(`step:${r.id}`, { select: true })
   }
   const removed = removedFieldsOf(config).map((key) => ({ key, name: config.texts[`apply.f.${key}`]?.[appLang] || translate(appLang, `apply.f.${key}` as TranslationKey) }))
-  const restore = (key: ApplyBuiltinField) => {
-    const next = restoreField(config, key, anchorStep())
+  const restoreIn = (stepId: string, key: ApplyBuiltinField) => {
+    const next = restoreField(config, key, stepId)
     if (next === config) return
     onChange(next)
     setOpenKey(key)
     focusCard(`field:${key}`, { select: true })
+  }
+  const restore = (key: ApplyBuiltinField) => restoreIn(anchorStep(), key)
+  const addQuestionIn = (stepId: string, type: CustomQuestionType) => {
+    const r = addQuestion(config, stepId, type, t('applications.builder.newQuestion'))
+    if (!r.id) return
+    onChange(r.config)
+    setOpenKey(`custom:${r.id}`)
+    focusCard(`field:custom:${r.id}`, { select: true })
   }
   const addBar = <AddBar railed={!!openField} questionsFull={questionsFull} sectionsFull={sectionsFull} removed={removed} onAddQuestion={addQuestionBelow} onRestore={restore} onAddSection={addSection} />
 
@@ -124,6 +132,9 @@ export function FormCards({ panelOpen, onPanelToggle, focusRequest }: { panelOpe
     focusCard,
     addBar,
     addQuestionBelow,
+    addQuestionIn,
+    questionMenu: (stepId) => questionMenuItems(t, questionsFull, removed, (type) => addQuestionIn(stepId, type), (key) => restoreIn(stepId, key)),
+    questionsFull,
   }
 
   return (

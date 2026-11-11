@@ -235,6 +235,8 @@ export const enApplications = {
   // add bar
   'applications.builder.addBar': 'Add to the form',
   'applications.builder.addQuestion': 'Add question',
+  'applications.builder.addQuestionTo': 'Add a question to section {n}',
+  'applications.builder.sectionAddQuestion': 'Add a question here',
   'applications.builder.addSection': 'Add section',
   'applications.builder.newQuestion': 'New question',
   'applications.builder.questionsFull': '{max} own questions is the most',

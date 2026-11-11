@@ -6,6 +6,23 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { QUESTION_KINDS, kindLabelKey } from './kinds'
 
+/** The Add question menu: the kinds, then the deleted standard questions to restore (ADR-0057). Shared by the add bar and the sections. */
+export function questionMenuItems(
+  t: ReturnType<typeof useI18n>['t'],
+  questionsFull: boolean,
+  removed: { key: ApplyBuiltinField; name: string }[],
+  onAdd: (type: CustomQuestionType) => void,
+  onRestore: (key: ApplyBuiltinField) => void,
+): (MenuItem | MenuHeading | 'separator')[] {
+  const kinds: MenuItem[] = QUESTION_KINDS.map((k) => {
+    const Icon = k.icon
+    return { label: t(kindLabelKey(k.type)), icon: <Icon />, disabled: questionsFull, onSelect: () => onAdd(k.type) }
+  })
+  return removed.length
+    ? [...kinds, 'separator', { heading: t('applications.builder.restoreHeading') }, ...removed.map((r): MenuItem => ({ label: r.name, icon: <RotateCcw />, onSelect: () => onRestore(r.key) }))]
+    : kinds
+}
+
 /**
  * The add bar: Add question (pick the kind first) and Add section. It is one element that changes place with the screen:
  * a fixed bar at the bottom on phones and tablets; from the xl breakpoint it floats to the right of the open card
@@ -32,13 +49,7 @@ export function AddBar({
 }) {
   const { t } = useI18n()
   const reason = questionsFull ? t('applications.builder.questionsFull', { max: MAX_CUSTOM_QUESTIONS }) : sectionsFull ? t('applications.builder.sectionsFull', { max: MAX_APPLY_STEPS }) : null
-  const kinds: MenuItem[] = QUESTION_KINDS.map((k) => {
-    const Icon = k.icon
-    return { label: t(kindLabelKey(k.type)), icon: <Icon />, disabled: questionsFull, onSelect: () => onAddQuestion(k.type) }
-  })
-  const items: (MenuItem | MenuHeading | 'separator')[] = removed.length
-    ? [...kinds, 'separator', { heading: t('applications.builder.restoreHeading') }, ...removed.map((r): MenuItem => ({ label: r.name, icon: <RotateCcw />, onSelect: () => onRestore(r.key) }))]
-    : kinds
+  const items = questionMenuItems(t, questionsFull, removed, onAddQuestion, onRestore)
   // With the own-question limit reached the menu still offers the deleted standard questions (they are not own questions).
   const menuOnly = questionsFull && removed.length > 0
   const label = railed ? 'xl:sr-only' : ''
