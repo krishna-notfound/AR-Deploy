@@ -115,6 +115,21 @@ describe('ApplicationsPage', () => {
   })
 })
 
+describe('ApplicationsPage: applications without a company or applicant name (ADR-0057)', () => {
+  it('lists them by the applicant email, in the table and on phones, with no "null" and no empty links', async () => {
+    await submitApplication()
+    const real = (await service.getApplications()) as { ok: true; data: { items: BusinessApplication[] } }
+    const nameless = real.data.items.map((x) => ({ ...x, businessName: null, applicantName: null }))
+    vi.spyOn(service, 'getApplications').mockResolvedValue(ok({ ...real.data, items: nameless }))
+    const { container } = renderAt('/admin/applications', <ApplicationsPage />)
+    const table = await screen.findByRole('table', { name: 'Business applications' })
+    const link = within(table).getByRole('link', { name: 'rita@atelier.test' })
+    expect(link).toHaveAttribute('href', expect.stringContaining('/admin/applications/'))
+    expect(container.textContent).not.toMatch(/null|undefined/)
+    for (const a of container.querySelectorAll('a')) expect((a.textContent ?? '').trim(), 'every link has text').not.toBe('')
+  })
+})
+
 describe('Monogram', () => {
   it('is a 32px Inter 12/500 square inside the dashboard and the 40px serif mark elsewhere', () => {
     const { container, rerender } = render(<Monogram name="Oak & Ember" />)

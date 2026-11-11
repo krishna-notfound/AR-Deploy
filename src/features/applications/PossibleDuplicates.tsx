@@ -42,7 +42,7 @@ export function PossibleDuplicates({ applicationId }: { applicationId: ID }) {
           {applications.map((a) => (
             <li key={`a-${a.id}`}>
               <Link to={applicationAdminPath(a.id)} className={`${ROW} text-accent-ink hover:bg-subtle hover:underline`}>
-                {t('applications.dup.application', { reference: a.reference, name: a.businessName, status: applicationStatusLabel(a.status, lang), match: t(`applications.dup.match.${a.match}`) })}
+                {t('applications.dup.application', { reference: a.reference, name: a.businessName?.trim() || t('applications.noCompanyName'), status: applicationStatusLabel(a.status, lang), match: t(`applications.dup.match.${a.match}`) })}
               </Link>
             </li>
           ))}

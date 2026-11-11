@@ -25,7 +25,8 @@ export interface StoredApplication {
   id: string
   reference: string
   applicantEmail: string
-  businessName: string
+  /** Null when the published form does not ask for it (ADR-0057). */
+  businessName: string | null
   language: 'en' | 'pt'
   createdAt: string
 }
@@ -37,8 +38,8 @@ export interface SubmitDeps {
   salt: string
   now?: () => Date
   findByKey(submissionKey: string): Promise<StoredApplication | null>
-  /** An open (submitted / under review) application for the same business name from the same email. */
-  findOpenDuplicate(email: string, businessName: string): Promise<{ id: string } | null>
+  /** An open (submitted / under review) application for the same business name from the same email; with no name, one without a name. */
+  findOpenDuplicate(email: string, businessName: string | null): Promise<{ id: string } | null>
   /** service_application_attempt: true when the attempt is allowed (and recorded). */
   allowAttempt(hashes: string[]): Promise<boolean>
   /** Inserts the row; 'duplicate_key' when the submission key already exists (a concurrent retry). */
@@ -188,7 +189,7 @@ async function sendApplicationEmails(deps: SubmitDeps, stored: StoredApplication
     if (skip.has(workflow)) continue
     try {
       if (!deps.config.ok || !job.to) {
-        const rendered = renderEmail(job.kind, job.lang, { businessName: stored.businessName })
+        const rendered = renderEmail(job.kind, job.lang, { businessName: stored.businessName ?? undefined })
         await deps.log({
           kind: job.kind,
           recipient: job.to || 'not configured',
@@ -202,7 +203,7 @@ async function sendApplicationEmails(deps: SubmitDeps, stored: StoredApplication
       }
       const config = deps.config.config
       const email = renderEmail(job.kind, job.lang, {
-        businessName: stored.businessName,
+        businessName: stored.businessName ?? undefined,
         applicantEmail: stored.applicantEmail,
         actionUrl: job.kind === 'admin_notification' && config.appBaseUrl.startsWith('https://') ? `${config.appBaseUrl}/admin/applications/${stored.id}` : undefined,
       })
@@ -218,7 +219,7 @@ async function sendApplicationEmails(deps: SubmitDeps, stored: StoredApplication
 async function notifyStaff(deps: SubmitDeps, stored: StoredApplication) {
   if (!deps.notify) return
   try {
-    await deps.notify({ audience: { staff: 'applications.view' }, kind: 'new_application', ...applicationNotice(stored.businessName), link: `/admin/applications/${stored.id}`, dedupeKey: `application:${stored.id}` })
+    await deps.notify({ audience: { staff: 'applications.view' }, kind: 'new_application', ...applicationNotice(stored.businessName ?? ''), link: `/admin/applications/${stored.id}`, dedupeKey: `application:${stored.id}` })
   } catch (e) {
     console.error(`application notification failed: ${loggable(e)}`)
   }

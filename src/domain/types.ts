@@ -311,8 +311,9 @@ export interface BusinessApplication {
   id: ID
   reference: string
   status: ApplicationStatus
-  businessName: string
-  applicantName: string
+  /** Null when the application form does not ask for it (ADR-0057): show the email or pplications.noCompanyName, never a blank. */
+  businessName: string | null
+  applicantName: string | null
   applicantEmail: string
   applicantPhone?: string
   website?: string
@@ -350,7 +351,7 @@ export interface BusinessApplication {
  * A business match never carries the owner's email.
  */
 export interface ApplicationDuplicates {
-  applications: { id: ID; reference: string; businessName: string; status: ApplicationStatus; createdAt: ISODate; match: 'email' | 'name' | 'both' }[]
+  applications: { id: ID; reference: string; businessName: string | null; status: ApplicationStatus; createdAt: ISODate; match: 'email' | 'name' | 'both' }[]
   businesses: { id: ID; name: string; status: BusinessStatus; match: 'owner_email' | 'name' | 'both' }[]
 }
 

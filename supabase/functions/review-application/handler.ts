@@ -1,6 +1,7 @@
 // Request handling for the review-application Edge Function (R-W2-1, spec §10.3). Every review action goes through
 // here, so a rejected applicant is told, in their language.
-//   POST { applicationId, action: 'start_review' | 'approve' | 'reject' | 'reopen', reason?, includeReason? }
+//   POST { applicationId, action: 'start_review' | 'approve' | 'reject' | 'reopen', reason?, includeReason?, businessName? }
+// businessName is the company name typed in the Approve dialog (ADR-0057); an application whose form did not ask for one needs it.
 //     → { ok: true, status, businessId?, email?: { status, error? } }
 // Staff only, at the 2FA level their policy requires (R-W1-1): the gate runs before anything is read or changed. The
 // per-action permission (applications.approve / applications.reject) stays in SQL: admin_review_application runs with
@@ -24,6 +25,8 @@ const REVIEW_ERRORS: Record<string, number> = {
   reason_required: 422,
   invalid_transition: 422,
   reopen_not_allowed: 422,
+  business_name_required: 422,
+  business_name_invalid: 422,
   application_not_found: 404,
 }
 
@@ -40,12 +43,12 @@ export interface ReviewDeps {
    * admin_review_application with the caller's own token. Its refusals come back as { error } with the keys of
    * REVIEW_ERRORS ('forbidden' for a missing permission); any other failure rejects.
    */
-  reviewAsCaller(token: string, applicationId: string, action: ReviewAction, reason: string | null): Promise<ReviewOutcome>
+  reviewAsCaller(token: string, applicationId: string, action: ReviewAction, reason: string | null, businessName?: string | null): Promise<ReviewOutcome>
   /**
    * The applicant's details for the decision email (service role), and the status before this review, so a repeated
    * reject (a double click or a retry) does not email twice.
    */
-  getApplicant(applicationId: string): Promise<{ businessName: string; email: string; language: 'en' | 'pt'; status: string } | null>
+  getApplicant(applicationId: string): Promise<{ businessName: string | null; email: string; language: 'en' | 'pt'; status: string } | null>
   log(entry: LogEntry): Promise<string>
 }
 
@@ -73,11 +76,13 @@ export async function handleReviewApplication(req: Request, deps: ReviewDeps): P
   if ([...reason].length > REASON_MAX_LENGTH)
     return reply(400, { error: 'invalid_request', fields: { reason: `Keep the reason to ${REASON_MAX_LENGTH.toLocaleString('en')} characters or fewer.` } })
   const includeReason = body.includeReason === true
+  if (body.businessName !== undefined && body.businessName !== null && typeof body.businessName !== 'string') return reply(400, { error: 'invalid_request' })
+  const businessName = typeof body.businessName === 'string' ? body.businessName.trim().slice(0, 200) : ''
 
   const applicant = await deps.getApplicant(applicationId)
   if (!applicant) return reply(404, { error: 'application_not_found' })
 
-  const reviewed = await deps.reviewAsCaller(token, applicationId, action, reason || null)
+  const reviewed = await deps.reviewAsCaller(token, applicationId, action, reason || null, businessName || null)
   if ('error' in reviewed) {
     const status = REVIEW_ERRORS[reviewed.error]
     if (!status) throw new Error(`review failed: ${reviewed.error.slice(0, 100)}`)
@@ -96,7 +101,7 @@ export async function handleReviewApplication(req: Request, deps: ReviewDeps): P
 
 async function sendDecision(
   deps: ReviewDeps,
-  a: { applicationId: string; applicant: { businessName: string; email: string; language: 'en' | 'pt' }; reason?: string; actorId: string },
+  a: { applicationId: string; applicant: { businessName: string | null; email: string; language: 'en' | 'pt' }; reason?: string; actorId: string },
 ): Promise<DecisionEmail> {
   const base = { kind: 'application_decision' as const, applicationId: a.applicationId, workflow: `application:${a.applicationId}:decision`, triggeredBy: a.actorId }
   // The rejection is already committed, so nothing here may fail the request. A log row that can't be written

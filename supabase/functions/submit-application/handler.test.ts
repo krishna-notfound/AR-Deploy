@@ -65,7 +65,7 @@ function deps(over: Partial<SubmitDeps> = {}) {
       const r = rows.find((x) => x.key === k)
       return r ? stored(r) : null
     },
-    findOpenDuplicate: async (email, name) => rows.find((r) => r.app.applicantEmail === email && r.app.businessName.toLowerCase() === name.toLowerCase()) ?? null,
+    findOpenDuplicate: async (email, name) => rows.find((r) => r.app.applicantEmail === email && (r.app.businessName?.toLowerCase() ?? null) === (name?.toLowerCase() ?? null)) ?? null,
     // The R-W2-10 rule: refused at MAX attempts in the hour under any of the hashes; otherwise the first hash is recorded.
     allowAttempt: async (hashes) => {
       if (attempts.filter((h) => hashes.includes(h)).length >= MAX_SUBMISSIONS_PER_HOUR) return false
@@ -653,5 +653,33 @@ describe('submit-application notifications (ADR-0056)', () => {
     clock.at = new Date(clock.at.getTime() + 60_000)
     await handleSubmitApplication(post(VALID), d)
     expect(notify.mock.calls.map((c) => (c as unknown as [{ dedupeKey: string }])[0].dedupeKey)).toEqual(['application:app-1', 'application:app-1'])
+  })
+})
+
+describe('submit-application: a form that does not ask for the company name (ADR-0057)', () => {
+  const nameless = (): ApplyFormConfig => {
+    const c = JSON.parse(JSON.stringify(DEFAULT_APPLY_FORM)) as ApplyFormConfig
+    c.removedFields = ['businessName', 'applicantName']
+    c.fields = c.fields.filter((f) => f.key !== 'businessName' && f.key !== 'applicantName')
+    return c
+  }
+  const body = { ...VALID, businessName: '', applicantName: '' }
+
+  it('stores null names, sends the confirmation and the team alert without a company name, and notifies staff with a generic text', async () => {
+    const notify = vi.fn(async () => {})
+    const { d, rows, sends } = deps({ loadApplyRules: async () => rulesFromConfig(nameless(), 3), notify })
+    const res = await handleSubmitApplication(post(body), d)
+    expect(res.status).toBe(200)
+    expect(rows[0]!.app).toMatchObject({ businessName: null, applicantName: null, applicantEmail: 'ana@studio.test' })
+    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test'])
+    expect(sends[1]!.subject).toBe('New business awaiting review: ana@studio.test')
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ body: { en: 'A business applied to join Sanctus.', pt: 'Uma empresa candidatou-se à Sanctus.' } }))
+  })
+
+  it('a second open application from the same email without a name is the duplicate; a named one is not', async () => {
+    const { d } = deps({ loadApplyRules: async () => rulesFromConfig(nameless(), 3) })
+    expect((await handleSubmitApplication(post(body), d)).status).toBe(200)
+    const again = await handleSubmitApplication(post({ ...body, submissionKey: '7f1c1b1e-3c55-4a1c-9d47-0a3c1e2b9f10' }), d)
+    expect(again.status).toBe(409)
   })
 })

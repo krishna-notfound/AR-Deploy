@@ -89,6 +89,7 @@ export const enApplications = {
   'applications.email.to': 'To {recipient}',
 
   // ---- possible duplicates ----
+  'applications.noCompanyName': 'Company name not given',
   'applications.dup.title': 'Possible duplicates',
   'applications.dup.description': 'Check these before you decide. This is only a warning; every action stays available.',
   'applications.dup.checking': 'Checking for possible duplicates…',

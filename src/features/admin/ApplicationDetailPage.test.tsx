@@ -224,7 +224,7 @@ describe('ApplicationDetailPage: deleted business, reopen, duplicates, approval 
     expect(heading.compareDocumentPosition(approveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     for (const name of ['Start review', 'Reject']) expect(heading.compareDocumentPosition(screen.getByRole('button', { name })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await approveFromPage()
-    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(id, 'approve', undefined, { includeReason: false }))
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(id, 'approve', undefined, { includeReason: false, businessName: 'Atelier Norte' }))
   })
 
   it("with owners.manage and businesses.view: today's toast and 'Go to owner invitation'", async () => {
@@ -319,5 +319,61 @@ describe('the applicant\'s PDF catalogue (ADR-0050)', () => {
     expect(await screen.findByText('The catalogue could not be opened. Try again.')).toBeInTheDocument()
     expect(tab.close).toHaveBeenCalled()
     expect(tab.location.href).toBe('')
+  })
+})
+
+describe('ApplicationDetailPage: an application without a company name (ADR-0057)', () => {
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn()
+  })
+
+  async function nameless() {
+    const id = await submitApplication()
+    const real = (await service.getApplication(id)) as { ok: true; data: BusinessApplication }
+    vi.spyOn(service, 'getApplication').mockResolvedValue(ok({ ...real.data, businessName: null, applicantName: null }))
+    return id
+  }
+
+  it('shows the applicant email as the title and breadcrumb, and "Not given" for the name rows', async () => {
+    const id = await nameless()
+    renderPage(id)
+    expect(await screen.findByRole('heading', { level: 1, name: 'rita@atelier.test' })).toBeInTheDocument()
+    expect(screen.getAllByText('rita@atelier.test').length).toBeGreaterThan(1)
+    expect(screen.getAllByText('Not given').length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('null')).not.toBeInTheDocument()
+  })
+
+  it('Approve asks for the company name: empty is refused, 2 to 80 characters is sent with the review', async () => {
+    const id = await nameless()
+    const spy = vi.spyOn(service, 'reviewApplication')
+    renderPage(id)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Approve' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByRole('textbox', { name: /Company name/ })
+    expect(input).toHaveValue('')
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }))
+    expect(await within(dialog).findByText('Enter the company name, 2 to 80 characters.')).toBeInTheDocument()
+    expect(spy).not.toHaveBeenCalled()
+    await user.type(input, '  Casa Nova  ')
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }))
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(id, 'approve', undefined, { includeReason: false, businessName: 'Casa Nova' }))
+    const list = (await service.getBusinesses()) as { ok: true; data: { name: string }[] }
+    expect(list.data.map((b) => b.name)).toContain('Casa Nova')
+  })
+
+  it('prefills the name the form had and lets the reviewer correct it', async () => {
+    const id = await submitApplication()
+    const spy = vi.spyOn(service, 'reviewApplication')
+    renderPage(id)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Approve' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByRole('textbox', { name: /Company name/ })
+    expect(input).toHaveValue('Atelier Norte')
+    await user.clear(input)
+    await user.type(input, 'Atelier Norte Lda')
+    await user.click(within(dialog).getByRole('button', { name: 'Approve' }))
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(id, 'approve', undefined, { includeReason: false, businessName: 'Atelier Norte Lda' }))
   })
 })

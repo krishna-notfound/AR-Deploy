@@ -88,6 +88,7 @@ export const ptApplications: Partial<Record<TranslationKey, string>> = {
   'applications.email.to': 'Para {recipient}',
 
   // ---- possible duplicates ----
+  'applications.noCompanyName': 'Nome da empresa não indicado',
   'applications.dup.title': 'Possíveis duplicados',
   'applications.dup.description': 'Verifique estes casos antes de decidir. É apenas um aviso; todas as ações continuam disponíveis.',
   'applications.dup.checking': 'A verificar possíveis duplicados…',

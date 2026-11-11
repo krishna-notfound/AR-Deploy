@@ -15,7 +15,7 @@ const anonKey = env('SUPABASE_ANON_KEY') ?? ''
 const admin = createClient(url, serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
 
 /** admin_review_application's refusals, by the message it raises; everything else is a 500. */
-const KNOWN = new Set(['reason_required', 'invalid_transition', 'reopen_not_allowed', 'application_not_found'])
+const KNOWN = new Set(['reason_required', 'invalid_transition', 'reopen_not_allowed', 'application_not_found', 'business_name_required', 'business_name_invalid'])
 
 Deno.serve((req) =>
   handleReviewApplication(req, {
@@ -26,12 +26,18 @@ Deno.serve((req) =>
       return error ? null : (data.user?.id ?? null)
     },
     gate: (token) => gateCaller(callerRpc(url, anonKey, token), 'staff'),
-    async reviewAsCaller(token, applicationId, action, reason) {
+    async reviewAsCaller(token, applicationId, action, reason, businessName) {
       const caller = createClient(url, anonKey, {
         auth: { persistSession: false, autoRefreshToken: false },
         global: { headers: { Authorization: `Bearer ${token}` } },
       })
-      const { data, error } = await caller.rpc('admin_review_application', { p_application_id: applicationId, p_action: action, p_reason: reason })
+      const { data, error } = await caller.rpc('admin_review_application', {
+        p_application_id: applicationId,
+        p_action: action,
+        p_reason: reason,
+        // Sent only when typed, so the call also works against the three-argument function until the migration is applied.
+        ...(businessName ? { p_business_name: businessName } : {}),
+      })
       if (error) {
         if (KNOWN.has(error.message)) return { error: error.message }
         // platform_admin_only (42501): the gated permission check for this action said no.
