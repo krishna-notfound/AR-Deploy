@@ -84,9 +84,9 @@ export function ImageUpload({
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
         {own.map((img) => (
           <figure key={img.id} className="group relative">
-            <SmartImage src={img.url} alt={img.alt ?? ''} className={cn('aspect-square w-full rounded-lg', img.isPrimary && allowPrimary && 'ring-2 ring-accent ring-offset-2')} />
+            <SmartImage src={img.url} alt={img.alt ?? ''} className={cn('aspect-square w-full rounded-lg', img.isPrimary && allowPrimary && 'ring-2 ring-accent ring-offset-2 ring-offset-canvas')} />
             {img.isPrimary && allowPrimary && (
-              <figcaption className="absolute bottom-1.5 left-1.5 rounded bg-ink/80 px-1.5 py-0.5 text-[12px] font-medium text-white">{t('ui.images.primary')}</figcaption>
+              <figcaption className="absolute bottom-1.5 left-1.5 rounded bg-obsidian/80 px-1.5 py-0.5 text-[12px] font-medium text-chalk">{t('ui.images.primary')}</figcaption>
             )}
             <div className="absolute top-1.5 right-1.5 flex gap-1 rounded-md bg-surface/95 p-0.5 opacity-100 shadow-sm sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
               {allowPrimary && !img.isPrimary && (

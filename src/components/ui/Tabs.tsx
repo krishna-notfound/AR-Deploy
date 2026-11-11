@@ -94,7 +94,7 @@ export function Tabs<T extends string>({
                       'h-8 rounded-[var(--radius-control)] border px-3 pointer-coarse:h-11',
                       selected ? 'border-line bg-surface text-ink' : 'border-transparent text-ink-muted hover:text-ink',
                     )
-                  : cn('min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11', selected ? 'bg-obsidian text-chalk' : 'text-ink-muted hover:bg-subtle hover:text-ink'),
+                  : cn('min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11', selected ? 'bg-ink text-canvas' : 'text-ink-muted hover:bg-subtle hover:text-ink'),
             )}
           >
             {t.label}

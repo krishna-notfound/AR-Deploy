@@ -43,7 +43,7 @@ function PieceTile({ piece, kind, selected, disabled, onClick }: { piece: Showca
     >
       <PieceThumb piece={piece} className="aspect-square w-full" />
       {selected && (
-        <span className="absolute top-1.5 left-1.5 grid size-5 place-items-center bg-ink text-chalk" aria-hidden>
+        <span className="absolute top-1.5 left-1.5 grid size-5 place-items-center bg-ink text-canvas" aria-hidden>
           <Check className="size-3.5" />
         </span>
       )}

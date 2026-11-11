@@ -12,7 +12,8 @@ export function BusinessIdentityPreview({ business }: { business: Pick<BusinessI
   return (
     <div>
       <p className="mb-2 text-[13px] font-medium text-ink-muted">{t('admin.businesses.preview.title')}</p>
-      <div className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]" aria-label={t('admin.businesses.preview.aria')}>
+      {/* A miniature of the public catalogue: it stays light inside the dark dashboard (ADR-0060). */}
+      <div data-theme="light" className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]" aria-label={t('admin.businesses.preview.aria')}>
         <div className="flex items-center gap-1.5 border-b border-line bg-canvas px-3 py-2">
           <span className="size-2 rounded-full bg-line-strong" />
           <span className="size-2 rounded-full bg-line-strong" />

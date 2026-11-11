@@ -77,7 +77,7 @@ export function Pagination({
                       dash
                         ? 'grid h-8 min-w-8 place-items-center rounded-[var(--radius-control)] px-2 text-sm font-medium tabular-nums'
                         : 'grid h-8 min-w-8 place-items-center rounded-[var(--radius-control)] px-2 text-[12px] font-medium tabular-nums',
-                      p === page ? 'bg-obsidian text-chalk' : 'border border-line text-ink hover:bg-subtle',
+                      p === page ? 'bg-ink text-canvas' : 'border border-line text-ink hover:bg-subtle',
                     )}
                   >
                     {p}

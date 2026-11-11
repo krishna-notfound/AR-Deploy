@@ -1,4 +1,5 @@
-// Chart components in the Sanctus palette (ADR-0023): views in obsidian #1D1C1A, AR launch attempts in bronze #8A765C.
+// Chart components in the Sanctus palette (ADR-0023): views in ink (obsidian on light, bone on dark), AR launch attempts in bronze.
+// Colours are tokens (var(--color-*)), so the charts follow the dashboard theme (ADR-0060).
 // The two differ strongly in lightness, so they stay apart for colour-blind readers too; each chart also has a text
 // label and a table view, so colour is never the only cue.
 // Views and AR launch attempts have different magnitudes, so they never share a dual axis: the analytics page draws
@@ -12,12 +13,12 @@ import { useFormat } from '@/lib/useFormat'
 
 export const SERIES = {
   // The views series counts product page views plus embed views (R-W5-3): its label says so.
-  views: { color: '#1D1C1A', label: 'Page and embed views', labelKey: 'ui.chart.views' },
-  ar: { color: '#8A765C', label: 'AR launch attempts', labelKey: 'ui.chart.ar' },
+  views: { color: 'var(--color-ink)', label: 'Page and embed views', labelKey: 'ui.chart.views' },
+  ar: { color: 'var(--color-accent)', label: 'AR launch attempts', labelKey: 'ui.chart.ar' },
 } as const
 
-// Axis ticks follow the dashboard floor: 12px in the muted ink (#5A5148), never smaller.
-const AXIS = { stroke: '#d9d3c7', fontSize: 12, tick: { fill: '#5a5148', fontSize: 12 } }
+// Axis ticks follow the dashboard floor: 12px in the muted ink, never smaller.
+const AXIS = { stroke: 'var(--color-line)', fontSize: 12, tick: { fill: 'var(--color-ink-muted)', fontSize: 12 } }
 
 function shortDate(iso: string, lang: Lang) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString(localeOf(lang), { month: 'short', day: 'numeric' })
@@ -59,11 +60,11 @@ export function TrendChart({ data, series, height = 160, prefs }: { data: DailyP
     <div style={{ height }} role="img" aria-label={t('ui.chart.last30', { label: t(s.labelKey) })}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
-          <CartesianGrid vertical={false} stroke="#ece7dd" strokeDasharray="2 4" />
+          <CartesianGrid vertical={false} stroke="var(--color-subtle)" strokeDasharray="2 4" />
           <XAxis dataKey="date" tickFormatter={(d: string) => dayLabel(d, prefs, f.lang)} minTickGap={28} tickLine={false} axisLine={false} {...AXIS} />
           <YAxis tickFormatter={(v: number) => f.compact(v)} tickLine={false} axisLine={false} width={44} allowDecimals={false} {...AXIS} />
           <Tooltip
-            cursor={{ stroke: '#8a8073', strokeWidth: 1, strokeDasharray: '3 3' }}
+            cursor={{ stroke: 'var(--color-line-strong)', strokeWidth: 1, strokeDasharray: '3 3' }}
             content={(props) => <TrendTooltip active={props.active} payload={props.payload as readonly TooltipPayload[] | undefined} label={props.label as string | undefined} seriesLabel={s.label} prefs={prefs} />}
           />
           <Area
@@ -74,7 +75,7 @@ export function TrendChart({ data, series, height = 160, prefs }: { data: DailyP
             fill={s.color}
             fillOpacity={0.05}
             dot={false}
-            activeDot={{ r: 3.5, strokeWidth: 2, stroke: '#faf8f3', fill: s.color }}
+            activeDot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--color-surface)', fill: s.color }}
             isAnimationActive={false}
           />
         </AreaChart>
@@ -94,11 +95,11 @@ export function CombinedTrendChart({ data, show, height = 220, prefs }: { data: 
     <div style={{ height }} role="img" aria-label={t('ui.chart.last30', { label: shown.map((k) => t(SERIES[k].labelKey)).join(t('ui.chart.and')) })}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
-          <CartesianGrid vertical={false} stroke="#ece7dd" />
+          <CartesianGrid vertical={false} stroke="var(--color-subtle)" />
           <XAxis dataKey="date" tickFormatter={(d: string) => dayLabel(d, prefs, f.lang)} minTickGap={56} tickLine={false} axisLine={false} {...AXIS} />
           <YAxis tickFormatter={(v: number) => f.compact(v)} tickLine={false} axisLine={false} width={44} allowDecimals={false} {...AXIS} />
           <Tooltip
-            cursor={{ stroke: '#8a8073', strokeWidth: 1, strokeDasharray: '3 3' }}
+            cursor={{ stroke: 'var(--color-line-strong)', strokeWidth: 1, strokeDasharray: '3 3' }}
             content={(props) => {
               const point = (props.payload?.[0] as TooltipPayload | undefined)?.payload
               if (!props.active || !point) return null
@@ -124,7 +125,7 @@ export function CombinedTrendChart({ data, show, height = 220, prefs }: { data: 
               stroke={SERIES[k].color}
               strokeWidth={2}
               dot={false}
-              activeDot={{ r: 3.5, strokeWidth: 2, stroke: '#faf8f3', fill: SERIES[k].color }}
+              activeDot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--color-surface)', fill: SERIES[k].color }}
               isAnimationActive={false}
             />
           ))}
@@ -150,9 +151,9 @@ export function HorizontalBars({ data, series, valueLabel }: { data: BarDatum[];
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 48, bottom: 0, left: 0 }} barCategoryGap={10}>
           <XAxis type="number" hide />
-          <YAxis type="category" dataKey="label" width={150} tickLine={false} axisLine={false} {...AXIS} tick={{ fill: '#1d1c1a', fontSize: 12 }} />
+          <YAxis type="category" dataKey="label" width={150} tickLine={false} axisLine={false} {...AXIS} tick={{ fill: 'var(--color-ink)', fontSize: 12 }} />
           <Tooltip
-            cursor={{ fill: '#ece7dd' }}
+            cursor={{ fill: 'var(--color-subtle)' }}
             content={(props) => {
               const p = props.payload?.[0] as { value?: number; payload?: BarDatum } | undefined
               if (!props.active || !p?.payload) return null
@@ -172,7 +173,7 @@ export function HorizontalBars({ data, series, valueLabel }: { data: BarDatum[];
             radius={[0, 1, 1, 0]}
             maxBarSize={22}
             isAnimationActive={false}
-            label={{ position: 'right', fill: '#5a5148', fontSize: 12, formatter: (v: unknown) => f.compact(Number(v)) }}
+            label={{ position: 'right', fill: 'var(--color-ink-muted)', fontSize: 12, formatter: (v: unknown) => f.compact(Number(v)) }}
           />
         </BarChart>
       </ResponsiveContainer>
