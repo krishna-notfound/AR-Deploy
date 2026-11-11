@@ -31,6 +31,7 @@ export const enCore = {
   'catalog.has3d': '3D model',
   'catalog.previewBanner': 'Preview. Customers cannot see this catalog until it is activated.',
   'catalog.eyebrow': 'Catalog',
+  'catalog.heading': 'The pieces',
   'catalog.viewPiece': 'View piece',
 
   // The built-in category names, singular like the managed list's seed (ADR-0055): the fallback while the list loads.

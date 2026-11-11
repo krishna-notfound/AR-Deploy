@@ -52,8 +52,8 @@ describe('catalogue categories', () => {
     await screen.findByText(/^\d+ products$/)
     await waitFor(async () => expect(await chips()).toContain('Garden pieces'))
     await user.click(screen.getByRole('button', { name: 'Garden pieces' }))
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(1))
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(mine.name.en)
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 2 }).filter((h) => h.textContent !== 'The pieces')).toHaveLength(1))
+    expect(screen.getByRole('heading', { level: 2, name: mine.name.en })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Garden pieces' })).toHaveAttribute('aria-pressed', 'true')
   })
 

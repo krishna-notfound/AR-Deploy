@@ -116,7 +116,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   const textAction = cn(TAP_TARGET, 'inline-flex items-center self-start border-b border-current pb-1 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink transition-colors hover:text-accent-ink')
 
   return (
-    <PublicShell business={business} catalogHref={catalogHref}>
+    <PublicShell business={business}>
       {isPreview && (
         <div className="border-b border-warning/30 bg-warning-soft">
           <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-10">

@@ -194,7 +194,7 @@ export function MorePhotos({ stage }: { stage: ProductStage }) {
       <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
         {stage.additional.map((img) => (
           <li key={img.id} className="rounded-[var(--radius-card)] border border-line bg-surface p-2.5 sm:p-3">
-            <SmartImage src={img.url} alt={img.alt || stage.name} className="aspect-[4/3] w-full rounded-[var(--radius-control)] bg-subtle" />
+            <SmartImage src={img.url} alt={img.alt || stage.name} className="aspect-[4/3] w-full rounded-[var(--radius-control)] bg-subtle object-contain p-3 sm:p-4" />
           </li>
         ))}
       </ul>

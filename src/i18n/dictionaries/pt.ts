@@ -30,6 +30,7 @@ export const ptCore: Partial<Record<TranslationKey, string>> = {
   'catalog.has3d': 'Modelo 3D',
   'catalog.previewBanner': 'Pré-visualização. Os clientes só veem este catálogo depois de ativado.',
   'catalog.eyebrow': 'Catálogo',
+  'catalog.heading': 'As peças',
   'catalog.viewPiece': 'Ver peça',
 
   'category.sofa': 'Sofá',
