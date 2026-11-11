@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { type ReactNode, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/cn'
@@ -9,7 +10,16 @@ export interface MenuItem {
   onSelect: () => void
   destructive?: boolean
   disabled?: boolean
+  /** Makes the item a choice in a group (role menuitemradio): true for the one that is on, false for the others. */
+  checked?: boolean
 }
+
+/** A caption for the items that follow it (not focusable). */
+export interface MenuHeading {
+  heading: string
+}
+
+const ITEM_SELECTOR = '[role^="menuitem"]:not([disabled])'
 
 const GAP = 4
 const EDGE = 8
@@ -51,7 +61,7 @@ export function DropdownMenu({
   triggerClassName,
 }: {
   trigger: ReactNode
-  items: (MenuItem | 'separator')[]
+  items: (MenuItem | MenuHeading | 'separator')[]
   label: string
   align?: 'start' | 'end'
   triggerClassName?: string
@@ -95,7 +105,7 @@ export function DropdownMenu({
     document.addEventListener('mousedown', onDown)
     window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', reposition)
-    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus({ preventScroll: true })
+    menuRef.current?.querySelector<HTMLElement>(ITEM_SELECTOR)?.focus({ preventScroll: true })
     return () => {
       document.removeEventListener('mousedown', onDown)
       window.removeEventListener('scroll', onScroll, true)
@@ -104,7 +114,7 @@ export function DropdownMenu({
   }, [open, reposition])
 
   const onMenuKey = (e: React.KeyboardEvent) => {
-    const els = [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [])]
+    const els = [...(menuRef.current?.querySelectorAll<HTMLElement>(ITEM_SELECTOR) ?? [])]
     const idx = els.indexOf(document.activeElement as HTMLElement)
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -160,11 +170,16 @@ export function DropdownMenu({
             {items.map((item, i) =>
               item === 'separator' ? (
                 <hr key={`sep-${i}`} className="my-1.5 border-line" />
+              ) : 'heading' in item ? (
+                <p key={`head-${item.heading}`} role="presentation" className="px-3 pt-1 pb-1 text-[12px] font-medium text-ink-muted">
+                  {item.heading}
+                </p>
               ) : (
                 <button
                   key={item.label}
                   type="button"
-                  role="menuitem"
+                  role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+                  aria-checked={item.checked}
                   tabIndex={-1}
                   disabled={item.disabled}
                   onClick={() => {
@@ -179,6 +194,7 @@ export function DropdownMenu({
                 >
                   {item.icon && <span className="text-ink-muted [&_svg]:size-4" aria-hidden>{item.icon}</span>}
                   {item.label}
+                  {item.checked && <Check className="ml-auto size-4 text-accent-ink" aria-hidden />}
                 </button>
               ),
             )}

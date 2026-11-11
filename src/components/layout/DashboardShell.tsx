@@ -14,6 +14,7 @@ import { account } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { useMyProfile } from '@/features/settings/useMyProfile'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { useThemeMenuItems } from '@/theme/ThemeChoiceControl'
 import { Avatar } from '../ui/Avatar'
 import { PageSkeleton } from '../ui/PageSkeleton'
 import { IconButton } from '../ui/Button'
@@ -89,7 +90,8 @@ export function DashboardShell({ nav: allNav, variant }: { nav: NavItem[]; varia
         {/* Desktop sidebar */}
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-30 hidden flex-col bg-obsidian text-chalk transition-[width] duration-150 lg:flex',
+            // On the dark theme the sidebar is almost the ground colour, so a hairline carries the edge.
+            'fixed inset-y-0 left-0 z-30 hidden flex-col bg-obsidian text-chalk transition-[width] duration-150 lg:flex dark:border-r dark:border-white/10',
             collapsed ? 'w-[72px]' : 'w-64',
           )}
         >
@@ -298,6 +300,7 @@ function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Varia
   const { t } = useI18n()
   const { profile } = useMyProfile()
   const leave = useLeaveAccount()
+  const themeItems = useThemeMenuItems()
   const navigate = useNavigate()
   const { pathname, search } = useLocation()
   const iconBtn =
@@ -315,6 +318,8 @@ function UserBlock({ collapsed, variant }: { collapsed?: boolean; variant: Varia
         items={[
           { label: t('ui.shell.accountSettings'), icon: <UserRound />, onSelect: () => openSettings('account') },
           { label: t('ui.shell.security'), icon: <ShieldCheck />, onSelect: () => openSettings('security') },
+          'separator',
+          ...themeItems,
           'separator',
           { label: t('ui.shell.signOut'), icon: <LogOut />, onSelect: () => void leave({ signOut: true }) },
         ]}

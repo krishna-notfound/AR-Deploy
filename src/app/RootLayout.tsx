@@ -3,6 +3,7 @@ import { Outlet, ScrollRestoration } from 'react-router'
 import { useToast } from '@/components/ui/ToastProvider'
 import { LanguageProvider, useI18n } from '@/i18n/LanguageProvider'
 import { demoStore as store, isDemoMode } from '@/services'
+import { ThemeSync } from '@/theme/ThemeSync'
 import { useSiteFavicon } from './useSiteFavicon'
 
 /** Browser-storage notices (demo mode only), in the person's language. */
@@ -27,6 +28,7 @@ export function RootLayout() {
   return (
     <LanguageProvider>
       <DemoStorageNotices />
+      <ThemeSync />
       <ScrollRestoration />
       <Outlet />
     </LanguageProvider>
