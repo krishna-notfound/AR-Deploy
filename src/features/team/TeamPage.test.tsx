@@ -48,7 +48,7 @@ describe('Team & Access page (ADR-0029)', () => {
     open('/admin/team')
     await within(await screen.findByRole('table')).findByText('ana.ribeiro@sanctus.example')
     const owner = within(rowFor('admin@platform.example')).getByText('Owner')
-    expect(owner.className).toContain('bg-obsidian')
+    expect(owner.className).toContain('bg-ink')
     expect(owner.className).not.toContain('uppercase')
     expect(within(rowFor('ana.ribeiro@sanctus.example')).getByText('Admin').className).not.toContain('uppercase')
     expect(rowFor('ana.ribeiro@sanctus.example').className).toContain('h-[60px]')

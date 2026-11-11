@@ -513,7 +513,7 @@ export function ProductEditorForm({
                       hasError
                         ? cn('border-danger/40 text-danger', active ? 'bg-danger-soft font-medium lg:border-danger' : 'bg-surface lg:border-transparent')
                         : active
-                          ? 'border-ink bg-ink font-medium text-chalk lg:text-ink'
+                          ? 'border-ink bg-ink font-medium text-canvas lg:text-ink'
                           : 'border-line bg-surface text-ink-muted hover:text-ink lg:border-transparent',
                     )}
                   >

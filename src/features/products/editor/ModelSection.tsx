@@ -436,7 +436,8 @@ export function ModelPreview({
 
   return (
     <div>
-      <div className="relative aspect-[16/10] overflow-hidden rounded-[var(--radius-card)] border border-line bg-subtle">
+      {/* The 3D stage keeps the light ground customers see on the public page (ADR-0060), also in the dark dashboard. */}
+      <div data-theme="light" className="relative aspect-[16/10] overflow-hidden rounded-[var(--radius-card)] border border-line bg-subtle">
         <ModelViewer
           key={`${glb.url}-${attempt}`}
           src={glb.url}

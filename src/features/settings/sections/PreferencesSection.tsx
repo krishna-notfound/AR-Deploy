@@ -10,6 +10,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { type DatePrefs, formatDate, formatDateTime, formatTime } from '@/lib/format'
 import { browserTimeZone, timeZoneList, useProfileSettings } from '@/lib/preferences'
+import { ThemeChoiceControl } from '@/theme/ThemeChoiceControl'
 import { SectionHeader, SettingsCard } from '../SettingsUi'
 
 const DATE_FORMATS: DateFormatPref[] = ['d MMM yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd']
@@ -25,6 +26,7 @@ export default function PreferencesSection() {
   return (
     <>
       <SectionHeader title={t('settings.section.preferences')} description={t('settings.prefs.description')} />
+      <AppearanceCard />
       {state.status === 'loading' ? (
         <SettingsCard title={t('settings.prefs.zoneAndFormat')}>
           <div className="space-y-3" aria-busy="true" aria-label={t('settings.prefs.loading')}>
@@ -41,6 +43,19 @@ export default function PreferencesSection() {
         <PreferencesForm key={state.profile.userId} profile={state.profile} />
       )}
     </>
+  )
+}
+
+/** Light / Dark / System for this device (ADR-0060): applied at once, kept in the browser, not in the account. */
+function AppearanceCard() {
+  const { t } = useI18n()
+  return (
+    <div className="mb-6">
+      <SettingsCard title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
+        <ThemeChoiceControl legend={t('settings.appearance.legend')} />
+        <p className="mt-3 text-ui-small text-ink-muted">{t('settings.appearance.note')}</p>
+      </SettingsCard>
+    </div>
   )
 }
 

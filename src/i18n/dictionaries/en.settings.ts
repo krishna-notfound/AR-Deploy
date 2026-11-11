@@ -267,6 +267,10 @@ export const enSettings = {
   'settings.prefs.hour12': '12-hour',
   'settings.prefs.now': 'Now in your time zone:',
   'settings.prefs.save': 'Save preferences',
+  'settings.appearance.title': 'Appearance',
+  'settings.appearance.description': 'Choose how the dashboard looks on this device. The public site and sign-in pages always stay light.',
+  'settings.appearance.legend': 'Theme',
+  'settings.appearance.note': 'Applied at once and remembered on this device only. It does not change your account.',
   // Security activity
   'settings.activity.descriptionDemo': 'Your last 50 sign-ins and changes to your account security. Demo: only actions taken in this browser session are listed.',
   'settings.activity.description': 'Your last 50 sign-ins and changes to your account security. If something here was not you, change your password and turn on 2FA.',

@@ -49,7 +49,7 @@ export function useTeamText() {
 
 export function RoleBadge({ role }: { role: PlatformRole }) {
   const { t } = useI18n()
-  return <Badge tone={ROLE_TONE[role]} className={role === 'owner' ? 'bg-obsidian text-chalk' : undefined}>{t(ROLE_KEY[role])}</Badge>
+  return <Badge tone={ROLE_TONE[role]} className={role === 'owner' ? 'bg-ink text-canvas' : undefined}>{t(ROLE_KEY[role])}</Badge>
 }
 
 export function MemberStatusBadge({ status }: { status: MemberStatus }) {

@@ -40,6 +40,8 @@
   --color-danger-soft: #f8e5e2;
   --color-info: #33597a;
   --color-info-soft: #e5edf4;
+  /* Text on a solid danger fill (the destructive button). White on light; dark text on the dark theme's lighter red. */
+  --color-on-danger: #ffffff;
 
   /* Type scale. display/headline/title are set in the serif (font-display); UI text stays 13-15px Jost.
      eyebrow and label are the spaced uppercase captions of the references ("COLEÇÕES", "VER COLEÇÃO →"). */
@@ -105,6 +107,92 @@
     50% { opacity: 1; }
   }
 }
+
+/* Dashboard dark mode (ADR-0060, amends ADR-0023). The same token names, redefined under `data-theme="dark"`, which
+   only the signed-in dashboards ever set (src/theme/). A warm Sanctus dark: an umber-black ground, bone text, bronze
+   accents kept for the action and the indicator. Palette constants (obsidian, chalk, limestone, umber, taupe) do not
+   change: they name fixed colours for surfaces that stay dark or light (the sidebar, photo overlays, the public site).
+   Contrast on canvas #141311 (ratios, AA text 4.5 and UI 3): ink 16.3, ink-body 12.5, ink-muted 8.1, ink-faint 6.2 (5.2 on
+   subtle), accent-ink 9.7, success 8.6, warning 8.9, danger 7.7, info 8.5; line-strong 4.5 and accent 5.8 for borders and
+   rings; the tinted "soft" grounds carry their text at 6.5 to 7.8; the primary button (canvas on ink) 16.3. */
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #141311;
+  --color-surface: #1c1a17;
+  --color-subtle: #26231f;
+  --color-line: #34302a;
+  --color-line-strong: #867c6e;
+  --color-ink: #f3f0e9;
+  --color-ink-body: #d9d3c7;
+  --color-ink-muted: #b3aa9b;
+  --color-ink-faint: #9d9486;
+
+  --color-accent-bright: #c9b79b;
+  --color-accent: #a38d6e;
+  --color-accent-hover: #b8a283;
+  --color-accent-ink: #cdb994;
+  --color-accent-soft: #2b261d;
+
+  --color-success: #6dc196;
+  --color-success-soft: #16261e;
+  --color-warning: #e4a94d;
+  --color-warning-soft: #2b2212;
+  --color-danger: #f28b7e;
+  --color-danger-soft: #2f1a17;
+  --color-info: #8ab4d9;
+  --color-info-soft: #182230;
+  --color-on-danger: #1c0f0d;
+
+  --shadow-pop: 0 16px 40px -12px rgb(0 0 0 / 0.65), 0 0 0 1px rgb(243 240 233 / 0.1);
+}
+
+/* A light island inside a dark dashboard: anything that shows a public page (Website Editor previews, the apply-form
+   preview, catalogue previews) wears `data-theme="light"`, so the tokens resolve to the public palette there. These
+   values repeat the @theme block above; src/theme/theme.test.ts fails if they drift apart. */
+[data-theme='light'] {
+  color-scheme: light;
+  --color-canvas: #f3f0e9;
+  --color-surface: #faf8f3;
+  --color-subtle: #ece7dd;
+  --color-line: #d9d3c7;
+  --color-line-strong: #8a8073;
+  --color-ink: #1d1c1a;
+  --color-ink-body: #3a352f;
+  --color-ink-muted: #5a5148;
+  --color-ink-faint: #6e6559;
+
+  --color-accent-bright: #c9b79b;
+  --color-accent: #8a765c;
+  --color-accent-hover: #76644d;
+  --color-accent-ink: #6e5c45;
+  --color-accent-soft: #eae3d6;
+
+  --color-success: #2f6b4f;
+  --color-success-soft: #e5f0e9;
+  --color-warning: #8f5a0b;
+  --color-warning-soft: #f8eedc;
+  --color-danger: #a8362a;
+  --color-danger-soft: #f8e5e2;
+  --color-info: #33597a;
+  --color-info-soft: #e5edf4;
+  --color-on-danger: #ffffff;
+
+  --shadow-card: 0 0 0 1px var(--color-line);
+  --shadow-pop: 0 16px 40px -16px rgb(29 28 26 / 0.28), 0 0 0 1px rgb(29 28 26 / 0.08);
+  /* var() references are resolved where they are declared, so the island re-declares the ones that point at tokens. */
+  --brand-accent: var(--color-accent);
+}
+@layer base {
+  /* In the base layer, so a utility on the same element (bg-subtle, text-ink) still wins. */
+  [data-theme='light']:not(:root) {
+    background-color: var(--color-canvas);
+    color: var(--color-ink-body);
+  }
+}
+
+/* `dark:` follows the app's theme switch, not the device setting. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /* Public catalog and product pages: the same look with slightly softened corners (ADR-0037, owner 2026-10-26).
    Dashboards keep the 2px references. */

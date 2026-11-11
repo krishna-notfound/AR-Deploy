@@ -269,6 +269,10 @@ export const ptSettings: Partial<Record<TranslationKey, string>> = {
   'settings.prefs.hour12': '12 horas',
   'settings.prefs.now': 'Agora no seu fuso horário:',
   'settings.prefs.save': 'Guardar preferências',
+  'settings.appearance.title': 'Aspeto',
+  'settings.appearance.description': 'Escolha o aspeto do painel neste dispositivo. O site público e as páginas de início de sessão ficam sempre claros.',
+  'settings.appearance.legend': 'Tema',
+  'settings.appearance.note': 'Aplicado de imediato e guardado apenas neste dispositivo. Não altera a sua conta.',
   // Security activity
   'settings.activity.descriptionDemo': 'Os seus últimos 50 inícios de sessão e alterações à segurança da conta. Demonstração: só são listadas as ações feitas nesta sessão do navegador.',
   'settings.activity.description': 'Os seus últimos 50 inícios de sessão e alterações à segurança da conta. Se algo aqui não foi feito por si, altere a palavra-passe e ative a 2FA.',

@@ -58,7 +58,7 @@ export default function EditorPreview() {
 
   return (
     <SiteContentProvider source="draft">
-      <div className={cn('min-h-dvh pb-20', phone && 'mx-auto max-w-[390px] border-x border-line-strong')}>
+      <div data-theme="light" className={cn('min-h-dvh pb-20', phone && 'mx-auto max-w-[390px] border-x border-line-strong')}>
         <Suspense fallback={<FullPageSpinner />}>
           <PreviewBody target={target} />
         </Suspense>

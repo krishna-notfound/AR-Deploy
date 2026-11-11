@@ -188,7 +188,7 @@ describe('Tabs (pill) as a segmented control', () => {
     const { rerender } = render(<Tabs tabs={tabs} value="a" onChange={() => {}} label="Filter" variant="pill" />)
     expect(screen.getByRole('tablist').className).toBe('flex gap-1 overflow-x-auto')
     expect(screen.getByRole('tab', { name: /All/ }).className).toBe(
-      'inline-flex shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors text-[12px] tracking-[0.12em] uppercase min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11 bg-obsidian text-chalk',
+      'inline-flex shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors text-[12px] tracking-[0.12em] uppercase min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11 bg-ink text-canvas',
     )
     expect(screen.getByRole('tab', { name: 'Active' }).className).toBe(
       'inline-flex shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors text-[12px] tracking-[0.12em] uppercase min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11 text-ink-muted hover:bg-subtle hover:text-ink',

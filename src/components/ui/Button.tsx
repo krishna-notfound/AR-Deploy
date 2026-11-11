@@ -12,15 +12,16 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   // Obsidian is the default action (the references' dark, square button); bronze marks the one action that matters most.
-  primary: 'bg-ink text-chalk hover:bg-umber',
+  // On the dark theme (ADR-0060) ink is bone and canvas is the dark ground, so it stays the strongest element.
+  primary: 'bg-ink text-canvas hover:bg-ink-muted',
   // The primary button for a photograph or an obsidian field (landing hero, 3D section): chalk with ink text.
   inverse: 'bg-chalk text-ink hover:bg-limestone',
-  accent: 'bg-accent-bright text-ink hover:bg-limestone',
+  accent: 'bg-accent-bright text-obsidian hover:bg-limestone',
   // White, not chalk: safeBrandAccent guarantees 4.5:1 against white only.
   brand: 'bg-[var(--brand-accent)] text-white hover:brightness-110',
   secondary: 'bg-surface text-ink border border-line-strong hover:border-ink hover:bg-subtle',
   ghost: 'text-ink hover:bg-subtle',
-  danger: 'bg-danger text-white hover:brightness-110',
+  danger: 'bg-danger text-on-danger hover:brightness-110',
 }
 
 // lg is the editorial call-to-action of the references: spaced uppercase label on a square button.

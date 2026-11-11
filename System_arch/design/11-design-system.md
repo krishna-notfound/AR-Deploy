@@ -110,3 +110,23 @@ Inside the dashboards (`[data-surface="dashboard"]`, set by `DashboardShell`) th
 - **Spacing:** canvas padding 40/24/16, card gap and padding 24, controls 40 (36 in card headers, 44 touch), sidebar 256 with 40px rows and 18px icons, top bar 56.
 - **Rules:** nothing under 12px; greys are `#5A5148` (`#6E6559` only for placeholders); weights 400/500/600; tabular figures on numbers; no small uppercase letter-spaced text (only the SANCTUS wordmark); no icons on stat cards.
 - **Guard:** `npx playwright test --project=guard` checks that the untouched pages are pixel-identical (`tests/visual/guard.spec.ts`).
+
+## Dashboard dark mode (ADR-0060)
+
+The signed-in dashboards (`/admin/**`, `/dashboard/**`, settings, the bell) can be dark. Public pages, sign-in and invitation pages never are.
+
+- **Switch:** Light (default) / Dark / System, per device in `localStorage` key `arfurn:theme`; account menu (radio group) and Settings → Preferences → Appearance. Code: `src/theme/` (`theme.ts` store and rules, `ThemeSync.tsx` route sync, `ThemeChoiceControl.tsx`). `public/theme-init.js` sets `data-theme` on `<html>` before first paint (dashboard paths only); `ThemeSync` removes it on every other route.
+- **Tokens:** `[data-theme="dark"]` in `src/index.css` redefines the colour tokens; `[data-theme="light"]` restores the public values for a light island (a test keeps it equal to `@theme`). Use `data-theme="light"` around anything that shows a public page: Website Editor previews, the apply-form preview, the catalogue mini preview and the 3D stage. Tailwind's `dark:` variant follows `[data-theme="dark"]`, not the device.
+
+| Token | Dark | Contrast on canvas `#141311` |
+|---|---|---|
+| canvas / surface / subtle | `#141311` / `#1c1a17` / `#26231f` | n/a |
+| line / line-strong | `#34302a` / `#867c6e` | 1.4 / 4.5 (UI) |
+| ink / ink-body | `#f3f0e9` / `#d9d3c7` | 16.3 / 12.5 |
+| ink-muted / ink-faint | `#b3aa9b` / `#9d9486` | 8.1 / 6.2 (5.2 on subtle) |
+| accent / accent-ink / accent-bright | `#a38d6e` / `#cdb994` / `#c9b79b` | 5.8 (ring) / 9.7 (text) / fill under obsidian text 8.7 |
+| success / warning / danger / info | `#6dc196` / `#e4a94d` / `#f28b7e` / `#8ab4d9` | 8.6 / 8.9 / 7.7 / 8.5 |
+| `*-soft` grounds | `#16261e` `#2b2212` `#2f1a17` `#182230` `#2b261d` | their text 6.5 to 7.8 |
+| on-danger (text on a solid danger fill) | `#1c0f0d` | 7.8 on danger |
+
+- **Rules:** the primary button is `bg-ink text-canvas` (bone with obsidian text on dark). Palette constants (`obsidian`, `chalk`, `limestone`) are fixed colours for surfaces that stay dark or light, such as the sidebar and photo overlays; use semantic tokens everywhere else. QR codes stay dark on white. Charts use `var(--color-*)`. The sidebar gets a hairline on dark because it is almost the ground colour.
