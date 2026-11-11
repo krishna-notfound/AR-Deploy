@@ -1,7 +1,7 @@
-import { LayoutList, Plus } from 'lucide-react'
+import { LayoutList, Plus, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { DropdownMenu, type MenuItem } from '@/components/ui/Menu'
-import { type CustomQuestionType, MAX_APPLY_STEPS, MAX_CUSTOM_QUESTIONS } from '@/domain/siteContent'
+import { DropdownMenu, type MenuHeading, type MenuItem } from '@/components/ui/Menu'
+import { type ApplyBuiltinField, type CustomQuestionType, MAX_APPLY_STEPS, MAX_CUSTOM_QUESTIONS } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { QUESTION_KINDS, kindLabelKey } from './kinds'
@@ -12,13 +12,35 @@ import { QUESTION_KINDS, kindLabelKey } from './kinds'
  * (`railed`) or, with no card open, sits as a row after the last card. When a limit is reached the button is disabled and
  * the reason is written next to it.
  */
-export function AddBar({ railed, questionsFull, sectionsFull, onAddQuestion, onAddSection }: { railed: boolean; questionsFull: boolean; sectionsFull: boolean; onAddQuestion: (type: CustomQuestionType) => void; onAddSection: () => void }) {
+export function AddBar({
+  railed,
+  questionsFull,
+  sectionsFull,
+  removed,
+  onAddQuestion,
+  onRestore,
+  onAddSection,
+}: {
+  railed: boolean
+  questionsFull: boolean
+  sectionsFull: boolean
+  /** The deleted standard questions, by name: they can be restored from the Add question menu (ADR-0057). */
+  removed: { key: ApplyBuiltinField; name: string }[]
+  onAddQuestion: (type: CustomQuestionType) => void
+  onRestore: (key: ApplyBuiltinField) => void
+  onAddSection: () => void
+}) {
   const { t } = useI18n()
   const reason = questionsFull ? t('applications.builder.questionsFull', { max: MAX_CUSTOM_QUESTIONS }) : sectionsFull ? t('applications.builder.sectionsFull', { max: MAX_APPLY_STEPS }) : null
-  const items: MenuItem[] = QUESTION_KINDS.map((k) => {
+  const kinds: MenuItem[] = QUESTION_KINDS.map((k) => {
     const Icon = k.icon
-    return { label: t(kindLabelKey(k.type)), icon: <Icon />, onSelect: () => onAddQuestion(k.type) }
+    return { label: t(kindLabelKey(k.type)), icon: <Icon />, disabled: questionsFull, onSelect: () => onAddQuestion(k.type) }
   })
+  const items: (MenuItem | MenuHeading | 'separator')[] = removed.length
+    ? [...kinds, 'separator', { heading: t('applications.builder.restoreHeading') }, ...removed.map((r): MenuItem => ({ label: r.name, icon: <RotateCcw />, onSelect: () => onRestore(r.key) }))]
+    : kinds
+  // With the own-question limit reached the menu still offers the deleted standard questions (they are not own questions).
+  const menuOnly = questionsFull && removed.length > 0
   const label = railed ? 'xl:sr-only' : ''
   return (
     <div
@@ -33,7 +55,7 @@ export function AddBar({ railed, questionsFull, sectionsFull, onAddQuestion, onA
           : 'xl:static xl:z-auto xl:mt-2 xl:justify-start xl:border-0 xl:bg-transparent xl:p-0 xl:pb-0 xl:shadow-none',
       )}
     >
-      {questionsFull ? (
+      {questionsFull && !menuOnly ? (
         <Button size="sm" icon={<Plus className="size-4" aria-hidden />} disabled aria-describedby="add-bar-why" title={reason ?? undefined}>
           <span className={label}>{t('applications.builder.addQuestion')}</span>
         </Button>

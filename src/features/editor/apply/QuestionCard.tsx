@@ -25,7 +25,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { cn } from '@/lib/cn'
 import { BUILTIN_FIELDS } from '../../../../supabase/functions/_shared/applyForm.ts'
 import { LangField, LockNote, useBuilder, useCards, useErrorText, useLangError, withLang } from './builderParts'
-import { addOption, deleteQuestion, duplicateQuestion, isChoiceQuestion, moveOption, removeOption, resetText, setHidden, setOptionHidden, setRequired, updateQuestion, visibleOptionCount } from './formOps'
+import { addOption, deleteField, deleteQuestion, duplicateQuestion, isChoiceQuestion, moveOption, removeOption, resetText, setHidden, setOptionHidden, setRequired, updateQuestion, visibleOptionCount } from './formOps'
 import { BUILTIN_SHAPE, KindIcon, QUESTION_KINDS, kindLabelKey } from './kinds'
 import { TextOverride, originalName, stepTitleOf } from './TextOverride'
 import { fieldTextKeys, optionTextKey } from './textGroups'
@@ -43,6 +43,7 @@ export function QuestionCard({ field, first, last, step, sections }: { field: Re
   const keys = builtin ? fieldTextKeys(builtin) : null
   const qi = q ? config.customQuestions.findIndex((x) => x.id === q.id) : -1
   const dragging = cards.drag?.key === key
+  const confirm = useConfirm()
 
   const name = q
     ? q.label[lang] || q.label.en || t('applications.builder.untitledQuestion')
@@ -77,6 +78,26 @@ export function QuestionCard({ field, first, last, step, sections }: { field: Re
     }
   }
 
+  /** Deleting asks first. An own question goes for good; a standard one is listed under Restore a standard question. */
+  const remove = async () => {
+    const ok = await confirm(
+      q
+        ? { title: t('applications.builder.deleteQuestionTitle'), body: t('applications.builder.deleteQuestionBody'), confirmLabel: t('applications.builder.deleteQuestionConfirm'), destructive: true }
+        : {
+            title: t('applications.builder.deleteStandardTitle', { name }),
+            body: t(builtin === 'language' ? 'applications.builder.deleteStandardBodyLanguage' : builtin === 'businessName' ? 'applications.builder.deleteStandardBodyName' : 'applications.builder.deleteStandardBody'),
+            confirmLabel: t('applications.builder.deleteQuestionConfirm'),
+            destructive: true,
+          },
+    )
+    if (!ok) return
+    const near = step.fields[step.fields.findIndex((x) => x.key === key) + 1] ?? step.fields[step.fields.findIndex((x) => x.key === key) - 1]
+    if (open) setOpenKey(null)
+    onChange(q ? deleteQuestion(config, q.id) : deleteField(config, key))
+    // The card is gone: keyboard focus goes to its neighbour's handle, or to the add bar when the section is now empty.
+    requestAnimationFrame(() => (near ? document.querySelector<HTMLElement>(`[data-row="${CSS.escape(near.key)}"] [data-handle]`) : document.querySelector<HTMLElement>('[data-add-bar] button'))?.focus({ preventScroll: true }))
+  }
+
   const menuItems: (MenuItem | 'separator')[] = [
     { label: t('applications.builder.menuMoveUp'), icon: <ArrowUp />, disabled: first, onSelect: () => cards.move(key, 'up') },
     { label: t('applications.builder.menuMoveDown'), icon: <ArrowDown />, disabled: last, onSelect: () => cards.move(key, 'down') },
@@ -88,6 +109,7 @@ export function QuestionCard({ field, first, last, step, sections }: { field: Re
             .map((s): MenuItem => ({ label: t('applications.builder.moveToSection', { n: s.n, title: stepTitleOf(s.step, appLang, 28) }), icon: <CornerDownRight />, onSelect: () => cards.moveTo(key, s.step.id) })),
         ]
       : []),
+    ...(field.locked ? [] : ['separator' as const, { label: t('applications.builder.deleteQuestionConfirm'), icon: <Trash2 />, destructive: true, onSelect: () => void remove() } satisfies MenuItem]),
   ]
 
   const requiredBadge = field.hidden ? (
@@ -133,9 +155,9 @@ export function QuestionCard({ field, first, last, step, sections }: { field: Re
         <div className="min-w-0 flex-1 py-1">
           {open ? (
             q ? (
-              <OwnQuestionBody q={q} qi={qi} required={field.required} onClose={closeCard} />
+              <OwnQuestionBody q={q} qi={qi} required={field.required} onClose={closeCard} onDelete={() => void remove()} />
             ) : (
-              <StandardBody k={builtin!} field={field} name={name} />
+              <StandardBody k={builtin!} field={field} name={name} onDelete={() => void remove()} />
             )
           ) : (
             <button type="button" data-autofocus aria-expanded={false} aria-label={t('applications.builder.editField', { name })} onClick={openCard} className="block w-full rounded-[var(--radius-control)] text-left">
@@ -225,11 +247,10 @@ function FieldSketch({ field }: { field: ResolvedField }) {
   return optionRows(labels, false)
 }
 
-function OwnQuestionBody({ q, qi, required, onClose }: { q: CustomQuestion; qi: number; required: boolean; onClose: () => void }) {
+function OwnQuestionBody({ q, qi, required, onClose, onDelete }: { q: CustomQuestion; qi: number; required: boolean; onClose: () => void; onDelete: () => void }) {
   const { t } = useI18n()
   const { config, onChange, lang, setOpenKey } = useBuilder()
   const cards = useCards()
-  const confirm = useConfirm()
   const langError = useLangError()
   const errorText = useErrorText()
   const { errors } = useBuilder()
@@ -245,18 +266,6 @@ function OwnQuestionBody({ q, qi, required, onClose }: { q: CustomQuestion; qi: 
     setOpenKey(`custom:${r.id}`)
     cards.focusCard(`field:custom:${r.id}`, { select: true })
   }
-  const remove = async () => {
-    const ok = await confirm({
-      title: t('applications.builder.deleteQuestionTitle'),
-      body: t('applications.builder.deleteQuestionBody'),
-      confirmLabel: t('applications.builder.deleteQuestionConfirm'),
-      destructive: true,
-    })
-    if (!ok) return
-    onChange(deleteQuestion(config, q.id))
-    setOpenKey(null)
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-3">
@@ -344,7 +353,7 @@ function OwnQuestionBody({ q, qi, required, onClose }: { q: CustomQuestion; qi: 
           <Button size="sm" icon={<Copy className="size-4" aria-hidden />} disabled={full} onClick={duplicate} aria-describedby={full ? `dup-why-${q.id}` : undefined}>
             {t('applications.builder.duplicate')}
           </Button>
-          <Button size="sm" icon={<Trash2 className="size-4 text-danger" aria-hidden />} onClick={remove}>
+          <Button size="sm" icon={<Trash2 className="size-4 text-danger" aria-hidden />} onClick={onDelete}>
             {t('applications.builder.delete')}
           </Button>
           <Button size="sm" variant="ghost" onClick={onClose}>
@@ -362,7 +371,7 @@ function OwnQuestionBody({ q, qi, required, onClose }: { q: CustomQuestion; qi: 
   )
 }
 
-function StandardBody({ k, field, name }: { k: ApplyBuiltinField; field: ResolvedField; name: string }) {
+function StandardBody({ k, field, name, onDelete }: { k: ApplyBuiltinField; field: ResolvedField; name: string; onDelete: () => void }) {
   const { t, lang: appLang } = useI18n()
   const { config, onChange } = useBuilder()
   const info = BUILTIN_FIELDS[k]
@@ -422,6 +431,11 @@ function StandardBody({ k, field, name }: { k: ApplyBuiltinField; field: Resolve
               onClick={() => onChange(setHidden(config, k, !field.hidden))}
             >
               {field.hidden ? t('applications.builder.show') : t('applications.builder.hideQuestion')}
+            </Button>
+          )}
+          {!locked && (
+            <Button size="sm" icon={<Trash2 className="size-4 text-danger" aria-hidden />} aria-label={t('applications.builder.deleteNamed', { name })} onClick={onDelete}>
+              {t('applications.builder.delete')}
             </Button>
           )}
           {field.hidden && <span className="text-ui-small text-ink-muted">{t('applications.builder.hiddenNote')}</span>}

@@ -1,9 +1,11 @@
-import { Eye } from 'lucide-react'
+import { Eye, MoreVertical, RotateCcw, Sparkles } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { DashboardContext } from '@/components/layout/dashboardContext'
 import { Button } from '@/components/ui/Button'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { SegmentedControl } from '@/components/ui/Form'
+import { DropdownMenu } from '@/components/ui/Menu'
 import { Modal } from '@/components/ui/Modal'
 import { InlineNotice } from '@/components/ui/States'
 import { type ApplyFormConfig, type Lang, MAX_APPLY_STEPS, MAX_CUSTOM_QUESTIONS, type SiteContent, validateApplyForm } from '@/domain/siteContent'
@@ -12,6 +14,7 @@ import { cn } from '@/lib/cn'
 import { ApplyForm } from '../../apply/ApplyForm'
 import { BuilderContext, type BuilderContextValue, type FocusRequest } from './builderParts'
 import { FormCards } from './FormCards'
+import { isOriginalForm, restoreOriginal, startFromBlank } from './formOps'
 import { type Problem, problemsOf } from './problems'
 
 /**
@@ -28,6 +31,7 @@ const SHOWN_PROBLEMS = 5
 
 export function ApplyFormEditor({ draft, onChange }: ApplyFormEditorProps) {
   const { t, lang: appLang } = useI18n()
+  const confirm = useConfirm()
   const [params] = useSearchParams()
   const config = draft.applyForm
   const errors = useMemo(() => validateApplyForm(config), [config])
@@ -54,6 +58,18 @@ export function ApplyFormEditor({ draft, onChange }: ApplyFormEditorProps) {
 
   const update = (next: ApplyFormConfig) => {
     if (next !== config) onChange({ ...draft, applyForm: next })
+  }
+
+  /** Both are ordinary draft edits: History and "don't publish" undo them (ADR-0057). */
+  const reshape = async (kind: 'blank' | 'original') => {
+    const ok = await confirm(
+      kind === 'blank'
+        ? { title: t('applications.builder.startBlankTitle'), body: t('applications.builder.startBlankBody'), confirmLabel: t('applications.builder.startBlankConfirm'), destructive: true }
+        : { title: t('applications.builder.restoreOriginalTitle'), body: t('applications.builder.restoreOriginalBody'), confirmLabel: t('applications.builder.restoreOriginalConfirm'), destructive: true },
+    )
+    if (!ok) return
+    setOpenKey(null)
+    update(kind === 'blank' ? startFromBlank(config) : restoreOriginal(config))
   }
 
   const goTo = (p: Problem) => {
@@ -84,9 +100,21 @@ export function ApplyFormEditor({ draft, onChange }: ApplyFormEditorProps) {
             </div>
             <p className="text-ui-small text-ink-muted">{t('applications.builder.usage', { s: config.steps.length, maxS: MAX_APPLY_STEPS, q: config.customQuestions.length, maxQ: MAX_CUSTOM_QUESTIONS })}</p>
           </div>
-          <Button icon={<Eye className="size-4" aria-hidden />} onClick={() => setPreviewOpen(true)}>
-            {t('applications.builder.previewForm')}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button icon={<Eye className="size-4" aria-hidden />} onClick={() => setPreviewOpen(true)}>
+              {t('applications.builder.previewForm')}
+            </Button>
+            <DropdownMenu
+              label={t('applications.builder.formMenu')}
+              align="end"
+              trigger={<MoreVertical className="size-4" aria-hidden />}
+              triggerClassName="pointer-coarse:size-11"
+              items={[
+                { label: t('applications.builder.startBlank'), icon: <Sparkles />, onSelect: () => void reshape('blank') },
+                { label: t('applications.builder.restoreOriginal'), icon: <RotateCcw />, disabled: isOriginalForm(config), onSelect: () => void reshape('original') },
+              ]}
+            />
+          </div>
         </div>
 
         {problemCount > 0 && (

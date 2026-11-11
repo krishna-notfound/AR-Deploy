@@ -12,6 +12,8 @@ import { account, service } from '@/services'
 import { fail, ok } from '@/services/catalogService'
 import { DEMO_CODE, resetMockAccount } from '@/services/mock/mockAccount'
 import AdminOverviewPage from './AdminOverviewPage'
+import type { BusinessApplication } from '@/domain/types'
+import type { Page } from '@/services/catalogService'
 import ApplicationsPage from './ApplicationsPage'
 import BusinessesListPage from './BusinessesListPage'
 
@@ -118,8 +120,8 @@ describe('ApplicationsPage', () => {
 describe('ApplicationsPage: applications without a company or applicant name (ADR-0057)', () => {
   it('lists them by the applicant email, in the table and on phones, with no "null" and no empty links', async () => {
     await submitApplication()
-    const real = (await service.getApplications()) as { ok: true; data: { items: BusinessApplication[] } }
-    const nameless = real.data.items.map((x) => ({ ...x, businessName: null, applicantName: null }))
+    const real = (await service.getApplications()) as { ok: true; data: Page<BusinessApplication> }
+    const nameless = real.data.items.map((x): BusinessApplication => ({ ...x, businessName: null, applicantName: null }))
     vi.spyOn(service, 'getApplications').mockResolvedValue(ok({ ...real.data, items: nameless }))
     const { container } = renderAt('/admin/applications', <ApplicationsPage />)
     const table = await screen.findByRole('table', { name: 'Business applications' })

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MAX_APPLY_STEPS, MAX_CUSTOM_QUESTIONS, type CustomQuestionType } from '@/domain/siteContent'
+import { type ApplyBuiltinField, MAX_APPLY_STEPS, MAX_CUSTOM_QUESTIONS, type CustomQuestionType, removedFieldsOf } from '@/domain/siteContent'
+import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { translate } from '@/i18n/translate'
 import { AddBar } from './AddBar'
 import { CardsContext, type CardsContextValue, type FocusRequest, useBuilder } from './builderParts'
 import { useFieldDrag } from './dragReorder'
-import { addQuestion, addStep, layoutOf, moveField, moveFieldTo, moveFieldToStep, placeableSteps, positionOf } from './formOps'
+import { addQuestion, addStep, layoutOf, moveField, moveFieldTo, moveFieldToStep, placeableSteps, positionOf, restoreField } from './formOps'
 import { MessagesPanel } from './MessagesPanel'
 import { AfterCard, HeaderCard, SectionCard } from './SectionCards'
 
@@ -25,7 +27,7 @@ function sectionInView(fallback: string): string {
  * announcements for screen readers, focusing a card, and the add bar.
  */
 export function FormCards({ panelOpen, onPanelToggle, focusRequest }: { panelOpen: boolean; onPanelToggle: () => void; focusRequest: FocusRequest | null }) {
-  const { t } = useI18n()
+  const { t, lang: appLang } = useI18n()
   const { config, onChange, openKey, setOpenKey, requestFocus } = useBuilder()
   const steps = layoutOf(config)
   const [announcement, setAnnouncement] = useState('')
@@ -103,7 +105,15 @@ export function FormCards({ panelOpen, onPanelToggle, focusRequest }: { panelOpe
     onChange(r.config)
     focusCard(`step:${r.id}`, { select: true })
   }
-  const addBar = <AddBar railed={!!openField} questionsFull={questionsFull} sectionsFull={sectionsFull} onAddQuestion={addQuestionBelow} onAddSection={addSection} />
+  const removed = removedFieldsOf(config).map((key) => ({ key, name: config.texts[`apply.f.${key}`]?.[appLang] || translate(appLang, `apply.f.${key}` as TranslationKey) }))
+  const restore = (key: ApplyBuiltinField) => {
+    const next = restoreField(config, key, anchorStep())
+    if (next === config) return
+    onChange(next)
+    setOpenKey(key)
+    focusCard(`field:${key}`, { select: true })
+  }
+  const addBar = <AddBar railed={!!openField} questionsFull={questionsFull} sectionsFull={sectionsFull} removed={removed} onAddQuestion={addQuestionBelow} onRestore={restore} onAddSection={addSection} />
 
   const ctx: CardsContextValue = {
     move,

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { type ApplyFormConfig, DEFAULT_APPLY_FORM, resolveApplyForm, validateApplyForm } from '@/domain/siteContent'
+import { type ApplyFormConfig, DEFAULT_APPLY_FORM, MAX_APPLY_STEPS, MAX_CUSTOM_QUESTIONS, APPLY_BUILTIN_KEYS, removedFieldsOf, resolveApplyForm, rulesFromConfig, validateApplyForm } from '@/domain/siteContent'
 import {
   addOption,
   addQuestion,
   addStep,
+  canDeleteStep,
+  isOriginalForm,
+  deleteField,
   deleteQuestion,
   deleteStep,
   duplicateQuestion,
@@ -17,11 +20,14 @@ import {
   positionOf,
   removeOption,
   resetText,
+  restoreField,
+  restoreOriginal,
   setHidden,
   setOptionHidden,
   setRequired,
   setStepText,
   setText,
+  startFromBlank,
   updateQuestion,
 } from './formOps'
 
@@ -138,9 +144,12 @@ describe('required and hidden', () => {
 
   it('locked fields cannot be hidden or made optional; language has no required switch; questions cannot be hidden', () => {
     const c = base()
-    for (const k of ['businessName', 'applicantName', 'applicantEmail']) {
-      expect(setHidden(c, k, true)).toBe(c)
-      expect(setRequired(c, k, false)).toBe(c)
+    expect(setHidden(c, 'applicantEmail', true)).toBe(c)
+    expect(setRequired(c, 'applicantEmail', false)).toBe(c)
+    // The names are ordinary questions now (ADR-0057): they can be hidden and made optional.
+    for (const k of ['businessName', 'applicantName']) {
+      expect(layoutOf(setHidden(c, k, true)).flatMap((s) => s.fields).find((f) => f.key === k)!.hidden).toBe(true)
+      expect(layoutOf(setRequired(c, k, false)).flatMap((s) => s.fields).find((f) => f.key === k)!.required).toBe(false)
     }
     expect(setRequired(c, 'language', false)).toBe(c)
     const withQ = addQuestion(c, 'business', 'short_text', 'Q').config
@@ -177,14 +186,14 @@ describe('options of a built-in choice field', () => {
 })
 
 describe('steps', () => {
-  it('adds steps before Review up to eight and then stops', () => {
+  it('adds steps before Review up to twelve and then stops', () => {
     let c = base()
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < MAX_APPLY_STEPS - 5; i++) {
       const r = addStep(c, `Extra ${i}`)
       expect(r.id).toBeTruthy()
       c = r.config
     }
-    expect(c.steps).toHaveLength(8)
+    expect(c.steps).toHaveLength(12)
     expect(c.steps.at(-1)!.builtin).toBe('review')
     const full = addStep(c, 'One too many')
     expect(full.id).toBeNull()
@@ -230,24 +239,23 @@ describe('steps', () => {
     c = deleteStep(c, base0.id!)
     expect(c.steps.map((s) => s.id)).not.toContain(base0.id)
     expect(keysOf(c, 'catalogue')).toContain('notes')
-    expect(deleteStep(base(), 'business')).toEqual(base())
     expect(validateApplyForm(c)).toEqual({})
   })
 })
 
 describe('questions', () => {
-  it('adds a question on step 2 as its last field, and stops at ten', () => {
+  it('adds a question on step 2 as its last field, and stops at thirty', () => {
     let c = base()
     let firstId = ''
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < MAX_CUSTOM_QUESTIONS; i++) {
       const r = addQuestion(c, 'location', 'short_text', `Question ${i}`)
       expect(r.id).toBeTruthy()
       firstId ||= r.id!
       c = r.config
     }
     expect(keysOf(c, 'location').slice(0, 3)).toEqual(['country', 'city', `custom:${firstId}`])
-    expect(c.customQuestions).toHaveLength(10)
-    const full = addQuestion(c, 'location', 'yes_no', 'Eleventh')
+    expect(c.customQuestions).toHaveLength(30)
+    const full = addQuestion(c, 'location', 'yes_no', 'Thirty-first')
     expect(full.id).toBeNull()
     expect(full.config).toBe(c)
     expect(validateApplyForm(c)).toEqual({})
@@ -325,9 +333,9 @@ describe('questions', () => {
     expect(validateApplyForm(d.config)).toEqual({})
   })
 
-  it('stops duplicating at ten own questions and for an unknown question', () => {
+  it('stops duplicating at thirty own questions and for an unknown question', () => {
     let c = base()
-    for (let i = 0; i < 10; i++) c = addQuestion(c, 'business', 'short_text', `Q${i}`).config
+    for (let i = 0; i < 30; i++) c = addQuestion(c, 'business', 'short_text', `Q${i}`).config
     const full = duplicateQuestion(c, c.customQuestions[0]!.id, { en: ' (copy)', pt: ' (cópia)' })
     expect(full.id).toBeNull()
     expect(full.config).toBe(c)
@@ -367,5 +375,223 @@ describe('wording', () => {
     const c = setText(base(), 'apply.stepOf', 'en', 'Step {n} of {total} {oops}')
     expect(validateApplyForm(c)).toMatchObject({ 'texts.apply.stepOf.en': 'unknown_token' })
     expect(validateApplyForm(setText(base(), 'apply.done.reference', 'en', 'Your number'))).toMatchObject({ 'texts.apply.done.reference.en': 'missing_token' })
+  })
+})
+
+describe('delete a standard question (ADR-0057)', () => {
+  const STANDARD = APPLY_BUILTIN_KEYS.filter((k) => k !== 'applicantEmail')
+
+  it('every standard question except the email can be deleted: it leaves the form, is listed as removed and the document stays valid', () => {
+    for (const k of STANDARD) {
+      const c = deleteField(base(), k)
+      expect(c, k).not.toBe(base())
+      expect(removedFieldsOf(c)).toEqual([k])
+      expect(layoutOf(c).flatMap((s) => s.fields.map((f) => f.key)), k).not.toContain(k)
+      expect(resolveApplyForm(c).flatMap((s) => s.fields.map((f) => f.key))).toHaveLength(15)
+      expect(c.fields.some((f) => f.key === k)).toBe(false)
+      expect(validateApplyForm(c), k).toEqual({})
+      // The server treats it as hidden and optional: stored as null.
+      expect(rulesFromConfig(c, 1)!.fields[k]).toEqual({ hidden: true, required: false })
+    }
+  })
+
+  it('the applicant email cannot be deleted; an unknown key and a question id change nothing', () => {
+    const c = base()
+    expect(deleteField(c, 'applicantEmail')).toBe(c)
+    expect(deleteField(c, 'nope')).toBe(c)
+    const q = addQuestion(c, 'business', 'short_text', 'Q')
+    expect(deleteField(q.config, `custom:${q.id}`)).toBe(q.config)
+  })
+
+  it('deleting twice is a no-op, and the input is not changed', () => {
+    const once = deleteField(base(), 'website')
+    expect(deleteField(once, 'website')).toBe(once)
+    const c = base()
+    const before = JSON.stringify(c)
+    deleteField(c, 'city')
+    expect(JSON.stringify(c)).toBe(before)
+  })
+
+  it('deleting a choice question also forgets its hidden options, so a restored one starts complete', () => {
+    let c = setOptionHidden(base(), 'productCount', '1-10', true)
+    c = deleteField(c, 'productCount')
+    expect(c.hiddenOptions.productCount).toBeUndefined()
+    expect(validateApplyForm(c)).toEqual({})
+    expect(restoreField(c, 'productCount').hiddenOptions.productCount).toBeUndefined()
+  })
+
+  it('a deleted question keeps its edited wording (texts stay)', () => {
+    let c = setText(base(), 'apply.f.website', 'en', 'Your site')
+    c = deleteField(c, 'website')
+    expect(c.texts['apply.f.website']).toEqual({ en: 'Your site' })
+    expect(restoreField(c, 'website').texts['apply.f.website']).toEqual({ en: 'Your site' })
+  })
+
+  it('all of them can go at once: only the email is left and the form is still valid', () => {
+    let c = base()
+    for (const k of STANDARD) c = deleteField(c, k)
+    expect(removedFieldsOf(c)).toEqual(STANDARD)
+    expect(resolveApplyForm(c).flatMap((s) => s.fields.map((f) => f.key))).toEqual(['applicantEmail'])
+    expect(validateApplyForm(c)).toEqual({})
+  })
+
+  it('restoring puts the question back at the end of the section asked for, with its default flags, or on its default section', () => {
+    const gone = deleteField(deleteField(base(), 'website'), 'applicantPhone')
+    const onDefault = restoreField(gone, 'website')
+    expect(keysOf(onDefault, 'business')).toEqual(['businessName', 'category', 'description', 'website'])
+    expect(removedFieldsOf(onDefault)).toEqual(['applicantPhone'])
+    const elsewhere = restoreField(gone, 'applicantPhone', 'location')
+    expect(keysOf(elsewhere, 'location')).toEqual(['country', 'city', 'applicantPhone'])
+    const f = layoutOf(restoreField(deleteField(base(), 'category'), 'category')).flatMap((s) => s.fields).find((x) => x.key === 'category')!
+    expect(f).toMatchObject({ required: true, hidden: false })
+    expect(validateApplyForm(onDefault)).toEqual({})
+    expect(validateApplyForm(elsewhere)).toEqual({})
+  })
+
+  it('restoring after a section was deleted goes to the first section; Review and unknown sections are refused; a field that is not removed changes nothing', () => {
+    const c = deleteStep(deleteField(base(), 'country'), 'location')
+    const back = restoreField(c, 'country')
+    expect(layoutOf(back).flatMap((s) => s.fields).find((f) => f.key === 'country')).toBeTruthy()
+    expect(back.steps.some((s) => s.builtin === 'review')).toBe(true)
+    expect(validateApplyForm(back)).toEqual({})
+    const d = deleteField(base(), 'country')
+    expect(restoreField(d, 'country', 'review')).toBe(d)
+    expect(restoreField(base(), 'country')).toEqual(base())
+    const intact = base()
+    expect(restoreField(intact, 'country')).toBe(intact)
+  })
+})
+
+describe('delete any section (ADR-0057)', () => {
+  it('a built-in section can go: its questions move to the section above; the first one moves them to the next', () => {
+    const c = deleteStep(base(), 'location')
+    expect(c.steps.map((s) => s.id)).toEqual(['business', 'contact', 'catalogue', 'review'])
+    expect(keysOf(c, 'business')).toEqual(['businessName', 'website', 'category', 'description', 'country', 'city'])
+    expect(validateApplyForm(c)).toEqual({})
+    const first = deleteStep(base(), 'business')
+    expect(first.steps.map((s) => s.id)).toEqual(['location', 'contact', 'catalogue', 'review'])
+    expect(keysOf(first, 'location')).toEqual(['businessName', 'website', 'category', 'description', 'country', 'city'])
+    expect(validateApplyForm(first)).toEqual({})
+  })
+
+  it('nothing is lost or duplicated when a section goes', () => {
+    const first = deleteStep(base(), 'business')
+    const all = layoutOf(first).flatMap((s) => s.fields.map((f) => f.key))
+    expect(new Set(all).size).toBe(all.length)
+    expect(all).toHaveLength(16)
+  })
+
+  it('Review cannot be deleted; an unknown section changes nothing', () => {
+    const c = base()
+    expect(deleteStep(c, 'review')).toBe(c)
+    expect(deleteStep(c, 'nowhere')).toBe(c)
+  })
+
+  it('the last section before Review cannot be deleted (the email needs one) and canDeleteStep says so', () => {
+    let c = base()
+    for (const id of ['business', 'location', 'contact']) c = deleteStep(c, id)
+    expect(c.steps.map((s) => s.id)).toEqual(['catalogue', 'review'])
+    expect(canDeleteStep(c, 'catalogue')).toBe(false)
+    expect(deleteStep(c, 'catalogue')).toBe(c)
+    expect(canDeleteStep(c, 'review')).toBe(false)
+    expect(canDeleteStep(base(), 'business')).toBe(true)
+    expect(canDeleteStep(base(), 'nowhere')).toBe(false)
+    expect(layoutOf(c).flatMap((s) => s.fields.map((f) => f.key))).toHaveLength(16)
+    expect(validateApplyForm(c)).toEqual({})
+  })
+
+  it('deleting a section moves its hidden questions and own questions too', () => {
+    let c = setHidden(base(), 'notes', true)
+    const q = addQuestion(c, 'catalogue', 'yes_no', 'Ship abroad?')
+    c = deleteStep(q.config, 'catalogue')
+    const f = layoutOf(c).flatMap((s) => s.fields)
+    expect(f.find((x) => x.key === 'notes')!.hidden).toBe(true)
+    expect(keysOf(c, 'contact')).toContain(`custom:${q.id}`)
+    expect(validateApplyForm(c)).toEqual({})
+  })
+})
+
+describe('start from blank (ADR-0057)', () => {
+  it('leaves one section with the email, Review, no own questions, every other standard question removed; texts stay', () => {
+    let c = setText(base(), 'apply.title', 'en', 'Join us')
+    c = setText(c, 'apply.f.consent', 'pt', 'Aceito')
+    c = addQuestion(c, 'business', 'short_text', 'Mine').config
+    c = setOptionHidden(c, 'productCount', '1-10', true)
+    const blank = startFromBlank(c)
+    expect(blank.steps).toHaveLength(2)
+    expect(blank.steps.at(-1)!.builtin).toBe('review')
+    expect(layoutOf(blank).map((s) => s.fields.map((f) => f.key))).toEqual([['applicantEmail'], []])
+    expect(blank.customQuestions).toEqual([])
+    expect(blank.hiddenOptions).toEqual({})
+    expect(removedFieldsOf(blank)).toEqual(APPLY_BUILTIN_KEYS.filter((k) => k !== 'applicantEmail'))
+    expect(blank.texts).toEqual(c.texts)
+    expect(layoutOf(blank)[0]!.fields[0]).toMatchObject({ key: 'applicantEmail', required: true, hidden: false })
+    expect(validateApplyForm(blank)).toEqual({})
+    // Idempotent in effect.
+    expect(layoutOf(startFromBlank(blank)).map((s) => s.fields.map((f) => f.key))).toEqual([['applicantEmail'], []])
+  })
+
+  it('keeps the section that held the email (and its wording); a form whose email section was customised keeps that title', () => {
+    let c = setStepText(base(), 'contact', 'title', 'en', 'About you')
+    const blank = startFromBlank(c)
+    expect(blank.steps[0]).toMatchObject({ id: 'contact', title: { en: 'About you' } })
+    c = deleteStep(base(), 'contact')
+    const fromNoContact = startFromBlank(c)
+    expect(fromNoContact.steps).toHaveLength(2)
+    expect(validateApplyForm(fromNoContact)).toEqual({})
+    expect(layoutOf(fromNoContact)[0]!.fields.map((f) => f.key)).toEqual(['applicantEmail'])
+  })
+
+  it('works from a form that already has removed questions and does not change the input', () => {
+    const c = deleteField(base(), 'city')
+    const before = JSON.stringify(c)
+    const blank = startFromBlank(c)
+    expect(JSON.stringify(c)).toBe(before)
+    expect(removedFieldsOf(blank)).toHaveLength(15)
+  })
+
+  it('own questions can be added to a blank form and the form stays valid', () => {
+    const blank = startFromBlank(base())
+    const r = addQuestion(blank, blank.steps[0]!.id, 'long_text', 'Tell us more')
+    expect(r.id).toBeTruthy()
+    expect(layoutOf(r.config)[0]!.fields.map((f) => f.key)).toEqual(['applicantEmail', `custom:${r.id}`])
+    expect(validateApplyForm(r.config)).toEqual({})
+  })
+})
+
+describe('restore the original form (ADR-0057)', () => {
+  it('puts back the sections, questions and options of the original; the texts stay', () => {
+    let c = setText(base(), 'apply.title', 'en', 'Join us')
+    c = startFromBlank(c)
+    c = addQuestion(c, c.steps[0]!.id, 'yes_no', 'Mine').config
+    const back = restoreOriginal(c)
+    expect(back.steps).toEqual(DEFAULT_APPLY_FORM.steps)
+    expect(back.fields).toEqual(DEFAULT_APPLY_FORM.fields)
+    expect(back.customQuestions).toEqual([])
+    expect(back.hiddenOptions).toEqual({})
+    expect(removedFieldsOf(back)).toEqual([])
+    expect(back.texts).toEqual({ 'apply.title': { en: 'Join us' } })
+    expect(validateApplyForm(back)).toEqual({})
+  })
+
+  it('undoes hidden options and hidden questions too, and does not change the input', () => {
+    const c = setHidden(setOptionHidden(base(), 'category', 'other', true), 'website', true)
+    const before = JSON.stringify(c)
+    const back = restoreOriginal(c)
+    expect(JSON.stringify(c)).toBe(before)
+    expect(layoutOf(back).flatMap((s) => s.fields).every((f) => !f.hidden)).toBe(true)
+    expect(back.hiddenOptions).toEqual({})
+  })
+})
+
+describe('isOriginalForm', () => {
+  it('is true for the original (also written out), false after any structural change, and true again after restoring', () => {
+    expect(isOriginalForm(base())).toBe(true)
+    expect(isOriginalForm(materialize(base()))).toBe(true)
+    expect(isOriginalForm(setText(base(), 'apply.title', 'en', 'Join us'))).toBe(true) // texts do not count
+    for (const changed of [deleteField(base(), 'city'), deleteStep(base(), 'location'), setHidden(base(), 'website', true), setRequired(base(), 'website', true), addQuestion(base(), 'business', 'yes_no', 'Q').config, setOptionHidden(base(), 'category', 'other', true), addStep(base(), 'X').config, startFromBlank(base())]) {
+      expect(isOriginalForm(changed)).toBe(false)
+      expect(isOriginalForm(restoreOriginal(changed))).toBe(true)
+    }
   })
 })

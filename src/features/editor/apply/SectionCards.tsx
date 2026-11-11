@@ -9,7 +9,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { editorPreviewPath } from '@/lib/urls'
 import { LangField, LockNote, useBuilder, useCards, useLangError } from './builderParts'
-import { addStep, deleteStep, moveStep, setStepText } from './formOps'
+import { addStep, canDeleteStep, deleteStep, moveStep, setStepText } from './formOps'
 import { QuestionCard } from './QuestionCard'
 import { TextOverride, originalName, stepTitleOf } from './TextOverride'
 import { groupKeys } from './textGroups'
@@ -44,6 +44,7 @@ export function SectionCard({ step, n, total, sections }: { step: ResolvedStep; 
   const idx = config.steps.findIndex((s) => s.id === step.id)
   const own = config.steps[idx]
   const atLimit = config.steps.length >= MAX_APPLY_STEPS
+  const canDelete = canDeleteStep(config, step.id)
   const title = stepTitleOf(step, appLang)
   const drag = cards.drag
   const dropHere = drag?.stepId === step.id
@@ -57,7 +58,7 @@ export function SectionCard({ step, n, total, sections }: { step: ResolvedStep; 
   const remove = async () => {
     const ok = await confirm({
       title: t('applications.builder.sectionDeleteTitle', { n }),
-      body: t('applications.builder.sectionDeleteBody'),
+      body: t(idx === 0 ? 'applications.builder.sectionDeleteBodyFirst' : 'applications.builder.sectionDeleteBody'),
       confirmLabel: t('applications.builder.sectionDelete'),
       destructive: true,
     })
@@ -78,7 +79,7 @@ export function SectionCard({ step, n, total, sections }: { step: ResolvedStep; 
     { label: t('applications.builder.sectionDown'), icon: <ArrowDown />, disabled: n >= total - 1, onSelect: () => shift(1) },
     'separator',
     { label: atLimit ? t('applications.builder.sectionAddFull', { max: MAX_APPLY_STEPS }) : t('applications.builder.sectionAddBelow'), icon: <Plus />, disabled: atLimit, onSelect: addBelow },
-    ...(step.builtin ? [] : [{ label: t('applications.builder.sectionDelete'), icon: <Trash2 />, destructive: true, onSelect: () => void remove() } satisfies MenuItem]),
+    { label: canDelete ? t('applications.builder.sectionDelete') : t('applications.builder.sectionDeleteLast'), icon: <Trash2 />, destructive: true, disabled: !canDelete, onSelect: () => void remove() },
   ]
 
   // The line that shows where a dragged card will land, among the cards that stay put.

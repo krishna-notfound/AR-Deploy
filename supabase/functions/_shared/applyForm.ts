@@ -82,6 +82,8 @@ export interface CustomAnswer {
 // ---- limits (the SQL gate repeats the ones marked SQL) ---------------------------------------------------------------
 export const MAX_APPLY_STEPS = 12 // SQL (was 8 before ADR-0057)
 export const MAX_CUSTOM_QUESTIONS = 30 // SQL (was 10 before ADR-0057)
+/** Placements in the draft: the 16 built-in fields, 30 own questions and a little slack (private.check_site_content_shape). */
+export const MAX_APPLY_FIELDS = 50 // SQL
 export const MIN_CHOICE_OPTIONS = 2 // SQL
 export const MAX_CHOICE_OPTIONS = 10 // SQL
 export const MAX_TEXT_OVERRIDE = 600 // SQL
