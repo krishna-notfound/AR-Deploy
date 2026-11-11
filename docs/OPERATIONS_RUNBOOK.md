@@ -378,6 +378,33 @@ Order: **frontend, function, then the script, and before any earlier rollback (S
 6. Regenerate the types: `SUPABASE_PROJECT_REF=zggylkbgajamhriebdrg npm run db:types`.
 
 
+## Password change verification and forgot-password hardening (ADR-0066)
+
+Built 2026-11-11, **not applied or deployed**. Migration `supabase/migrations/20261111160021_password_change_codes.sql` (adds the `change_password` code purpose and the `account_password_reset` event), Edge Function `account-security` (new actions `change_password` and `reset_password`), frontend. Security notes and the forgot-password audit: `docs/SECURITY_REVIEW.md` "ADR-0066".
+
+### Release order
+
+Each step only with the owner's go-ahead (CLAUDE.md).
+
+1. Apply the migration to `zggylkbgajamhriebdrg` (check `npx supabase migration list --linked` first).
+2. Redeploy **`account-security`** (`npx supabase functions deploy account-security --project-ref zggylkbgajamhriebdrg`). No new secrets: it uses `SUPABASE_ANON_KEY`, which Edge Functions already have.
+3. Deploy the frontend. Until steps 1 and 2 are live, the new "Change password" dialog and the reset page's last step answer "That request wasn't valid" (the old function does not know the actions).
+
+### Supabase dashboard settings (the owner sets these)
+
+In addition to "Account settings and 2FA (S1)" above, and with the same care (dashboard only, never `config push`):
+
+1. **Authentication → Sign In / Providers → Email:** **Secure password change** on, **Require current password when updating** on (where listed), **Minimum password length** 12. These narrow the direct Supabase Auth path; the app's own change and reset no longer go through it.
+2. **Authentication → Emails → Notification emails:** **Password changed** on.
+3. **Test straight after saving:** a password change in Settings → My account (emailed code; with 2FA on, the authenticator code too), a forgot-password reset (email code → new password → sign-in; for a 2FA account the authenticator step comes after the code), and an **owner-invite onboarding** (that page still sets the first password through Supabase Auth directly, so "Require current password when updating" can affect it: if it fails, turn that switch off again and tell the developer).
+
+What stays open even with these switches: SECURITY_REVIEW "ADR-0066" (a session plus the current password can still change the password through Supabase Auth directly, without the emailed code).
+
+### Rollback
+
+1. Redeploy the previous `account-security` (from the commit before ADR-0066) and roll back the frontend (Vercel Instant Rollback).
+2. Then run `supabase/rollback/20261111_password_change_codes_rollback.sql` in the SQL editor as the database owner. It deletes open `change_password` codes; `account_password_reset` events stay.
+
 ## Rollback
 
 | What | How | Data effect |

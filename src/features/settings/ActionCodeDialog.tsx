@@ -1,6 +1,7 @@
 // The shared dialog for risky account actions (spec 8 "Risky actions"): it emails a 6-digit code when it opens, takes
 // the code, and runs the action only when the server accepts it. Used by My account (closure), Security & 2FA
-// (turn off 2FA, new recovery codes) and the Owner's admin actions (reset 2FA, complete closure).
+// (turn off 2FA, new recovery codes), the Owner's admin actions (reset 2FA, complete closure) and, with the
+// authenticator code too when the account has 2FA, the password change (ADR-0066).
 import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
@@ -52,6 +53,11 @@ const rememberBlocked = (uid: string) => {
 }
 /** After these the code in hand is no longer usable: clear the field so the next step is a new code. */
 const CODE_SPENT = new Set(['code_expired', 'too_many_attempts'])
+/** The authenticator-code refusals (ADR-0066): shown on that field, which is cleared for the next code from the app. */
+const TOTP_ERRORS: Record<string, TranslationKey> = {
+  invalid_totp: 'settings.code.err.totpInvalid',
+  totp_required: 'settings.code.err.totpRequired',
+}
 
 type T = ReturnType<typeof useI18n>['t']
 const codeMessage = (e: ServiceError, t: T) => (e.reason && Object.hasOwn(CODE_ERRORS, e.reason) ? t(CODE_ERRORS[e.reason] as TranslationKey) : accountErrorText(e, t))
@@ -67,8 +73,11 @@ export interface ActionCodeDialogProps {
   confirmLabel: string
   destructive?: boolean
   onClose: () => void
-  /** Runs the action with the code. On success the dialog closes (it calls onClose); on failure it shows the reason. */
-  onConfirm: (code: string) => Promise<Result<unknown>>
+  /** Also asks for the code the authenticator app shows now (an account with 2FA changing its password, ADR-0066). */
+  totp?: boolean
+  /** Runs the action with the code (and the authenticator code when `totp`). On success the dialog closes (it calls
+   * onClose); on failure it shows the reason. */
+  onConfirm: (code: string, totp?: string) => Promise<Result<unknown>>
 }
 
 export function ActionCodeDialog(props: ActionCodeDialogProps) {
@@ -77,7 +86,7 @@ export function ActionCodeDialog(props: ActionCodeDialogProps) {
   return <OpenActionCodeDialog {...props} />
 }
 
-function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destructive, onClose, onConfirm }: ActionCodeDialogProps) {
+function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destructive, totp: askTotp = false, onClose, onConfirm }: ActionCodeDialogProps) {
   const { t } = useI18n()
   const uid = useOptionalAccount()?.user?.id ?? ''
   const [send, setSend] = useState<Send>(() => (sendBlocked(uid) ? { status: 'blocked' } : { status: 'sending' }))
@@ -86,6 +95,8 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
   const [now, setNow] = useState(() => Date.now())
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [totp, setTotp] = useState('')
+  const [totpError, setTotpError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const live = useRef(true)
   const sendId = useRef(0)
@@ -148,14 +159,14 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
   const submit = async (e?: FormEvent) => {
     e?.preventDefault()
     if (submitting.current || send.status !== 'sent') return
-    if (code.length !== CODE_LENGTH) {
-      setError(t('settings.code.enter'))
-      return
-    }
+    const codeOk = code.length === CODE_LENGTH
+    const totpOk = !askTotp || totp.length === CODE_LENGTH
+    setError(codeOk ? null : t('settings.code.enter'))
+    setTotpError(totpOk ? null : t('settings.code.totpEnter'))
+    if (!codeOk || !totpOk) return
     submitting.current = true
     setPending(true)
-    setError(null)
-    const r = await onConfirm(code)
+    const r = await (askTotp ? onConfirm(code, totp) : onConfirm(code))
     submitting.current = false
     if (!live.current) return
     setPending(false)
@@ -163,8 +174,15 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
       onClose()
       return
     }
+    const reason = r.error.reason
+    if (askTotp && reason && Object.hasOwn(TOTP_ERRORS, reason)) {
+      // An authenticator code works once per 30 s window: the next try needs the newest one.
+      setTotpError(t(TOTP_ERRORS[reason] as TranslationKey))
+      setTotp('')
+      return
+    }
     setError(codeMessage(r.error, t))
-    if (r.error.reason && CODE_SPENT.has(r.error.reason)) setCode('')
+    if (reason && CODE_SPENT.has(reason)) setCode('')
   }
 
   const sent = send.status === 'sent'
@@ -227,6 +245,22 @@ function OpenActionCodeDialog({ purpose, title, description, confirmLabel, destr
             />
           </FormField>
         </div>
+        {askTotp && (
+          <FormField label={t('settings.code.totpLabel')} hint={t('settings.code.totpHint')} error={totpError ?? undefined}>
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              value={totp}
+              disabled={!sent || pending}
+              onChange={(e) => {
+                setTotp(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))
+                if (totpError) setTotpError(null)
+              }}
+              className="font-mono tracking-[0.3em]"
+            />
+          </FormField>
+        )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Button size="sm" variant="ghost" onClick={resend} disabled={!canResend} className="-ml-3!">
             {cooldown > 0 ? t('settings.code.resendIn', { n: cooldown }) : t('settings.code.resend')}

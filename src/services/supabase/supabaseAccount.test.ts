@@ -119,27 +119,74 @@ const PROFILE_ROW = {
 }
 
 describe('Supabase account service', () => {
-  it('changePassword calls updateUser with current_password and then signOut scope others; maps current_password_mismatch and same_password', async () => {
-    const f = fake()
-    expect(await account(f).changePassword('old-password-1', 'new-password-12')).toEqual({ ok: true, data: undefined })
-    expect(f.auth.updateUser).toHaveBeenCalledWith({ password: 'new-password-12', current_password: 'old-password-1' })
-    expect(f.auth.signOut).toHaveBeenCalledWith({ scope: 'others' })
+  // ADR-0066: never updateUser({ password }) from the browser; the account-security function does the change.
+  it('changePassword posts change_password with both passwords and the code, never calls updateUser, then clears the local session', async () => {
+    const f = fake({ invoke: { data: { ok: true, signedOut: true } } })
+    const input = { current: 'old-password-1', next: 'new-password-12', code: '123456' }
+    expect(await account(f).changePassword(input)).toEqual({ ok: true, data: undefined })
+    expect(f.invoke).toHaveBeenCalledWith('account-security', { body: { action: 'change_password', current_password: 'old-password-1', new_password: 'new-password-12', code: '123456' } })
+    expect(f.auth.updateUser).not.toHaveBeenCalled()
+    expect(f.auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(f.auth.mfa.challengeAndVerify).not.toHaveBeenCalled()
+    // The server writes the audit event now; the browser no longer logs it.
+    expect(f.rpc).not.toHaveBeenCalledWith('log_account_event', expect.anything())
     const order = names(f.log)
-    expect(order.indexOf('auth.updateUser')).toBeLessThan(order.indexOf('auth.signOut'))
-    expect(f.rpc).toHaveBeenCalledWith('log_account_event', { p_event: 'account_password_changed' })
+    expect(order.indexOf('invoke')).toBeLessThan(order.indexOf('auth.signOut'))
 
-    for (const code of ['current_password_mismatch', 'same_password']) {
-      const g = fake({ auth: { updateUser: () => ({ data: { user: null }, error: authError(code) }) } })
-      const r = await account(g).changePassword('old-password-1', 'new-password-12')
-      expect(r.ok).toBe(false)
-      if (!r.ok) {
-        expect(r.error.reason).toBe(code)
-        expect(r.error.message).not.toContain('raw provider text')
-      }
+    for (const code of ['invalid_code', 'code_expired', 'too_many_attempts', 'totp_required', 'aal2_required', 'current_password_mismatch', 'same_password', 'weak_password', 'rate_limited']) {
+      const g = fake({ invoke: { data: null, error: httpError(code === 'rate_limited' || code === 'too_many_attempts' ? 429 : 400, { ok: false, error: code }) } })
+      const r = await account(g).changePassword(input)
+      expect(!r.ok && r.error.reason).toBe(code)
       expect(g.auth.signOut).not.toHaveBeenCalled()
     }
 
-    const short = await account(fake()).changePassword('old', 'short')
+    const short = fake()
+    const s = await account(short).changePassword({ ...input, next: 'short' })
+    expect(!s.ok && s.error.reason).toBe('weak_password')
+    expect(short.invoke).not.toHaveBeenCalled()
+  })
+
+  it('changePassword with 2FA verifies the authenticator code first (a fresh amr), and a wrong one is invalid_totp with no call', async () => {
+    const factors = () => ({ data: { all: [{ id: 'f1', factor_type: 'totp', status: 'verified' }], totp: [{ id: 'f1' }], phone: [] }, error: null })
+    const f = fake({ invoke: { data: { ok: true } }, mfa: { listFactors: factors } })
+    const input = { current: 'old-password-1', next: 'new-password-12', code: '123456', totp: '654 321' }
+    expect((await account(f).changePassword(input)).ok).toBe(true)
+    expect(f.auth.mfa.challengeAndVerify).toHaveBeenCalledWith({ factorId: 'f1', code: '654321' })
+    const order = names(f.log)
+    expect(order.indexOf('mfa.challengeAndVerify')).toBeLessThan(order.indexOf('invoke'))
+    // The authenticator code is never sent to the function.
+    expect(JSON.stringify(f.invoke.mock.calls)).not.toContain('654')
+
+    const g = fake({ mfa: { listFactors: factors, challengeAndVerify: () => ({ data: null, error: authError('mfa_verification_failed', 422) }) } })
+    const r = await account(g).changePassword(input)
+    expect(!r.ok && r.error.reason).toBe('invalid_totp')
+    expect(g.invoke).not.toHaveBeenCalled()
+  })
+
+  it('checkCurrentPassword uses the throwaway client; a wrong password is current_password_mismatch', async () => {
+    const f = fake()
+    expect((await account(f).checkCurrentPassword('right')).ok).toBe(true)
+    expect(f.pwAuth.signInWithPassword).toHaveBeenCalledWith({ email: 'ana@studio.pt', password: 'right' })
+    expect(f.auth.signInWithPassword).not.toHaveBeenCalled()
+    const bad = await account(fake({ password: 'wrong' })).checkCurrentPassword('wrong')
+    expect(!bad.ok && bad.error.reason).toBe('current_password_mismatch')
+    const limited = await account(fake({ password: 'http429' })).checkCurrentPassword('x')
+    expect(!limited.ok && limited.error.reason).toBe('rate_limited')
+  })
+
+  it('resetPassword posts reset_password and clears the local session; reset_expired and aal2_required come through', async () => {
+    const f = fake({ invoke: { data: { ok: true, signedOut: true } } })
+    expect((await account(f).resetPassword('a-new-long-password')).ok).toBe(true)
+    expect(f.invoke).toHaveBeenCalledWith('account-security', { body: { action: 'reset_password', new_password: 'a-new-long-password' } })
+    expect(f.auth.updateUser).not.toHaveBeenCalled()
+    expect(f.auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    for (const code of ['reset_expired', 'aal2_required', 'weak_password']) {
+      const g = fake({ invoke: { data: null, error: httpError(code === 'weak_password' ? 400 : 403, { ok: false, error: code }) } })
+      const r = await account(g).resetPassword('a-new-long-password')
+      expect(!r.ok && r.error.reason).toBe(code)
+      expect(g.auth.signOut).not.toHaveBeenCalled()
+    }
+    const short = await account(fake()).resetPassword('short')
     expect(!short.ok && short.error.reason).toBe('weak_password')
   })
 

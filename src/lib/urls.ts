@@ -127,6 +127,10 @@ export const APPLY_PATH = '/apply'
 export const JOIN_PATH = '/join'
 /** Where owner invitation links land (the provision-owner Edge Function builds the absolute URL from APP_BASE_URL). */
 export const ACCEPT_INVITE_PATH = '/accept-invite'
+/** "Forgot password" (ADR-0027: the email carries a code, not a link; Supabase Auth still wants a redirect URL). */
+export const RESET_PASSWORD_PATH = '/reset-password'
+/** The redirect URL handed to Supabase Auth with a reset request: this deployment's reset page, no query or token. */
+export const passwordResetRedirectUrl = (): string => absoluteLocalUrl(RESET_PASSWORD_PATH)
 /** Public legal pages (EN/PT, text from docs/legal/drafts). Served on the platform domain and on business subdomains. */
 export const PRIVACY_PATH = '/privacy'
 export const TERMS_PATH = '/terms'

@@ -57,6 +57,8 @@ export type SecurityNotice =
   | 'closure_requested'
   | 'closure_completed'
   | 'closure_restored'
+  | 'password_changed'
+  | 'password_reset'
 
 export interface RenderedEmail {
   subject: string
@@ -147,6 +149,19 @@ const NOTICE: Record<SecurityNotice, Omit<Copy, 'cta'>> = {
     heading: 'Your account stays open',
     body: 'The Sanctus team cancelled the closure of your account. Your catalogue is back to how it was before you asked to close it.',
     note: 'If you still want to close your account, you can ask again from your account settings.',
+  },
+  // ADR-0066. "Forgot password" is the way back for someone whose password was changed without them.
+  password_changed: {
+    subject: 'Your Sanctus password was changed',
+    heading: 'Your password was changed',
+    body: 'The password of your Sanctus account was changed from your account settings, with a code sent to this address. Every device was signed out: sign in again with the new password.',
+    note: 'If this was not you, reset your password from the sign-in page ("Forgot password") and contact the Sanctus team.',
+  },
+  password_reset: {
+    subject: 'Your Sanctus password was reset',
+    heading: 'Your password was reset',
+    body: 'The password of your Sanctus account was reset with a code sent to this address. Every device was signed out: sign in again with the new password.',
+    note: 'If this was not you, reset your password again from the sign-in page ("Forgot password") and contact the Sanctus team.',
   },
 }
 const securityNotice = (d: TemplateData): Copy => ({ ...NOTICE[d.notice ?? '2fa_disabled'], cta: 'Open Sanctus' })

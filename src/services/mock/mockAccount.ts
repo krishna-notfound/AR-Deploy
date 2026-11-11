@@ -127,6 +127,7 @@ export function voidMockClosure(businessId: string): string[] {
 export function resetMockAccount(opts: { onboarding?: 'completed' | 'new' } = {}): void {
   state = initial(opts.onboarding)
   statusBefore = { [DEMO_CLOSING_BUSINESS]: 'inactive' }
+  recovering = false
 }
 
 const nowIso = () => new Date().toISOString()
@@ -157,6 +158,18 @@ async function run<T>(fn: () => Result<T>): Promise<Result<T>> {
   } catch {
     return accountFail('unknown')
   }
+}
+
+/** The demo's pretend recovery session ("Forgot password", mockPasswordReset). Gone on reload. */
+let recovering = false
+/** A verified reset code: a recovery session, which starts at aal1 (with demo 2FA on, the authenticator step follows). */
+export function openMockRecovery(): void {
+  recovering = true
+  state.aal = 'aal1'
+}
+export const mockRecoveryOpen = (): boolean => recovering
+export function closeMockRecovery(): void {
+  recovering = false
 }
 
 function clearFactor(): void {
@@ -231,11 +244,35 @@ export const mockAccountService: AccountService = {
 
   listSecurityEvents: () => run(() => ok(state.events)),
 
-  changePassword: (current, next) =>
+  // Demo accounts have no password: any current password is accepted (the UI says so). The rest mirrors the
+  // account-security function (ADR-0066): the emailed code, and the authenticator code when 2FA is on.
+  checkCurrentPassword: (password) => run(() => (password ? ok(undefined) : accountFail('current_password_mismatch'))),
+
+  changePassword: ({ current, next, code, totp }) =>
     run(() => {
+      const has2fa = state.factor?.verified === true
+      const requires2fa = isStaff() ? state.platform.require2faStaff : state.platform.require2faBusiness
+      if (!current) return accountFail('invalid_request')
+      if ((has2fa || requires2fa) && state.aal !== 'aal2') return accountFail('aal2_required')
+      if (has2fa) {
+        if (totp === undefined) return accountFail('totp_required')
+        if (totp.replace(/\s/g, '') !== DEMO_CODE) return accountFail('invalid_totp')
+      }
       if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) return accountFail('weak_password')
       if (current === next) return accountFail('same_password')
+      const c = checkCode(code)
+      if (!c.ok) return c
       record('account_password_changed')
+      return ok(undefined)
+    }),
+
+  resetPassword: (next) =>
+    run(() => {
+      if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) return accountFail('weak_password')
+      if (!recovering) return accountFail('reset_expired')
+      if (state.factor?.verified && state.aal !== 'aal2') return accountFail('aal2_required')
+      record('account_password_reset')
+      recovering = false
       return ok(undefined)
     }),
 

@@ -2,6 +2,7 @@ import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { RECOVERED_PATCH, VERIFIED_PATCH, clearPasswordSignIn, markPasswordSignIn, needsCodeStep, useAccount, useSecurityState } from '@/auth/AccountProvider'
+import { clearRecoveryPending } from '@/auth/recoveryPending'
 import { useLeaveAccount } from '@/auth/RequireRole'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -12,7 +13,7 @@ import { preloadDashboardDictionaries } from '@/i18n/dashboardLoader'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { auth } from '@/services'
-import { APPLY_PATH, settingsPath } from '@/lib/urls'
+import { APPLY_PATH, RESET_PASSWORD_PATH, settingsPath } from '@/lib/urls'
 import { cn } from '@/lib/cn'
 import { TAP_TARGET } from '../public/tapTarget'
 import { AuthHeading, AuthLayout, authFieldsClass } from './AuthLayout'
@@ -88,6 +89,8 @@ export default function LoginPage() {
     const res = await authService.signInWithPassword(email.trim(), password)
     setPending(false)
     if (!res.ok) clearPasswordSignIn()
+    // A password sign-in replaces any half-finished reset in this tab (ADR-0066).
+    else clearRecoveryPending()
     // On success the auth listener reloads the account and the redirect above takes over.
     setError(res.ok ? null : authErrorText(t, res.error))
   }
@@ -124,7 +127,7 @@ export default function LoginPage() {
           <FormField
             label={t('auth.login.password')}
             aside={
-              <Link to="/reset-password" className={cn(TAP_TARGET, 'text-xs text-accent-ink hover:underline')}>
+              <Link to={RESET_PASSWORD_PATH} className={cn(TAP_TARGET, 'text-xs text-accent-ink hover:underline')}>
                 {t('auth.login.forgot')}
               </Link>
             }

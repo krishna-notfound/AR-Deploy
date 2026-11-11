@@ -1,0 +1,29 @@
+# ADR-0066: Password change verification and the forgot-password hardening
+- **Status:** Accepted
+- **Date:** 2026-11-11
+- **Affects:** design/19-supabase.md, design/23-email.md, docs/superpowers/specs/2026-10-25-account-settings-s1-design.md (§7, §8, §9), docs/SECURITY_REVIEW.md, docs/OPERATIONS_RUNBOOK.md, docs/CLIENT_HANDOVER.md; amends ADR-0032 (S1 password change) and ADR-0027 (reset page)
+
+## Context
+Owner decision 2026-11-11 (docs/DECISIONS.md): "on changing password 2fa and email 2fa otp also will be made, audit forget password and fix". Until now Settings → Account changed the password with `auth.updateUser({ password, current_password })` straight from the browser: no emailed code, no second factor. The reset page showed its "choose a new password" form to any signed-in session, asked a 2FA account for nothing after the reset code, wrote no audit event and kept other sessions open only on a best-effort client call.
+
+## Decision
+- **Change password = current password + emailed code + (with 2FA) a fresh authenticator code, checked on the server.** A new `account-security` action `change_password { current_password, new_password, code }` checks, in this order: aal2 when the account has 2FA or its group requires it; with a verified TOTP factor, an authenticator verification in the last 5 minutes (the `totp` entry of the JWT `amr` claim); the new password's rules (12 to 128 characters, not the current one); the emailed code (new purpose `change_password`, consumed); the current password (a throwaway anon sign-in, checked after the code so the endpoint is no password oracle without the inbox). It then sets the password with the service role (`auth.admin.updateUserById`), ends every session of the account (`service_end_sessions`, this one too), voids open codes, logs `account_password_changed` (with the IP) and emails a `password_changed` security notice.
+- **The browser** checks the current password first (throwaway client, no code wasted on a typo), opens the shared `ActionCodeDialog` (purpose `change_password`, resend cooldown as before) with a second "Authenticator code" field when the account has 2FA, verifies that code with `mfa.challengeAndVerify` (so the token carries a fresh `amr`) and then calls the action. On success it signs out here and goes to sign-in. A recovery code is not accepted in place of the authenticator code: no existing 2FA-gated action takes one (they need aal2); a lost phone goes through the sign-in recovery step, which removes 2FA.
+- **Reset password, last step** goes through a new action `reset_password { new_password }`: only a session started with an emailed code (`amr` `otp`, `recovery` or `magiclink`) in the last 15 minutes; aal2 when the account has a verified factor (the reset never skips 2FA); the same password rules; then the same set → end every session → `account_password_reset` event → `password_reset` notice.
+- **Reset page:** a signed-in visitor who did not start the reset here is sent to Settings (or signs out to reset); after the code, a 2FA account passes `TwoFactorStep` (authenticator or recovery code) before the new password; a 60-second resend wait; the same "if an account uses this address" answer, also when Supabase's per-address resend limit (which only an existing account can hit) answers; an old or failed link shows a clear notice; tokens and Supabase's error parameters are removed from the address bar; while a reset is in progress the dashboards send the tab back to `/reset-password` (sessionStorage deadline, UX only); the redirect URL comes from `src/lib/urls.ts`.
+- **Demo mode** runs both flows on labelled harnesses: action and authenticator code 123456, reset code 12345678, nothing emailed.
+- **Database:** migration `20261111160021_password_change_codes` adds `change_password` to the action-code purpose check and to `service_create_action_code`, and `account_password_reset` to `service_log_account_event` (rollback in `supabase/rollback/`). Not applied anywhere.
+
+## Consequences
+- Good: the app's own paths enforce the code, the second factor, the password rules, the audit event, the notice and the sign-out on the server, not in the browser.
+- Good: a reset can no longer be used to skip 2FA through the app, and a half-finished reset can't browse the dashboards in that tab.
+- Trade-off: a password change signs this device out too (the admin API ends every session); the person signs in again with the new password.
+- Trade-off (open until the owner changes Auth settings): Supabase Auth still accepts `PUT /auth/v1/user { password }` from any signed-in session. Its settings can make that path need the current password, a recent sign-in and (built in) aal2 for 2FA accounts, but no setting makes it need our emailed code. See SECURITY_REVIEW "ADR-0066" for the exact switches and what stays open.
+- Trade-off: the server checks rest on the JWT `amr` claim with timestamps (Supabase's default format). A custom access-token hook that rewrote `amr` as bare names would make both actions refuse (fail closed).
+- Release order: apply the migration, redeploy `account-security`, then deploy the frontend; before that the new buttons answer "invalid request".
+
+## Alternatives rejected
+- Keep `updateUser` in the browser and add a code check before it: bypassable by calling Supabase Auth directly.
+- Verify the TOTP inside the function with the caller's token: it would rotate the caller's session behind supabase-js's back.
+- A trigger on `auth.users` refusing password changes without a server-issued ticket: it would also break invitations and Supabase's own flows, and failing inside Auth's transaction gives people a 500; left as a possible follow-up for the owner to decide.
+- A demo-only redirect away from `/reset-password` (the old behaviour): the flow could not be tested end to end in demo mode.

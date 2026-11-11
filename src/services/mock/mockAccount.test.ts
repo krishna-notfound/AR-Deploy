@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { DEMO_RESET_CODE } from '../passwordResetService'
 import { DEMO_CODE, mockAccountService as a, resetMockAccount } from './mockAccount'
+import { mockPasswordReset } from './mockPasswordReset'
 
 describe('demo account service', () => {
   beforeEach(() => resetMockAccount())
@@ -86,11 +88,16 @@ describe('demo account service', () => {
   })
 
   it('checks password and email inputs like the real service', async () => {
-    const short = await a.changePassword('current-password', 'short')
+    const short = await a.changePassword({ current: 'current-password', next: 'short', code: DEMO_CODE })
     expect(!short.ok && short.error.reason).toBe('weak_password')
-    const same = await a.changePassword('same-password-123', 'same-password-123')
+    const same = await a.changePassword({ current: 'same-password-123', next: 'same-password-123', code: DEMO_CODE })
     expect(!same.ok && same.error.reason).toBe('same_password')
-    expect((await a.changePassword('old-password-123', 'new-password-456')).ok).toBe(true)
+    const wrongCode = await a.changePassword({ current: 'old-password-123', next: 'new-password-456', code: '111111' })
+    expect(!wrongCode.ok && wrongCode.error.reason).toBe('invalid_code')
+    expect((await a.changePassword({ current: 'old-password-123', next: 'new-password-456', code: DEMO_CODE })).ok).toBe(true)
+    expect((await a.checkCurrentPassword('anything')).ok).toBe(true)
+    const empty = await a.checkCurrentPassword('')
+    expect(!empty.ok && empty.error.reason).toBe('current_password_mismatch')
     const bad = await a.requestEmailChange('pw', 'not-an-email')
     expect(!bad.ok && bad.error.reason).toBe('invalid_email')
     expect((await a.requestEmailChange('pw', 'new@demo.example')).ok).toBe(true)
@@ -99,5 +106,42 @@ describe('demo account service', () => {
     await a.cancelEmailChange()
     s = await a.getSecurityState()
     expect(s.ok && s.data.pendingEmail).toBeNull()
+  })
+
+  // ADR-0066, mirroring the account-security function.
+  it('with demo 2FA on, a password change needs the authenticator code too', async () => {
+    const e = await a.startTotpEnrollment()
+    if (!e.ok) throw new Error('enrol failed')
+    await a.confirmTotpEnrollment(e.data.factorId, DEMO_CODE)
+    const input = { current: 'old-password-123', next: 'new-password-456', code: DEMO_CODE }
+    const missing = await a.changePassword(input)
+    expect(!missing.ok && missing.error.reason).toBe('totp_required')
+    const wrong = await a.changePassword({ ...input, totp: '000000' })
+    expect(!wrong.ok && wrong.error.reason).toBe('invalid_totp')
+    expect((await a.changePassword({ ...input, totp: DEMO_CODE })).ok).toBe(true)
+    const ev = await a.listSecurityEvents()
+    expect(ev.ok && ev.data[0]?.type).toBe('account_password_changed')
+  })
+
+  it('resetPassword needs the pretend recovery session, and its 2FA step when 2FA is on', async () => {
+    const closed = await a.resetPassword('a-new-long-password')
+    expect(!closed.ok && closed.error.reason).toBe('reset_expired')
+    const e = await a.startTotpEnrollment()
+    if (!e.ok) throw new Error('enrol failed')
+    await a.confirmTotpEnrollment(e.data.factorId, DEMO_CODE)
+    expect((await mockPasswordReset.verifyCode('x@demo.example', '00000000')).ok).toBe(false)
+    expect((await mockPasswordReset.verifyCode('x@demo.example', DEMO_RESET_CODE)).ok).toBe(true)
+    expect(await mockPasswordReset.hasSession()).toEqual({ ok: true, data: true })
+    // The recovery session starts at aal1: the reset page asks for the authenticator code first.
+    expect(await a.getAssurance()).toEqual({ ok: true, data: { currentLevel: 'aal1', nextLevel: 'aal2' } })
+    const skip = await a.resetPassword('a-new-long-password')
+    expect(!skip.ok && skip.error.reason).toBe('aal2_required')
+    expect((await a.verifyTotpForSignIn(DEMO_CODE)).ok).toBe(true)
+    const short = await a.resetPassword('short')
+    expect(!short.ok && short.error.reason).toBe('weak_password')
+    expect((await a.resetPassword('a-new-long-password')).ok).toBe(true)
+    expect(await mockPasswordReset.hasSession()).toEqual({ ok: true, data: false })
+    const ev = await a.listSecurityEvents()
+    expect(ev.ok && ev.data[0]?.type).toBe('account_password_reset')
   })
 })

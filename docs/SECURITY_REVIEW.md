@@ -1,6 +1,6 @@
 # Security review
 
-Scope: multi-business catalog with Supabase (Postgres + RLS, Auth, Storage, one Edge Function) and a static Vite frontend on Vercel. Findings with IDs, severity and status: [PRODUCTION_READINESS.md §4](PRODUCTION_READINESS.md). Last updated 2026-10-26 (S1 section added).
+Scope: multi-business catalog with Supabase (Postgres + RLS, Auth, Storage, one Edge Function) and a static Vite frontend on Vercel. Findings with IDs, severity and status: [PRODUCTION_READINESS.md §4](PRODUCTION_READINESS.md). Last updated 2026-11-11 (ADR-0066 section added: password change and forgot-password audit).
 
 ## Trust boundaries
 
@@ -44,7 +44,7 @@ Status: applied to `zggylkbgajamhriebdrg` on 2026-10-26 and checked live (31 of 
 | Recovery codes | 8 per set, about 49.5 bits each from a CSPRNG, stored only as sha256(salt + code) in `private.recovery_codes`, single use, regenerated with an emailed code. Redeeming one removes the second factor and the other codes. Redeeming needs an `aal1` session (a signed-in `aal2` person turns 2FA off with an emailed code instead). |
 | Disabling 2FA | Needs `aal2` and an emailed code, and is refused while the policy requires 2FA for the person's group. |
 | Account closure | A business owner's request takes the business offline (the previous status is kept) and emails the platform; only the Owner at `aal2`, with an emailed code, completes it. The Owner account cannot be closed. Admin and Team members end their own access at once. |
-| Email and password change | Supabase Auth: current password required, secure email change (both addresses confirm), security notification emails (runbook has the dashboard steps). The app logs the request in the audit log. |
+| Email and password change | Email: Supabase Auth, current password required, secure email change (both addresses confirm), security notification emails (runbook has the dashboard steps); the app logs the request. Password: since ADR-0066 the `account-security` action `change_password` (current password, emailed code and, with 2FA, a fresh authenticator code; see the ADR-0066 section below). |
 | Audit | `account_*` events in `audit_events` (sign-in, password, email request, 2FA on and off, recovery, reset, closure steps, deletion). A person reads their own last 50. Codes and secrets are never logged; the deleted user's address is stored as a hash. |
 
 ### Hardened during review
@@ -137,3 +137,57 @@ Status: built on the branch `s4/integration`; to be applied to `zggylkbgajamhrie
 - **The backfills decide who keeps what.** Admin gains `models.manage`, and every business with a 3D file starts with own uploads on. The pre-flight shows both before anything is applied.
 - **Mixed versions:** the old role editor would drop `models.manage` from a role it saves. The runbook says to keep the gap before the frontend release short and to leave roles alone during it.
 - **Demo mode** keeps request photos and staged models in the browser session only, labelled as such. It is not a security boundary.
+
+## ADR-0066: Password change verification and forgot-password audit (2026-11-11)
+
+Status: built on `feature/sanctus-brand-design-system`; **nothing applied or deployed**. Migration `20261111160021_password_change_codes` (rollback `supabase/rollback/20261111_password_change_codes_rollback.sql`), Edge Function `account-security` (redeploy), frontend. Release order: migration → `account-security` → frontend (before the function is redeployed, the new buttons answer "invalid request").
+
+### What is enforced, and where
+
+| Control | Enforced by |
+|---|---|
+| Changing the password needs the current password | `account-security` `change_password`: a throwaway anon sign-in, after the emailed code (so the endpoint is no password oracle without the inbox). The browser checks it once before a code is sent (no code wasted on a typo); that check is UX. |
+| ...and an emailed code | Purpose `change_password`: 6 digits, 10 minutes, 5 attempts, 5 codes per hour, newer replaces older, hashed (the S1 rules). |
+| ...and, with 2FA on, the authenticator code | The session must be aal2 and its JWT `amr` must hold a `totp` verification from the last 5 minutes (`totp_required` otherwise). The browser verifies the typed code with `mfa.challengeAndVerify` just before the call. A group that requires 2FA needs aal2 even without a factor. |
+| New password rules | 12 to 128 characters and not the current one, on the server (both actions) and in the browser. |
+| After a change or reset | Set with the service role (`auth.admin.updateUserById`), then `service_end_sessions` ends every session (this one too); `account_password_changed` / `account_password_reset` audit events with the IP; a `password_changed` / `password_reset` security notice email. Passwords are never logged, audited or emailed (handler tests check this). |
+| Reset sets a password without the current one only for a fresh reset session | `reset_password`: the JWT `amr` must show a sign-in with an emailed code (`otp`, `recovery` or `magiclink`) in the last 15 minutes (`reset_expired` otherwise), and aal2 when the account has a verified factor (`aal2_required`). |
+| Reset page | Not a boundary (the actions above are). Shows the new-password form only after its own code step; asks 2FA accounts for the authenticator (or a recovery code) first; dashboards send a mid-reset tab back to it (sessionStorage deadline, 15 minutes). |
+
+### Forgot-password audit
+
+Checked end to end on 2026-11-11 (request page, email code, `ResetPasswordPage.tsx`, `services/supabase/auth.ts`, the new `reset_password` action). The hosted Auth behaviour marked "per Supabase Auth source" was read from the open-source Auth server, not tested on the client project.
+
+| # | Finding | Severity | Status |
+|---|---|---|---|
+| PW-1 | `/reset-password` showed "Choose a new password" to **any** signed-in session (SEC-12): someone at an unlocked, signed-in browser could set a new password without the current one, a code or 2FA. | High | **Fixed.** The form appears only after this page's code step; another session gets "You are signed in" with Settings or "Sign out and reset". The server action refuses a session without a recent emailed-code sign-in. |
+| PW-2 | A 2FA account went from the reset code (an aal1 session) straight to the new password. Per Supabase Auth source, `updateUser({ password })` then fails (`insufficient_aal`), so the reset could not finish and said so unclearly; had Auth accepted it, the reset would have skipped 2FA. | High | **Fixed.** After the code, `TwoFactorStep` (authenticator, or a recovery code, which removes 2FA as at sign-in); `reset_password` needs aal2 when a verified factor exists. |
+| PW-3 | A recovery session could leave the reset page and use the dashboards. | Medium | **Fixed (UX).** `RequireRole` sends the tab back while a reset is in progress. Not a boundary: for an account without 2FA the code holder controls the inbox, which already equals a sign-in; a 2FA account stays aal1, which the database refuses. |
+| PW-4 | Other sessions after a reset were ended only by a best-effort browser call. | Medium | **Fixed.** The server ends every session (`service_end_sessions`). Access tokens already issued stay valid until they expire (at most the JWT lifetime, 1 hour by default), as with every Supabase sign-out. |
+| PW-5 | No audit event after a reset; the notice email depended on Supabase's "Password changed" notification setting (not checked). | Medium | **Fixed.** `account_password_reset` event (shown in Security activity) and a `password_reset` notice from `account-security`. |
+| PW-6 | Password rules: the reset page checked only the 12-character minimum, in the browser; the server-side minimum is the Auth setting (last known 8 on production, PRODUCTION_READINESS, not checked). | Medium | **Fixed for the app's path** (12 to 128 on the server in both actions). The direct Auth path follows the dashboard minimum: the owner sets it to 12 (below). |
+| PW-7 | Account enumeration: the copy was already neutral, but Supabase's per-address resend limit (`over_email_send_rate_limit`) only fires for an existing account and was shown as an error. | Low | **Fixed in the app** (answered like a send; 60 s wait before a resend). **Open at the API**: a direct call to `/auth/v1/recover` still shows the 429 and a timing difference (an email is sent only for a real account). Supabase behaviour; accepted. |
+| PW-8 | "Send a new code" had no cooldown. | Low | **Fixed.** 60 seconds (Supabase's default per-address frequency). |
+| PW-9 | An expired, used or malformed link (old emails, Supabase's `#error=…` redirect) had no clear page, and its parameters stayed in the address bar. | Low | **Fixed.** A notice ("no longer valid, ask for a code below") and the token or error parameters are removed from the URL (`history.replaceState`). |
+| PW-10 | The reset redirect URL was built in the page (`window.location.origin`). | Low | **Fixed.** `passwordResetRedirectUrl()` in `src/lib/urls.ts`. |
+| PW-11 | Token leaks (logs, analytics, Referer). | Info | Checked: reset emails carry a code, not a link (ADR-0027), so no token is in a URL; the page loads only Google Fonts CSS, and `Referrer-Policy: strict-origin-when-cross-origin` (vercel.json) sends the origin only; no analytics script runs on it; the services log no codes or passwords. |
+| PW-12 | Guessing the 8-digit reset code. | Info | Supabase's verify rate limit (30 per 5 minutes per IP by default; the hosted value is not checked) and the 1-hour expiry (ADR-0027). Unchanged. |
+| PW-13 | An invited owner who resets the password before accepting. | Info | The reset no longer calls `complete_owner_onboarding` (its session ends at once); the sign-in that follows accepts the membership (`record_sign_in`), as before for a failed call. |
+
+### Supabase Auth settings the owner must switch (dashboard; cannot be read or changed from here)
+
+The app's own paths are enforced on the server. **Supabase Auth itself still accepts `PUT /auth/v1/user { "password": … }` from any signed-in session** (that is what supabase-js `updateUser` calls). These settings narrow that direct path; **none of them can make it require our emailed code**, so that part stays open (below). Do not use `supabase config push` (it would push the local development Auth config).
+
+1. **Authentication → Sign In / Providers → Email → "Secure password change": on.** Auth then asks for a recent sign-in (session younger than 24 hours) or an emailed reauthentication code before a password change.
+2. **Same page → "Require current password when updating": on** (where the dashboard shows it; some versions label switch 1 this way). The direct call then needs the current password (`current_password_mismatch` / `current_password_required`).
+3. **Same page → "Minimum password length": 12** (and leaked-password protection where the plan allows), so the direct path uses the same minimum as the app.
+4. **Authentication → Emails → Security notifications → "Password changed": on.** A second, Supabase-sent notice for any password change, including one made through the direct path.
+5. Built in, nothing to switch: per Supabase Auth source, an account with a verified factor can change its password through Auth only from an aal2 session.
+
+**Open until then, and after:** someone who already holds a signed-in session **and** the current password (and, for a 2FA account, an aal2 session) can still change the password through the direct Auth call without the emailed code; with settings 1 and 2 off, a session alone is enough for an account without 2FA. Detection: setting 4, plus the missing `account_password_changed` event in Security activity. Prevention would need a database trigger on `auth.users` refusing changes that did not come through `account-security` (ADR-0066 "Alternatives rejected"); that is an owner decision.
+
+### Other notes
+
+- Both actions read the JWT `amr` claim with timestamps (Supabase's default). A custom access-token hook that rewrote `amr` to bare names would make them refuse (fail closed): check this if such a hook is ever added.
+- A password change now signs out this device too (the admin update ends every session); the person signs in again.
+- Demo mode runs both flows on labelled harnesses (code 123456, reset code 12345678, nothing emailed); not a security boundary.

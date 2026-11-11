@@ -8,7 +8,7 @@ import { type EmailStatus, type LogEntry, type OutgoingEmail, SAFE_EMAIL_REASONS
 import { type RenderedEmail, type SecurityNotice, closureCancelledEmail, closureRequestEmail, securityCodeEmail, securityNoticeEmail, teamNoticeEmail } from '../_shared/email-templates.ts'
 import { UUID, bearerToken, clientIp, readJsonObject, reply, sha256Hex } from '../_shared/http.ts'
 
-export const ACTION_PURPOSES = ['disable_2fa', 'regenerate_recovery', 'request_closure', 'owner_reset_2fa', 'complete_closure'] as const
+export const ACTION_PURPOSES = ['disable_2fa', 'regenerate_recovery', 'request_closure', 'owner_reset_2fa', 'complete_closure', 'change_password'] as const
 export type ActionPurpose = (typeof ACTION_PURPOSES)[number]
 /** Codes only the platform Owner may ask for (their actions refuse everyone else anyway). */
 const OWNER_PURPOSES: ReadonlySet<string> = new Set(['owner_reset_2fa', 'complete_closure'])
@@ -54,6 +54,17 @@ export async function removeBusinessFolder(storage: SweepStorage, bucket: string
   if (failed) throw new Error(`storage sweep incomplete: ${bucket}`)
 }
 
+/** Password rules, the same as the reset page and Settings (src/services/accountService.ts PASSWORD_MIN/MAX). */
+export const PASSWORD_MIN = 12
+export const PASSWORD_MAX = 128
+/** ADR-0066: a password change by a 2FA account needs an authenticator code verified this recently (JWT amr). */
+export const TOTP_FRESH_MS = 5 * 60_000
+/** ADR-0066: a password reset needs a sign-in with the emailed reset code this recently (JWT amr). */
+export const RESET_WINDOW_MS = 15 * 60_000
+/** amr methods Supabase Auth writes for a session started with an emailed one-time code (verifyOtp). */
+const EMAILED_CODE_METHODS: ReadonlySet<string> = new Set(['otp', 'recovery', 'magiclink'])
+const TOTP_METHODS: ReadonlySet<string> = new Set(['totp', 'mfa/totp'])
+
 /** Recovery-code alphabet: 31 characters (no I, L, O, 0 or 1, so a code read aloud or handwritten is unambiguous).
  * 10 characters give about 49.5 bits per code. */
 export const RECOVERY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -67,11 +78,14 @@ export type ErrorCode =
   | 'aal2_required' | 'policy_requires_2fa' | 'owner_cannot_close' | 'already_requested' | 'not_allowed'
   | 'not_found' | 'email_failed' | 'unknown'
   | 'nothing_to_reset' | 'email_blocked'
+  | 'totp_required' | 'current_password_mismatch' | 'weak_password' | 'same_password' | 'reset_expired'
 
 const STATUS: Record<ErrorCode, number> = {
   not_signed_in: 401,
   invalid_request: 400, invalid_code: 400, code_expired: 400, already_requested: 400, not_found: 400, email_failed: 400,
   email_blocked: 400,
+  current_password_mismatch: 400, weak_password: 400, same_password: 400,
+  totp_required: 403, reset_expired: 403,
   aal2_required: 403, policy_requires_2fa: 403, owner_cannot_close: 403, not_allowed: 403,
   too_many_attempts: 429, rate_limited: 429,
   nothing_to_reset: 409,
@@ -103,6 +117,14 @@ export interface AccountSecurityDeps {
   userIdFromToken(token: string): Promise<string | null>
   /** Read from the JWT payload; only called after userIdFromToken accepted the token. */
   aalFromToken(token: string): 'aal1' | 'aal2'
+  /** The JWT's amr claim (how and when this session proved who it is); only read after userIdFromToken accepted it. */
+  amrFromToken(token: string): AmrEntry[]
+  /** Signs in with the password on a throwaway client and ends that session at once. Never touches the caller's session. */
+  checkPassword(email: string, password: string): Promise<'ok' | 'password_incorrect' | 'rate_limited' | 'unknown'>
+  /** Sets the password with the Auth admin API: 'weak_password' when Supabase Auth refuses it; throws on anything else. */
+  setPassword(userId: string, password: string): Promise<'ok' | 'weak_password'>
+  /** Ends every session of the user (service_end_sessions: their refresh tokens stop working). Throws on an error. */
+  endSessions(userId: string): Promise<void>
   /** A service_* SQL function, with the service role. Returns its jsonb result; throws on a transport error. */
   rpc(fn: string, args: Record<string, unknown>): Promise<Record<string, unknown>>
   listFactors(userId: string): Promise<Factor[]>
@@ -126,6 +148,12 @@ export interface AccountSecurityDeps {
   /** n bytes from a CSPRNG. */
   random(n: number): Uint8Array
   now(): Date
+}
+
+/** One amr entry; `at` is the time in ms, or null when the token carries the bare method list (no timestamps). */
+export interface AmrEntry {
+  method: string
+  at: number | null
 }
 
 class Refusal {
@@ -368,6 +396,47 @@ const ACTIONS: Record<string, Action> = {
     return done({ notice: email ? await notify(ctx, target, 'closure_completed', email) : NO_ADDRESS })
   },
 
+  // ADR-0066: the app's only way to change a password. Gates, in order, so nothing is spent on a request that can't
+  // succeed: 2FA (aal2, plus an authenticator code from the last 5 minutes when the account has a factor) → the new
+  // password's rules → the emailed code (consumed) → the current password (after the code, so this endpoint is no
+  // password oracle without the inbox) → set with the service role → every session ends → audit event and notice.
+  async change_password(ctx) {
+    const { deps, userId, body } = ctx
+    const current = typeof body.current_password === 'string' ? body.current_password : ''
+    const next = typeof body.new_password === 'string' ? body.new_password : ''
+    if (!current) throw new Refusal('invalid_request')
+    await requireAal2For2faUsers(ctx)
+    if ((await deps.listFactors(userId)).some(isVerifiedTotp) && !freshTotp(ctx)) throw new Refusal('totp_required')
+    checkNewPassword(next)
+    if (next === current) throw new Refusal('same_password')
+    await checkCode(ctx, 'change_password', body.code)
+    const email = await deps.userEmail(userId)
+    if (!email) throw new Refusal('not_found')
+    const check = await deps.checkPassword(email, current)
+    if (check === 'password_incorrect') throw new Refusal('current_password_mismatch')
+    if (check !== 'ok') throw new Refusal(check)
+    await applyPassword(ctx, next)
+    await voidCodes(ctx, 'change_password')
+    await logEvent(ctx, userId, 'account_password_changed')
+    await notify(ctx, userId, 'password_changed', email)
+    return done({ signedOut: true })
+  },
+
+  // ADR-0066: the last step of "Forgot password". Only a session started with the emailed reset code in the last
+  // 15 minutes may set a password without the current one, and an account with 2FA must also have passed its second
+  // step in that session (aal2): a reset never skips 2FA. Every session, this one too, ends afterwards.
+  async reset_password(ctx) {
+    const { deps, userId, body } = ctx
+    const next = typeof body.new_password === 'string' ? body.new_password : ''
+    checkNewPassword(next)
+    if (!recentEmailedCode(ctx)) throw new Refusal('reset_expired')
+    if (ctx.aal !== 'aal2' && (await deps.listFactors(userId)).some(isVerifiedTotp)) throw new Refusal('aal2_required')
+    await applyPassword(ctx, next)
+    await logEvent(ctx, userId, 'account_password_reset')
+    await notify(ctx, userId, 'password_reset')
+    return done({ signedOut: true })
+  },
+
   async restore_closure(ctx) {
     const target = targetUser(ctx)
     await requireOwnerAal2(ctx)
@@ -378,6 +447,29 @@ const ACTIONS: Record<string, Action> = {
 }
 
 // ---------------------------------------------------------------- gates and helpers
+
+/** The same rules as the rest of the app: 12 to 128 characters and nothing more (spec 8: no composition rules). */
+function checkNewPassword(next: string) {
+  if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) throw new Refusal('weak_password')
+}
+
+/** Has this session an amr entry of one of these methods from the last `windowMs` (and not from the future, 60 s skew)? */
+function recentAmr(ctx: Ctx, methods: ReadonlySet<string>, windowMs: number): boolean {
+  const now = ctx.deps.now().getTime()
+  return ctx.deps.amrFromToken(ctx.token).some((e) => methods.has(e.method) && e.at !== null && now - e.at <= windowMs && e.at - now <= 60_000)
+}
+const freshTotp = (ctx: Ctx) => recentAmr(ctx, TOTP_METHODS, TOTP_FRESH_MS)
+const recentEmailedCode = (ctx: Ctx) => recentAmr(ctx, EMAILED_CODE_METHODS, RESET_WINDOW_MS)
+
+/** Sets the password, then ends every session of the account (a failure there is logged; the new password stands). */
+async function applyPassword(ctx: Ctx, next: string) {
+  if ((await ctx.deps.setPassword(ctx.userId, next)) === 'weak_password') throw new Refusal('weak_password')
+  try {
+    await ctx.deps.endSessions(ctx.userId)
+  } catch (e) {
+    console.error(`account-security: ending sessions after a password change failed (${errorName(e)})`)
+  }
+}
 
 /** Calls a service_* function; an { error } answer becomes a Refusal with a known code (anything else: unknown). */
 async function sql(ctx: Ctx, fn: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -556,15 +648,35 @@ export function normalizeRecoveryCode(raw: unknown): string | null {
   return code.length === RECOVERY_LENGTH && [...code].every((c) => RECOVERY_ALPHABET.includes(c)) ? code : null
 }
 
-/** The aal claim of a JWT the gateway and getUser() already accepted; anything unreadable counts as aal1. */
-export function aalFromJwt(token: string): 'aal1' | 'aal2' {
+function jwtPayload(token: string): Record<string, unknown> | null {
   try {
     const part = token.split('.')[1]
-    if (!part) return 'aal1'
+    if (!part) return null
     const b64 = part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '=')
-    const payload = JSON.parse(atob(b64)) as { aal?: unknown }
-    return payload.aal === 'aal2' ? 'aal2' : 'aal1'
+    const payload: unknown = JSON.parse(atob(b64))
+    return payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : null
   } catch {
-    return 'aal1'
+    return null
   }
+}
+
+/** The aal claim of a JWT the gateway and getUser() already accepted; anything unreadable counts as aal1. */
+export function aalFromJwt(token: string): 'aal1' | 'aal2' {
+  return jwtPayload(token)?.aal === 'aal2' ? 'aal2' : 'aal1'
+}
+
+/**
+ * The amr claim of a JWT the gateway and getUser() already accepted: [{ method, timestamp (seconds) }, ...]. The bare
+ * form (a list of method names) has no times, so it never counts as recent. Anything unreadable is an empty list.
+ */
+export function amrFromJwt(token: string): AmrEntry[] {
+  const amr = jwtPayload(token)?.amr
+  if (!Array.isArray(amr)) return []
+  return amr.flatMap((e: unknown): AmrEntry[] => {
+    if (typeof e === 'string') return [{ method: e, at: null }]
+    if (!e || typeof e !== 'object') return []
+    const { method, timestamp } = e as { method?: unknown; timestamp?: unknown }
+    if (typeof method !== 'string') return []
+    return [{ method, at: typeof timestamp === 'number' && Number.isFinite(timestamp) ? timestamp * 1000 : null }]
+  })
 }

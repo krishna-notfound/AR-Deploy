@@ -176,8 +176,8 @@ test('the reset-password page renders without crashing', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.goto('/reset-password?lang=en')
-  // Demo mode has no password reset, so the page sends visitors to /demo.
-  await expect(page).toHaveURL(/\/demo/)
+  // Demo mode runs the reset on a labelled harness (ADR-0066); password.spec.ts walks through it.
+  await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible()
   await expect(page.getByText('Something went wrong')).toBeHidden()
   expect(errors).toEqual([])
 })

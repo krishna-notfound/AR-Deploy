@@ -1,13 +1,14 @@
 // Supabase Edge Function: account security (S1, spec §7). JWT verification stays on (supabase/config.toml); the
 // caller is whoever getUser() says the token belongs to, and the aal claim is read only after that succeeds.
 // Every database step is a service_* function or the Auth admin API, with the service role, which lives only in
-// Edge Function secrets; cancel_account_closure alone runs as the caller (anon key plus their token). Secrets:
+// Edge Function secrets; cancel_account_closure alone runs as the caller (anon key plus their token), and the current
+// password check of change_password signs in on a throwaway anon client (ADR-0066). Secrets:
 // RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS, ADMIN_NOTIFICATION_EMAIL (design/23-email.md).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { callerRpc } from '../_shared/caller.ts'
 import { type LogEntry, logRow, readEmailConfig, sendAndLog } from '../_shared/email.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
-import { SWEEP_BUCKETS, type SweepStorage, aalFromJwt, handleAccountSecurity, removeBusinessFolder } from './handler.ts'
+import { SWEEP_BUCKETS, type SweepStorage, aalFromJwt, amrFromJwt, handleAccountSecurity, removeBusinessFolder } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
 const url = env('SUPABASE_URL') ?? ''
@@ -42,6 +43,32 @@ Deno.serve((req) =>
       return error ? null : (data.user?.id ?? null)
     },
     aalFromToken: aalFromJwt,
+    amrFromToken: amrFromJwt,
+    // ADR-0066: a throwaway anon client (no storage, no refresh), signed out at once, which revokes the extra session.
+    async checkPassword(email, password) {
+      try {
+        const check = createClient(url, env('SUPABASE_ANON_KEY') ?? '', { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
+        const { error } = await check.auth.signInWithPassword({ email, password })
+        if (error) {
+          if (error.status === 429 || error.code === 'over_request_rate_limit') return 'rate_limited'
+          return error.code === 'invalid_credentials' ? 'password_incorrect' : 'unknown'
+        }
+        await check.auth.signOut({ scope: 'local' }).catch(() => undefined)
+        return 'ok'
+      } catch {
+        return 'unknown'
+      }
+    },
+    async setPassword(userId, password) {
+      const { error } = await admin.auth.admin.updateUserById(userId, { password })
+      if (!error) return 'ok'
+      if (error.code === 'weak_password') return 'weak_password'
+      throw new Error(`updateUserById failed: ${error.code ?? error.name}`)
+    },
+    async endSessions(userId) {
+      const { error } = await admin.rpc('service_end_sessions', { p_user: userId })
+      if (error) throw new Error(`service_end_sessions failed: ${error.code ?? 'unknown'}`)
+    },
     async rpc(fn, args) {
       const { data, error } = await admin.rpc(fn, args)
       // Never include the arguments: they carry code hashes and the code being checked.

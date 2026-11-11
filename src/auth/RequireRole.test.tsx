@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
+import { RECOVERY_WINDOW_MS, isRecoveryPending, markRecoveryPending } from './recoveryPending'
 import { RequireRole } from './RequireRole'
 
 const account = vi.hoisted(() => ({ value: {} as Record<string, unknown> }))
@@ -37,5 +38,37 @@ describe('RequireRole wording', () => {
     account.value = { user: { role: 'business_admin' } }
     renderGuard()
     expect(screen.getByRole('heading')).toHaveTextContent('Esta área é para contas de Super Administrador')
+  })
+})
+
+// ADR-0066: a session opened with a reset code chooses its new password before anything else (UX only).
+describe('RequireRole during a password reset', () => {
+  afterEach(() => sessionStorage.clear())
+
+  it('sends a signed-in tab with a reset in progress back to /reset-password', () => {
+    account.value = { user: { role: 'super_admin' } }
+    markRecoveryPending()
+    render(
+      <LanguageProvider>
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/admin']}>
+            <Routes>
+              <Route path="/admin" element={<RequireRole allow="super_admin"><p>inside</p></RequireRole>} />
+              <Route path="/reset-password" element={<p>reset page</p>} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      </LanguageProvider>,
+    )
+    expect(screen.getByText('reset page')).toBeInTheDocument()
+    expect(screen.queryByText('inside')).toBeNull()
+  })
+
+  it('lets the tab in once the reset window has passed', () => {
+    account.value = { user: { role: 'super_admin' } }
+    markRecoveryPending(Date.now() - RECOVERY_WINDOW_MS - 1)
+    renderGuard()
+    expect(screen.getByText('inside')).toBeInTheDocument()
+    expect(isRecoveryPending()).toBe(false)
   })
 })

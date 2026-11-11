@@ -19,7 +19,15 @@ export interface NoticeOutcome {
   error?: string
 }
 
-export type ProfilePatch = Partial<Pick<Profile, 'displayName' | 'timezone' | 'dateFormat' | 'clock' | 'notifyNewApplications'>>
+/** A password change (ADR-0066): both passwords, the emailed code and, when the account has 2FA, the authenticator code. */
+export interface PasswordChange {
+  current: string
+  next: string
+  code: string
+  totp?: string
+}
+
+export type ProfilePatch =Partial<Pick<Profile, 'displayName' | 'timezone' | 'dateFormat' | 'clock' | 'notifyNewApplications'>>
 
 export interface AccountService {
   getProfile(): Promise<Result<Profile>>
@@ -32,8 +40,24 @@ export interface AccountService {
   getAssurance(): Promise<Result<AssuranceLevels>>
   recordSignIn(): Promise<Result<void>>
   listSecurityEvents(): Promise<Result<SecurityEvent[]>>
-  /** Reasons: current_password_mismatch | same_password | weak_password | reauthentication_needed. */
-  changePassword(current: string, next: string): Promise<Result<void>>
+  /**
+   * ADR-0066: checks the current password before a code is emailed (a throwaway sign-in; the session is untouched).
+   * Reasons: current_password_mismatch | rate_limited.
+   */
+  checkCurrentPassword(password: string): Promise<Result<void>>
+  /**
+   * ADR-0066: through the account-security function, with the emailed code (purpose change_password) and, for an
+   * account with 2FA, the authenticator code (verified first, so the session carries a fresh one). On success every
+   * session has ended, this one too: the person signs in again. Reasons: invalid_code | code_expired |
+   * too_many_attempts | invalid_totp | totp_required | aal2_required | current_password_mismatch | same_password |
+   * weak_password | rate_limited.
+   */
+  changePassword(input: PasswordChange): Promise<Result<void>>
+  /**
+   * ADR-0066: the last step of "Forgot password", from the session the emailed reset code started (account-security
+   * reset_password). Every session ends afterwards. Reasons: weak_password | reset_expired | aal2_required.
+   */
+  resetPassword(next: string): Promise<Result<void>>
   /** Reasons: password_incorrect | email_taken | invalid_email | rate_limited. */
   requestEmailChange(currentPassword: string, newEmail: string): Promise<Result<void>>
   cancelEmailChange(): Promise<Result<void>>
@@ -87,6 +111,10 @@ export const ACCOUNT_ERRORS: Record<string, { code: ServiceErrorCode; message: s
   same_password: { code: 'VALIDATION', message: 'Choose a password different from your current one.' },
   weak_password: { code: 'VALIDATION', message: 'Choose a stronger password of 12 to 128 characters.' },
   reauthentication_needed: { code: 'PERMISSION', message: 'For your security, sign out, sign in again and retry.' },
+  // ADR-0066: password change and reset
+  invalid_totp: { code: 'VALIDATION', message: "That authenticator code isn't right. Enter the newest code from the app." },
+  totp_required: { code: 'PERMISSION', message: 'Enter a new code from your authenticator app and try again.' },
+  reset_expired: { code: 'PERMISSION', message: 'This reset has expired. Request a new code and start again.' },
   password_incorrect: { code: 'VALIDATION', message: 'Password is incorrect.' },
   email_taken: { code: 'CONFLICT', message: 'This email is already used by another account.' },
   invalid_email: { code: 'VALIDATION', message: 'Enter a valid email address.' },
