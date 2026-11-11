@@ -207,7 +207,7 @@ export function ProductMedia({
       </div>
 
       {gallery.length > 1 && (
-        <ul className="mt-3 flex gap-2 overflow-x-auto pb-0.5" aria-label={t('product.mediaLabel')}>
+        <ul className="mt-4 flex gap-3 overflow-x-auto pb-0.5" aria-label={t('product.mediaLabel')}>
           {gallery.map((img, i) => (
             <li key={img.id} className="shrink-0">
               <button
@@ -215,9 +215,9 @@ export function ProductMedia({
                 aria-label={t('product.photo', { n: i + 1, total: gallery.length })}
                 aria-current={mode === 'photos' && i === photoIdx}
                 onClick={() => showPhoto(i)}
-                className={cn('block size-16 overflow-hidden rounded-[var(--radius-control)] border bg-subtle p-0.5 transition-colors sm:size-20', mode === 'photos' && i === photoIdx ? 'border-ink' : 'border-line opacity-80 hover:border-line-strong hover:opacity-100')}
+                className={cn('block size-[4.5rem] overflow-hidden rounded-[var(--radius-control)] border bg-subtle p-1.5 transition-colors sm:size-24', mode === 'photos' && i === photoIdx ? 'border-ink' : 'border-line opacity-80 hover:border-line-strong hover:opacity-100')}
               >
-                <SmartImage src={img.url} alt="" className="size-full object-cover" />
+                <SmartImage src={img.url} alt="" className="size-full object-contain" />
               </button>
             </li>
           ))}

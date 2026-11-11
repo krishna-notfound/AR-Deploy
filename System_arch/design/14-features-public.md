@@ -4,9 +4,10 @@ Read when: building `/catalog/*` or `/products/*`. Also read [09-3d-ar.md](09-3d
 **Look (ADR-0037, 2026-10-26):** the original catalog and product layout, with slightly soft corners on the public pages only (`.public-soft` in `src/index.css`: 6px controls, 10px cards, photos and panels). The product's own link is a real button. ADR-0036 (the Stitch redesign) is superseded.
 
 ## CatalogPage `/catalog/:businessSlug`
-- **Header:** logo, name, description. Branding comes from `--brand-accent`.
-- **Controls:** search and category chips.
-- **Grid:** 1, 2, 3, or 4 columns depending on width. Each `ProductCard` shows the primary image, name, price, and a "3D" pill when a GLB exists.
+- **Page header (every `/catalog/**` and product page, also the loading and not-found states; ADR-0062):** the Sanctus `Wordmark` linking to `/` and the language switch. The company name and logo are not in the header. Branding comes from `--brand-accent`.
+- **Catalogue top (ADR-0062):** a full-width Sanctus photograph (`public/images/sanctus/v2/lamp-vase.webp`) under a dark veil, as the landing hero and the sign-in panel. On it, in white: the company logo (on a small chalk tile), the "Catalog" eyebrow, the company name as the only `<h1>` and the piece count. The name appears once on the page: the footer is "Catalogue powered by Sanctus" without `© name`; the tab title stays the name. The company description is not shown (ADR-0054).
+- **Body (ADR-0062):** a serif "The pieces" heading, then the search and category chips (sticky bar from `sm`), then the grid.
+- **Grid:** 2 columns on phones, 3 at `lg`, 4 at `xl`. Each `ProductCard` (ADR-0054) shows the contained primary image, category, name and a "3D · AR" chip when a GLB exists. No price.
 - Shows **published** products only.
 - **States:**
   - Skeleton grid while loading.
@@ -16,7 +17,7 @@ Read when: building `/catalog/*` or `/products/*`. Also read [09-3d-ar.md](09-3d
 
 ## ProductPage `/products/:businessSlug/:productSlug`
 Mobile-first, single column. Switches to two columns at `lg`.
-- **Media:** a toggle between `ModelViewer3D` and the gallery, with thumbnails.
+- **Media:** a toggle between `ModelViewer3D` and the gallery, with thumbnails. The whole piece is always visible (ADR-0062): the stage, the thumbnails and "More photos" use `object-contain` on the subtle ground with padding, never a crop. `SmartImage` keeps `object-cover` as its default but drops it when the caller sets its own `object-*` class.
 - **Info:**
   - Name, price, and short description.
   - **"View in my home"** button (prominent).

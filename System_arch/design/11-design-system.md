@@ -25,7 +25,7 @@ Decision: [ADR-0011](../decisions/ADR-0011-visual-identity.md)
   - Topbar with a "Demo mode" pill, a notifications popover (recent activity, unread dot, "Mark all as read") and a profile menu (Switch account, Logout).
   - Nav items come from `nav.ts`.
 - **PageHeader:** breadcrumbs, title, description, a meta row and actions. It also sets `document.title`.
-- **PublicShell** (`features/public`): business logo and name, the EN/PT switcher and a footer.
+- **PublicShell** (`features/public`): the Sanctus wordmark (to `/`), the EN/PT switcher and a footer (ADR-0062: the company name and logo live on the catalogue photograph, not in the header or footer).
 
 ## Components (`src/components/ui`)
 | Component | File | Notes |

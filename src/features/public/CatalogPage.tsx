@@ -15,13 +15,16 @@ import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
 import { useCategories, useCategoryLabel } from '@/services/listsHooks'
-import { catalogLocalPath, productLocalPath, tenantCatalogPath, tenantProductPath } from '@/lib/urls'
+import { productLocalPath, tenantProductPath } from '@/lib/urls'
 import { PublicMessage } from './PublicMessage'
 import { ProductCard } from './ProductCard'
 import { PublicShell } from './PublicShell'
 import { TAP_TARGET } from './tapTarget'
 
 /** Signed media URLs last MEDIA_URL_TTL_SECONDS; refetch on return to the tab once half of that has passed. */
+/** The catalogue top's photograph: a Sanctus brand photo (not the landing hero's or the sign-in pages'), dark enough for white text. */
+const CATALOG_PHOTO = '/images/sanctus/v2/lamp-vase.webp'
+
 const MEDIA_REFRESH_MS = (MEDIA_URL_TTL_SECONDS * 1000) / 2
 
 export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
@@ -77,7 +80,6 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   const visible = all.filter((p) => (!cat || p.category === cat) && (!term || localized(p.name).toLowerCase().includes(term) || p.name.en.toLowerCase().includes(term)))
 
   const productHref = (p: Product) => (tenantSlug ? tenantProductPath(p, { preview: isPreview }) : productLocalPath({ slug }, p, { preview: isPreview }))
-  const catalogHref = tenantSlug ? tenantCatalogPath({ preview: isPreview }) : catalogLocalPath({ slug }, { preview: isPreview })
   // Clearing the search and category keeps the preview flag.
   const clearFilters = () => setSearch(isPreview ? { preview: '1' } : {}, { replace: true })
 
@@ -115,14 +117,14 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
 
   if (!showCatalog) {
     return (
-      <PublicShell business={b} catalogHref={catalogHref}>
+      <PublicShell business={b}>
         <PublicMessage icon={PauseCircle} title={t('catalog.inactiveTitle')} body={t('catalog.inactiveBody')} />
       </PublicShell>
     )
   }
 
   return (
-    <PublicShell business={b} catalogHref={catalogHref}>
+    <PublicShell business={b}>
       {isPreview && (
         <div className="border-b border-warning/30 bg-warning-soft" role="status">
           <p className="mx-auto flex max-w-[1320px] items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-warning sm:px-10">
@@ -131,29 +133,41 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
           </p>
         </div>
       )}
-      {/* Title block as the landing's section headers: eyebrow, serif name and count. The company description is internal (ADR-0054) and not shown. */}
-      <section className="mx-auto max-w-[1320px] px-5 pt-12 pb-10 sm:px-10 sm:pt-20 sm:pb-12">
-        <div>
-          <div className="flex min-w-0 items-start gap-5">
-            {b.logoUrl && <SmartImage src={b.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />}
-            <div className="min-w-0">
-              <p className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-accent-ink">{t('catalog.eyebrow')}</p>
-              <h1 className="mt-3 text-headline break-words">{b.name}</h1>
-              {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
-              {products.status === 'success' && (
-                <p className="mt-4 text-[12px] leading-[1.2] font-medium tracking-[0.08em] uppercase text-ink-muted tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>
-              )}
-            </div>
-          </div>
+      {/* Catalogue top (ADR-0062), in the landing hero's and sign-in panel's style: a Sanctus photograph under a dark veil with the
+          company's logo, the eyebrow, its name (the only place the name is written on this page) and the piece count in white.
+          The company description is internal (ADR-0054) and not shown. */}
+      <section aria-labelledby="catalog-title" className="relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden bg-obsidian text-chalk sm:min-h-[24rem] lg:min-h-[30rem]">
+        <img src={CATALOG_PHOTO} alt="" width={1200} height={896} fetchPriority="high" className="absolute inset-0 -z-10 size-full object-cover object-[50%_44%]" />
+        <div className="absolute inset-0 -z-10 bg-obsidian/45" aria-hidden />
+        <div className="absolute inset-x-0 bottom-0 -z-10 h-[80%] bg-linear-to-t from-obsidian/85 via-obsidian/40 to-transparent" aria-hidden />
+        <div className="mx-auto w-full max-w-[1320px] px-5 pt-16 pb-9 sm:px-10 sm:pb-12 lg:pb-16">
+          {b.logoUrl && (
+            <span className="mb-6 inline-flex size-14 items-center justify-center rounded-[var(--radius-control)] bg-chalk p-2 sm:size-16">
+              <SmartImage src={b.logoUrl} alt="" className="size-full object-contain" />
+            </span>
+          )}
+          <p className="flex items-center gap-4 text-[12px] leading-[1.4] font-medium tracking-[0.08em] text-chalk/85 uppercase">
+            <span className="h-px w-8 bg-chalk/50" aria-hidden />
+            {t('catalog.eyebrow')}
+          </p>
+          <h1 id="catalog-title" className="mt-4 max-w-3xl font-display text-[clamp(2.25rem,1.6rem+2.8vw,4rem)] leading-[1.06] font-light break-words text-chalk">
+            {b.name}
+          </h1>
+          {/* Only a loaded list has a count: "0 products" while loading or after a failure reads as an empty catalogue. */}
+          {products.status === 'success' && <p className="mt-5 text-[12px] leading-[1.2] font-medium tracking-[0.08em] text-chalk/85 uppercase tabular-nums">{all.length === 1 ? t('catalog.countOne') : t('catalog.count', { count: all.length })}</p>}
         </div>
       </section>
+
+      <div className="mx-auto max-w-[1320px] px-5 pt-12 pb-6 sm:px-10 sm:pt-16 sm:pb-8">
+        <h2 className="text-headline">{t('catalog.heading')}</h2>
+      </div>
 
       {/* Solid filter bar (no blur), hairline top and bottom. */}
       {/* Pinned under the header from tablet width up; on a phone the two stacked rows would cover a third of the screen. */}
       <div className="z-20 border-y border-line bg-canvas sm:sticky sm:top-20">
-        <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-8 sm:px-10">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-5 py-3 sm:px-10 lg:flex-row lg:items-center lg:gap-8">
           {categories.length > 1 && (
-            <div role="group" aria-label={t('catalog.categories')} className="-mx-5 -my-1 flex min-w-0 gap-2 overflow-x-auto px-5 py-1 sm:mx-0 sm:px-0">
+            <div role="group" aria-label={t('catalog.categories')} className="-mx-5 -my-1 flex min-w-0 gap-2 overflow-x-auto px-5 py-1 sm:-mx-10 sm:px-10 lg:mx-0 lg:px-0">
               {(['', ...categories] as const).map((c) => (
                 <button
                   key={c || 'all'}
@@ -171,11 +185,11 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
               ))}
             </div>
           )}
-          <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('catalog.searchLabel')} placeholder={t('catalog.searchPlaceholder')} className="sm:ml-auto sm:w-72 sm:shrink-0" />
+          <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('catalog.searchLabel')} placeholder={t('catalog.searchPlaceholder')} className="sm:w-72 lg:ml-auto lg:shrink-0" />
         </div>
       </div>
 
-      <section className="mx-auto max-w-[1320px] px-5 py-10 sm:px-10 sm:py-16" aria-live="polite">
+      <section className="mx-auto max-w-[1320px] px-5 pt-8 pb-16 sm:px-10 sm:pt-10 sm:pb-24" aria-live="polite">
         {products.status === 'loading' && !products.data ? (
           <CardSkeletons label={t('common.loading')} />
         ) : products.status === 'error' && !products.data ? (

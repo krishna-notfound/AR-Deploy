@@ -15,7 +15,9 @@ export function SmartImage({ src, alt, className, fallbackLabel, ...rest }: ImgH
       </div>
     )
   }
-  return <img src={src} alt={alt ?? ''} className={cn('bg-subtle object-cover', className)} onError={() => setFailed(true)} loading="lazy" decoding="async" {...rest} />
+  // object-cover is the default; a caller that sets its own object-fit (object-contain for a whole piece) replaces it.
+  const fit = className && /(^|\s)object-(contain|cover|fill|none|scale-down)(\s|$)/.test(className) ? undefined : 'object-cover'
+  return <img src={src} alt={alt ?? ''} className={cn('bg-subtle', fit, className)} onError={() => setFailed(true)} loading="lazy" decoding="async" {...rest} />
 }
 
 export function Thumb({ src, alt, size = 'md' }: { src?: string; alt: string; size?: 'sm' | 'md' | 'lg' }) {
