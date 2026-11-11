@@ -100,3 +100,4 @@ Architecture decision records live in `System_arch/decisions/` (index: `System_a
 | 2026-11-11 | Approving an application whose form had no company name: the Approve dialog asks for the name ("Approve asks for the name") | Owner | ADR-0057 |
 | 2026-11-11 | Application form limits raised to 30 own questions and 12 sections; the needed database change and submit/review function updates may be applied to the TESTING database once tests pass ("Yes, 30/12 + testing DB") | Owner | ADR-0057 |
 | 2026-11-11 | Application form "delete anything" goes live: migration `20261111095614_apply_form_delete_anything` applied to the testing database (31 total), `submit-application` v13 and `review-application` v3 deployed, front-end merged to `main` ("yes") | Owner | ADR-0057, System_arch/HANDOFF.md |
+| 2026-11-11 | Form builder: Add a question here in every section menu and an Add question button in an empty section; goes live ("yes") | Owner | ADR-0059 |
