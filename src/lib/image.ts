@@ -48,14 +48,14 @@ export async function squareResize(file: File, size = 256): Promise<Blob> {
   }
 }
 
-interface Decoded {
+export interface Decoded {
   image: CanvasImageSource
   width: number
   height: number
   close: () => void
 }
 
-async function decode(file: File): Promise<Decoded> {
+export async function decode(file: Blob): Promise<Decoded> {
   if (typeof createImageBitmap === 'function') {
     const fromBitmap = (bmp: ImageBitmap): Decoded => ({ image: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close() })
     try {

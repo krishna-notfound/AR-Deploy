@@ -2,6 +2,7 @@ import { ImageOff } from 'lucide-react'
 import { type ImgHTMLAttributes, useEffect, useState } from 'react'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 
 /** <img> with a neutral fallback when the source is missing or fails to load. */
 export function SmartImage({ src, alt, className, fallbackLabel, ...rest }: ImgHTMLAttributes<HTMLImageElement> & { fallbackLabel?: string }) {
@@ -20,7 +21,10 @@ export function SmartImage({ src, alt, className, fallbackLabel, ...rest }: ImgH
   return <img src={src} alt={alt ?? ''} className={cn('bg-subtle', fit, className)} onError={() => setFailed(true)} loading="lazy" decoding="async" {...rest} />
 }
 
+const PRODUCT_FRAME = imageFrame('product')
+
+/** A product photo thumbnail in the product frame (4:5, ADR-0064): the whole picture, never cropped by the box. */
 export function Thumb({ src, alt, size = 'md' }: { src?: string; alt: string; size?: 'sm' | 'md' | 'lg' }) {
-  const s = { sm: 'size-8 rounded-md', md: 'size-10 rounded-lg', lg: 'size-14 rounded-lg' }[size]
-  return <SmartImage src={src} alt={alt} className={cn(s, 'shrink-0')} />
+  const s = { sm: 'h-8 rounded-md', md: 'h-10 rounded-lg', lg: 'h-14 rounded-lg' }[size]
+  return <SmartImage src={src} alt={alt} className={cn(s, PRODUCT_FRAME.aspectClass, PRODUCT_FRAME.fitClass, 'shrink-0')} />
 }

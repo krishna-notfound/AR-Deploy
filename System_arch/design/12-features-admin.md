@@ -92,3 +92,6 @@ Read when: building `/` or any `/admin/*` page. For the shared editor, see [15-p
 ## Categories and currencies (ADR-0055)
 
 Admin console entry "Categories & currencies" (`/admin/lists`, `content.manage`) with two tabs. Categories: add (English and Portuguese name), rename, move up and down, show or hide, delete with a confirmation (the products move to "Other"). Currencies: a searchable list with a switch each; at least one stays on. The product editor, the product filters, the CSV import, the business form and the public catalogue read the lists through `useCategories` / `useCategoryLabel` / `useCurrencies` (`src/services/listsHooks.ts`); the built-ins are the fallback while the lists load.
+
+## Product photos: crop on upload and Edit picture (ADR-0063)
+Choosing a photo in the product editor (and in an option's photos) opens the crop dialog before anything is uploaded. Save uploads the untouched original and the edited WebP copy; Cancel skips that file. Each photo tile has **Edit picture** (reopens the original with its crop), **Make primary** and **Remove**. Admin thumbnails (product table, analytics, model requests) show the photo in the 4:5 frame, whole.

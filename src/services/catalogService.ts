@@ -259,6 +259,11 @@ export interface CatalogService {
 
   // files: validate on the client first (lib/files.ts); this only stores them
   uploadAsset(input: { kind: UploadKind; file: File; businessId?: ID }): Promise<Result<UploadedAsset>>
+  /**
+   * A link that opens a stored file now, for "Edit picture" (ADR-0063): the photo's untouched original, which the product
+   * read does not sign. Demo mode keeps pictures as data URLs, so it hands back what it was given.
+   */
+  getMediaUrl(storagePath: string): Promise<Result<string>>
 
   /** Called after any successful write, so open queries can refetch. Returns an unsubscribe function. */
   subscribe(listener: () => void): () => void

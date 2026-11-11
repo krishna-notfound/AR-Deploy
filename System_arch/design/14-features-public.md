@@ -56,3 +56,6 @@ Sections:
 - **Footer:** contact placeholder and credits.
 
 The page is English-only. Its copy changes with the mode (no "sample data" claims in Supabase mode).
+
+## Photo frame (ADR-0064)
+Every product photo is shown in the 4:5 product frame with `object-contain`: the catalogue card, the product page stage (4:5 at every width; on a wide screen its width is capped so its height stays within the viewport), the stage thumbnails and "More photos" (two columns on phones, three from `md`, four from `lg`). A cropped file fills the frame exactly; an old or "whole" photo shows whole on the frame's plain colour.

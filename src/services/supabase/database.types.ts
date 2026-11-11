@@ -650,9 +650,11 @@ export type Database = {
         Row: {
           alt: string | null
           created_at: string
+          crop: Json | null
           id: string
           is_primary: boolean
           kind: string
+          original_path: string | null
           product_id: string
           sort_order: number
           storage_path: string | null
@@ -661,9 +663,11 @@ export type Database = {
         Insert: {
           alt?: string | null
           created_at?: string
+          crop?: Json | null
           id?: string
           is_primary?: boolean
           kind?: string
+          original_path?: string | null
           product_id: string
           sort_order?: number
           storage_path?: string | null
@@ -672,9 +676,11 @@ export type Database = {
         Update: {
           alt?: string | null
           created_at?: string
+          crop?: Json | null
           id?: string
           is_primary?: boolean
           kind?: string
+          original_path?: string | null
           product_id?: string
           sort_order?: number
           storage_path?: string | null
@@ -738,8 +744,10 @@ export type Database = {
         Row: {
           alt: string | null
           created_at: string
+          crop: Json | null
           id: string
           is_primary: boolean
+          original_path: string | null
           product_id: string
           sort_order: number
           storage_path: string
@@ -748,8 +756,10 @@ export type Database = {
         Insert: {
           alt?: string | null
           created_at?: string
+          crop?: Json | null
           id?: string
           is_primary?: boolean
+          original_path?: string | null
           product_id: string
           sort_order?: number
           storage_path: string
@@ -758,8 +768,10 @@ export type Database = {
         Update: {
           alt?: string | null
           created_at?: string
+          crop?: Json | null
           id?: string
           is_primary?: boolean
+          original_path?: string | null
           product_id?: string
           sort_order?: number
           storage_path?: string

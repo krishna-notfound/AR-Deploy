@@ -294,6 +294,9 @@ export async function imageToPersistableDataUrl(file: File, maxDim = 1600, t: TF
     canvas.height = Math.round(img.naturalHeight * scale)
     const ctx = canvas.getContext('2d')
     if (!ctx) return { ok: true, url: original }
+    // JPEG has no transparency: paint white first, so a transparent picture does not turn black.
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
     for (const q of [0.85, 0.72, 0.6]) {
       const url = canvas.toDataURL('image/jpeg', q)

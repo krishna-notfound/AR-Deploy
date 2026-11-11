@@ -119,6 +119,13 @@ Use **Add Product** in the business dashboard, or **All Products → New** in Su
 **Images**
 - **Gallery photos:** at least one is required before you can publish. PNG, JPEG or WebP, up to 5 MB each.
 - **Additional photos** are optional.
+- **Adjust each photo as you add it.** After you choose a photo, a window opens showing the **whole picture** inside the frame every product photo uses (4:5, a little taller than wide). Nothing is cut unless you choose to:
+  - **Drag** the picture to move it. **Zoom** with the slider, the **-** and **+** buttons, the mouse wheel, or by pinching on a phone.
+  - **Fill the frame** zooms until the picture covers the whole frame (the sides or the top and bottom are cut off). **Show whole picture** zooms out until all of it fits. **Reset** goes back to how the window opened.
+  - If the picture does not fill the frame, a note says so. You can still save it: it then shows whole, with plain space around it.
+  - Press **Save** to add the photo, or **Cancel** to skip it. When you choose several photos, the window opens for each one in turn.
+- **Edit picture.** Hover (or, on a phone, look at) the top right of a photo and press the pencil. The window reopens on your **original** photo with the framing you chose, so you can change it any time. Your original file is always kept; the catalogue and the product page show the adjusted copy.
+- Photos added before this change are not touched. They show whole in the same frame, and **Edit picture** works on them too.
 
 **Dimensions and specifications**
 - Width, height and depth, plus the unit (**centimetres or inches**). The unit switch only says which unit the numbers are in. It does **not** convert them.

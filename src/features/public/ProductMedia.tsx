@@ -7,6 +7,7 @@ import type { ProductImage, ProductModels } from '@/domain/types'
 import { arLaunchUrl } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 
 export { MODEL_STALL_TIMEOUT_MS }
 
@@ -17,6 +18,14 @@ export type MediaMode = '3d' | 'photos'
 export function initialMediaMode(media: { gallery: ProductImage[]; models: ProductModels }): MediaMode {
   return media.gallery.length || !media.models.glb ? 'photos' : '3d'
 }
+
+/** The stage and its thumbnails are the product photo frame, 4:5 at every width (ADR-0064). */
+const STAGE_FRAME = imageFrame('product')
+/**
+ * On a wide screen a 4:5 stage in a half-width column would be taller than the screen: its width is capped so its height stays
+ * within the viewport less the page's own chrome (the header, the card's top bar and padding: 16rem) (never narrower than 18rem), and it is centred in its card.
+ */
+const STAGE_WIDTH = 'mx-auto w-[min(100%,max(18rem,calc((100svh_-_16rem)_*_0.8)))]'
 
 const primaryIndex = (images: ProductImage[]) => Math.max(0, images.findIndex((i) => i.isPrimary))
 
@@ -114,7 +123,7 @@ export function ProductMedia({
 
   return (
     <div className={cn(fill && 'flex h-full flex-col')}>
-      <div className={cn('relative overflow-hidden rounded-[var(--radius-control)] bg-subtle', fill ? 'min-h-0 flex-1' : 'aspect-square sm:aspect-[5/4]')}>
+      <div className={cn('relative overflow-hidden rounded-[var(--radius-control)] bg-subtle', fill ? 'min-h-0 flex-1' : cn(STAGE_FRAME.aspectClass, STAGE_WIDTH))}>
         {glb && (
           <div className={cn('absolute inset-0', mode !== '3d' && 'invisible')} aria-hidden={mode !== '3d'}>
             <ModelViewer
@@ -215,7 +224,7 @@ export function ProductMedia({
                 aria-label={t('product.photo', { n: i + 1, total: gallery.length })}
                 aria-current={mode === 'photos' && i === photoIdx}
                 onClick={() => showPhoto(i)}
-                className={cn('block size-[4.5rem] overflow-hidden rounded-[var(--radius-control)] border bg-subtle p-1.5 transition-colors sm:size-24', mode === 'photos' && i === photoIdx ? 'border-ink' : 'border-line opacity-80 hover:border-line-strong hover:opacity-100')}
+                className={cn('block w-[4.5rem] overflow-hidden rounded-[var(--radius-control)] border bg-subtle p-1.5 transition-colors sm:w-24', STAGE_FRAME.aspectClass, mode === 'photos' && i === photoIdx ? 'border-ink' : 'border-line opacity-80 hover:border-line-strong hover:opacity-100')}
               >
                 <SmartImage src={img.url} alt="" className="size-full object-contain" />
               </button>

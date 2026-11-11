@@ -21,6 +21,7 @@ import type {
   ID,
   Lang,
   LengthUnit,
+  ImageCrop,
   LocalizedText,
   ModelAsset,
   ModelFormat,
@@ -84,6 +85,9 @@ export interface ImageRow {
   kind: ProductImage['kind']
   sort_order: number
   id: string
+  /** The untouched upload the shown copy was cut from (ADR-0063); null before the crop dialog. */
+  original_path?: string | null
+  crop?: ImageCrop | null
 }
 export interface ModelRow {
   format: ModelFormat
@@ -101,6 +105,8 @@ export interface VariantImageRow {
   alt: string | null
   is_primary: boolean
   sort_order: number
+  original_path?: string | null
+  crop?: ImageCrop | null
 }
 export interface VariantModelRow {
   format: ModelFormat
@@ -301,10 +307,25 @@ function toModels(rows: (ModelRow | VariantModelRow)[], resolve: Resolve): Produ
   return models
 }
 
+/** A crop from the database, only when it has the four numbers (the table's check guarantees it; a stray value is ignored, not trusted). */
+function toCrop(raw: unknown): ImageCrop | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const { x, y, width, height } = raw as Record<string, unknown>
+  return [x, y, width, height].every((n) => typeof n === 'number' && Number.isFinite(n)) && (width as number) > 0 && (height as number) > 0
+    ? { x: x as number, y: y as number, width: width as number, height: height as number }
+    : undefined
+}
+
+/** The optional original and crop of a photo row. The original's link is not signed here: Edit picture asks for it (getMediaUrl). */
+function cropFields(i: { original_path?: string | null; crop?: unknown }): Pick<ProductImage, 'originalPath' | 'crop'> {
+  const crop = toCrop(i.crop)
+  return { ...(i.original_path ? { originalPath: i.original_path } : {}), ...(crop ? { crop } : {}) }
+}
+
 function toVariant(v: VariantRow, resolve: Resolve): ProductVariant {
   const images = [...(v.product_variant_images ?? [])]
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map((i): ProductImage => ({ id: i.id, url: resolve(i), alt: i.alt ?? undefined, isPrimary: i.is_primary, kind: 'gallery', storagePath: i.storage_path }))
+    .map((i): ProductImage => ({ id: i.id, url: resolve(i), alt: i.alt ?? undefined, isPrimary: i.is_primary, kind: 'gallery', storagePath: i.storage_path, ...cropFields(i) }))
   const models = toModels(v.product_variant_models ?? [], resolve)
   return {
     id: v.id,
@@ -333,7 +354,7 @@ export function toProduct(r: ProductRow, signed: Map<string, string>): Product {
     currency: r.currency,
     images: [...(r.product_images ?? [])]
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map((i) => ({ id: i.id, url: resolve(i), alt: i.alt ?? undefined, isPrimary: i.is_primary, kind: i.kind, storagePath: i.storage_path ?? undefined })),
+      .map((i) => ({ id: i.id, url: resolve(i), alt: i.alt ?? undefined, isPrimary: i.is_primary, kind: i.kind, storagePath: i.storage_path ?? undefined, ...cropFields(i) })),
     models,
     dimensions: { width: Number(r.width), height: Number(r.height), depth: Number(r.depth), unit: r.dimension_unit },
     weight: r.weight_value != null && r.weight_unit ? { value: Number(r.weight_value), unit: r.weight_unit } : undefined,
@@ -377,7 +398,7 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
       keep_models: p.keepModels === true,
       expected_models_changed_at: p.modelsChangedAt ?? null,
     },
-    p_images: normalizeImages(p.images).map((img, i) => ({ ...stored(img), alt: img.alt ?? null, is_primary: img.isPrimary, kind: img.kind, sort_order: i })),
+    p_images: normalizeImages(p.images).map((img, i) => ({ ...stored(img), original_path: img.originalPath ?? null, crop: img.crop ?? null, alt: img.alt ?? null, is_primary: img.isPrimary, kind: img.kind, sort_order: i })),
     p_models: modelList(p.models).map((m) => ({ ...stored(m), format: m.format, file_name: m.fileName, size_bytes: m.sizeBytes ?? null, required_extensions: m.requiredExtensions ?? null })),
     // Variant ids are sent so they stay stable (save_product honours only ids of this product's own variants).
     // Variant media is always an owner upload: its rows carry the storage path only.
@@ -390,7 +411,7 @@ export function toSaveProductArgs(id: ID | null, p: ProductInput) {
       sort_order: i,
       images: normalizeImages(v.images ?? [])
         .filter((img) => img.storagePath)
-        .map((img) => ({ storage_path: img.storagePath, alt: img.alt ?? null, is_primary: img.isPrimary })),
+        .map((img) => ({ storage_path: img.storagePath, original_path: img.originalPath ?? null, crop: img.crop ?? null, alt: img.alt ?? null, is_primary: img.isPrimary })),
       models: modelList(v.models)
         .filter((m) => m.storagePath)
         .map((m) => ({ format: m.format, storage_path: m.storagePath, file_name: m.fileName, size_bytes: m.sizeBytes ?? null, required_extensions: m.requiredExtensions ?? null })),
@@ -405,7 +426,7 @@ const withoutModels = (p: Product): Product => ({ ...p, models: {}, variants: p.
 
 /** Storage paths a product points at: its images and models and every variant's photos and models. */
 export function mediaPaths(p: Pick<Product, 'images' | 'models' | 'variants'>): string[] {
-  const own = (images: ProductImage[] = [], models?: ProductModels) => [...images.map((i) => i.storagePath), ...modelList(models).map((m) => m.storagePath)]
+  const own = (images: ProductImage[] = [], models?: ProductModels) => [...images.flatMap((i) => [i.storagePath, i.originalPath]), ...modelList(models).map((m) => m.storagePath)]
   return [...own(p.images, p.models), ...p.variants.flatMap((v) => own(v.images, v.models))].filter((x): x is string => !!x)
 }
 
@@ -759,8 +780,12 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     const refs = await Promise.all(
       MEDIA_TABLES.map((table) => sb.from(table).select('storage_path').in('storage_path', unique).returns<{ storage_path: string }[]>()),
     )
-    if (refs.some((r) => r.error)) return { removed: 0, failed: unique.length } // keep files when unsure, and say so
-    const stillUsed = new Set(refs.flatMap((r) => r.data ?? []).map((r) => r.storage_path))
+    // A photo's untouched original (ADR-0063) is in use while its photo row exists.
+    const originals = await Promise.all(
+      (['product_images', 'product_variant_images'] as const).map((table) => sb.from(table).select('original_path').in('original_path', unique).returns<{ original_path: string }[]>()),
+    )
+    if (refs.some((r) => r.error) || originals.some((r) => r.error)) return { removed: 0, failed: unique.length } // keep files when unsure, and say so
+    const stillUsed = new Set([...refs.flatMap((r) => r.data ?? []).map((r) => r.storage_path), ...originals.flatMap((r) => r.data ?? []).map((r) => r.original_path)])
     const orphans = unique.filter((p) => !stillUsed.has(p))
     if (!orphans.length) return { removed: 0, failed: 0 }
     const { error } = await sb.storage.from(MEDIA_BUCKET).remove(orphans)
@@ -1432,6 +1457,13 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const signed = await sb.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL_SECONDS)
         if (signed.error) return fail('STORAGE', `Uploaded, but a preview link could not be created: ${signed.error.message}`)
         return ok({ url: signed.data.signedUrl, storagePath: path, status: 'valid' as const })
+      }),
+
+    // A fresh link to a stored product-media file, for "Edit picture" (the original is not signed with the product read).
+    getMediaUrl: (storagePath) =>
+      guard(async () => {
+        const signed = await sb.storage.from(MEDIA_BUCKET).createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS)
+        return signed.error ? fail('STORAGE', `The picture could not be opened: ${signed.error.message}`) : ok(signed.data.signedUrl)
       }),
 
     subscribe: (listener) => {

@@ -75,7 +75,7 @@ function PageSkeleton() {
     <main className={cn(SECTION, 'flex-1 py-10')} aria-busy="true" aria-label={t('common.loading')}>
       <Skeleton className="h-4 w-32" />
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-14">
-        <Skeleton className="aspect-square w-full sm:aspect-[5/4]" />
+        <Skeleton className="aspect-[4/5] w-full" />
         <div>
           <Skeleton className="h-4 w-24" />
           <Skeleton className="mt-4 h-12 w-3/4" />
