@@ -124,8 +124,8 @@ test.describe('Website Editor pictures', () => {
     expect((await opaque(detail)).ratio).toBeCloseTo(900 / 1200, 1) // the portrait itself is not stretched
     const third = about.getByTestId('about-third').getByRole('img', { name: 'A bronze bowl' })
     const t = await measure(third)
-    expect(t.fit).toBe('contain')
-    expect(t.naturalWidth / t.naturalHeight).toBeCloseTo(1, 2)
+    expect(t.fit).toBe('cover') // the box is 2:3 less a gap: cover trims those few pixels instead of showing bars
+    expect(t.naturalWidth / t.naturalHeight).toBeCloseTo(2 / 3, 2)
     await expect(about.getByText(CAPTION)).toHaveCount(0) // the picture replaces the caption
   })
 

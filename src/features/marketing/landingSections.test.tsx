@@ -228,7 +228,7 @@ describe('landing page sections', () => {
     const third = await within(about()).findByTestId('about-third')
     const img = within(third).getByRole('img', { name: 'A bronze bowl' })
     expect(img).toHaveAttribute('src', BLOB)
-    expect(img.className).toMatch(/object-contain/)
+    expect(img.className).toMatch(/object-cover/)
     expect(third.className).toMatch(/border-line/)
     // The picture replaces the caption; the two built-in photos stay.
     expect(within(about()).queryByText('Textures that tell stories.')).toBeNull()

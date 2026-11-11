@@ -54,7 +54,7 @@ describe('UploadButton with a frame', () => {
   })
 
   it('each frame gives the dialog its shape', async () => {
-    for (const [frame, aspect] of [['hero', 16 / 9], ['aboutThird', 1]] as const) {
+    for (const [frame, aspect] of [['hero', 16 / 9], ['aboutThird', 2 / 3]] as const) {
       const { unmount } = render(
         <LanguageProvider>
           <UploadButton kind="image" frame={frame} label="Upload picture" onUploaded={() => {}} />

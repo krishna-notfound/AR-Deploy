@@ -59,11 +59,11 @@ Owner answers:
 | `collection` | 4/5 | Landing collection cards |
 | `aboutMain` | 4/5 | About main photo |
 | `aboutDetail` | 1 | About detail photo |
-| `aboutThird` | 1 | About third photo (new slot, see section 7) |
+| `aboutThird` | 2/3 | About third photo (new slot, see section 7). `object-cover`: its box is 2:3 less one grid gap |
 | `imageText`, `qr` | 4/3 | Picture + text section, QR section picture |
 | `logo`, `avatar` | 1 | Company logo, profile photo |
 
-- **Display:** all except hero and banner use `object-contain` in their frame, so a cropped file fills it exactly and an uncropped "whole" save shows whole on the card's plain colour. The site's own built-in photos (static assets) keep their current look.
+- **Display:** all except hero, banner and the About third picture use `object-contain` in their frame, so a cropped file fills it exactly and an uncropped "whole" save shows whole on the card's plain colour. The site's own built-in photos (static assets) keep their current look.
 - **Frame shapes come from this module,** not from hardcoded aspect classes per component.
 
 ## 4. Uploads and storage
@@ -111,6 +111,6 @@ Owner answers:
 ## 7. About section: a third picture (owner, 2026-11-11: "Third picture")
 
 - **The problem:** the About grid shows a big photo, a detail photo and a third box holding the italic caption (`landing.feature.textureCaption`). The box looks like an empty picture slot.
-- **New slot:** `landing.about.third?: { path, alt{en,pt?}, originalPath?, crop? }`. The editor's About pictures gain a third slot (Upload / Edit picture / Remove, with alt texts), cropped at 1:1 (`aboutThird`).
-- **On the page:** with a third picture, the box shows it (`object-contain`, same border). Without one, the caption text shows there as today.
+- **New slot:** `landing.about.third?: { path, alt{en,pt?}, originalPath?, crop? }`. The editor's About pictures gain a third slot (Upload / Edit picture / Remove, with alt texts), cropped at 2:3 (`aboutThird`; changed from 1:1 at review, because the box is tall and a square picture showed bars).
+- **On the page:** with a third picture, the box shows it (`object-cover`, same border). Without one, the caption text shows there as today.
 - **Same change:** this goes in Migration B and the TS mirror: the shape check, `private.site_asset_ok` for the path, and the public chrome read already returns `landingAbout` whole. Tests cover both with and without the third picture.

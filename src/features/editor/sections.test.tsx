@@ -211,13 +211,13 @@ describe('Landing tab: QR and About pictures', () => {
     await waitFor(async () => expect((await savedLanding()).about).toBeUndefined(), { timeout: 8000 })
   })
 
-  it('About: the third picture is uploaded at 1:1, kept with its description, and removing it shows the caption again', { timeout: 90_000 }, async () => {
+  it('About: the third picture is uploaded at 2:3, kept with its description, and removing it shows the caption again', { timeout: 90_000 }, async () => {
     let seq = 0
     Object.assign(URL, { createObjectURL: vi.fn(() => `blob:third/${++seq}`) })
     open()
     const b = await block()
     await userEvent.click(b.getByRole('button', { name: 'Edit About' }))
-    await uploadAndSave(b.getAllByTestId('upload-image')[2]!, 'third.png', 1)
+    await uploadAndSave(b.getAllByTestId('upload-image')[2]!, 'third.png', 2 / 3)
     await waitFor(async () => expect((await savedLanding()).about).toMatchObject({ third: { path: expect.stringMatching(/^landing\/.+\.webp$/), originalPath: expect.stringMatching(/^landing\/.+\.png$/), crop: CROP } }), { timeout: 8000 })
     expect((await savedLanding()).about?.image).toBeUndefined()
     expect(b.getAllByRole('img', { name: 'The picture of this section' }).map((p) => p.getAttribute('src'))[2]).toBe('blob:third/2')

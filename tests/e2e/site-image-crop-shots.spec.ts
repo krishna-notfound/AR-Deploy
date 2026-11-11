@@ -52,7 +52,7 @@ test('screenshots of the editor and the landing page', async ({ page }) => {
   await sections.getByRole('button', { name: 'Edit About' }).click()
   await pick(page, sections.getByTestId('upload-image').nth(0), 'landscape.jpg', true)
   await pick(page, sections.getByTestId('upload-image').nth(1), 'portrait.jpg', false)
-  await pick(page, sections.getByTestId('upload-image').nth(2), 'square.jpg', false)
+  await pick(page, sections.getByTestId('upload-image').nth(2), 'square.jpg', true)
   await sections.getByRole('textbox', { name: 'Description (English)' }).nth(2).fill('A bronze bowl')
 
   // A collection card with an uploaded portrait.

@@ -28,7 +28,9 @@ export const IMAGE_FRAMES: Record<ImageFrameKey, ImageFrame> = {
   collection: contain(4 / 5, 'aspect-[4/5]'),
   aboutMain: contain(4 / 5, 'aspect-[4/5]'),
   aboutDetail: contain(1, 'aspect-square'),
-  aboutThird: contain(1, 'aspect-square'),
+  // The About grid's third box takes the height the 4:5 main photo leaves under the square detail: about 2:3 (a gap less).
+  // Cover, so the few pixels of the gap are trimmed instead of showing as bars.
+  aboutThird: cover(2 / 3, 'aspect-[2/3]'),
   imageText: contain(4 / 3, 'aspect-[4/3]'),
   qr: contain(4 / 3, 'aspect-[4/3]'),
   logo: contain(1, 'aspect-square'),
