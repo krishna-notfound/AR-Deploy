@@ -1,4 +1,8 @@
-# 19 Ã‚Â· Supabase backend (foundation)
+
+## Website Editor picture originals and crops (ADR-0063, migration `20261111141703_site_content_image_crop`; written and tested in PGlite, NOT applied as of 2026-11-11)
+- No table, column, bucket or policy change: `originalPath` and `crop` are optional keys inside the site-content document on every uploaded picture (hero, collection card, showcase, own sections, QR, About), plus `landing.about.third`. New `private.check_image_extras(jsonb, text)`: `originalPath` an image path through `private.site_asset_ok`, `crop` an object with numeric `x`, `y`, positive `width`, `height` and no other key (error `<picture>.originalPath|invalid_value` or `<picture>.crop|invalid_value`; absent or JSON null passes). `private.check_site_image`, `private.check_landing_layout` and `private.validate_site_content` are replaced from their latest bodies (`20261111083034_landing_sections.sql`); `private.check_site_content_shape` is not touched. The TypeScript mirror is `src/domain/siteContent.ts` (`validateSiteContent`, `normalizeSiteContent`).
+- Nothing removes `site-content` files, so an original is never swept (guard: `src/services/supabase/siteContentKeepsFiles.test.ts`). The public chrome read returns the pictures whole (the bucket is public-read already).
+- Rollback: `supabase/rollback/20261111_site_content_image_crop_rollback.sql` (nothing is deleted; the keys stay in the documents, unchecked). Tests: `supabase/tests/siteContentImageCrop.test.ts`.# 19 Ã‚Â· Supabase backend (foundation)
 Decisions: ADR-0015 (dual mode), ADR-0016 (routes). This file is the setup guide.
 
 ## Status (2026-10-27): the live project is the client's `zggylkbgajamhriebdrg` (18 migrations applied, 13 Edge Functions active; see `System_arch/HANDOFF.md` Live state). `pmnjchhrgvajtjpadpqo` is the old dev project and is not used. The sections below are dated records of the old project (2026-10-13/20) and of the first 7 migrations.

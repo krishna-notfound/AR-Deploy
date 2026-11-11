@@ -34,6 +34,8 @@ export const ptUi: Partial<Record<TranslationKey, string>> = {
   'ui.logo.upload': 'Carregar logótipo',
   'ui.logo.remove': 'Remover',
   'ui.logo.help': 'Uma imagem quadrada funciona melhor. PNG, JPG ou WebP até 2 MB.',
+  'ui.logo.cropTitle': 'Ajustar o logótipo',
+  'ui.logo.cropHelp': 'Depois de escolher um ficheiro pode movê-lo e aproximá-lo para o ajustar ao quadrado.',
   'ui.chart.views': 'Visualizações de páginas e incorporações',
   'ui.chart.ar': 'Tentativas de abertura em RA',
   'ui.chart.last30': '{label}, últimos 30 dias',

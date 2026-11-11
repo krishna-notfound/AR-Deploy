@@ -5,6 +5,7 @@ import { App } from '@/app/App'
 import { HOUSE_BUSINESS_SLUG, emptySiteContent } from '@/domain/siteContent'
 import { content } from '@/services'
 import { mockCatalogService } from '@/services/mock/mockCatalogService'
+import { CROP } from '@/test/cropDialogStub'
 import {
   addCollection,
   addCollectionProduct,
@@ -30,6 +31,9 @@ import {
   updateCollection,
   withLang,
 } from './landingOps'
+
+// The crop dialog needs a laid-out browser (its own tests: components/image); here it is a stand-in whose Save sends the fixed CROP.
+vi.mock('@/components/image/ImageCropDialog', async () => import('@/test/cropDialogStub'))
 
 const open = () => {
   localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
@@ -187,8 +191,24 @@ describe('Landing tab: the hero picture block (ADR-0049)', () => {
     expect(within(block).getByText('No 3D model, so the picture has no 3D button.')).toBeInTheDocument()
 
     await userEvent.upload(within(block).getByTestId('upload-image'), new File([new Uint8Array(1024)], 'hero.png', { type: 'image/png' }))
-    await waitFor(async () => expect((await savedLanding()).hero?.image?.path).toMatch(/^landing\/.+\.png$/), { timeout: 8000 })
-    expect(within(block).getByRole('img', { name: 'The hero picture' })).toHaveAttribute('src', 'blob:hero/1')
+    // The crop dialog opens in the hero frame (16:9) first; Save uploads the original and the edited copy.
+    const dialog = await screen.findByRole('dialog', { name: 'Adjust the picture' })
+    expect(dialog).toHaveAttribute('data-aspect', String(16 / 9))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save crop' }))
+    await waitFor(async () => expect((await savedLanding()).hero?.image?.path).toMatch(/^landing\/.+\.webp$/), { timeout: 8000 })
+    const hero = (await savedLanding()).hero!.image!
+    expect(hero.originalPath).toMatch(/^landing\/.+\.png$/)
+    expect(hero.crop).toEqual(CROP)
+    expect(within(block).getByRole('img', { name: 'The hero picture' })).toHaveAttribute('src', 'blob:hero/2')
+
+    // Edit picture reopens the ORIGINAL with the crop it had, and replaces only the edited copy.
+    await userEvent.click(within(block).getByRole('button', { name: 'Edit picture: Picture' }))
+    const again = await screen.findByRole('dialog', { name: 'Adjust the picture' })
+    expect(again).toHaveAttribute('data-src', 'blob:hero/1')
+    expect(JSON.parse(again.getAttribute('data-initial')!)).toEqual(CROP)
+    await userEvent.click(within(again).getByRole('button', { name: 'Save crop' }))
+    await waitFor(async () => expect((await savedLanding()).hero?.image?.path).not.toBe(hero.path), { timeout: 8000 })
+    expect((await savedLanding()).hero!.image!.originalPath).toBe(hero.originalPath)
 
     await userEvent.upload(within(block).getByTestId('upload-glb'), new File([new Uint8Array(1024)], 'sofa.glb', { type: 'model/gltf-binary' }))
     await waitFor(async () => expect((await savedLanding()).hero?.model?.glb.path).toMatch(/^landing\/.+\.glb$/), { timeout: 8000 })
@@ -361,7 +381,11 @@ describe('Landing tab: the three blocks (ADR-0047)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Add a collection' }))
     const cardPicture = (await screen.findByRole('img', { name: 'The picture of this card' })).closest('fieldset')!
     await userEvent.upload(within(cardPicture).getByTestId('upload-image'), new File([new Uint8Array(1024)], 'card.png', { type: 'image/png' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Adjust the picture' })
+    expect(dialog).toHaveAttribute('data-aspect', String(4 / 5)) // the collection card frame
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save crop' }))
     await waitFor(async () => expect(typeof (await savedLanding()).collections[0]!.image).toBe('object'), { timeout: 8000 })
+    expect((await savedLanding()).collections[0]!.image).toMatchObject({ originalPath: expect.stringMatching(/^landing\/.+\.png$/), crop: CROP })
     expect(screen.getByRole('img', { name: 'The picture of this card' })).toHaveAttribute('src', 'blob:test/1')
     await userEvent.click(within(cardPicture).getByRole('button', { name: 'Remove' }))
     await waitFor(async () => expect((await savedLanding()).collections[0]!.image).toBe('hero-living'), { timeout: 8000 })

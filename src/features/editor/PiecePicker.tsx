@@ -5,9 +5,13 @@ import { Badge } from '@/components/ui/Badge'
 import type { ProductRef } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { editorShowcasePath } from '@/lib/urls'
 import { sameRef } from './landingOps'
 import type { ShowcasePiece } from './useShowcasePieces'
+
+/** A piece shows its product photo: the 4:5 product frame, shown whole (ADR-0064). */
+const PRODUCT_FRAME = imageFrame('product')
 
 /** The piece's name for assistive technology: a draft says so, because visitors do not see it. */
 function pieceLabel(piece: ShowcasePiece, draft: string): string {
@@ -17,7 +21,7 @@ function pieceLabel(piece: ShowcasePiece, draft: string): string {
 /** A small picture of a piece, or a quiet placeholder when it has no photo. */
 export function PieceThumb({ piece, className }: { piece: Pick<ShowcasePiece, 'image'>; className?: string }) {
   return piece.image ? (
-    <img src={piece.image} alt="" width={96} height={96} loading="lazy" className={cn('bg-subtle object-cover', className)} />
+    <img src={piece.image} alt="" width={96} height={120} loading="lazy" className={cn('bg-subtle', PRODUCT_FRAME.fitClass, className)} />
   ) : (
     <span className={cn('grid place-items-center bg-subtle text-ink-faint', className)} aria-hidden>
       <ImageOff className="size-4" />
@@ -41,7 +45,7 @@ function PieceTile({ piece, kind, selected, disabled, onClick }: { piece: Showca
         selected ? 'border-ink ring-2 ring-ink' : 'border-line hover:border-line-strong',
       )}
     >
-      <PieceThumb piece={piece} className="aspect-square w-full" />
+      <PieceThumb piece={piece} className={cn('w-full', PRODUCT_FRAME.aspectClass)} />
       {selected && (
         <span className="absolute top-1.5 left-1.5 grid size-5 place-items-center bg-ink text-canvas" aria-hidden>
           <Check className="size-3.5" />

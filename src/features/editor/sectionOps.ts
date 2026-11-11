@@ -116,9 +116,16 @@ export function setSectionButton(doc: SiteContent, id: string, field: 'labelEn' 
   })
 }
 
+/** What a stored picture keeps of an upload: its path and, when the crop dialog made it, the original and the crop (ADR-0063). A new upload never inherits the old picture's crop. */
+export const pictureOf = (asset: SiteAsset): Pick<SiteAsset, 'path' | 'originalPath' | 'crop'> => ({
+  path: asset.path,
+  ...(asset.originalPath ? { originalPath: asset.originalPath } : {}),
+  ...(asset.crop ? { crop: asset.crop } : {}),
+})
+
 /** An own section's picture design: the uploaded picture (`undefined` clears the path again), keeping the alt text. */
 export function setSectionImage(doc: SiteContent, id: string, asset: SiteAsset | undefined): SiteContent {
-  return updateOwnSection(doc, id, (s) => (s.kind === 'text' ? s : { ...s, image: { ...s.image, path: asset?.path ?? '' } }))
+  return updateOwnSection(doc, id, (s) => (s.kind === 'text' ? s : { ...s, image: { ...(asset ? pictureOf(asset) : { path: '' }), alt: s.image.alt } }))
 }
 
 export function setSectionImageAlt(doc: SiteContent, id: string, lang: Lang, value: string): SiteContent {
@@ -151,7 +158,7 @@ const qrOf = (doc: SiteContent): LandingQr => doc.landing.qr ?? { imageSide: 'no
 export function setQrImage(doc: SiteContent, asset: SiteAsset | undefined): SiteContent {
   const { image: old, ...rest } = qrOf(doc)
   if (!asset) return withQr(doc, { ...rest, imageSide: 'none' })
-  return withQr(doc, { ...rest, image: { path: asset.path, alt: old?.alt ?? { en: '' } }, imageSide: rest.imageSide === 'none' ? 'left' : rest.imageSide })
+  return withQr(doc, { ...rest, image: { ...pictureOf(asset), alt: old?.alt ?? { en: '' } }, imageSide: rest.imageSide === 'none' ? 'left' : rest.imageSide })
 }
 
 export function setQrImageAlt(doc: SiteContent, lang: Lang, value: string): SiteContent {
@@ -168,13 +175,13 @@ type AboutPicture = keyof LandingAbout
 
 function withAbout(doc: SiteContent, about: LandingAbout): SiteContent {
   const { about: _old, ...rest } = doc.landing
-  return { ...doc, landing: about.image || about.detail ? { ...rest, about } : rest }
+  return { ...doc, landing: about.image || about.detail || about.third ? { ...rest, about } : rest }
 }
 
 /** Replaces one About picture, keeping its alt text; `undefined` goes back to the built-in photo. */
 export function setAboutImage(doc: SiteContent, which: AboutPicture, asset: SiteAsset | undefined): SiteContent {
   const about = { ...(doc.landing.about ?? {}) }
-  if (asset) about[which] = { path: asset.path, alt: about[which]?.alt ?? { en: '' } }
+  if (asset) about[which] = { ...pictureOf(asset), alt: about[which]?.alt ?? { en: '' } }
   else delete about[which]
   return withAbout(doc, about)
 }

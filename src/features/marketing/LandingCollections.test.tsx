@@ -91,6 +91,26 @@ describe('LandingCollections: published cards', () => {
     expect(within(first).queryAllByRole('link')).toHaveLength(0)
   })
 
+  it('uses the 4:5 collection frame: an uploaded picture shows whole in it, a built-in photo keeps filling it', { timeout: 30_000 }, async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:card/1') })
+    localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
+    const up = await content.uploadSiteAsset(new File([new Uint8Array(8)], 'card.png', { type: 'image/png' }), 'image')
+    if (!up.ok) throw new Error('upload')
+    await publishCards([
+      card({ title: { en: 'Mine' }, slug: 'mine', image: { path: up.data.path, originalPath: up.data.path, crop: { x: 0, y: 0, width: 400, height: 500 } }, link: { kind: 'collection' } }),
+      card({ title: { en: 'Built in' }, slug: 'built', image: 'lamp-vase', link: { kind: 'collection' } }),
+    ])
+    openLanding()
+    const s = await section()
+    await s.findByRole('heading', { name: 'Mine' })
+    const mine = s.getByRole('link', { name: /Mine/ }).querySelector('img')!
+    expect(mine).toHaveAttribute('src', 'blob:card/1')
+    expect(mine.className).toMatch(/aspect-\[4\/5\]/)
+    expect(mine.className).toMatch(/object-contain/)
+    const built = s.getByRole('link', { name: /Built in/ }).querySelector('img')!
+    expect(built.className).toMatch(/aspect-\[4\/5\]/)
+    expect(built.className).toMatch(/object-cover/)
+  })
   it('shows Portuguese when it exists and the English text otherwise', { timeout: 30_000 }, async () => {
     await publishCards([
       card({ title: { en: 'English only' }, text: { en: 'Only in English' }, link: { kind: 'collection' } }),

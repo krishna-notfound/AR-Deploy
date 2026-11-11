@@ -7,6 +7,7 @@ import { Eyebrow } from '@/components/ui/Eyebrow'
 import { type BuiltinSectionId, type SiteImage, resolveLandingSections } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { APPLY_PATH, showcaseProductPath } from '@/lib/urls'
 import { siteAssetUrl } from '@/services'
 import { useLandingExample, useLandingFeatured } from '@/services/contentHooks'
@@ -199,14 +200,19 @@ function Experience() {
 /** An About photograph: the Owner/Admin's upload with its own description, else the built-in photo with its description. */
 function aboutPicture(own: SiteImage | undefined, builtin: { src: string; alt: string }, localized: ReturnType<typeof useI18n>['localized']) {
   const url = own ? siteAssetUrl(own) : ''
-  return url ? { src: url, alt: localized(own!.alt) } : builtin
+  // An upload is cropped to its frame and shown whole in it (contain); the built-in photos keep filling theirs (cover).
+  return url ? { src: url, alt: localized(own!.alt), fit: 'contain' as const } : { ...builtin, fit: 'cover' as const }
 }
+
+const ABOUT_MAIN = imageFrame('aboutMain')
+const ABOUT_DETAIL = imageFrame('aboutDetail')
 
 function About() {
   const { t, localized } = useI18n()
   const about = useSiteContent().chrome?.landingAbout
   const main = aboutPicture(about?.image, { src: IMG('coffee-table'), alt: t('landing.about.imageAlt') }, localized)
   const detail = aboutPicture(about?.detail, { src: IMG('detail-joinery'), alt: t('landing.about.detailAlt') }, localized)
+  const thirdUrl = about?.third ? siteAssetUrl(about.third) : ''
   return (
     <section id="sobre" className="scroll-mt-24" aria-labelledby="about-title">
       <div className={cn(SECTION, SECTION_Y, 'grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16')}>
@@ -224,7 +230,7 @@ function About() {
             width={1200}
             height={896}
             loading="lazy"
-            className="row-span-2 aspect-[4/5] size-full border border-line bg-subtle object-cover"
+            className={cn('row-span-2 w-full border border-line bg-subtle', ABOUT_MAIN.aspectClass, main.fit === 'contain' ? ABOUT_MAIN.fitClass : 'object-cover')}
           />
           <img
             src={detail.src}
@@ -232,12 +238,18 @@ function About() {
             width={1024}
             height={1024}
             loading="lazy"
-            className="aspect-square w-full border border-line bg-subtle object-cover"
+            className={cn('w-full border border-line bg-subtle', ABOUT_DETAIL.aspectClass, detail.fit === 'contain' ? ABOUT_DETAIL.fitClass : 'object-cover')}
           />
-          <div className="flex flex-col justify-end border border-line bg-subtle p-3 sm:p-5">
-            <span className="block h-px w-8 bg-accent" aria-hidden />
-            <p className="mt-3 font-display text-base leading-snug text-ink-body italic sm:text-xl">{t('landing.feature.textureCaption')}</p>
-          </div>
+          {about?.third && thirdUrl ? (
+            <div className="relative min-h-0 border border-line bg-subtle" data-testid="about-third">
+              <img src={thirdUrl} alt={localized(about.third.alt)} loading="lazy" className={cn('absolute inset-0 size-full', imageFrame('aboutThird').fitClass)} />
+            </div>
+          ) : (
+            <div className="flex flex-col justify-end border border-line bg-subtle p-3 sm:p-5">
+              <span className="block h-px w-8 bg-accent" aria-hidden />
+              <p className="mt-3 font-display text-base leading-snug text-ink-body italic sm:text-xl">{t('landing.feature.textureCaption')}</p>
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -194,4 +194,72 @@ describe('landing page sections', () => {
     // The detail photo stays the built-in one.
     expect(within(about()).getAllByRole('img')[1]).toHaveAttribute('src', '/images/sanctus/v2/detail-joinery.webp')
   })
+
+  it('About: frames come from the frame table; an upload shows whole in its frame, the built-in photos keep filling theirs', async () => {
+    const first = renderLanding()
+    const about = () => document.getElementById('sobre')!
+    await screen.findByRole('link', { name: 'See a live example' })
+    const [builtinMain, builtinDetail] = within(about()).getAllByRole('img')
+    expect(builtinMain!.className).toMatch(/aspect-\[4\/5\].*object-cover|object-cover.*aspect-\[4\/5\]/)
+    expect(builtinDetail!.className).toMatch(/aspect-square/)
+    expect(builtinDetail!.className).toMatch(/object-cover/)
+    first.unmount()
+
+    await publishLanding({ about: { image: IMG, detail: IMG } })
+    renderLanding()
+    const mine = await waitFor(() => within(about()).getAllByRole('img', { name: 'A sofa in a room' }))
+    expect(mine).toHaveLength(2)
+    expect(mine[0]!.className).toMatch(/aspect-\[4\/5\]/)
+    expect(mine[0]!.className).toMatch(/object-contain/)
+    expect(mine[1]!.className).toMatch(/aspect-square/)
+    expect(mine[1]!.className).toMatch(/object-contain/)
+  })
+
+  it('About: the third box shows the caption until a third picture is set, then the picture (contained, same border) instead', async () => {
+    const first = renderLanding()
+    const about = () => document.getElementById('sobre')!
+    await screen.findByRole('link', { name: 'See a live example' })
+    expect(within(about()).getByText('Textures that tell stories.')).toBeInTheDocument()
+    expect(within(about()).queryByTestId('about-third')).toBeNull()
+    first.unmount()
+
+    await publishLanding({ about: { third: { ...IMG, alt: { en: 'A bronze bowl', pt: 'Uma tigela de bronze' } } } })
+    renderLanding()
+    const third = await within(about()).findByTestId('about-third')
+    const img = within(third).getByRole('img', { name: 'A bronze bowl' })
+    expect(img).toHaveAttribute('src', BLOB)
+    expect(img.className).toMatch(/object-contain/)
+    expect(third.className).toMatch(/border-line/)
+    // The picture replaces the caption; the two built-in photos stay.
+    expect(within(about()).queryByText('Textures that tell stories.')).toBeNull()
+    expect(within(about()).getAllByRole('img').map((i) => i.getAttribute('src'))).toEqual(['/images/sanctus/v2/coffee-table.webp', '/images/sanctus/v2/detail-joinery.webp', BLOB])
+  })
+
+  it('About: a third picture that only exists in an older browser session (no address) falls back to the caption', async () => {
+    await publishLanding({ about: { third: { path: 'landing/gone-0000.webp', alt: { en: 'Gone' } } } })
+    renderLanding()
+    await screen.findByRole('link', { name: 'See a live example' })
+    expect(document.getElementById('sobre')!.querySelector('[data-testid="about-third"]')).toBeNull()
+  })
+
+  it('Image + text and the QR section use their 4:3 frame, contained; a banner fills its band', async () => {
+    await publishLanding({
+      sections: [
+        builtin('qr'),
+        { kind: 'imageText', id: 'story', title: { en: 'Our story' }, image: IMG, imageSide: 'left' },
+        { kind: 'banner', id: 'wide', title: { en: 'Wide' }, image: IMG },
+      ] as LandingSection[],
+      qr: { image: IMG, imageSide: 'left' },
+    })
+    renderLanding()
+    const story = (await screen.findByRole('heading', { level: 2, name: 'Our story' })).closest('section')!
+    const picture = within(story).getByRole('img', { name: 'A sofa in a room' })
+    expect(picture.className).toMatch(/aspect-\[4\/3\]/)
+    expect(picture.className).toMatch(/object-contain/)
+    const qr = within(document.getElementById('qr')!).getByRole('img', { name: 'A sofa in a room' })
+    expect(qr.className).toMatch(/aspect-\[4\/3\]/)
+    expect(qr.className).toMatch(/object-contain/)
+    const wide = (await screen.findByRole('heading', { level: 2, name: 'Wide' })).closest('section')!
+    expect(wide.querySelector('img')!.className).toMatch(/object-cover/)
+  })
 })

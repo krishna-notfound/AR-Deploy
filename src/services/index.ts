@@ -94,6 +94,7 @@ export function siteAssetUrl(asset: SiteAsset): string {
   return `${base}/storage/v1/object/public/${SITE_ASSET_BUCKET}/${asset.path}`
 }
 
+export { checkSiteAssetFile } from './siteAsset'
 export { backend, isDemoMode } from './backend'
 export type { AccountService, AssuranceLevels, NoticeOutcome, ProfilePatch } from './accountService'
 export { ACCOUNT_ERRORS, AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, PASSWORD_MAX, PASSWORD_MIN } from './accountService'

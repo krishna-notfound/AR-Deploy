@@ -7,8 +7,12 @@ import { Eyebrow } from '@/components/ui/Eyebrow'
 import type { BannerSection, ImageTextSection, OwnSection, SectionButton, SiteImage, TextSection } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { siteAssetUrl } from '@/services'
 import { SECTION, SECTION_Y } from './landingFrame'
+
+const IMAGE_TEXT = imageFrame('imageText')
+const BANNER = imageFrame('banner')
 
 const arrow = <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden />
 
@@ -73,7 +77,7 @@ function ImageTextBlock({ section }: { section: ImageTextSection }) {
             src={src}
             alt={localized(section.image.alt)}
             loading="lazy"
-            className={cn('aspect-[4/3] w-full border border-line bg-subtle object-contain', section.imageSide === 'right' && 'lg:order-last')}
+            className={cn('w-full border border-line bg-subtle', IMAGE_TEXT.aspectClass, IMAGE_TEXT.fitClass, section.imageSide === 'right' && 'lg:order-last')}
           />
         )}
         <div className={cn('min-w-0', !src && 'lg:col-span-2 lg:mx-auto lg:max-w-2xl')}>
@@ -103,7 +107,7 @@ function BannerBlock({ section }: { section: BannerSection }) {
       aria-labelledby={title ? headingId(section.id) : undefined}
       aria-label={title ? undefined : localized(section.image.alt) || undefined}
     >
-      {src && <img src={src} alt={title ? '' : localized(section.image.alt)} loading="lazy" className="absolute inset-0 -z-10 size-full object-cover" />}
+      {src && <img src={src} alt={title ? '' : localized(section.image.alt)} loading="lazy" className={cn('absolute inset-0 -z-10 size-full', BANNER.fitClass)} />}
       <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
         <div className="absolute inset-0 bg-obsidian/35" />
         {hasText && <div className="absolute inset-x-0 bottom-0 h-[80%] bg-linear-to-t from-obsidian/85 via-obsidian/45 to-transparent" />}

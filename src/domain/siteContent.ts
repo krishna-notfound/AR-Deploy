@@ -18,7 +18,7 @@ import {
 } from '../../supabase/functions/_shared/applyForm.ts'
 
 import { LANDING_TEXT_LIMITS, type LandingTexts } from './landingTexts'
-import type { Category } from './types'
+import type { Category, ImageCrop } from './types'
 
 export type { ApplyFormConfig, ContentErrorKey, ContentErrors, Lang }
 export * from '../../supabase/functions/_shared/applyForm.ts'
@@ -63,8 +63,12 @@ export type LandingImageKey = (typeof LANDING_IMAGE_KEYS)[number]
 
 /** A file the Owner/Admin uploaded in the Website Editor: its object path inside the public storage bucket `site-content`. Resolve it to a URL with `siteAssetUrl` (src/services). */
 export interface SiteAsset {
-  /** `landing/<name>.<ext>`, matching SITE_ASSET_PATH. */
+  /** `landing/<name>.<ext>`, matching SITE_ASSET_PATH. For a picture cropped on upload (ADR-0063) this is the edited copy the page shows. */
   path: string
+  /** Pictures only: the untouched upload the copy was cut from, so Edit picture can start again from it. Absent on a picture from before the crop dialog. */
+  originalPath?: string
+  /** Pictures only: the rectangle of the original the copy holds, in the original's pixels. Absent: never cropped. */
+  crop?: ImageCrop
 }
 /**
  * What an upload is checked as. `favicon` (ADR-0053) is a PNG up to 1 MB stored like any other picture: the same bucket, the same
@@ -230,10 +234,12 @@ export interface LandingQr {
 }
 export const QR_SIDES = ['left', 'right', 'none'] as const
 
-/** The two photographs of the About section. Absent: the built-in photos. */
+/** The photographs of the About section: the main and the detail photo (absent: the built-in photos) and an optional third. */
 export interface LandingAbout {
   image?: SiteImage
   detail?: SiteImage
+  /** The third box of the About grid (owner, 2026-11-11). Absent: the box shows the italic caption. */
+  third?: SiteImage
 }
 
 export const MAX_LANDING_SECTIONS = 16
@@ -393,7 +399,24 @@ function normalizeLandingTexts(v: unknown): LandingTexts | undefined {
   return Object.keys(out).length ? out : undefined
 }
 
+/** A file reference with just its path: the 3D model files and the favicon. */
 const asset = (v: unknown): SiteAsset | undefined => (isSiteAsset(v) ? { path: v.path } : undefined)
+
+const isCropShape = (v: unknown): v is ImageCrop => {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false
+  const c = v as Record<string, unknown>
+  return ['x', 'y', 'width', 'height'].every((k) => typeof c[k] === 'number' && Number.isFinite(c[k]))
+}
+/** The optional keys of an uploaded picture (ADR-0063): a string originalPath and a crop with four finite numbers; anything else is dropped. */
+function pictureExtras(v: unknown): Pick<SiteAsset, 'originalPath' | 'crop'> {
+  const o = obj(v)
+  const out: Pick<SiteAsset, 'originalPath' | 'crop'> = {}
+  if (typeof o.originalPath === 'string' && o.originalPath) out.originalPath = o.originalPath
+  if (isCropShape(o.crop)) out.crop = { x: o.crop.x, y: o.crop.y, width: o.crop.width, height: o.crop.height }
+  return out
+}
+/** A picture (hero, card or showcase picture) with its originalPath and crop kept. */
+const picture = (v: unknown): SiteAsset | undefined => (isSiteAsset(v) ? { path: v.path, ...pictureExtras(v) } : undefined)
 const optPair = (v: unknown): { en: string; pt?: string } | undefined => {
   if (v === undefined) return undefined
   const p = pair(v)
@@ -403,7 +426,7 @@ const optPair = (v: unknown): { en: string; pt?: string } | undefined => {
 /** A picture with its description; the path may be empty (a picture design not uploaded yet). Undefined when there is no path string. */
 function siteImage(v: unknown): SiteImage | undefined {
   const o = obj(v)
-  return typeof o.path === 'string' ? { path: o.path, alt: pair(o.alt) } : undefined
+  return typeof o.path === 'string' ? { path: o.path, ...pictureExtras(o), alt: pair(o.alt) } : undefined
 }
 
 function normalizeButton(v: unknown): SectionButton | undefined {
@@ -456,13 +479,15 @@ function normalizeAbout(x: unknown): LandingAbout | undefined {
   if (image) out.image = image
   const detail = siteImage(o.detail)
   if (detail) out.detail = detail
-  return out.image || out.detail ? out : undefined
+  const third = siteImage(o.third)
+  if (third) out.third = third
+  return out.image || out.detail || out.third ? out : undefined
 }
 
 function normalizeHero(x: unknown): LandingHero {
   const o = obj(x)
   const out: LandingHero = {}
-  const image = asset(o.image)
+  const image = picture(o.image)
   if (image) out.image = image
   const glb = asset(obj(o.model).glb)
   if (glb) out.model = { glb }
@@ -483,7 +508,7 @@ function normalizeShowcase(x: unknown): LandingShowcase {
   if (typeof o.dimensions === 'string' && o.dimensions) out.dimensions = o.dimensions
   const price = obj(o.price)
   if (typeof price.amount === 'number' && Number.isFinite(price.amount)) out.price = { amount: price.amount, currency: 'EUR' }
-  const image = asset(o.image)
+  const image = picture(o.image)
   if (image) out.image = image
   const m = obj(o.model)
   const glb = asset(m.glb)
@@ -511,7 +536,7 @@ function normalizeCollection(x: unknown): LandingCollection {
   else if (l.kind === 'apply') link = { kind: 'apply' }
   else if (l.kind === 'collection') link = { kind: 'collection' }
   const products = Array.isArray(o.products) ? o.products.map(productRef) : []
-  const out: LandingCollection = { id: str(o.id), slug: str(o.slug), title: pair(o.title), image: isSiteAsset(o.image) ? { path: o.image.path } : str(o.image), link, products }
+  const out: LandingCollection = { id: str(o.id), slug: str(o.slug), title: pair(o.title), image: picture(o.image) ?? str(o.image), link, products }
   if (o.text !== undefined) {
     const text = pair(o.text)
     if (text.en || text.pt) out.text = text
@@ -768,6 +793,22 @@ function checkImage(img: unknown, path: string, required: boolean, put: Put): vo
   if (img.path === '') put(path, 'required')
   else if (typeof img.path !== 'string' || siteAssetKind(img.path) !== 'image') put(path, 'invalid_value')
   checkPair(img.alt, `${path}.alt`, MAX_IMAGE_ALT, false, put)
+  checkPictureExtras(img, path, put)
+}
+
+/** originalPath (an image path of the bucket) and crop ({x, y, width, height}: numbers, width and height above 0, no other key), both optional. Same rules as private.check_image_extras. */
+function checkPictureExtras(img: Record<string, unknown>, path: string, put: Put): void {
+  const original = img.originalPath
+  if (original !== undefined && original !== null && (typeof original !== 'string' || siteAssetKind(original) !== 'image')) put(`${path}.originalPath`, 'invalid_value')
+  const crop = img.crop
+  if (crop === undefined || crop === null) return
+  const ok =
+    isRecord(crop) &&
+    Object.keys(crop).every((k) => k === 'x' || k === 'y' || k === 'width' || k === 'height') &&
+    ['x', 'y', 'width', 'height'].every((k) => typeof crop[k] === 'number' && Number.isFinite(crop[k])) &&
+    (crop.width as number) > 0 &&
+    (crop.height as number) > 0
+  if (!ok) put(`${path}.crop`, 'invalid_value')
 }
 
 function checkButton(b: unknown, path: string, put: Put): void {
@@ -836,6 +877,7 @@ function validateAbout(about: LandingAbout, put: Put): void {
   if (!isRecord(about)) return put('landing.about', 'invalid_value')
   checkImage(about.image, 'landing.about.image', false, put)
   checkImage(about.detail, 'landing.about.detail', false, put)
+  checkImage(about.third, 'landing.about.third', false, put)
 }
 
 function validateRef(ref: ProductRef, path: string, put: (path: string, key: ContentErrorKey) => void): void {
@@ -849,6 +891,7 @@ function validateRef(ref: ProductRef, path: string, put: (path: string, key: Con
 function validateAsset(a: SiteAsset | undefined, kind: SiteAssetKind, path: string, put: (path: string, key: ContentErrorKey) => void): void {
   if (!a) return put(path, 'required')
   if (siteAssetKind(typeof a.path === 'string' ? a.path : '') !== kind) put(path, 'invalid_value')
+  if (kind === 'image' && isRecord(a)) checkPictureExtras(a, path, put)
 }
 
 function validateHero(h: LandingHero, put: (path: string, key: ContentErrorKey) => void): void {
@@ -1071,6 +1114,7 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
   if (!same(a.landing?.qr, b.landing?.qr)) landingSections++
   if (!same(a.landing?.about?.image, b.landing?.about?.image)) landingSections++
   if (!same(a.landing?.about?.detail, b.landing?.about?.detail)) landingSections++
+  if (!same(a.landing?.about?.third, b.landing?.about?.third)) landingSections++
 
   const siteFavicon = same(a.chrome?.favicon, b.chrome?.favicon) ? 0 : 1
 

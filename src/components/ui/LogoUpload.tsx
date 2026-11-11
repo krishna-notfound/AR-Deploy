@@ -1,8 +1,11 @@
 import { Upload, X } from 'lucide-react'
 import { useId, useState } from 'react'
+import { ImageCropDialog } from '@/components/image/ImageCropDialog'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { LOGO_RULES, validateImageFile } from '@/lib/files'
+import { editedFile } from '@/lib/imageCrop'
+import { imageFrame } from '@/lib/imageFrames'
 import { service } from '@/services'
 import { Button } from './Button'
 import { SmartImage } from './SmartImage'
@@ -22,20 +25,31 @@ export function LogoUpload({
   const id = useId()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /** The file chosen and waiting in the crop dialog (ADR-0063: the logo is cropped on upload only; no original is kept). */
+  const [pending, setPending] = useState<File | null>(null)
 
-  const onFile = async (file: File) => {
+  const onFile = (file: File) => {
     const check = validateImageFile(file, LOGO_RULES, t)
     if (!check.ok) {
       setError(check.message)
       return
     }
+    setError(null)
+    setPending(file)
+  }
+
+  const save = async (file: File, blob: Blob) => {
     setBusy(true)
-    const res = await service.uploadAsset({ kind: 'logo', file, businessId })
-    setBusy(false)
-    if (!res.ok) setError(errorText(res.error, t))
-    else {
-      setError(null)
-      onChange(res.data.url)
+    try {
+      const res = await service.uploadAsset({ kind: 'logo', file: editedFile(blob, file.name), businessId })
+      if (!res.ok) setError(errorText(res.error, t))
+      else {
+        setError(null)
+        onChange(res.data.url)
+      }
+    } finally {
+      setBusy(false)
+      setPending(null)
     }
   }
 
@@ -54,7 +68,7 @@ export function LogoUpload({
               className="sr-only"
               onChange={(e) => {
                 const f = e.target.files?.[0]
-                if (f) void onFile(f)
+                if (f) onFile(f)
                 e.target.value = ''
               }}
             />
@@ -66,11 +80,22 @@ export function LogoUpload({
           )}
         </div>
       </div>
-      <p className="mt-2 text-xs text-ink-muted">{t('ui.logo.help')}</p>
+      <p className="mt-2 text-xs text-ink-muted">{t('ui.logo.help')} {t('ui.logo.cropHelp')}</p>
       {error && (
         <p role="alert" className="mt-1 text-xs font-medium text-danger">
           {error}
         </p>
+      )}
+      {pending && (
+        <ImageCropDialog
+          key={`--`}
+          file={pending}
+          aspect={imageFrame('logo').aspect}
+          title={t('ui.logo.cropTitle')}
+          output={{ maxSide: 1024 }}
+          onCancel={() => setPending(null)}
+          onSave={(result) => save(pending, result.blob)}
+        />
       )}
     </div>
   )

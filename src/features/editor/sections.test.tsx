@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import { content } from '@/services'
 import { mockCatalogService } from '@/services/mock/mockCatalogService'
+import { CROP } from '@/test/cropDialogStub'
+
+// The crop dialog needs a laid-out browser (its own tests: components/image); here it is a stand-in whose Save sends the fixed CROP.
+vi.mock('@/components/image/ImageCropDialog', async () => import('@/test/cropDialogStub'))
 
 const open = () => {
   localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'admin' }))
@@ -18,6 +22,14 @@ const savedLanding = async () => {
   return s.data.draft.landing
 }
 const block = async () => within(await screen.findByRole('region', { name: 'Sections' }, { timeout: 15_000 }))
+/** Chooses a picture, saves the crop dialog it opens (checking the frame), and returns once the dialog is gone. */
+async function uploadAndSave(input: HTMLElement, name: string, aspect: number) {
+  await userEvent.upload(input, new File([new Uint8Array(1024)], name, { type: 'image/png' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Adjust the picture' })
+  expect(dialog).toHaveAttribute('data-aspect', String(aspect))
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Save crop' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+}
 const rowNames = (b: ReturnType<typeof within>) => b.getAllByRole('listitem').map((li: HTMLElement) => li.querySelector('.truncate')?.textContent)
 
 beforeEach(async () => {
@@ -108,9 +120,20 @@ describe('Landing tab: Sections', () => {
     const b = await block()
     await userEvent.click(b.getByRole('button', { name: 'Add section' }))
     await userEvent.click(b.getByRole('button', { name: /^Picture and text/ }))
-    await userEvent.upload(await b.findByTestId('upload-image'), new File([new Uint8Array(1024)], 'pic.png', { type: 'image/png' }))
-    await waitFor(async () => expect((await savedLanding()).sections?.at(-1)).toMatchObject({ kind: 'imageText', image: { path: expect.stringMatching(/^landing\/.+\.png$/) } }), { timeout: 8000 })
-    expect(b.getByRole('img', { name: 'The picture of this section' })).toHaveAttribute('src', 'blob:sec/1')
+    await uploadAndSave(await b.findByTestId('upload-image'), 'pic.png', 4 / 3) // the picture + text frame
+    await waitFor(async () => expect((await savedLanding()).sections?.at(-1)).toMatchObject({ kind: 'imageText', image: { path: expect.stringMatching(/^landing\/.+\.webp$/), originalPath: expect.stringMatching(/^landing\/.+\.png$/), crop: CROP } }), { timeout: 8000 })
+    expect(b.getByRole('img', { name: 'The picture of this section' })).toHaveAttribute('src', 'blob:sec/2')
+
+    // Edit picture reopens the original (blob:sec/1) with the crop it had; saving keeps the original and swaps the copy.
+    const lastImage = async () => ((await savedLanding()).sections!.at(-1) as unknown as { image: { path: string; originalPath: string } }).image
+    const before = await lastImage()
+    await userEvent.click(b.getByRole('button', { name: 'Edit picture: Picture' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Adjust the picture' })
+    expect(dialog).toHaveAttribute('data-src', 'blob:sec/1')
+    expect(JSON.parse(dialog.getAttribute('data-initial')!)).toEqual(CROP)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save crop' }))
+    await waitFor(async () => expect((await lastImage()).path).not.toBe(before.path), { timeout: 8000 })
+    expect((await lastImage()).originalPath).toBe(before.originalPath)
 
     await userEvent.type(b.getByRole('textbox', { name: 'Description (English)' }), 'A walnut table')
     await userEvent.click(b.getByRole('radio', { name: 'Right' }))
@@ -153,8 +176,8 @@ describe('Landing tab: QR and About pictures', () => {
     expect(b.getByRole('radio', { name: 'Picture on the left' })).toBeDisabled()
     expect(b.getByRole('radio', { name: 'Text only, centred' })).toBeChecked()
 
-    await userEvent.upload(b.getByTestId('upload-image'), new File([new Uint8Array(1024)], 'qr.png', { type: 'image/png' }))
-    await waitFor(async () => expect((await savedLanding()).qr).toMatchObject({ imageSide: 'left', image: { path: expect.stringMatching(/^landing\/.+\.png$/) } }), { timeout: 8000 })
+    await uploadAndSave(b.getByTestId('upload-image'), 'qr.png', 4 / 3) // the QR section frame
+    await waitFor(async () => expect((await savedLanding()).qr).toMatchObject({ imageSide: 'left', image: { path: expect.stringMatching(/^landing\/.+\.webp$/), originalPath: expect.stringMatching(/^landing\/.+\.png$/), crop: CROP } }), { timeout: 8000 })
     await userEvent.click(b.getByRole('radio', { name: 'Picture on the right' }))
     await userEvent.type(b.getByRole('textbox', { name: 'Description (English)' }), 'A table card')
     await waitFor(async () => expect((await savedLanding()).qr).toMatchObject({ imageSide: 'right', image: { alt: { en: 'A table card' } } }), { timeout: 8000 })
@@ -172,16 +195,39 @@ describe('Landing tab: QR and About pictures', () => {
     const previews = b.getAllByRole('img', { name: 'The picture of this section' })
     expect(previews.map((p) => p.getAttribute('src'))).toEqual(['/images/sanctus/v2/coffee-table.webp', '/images/sanctus/v2/detail-joinery.webp'])
     expect(b.getAllByText('Built-in photo in use.')).toHaveLength(2)
+    // The optional third picture: nothing set, so the About box shows its caption.
+    expect(b.getByText('No third picture: the box shows the caption.')).toBeInTheDocument()
+    expect(b.queryByRole('button', { name: /^Edit picture/ })).toBeNull()
 
     const uploads = b.getAllByTestId('upload-image')
-    await userEvent.upload(uploads[1]!, new File([new Uint8Array(1024)], 'detail.png', { type: 'image/png' }))
-    await waitFor(async () => expect((await savedLanding()).about).toMatchObject({ detail: { path: expect.stringMatching(/^landing\/.+\.png$/) } }), { timeout: 8000 })
+    expect(uploads).toHaveLength(3)
+    await uploadAndSave(uploads[1]!, 'detail.png', 1) // the detail frame is square
+    await waitFor(async () => expect((await savedLanding()).about).toMatchObject({ detail: { path: expect.stringMatching(/^landing\/.+\.webp$/), originalPath: expect.stringMatching(/^landing\/.+\.png$/), crop: CROP } }), { timeout: 8000 })
     expect((await savedLanding()).about?.image).toBeUndefined()
     await userEvent.type(b.getByRole('textbox', { name: 'Description (English)' }), 'Dovetail joint')
     await waitFor(async () => expect((await savedLanding()).about?.detail?.alt).toEqual({ en: 'Dovetail joint' }), { timeout: 8000 })
 
     await userEvent.click(b.getByRole('button', { name: 'Use the built-in photo: Detail photograph' }))
     await waitFor(async () => expect((await savedLanding()).about).toBeUndefined(), { timeout: 8000 })
+  })
+
+  it('About: the third picture is uploaded at 1:1, kept with its description, and removing it shows the caption again', { timeout: 90_000 }, async () => {
+    let seq = 0
+    Object.assign(URL, { createObjectURL: vi.fn(() => `blob:third/${++seq}`) })
+    open()
+    const b = await block()
+    await userEvent.click(b.getByRole('button', { name: 'Edit About' }))
+    await uploadAndSave(b.getAllByTestId('upload-image')[2]!, 'third.png', 1)
+    await waitFor(async () => expect((await savedLanding()).about).toMatchObject({ third: { path: expect.stringMatching(/^landing\/.+\.webp$/), originalPath: expect.stringMatching(/^landing\/.+\.png$/), crop: CROP } }), { timeout: 8000 })
+    expect((await savedLanding()).about?.image).toBeUndefined()
+    expect(b.getAllByRole('img', { name: 'The picture of this section' }).map((p) => p.getAttribute('src'))[2]).toBe('blob:third/2')
+    await userEvent.type(b.getByRole('textbox', { name: 'Description (English)' }), 'A bronze bowl')
+    await waitFor(async () => expect((await savedLanding()).about?.third?.alt).toEqual({ en: 'A bronze bowl' }), { timeout: 8000 })
+    expect(b.getByRole('button', { name: 'Edit picture: Third picture' })).toBeInTheDocument()
+
+    await userEvent.click(b.getByRole('button', { name: 'Remove the third picture (show the caption)' }))
+    await waitFor(async () => expect((await savedLanding()).about).toBeUndefined(), { timeout: 8000 })
+    expect(b.getByText('No third picture: the box shows the caption.')).toBeInTheDocument()
   })
 
   it('the QR texts are in the Texts block under their own section, with the old hero text as the original', { timeout: 60_000 }, async () => {

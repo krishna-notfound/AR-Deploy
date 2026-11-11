@@ -5,6 +5,7 @@ import { Eyebrow } from '@/components/ui/Eyebrow'
 import type { LandingCollection, LandingCollectionLink } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { imageFrame } from '@/lib/imageFrames'
 import { collectionPath } from '@/lib/urls'
 import { BUILTIN_COLLECTIONS } from './landingBuiltin'
 import { collectionImage, landingImage } from './landingImages'
@@ -23,8 +24,12 @@ export interface CardView {
   text?: string
   image: string
   focus?: string
+  /** An uploaded picture (cropped to the frame, shown whole in it); the built-in photos keep filling the frame. */
+  uploaded?: boolean
   href?: string
 }
+
+const FRAME = imageFrame('collection')
 
 /**
  * Where an Editor card leads (ADR-0047): always to its own collection page. The old link kinds (catalogue, product, apply)
@@ -49,7 +54,7 @@ function editorCards(list: LandingCollection[], localized: ReturnType<typeof use
     .flatMap((c) => {
       const img = collectionImage(c.image)
       if (!img) return [] // an unknown photo key is never published (the database refuses it); skip rather than show a broken card
-      return [{ id: c.id, title: localized(c.title), text: c.text ? localized(c.text) || undefined : undefined, image: img.src, focus: img.focus, href: hrefOf(c.link, c.slug) }]
+      return [{ id: c.id, title: localized(c.title), text: c.text ? localized(c.text) || undefined : undefined, image: img.src, focus: img.focus, ...(img.uploaded ? { uploaded: true } : {}), href: hrefOf(c.link, c.slug) }]
     })
 }
 
@@ -110,7 +115,7 @@ function Card({ card }: { card: CardView }) {
   const { t } = useI18n()
   const body: ReactNode = (
     <>
-      <img src={card.image} alt="" width={1200} height={896} loading="lazy" className={cn('aspect-[4/5] w-full bg-subtle object-cover', card.focus)} />
+      <img src={card.image} alt="" width={1200} height={896} loading="lazy" className={cn('w-full bg-subtle', FRAME.aspectClass, card.uploaded ? FRAME.fitClass : 'object-cover', card.focus)} />
       <h3 className="mt-4 font-display text-[1.375rem] leading-tight font-normal text-ink sm:mt-5 sm:text-[1.625rem]">{card.title}</h3>
       {card.text && <p className="mt-1.5 text-sm leading-5 text-ink-muted">{card.text}</p>}
       {card.href && (

@@ -191,3 +191,9 @@ export async function renderCrop(
     decoded.close()
   }
 }
+
+/** The edited copy as a file for upload: WebP (JPEG where the browser could not write WebP), named after the original. */
+export function editedFile(blob: Blob, originalName: string): File {
+  const base = originalName.replace(/\.[^.]+$/, '') || 'photo'
+  return new File([blob], `${base}.${blob.type === 'image/jpeg' ? 'jpg' : 'webp'}`, { type: blob.type })
+}

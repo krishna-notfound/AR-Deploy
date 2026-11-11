@@ -1,4 +1,6 @@
-# 12 · Super Admin screens + demo entry
+
+### Website Editor pictures, logo and profile photo (ADR-0063, IC-2)
+Every picture uploaded in the Website Editor (hero, collection cards, own picture + text and banner sections, the QR section, the About photographs) goes through the crop dialog first (`UploadButton` with a `frame` from `src/lib/imageFrames.ts`), uploads the original and the edited WebP copy to `site-content`, and keeps `path`, `originalPath` and `crop` in the document. **Edit picture** (`EditPictureButton`) reopens the original with its crop (an older picture: the file shown) and uploads a new copy; Remove still works. The About block has a third slot (**Third picture**, 1:1, with alt texts EN and PT; Remove brings the caption back). The 3D model files and the favicon keep their plain upload. The company logo (`LogoUpload`, up to 1024 px) and the profile photo (512 px, smaller if it would pass 512 KB) use the same dialog at 1:1 on upload only: no original is kept and there is no re-edit; the automatic `squareResize` was removed. Shared stand-in for tests: `src/test/cropDialogStub.tsx`.# 12 · Super Admin screens + demo entry
 Read when: building `/` or any `/admin/*` page. For the shared editor, see [15-product-editor.md](15-product-editor.md). For analytics, see [16-analytics.md](16-analytics.md).
 
 ## Demo entry `/`

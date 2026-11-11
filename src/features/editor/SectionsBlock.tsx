@@ -9,6 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FormField, Input, Textarea } from '@/components/ui/Form'
 import {
   type ContentErrors,
+  type LandingAbout,
   type LandingSection,
   MAX_IMAGE_ALT,
   MAX_LANDING_SECTIONS,
@@ -22,13 +23,16 @@ import {
   type OwnSection,
   type OwnSectionKind,
   QR_SIDES,
+  type SiteAsset,
   type SiteImage,
 } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { type ImageFrameKey, imageFrame } from '@/lib/imageFrames'
 import { slugInput } from '@/lib/slug'
 import { siteAssetUrl } from '@/services'
+import { EditPictureButton } from './EditPictureButton'
 import { useEditor } from './EditorContext'
 import { UploadButton } from './UploadButton'
 import {
@@ -234,12 +238,14 @@ function LangFields({
   )
 }
 
-/** A picture with its preview, Upload / Replace / Remove and the description in both languages. */
+/** A picture with its preview in its frame, Upload / Edit picture / Remove and the description in both languages. */
 function PictureField({
   legend,
+  frame,
   image,
   builtinPreview,
   builtinNote,
+  emptyText,
   removeLabel,
   error,
   altErrorEn,
@@ -250,14 +256,18 @@ function PictureField({
   help,
 }: {
   legend: string
+  /** The picture's frame (src/lib/imageFrames.ts): the crop dialog's shape and the preview's. */
+  frame: ImageFrameKey
   image: SiteImage | undefined
   builtinPreview?: string
   builtinNote?: string
+  /** What the empty preview says when there is no built-in picture and the picture is optional. */
+  emptyText?: string
   removeLabel: string
   error?: string
   altErrorEn?: string
   altErrorPt?: string
-  onUploaded: (asset: { path: string }) => void
+  onUploaded: (asset: SiteAsset) => void
   onRemove: () => void
   onAlt: (lang: Lang, text: string) => void
   help?: ReactNode
@@ -266,33 +276,37 @@ function PictureField({
   const has = !!image?.path
   const url = has ? siteAssetUrl({ path: image!.path }) : ''
   const sessionOnly = has && !url
+  const shape = imageFrame(frame)
   return (
     <fieldset className="min-w-0">
       <legend className="text-ui-small font-medium text-ink">{legend}</legend>
       <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
         <div className="min-w-0">
-          <div className="grid aspect-[4/3] w-full place-items-center overflow-hidden border border-line bg-subtle">
+          <div className={cn('grid w-full place-items-center overflow-hidden border border-line bg-subtle', shape.aspectClass)}>
             {sessionOnly ? (
               <span className="flex flex-col items-center gap-2 px-4 text-center text-ui-small text-ink-muted">
                 <ImageIcon className="size-5" aria-hidden />
                 {t('editor.showcase.sessionOnly')}
               </span>
             ) : url || builtinPreview ? (
-              <img src={url || builtinPreview} alt={t('editor.sections.pictureCurrent')} className="size-full object-contain" />
+              <img src={url || builtinPreview} alt={t('editor.sections.pictureCurrent')} className={cn('size-full', shape.fitClass)} />
             ) : (
-              <span className="px-4 text-center text-ui-small text-ink-muted">{t('editor.sections.pictureNone')}</span>
+              <span className="px-4 text-center text-ui-small text-ink-muted">{emptyText ?? t('editor.sections.pictureNone')}</span>
             )}
           </div>
           {!has && builtinNote && <p className="mt-2 text-ui-small text-ink-muted">{builtinNote}</p>}
           <div className="mt-3 flex flex-wrap items-start gap-2">
-            <UploadButton kind="image" label={t(has ? 'editor.showcase.replacePicture' : 'editor.showcase.uploadPicture')} onUploaded={onUploaded} />
+            <UploadButton kind="image" frame={frame} label={t(has ? 'editor.showcase.replacePicture' : 'editor.showcase.uploadPicture')} onUploaded={onUploaded} />
+            {has && !sessionOnly && <EditPictureButton image={image!} frame={frame} label={t('editor.crop.editFor', { name: legend })} onEdited={onUploaded} />}
             {has && (
               <Button size="sm" aria-label={removeLabel} onClick={onRemove}>
                 {t('editor.showcase.remove')}
               </Button>
             )}
           </div>
-          <p className="mt-1 text-ui-small text-ink-muted">{t('editor.showcase.pictureHint')}</p>
+          <p className="mt-1 text-ui-small text-ink-muted">
+            {t('editor.showcase.pictureHint')} {t('editor.crop.hint')}
+          </p>
           {error && (
             <p role="alert" className="mt-2 text-ui-small text-danger">
               {error}
@@ -358,6 +372,7 @@ function OwnEditor({ section, index }: { section: OwnSection; index: number }) {
       {section.kind !== 'text' && (
         <PictureField
           legend={t('editor.sections.picture')}
+          frame={section.kind === 'banner' ? 'banner' : 'imageText'}
           image={section.image.path ? section.image : undefined}
           removeLabel={`${t('editor.showcase.remove')}: ${t('editor.sections.picture')}`}
           error={err('image')}
@@ -422,6 +437,7 @@ function QrPanel() {
       <p className="max-w-xl text-ui-small text-ink-muted">{t('editor.sections.textsNote')}</p>
       <PictureField
         legend={t('editor.sections.picture')}
+        frame="qr"
         image={qr?.image}
         builtinNote={t('editor.sections.qr.noPicture')}
         removeLabel={`${t('editor.showcase.remove')}: ${t('editor.sections.qr.title')}`}
@@ -459,6 +475,7 @@ function QrPanel() {
 
 // ---- About pictures ---------------------------------------------------------------------------------------------------
 const ABOUT_BUILTIN = { image: '/images/sanctus/v2/coffee-table.webp', detail: '/images/sanctus/v2/detail-joinery.webp' } as const
+const ABOUT_FRAME = { image: 'aboutMain', detail: 'aboutDetail', third: 'aboutThird' } as const satisfies Record<keyof LandingAbout, ImageFrameKey>
 
 function AboutPanel() {
   const { t } = useI18n()
@@ -469,14 +486,14 @@ function AboutPanel() {
     <>
       <p className="max-w-xl text-ui-small text-ink-muted">{t('editor.sections.about.help')}</p>
       <p className="max-w-xl text-ui-small text-ink-muted">{t('editor.sections.textsNote')}</p>
-      {(['image', 'detail'] as const).map((which) => (
+      {(['image', 'detail', 'third'] as const).map((which) => (
         <PictureField
           key={which}
           legend={t(key(`editor.sections.about.${which}`))}
+          frame={ABOUT_FRAME[which]}
           image={about?.[which]}
-          builtinPreview={ABOUT_BUILTIN[which]}
-          builtinNote={t('editor.sections.about.builtin')}
-          removeLabel={`${t('editor.sections.about.reset')}: ${t(key(`editor.sections.about.${which}`))}`}
+          {...(which === 'third' ? { emptyText: t('editor.sections.about.thirdNone') } : { builtinPreview: ABOUT_BUILTIN[which], builtinNote: t('editor.sections.about.builtin') })}
+          removeLabel={which === 'third' ? t('editor.sections.about.thirdRemove') : `${t('editor.sections.about.reset')}: ${t(key(`editor.sections.about.${which}`))}`}
           error={err(which)}
           altErrorEn={err(`${which}.alt.en`)}
           altErrorPt={err(`${which}.alt.pt`)}
