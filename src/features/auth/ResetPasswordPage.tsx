@@ -337,7 +337,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout page="resetPassword">
       {step === 'checking' ? (
         <p className="text-sm text-ink-muted" role="status">
           {t('reset.checking')}

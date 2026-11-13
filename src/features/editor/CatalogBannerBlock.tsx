@@ -1,10 +1,13 @@
 // The Site tab's "Catalogue banner" panel (ADR-0065): the platform's default picture at the top of every catalogue whose company has
 // not set its own. Upload, Edit picture and Remove go through the same buttons as the other website pictures (cropped to 2:1 on upload,
-// original kept); it is part of the draft and goes live with Publish.
+// original kept); it is part of the draft and goes live with Publish. Below it, the heading above every catalogue's pieces (ADR-0067).
 import { ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { FormField, Input } from '@/components/ui/Form'
+import { MAX_CATALOG_HEADING } from '@/domain/siteContent'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { translate } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
 import { imageFrame } from '@/lib/imageFrames'
 import { siteAssetUrl } from '@/services'
@@ -12,7 +15,7 @@ import { CATALOG_PHOTO } from '../public/catalogBanner'
 import { EditPictureButton } from './EditPictureButton'
 import { useEditor } from './EditorContext'
 import { UploadButton } from './UploadButton'
-import { setCatalogBanner } from './siteOps'
+import { setCatalogBanner, setCatalogHeading } from './siteOps'
 
 const shape = imageFrame('catalogBanner')
 
@@ -74,6 +77,40 @@ export function CatalogBannerBlock() {
           )}
         </div>
       </div>
+
+      <CatalogHeadingFields />
     </section>
+  )
+}
+
+/** The heading above a catalogue's pieces (ADR-0067), in English and Portuguese; an empty box keeps the original, shown in grey inside it. */
+function CatalogHeadingFields() {
+  const { t } = useI18n()
+  const { draft, setDraft, errors } = useEditor()
+  const value = draft.chrome?.catalogHeading ?? {}
+  const name = t('editor.site.heading.title')
+  return (
+    <div className="mt-6 border-t border-line pt-5">
+      <h4 className="text-ui-body font-medium text-ink">{name}</h4>
+      <p className="mt-1 max-w-xl text-ui-small text-ink-muted">{t('editor.site.heading.help')}</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {(['en', 'pt'] as const).map((l) => {
+          const code = errors[`chrome.catalogHeading.${l}`]
+          const langName = t(`editor.lang.${l}`)
+          return (
+            <FormField key={l} label={langName} error={code ? t(`editor.err.${code}` as TranslationKey) : undefined} hint={t('editor.landing.texts.limit', { max: MAX_CATALOG_HEADING })}>
+              <Input
+                lang={l}
+                aria-label={`${name} (${langName})`}
+                value={value[l] ?? ''}
+                placeholder={translate(l, 'catalog.heading')}
+                maxLength={MAX_CATALOG_HEADING}
+                onChange={(e) => setDraft((d) => setCatalogHeading(d, l, e.target.value))}
+              />
+            </FormField>
+          )
+        })}
+      </div>
+    </div>
   )
 }

@@ -222,10 +222,6 @@ function pathModeRoutes(): RouteObject[] {
         {
           element: <Standalone />,
           children: [
-            // The demo account picker exists only in demo mode; on the live site /demo goes to the sign-in page.
-            { path: '/demo', element: isDemoMode ? <DemoEntryPage /> : <ToLogin /> },
-            { path: '/login', element: <LoginPage /> },
-            { path: JOIN_PATH, element: <JoinPage /> },
             ...settingsRoutes,
             editorPreviewRoute,
           ],
@@ -236,6 +232,11 @@ function pathModeRoutes(): RouteObject[] {
           element: <PublicLayout />,
           children: [
             { path: '/', element: <LandingPage /> },
+            // The sign-in pages read their panel from the published site content (ADR-0067), so they share this provider too.
+            // The demo account picker exists only in demo mode; on the live site /demo goes to the sign-in page.
+            { path: '/demo', element: isDemoMode ? <DemoEntryPage /> : <ToLogin /> },
+            { path: '/login', element: <LoginPage /> },
+            { path: JOIN_PATH, element: <JoinPage /> },
             { path: '/apply', element: <ApplyPage /> },
             { path: PRIVACY_PATH, element: <LegalPage doc="privacy" /> },
             { path: TERMS_PATH, element: <LegalPage doc="terms" /> },

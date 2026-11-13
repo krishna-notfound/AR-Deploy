@@ -2,11 +2,12 @@ import { Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { ImageCropDialog } from '@/components/image/ImageCropDialog'
 import { Button } from '@/components/ui/Button'
-import type { SiteAsset, SiteAssetKind } from '@/domain/siteContent'
+import { SITE_ASSET_MAX_BYTES, type SiteAsset, type SiteAssetKind } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { formatMb } from '@/lib/files'
 import { editedFile } from '@/lib/imageCrop'
 import { type ImageFrameKey, imageFrame } from '@/lib/imageFrames'
-import { checkSiteAssetFile, content } from '@/services'
+import { content, siteAssetProblem } from '@/services'
 
 const ACCEPT: Record<SiteAssetKind, string> = { image: 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', glb: '.glb,model/gltf-binary', usdz: '.usdz', favicon: 'image/png,.png' }
 
@@ -42,8 +43,15 @@ export function UploadButton({
   const pick = async (file: File | undefined) => {
     if (input.current) input.current.value = ''
     if (!file) return
-    setBusy(true)
     setError(null)
+    // The type and size are checked here first, so the reason is said in the person's language (the service checks again).
+    const problem = siteAssetProblem(file, kind)
+    if (problem) {
+      const rule = t(`editor.upload.rule.${kind}`, { max: formatMb(SITE_ASSET_MAX_BYTES[kind]) })
+      setError(problem === 'type' ? rule : t(problem === 'size' ? 'editor.upload.tooLarge' : 'editor.upload.empty', { name: file.name, size: formatMb(file.size), rule }))
+      return
+    }
+    setBusy(true)
     const refusal = precheck ? await precheck(file) : null
     if (refusal) {
       setBusy(false)
@@ -51,10 +59,8 @@ export function UploadButton({
       return
     }
     if (cropped) {
-      const bad = checkSiteAssetFile(file, kind)
       setBusy(false)
-      if (bad && !bad.ok) setError(bad.error.message)
-      else setPending(file)
+      setPending(file)
       return
     }
     const r = await content.uploadSiteAsset(file, kind)

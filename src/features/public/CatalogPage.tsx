@@ -163,7 +163,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
       </section>
 
       <div className="mx-auto max-w-[1320px] px-5 pt-12 pb-6 sm:px-10 sm:pt-16 sm:pb-8">
-        <h2 className="text-headline">{t('catalog.heading')}</h2>
+        {/* The Website Editor's heading in this language, else the built-in one (ADR-0067); kept invisible while the site content
+            loads so the built-in wording does not flash. */}
+        <h2 className={cn('text-headline [overflow-wrap:anywhere]', site.loading && 'invisible')}>{site.chrome?.catalogHeading?.[lang]?.trim() || t('catalog.heading')}</h2>
       </div>
 
       {/* Solid filter bar (no blur), hairline top and bottom. */}

@@ -3,42 +3,46 @@ import type { ReactNode, Ref } from 'react'
 import { Link } from 'react-router'
 import { Wordmark } from '@/components/ui/BrandMark'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
+import type { SignInPage, SignInTextKey } from '@/domain/siteContent'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { useSiteContent } from '../marketing/SiteContentProvider'
 import { TAP_TARGET } from '../public/tapTarget'
+import { chooseSignInPicture, signInText } from './signInPanel'
 
 const YEAR = new Date().getFullYear()
-
-/** The sign-in pages' photographs (owner-generated, public/images/sanctus/v2). */
-export const AUTH_PHOTOS = {
-  villa: { src: '/images/sanctus/v2/interior-villa.webp', position: '40% 50%' },
-  sofa: { src: '/images/sanctus/v2/sofa-travertine.webp', position: '50% 60%' },
-  lounge: { src: '/images/sanctus/v2/lounge-chair.webp', position: '50% 50%' },
-} as const
 
 /**
  * Split layout of the sign-in style pages (Stitch 10 and 17): a photograph with the brand statement on the left, the
  * form on the right. On phones the photograph becomes a short band above the form. `wide` gives the form more room
  * (application wizard, demo picker) and keeps the photograph in view while the form scrolls.
+ *
+ * The panel comes from the Website Editor (ADR-0067): one text set shared by every page (a text without a value in the current
+ * language is the dictionary's) and `page`'s own picture (else its built-in photograph). The published content is read through
+ * the site content provider of the route; the form never waits for it, and a failed read shows the built-in panel.
  */
 export function AuthLayout({
-  photo = 'villa',
+  page,
   wide = false,
   footer,
   children,
 }: {
-  photo?: keyof typeof AUTH_PHOTOS
+  /** Which sign-in page this is: chooses its picture. */
+  page: SignInPage
   wide?: boolean
   /** Extra small print under the rights line (credits, demo notes). */
   footer?: ReactNode
   children: ReactNode
 }) {
-  const { t } = useI18n()
-  const image = AUTH_PHOTOS[photo]
+  const { t, lang } = useI18n()
+  const site = useSiteContent()
+  const panel = site.chrome?.signIn
+  const image = chooseSignInPicture(page, { loading: site.loading, pictures: panel?.pictures })
+  const text = (key: SignInTextKey) => signInText(panel?.texts, key, lang) ?? t(`auth.panel.${key}`)
   return (
     <div className={cn('min-h-dvh bg-surface text-ink lg:grid', wide ? 'lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : 'lg:grid-cols-2')}>
       <aside className="relative isolate h-32 overflow-hidden bg-obsidian text-chalk sm:h-40 lg:sticky lg:top-0 lg:h-dvh lg:self-start">
-        <img src={image.src} alt="" className="absolute inset-0 -z-10 size-full object-cover" style={{ objectPosition: image.position }} />
+        {image && <img src={image.src} alt="" data-panel-picture={image.source} className="absolute inset-0 -z-10 size-full object-cover" style={{ objectPosition: image.position }} />}
         {/* A plain dark overlay so the white text stays legible on every part of the photograph. */}
         <div className="absolute inset-0 -z-10 bg-obsidian/45 lg:bg-obsidian/40" aria-hidden />
         <div className="absolute inset-x-0 bottom-0 -z-10 hidden h-2/3 bg-linear-to-t from-obsidian/80 to-transparent lg:block" aria-hidden />
@@ -48,18 +52,19 @@ export function AuthLayout({
               <Wordmark size={16} />
             </Link>
           </div>
-          <div className="mt-auto hidden max-w-md lg:block">
+          {/* While the published panel loads, its texts keep their place but stay invisible, so the built-in wording does not flash. */}
+          <div className={cn('mt-auto hidden max-w-md lg:block', site.loading && 'invisible')}>
             <p className="flex items-center gap-4 text-eyebrow text-chalk/80">
               <span className="h-px w-8 bg-chalk/50" aria-hidden />
-              {t('auth.panel.eyebrow')}
+              <span className="min-w-0 [overflow-wrap:anywhere]">{text('eyebrow')}</span>
             </p>
-            <p className="mt-6 font-display text-[3.25rem] leading-[1.04] font-light text-chalk">{t('auth.panel.title')}</p>
-            <p className="mt-5 max-w-sm text-[15px] leading-7 text-chalk/80">{t('auth.panel.body')}</p>
+            <p className="mt-6 font-display text-[3.25rem] leading-[1.04] font-light [overflow-wrap:anywhere] text-chalk">{text('title')}</p>
+            <p className="mt-5 max-w-sm text-[15px] leading-7 [overflow-wrap:anywhere] text-chalk/80">{text('body')}</p>
           </div>
-          <div className="mt-16 hidden items-center justify-between gap-6 border-t border-chalk/20 pt-6 text-label text-chalk/70 lg:flex">
-            <span>{t('auth.panel.tag1')}</span>
-            <span className="size-1 rounded-full bg-chalk/50" aria-hidden />
-            <span>{t('auth.panel.tag2')}</span>
+          <div className={cn('mt-16 hidden items-center justify-between gap-6 border-t border-chalk/20 pt-6 text-label text-chalk/70 lg:flex', site.loading && 'invisible')}>
+            <span className="min-w-0 [overflow-wrap:anywhere]">{text('tag1')}</span>
+            <span className="size-1 shrink-0 rounded-full bg-chalk/50" aria-hidden />
+            <span className="min-w-0 text-right [overflow-wrap:anywhere]">{text('tag2')}</span>
           </div>
         </div>
       </aside>

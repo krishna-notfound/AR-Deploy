@@ -22,6 +22,8 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
   const texts = content.landing?.texts
   const favicon = content.chrome?.favicon
   const catalogBanner = content.chrome?.catalogBanner
+  const signIn = content.chrome?.signIn
+  const catalogHeading = content.chrome?.catalogHeading
   return {
     version,
     footerPages,
@@ -37,6 +39,8 @@ export function chromeOf(content: SiteContent | null, version: number): Publishe
     ...(content.landing?.about ? { landingAbout: clone(content.landing.about) } : {}),
     ...(favicon ? { favicon: clone(favicon) } : {}),
     ...(catalogBanner ? { catalogBanner: clone(catalogBanner) } : {}),
+    ...(signIn ? { signIn: clone(signIn) } : {}),
+    ...(catalogHeading ? { catalogHeading: clone(catalogHeading) } : {}),
   }
 }
 

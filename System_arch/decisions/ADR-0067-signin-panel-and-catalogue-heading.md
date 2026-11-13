@@ -1,0 +1,28 @@
+# ADR-0067: Sign-in panel and catalogue heading in the Website Editor, 25 MB pictures
+- **Status:** Accepted
+- **Date:** 2026-11-13
+- **Affects:** design/12-features-admin.md, design/14-features-public.md, design/19-supabase.md; extends ADR-0043 (Website Editor), ADR-0063 (crop on upload) and ADR-0065 (catalogue banner)
+
+## Context
+The client (2026-11-13) cannot change the left half of the sign-in and application pages (the photograph and the "Mobiliário, além do comum." statement) or the "The pieces" / "As peças" heading of every catalogue, and phone photos over 5 MB are refused by Website Editor uploads. The owner decided (2026-11-13, `docs/DECISIONS.md`): A. one shared EN/PT text set for the sign-in panel and a picture per sign-in page, B. the catalogue heading as an EN/PT field next to the catalogue banner, C. Website Editor pictures up to 25 MB.
+
+## Decision
+- **A. Sign-in panel.** `chrome.signIn` in the site-content document: `texts` (eyebrow 60, title 120, body 400, tag1 40, tag2 40 characters; each `{en?, pt?}`, shared by every sign-in page) and `pictures` (one per page: `login`, `apply`, `join`, `resetPassword`, `acceptInvite`, `demo`; an uploaded site-content image `{path, originalPath?, crop?}`, decorative, no description). An empty text is the built-in `auth.panel.*` text of that language; a page without its own picture shows the photograph it had before (villa for sign-in, reset and owner invitation, sofa for the application, lounge chair for the team invitation and the demo page). `AuthLayout` takes a `page` prop and reads the published chrome through `useSiteContent()`; `/login`, `/demo` and the team join page moved under the public layout so they share its `SiteContentProvider` (`/apply`, `/reset-password` and `/accept-invite` were already there). Pure choices in `src/features/auth/signInPanel.ts` (`chooseSignInPicture`, `signInText`, `SIGN_IN_PHOTOS`).
+- **Loading:** the form never waits for the site content. While the published chrome loads, the panel is plain dark and its texts keep their place but are invisible, so neither the built-in photograph nor the built-in wording flashes before the chosen one (the rule ADR-0065 set for the catalogue banner). A failed read shows the built-in panel.
+- **Picture frame:** `signInPanel` in `src/lib/imageFrames.ts`, `cover(4 / 5)`. Boxes (demo mode, 2026-11-13): on a computer the panel is a full-height column, measured 600 x 900 (2:3) at 1440 x 900 beside the wide forms (application, demo) and half the width (720 x 900, about 4:5) beside the narrow ones (sign-in, reset, invitations; `lg:grid-cols-2`); on a phone it is a band, measured 390 x 128. The picture covers the panel, so its edges are trimmed where the box differs and a phone shows its middle; the Editor says so.
+- **B. Catalogue heading.** `chrome.catalogHeading` `{en?, pt?}`, 80 characters, platform-wide (not per company), edited under the catalogue banner in the Site tab's "Catalogue banner" panel. The catalogue shows the text of the current language, else `catalog.heading`; invisible while the site content loads.
+- **Editor:** the Site tab gains a "Sign-in pages panel" block (five texts in EN and PT with the original as the placeholder; six page cards with Upload, Edit picture and Remove through `UploadButton` / `EditPictureButton`) and the heading fields in the banner panel. Pure edits `setSignInText`, `setSignInPicture`, `setCatalogHeading` (`siteOps.ts`); both are counted in the publish summary and a problem links back to the Site tab.
+- **C. 25 MB.** `SITE_ASSET_MAX_BYTES.image` goes from 5 MB to 25 MB (all Website Editor pictures; 3D files, the favicon, product photos `IMAGE_RULES`, logos and company banners keep their limits). `UploadButton` now checks type and size itself and says why in EN or PT (`editor.upload.*`). The bucket `site-content` already takes 40 MB (for .usdz files), so the migration only raises it if a project has it under 25 MB, and never lowers it.
+- **Database:** migration `20261113084852_website_editor_signin_panel_heading.sql` redefines `private.validate_site_content` and `public.get_published_site_content` from their latest bodies (`catalogue_banner`) with the new checks and the two new `chrome` keys; same signatures and grants. Rollback `supabase/rollback/20261113_website_editor_signin_panel_heading_rollback.sql`; PGlite tests `supabase/tests/signInPanelHeading.test.ts`. Not applied (ADR-0042: owner's go-ahead).
+
+## Consequences
+- Good: the client edits the whole sign-in panel and the catalogue heading in the same draft, preview and Publish flow as the rest of the site; empty fields keep today's wording, so nothing changes until they publish.
+- Good: phone photos up to 25 MB can be uploaded; the crop dialog still stores a WebP copy of at most 2000 px for the page.
+- Trade-off: one text set for every sign-in page (owner's choice), so the texts cannot differ per page; on a phone only the picture shows (the texts were already hidden there).
+- Trade-off: a 25 MB original is stored as it is next to the edited copy (bucket storage grows; the page loads only the copy).
+- Trade-off: the sign-in pages now make the same small published-chrome request as the public pages.
+
+## Alternatives rejected
+- Reusing `landing.texts` (dictionary-key overrides) for the panel texts: they are not landing-page wording, and the SQL key list (`private.landing_text_limits`) would mix two pages.
+- Showing the built-in panel while the content loads: the built-in photograph and slogan would flash before the client's own on every visit.
+- Lowering the site-content bucket to 25 MB: it would refuse .usdz files up to 40 MB.

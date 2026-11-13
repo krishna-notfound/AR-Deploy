@@ -53,7 +53,7 @@ export default function LoginPage() {
   }
   if (codeStep) {
     return (
-      <AuthLayout>
+      <AuthLayout page="login">
         <AuthHeading eyebrow={t('auth.login.eyebrow')} title={t('auth.twoFactor.title')}>
           <p>{t('auth.twoFactor.intro')}</p>
         </AuthHeading>
@@ -96,7 +96,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout page="login">
       <AuthHeading eyebrow={t('auth.login.eyebrow')} title={t('auth.login.title')}>
         <p>{t('auth.login.intro')}</p>
       </AuthHeading>

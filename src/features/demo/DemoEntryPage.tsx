@@ -10,7 +10,7 @@ export default function DemoEntryPage() {
   useDocumentTitle(t('demo.title'))
   return (
     <AuthLayout
-      photo="lounge"
+      page="demo"
       wide
       footer={
         <>

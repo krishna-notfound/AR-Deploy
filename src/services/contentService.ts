@@ -20,6 +20,8 @@ import type {
   SiteAsset,
   SiteAssetKind,
   SiteContent,
+  SignInPanel,
+  TextPair,
 } from '@/domain/siteContent'
 import type { Result } from './catalogService'
 
@@ -51,6 +53,10 @@ export interface PublishedChrome {
   favicon?: SiteAsset
   /** The default picture at the top of a catalogue whose company has no banner of its own (ADR-0065); absent when none is published. */
   catalogBanner?: SiteAsset
+  /** The sign-in pages' panel: shared texts and each page's picture (ADR-0067); absent when none is published. */
+  signIn?: SignInPanel
+  /** The heading above a catalogue's pieces, per language (ADR-0067); absent when none is published. */
+  catalogHeading?: TextPair
 }
 export type PublishedPage =
   | { kind: 'builtin'; body: Partial<Record<Lang, string>> } // terms | privacy overrides
@@ -94,7 +100,7 @@ export interface ContentService {
   /** Copies that version into the draft; does not publish. */
   restoreContentVersion(version: number, baseUpdatedAt: ISODate): Promise<Result<{ draftUpdatedAt: ISODate }>>
   /**
-   * Uploads a picture (jpg, png, webp, 5 MB) or a 3D model (.glb 30 MB, .usdz 40 MB) for the landing page. Checks type and size
+   * Uploads a picture (jpg, png, webp, 25 MB, ADR-0067) or a 3D model (.glb 30 MB, .usdz 40 MB) for the landing page. Checks type and size
    * first (VALIDATION). Supabase: bucket `site-content`, path `landing/<uuid>.<ext>`. Demo: the file only lives in this browser
    * session (an object URL), so it is gone after a reload.
    */

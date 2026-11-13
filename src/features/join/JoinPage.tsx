@@ -57,7 +57,7 @@ export default function JoinPage() {
   }, [])
 
   return (
-    <AuthLayout photo="lounge">
+    <AuthLayout page="join">
       {state.kind === 'checking' ? (
         <p className="text-sm text-ink-muted" role="status">
           {t('join.checking')}

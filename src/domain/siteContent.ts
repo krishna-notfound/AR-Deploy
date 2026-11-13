@@ -79,7 +79,7 @@ export const SITE_ASSET_BUCKET = 'site-content'
 export const SITE_ASSET_PATH = /^landing\/[a-z0-9-]+\.(webp|jpg|jpeg|png|glb|usdz)$/
 export const SITE_ASSET_EXTENSIONS: Record<SiteAssetKind, readonly string[]> = { image: ['webp', 'jpg', 'jpeg', 'png'], glb: ['glb'], usdz: ['usdz'], favicon: ['png'] }
 /** Upload limits in bytes; the bucket repeats them (migration site_content_assets). The favicon's 1 MB is held by the Editor only. */
-export const SITE_ASSET_MAX_BYTES: Record<SiteAssetKind, number> = { image: 5 * 1024 * 1024, glb: 30 * 1024 * 1024, usdz: 40 * 1024 * 1024, favicon: 1024 * 1024 }
+export const SITE_ASSET_MAX_BYTES: Record<SiteAssetKind, number> = { image: 25 * 1024 * 1024, glb: 30 * 1024 * 1024, usdz: 40 * 1024 * 1024, favicon: 1024 * 1024 }
 
 export const isSiteAsset = (v: unknown): v is SiteAsset => typeof v === 'object' && v !== null && !Array.isArray(v) && typeof (v as { path?: unknown }).path === 'string'
 /** The kind of file an asset path names (by extension), or null when it is not a valid asset path. */
@@ -312,6 +312,30 @@ export interface SiteChrome {
    * the others, ADR-0063). Decorative, so it has no description. Absent: the built-in Sanctus photograph.
    */
   catalogBanner?: SiteAsset
+  /** The sign-in pages' left panel (ADR-0067): one text set shared by every page, and each page's own picture. Absent: the built-in ones. */
+  signIn?: SignInPanel
+  /** The heading above a catalogue's pieces ("The pieces", ADR-0067), per language. A language without text uses the built-in heading. */
+  catalogHeading?: TextPair
+}
+
+/** A text in English and Portuguese. A language that is absent (or empty) uses the built-in text. */
+export type TextPair = { en?: string; pt?: string }
+
+/** The pages that use the sign-in layout (AuthLayout), each with its own picture (ADR-0067). */
+export const SIGN_IN_PAGES = ['login', 'apply', 'join', 'resetPassword', 'acceptInvite', 'demo'] as const
+export type SignInPage = (typeof SIGN_IN_PAGES)[number]
+/** The sign-in panel's texts and how long each may be, in characters. Same list and limits in the SQL gate (ADR-0067). */
+export const SIGN_IN_TEXT_LIMITS = { eyebrow: 60, title: 120, body: 400, tag1: 40, tag2: 40 } as const
+export type SignInTextKey = keyof typeof SIGN_IN_TEXT_LIMITS
+export const SIGN_IN_TEXT_KEYS = Object.keys(SIGN_IN_TEXT_LIMITS) as SignInTextKey[]
+/** The catalogue heading's limit, in characters (the SQL gate holds the same). */
+export const MAX_CATALOG_HEADING = 80
+
+export interface SignInPanel {
+  /** Overrides of the built-in panel texts (auth.panel.*), shared by every sign-in page. */
+  texts?: Partial<Record<SignInTextKey, TextPair>>
+  /** Each page's own picture (cropped on upload, decorative, so no description). A page without one shows its built-in photograph. */
+  pictures?: Partial<Record<SignInPage, SiteAsset>>
 }
 
 export const MAX_CUSTOM_PAGES = 20
@@ -382,8 +406,37 @@ export function normalizeSiteContent(input: unknown): SiteContent {
   if (about) out.landing.about = about
   const favicon = asset(obj(raw.chrome).favicon)
   const catalogBanner = picture(obj(raw.chrome).catalogBanner)
-  if (favicon || catalogBanner) out.chrome = { ...(favicon ? { favicon } : {}), ...(catalogBanner ? { catalogBanner } : {}) }
+  const signIn = normalizeSignIn(obj(raw.chrome).signIn)
+  const catalogHeading = textPair(obj(raw.chrome).catalogHeading)
+  if (favicon || catalogBanner || signIn || catalogHeading)
+    out.chrome = { ...(favicon ? { favicon } : {}), ...(catalogBanner ? { catalogBanner } : {}), ...(signIn ? { signIn } : {}), ...(catalogHeading ? { catalogHeading } : {}) }
   return out
+}
+
+/** The languages that have text; undefined when none has. */
+function textPair(v: unknown): TextPair | undefined {
+  const o = obj(v)
+  const out: TextPair = {}
+  if (typeof o.en === 'string' && o.en) out.en = o.en
+  if (typeof o.pt === 'string' && o.pt) out.pt = o.pt
+  return out.en !== undefined || out.pt !== undefined ? out : undefined
+}
+
+/** The known texts that have text and the pictures of known pages; undefined when nothing is left. */
+function normalizeSignIn(v: unknown): SignInPanel | undefined {
+  const raw = obj(v)
+  const texts: NonNullable<SignInPanel['texts']> = {}
+  for (const key of SIGN_IN_TEXT_KEYS) {
+    const pair = textPair(obj(raw.texts)[key])
+    if (pair) texts[key] = pair
+  }
+  const pictures: NonNullable<SignInPanel['pictures']> = {}
+  for (const page of SIGN_IN_PAGES) {
+    const pic = picture(obj(raw.pictures)[page])
+    if (pic) pictures[page] = pic
+  }
+  const out: SignInPanel = { ...(Object.keys(texts).length ? { texts } : {}), ...(Object.keys(pictures).length ? { pictures } : {}) }
+  return Object.keys(out).length ? out : undefined
 }
 
 /** Keeps the entries that have text in at least one language; undefined when none are left. Unknown keys are kept (validateSiteContent refuses them). */
@@ -746,7 +799,47 @@ export function validateSiteContent(doc: SiteContent): ContentErrors {
     if (!isSiteAsset(f) || !isFaviconPath(f.path)) put('chrome.favicon', 'invalid_value')
   }
   if (doc.chrome?.catalogBanner !== undefined) validateAsset(doc.chrome.catalogBanner, 'image', 'chrome.catalogBanner', put)
+  if (doc.chrome?.signIn !== undefined) validateSignIn(doc.chrome.signIn, put)
+  if (doc.chrome?.catalogHeading !== undefined) checkTextPair(doc.chrome.catalogHeading, 'chrome.catalogHeading', MAX_CATALOG_HEADING, put)
   return e
+}
+
+/** A text pair whose keys may only be `en` and `pt` (an empty text is allowed: it means the built-in one). Paths: `<path>[.<lang>]`. */
+function checkTextPair(v: unknown, path: string, max: number, put: Put): void {
+  if (!isRecord(v)) return put(path, 'invalid_value')
+  for (const [l, t] of Object.entries(v)) {
+    if (l !== 'en' && l !== 'pt') put(`${path}.${l}`, 'unknown_key')
+    else if (typeof t !== 'string') put(`${path}.${l}`, 'invalid_value')
+    else if (t.length > max) put(`${path}.${l}`, 'too_long')
+  }
+}
+
+/** chrome.signIn (ADR-0067): only `texts` (known keys, each a text pair within its limit) and `pictures` (known pages, uploaded images). */
+function validateSignIn(v: unknown, put: Put): void {
+  const p = 'chrome.signIn'
+  if (!isRecord(v)) return put(p, 'invalid_value')
+  for (const [k, part] of Object.entries(v)) {
+    if (k === 'texts') {
+      if (!isRecord(part)) {
+        put(`${p}.texts`, 'invalid_value')
+        continue
+      }
+      for (const [key, pair] of Object.entries(part)) {
+        if (!Object.hasOwn(SIGN_IN_TEXT_LIMITS, key)) put(`${p}.texts.${key}`, 'unknown_key')
+        else checkTextPair(pair, `${p}.texts.${key}`, SIGN_IN_TEXT_LIMITS[key as SignInTextKey], put)
+      }
+    } else if (k === 'pictures') {
+      if (!isRecord(part)) {
+        put(`${p}.pictures`, 'invalid_value')
+        continue
+      }
+      for (const [page, pic] of Object.entries(part)) {
+        if (!(SIGN_IN_PAGES as readonly string[]).includes(page)) put(`${p}.pictures.${page}`, 'unknown_key')
+        else if (!isRecord(pic)) put(`${p}.pictures.${page}`, 'invalid_value')
+        else validateAsset(pic as unknown as SiteAsset, 'image', `${p}.pictures.${page}`, put)
+      }
+    } else put(`${p}.${k}`, 'unknown_key')
+  }
 }
 
 /** landing.texts: only keys of LANDING_EDITABLE_KEYS, each language a string within the key's limit. Paths: `landing.texts.<key>[.en|.pt]`. */
@@ -1002,6 +1095,10 @@ export interface ChangeSummary {
   siteFavicon: number
   /** The default catalogue banner (ADR-0065): 1 when it was set, replaced, edited or removed. */
   catalogBanner: number
+  /** The sign-in panel (ADR-0067): each text per language, plus each page's picture set, replaced, edited or removed. */
+  signInPanel: number
+  /** The catalogue heading (ADR-0067), per language. */
+  catalogHeading: number
   total: number
 }
 
@@ -1128,6 +1225,13 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
   const siteFavicon = same(a.chrome?.favicon, b.chrome?.favicon) ? 0 : 1
   const catalogBanner = same(a.chrome?.catalogBanner, b.chrome?.catalogBanner) ? 0 : 1
 
+  let signInPanel = 0
+  for (const key of SIGN_IN_TEXT_KEYS)
+    for (const l of ['en', 'pt'] as const) if ((a.chrome?.signIn?.texts?.[key]?.[l] ?? '') !== (b.chrome?.signIn?.texts?.[key]?.[l] ?? '')) signInPanel++
+  for (const page of SIGN_IN_PAGES) if (!same(a.chrome?.signIn?.pictures?.[page], b.chrome?.signIn?.pictures?.[page])) signInPanel++
+  let catalogHeading = 0
+  for (const l of ['en', 'pt'] as const) if ((a.chrome?.catalogHeading?.[l] ?? '') !== (b.chrome?.catalogHeading?.[l] ?? '')) catalogHeading++
+
   return {
     pages,
     footer,
@@ -1142,6 +1246,8 @@ export function summarizeChanges(before: SiteContent | null, after: SiteContent)
     landingSections,
     siteFavicon,
     catalogBanner,
-    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase + landingTexts + landingSections + siteFavicon + catalogBanner,
+    signInPanel,
+    catalogHeading,
+    total: pages + footer + applicationTexts + applicationSteps + applicationFields + questions + social + landingCollections + landingShowcase + landingTexts + landingSections + siteFavicon + catalogBanner + signInPanel + catalogHeading,
   }
 }

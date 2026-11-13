@@ -111,7 +111,7 @@ export function siteAssetUrl(asset: SiteAsset): string {
   return `${base}/storage/v1/object/public/${SITE_ASSET_BUCKET}/${asset.path}`
 }
 
-export { checkSiteAssetFile } from './siteAsset'
+export { checkSiteAssetFile, siteAssetProblem } from './siteAsset'
 export { backend, isDemoMode } from './backend'
 export type { AccountService, AssuranceLevels, NoticeOutcome, PasswordChange, ProfilePatch } from './accountService'
 export { DEMO_RESET_CODE, type PasswordResetService } from './passwordResetService'
