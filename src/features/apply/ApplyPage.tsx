@@ -46,7 +46,7 @@ export default function ApplyPage() {
   useDocumentTitle(tx.text('apply.title'))
 
   return (
-    <AuthLayout photo="sofa" wide footer={<LegalLinks social linkClassName="transition-colors hover:text-ink" />}>
+    <AuthLayout page="apply" wide footer={<LegalLinks social linkClassName="transition-colors hover:text-ink" />}>
       {!loaded ? (
         <FormSkeleton label={t('common.loading')} />
       ) : (

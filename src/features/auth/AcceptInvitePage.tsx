@@ -53,7 +53,7 @@ export default function AcceptInvitePage() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout page="acceptInvite">
       {step !== null && <StepIndicator label={t('invite.steps')} current={step} steps={[t('invite.step.code'), t('invite.step.password')]} className="mb-10" />}
       <AuthHeading eyebrow={t('invite.eyebrow')} title={t('invite.title')} />
       <div className="mt-6 space-y-6">{body}</div>

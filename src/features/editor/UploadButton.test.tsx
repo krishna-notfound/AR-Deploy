@@ -77,17 +77,38 @@ describe('UploadButton with a frame', () => {
     expect(onUploaded).not.toHaveBeenCalled()
   })
 
-  it('refuses a file that is not a picture, or is over 5 MB, before the dialog opens', async () => {
+  it('refuses a file that is not a picture, or is over 25 MB, before the dialog opens', async () => {
     const upload = vi.spyOn(content, 'uploadSiteAsset')
     const onUploaded = pictureButton()
     const input = screen.getByTestId('upload-image')
     await userEvent.upload(input, new File(['x'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false })
-    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a JPG, PNG or WebP picture up to 5 MB.')
-    await userEvent.upload(input, png('huge.png', 5 * 1024 * 1024 + 1))
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('too large'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a JPG, PNG or WebP picture up to 25 MB.')
+    await userEvent.upload(input, png('huge.png', 25 * 1024 * 1024 + 1))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('huge.png is too large (25 MB). Choose a JPG, PNG or WebP picture up to 25 MB.'))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(upload).not.toHaveBeenCalled()
     expect(onUploaded).not.toHaveBeenCalled()
+  })
+
+  it('takes a phone photo between 5 and 25 MB: the crop dialog opens', async () => {
+    pictureButton()
+    await userEvent.upload(screen.getByTestId('upload-image'), png('phone.png', 12 * 1024 * 1024))
+    expect(await screen.findByRole('dialog', { name: 'Adjust the picture' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('says why a file is refused in Portuguese too', async () => {
+    localStorage.setItem('arfurn:lang', 'pt')
+    render(
+      <LanguageProvider>
+        <UploadButton kind="image" frame="imageText" label="Carregar imagem" onUploaded={() => {}} />
+      </LanguageProvider>,
+    )
+    const input = screen.getByTestId('upload-image')
+    await userEvent.upload(input, new File(['x'], 'notas.txt', { type: 'text/plain' }), { applyAccept: false })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Escolha uma imagem JPG, PNG ou WebP até 25 MB.')
+    await userEvent.upload(input, png('enorme.png', 26 * 1024 * 1024))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('enorme.png é demasiado grande (26 MB). Escolha uma imagem JPG, PNG ou WebP até 25 MB.'))
   })
 
   it('when the original cannot be uploaded it says so, keeps nothing, and does not try the copy', async () => {

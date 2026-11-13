@@ -43,7 +43,7 @@ describe('content.uploadSiteAsset (demo)', () => {
     asAdmin()
     const bad = [
       await content.uploadSiteAsset(file('a.gif', 'image/gif'), 'image'),
-      await content.uploadSiteAsset(file('a.png', 'image/png', 5 * 1024 * 1024 + 1), 'image'),
+      await content.uploadSiteAsset(file('a.png', 'image/png', 25 * 1024 * 1024 + 1), 'image'),
       await content.uploadSiteAsset(file('a.glb', 'model/gltf-binary', 30 * 1024 * 1024 + 1), 'glb'),
       await content.uploadSiteAsset(file('a.glb', 'model/gltf-binary', 0), 'glb'),
       await content.uploadSiteAsset(file('a.png', 'image/png'), 'glb'),

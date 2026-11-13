@@ -40,7 +40,7 @@ Resend docs: "403 error using resend.dev domain".
 - The guard in `recipientAllowed()` blocks other recipients up front and logs them as `blocked`, instead of collecting provider 403s.
 - **Real owners and admins cannot receive email until a domain is verified.**
 - Free plan: 100 emails a day, 3,000 a month, 10 requests a second.
-- Supabase Auth's own emails (password reset, sign-up confirmation) still go through Supabase's built-in mailer. It only delivers to members of the client's Supabase organisation and is heavily rate-limited. They move to Resend SMTP once the domain is verified (below).
+- Supabase Auth's own emails (password reset, invitations, sign-in codes) go through Resend SMTP. **2026-11-13:** their sender is `no-reply@sanctus.warpkit.online` (owner's choice; before that it was `onboarding@resend.dev`, which only reached the Resend account owner, so forgot-password failed for everyone else). At handover it moves to the client's domain like `EMAIL_FROM` (below).
 
 ## Secrets and redirect URLs per environment
 | Secret (Edge Functions) | Development / Preview | Production |
