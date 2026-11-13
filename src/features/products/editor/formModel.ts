@@ -1,4 +1,4 @@
-import type { Business, Product, ProductModels } from '@/domain/types'
+import type { Business, Product, ProductModels, ProductVariant } from '@/domain/types'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { type Vars, translate } from '@/i18n/translate'
 import { minorToInput, parseMoneyInput } from '@/lib/format'
@@ -71,6 +71,15 @@ export function withStoredModels(form: EditorForm, stored: Product): EditorForm 
       }),
     },
   }
+}
+
+/**
+ * The form with a variant that was stored outside it (ADR-0068: "New variant" in the 3D model request form) appended, so
+ * the next save keeps it. Every other field, including unsaved options, stays as typed; a variant already there is not added twice.
+ */
+export function withAddedVariant(form: EditorForm, variant: ProductVariant): EditorForm {
+  if (form.input.variants.some((v) => v.id === variant.id)) return form
+  return { ...form, input: { ...form.input, variants: [...form.input.variants, variant] } }
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { Business, Product } from '@/domain/types'
+import type { Business, LocalizedText, Product } from '@/domain/types'
 import { type FieldMessage, msg } from '@/i18n/fieldMessage'
 import { isHttpUrl } from '@/lib/files'
 import { PRODUCT_SLUG_MAX, isValidSlug } from '@/lib/slug'
@@ -62,6 +62,32 @@ export function validateProductDraft(data: ProductInput, siblings: Product[]): F
   // Same caps as save_product (20261020143507_variant_media).
   else if (data.variants.length > MAX_VARIANTS) e.variants = msg('common.validation.product.variantsMax', { n: MAX_VARIANTS })
   else if (data.variants.some((v) => (v.images?.length ?? 0) > MAX_VARIANT_IMAGES)) e.variants = msg('common.validation.product.variantImagesMax', { n: MAX_VARIANT_IMAGES })
+  return e
+}
+
+/** A variant added on its own, from the 3D model request form (ADR-0068): a name (any text) and an optional swatch. */
+export interface NewVariantInput {
+  name: LocalizedText
+  colorHex?: string
+}
+
+/** Trimmed names; an empty Portuguese name or swatch is left out (as the editor saves a variant). */
+export function cleanNewVariant(input: NewVariantInput): NewVariantInput {
+  const pt = input.name.pt?.trim()
+  const colorHex = input.colorHex?.trim()
+  return { name: { en: input.name.en.trim(), ...(pt ? { pt } : {}) }, ...(colorHex ? { colorHex } : {}) }
+}
+
+/**
+ * The editor's variant rules for one more variant on a product that has `existing` ones: an English name (duplicates are
+ * allowed, as in the editor), a hex swatch when given, and the save_product cap.
+ */
+export function validateNewVariant(input: NewVariantInput, existing: number): FieldErrors {
+  const e: FieldErrors = {}
+  const v = cleanNewVariant(input)
+  if (!v.name.en) e.variantName = msg('common.validation.product.variantNameRequired')
+  if (v.colorHex && !/^#[0-9a-fA-F]{6}$/.test(v.colorHex)) e.variantColor = msg('common.validation.colourInvalid')
+  if (existing >= MAX_VARIANTS) e.variants = msg('common.validation.product.variantsMax', { n: MAX_VARIANTS })
   return e
 }
 

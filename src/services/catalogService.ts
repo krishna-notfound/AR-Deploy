@@ -34,6 +34,7 @@ import type {
   RolePermissions,
 } from '@/domain/types'
 import type { FieldError } from '@/i18n/fieldMessage'
+import type { NewVariantInput } from './validation'
 import type { ModelAsset, ModelFormat } from '@/domain/types'
 import type { ModelRequest, ModelRequestDetail, ModelRequestOutcome, ModelRequestQuery, ProductRequestState } from '@/domain/modelRequests'
 
@@ -210,6 +211,12 @@ export interface CatalogService {
   getShowcase(): Promise<Result<{ business: Business; products: Product[] }>>
   createProduct(data: ProductInput): Promise<Result<Product>>
   updateProduct(id: ID, data: Partial<ProductInput>): Promise<Result<Product>>
+  /**
+   * Adds one variant (a name and an optional swatch) to the stored product and leaves everything else as stored, its 3D files
+   * included (ADR-0068: "New variant" in the 3D model request form). Same permission as saving the product. Returns the
+   * stored product and the new variant's id.
+   */
+  addProductVariant(productId: ID, variant: NewVariantInput): Promise<Result<{ product: Product; variantId: ID }>>
   duplicateProduct(id: ID): Promise<Result<Product>>
   deleteProduct(id: ID): Promise<Result<StorageSweep>>
   publishProduct(id: ID): Promise<Result<Product>>

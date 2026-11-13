@@ -13,7 +13,7 @@ import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
 import { OPEN_REQUEST_STATUSES } from '@/domain/modelRequests'
-import { type Business, type Product, type ProductStatus } from '@/domain/types'
+import { type Business, type Product, type ProductStatus, type ProductVariant } from '@/domain/types'
 import { useCategories, useCategoryLabel, useCurrencies } from '@/services/listsHooks'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { errorText, fieldTexts } from '@/i18n/errorText'
@@ -30,7 +30,7 @@ import { primaryImage } from '@/lib/product'
 import { useModelRequests } from '@/features/modelRequests/hooks'
 import { modelRequestStatusLabel } from '@/features/modelRequests/ModelRequestStatusBadge'
 import { type EditorScope, editPath, useProductActions } from '../useProductActions'
-import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput, withFreshModelUrls, withStoredModels } from './formModel'
+import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput, withAddedVariant, withFreshModelUrls, withStoredModels } from './formModel'
 import { LocalizedField } from './LocalizedField'
 import { ModelFilesReadOnly } from './ModelFilesReadOnly'
 import { ModelRequestPanel } from './ModelRequestPanel'
@@ -360,6 +360,16 @@ export function ProductEditorForm({
   }, [latestId])
   useRefreshWhenStale(onRefreshUrls, MEDIA_REFRESH_MS, latest)
 
+  /**
+   * ADR-0068: the request panel stored a new variant. It joins the form and its saved snapshot alike (so the form's saved
+   * state does not change and the next save keeps it), and `latest`'s variants. `latest`'s modelsChangedAt is left alone (R-S4-17).
+   */
+  const onVariantAdded = (variant: ProductVariant) => {
+    setForm((f) => withAddedVariant(f, variant))
+    setSnapshot((s) => JSON.stringify(withAddedVariant(JSON.parse(s) as EditorForm, variant)))
+    setLatest((l) => (l && !l.variants.some((v) => v.id === variant.id) ? { ...l, variants: [...l.variants, variant] } : l))
+  }
+
   const goToEdit = (p: Product, state?: NavState) => {
     skipBlock.current = true
     navigate(editPath(scope, p), { replace: true, state })
@@ -667,6 +677,7 @@ export function ProductEditorForm({
                 saving={busy === 'save'}
                 onSaveDraft={() => void onSaveDraft()}
                 onReload={() => void onReload()}
+                onVariantAdded={onVariantAdded}
               />
             )}
             {(scope !== 'business' || (ownerChoice && modelChoice === 'upload')) && (

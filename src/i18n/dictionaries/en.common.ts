@@ -88,7 +88,7 @@ export const enCommon = {
   'common.error.reason.reopen_not_allowed': 'Only an approved application whose business was deleted can be reopened.',
   'common.error.reason.invalid_transition': 'This application has already been handled.',
   'common.error.reason.reason_required': 'Give a reason first.',
-  'common.error.reason.model_request_open': 'This already has an open 3D model request.',
+  'common.error.reason.model_request_open': 'This already has an open 3D model request. For another version of the product, such as another colour or finish, choose New variant under Model for.',
   'common.error.reason.model_request_not_cancellable': 'This request has already started and can no longer be cancelled.',
   'common.error.reason.models_changed_elsewhere': 'The 3D files were changed somewhere else. Reload the page and try again.',
   'common.error.reason.own_models_not_allowed': 'This business is not allowed to upload its own 3D files.',
@@ -120,6 +120,7 @@ export const enCommon = {
   'common.validation.product.weightInvalid': 'Enter a positive weight.',
   'common.validation.product.priceDeltaInvalid': 'Enter each price difference as an amount such as 25.00 (no negatives), or leave it empty.',
   'common.validation.product.variantsMax': 'Use {n} colours or options or fewer.',
+  'common.validation.product.variantNameRequired': 'Enter a name for the new variant.', // ADR-0068
   'common.validation.product.variantImagesMax': 'Each colour or option can have up to {n} photos.',
   'common.validation.publish.nameRequired': 'Add an English product name before publishing.',
   'common.validation.publish.priceRequired': 'Set a price greater than zero before publishing.',

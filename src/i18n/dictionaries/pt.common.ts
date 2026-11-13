@@ -86,7 +86,7 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'common.error.reason.reopen_not_allowed': 'Só é possível reabrir uma candidatura aprovada cuja empresa tenha sido eliminada.',
   'common.error.reason.invalid_transition': 'Esta candidatura já foi tratada.',
   'common.error.reason.reason_required': 'Indique primeiro um motivo.',
-  'common.error.reason.model_request_open': 'Já existe um pedido de modelo 3D em aberto.',
+  'common.error.reason.model_request_open': 'Já existe um pedido de modelo 3D em aberto. Para outra versão do produto, por exemplo outra cor ou acabamento, escolha Nova variante em Modelo para.',
   'common.error.reason.model_request_not_cancellable': 'Este pedido já começou e já não pode ser cancelado.',
   'common.error.reason.models_changed_elsewhere': 'Os ficheiros 3D foram alterados noutro local. Recarregue a página e tente novamente.',
   'common.error.reason.own_models_not_allowed': 'Esta empresa não pode carregar os seus próprios ficheiros 3D.',
@@ -117,6 +117,7 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'common.validation.product.weightInvalid': 'Introduza um peso positivo.',
   'common.validation.product.priceDeltaInvalid': 'Introduza cada diferença de preço como um valor, por exemplo 25.00 (sem negativos), ou deixe-a vazia.',
   'common.validation.product.variantsMax': 'Use no máximo {n} cores ou opções.',
+  'common.validation.product.variantNameRequired': 'Indique um nome para a nova variante.', // ADR-0068
   'common.validation.product.variantImagesMax': 'Cada cor ou opção pode ter até {n} fotografias.',
   'common.validation.publish.nameRequired': 'Adicione o nome do produto em inglês antes de publicar.',
   'common.validation.publish.priceRequired': 'Defina um preço superior a zero antes de publicar.',
