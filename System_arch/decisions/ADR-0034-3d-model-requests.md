@@ -1,5 +1,5 @@
 # ADR-0034: 3D model requests (S4)
-- **Status:** Accepted
+- **Status:** Accepted (amended by ADR-0068, 2026-11-13: the request form adds a "New variant" choice that creates the variant and requests its model in one step; the one-open-request-per-target rule below stays valid)
 - **Date:** 2026-10-26
 - **Affects:** design/19-supabase.md, design/23-email.md, design/15-product-editor.md, design/12-features-admin.md, docs/SECURITY_REVIEW.md, docs/OPERATIONS_RUNBOOK.md, ADR-0021, ADR-0029, ADR-0033
 - **Spec:** `docs/superpowers/specs/2026-10-26-s4-3d-model-requests-design.md` (the owner's decisions of 2026-10-26 at the end of the spec override the defaults above them)

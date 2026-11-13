@@ -141,7 +141,7 @@ describe('S4 Task 4: ModelRequestPanel', () => {
     expect(await screen.findByRole('link', { name: 'Add width, height and depth in Specifications first. The model is made to that size.' })).toBeInTheDocument()
   })
 
-  it('form: Model for lists the product and its saved options (hidden with none); the count line; Send needs 2 photos; an 11th, a 12 MB photo and a GIF are refused; a 900 px photo warns; the demo label', async () => {
+  it('form: Model for lists the product, its saved options and New variant; the count line; Send needs 2 photos; an 11th, a 12 MB photo and a GIF are refused; a 900 px photo warns; the demo label', async () => {
     requests([])
     const { unmount } = render(
       <ToastProvider>
@@ -149,7 +149,10 @@ describe('S4 Task 4: ModelRequestPanel', () => {
       </ToastProvider>,
     )
     await screen.findByRole('button', { name: 'Send request' })
-    expect(screen.queryByLabelText('Model for')).not.toBeInTheDocument()
+    // ADR-0068: with no saved options the choice is the product or a new variant.
+    expect(within(screen.getByLabelText('Model for')).getAllByRole('option').map((o) => o.textContent)).toEqual(['The product', 'New variant'])
+    expect(screen.getByLabelText('Model for')).toHaveValue('')
+    expect(screen.queryByLabelText('Variant name (English)')).not.toBeInTheDocument()
     expect(screen.getByText('Demo: these photos are kept only until you reload.')).toBeInTheDocument()
     expect(screen.getByText('0 of 10 photos · add at least 2')).toBeInTheDocument()
     expect(picker()).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp')
@@ -185,7 +188,7 @@ describe('S4 Task 4: ModelRequestPanel', () => {
     requests([])
     renderPanel({ ...product, variants: [{ ...({} as Product['variants'][number]), id: 'v-oak', name: { en: 'Oak' } }] })
     const select = await screen.findByLabelText('Model for')
-    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['The product', 'Oak'])
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['The product', 'Oak', 'New variant'])
   })
 
   it('sending: per-photo progress, the button busy, the form locked; then the toast and the form clears', async () => {
@@ -222,8 +225,8 @@ describe('S4 Task 4: ModelRequestPanel', () => {
     await screen.findByRole('button', { name: 'Send request' })
     await pick(photos(2))
     await userEvent.click(sendButton())
-    // The service sentence stays English for logs; the panel shows the translated sentence for the reason.
-    expect(await screen.findByText('This already has an open 3D model request.')).toBeInTheDocument()
+    // The service sentence stays English for logs; the panel shows the translated sentence for the reason, which points to New variant (ADR-0068).
+    expect(await screen.findByText('This already has an open 3D model request. For another version of the product, such as another colour or finish, choose New variant under Model for.')).toBeInTheDocument()
     expect(screen.getByText('2 of 10 photos · add at least 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove photo-2.jpg' })).toBeEnabled()
   })
@@ -233,7 +236,10 @@ describe('S4 Task 4: ModelRequestPanel', () => {
     const cancel = vi.spyOn(service, 'cancelModelRequest').mockResolvedValue(ok({ status: 'cancelled' }))
     renderPanel()
     expect(await screen.findByText(/^Requested on .+\. The Sanctus team will start on it soon\.$/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Send request' })).not.toBeInTheDocument()
+    // ADR-0068: the only target left is a new variant, explained in one line.
+    expect(screen.getByText(ALL_OPEN)).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Model for')).getAllByRole('option').map((o) => o.textContent)).toEqual(['New variant'])
+    expect(screen.getByLabelText('Variant name (English)')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Cancel request' }))
     expect(cancel).toHaveBeenCalledWith('r-requested-p')
     expect(await screen.findByText('Request cancelled.')).toBeInTheDocument()
@@ -293,5 +299,139 @@ describe('S4 Task 4: ModelRequestPanel', () => {
     renderPanel()
     await userEvent.click(await screen.findByRole('button', { name: 'Cancel request' }))
     await waitFor(() => expect(screen.getAllByText('This request has already started and can no longer be cancelled.').length).toBeGreaterThan(0))
+  })
+})
+
+const ALL_OPEN = 'Every 3D model above is already requested. For another version of this product, such as another colour or finish, request one for a new variant.'
+
+describe('ADR-0068: a model request for a new variant', () => {
+  const walnut = { id: 'v-walnut', name: { en: 'Walnut' }, colorHex: '#5a3e2b' }
+  const chooseNew = async () => {
+    await screen.findByRole('button', { name: 'Send request' })
+    await userEvent.selectOptions(screen.getByLabelText('Model for'), 'New variant')
+  }
+  const added = (variant: Product['variants'][number] = walnut) => ok({ product: { ...product, variants: [...product.variants, variant] }, variantId: variant.id })
+
+  it('New variant shows a required name (any text), an optional Portuguese name and an optional swatch; Send adds the variant, then requests its model', async () => {
+    requests([])
+    const add = vi.spyOn(service, 'addProductVariant').mockResolvedValue(added())
+    const send = vi.spyOn(service, 'requestModel').mockResolvedValue(ok(request({ status: 'requested', variantId: walnut.id })))
+    const onVariantAdded = vi.fn()
+    render(
+      <ToastProvider>
+        <ModelRequestPanel product={product} onSaveDraft={vi.fn()} onReload={vi.fn()} onVariantAdded={onVariantAdded} />
+      </ToastProvider>,
+    )
+    await chooseNew()
+    expect(screen.getByText('For another version of this product, such as another colour, finish or size. It is added to Colours and variants with its own 3D model.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Variant name (English)')).toBeRequired()
+    expect(screen.getByLabelText('Variant name in Portuguese (optional)')).not.toBeRequired()
+    expect(screen.queryByLabelText('Swatch colour')).not.toBeInTheDocument()
+    await pick(photos(2))
+    // No name: the field says so and nothing is written.
+    await userEvent.click(sendButton())
+    expect(await screen.findByText('Enter a name for the new variant.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Variant name (English)')).toHaveAttribute('aria-invalid', 'true')
+    expect(add).not.toHaveBeenCalled()
+    await userEvent.type(screen.getByLabelText('Variant name (English)'), ' Walnut ')
+    await userEvent.type(screen.getByLabelText('Variant name in Portuguese (optional)'), 'Nogueira')
+    await userEvent.click(screen.getByLabelText('Show a colour swatch'))
+    fireEvent.input(screen.getByLabelText('Swatch colour'), { target: { value: '#5a3e2b' } })
+    await userEvent.click(sendButton())
+    expect(add).toHaveBeenCalledWith(product.id, { name: { en: 'Walnut', pt: 'Nogueira' }, colorHex: '#5a3e2b' })
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ productId: product.id, variantId: walnut.id }), expect.any(Function)))
+    expect(onVariantAdded).toHaveBeenCalledWith(walnut)
+    expect(await screen.findByText("Request sent. We'll email you when the model is ready.")).toBeInTheDocument()
+    expect(screen.getByText('“Walnut” was added to Colours and variants.')).toBeInTheDocument()
+  })
+
+  it('a name that is only a size or a finish is fine, and without the swatch no colour is sent', async () => {
+    requests([])
+    const add = vi.spyOn(service, 'addProductVariant').mockResolvedValue(added({ id: 'v-200', name: { en: '200 cm' } }))
+    vi.spyOn(service, 'requestModel').mockResolvedValue(ok(request({ status: 'requested', variantId: 'v-200' })))
+    renderPanel()
+    await chooseNew()
+    await userEvent.type(screen.getByLabelText('Variant name (English)'), '200 cm')
+    await pick(photos(2))
+    await userEvent.click(sendButton())
+    await waitFor(() => expect(add).toHaveBeenCalledWith(product.id, { name: { en: '200 cm' } }))
+  })
+
+  it('the variant is added but the request fails: says so, keeps the photos and selects the new variant, so a retry only sends the request', async () => {
+    requests([])
+    const add = vi.spyOn(service, 'addProductVariant').mockResolvedValue(added())
+    const send = vi
+      .spyOn(service, 'requestModel')
+      .mockResolvedValueOnce({ ok: false, error: { code: 'UNKNOWN', message: 'network' } })
+      .mockResolvedValueOnce(ok(request({ status: 'requested', variantId: walnut.id })))
+    renderPanel()
+    await chooseNew()
+    await userEvent.type(screen.getByLabelText('Variant name (English)'), 'Walnut')
+    await pick(photos(2))
+    await userEvent.click(sendButton())
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/^“Walnut” was added to Colours and variants, but its 3D model request wasn't sent: .+ It is selected below, so you can send the request again\.$/)
+    expect(screen.getByLabelText('Model for')).toHaveValue(walnut.id)
+    expect(screen.queryByLabelText('Variant name (English)')).not.toBeInTheDocument()
+    expect(screen.getByText('2 of 10 photos · add at least 2')).toBeInTheDocument()
+    await userEvent.click(sendButton())
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2))
+    expect(send.mock.calls[1]![0]).toMatchObject({ variantId: walnut.id })
+    expect(add).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText("Request sent. We'll email you when the model is ready.")).toBeInTheDocument()
+  })
+
+  it('adding the variant fails: the reason shows, no request is sent and the typed name stays', async () => {
+    requests([])
+    vi.spyOn(service, 'addProductVariant').mockResolvedValue({ ok: false, error: { code: 'VALIDATION', message: 'x', fieldErrors: { variants: { key: 'common.validation.product.variantsMax', vars: { n: 50 } } } } })
+    const send = vi.spyOn(service, 'requestModel')
+    renderPanel()
+    await chooseNew()
+    await userEvent.type(screen.getByLabelText('Variant name (English)'), 'Walnut')
+    await pick(photos(2))
+    await userEvent.click(sendButton())
+    expect(await screen.findByText('Use 50 colours or options or fewer.')).toBeInTheDocument()
+    expect(send).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Variant name (English)')).toHaveValue('Walnut')
+  })
+
+  it('a double click adds one variant and sends one request', async () => {
+    requests([])
+    let finish!: () => void
+    const add = vi.spyOn(service, 'addProductVariant').mockImplementation(async () => {
+      await new Promise<void>((r) => (finish = r))
+      return added()
+    })
+    vi.spyOn(service, 'requestModel').mockResolvedValue(ok(request({ status: 'requested', variantId: walnut.id })))
+    renderPanel()
+    await chooseNew()
+    await userEvent.type(screen.getByLabelText('Variant name (English)'), 'Walnut')
+    await pick(photos(2))
+    fireEvent.click(sendButton())
+    fireEvent.click(sendButton())
+    await act(async () => finish())
+    expect(await screen.findByText("Request sent. We'll email you when the model is ready.")).toBeInTheDocument()
+    expect(add).toHaveBeenCalledTimes(1)
+    expect(service.requestModel).toHaveBeenCalledTimes(1)
+  })
+
+  it('every target open: the line explains New variant; a product at the variant cap offers no New variant', async () => {
+    const oak = { id: 'v-oak', name: { en: 'Oak' } }
+    requests([request({ status: 'requested' }), request({ status: 'in_progress', variantId: 'v-oak' })])
+    const { unmount } = render(
+      <ToastProvider>
+        <ModelRequestPanel product={{ ...product, variants: [oak] }} onSaveDraft={vi.fn()} onReload={vi.fn()} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText(ALL_OPEN)).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Model for')).getAllByRole('option').map((o) => o.textContent)).toEqual(['New variant'])
+    unmount()
+
+    const full = Array.from({ length: 50 }, (_, i) => ({ id: `v-${i}`, name: { en: `V${i}` } }))
+    requests([request({ status: 'requested' })])
+    renderPanel({ ...product, variants: full })
+    await screen.findByRole('button', { name: 'Send request' })
+    expect(within(screen.getByLabelText('Model for')).queryByRole('option', { name: 'New variant' })).toBeNull()
+    expect(screen.queryByText(ALL_OPEN)).toBeNull()
   })
 })

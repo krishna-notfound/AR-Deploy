@@ -156,6 +156,7 @@ A business gets 3D models for its products by asking for them, the platform team
   - **New, unsaved product:** "Save this product first, then request its 3D model." with a working **Save draft** button.
   - **Dimensions missing:** the form is shown, and Send is replaced by the dimensions line linking to the fields (§9.1).
   - **No open request:** the form: "Model for" (the product, or one of its saved options; options shown only when the product has any), the photo picker (2 to 10, thumbnails, remove, count line, the tips), "Notes for the Sanctus team" (optional, 1000 characters), **Send request**. Send is enabled only with 2 to 10 valid photos; the reason is shown next to it otherwise.
+  - **Amended by ADR-0068 (2026-11-13):** "Model for" is always shown and also offers **"New variant"** (not at 50 variants): an English name (required, any text), an optional Portuguese name and an optional colour swatch. Send adds the variant to the product (`addProductVariant`) and then requests its model; if the request fails after the variant was added, the form says so and keeps the new variant selected for a retry. When the product and every saved option already have an open request, the form stays (with "New variant" only) under one line saying a new variant can be requested for another version. The one-open-request-per-target rule is unchanged.
   - **Sending:** per-photo progress, the button busy, the form locked.
   - **Open, final and history states** (per target): status badge, date, and the actions of §9.1. The latest request per target shows; older ones are under "Earlier requests (n)".
   - **Loading:** a skeleton. **Error:** "Couldn't load 3D model requests." with Retry. It never falls back to sample data.
@@ -338,7 +339,7 @@ Every `admin_*` function checks `platform_can('models.manage')` (2FA-gated) firs
 |---|---|---|
 | `own_models_not_allowed` | 42501 | "3D files for this business are made by the Sanctus team. Request a 3D model instead." |
 | `own_models_admin_only` | 42501 | "Only the Sanctus team can change this setting, from the business page." |
-| `model_request_open` | 23505 | "This product already has an open 3D model request." (with an option: "This option already has…") |
+| `model_request_open` | 23505 | "This product already has an open 3D model request." (with an option: "This option already has…"). Shown to the business (ADR-0068): "This already has an open 3D model request. For another version of the product, such as another colour or finish, choose New variant under Model for." |
 | `model_request_limit` | P0001 | "Your business has 25 open 3D model requests. Wait for some to be finished, or cancel one." |
 | `model_request_photos_count` | 22023 | "Add 2 to 10 photos." |
 | `model_request_photo_missing` | 22023 | "A photo didn't finish uploading. Remove it and add it again." |

@@ -177,6 +177,12 @@ Most businesses do not make their own 3D files. Instead you ask the Sanctus team
 3. Add **2 to 10 photos** (JPG, PNG or WebP, up to 10 MB each): the front, the back, both sides, an angle, and close-ups of the material, in even light and without people. Only the Sanctus team sees these photos. They are separate from your catalog photos and never appear in your catalog.
 4. For a colour or option that needs its own model, pick it under **Model for**. Add a note if it helps (for example "the legs are oak and the cushion is removable"), then press **Send request**.
 
+**A model for another version of the same product (another colour, finish or size)**
+- Each product, and each of its colours and options, can have **one open request at a time**. A second request for the same one is refused with "This already has an open 3D model request".
+- For another version, choose **New variant** under **Model for**. Type its name in English (required; it can be anything you call the version, for example "Walnut", "Matt black" or "200 cm"), optionally its Portuguese name, and tick **Show a colour swatch** if you want a colour dot for it. Add the photos of that version and press **Send request**.
+- The new variant is added to **Colours and variants** on the product, and the request appears with that variant's name. You can add its price difference, SKU or photos there later.
+- If the variant is added but the request could not be sent, the message says so. The variant stays and is already selected: press **Send request** again.
+
 **What you see afterwards**
 - **Requested:** the Sanctus team has not started. You can press **Cancel request** until work starts (the photos are then deleted).
 - **In progress:** work has started. To stop it, contact the Sanctus team.

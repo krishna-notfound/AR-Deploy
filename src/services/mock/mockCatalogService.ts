@@ -23,7 +23,7 @@ import { createMockModelRequestsStaff } from './mockModelRequestsStaff'
 import { createSeed } from './seed'
 import { store } from './store'
 import { msg } from '@/i18n/fieldMessage'
-import { hasOwnValidGlb, isSlugTaken, normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
+import { cleanNewVariant, hasOwnValidGlb, isSlugTaken, normalizeImages, normalizeVariants, validateBusiness, validateForPublish, validateNewVariant, validateProductDraft } from '../validation'
 
 export const FAIL_RATE_KEY = 'arfurn:debug:failRate'
 /** Demo actor for audit entries (the demo account picker is not authentication). */
@@ -505,6 +505,21 @@ export const mockCatalogService: CatalogService = {
         if (next.slug !== current.slug) auditProduct(d, 'product_slug_changed', next, { metadata: { from: current.slug, to: next.slug } })
       })
       return ok(next)
+    }),
+
+  addProductVariant: (productId, input) =>
+    run(() => {
+      const current = store.get().products.find((p) => p.id === productId)
+      if (!current) return fail('NOT_FOUND', 'Product not found.')
+      const errors = validateNewVariant(input, current.variants.length)
+      if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
+      // Only the variant list changes: the product's fields and 3D files stay as stored (ADR-0068).
+      const variant = { id: newId('var'), ...cleanNewVariant(input) }
+      const next: Product = { ...current, variants: [...current.variants, variant], updatedAt: nowIso() }
+      store.update((d) => {
+        d.products = d.products.map((p) => (p.id === productId ? next : p))
+      })
+      return ok({ product: next, variantId: variant.id })
     }),
 
   duplicateProduct: (id) =>

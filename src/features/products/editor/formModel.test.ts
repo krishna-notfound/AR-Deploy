@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelAsset, Product } from '@/domain/types'
-import { convertDims, emptyForm, toInput, withFreshModelUrls } from './formModel'
+import { convertDims, emptyForm, toInput, withAddedVariant, withFreshModelUrls } from './formModel'
 
 describe('convertDims (AR-10)', () => {
   it('converts back to the exact values entered instead of compounding the rounding', () => {
@@ -42,5 +42,18 @@ describe('withFreshModelUrls: re-signed 3D file URLs', () => {
     expect(next.input.models.glb).toMatchObject({ url: 'https://fresh/m.glb', status: 'valid' })
     expect(next.input.models.usdz).toMatchObject({ url: 'https://old/new.usdz', storagePath: 'b1/new.usdz' })
     expect(next.input.variants[0]?.models?.glb).toMatchObject({ url: 'https://fresh/v.glb', status: 'valid' })
+  })
+})
+
+describe('withAddedVariant (ADR-0068)', () => {
+  it('appends a variant stored from the request form once, keeping every unsaved field and option', () => {
+    const form = emptyForm()
+    form.input.name = { en: 'Typed, not saved' }
+    form.input.variants = [{ id: 'var_unsaved', name: { en: 'Draft option' } }]
+    const walnut = { id: 'v-walnut', name: { en: 'Walnut' }, colorHex: '#5a3e2b' }
+    const next = withAddedVariant(form, walnut)
+    expect(next.input.name.en).toBe('Typed, not saved')
+    expect(next.input.variants).toEqual([{ id: 'var_unsaved', name: { en: 'Draft option' } }, walnut])
+    expect(withAddedVariant(next, walnut)).toBe(next)
   })
 })

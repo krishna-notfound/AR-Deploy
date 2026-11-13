@@ -41,7 +41,7 @@ import { catalogLocalPath, catalogPublicUrl } from '@/lib/urls'
 import { deriveActivity, deviceTimeZone, summarize } from '../analytics'
 import { type AuditEntry, type BusinessInput, CLOSURE_PENDING_ERROR, type CatalogService, type CreatedBusiness, PLATFORM_ACTOR_LABELS, PLATFORM_CHANGE_EVENTS, REOPEN_NOT_ALLOWED_ERROR, MEDIA_URL_TTL_SECONDS, type ProductInput, type ProvisionOutcome, type Result, type ServiceError, type ServiceErrorCode, type StorageSweep, type UploadKind, fail, ok, teamFail, toAuditEntry } from '../catalogService'
 import { type FieldMessage, msg } from '@/i18n/fieldMessage'
-import { hasOwnValidGlb, normalizeImages, validateBusiness, validateForPublish, validateProductDraft } from '../validation'
+import { cleanNewVariant, hasOwnValidGlb, normalizeImages, validateBusiness, validateForPublish, validateNewVariant, validateProductDraft } from '../validation'
 
 export const MEDIA_BUCKET = 'product-media'
 const REQUEST_PHOTO_BUCKET = 'model-request-photos'
@@ -1186,6 +1186,22 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
           }
         }
         return changed(saved)
+      }),
+    addProductVariant: (productId, input) =>
+      guard(async () => {
+        const current = await productById(productId)
+        if (!current.ok) return current
+        const errors = validateNewVariant(input, current.data.variants.length)
+        if (Object.keys(errors).length) return fail('VALIDATION', 'Please fix the highlighted fields.', errors)
+        // The stored product with one more variant. Its id is not a uuid, so save_product inserts it; keepModels leaves every
+        // 3D file row alone, so nothing the Sanctus team delivered meanwhile is touched (ADR-0068).
+        const before = new Set(current.data.variants.map((v) => v.id))
+        const next: ProductInput = { ...current.data, variants: [...current.data.variants, { id: 'new-variant', ...cleanNewVariant(input) }], keepModels: true }
+        const saved = await saveProduct(productId, next)
+        if (!saved.ok) return saved
+        const added = saved.data.variants.findLast((v) => !before.has(v.id))
+        if (!added) return fail('UNKNOWN', 'The variant was saved but could not be read back. Reload the page.')
+        return changed(ok({ product: saved.data, variantId: added.id }))
       }),
     duplicateProduct: (id) =>
       guard(async () => {

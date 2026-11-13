@@ -18,7 +18,14 @@ import { ProductEditorForm } from './ProductEditorForm'
 // all granted (as outside the app shell) unless a test denies one.
 const perms = vi.hoisted(() => ({ deny: [] as string[] }))
 vi.mock('./ModelRequestPanel', () => ({
-  ModelRequestPanel: (p: { product?: { id: string } }) => <div data-testid="request-panel" data-product={p.product?.id ?? ''} />,
+  ModelRequestPanel: (p: { product?: { id: string; variants: { id: string }[] }; onVariantAdded?: (v: { id: string; name: { en: string }; colorHex?: string }) => void }) => (
+    <div data-testid="request-panel" data-product={p.product?.id ?? ''} data-variants={p.product?.variants.map((v) => v.id).join(',') ?? ''}>
+      {/* Stands in for "New variant" in the request form (ADR-0068), which stores the variant and hands it over. */}
+      <button type="button" onClick={() => p.onVariantAdded?.({ id: 'v-walnut', name: { en: 'Walnut' }, colorHex: '#5a3e2b' })}>
+        Stand-in: variant added
+      </button>
+    </div>
+  ),
 }))
 // The crop dialog needs a laid-out browser; here it is a stand-in whose Save sends an edited copy (its own tests: components/image).
 vi.mock('@/components/image/ImageCropDialog', () => ({
@@ -514,6 +521,29 @@ describe('S4 Task 3: the 3D section by role and switch (R-S4-4, R-S4-17)', () =>
     const stored = await service.getProductById(p.id)
     expect(stored.ok && stored.data.models.glb).toBeFalsy()
     expect(stored.ok && stored.data.name.en).toBe(p.name.en)
+  })
+
+  it('ADR-0068: a variant added from the request panel joins the form and the panel, the form stays saved, and the next save keeps it with the unsaved edits', async () => {
+    const user = userEvent.setup()
+    asOwner('biz_casa')
+    const update = vi.spyOn(service, 'updateProduct')
+    const p = await renderEditor('business', 'biz_casa', 'prd_glam_sofa')
+    await user.click(models().getByRole('button', { name: 'Stand-in: variant added' }))
+    const names = () => screen.getAllByLabelText('Option name (English)').map((i) => (i as HTMLInputElement).value)
+    expect(names()).toEqual([...p.variants.map((v) => v.name.en), 'Walnut'])
+    expect(models().getByTestId('request-panel').dataset.variants!.split(',')).toContain('v-walnut')
+    expect(screen.getAllByText('All changes saved').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Unsaved changes')).toBeNull()
+    // A name typed before or after stays unsaved; saving sends it with the new variant.
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), ' II')
+    await user.click(models().getByRole('button', { name: 'Stand-in: variant added' }))
+    expect(names().filter((n) => n === 'Walnut')).toHaveLength(1)
+    expect(screen.getAllByText('Unsaved changes').length).toBeGreaterThan(0)
+    await user.click(screen.getByRole('button', { name: /Save (draft|changes)/ }))
+    await waitFor(() => expect(update).toHaveBeenCalled())
+    const sent = update.mock.calls[0]![1]
+    expect(sent.name?.en).toBe(`${p.name.en} II`)
+    expect(sent.variants?.at(-1)).toMatchObject({ id: 'v-walnut', name: { en: 'Walnut' }, colorHex: '#5a3e2b' })
   })
 
   it('models_changed_elsewhere shows its copy with a Reload button that loads the stored 3D files and keeps the unsaved edits (final review)', async () => {
