@@ -108,6 +108,22 @@ export function readImageSize(b: Uint8Array): { width: number; height: number } 
   return null
 }
 
+/**
+ * What the file really is by its first bytes: image/png, image/jpeg or image/webp, or null for anything else (HTML, SVG, a
+ * script with a picture name). The declared type of an upload is the browser's word; Storage cannot read the content (QA F-TI-1).
+ */
+export async function imageMimeOf(file: Blob): Promise<'image/png' | 'image/jpeg' | 'image/webp' | null> {
+  try {
+    const b = await readHead(file)
+    if (!readImageSize(b)) return null
+    if (b[0] === 0x89) return 'image/png'
+    if (b[0] === 0xff) return 'image/jpeg'
+    return 'image/webp'
+  } catch {
+    return null
+  }
+}
+
 /** A photo's pixel size from its header (PNG, JPEG or WebP), without decoding it; null when it can't be read (S4 R-S4-5). */
 export async function imageSize(file: Blob): Promise<{ width: number; height: number } | null> {
   try {

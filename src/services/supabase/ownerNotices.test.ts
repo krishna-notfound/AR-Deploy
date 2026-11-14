@@ -53,6 +53,8 @@ function stub(opts: {
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0))
+/** The notify-business-owner calls only: a status change also asks sync-ar-models to follow it (a separate call). */
+const notices = (invoke: ReturnType<typeof vi.fn>) => invoke.mock.calls.filter(([name]) => name === 'notify-business-owner')
 
 describe('owner notices after staff changes (R-W7-2)', () => {
   it('setBusinessStatus succeeds and resolves ok when notify-business-owner rejects', async () => {
@@ -71,25 +73,25 @@ describe('owner notices after staff changes (R-W7-2)', () => {
     expect(r.ok).toBe(true)
     await flush()
     await flush()
-    expect(invoke).toHaveBeenCalledTimes(1)
+    expect(notices(invoke)).toHaveLength(1)
   })
 
   it('no notice for a business owner (no platform role) or for a move to draft', async () => {
     const owner = stub({ role: null, tables: { businesses: { data: [businessRow('inactive')] } } })
     expect((await createSupabaseCatalogService(owner.sb).setBusinessStatus(BIZ, 'inactive')).ok).toBe(true)
     await flush()
-    expect(owner.invoke).not.toHaveBeenCalled()
+    expect(notices(owner.invoke)).toHaveLength(0)
     const draft = stub({ tables: { businesses: { data: [businessRow('draft')] } } })
     expect((await createSupabaseCatalogService(draft.sb).setBusinessStatus(BIZ, 'draft')).ok).toBe(true)
     await flush()
-    expect(draft.invoke).not.toHaveBeenCalled()
+    expect(notices(draft.invoke)).toHaveLength(0)
   })
 
   it('a refused status change sends no notice', async () => {
     const { sb, invoke } = stub({ tables: { businesses: { error: { code: '42501', message: 'denied' } } } })
     expect((await createSupabaseCatalogService(sb).setBusinessStatus(BIZ, 'inactive')).ok).toBe(false)
     await flush()
-    expect(invoke).not.toHaveBeenCalled()
+    expect(invoke).not.toHaveBeenCalled() // a refused change asks neither for a notice nor for a sync
   })
 })
 

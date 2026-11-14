@@ -6,7 +6,11 @@
 //     published product: copy what is missing, set public_url, delete stale copies in the product's folder.
 //     draft or missing product: delete the product's folder and clear public_url. businessId names the folder of a
 //     product that no longer exists (deleteProduct).
-//   POST { all: true } → the same for every published product; the platform Owner only (one-time backfill).
+//   POST { businessId } (no productId) → the same for every product of that business, and a folder left for a product that no
+//     longer exists. The function lists the products itself (service role), so the caller needs no read access to them
+//     (a business paused or deleted by staff without products.view). Gate: can_sync_ar_models_business.
+//   POST { all: true } → the same for every published product, then every ar-models folder whose product is not published is
+//     cleared (reconcile); the platform Owner only. Safe to repeat; it is the clean-up for a client call that was lost.
 // The caller's own token answers who may ask (can_sync_ar_models, with the 2FA gates); the service role does the work.
 // Only fixed error codes reach the client; nothing logs a token, an address or a URL.
 import { type CallerRpc, type GateResult, gateReply } from '../_shared/gate.ts'
@@ -42,6 +46,10 @@ export interface SyncDeps {
   product(productId: string): Promise<SyncProduct | null>
   /** Service role: ids of every published product. */
   publishedProductIds(): Promise<string[]>
+  /** Service role: ids of every product of one business, whatever its status. */
+  businessProductIds(businessId: string): Promise<string[]>
+  /** The <business>/<product> folders that exist in ar-models: one business's, or every business's when none is named. */
+  arProductFolders(businessId?: string): Promise<{ businessId: string; productId: string }[]>
   /** Every object path in ar-models under `folder` (sub-folders included). */
   listFolder(folder: string): Promise<string[]>
   /** Copies product-media `from` to ar-models `to` (with the model content type), replacing an object already there. Rejects on failure. */
@@ -61,7 +69,13 @@ export async function syncGate(rpc: CallerRpc, productId: string, businessId: st
   return (await rpc('can_sync_ar_models', { p_product: productId, p_business: businessId })) === true ? 'ok' : 'forbidden'
 }
 
-const SAFE_ID = /^[A-Za-z0-9-]{1,64}$/
+/** The same two checks for a whole business: can_sync_ar_models_business (a member, or staff who change what is public). */
+export async function businessGate(rpc: CallerRpc, businessId: string): Promise<GateResult> {
+  if ((await rpc('caller_mfa_satisfied')) !== true) return 'aal2_required'
+  return (await rpc('can_sync_ar_models_business', { p_business: businessId })) === true ? 'ok' : 'forbidden'
+}
+
+const SAFE_ID =/^[A-Za-z0-9-]{1,64}$/
 
 /** ar-models/<business>/<product>/<variant|base>/<format>-<source file id>.<ext>; null for a path it cannot name. */
 export function publicPath(product: Pick<SyncProduct, 'id' | 'businessId'>, m: Pick<ModelRef, 'variantId' | 'format' | 'storagePath'>): string | null {
@@ -140,6 +154,28 @@ export async function syncProduct(deps: SyncDeps, productId: string, businessId:
   return { copied, removed: stale.length, failed }
 }
 
+const add = (total: SyncCounts, c: SyncCounts) => {
+  total.copied += c.copied
+  total.removed += c.removed
+  total.failed += c.failed
+}
+
+/**
+ * Brings every public copy of one business in line with the business and its products (QA RLS-01 / BL-2). The caller never
+ * lists the products: the service role does, so a staff member who may pause a business but not read its products still gets
+ * the copies of a paused business removed. Copies left in the bucket for products that no longer exist are cleared too.
+ */
+export async function syncBusiness(deps: SyncDeps, businessId: string): Promise<SyncCounts> {
+  const ids = new Set(await deps.businessProductIds(businessId))
+  for (const f of await deps.arProductFolders(businessId)) ids.add(f.productId)
+  const total: SyncCounts = { copied: 0, removed: 0, failed: 0 }
+  for (const pid of ids) {
+    // One product's error is counted, not fatal: the rest are still brought in line.
+    add(total, await syncProduct(deps, pid, businessId).catch(() => ({ copied: 0, removed: 0, failed: 1 })))
+  }
+  return total
+}
+
 export async function handleSyncArModels(req: Request, deps: SyncDeps): Promise<Response> {
   if (req.method === 'OPTIONS') return reply(204)
   if (req.method !== 'POST') return reply(405, { error: 'method_not_allowed' })
@@ -155,19 +191,31 @@ export async function handleSyncArModels(req: Request, deps: SyncDeps): Promise<
     const gate = await deps.ownerGate(token)
     if (gate !== 'ok') return gateReply(gate)
     const total: SyncCounts = { copied: 0, removed: 0, failed: 0 }
-    for (const pid of await deps.publishedProductIds()) {
+    const published = await deps.publishedProductIds()
+    for (const pid of published) {
       // One product's error is counted, not fatal: the backfill goes on with the rest.
-      const c = await syncProduct(deps, pid, null).catch(() => ({ copied: 0, removed: 0, failed: 1 }))
-      total.copied += c.copied
-      total.removed += c.removed
-      total.failed += c.failed
+      add(total, await syncProduct(deps, pid, null).catch(() => ({ copied: 0, removed: 0, failed: 1 })))
+    }
+    // Reconcile: a folder whose product is not published (unpublished, paused business, deleted) is cleared, whatever a
+    // lost client call left behind. Safe to run again at any time.
+    const live = new Set(published)
+    for (const f of await deps.arProductFolders()) {
+      if (live.has(f.productId)) continue
+      add(total, await syncProduct(deps, f.productId, f.businessId).catch(() => ({ copied: 0, removed: 0, failed: 1 })))
     }
     return reply(200, { ok: true, ...total })
   }
 
   const productId = typeof body.productId === 'string' && UUID.test(body.productId) ? body.productId : ''
   const businessId = typeof body.businessId === 'string' && UUID.test(body.businessId) ? body.businessId : null
-  if (!productId || (body.businessId !== undefined && !businessId)) return reply(400, { error: 'invalid_request' })
+  if (body.businessId !== undefined && !businessId) return reply(400, { error: 'invalid_request' })
+  // { businessId } alone: every product of that business (a business paused, resumed or deleted).
+  if (!productId && businessId) {
+    const gate = await businessGate(deps.callerRpc(token), businessId)
+    if (gate !== 'ok') return gateReply(gate)
+    return reply(200, { ok: true, ...(await syncBusiness(deps, businessId)) })
+  }
+  if (!productId) return reply(400, { error: 'invalid_request' })
 
   const gate = await syncGate(deps.callerRpc(token), productId, businessId)
   if (gate !== 'ok') return gateReply(gate)

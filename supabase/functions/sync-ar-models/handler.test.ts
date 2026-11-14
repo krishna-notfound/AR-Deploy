@@ -27,12 +27,21 @@ function world(product: SyncProduct | null, opts: { rpcs?: Rpcs; files?: string[
     callerRpc: (token): CallerRpc => async (fn, args) => {
       rpcCalls.push([fn, args])
       if (fn === 'caller_mfa_satisfied') return token !== 'aal1-token' && (opts.rpcs?.mfa ?? true)
-      if (fn === 'can_sync_ar_models') return opts.rpcs?.canSync ?? true
+      if (fn === 'can_sync_ar_models' || fn === 'can_sync_ar_models_business') return opts.rpcs?.canSync ?? true
       throw new Error(`unexpected rpc ${fn}`)
     },
     ownerGate: async (t) => (t === 'owner-token' ? 'ok' : t === 'aal1-token' ? 'aal2_required' : 'forbidden'),
     product: async (id) => products.get(id) ?? null,
     publishedProductIds: async () => [...products.values()].filter((p) => p.status === 'published').map((p) => p.id),
+    businessProductIds: async (b) => [...products.values()].filter((p) => p.businessId === b).map((p) => p.id),
+    arProductFolders: async (b) => {
+      const seen = new Set<string>()
+      for (const f of files) {
+        const [biz, pid] = f.split('/')
+        if (biz && pid && (!b || biz === b)) seen.add(`${biz}/${pid}`)
+      }
+      return [...seen].map((s) => ({ businessId: s.split('/')[0]!, productId: s.split('/')[1]! }))
+    },
     listFolder: async (folder) => [...files].filter((f) => f.startsWith(`${folder}/`)),
     copy: async (from, to) => {
       if (from === opts.failCopy) throw new Error('copy failed')
@@ -217,6 +226,80 @@ describe('sync-ar-models: { all: true } backfill', () => {
       expect(await json(r)).toEqual({ error })
       expect(w.copies).toEqual([])
     }
+  })
+})
+
+describe('sync-ar-models: { businessId } (QA RLS-01 / BL-2)', () => {
+  it('asks caller_mfa_satisfied, then can_sync_ar_models_business with the business', async () => {
+    const w = world(product('published'))
+    await handleSyncArModels(post({ businessId: BIZ }), w.deps)
+    expect(w.rpcCalls).toEqual([
+      ['caller_mfa_satisfied', undefined],
+      ['can_sync_ar_models_business', { p_business: BIZ }],
+    ])
+  })
+
+  it('a paused business: every product copy goes, found by the function and not listed by the caller', async () => {
+    const other = { ...product('published'), id: GONE, businessStatus: 'inactive' }
+    const w = world(product('published', { businessStatus: 'inactive' }), { files: [GLB_PATH, VAR_PATH, `${BIZ}/${GONE}/base/glb-x.glb`] })
+    w.products.set(GONE, other)
+    const r = await handleSyncArModels(post({ businessId: BIZ }), w.deps)
+    expect(await json(r)).toEqual({ ok: true, copied: 0, removed: 3, failed: 0 })
+    expect(w.files.size).toBe(0)
+    expect(w.copies).toEqual([])
+  })
+
+  it('a resumed business gets its published products copied again', async () => {
+    const w = world(product('published'))
+    expect(await json(await handleSyncArModels(post({ businessId: BIZ }), w.deps))).toEqual({ ok: true, copied: 3, removed: 0, failed: 0 })
+  })
+
+  it('a deleted business: the folders of products that no longer exist are emptied', async () => {
+    const w = world(null, { files: [`${BIZ}/${GONE}/base/glb-x.glb`, `${BIZ}/${PID}/base/glb-y.glb`, `${GONE}/${PID}/base/glb-z.glb`] })
+    const r = await handleSyncArModels(post({ businessId: BIZ }), w.deps)
+    expect(await json(r)).toEqual({ ok: true, copied: 0, removed: 2, failed: 0 })
+    expect([...w.files]).toEqual([`${GONE}/${PID}/base/glb-z.glb`]) // another business is not touched
+  })
+
+  it('one product that throws is counted as failed and the others are still synced', async () => {
+    const w = world(product('published'))
+    w.products.set(GONE, { ...product('published'), id: GONE })
+    const realProduct = w.deps.product
+    w.deps.product = async (id) => {
+      if (id === GONE) throw new Error('boom')
+      return realProduct(id)
+    }
+    expect(await json(await handleSyncArModels(post({ businessId: BIZ }), w.deps))).toEqual({ ok: true, copied: 3, removed: 0, failed: 1 })
+  })
+
+  it('a caller who may not sync is 403 and a session that needs 2FA is 403 aal2_required; nothing changes', async () => {
+    const no = world(product('published', { businessStatus: 'inactive' }), { rpcs: { canSync: false }, files: [GLB_PATH] })
+    const r = await handleSyncArModels(post({ businessId: BIZ }), no.deps)
+    expect(r.status).toBe(403)
+    expect(await json(r)).toEqual({ error: 'forbidden' })
+    expect(no.removed).toEqual([])
+    const aal1 = world(product('published'))
+    const r2 = await handleSyncArModels(post({ businessId: BIZ }, 'aal1-token'), aal1.deps)
+    expect(await json(r2)).toEqual({ error: 'aal2_required' })
+    expect(aal1.rpcCalls.map(([fn]) => fn)).toEqual(['caller_mfa_satisfied'])
+  })
+
+  it('a bad business id is 400 invalid_request before any gate call', async () => {
+    const w = world(product('published'))
+    expect((await handleSyncArModels(post({ businessId: 'nope' }), w.deps)).status).toBe(400)
+    expect(w.rpcCalls).toEqual([])
+  })
+})
+
+describe('sync-ar-models: { all: true } reconcile (QA RLS-01)', () => {
+  it('also clears the folder of an unpublished, paused or deleted product that a lost client call left behind', async () => {
+    const draft = { ...product('draft'), id: GONE }
+    const w = world(product('published'), { files: [`${BIZ}/${GONE}/base/glb-x.glb`, `${BIZ}/${PID}/base/stale.glb`, `${BIZ}/55555555-5555-4555-8555-555555555555/base/glb-y.glb`] })
+    w.products.set(GONE, draft)
+    const r = await handleSyncArModels(post({ all: true }, 'owner-token'), w.deps)
+    expect(await json(r)).toEqual({ ok: true, copied: 3, removed: 3, failed: 0 })
+    expect([...w.files].some((f) => f.includes(`/${GONE}/`) || f.includes('5555'))).toBe(false)
+    expect(w.files.has(GLB_PATH)).toBe(true)
   })
 })
 

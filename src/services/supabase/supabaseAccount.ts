@@ -7,6 +7,7 @@
 // A failure is always reported with a reason; nothing here falls back to demo data.
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, TotpEnrollment } from '@/domain/types'
+import { imageMimeOf } from '@/lib/image'
 import { settingsPath } from '@/lib/urls'
 import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, type NoticeOutcome, PASSWORD_MAX, PASSWORD_MIN, type ProfilePatch, accountFail } from '../accountService'
 import { type Result, ok } from '../catalogService'
@@ -279,6 +280,8 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     async uploadAvatar(file) {
       const ext = AVATAR_TYPES[file.type]
       if (!ext || file.size > AVATAR_MAX_BYTES) return accountFail('invalid_avatar')
+      // The declared type is the caller's word and the bucket cannot read the content: the file must really be that picture (F-TI-1).
+      if ((await imageMimeOf(file)) !== file.type) return accountFail('invalid_avatar')
       const me = await currentUser()
       if (!me.ok) return me
       const previous = await readAvatarPath(me.data.id)
