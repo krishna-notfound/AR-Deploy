@@ -42,6 +42,6 @@ export default defineConfig({
     timeout: 60_000,
     // E2E covers demo mode; process env beats .env.local, so a developer's Supabase setup is not used here.
     // Model optimization is off by default (client sign-off pending, ADR-0019); E2E turns it on to test it.
-    env: { VITE_DATA_MODE: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_ROOT_DOMAIN: '', VITE_MODEL_OPTIMIZATION: 'on' },
+    env: { VITE_DATA_MODE: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_ROOT_DOMAIN: '', VITE_MODEL_OPTIMIZATION: 'on', VITE_DEFAULT_LANG: 'en' },
   },
 })

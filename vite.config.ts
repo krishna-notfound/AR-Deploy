@@ -38,7 +38,8 @@ export default defineConfig(({ mode, command }) => {
       // faster overall and keeps timing-sensitive UI tests stable.
       maxWorkers: '50%',
       // Tests always run in demo mode, whatever a developer's .env.local says.
-      env: { VITE_DATA_MODE: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_ROOT_DOMAIN: '' },
+      // Tests are written against the English copy; the site itself opens in Portuguese (VITE_DEFAULT_LANG unset).
+    env: { VITE_DATA_MODE: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_ROOT_DOMAIN: '', VITE_DEFAULT_LANG: 'en' },
     },
   }
 })

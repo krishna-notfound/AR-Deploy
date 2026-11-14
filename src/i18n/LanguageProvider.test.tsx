@@ -34,15 +34,18 @@ afterEach(() => {
 })
 
 describe('LanguageProvider choice order', () => {
-  it('defaults to English when nothing is set and the browser is not Portuguese', () => {
-    render(<LanguageProvider><Probe /></LanguageProvider>)
-    expect(screen.getByTestId('lang')).toHaveTextContent('en')
-  })
-
-  it('uses the browser language when nothing is saved (pt* is Portuguese)', () => {
-    vi.spyOn(navigator, 'language', 'get').mockReturnValue('pt-BR')
+  it('with nothing chosen, the site opens in Portuguese whatever the browser language (owner, 2026-11-14)', () => {
+    vi.stubEnv('VITE_DEFAULT_LANG', '')
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
     render(<LanguageProvider><Probe /></LanguageProvider>)
     expect(screen.getByTestId('lang')).toHaveTextContent('pt')
+    vi.unstubAllEnvs()
+  })
+
+  it('VITE_DEFAULT_LANG overrides the default (the test runs use en)', () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('pt-PT')
+    render(<LanguageProvider><Probe /></LanguageProvider>)
+    expect(screen.getByTestId('lang')).toHaveTextContent('en')
   })
 
   it('a saved choice beats the browser language', () => {

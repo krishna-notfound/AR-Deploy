@@ -22,7 +22,10 @@ function migrateSessionChoice() {
   }
 }
 
-/** `?lang=` for this visit (not stored), then the device's saved choice, then the browser language. */
+/**
+ * `?lang=` for this visit (not stored), then the device's saved choice, then Portuguese (owner, 2026-11-14, ADR-0079:
+ * the browser language no longer decides). VITE_DEFAULT_LANG overrides that last step; the test runs set it to `en`.
+ */
 function initialLang(): Lang {
   const fromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null
   if (isLang(fromUrl)) return fromUrl
@@ -33,7 +36,8 @@ function initialLang(): Lang {
   } catch {
     // ignore
   }
-  return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('pt') ? 'pt' : 'en'
+  const configured: unknown = import.meta.env.VITE_DEFAULT_LANG
+  return isLang(configured) ? configured : 'pt'
 }
 
 interface LangCtx {
