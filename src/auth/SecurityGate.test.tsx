@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Link, MemoryRouter, Route, Routes } from 'react-router'
+import { Link, MemoryRouter, Route, RouterProvider, Routes, createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 import { adminNav } from '@/components/layout/nav'
+import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import SettingsLayout from '@/features/settings/SettingsLayout'
 import type { Business } from '@/domain/types'
@@ -118,15 +119,16 @@ describe('SecurityGate notice in the dashboards', () => {
 
   it('sits inline in the settings main column too', { timeout: 20_000 }, async () => {
     failBoth()
+    // SettingsLayout guards unsaved drafts with useBlocker, which needs a data router (the app uses createBrowserRouter).
+    const router = createMemoryRouter(
+      [{ path: '/admin/settings/:section?', element: <AccountProvider><RequireRole allow="super_admin"><SecurityGate><SettingsLayout scope="admin" /></SecurityGate></RequireRole></AccountProvider> }],
+      { initialEntries: ['/admin/settings/account'] },
+    )
     render(
       <ToastProvider>
-        <MemoryRouter initialEntries={['/admin/settings/account']}>
-          <AccountProvider>
-            <Routes>
-              <Route path="/admin/settings/:section?" element={<RequireRole allow="super_admin"><SecurityGate><SettingsLayout scope="admin" /></SecurityGate></RequireRole>} />
-            </Routes>
-          </AccountProvider>
-        </MemoryRouter>
+        <ConfirmProvider>
+          <RouterProvider router={router} />
+        </ConfirmProvider>
       </ToastProvider>,
     )
     const notice = await screen.findByText(CHECK_FAILED)

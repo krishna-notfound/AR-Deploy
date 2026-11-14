@@ -229,7 +229,7 @@ describe('BL-6: slug allocation is serialised', () => {
 
 describe('RLS-04: the 10-device cap holds for a direct insert', () => {
   const sub = (n: number, day: number) =>
-    `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth, created_at) values ($1, 'https://push.example/${n}', 'k', 'a', '2026-02-${String(day).padStart(2, '0')}')`
+    `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth, created_at) values ($1, 'https://fcm.googleapis.com/fcm/send/${n}', 'k', 'a', '2026-02-${String(day).padStart(2, '0')}')`
   const endpoints = async (uid: string) => (await db.query<{ e: string }>(`select endpoint as e from public.push_subscriptions where user_id = $1 order by created_at`, [uid])).rows.map((r) => r.e)
 
   it('twelve direct inserts by one user leave the newest ten; another user keeps theirs', async () => {
@@ -237,20 +237,20 @@ describe('RLS-04: the 10-device cap holds for a direct insert', () => {
     for (let i = 1; i <= 12; i++) await h.as(OWNER, (tx) => tx.query(sub(i, i), [OWNER]))
     const mine = await endpoints(OWNER)
     expect(mine).toHaveLength(10)
-    expect(mine[0]).toBe('https://push.example/3')
-    expect(mine.at(-1)).toBe('https://push.example/12')
-    expect(await endpoints(OTHER)).toEqual(['https://push.example/900'])
+    expect(mine[0]).toBe('https://fcm.googleapis.com/fcm/send/3')
+    expect(mine.at(-1)).toBe('https://fcm.googleapis.com/fcm/send/12')
+    expect(await endpoints(OTHER)).toEqual(['https://fcm.googleapis.com/fcm/send/900'])
   })
 
   it('a batch of inserts in one statement is capped too, and register_push_subscription still works', async () => {
     await db.exec(`delete from public.push_subscriptions where user_id = '${OWNER}'`)
     await h.as(OWNER, (tx) =>
-      tx.query(`insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) select $1, 'https://push.example/b' || g, 'k', 'a' from generate_series(1, 15) g`, [OWNER]),
+      tx.query(`insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) select $1, 'https://fcm.googleapis.com/fcm/send/b' || g, 'k', 'a' from generate_series(1, 15) g`, [OWNER]),
     )
     expect(await endpoints(OWNER)).toHaveLength(10)
-    await h.as(OWNER, (tx) => tx.query(`select public.register_push_subscription('https://push.example/rpc', 'k', 'a', 'ua')`))
+    await h.as(OWNER, (tx) => tx.query(`select public.register_push_subscription('https://fcm.googleapis.com/fcm/send/rpc', 'k', 'a', 'ua')`))
     expect(await endpoints(OWNER)).toHaveLength(10)
-    expect(await endpoints(OWNER)).toContain('https://push.example/rpc')
+    expect(await endpoints(OWNER)).toContain('https://fcm.googleapis.com/fcm/send/rpc')
   })
 })
 

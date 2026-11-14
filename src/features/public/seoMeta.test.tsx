@@ -32,32 +32,32 @@ describe('not-found pages are marked noindex (P3D-03 / EF-18: the server answers
   it('an unknown public URL', async () => {
     openApp('/no-such-page')
     await screen.findByRole('heading', { name: 'Page not found', level: 1 })
-    expect(robots()).toBe('noindex')
+    await waitFor(() => expect(robots()).toBe('noindex')) // the tag is added in an effect, which may run just after the heading appears
   })
 
   it('a catalogue that does not exist', async () => {
     openApp('/catalog/no-such-store')
     await screen.findByRole('heading', { name: 'Catalog not found' })
-    expect(robots()).toBe('noindex')
+    await waitFor(() => expect(robots()).toBe('noindex')) // the tag is added in an effect, which may run just after the heading appears
     expect(document.title).toContain('Catalog not found')
   })
 
   it('a product that does not exist, and a draft asked for by a visitor', async () => {
     openApp('/products/nordhaus/no-such-product')
     await screen.findByRole('heading', { name: 'Product not available' })
-    expect(robots()).toBe('noindex')
+    await waitFor(() => expect(robots()).toBe('noindex')) // the tag is added in an effect, which may run just after the heading appears
     cleanup()
     expect(robots()).toBeNull()
 
     openApp('/products/nordhaus/oslo-bar-stool?preview=1')
     await screen.findByRole('heading', { name: 'Product not available' })
-    expect(robots()).toBe('noindex')
+    await waitFor(() => expect(robots()).toBe('noindex')) // the tag is added in an effect, which may run just after the heading appears
   })
 
   it('the tag goes away with the page', async () => {
     const { unmount } = openApp('/no-such-page')
     await screen.findByRole('heading', { name: 'Page not found', level: 1 })
-    expect(robots()).toBe('noindex')
+    await waitFor(() => expect(robots()).toBe('noindex')) // the tag is added in an effect, which may run just after the heading appears
     unmount()
     expect(robots()).toBeNull()
   })
