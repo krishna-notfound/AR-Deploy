@@ -8,6 +8,7 @@ export function useQrCode(text: string, width = 1024) {
   useEffect(() => {
     let alive = true
     setUrl(null)
+    setError(false) // a failure for one text must not mark every later code as failed (QA BL-7)
     QRCode.toDataURL(text, { width, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#161616', light: '#FFFFFF' } })
       .then((u) => alive && setUrl(u))
       .catch(() => alive && setError(true))

@@ -270,6 +270,28 @@ describe('product editor: uploads and units', () => {
     expect(screen.getByText('chair.usdz')).toBeInTheDocument()
   })
 
+  it('does not let Save, Preview or Publish run while a chosen 3D model is still being added, then saves it (P3D-01)', async () => {
+    const user = userEvent.setup()
+    const resolveUpload = deferUploads()
+    const create = vi.spyOn(service, 'createProduct')
+    renderNew()
+    await chooseUpload(user)
+    await user.type(screen.getByRole('textbox', { name: /^Product name/ }), 'Test sofa')
+    await user.upload(screen.getByLabelText('Upload .glb file'), glbFile('chair.glb'))
+    const bar = screen.getByRole('region', { name: 'Save and publish' })
+    await waitFor(() => expect(within(bar).getByRole('button', { name: 'Save draft' })).toBeDisabled())
+    expect(within(bar).getByRole('button', { name: 'Publish' })).toBeDisabled()
+    expect(within(bar).getByRole('button', { name: 'Preview' })).toBeDisabled()
+    expect(within(bar).getByText('Adding a 3D model. Saving is available when it finishes.')).toBeInTheDocument()
+    await resolveUpload('chair.glb')
+    await screen.findByText('chair.glb')
+    await waitFor(() => expect(within(bar).getByRole('button', { name: 'Save draft' })).toBeEnabled())
+    expect(within(bar).queryByText(/Adding a 3D model/)).not.toBeInTheDocument()
+    await user.click(within(bar).getByRole('button', { name: 'Save draft' }))
+    await waitFor(() => expect(create).toHaveBeenCalled())
+    expect(create.mock.calls[0]![0].models?.glb?.fileName).toBe('chair.glb')
+  })
+
   it('keeps gallery and additional photos uploaded at the same time (COR-13)', async () => {
     const user = userEvent.setup()
     const resolveUpload = deferUploads()

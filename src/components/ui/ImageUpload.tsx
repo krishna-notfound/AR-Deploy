@@ -1,4 +1,4 @@
-import { ImagePlus, Pencil, Star, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ImagePlus, Pencil, Star, Trash2 } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import { ImageCropDialog } from '@/components/image/ImageCropDialog'
 import type { ImageCrop, ProductImage } from '@/domain/types'
@@ -52,6 +52,8 @@ export function ImageUpload({
   const inputRef = useRef<HTMLInputElement>(null)
   const [errors, setErrors] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  /** Read out after a photo moves, so a screen-reader user hears where it landed. */
+  const [moved, setMoved] = useState('')
   /** Chosen files waiting for the crop dialog: the first one is open. */
   const [queue, setQueue] = useState<File[]>([])
   const [editing, setEditing] = useState<Editing | null>(null)
@@ -174,12 +176,27 @@ export function ImageUpload({
 
   const setPrimary = (id: string) => update((mine) => mine.map((i) => ({ ...i, isPrimary: i.id === id })))
   const remove = (id: string) => update((mine) => mine.filter((i) => i.id !== id))
+  /** Swaps a photo with its neighbour. The order is saved as it is (sort_order), and the primary photo stays the primary. */
+  const move = (id: string, by: -1 | 1) => {
+    const from = own.findIndex((i) => i.id === id)
+    const to = from + by
+    if (from < 0 || to < 0 || to >= own.length) return
+    setMoved(t('ui.images.moved', { name: own[from]?.alt || t('ui.images.image'), n: to + 1, total: own.length }))
+    update((mine) => {
+      const a = mine.findIndex((i) => i.id === id)
+      const b = a + by
+      if (a < 0 || b < 0 || b >= mine.length) return mine
+      const next = [...mine]
+      ;[next[a], next[b]] = [next[b]!, next[a]!]
+      return next
+    })
+  }
 
   const queued = queue[0]
   return (
     <div>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-        {own.map((img) => (
+        {own.map((img, idx) => (
           <figure key={img.id} className="group relative">
             <SmartImage
               src={img.url}
@@ -202,6 +219,16 @@ export function ImageUpload({
                 <Trash2 className="size-3.5" />
               </IconButton>
             </div>
+            {own.length > 1 && (
+              <div className="mt-1.5 flex justify-center gap-1">
+                <IconButton aria-label={t('ui.images.moveEarlier', { name: img.alt || t('ui.images.image') })} title={t('ui.images.moveEarlier', { name: img.alt || t('ui.images.image') })} size="sm" className="size-7" disabled={idx === 0} onClick={() => move(img.id, -1)}>
+                  <ChevronLeft className="size-3.5" />
+                </IconButton>
+                <IconButton aria-label={t('ui.images.moveLater', { name: img.alt || t('ui.images.image') })} title={t('ui.images.moveLater', { name: img.alt || t('ui.images.image') })} size="sm" className="size-7" disabled={idx === own.length - 1} onClick={() => move(img.id, 1)}>
+                  <ChevronRight className="size-3.5" />
+                </IconButton>
+              </div>
+            )}
           </figure>
         ))}
         <label
@@ -240,6 +267,10 @@ export function ImageUpload({
         {isDemoMode && ` ${t('ui.images.demoResize')}`}
         {` ${t('ui.images.cropHelp')}`}
         {allowPrimary && ` ${t('ui.images.primaryHelp')}`}
+        {own.length > 1 && ` ${t('ui.images.orderHelp')}`}
+      </p>
+      <p role="status" className="sr-only">
+        {moved}
       </p>
       {errors.length > 0 && (
         <ul role="alert" className="mt-2 space-y-1 text-xs font-medium text-danger">

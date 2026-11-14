@@ -1,7 +1,7 @@
 import type { Business, Product, ProductModels, ProductVariant } from '@/domain/types'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { type Vars, translate } from '@/i18n/translate'
-import { minorToInput, parseMoneyInput } from '@/lib/format'
+import { MAX_MEASURE, MAX_PRICE_MINOR, minorToInput, parseMoneyInput } from '@/lib/format'
 import type { ProductInput } from '@/services/catalogService'
 
 /** Editor form state: ProductInput plus raw text inputs for numbers. */
@@ -108,9 +108,10 @@ export function withFreshModelUrls(form: EditorForm, stored: Product): EditorFor
   }
 }
 
+/** A plain non-negative number, with a comma or a point as the decimal mark. Anything else is NaN: parseFloat would read "12abc" as 12 and "1.2.3" as 1.2 and save that (QA FV-05). */
 const num = (s: string) => {
-  const v = parseFloat(s.replace(',', '.'))
-  return Number.isFinite(v) ? v : NaN
+  const raw = s.trim().replace(',', '.')
+  return /^(\d+(\.\d+)?|\.\d+)$/.test(raw) ? parseFloat(raw) : NaN
 }
 
 /**
@@ -134,18 +135,21 @@ export function toInput(form: EditorForm, t: (key: TranslationKey, vars?: Vars) 
   const errors: Record<string, string> = {}
   const price = form.priceText.trim() === '' ? 0 : parseMoneyInput(form.priceText)
   if (price === null) errors.price = t('products.form.priceFormat')
+  else if (price > MAX_PRICE_MINOR) errors.price = t('common.validation.priceTooLarge')
   const dims = { width: 0, height: 0, depth: 0 }
   for (const k of ['width', 'height', 'depth'] as const) {
     const raw = form.dims[k].trim()
     if (raw === '') continue
     const v = num(raw)
     if (!Number.isFinite(v) || v < 0) errors[`dimensions.${k}`] = t('common.validation.numberPositive')
+    else if (v > MAX_MEASURE) errors[`dimensions.${k}`] = t('common.validation.numberTooLarge')
     else dims[k] = Math.round(v * 10) / 10
   }
   let weight: ProductInput['weight'] = undefined
   if (form.weightText.trim()) {
     const v = num(form.weightText)
     if (!Number.isFinite(v) || v <= 0) errors.weight = t('products.form.weightInvalid')
+    else if (v > MAX_MEASURE) errors.weight = t('common.validation.numberTooLarge')
     else weight = { value: v, unit: form.input.weight?.unit ?? 'kg' }
   }
   const cleanVariants = form.input.variants
@@ -153,6 +157,7 @@ export function toInput(form: EditorForm, t: (key: TranslationKey, vars?: Vars) 
     .map((v) => ({ ...v, name: { en: v.name.en.trim(), ...(v.name.pt?.trim() ? { pt: v.name.pt.trim() } : {}) } }))
   // An unnamed option is dropped on save, so one with anything entered (including its own files) must be named.
   if (form.input.variants.some((v) => !v.name.en.trim() && (v.name.pt || v.sku || v.images?.length || v.models?.glb || v.models?.usdz))) errors.variants = t('products.form.variantName')
+  if (!errors.variants && form.input.variants.some((v) => (v.priceDelta ?? 0) > MAX_PRICE_MINOR)) errors.variants = t('common.validation.priceTooLarge')
   return {
     input: {
       ...form.input,

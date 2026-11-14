@@ -9,6 +9,11 @@ export function formatMoney(minor: number, currency: Currency, lang: Lang = 'en'
   return new Intl.NumberFormat(localeOf(lang), { style: 'currency', currency }).format(minor / 100)
 }
 
+/** The largest price, or price difference, an editor accepts: 21 million in major units (the database stores whole minor units in an integer, which holds more). */
+export const MAX_PRICE_MINOR = 2_100_000_000
+/** The largest width, height, depth or weight an editor accepts: below one million (the database holds up to 999,999.99). */
+export const MAX_MEASURE = 999_999.9
+
 /** "1234.5" → 123450. Returns null for invalid input. */
 export function parseMoneyInput(value: string): number | null {
   const normalized = value.trim().replace(/\s/g, '').replace(',', '.')

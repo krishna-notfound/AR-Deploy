@@ -66,6 +66,25 @@ describe('ProductTable: open product page', () => {
   })
 })
 
+describe('ProductTable: row actions wait while one runs (QA EF-02)', () => {
+  it('Duplicate is disabled until the first duplicate finishes, so it cannot be submitted twice', async () => {
+    const { business, published } = await load()
+    let finish: () => void = () => {}
+    const real = service.duplicateProduct.bind(service)
+    const duplicate = vi.spyOn(service, 'duplicateProduct').mockImplementation(async (id) => {
+      await new Promise<void>((resolve) => (finish = resolve))
+      return real(id)
+    })
+    const user = await openMenuFor(business, published)
+    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }))
+    await user.click(screen.getAllByRole('button', { name: `Actions for ${published.name.en}` })[0]!)
+    expect(await screen.findByRole('menuitem', { name: 'Duplicate' })).toBeDisabled()
+    expect(duplicate).toHaveBeenCalledTimes(1)
+    finish()
+    await vi.waitFor(() => expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeEnabled())
+  })
+})
+
 describe('ProductTable: 3D request badges and filter (S4 R-S4-9)', () => {
   async function renderList(states: Record<string, ProductRequestState>) {
     const b = await service.getBusinessById('biz_nord')

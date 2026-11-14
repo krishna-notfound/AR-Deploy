@@ -57,3 +57,43 @@ describe('withAddedVariant (ADR-0068)', () => {
     expect(withAddedVariant(next, walnut)).toBe(next)
   })
 })
+describe('toInput: numbers (QA FV-04, FV-05)', () => {
+  const withDims = (width: string, weightText = '') => {
+    const form = emptyForm()
+    form.dims = { width, height: '10', depth: '10' }
+    form.weightText = weightText
+    return toInput(form)
+  }
+
+  it('refuses text that only starts like a number instead of saving a different value', () => {
+    expect(withDims('12abc').errors['dimensions.width']).toBe('Enter a positive number.')
+    expect(withDims('1.2.3').errors['dimensions.width']).toBe('Enter a positive number.')
+    expect(withDims('1e3').errors['dimensions.width']).toBe('Enter a positive number.')
+    expect(withDims('10', '5kg').errors.weight).toBe('Enter a positive weight or leave it empty.')
+    expect(withDims('10', '2..5').errors.weight).toBe('Enter a positive weight or leave it empty.')
+  })
+
+  it('still reads plain numbers, with a comma or a point', () => {
+    expect(withDims('83,5').input.dimensions.width).toBe(83.5)
+    expect(withDims('83.5', '12,5').input.weight?.value).toBe(12.5)
+    expect(withDims('.5').input.dimensions.width).toBe(0.5)
+    expect(withDims('83.5').errors).toEqual({})
+  })
+
+  it('names the limit for a price, a size and a weight that are too large', () => {
+    const form = emptyForm()
+    form.priceText = '99999999999'
+    form.dims = { width: '1000000', height: '10', depth: '10' }
+    form.weightText = '99999999'
+    const { errors } = toInput(form)
+    expect(errors.price).toBe('This amount is too high. Enter an amount below 21 million.')
+    expect(errors['dimensions.width']).toBe('This number is too large. Enter a value below 1 million.')
+    expect(errors.weight).toBe('This number is too large. Enter a value below 1 million.')
+  })
+
+  it('names the limit for a price difference that is too large', () => {
+    const form = emptyForm()
+    form.input.variants = [{ id: 'v', name: { en: 'Oak' }, priceDelta: 3_000_000_000 }]
+    expect(toInput(form).errors.variants).toBe('This amount is too high. Enter an amount below 21 million.')
+  })
+})

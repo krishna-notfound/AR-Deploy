@@ -239,6 +239,7 @@ export function mapDbError<T>(e: DbError, ctx: { notFound?: string; conflictFiel
     case '23514':
     case '23502':
     case '22P02':
+    case '22003': // numeric_value_out_of_range: a price or size beyond what the column holds
       return fail('VALIDATION', 'Some values were rejected. Check the fields and try again.')
     case 'P0002':
       return fail('NOT_FOUND', e.message)
@@ -662,6 +663,9 @@ const FUNCTION_ERRORS: Record<string, { code: ServiceErrorCode; message: string 
   config_unavailable: { code: 'UNKNOWN', message: 'The application could not be sent. Try again in a moment.' },
 }
 
+/** The batch request for the product files' download links failed as a whole (see hydrate). */
+class MediaLinksFailed extends Error {}
+
 export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService {
   const listeners = new Set<() => void>()
   /** Notify open queries after a successful write. */
@@ -674,6 +678,7 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     try {
       return await fn()
     } catch (err) {
+      if (err instanceof MediaLinksFailed) return { ok: false, error: { code: 'STORAGE', message: 'The pictures and 3D files could not be loaded.', reason: 'media_unavailable' } }
       return fail('UNKNOWN', `Could not reach Supabase: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
@@ -734,10 +739,16 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
     }
     const signed = new Map<string, string>()
     if (paths.size) {
-      // A signing failure leaves the URL empty; the UI then shows its missing-image / invalid-model state.
       const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUrls([...paths], SIGNED_URL_TTL_SECONDS)
+      // The whole request failed (network, session): that is a load error with a retry, never a file problem. Marking every stored
+      // 3D file invalid and every picture empty would show healthy files as broken (QA EF-12). A file that is really missing comes
+      // back as its own entry without a link, and still shows as unavailable.
+      if (error) {
+        if (import.meta.env.DEV) console.warn('[media] signing product media failed', error)
+        throw new MediaLinksFailed()
+      }
       for (const d of data ?? []) if (d.path && d.signedUrl) signed.set(d.path, d.signedUrl)
-      if (import.meta.env.DEV && (error || signed.size < paths.size)) console.warn('[media] signing product media failed', error ?? (data ?? []).filter((d) => !d.signedUrl))
+      if (import.meta.env.DEV && signed.size < paths.size) console.warn('[media] a product file has no download link', (data ?? []).filter((d) => !d.signedUrl))
     }
     return rows.map((r) => toProduct(r, signed))
   }

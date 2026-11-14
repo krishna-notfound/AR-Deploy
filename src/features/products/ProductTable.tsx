@@ -1,7 +1,7 @@
 import { useCan } from '@/auth/usePermission'
 import type { Permission } from '@/domain/types'
 import { CodeXml, Copy, CopyPlus, ExternalLink, Eye, EyeOff, MoreHorizontal, Pencil, QrCode, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { Badge, ProductStatusBadge, type Tone } from '@/components/ui/Badge'
 import { type Column, DataTable } from '@/components/ui/DataTable'
@@ -85,9 +85,24 @@ export function ProductTable({
   const allowed = (need: Permission) => scope === 'business' || can(need)
   const [qrFor, setQrFor] = useState<Product | null>(null)
   const [embedFor, setEmbedFor] = useState<Product | null>(null)
+  /** Products with a duplicate, publish, unpublish or delete in flight: their menu items wait, so a second click cannot repeat it (QA EF-02). */
+  const running = useRef(new Set<string>())
+  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(new Set())
+  const run = async (p: Product, action: () => Promise<unknown>) => {
+    if (running.current.has(p.id)) return
+    running.current.add(p.id)
+    setBusyIds(new Set(running.current))
+    try {
+      await action()
+    } finally {
+      running.current.delete(p.id)
+      setBusyIds(new Set(running.current))
+    }
+  }
 
   const menuItems = (p: Product): (MenuItem | 'separator')[] => {
     const b = businesses.get(p.businessId)
+    const disabled = busyIds.has(p.id)
     return [
       ...(allowed('products.edit') ? [{ label: t('common.edit'), icon: <Pencil />, onSelect: () => actions.edit(p) }] : []),
       { label: t(p.status === 'published' ? 'products.menu.open' : 'products.menu.previewDraft'), icon: <ExternalLink />, onSelect: () => actions.openPreview(p, b) },
@@ -95,15 +110,15 @@ export function ProductTable({
       // The product QR code only for a publicly visible product: published, in an active catalogue (ADR-0054).
       ...(p.status === 'published' && b?.status === 'active' ? [{ label: t('products.menu.qr'), icon: <QrCode />, onSelect: () => setQrFor(p) }] : []),
       { label: t(p.status === 'published' ? 'products.menu.embed' : 'products.menu.embedDraft'), icon: <CodeXml />, onSelect: () => setEmbedFor(p) },
-      ...(allowed('products.edit') ? [{ label: t('products.menu.duplicate'), icon: <CopyPlus />, onSelect: () => void actions.duplicate(p) }] : []),
+      ...(allowed('products.edit') ? [{ label: t('products.menu.duplicate'), icon: <CopyPlus />, disabled, onSelect: () => void run(p, () => actions.duplicate(p)) }] : []),
       ...(!allowed('products.publish')
         ? []
         : [
             p.status === 'published'
-              ? { label: t('products.actions.unpublish'), icon: <EyeOff />, onSelect: () => void actions.unpublish(p) }
-              : { label: t('products.menu.publish'), icon: <Eye />, onSelect: () => void actions.publish(p, b) },
+              ? { label: t('products.actions.unpublish'), icon: <EyeOff />, disabled, onSelect: () => void run(p, () => actions.unpublish(p)) }
+              : { label: t('products.menu.publish'), icon: <Eye />, disabled, onSelect: () => void run(p, () => actions.publish(p, b)) },
           ]),
-      ...(allowed('products.delete') ? (['separator', { label: t('common.delete'), icon: <Trash2 />, destructive: true, onSelect: () => void actions.remove(p) }] as const) : []),
+      ...(allowed('products.delete') ? (['separator', { label: t('common.delete'), icon: <Trash2 />, destructive: true, disabled, onSelect: () => void run(p, () => actions.remove(p)) }] as const) : []),
     ]
   }
 

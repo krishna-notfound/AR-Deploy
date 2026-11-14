@@ -32,6 +32,7 @@ import { modelRequestStatusLabel } from '@/features/modelRequests/ModelRequestSt
 import { type EditorScope, editPath, useProductActions } from '../useProductActions'
 import { type EditorForm, convertDims, emptyForm, formFromProduct, toInput, withAddedVariant, withFreshModelUrls, withStoredModels } from './formModel'
 import { LocalizedField } from './LocalizedField'
+import { type ModelBusy, ModelBusyProvider } from './modelBusy'
 import { ModelFilesReadOnly } from './ModelFilesReadOnly'
 import { ModelRequestPanel } from './ModelRequestPanel'
 import { ModelSection } from './ModelSection'
@@ -212,6 +213,8 @@ export function ProductEditorForm({
   const [errors, setErrors] = useState<Errors>(() => navState?.publishErrors ?? {})
   const [busy, setBusy] = useState<null | 'save' | 'publish' | 'unpublish' | 'preview' | 'delete'>(null)
   const [publishedOpen, setPublishedOpen] = useState(() => navState?.justPublished === true)
+  /** A 3D file is still being processed, uploaded or waiting for its scale choice: saving now would leave it out (QA P3D-01). */
+  const [modelBusy, setModelBusy] = useState<ModelBusy | null>(null)
   /** The last saved version: its slug drives the published dialog and Preview after a slug change. */
   const [latest, setLatest] = useState<Product | null>(product)
   const [pendingUnit, setPendingUnit] = useState<'cm' | 'in' | null>(null)
@@ -259,13 +262,13 @@ export function ProductEditorForm({
   const [reloading, setReloading] = useState(false)
 
   // ---- unsaved-changes guard ----
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => !skipBlock.current && dirty && currentLocation.pathname !== nextLocation.pathname)
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => !skipBlock.current && (dirty || !!modelBusy) && currentLocation.pathname !== nextLocation.pathname)
   useEffect(() => {
-    if (!dirty) return
+    if (!dirty && !modelBusy) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault()
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [dirty])
+  }, [dirty, modelBusy])
 
   useEffect(() => {
     if (!navState) return
@@ -376,6 +379,7 @@ export function ProductEditorForm({
   }
 
   const onSaveDraft = async () => {
+    if (modelBusy) return
     setBusy('save')
     const saved = await save()
     setBusy(null)
@@ -393,6 +397,7 @@ export function ProductEditorForm({
   }
 
   const onPublish = async () => {
+    if (modelBusy) return
     const check = checkForm(form, t)
     if (Object.keys(check.errors).length) return publishBlocked({ ...check.errors, ...check.publish })
     setBusy('publish')
@@ -418,6 +423,7 @@ export function ProductEditorForm({
   }
 
   const onPreview = async () => {
+    if (modelBusy) return
     let target = latest
     if (dirty || isNew) {
       setBusy('preview')
@@ -471,10 +477,11 @@ export function ProductEditorForm({
 
   // Inline from sm; below sm the header's More menu holds it (same handler and gate).
   const canDelete = !isNew && allowed('products.delete')
-  const statusText = t(dirty ? 'products.editor.unsaved' : isNew ? 'products.editor.notSavedYet' : 'products.editor.allSaved')
+  const statusText = modelBusy ? t(modelBusy === 'working' ? 'products.editor.modelWorking' : 'products.editor.modelWaiting') : t(dirty ? 'products.editor.unsaved' : isNew ? 'products.editor.notSavedYet' : 'products.editor.allSaved')
 
   return (
     // The form column stops at 792px (BRIEF section 6: a 200px index, a 32px gap, then the cards).
+    <ModelBusyProvider onChange={setModelBusy}>
     <div className="lg:max-w-[1024px]">
       <PageHeader
         title={isNew ? t('business.products.add') : form.input.name.en || t('products.editor.untitled')}
@@ -798,11 +805,11 @@ export function ProductEditorForm({
             </span>
           </p>
           <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:items-center sm:gap-3">
-            <Button onClick={onPreview} loading={busy === 'preview'} disabled={!!busy || !business} className="max-sm:px-2">
+            <Button onClick={onPreview} loading={busy === 'preview'} disabled={!!busy || !!modelBusy || !business} className="max-sm:px-2">
               {t('products.editor.preview')}
               {busy !== 'preview' && <ExternalLink className="size-4" aria-hidden />}
             </Button>
-            <Button onClick={onSaveDraft} loading={busy === 'save'} disabled={!!busy || (!dirty && !isNew)} className="max-sm:px-2">
+            <Button onClick={onSaveDraft} loading={busy === 'save'} disabled={!!busy || !!modelBusy || (!dirty && !isNew)} className="max-sm:px-2">
               {t(currentStatus === 'published' && !isNew ? 'products.editor.saveChanges' : 'products.editor.saveDraft')}
             </Button>
             {!allowed('products.publish') ? null : currentStatus === 'published' && !isNew ? (
@@ -810,7 +817,7 @@ export function ProductEditorForm({
                 {t('products.actions.unpublish')}
               </Button>
             ) : (
-              <Button variant="primary" onClick={onPublish} loading={busy === 'publish'} disabled={!!busy} className="max-sm:px-2 sm:px-5">
+              <Button variant="primary" onClick={onPublish} loading={busy === 'publish'} disabled={!!busy || !!modelBusy} className="max-sm:px-2 sm:px-5">
                 {t('products.menu.publish')}
               </Button>
             )}
@@ -884,6 +891,7 @@ export function ProductEditorForm({
         }
       />
     </div>
+    </ModelBusyProvider>
   )
 }
 
