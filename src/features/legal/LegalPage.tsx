@@ -3,12 +3,12 @@ import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { useMetaDescription } from '@/lib/pageMeta'
 import { usePublishedPage } from '@/services/contentHooks'
 import { LEGAL_CONTENT } from './content.generated'
 import { type Block, type Inline, inlineText, parseMarkdown } from './markdown'
 import { BlockView, type Heading, InlineContent, type Item, itemsOf } from './MarkdownBody'
 import { PageFrame } from './PageFrame'
-import { useMetaDescription } from './useMetaDescription'
 
 export type LegalDoc = 'privacy' | 'terms'
 

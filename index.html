@@ -9,6 +9,12 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Sanctus: product catalogues with photography, interactive 3D and native AR." />
+    <!-- Link previews: bots that do not run scripts read only these tags. A per-page preview (og:url, og:image) needs a server or a prerender step and a settled canonical domain: owner decision, docs/qa/2026-11-14-web-seo.md. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sanctus" />
+    <meta property="og:title" content="Sanctus · Beyond What Is Seen." />
+    <meta property="og:description" content="Sanctus: product catalogues with photography, interactive 3D and native AR." />
+    <meta name="twitter:card" content="summary" />
     <meta name="theme-color" content="#F3F0E9" />
     <!-- Dashboard dark mode without a flash (ADR-0060): a same-origin file, so the page stays inside script-src 'self'. -->
     <script src="/theme-init.js"></script>

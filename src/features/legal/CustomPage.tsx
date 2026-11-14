@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { errorText } from '@/i18n/errorText'
+import { useMetaDescription } from '@/lib/pageMeta'
 import { usePublishedPage } from '@/services/contentHooks'
 import PublicNotFoundPage from '../marketing/PublicNotFoundPage'
 import { MarkdownBody, firstParagraph } from './MarkdownBody'
 import { PageFrame } from './PageFrame'
-import { useMetaDescription } from './useMetaDescription'
 
 /**
  * A page the client made in the Editor, at /pages/:slug (platform domain and business subdomains). Title and body show in the

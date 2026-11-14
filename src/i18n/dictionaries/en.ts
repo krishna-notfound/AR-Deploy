@@ -25,6 +25,7 @@ export const enCore = {
   'catalog.clearFilters': 'Clear filters',
   'catalog.notFoundTitle': 'Catalog not found',
   'catalog.notFoundBody': 'Check the address, or ask the store for their catalog link.',
+  'catalog.metaDescription': '{name}: the catalog, with photographs, interactive 3D and augmented reality.',
   'catalog.goHome': 'Go to Sanctus',
   'catalog.inactiveTitle': 'This catalog is currently unavailable',
   'catalog.inactiveBody': 'The store has paused its online catalog. Please contact them directly.',
