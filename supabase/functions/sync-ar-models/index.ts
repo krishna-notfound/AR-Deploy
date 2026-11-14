@@ -35,7 +35,7 @@ async function listFiles(prefix: string): Promise<{ files: string[]; folders: st
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await admin.storage.from(AR_BUCKET).list(prefix, { limit: 1000, offset })
     if (error) throw fail('list', error as { name?: string })
-    for (const e of data ?? []) (e.id ? files : folders).push(`${prefix}/${e.name}`)
+    for (const e of data ?? []) (e.id ? files : folders).push(prefix ? `${prefix}/${e.name}` : e.name)
     if ((data ?? []).length < 1000) break
   }
   return { files, folders }
@@ -67,6 +67,21 @@ Deno.serve((req) =>
       const { data, error } = await admin.from('products').select('id').eq('status', 'published').limit(5000)
       if (error) throw fail('published lookup', error)
       return (data ?? []).map((r: { id: string }) => r.id)
+    },
+    async businessProductIds(businessId) {
+      const { data, error } = await admin.from('products').select('id').eq('business_id', businessId).limit(5000)
+      if (error) throw fail('business products lookup', error)
+      return (data ?? []).map((r: { id: string }) => r.id)
+    },
+    async arProductFolders(businessId) {
+      // ar-models/<business>/<product>/...: one level of business folders, then one of product folders.
+      const businesses = businessId ? [businessId] : (await listFiles('')).folders
+      const out: { businessId: string; productId: string }[] = []
+      for (const b of businesses) {
+        const biz = b.replace(/^\//, '')
+        for (const p of (await listFiles(biz)).folders) out.push({ businessId: biz, productId: p.slice(biz.length + 1) })
+      }
+      return out
     },
     async listFolder(folder) {
       // <business>/<product>/ holds one sub-folder per variant (and base); files sit one level down.

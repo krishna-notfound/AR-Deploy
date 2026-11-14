@@ -702,19 +702,26 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
    * is already decided and never changes; a failure is dropped (phone AR then uses the signed URL). businessId names
    * the folder of a product that no longer exists.
    */
-  const syncArModels = (productId: ID, businessId?: ID): void => {
-    void Promise.resolve()
-      .then(() => sb.functions.invoke(SYNC_AR_MODELS_FUNCTION, { body: businessId ? { productId, businessId } : { productId } }))
-      .catch(() => undefined)
-  }
-  /** The ids of a business's published products (the ones that can have public AR copies); [] when unreadable. */
-  const publishedIds = async (businessId: ID): Promise<ID[]> => {
-    try {
-      const { data } = await sb.from('products').select('id').eq('business_id', businessId).eq('status', 'published').returns<{ id: ID }[]>()
-      return Array.isArray(data) ? data.map((r) => r.id) : []
-    } catch {
-      return [] // never blocks the business action; the copies are then left for the next sync
-    }
+  const syncArModels = (productId: ID, businessId?: ID): void => callSyncArModels(businessId ? { productId, businessId } : { productId })
+  /**
+   * A business was paused, resumed or deleted: one call, and the function lists the business's products itself (service role).
+   * The caller used to list them with its own read rights, so staff without products.view left the copies of a paused
+   * business public (QA BL-2).
+   */
+  const syncArBusiness = (businessId: ID): void => callSyncArModels({ businessId })
+  /** One call, tried again once after a pause when it fails (a transient error); never throws, never blocks. */
+  const callSyncArModels = (body: Record<string, string>): void => {
+    void (async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const { error } = await sb.functions.invoke(SYNC_AR_MODELS_FUNCTION, { body })
+          if (!error) return
+        } catch {
+          // fall through to the retry
+        }
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 2000))
+      }
+    })()
   }
 
   /** Calls an Edge Function; its JSON error body ({ error, fields }) becomes a service error. */
@@ -1087,20 +1094,20 @@ export function createSupabaseCatalogService(sb: SupabaseClient): CatalogService
         const { data, error } = await sb.from('businesses').update({ status }).eq('id', id).select('*').maybeSingle<BusinessRow>()
         if (error) return mapDbError(error)
         if (data && (status === 'active' || status === 'inactive')) notifyOwner(id)
-        // Only an active business's products are public, so its AR copies follow the business status.
-        if (data) void publishedIds(id).then((ids) => ids.forEach((pid) => syncArModels(pid, id)))
+        // Only an active business's products are public, so its AR copies follow the business status. The function lists
+        // the products itself: this caller may not be allowed to read them.
+        if (data) syncArBusiness(id)
         return changed(data ? ok(toBusiness(data)) : await refusedOrMissing<Business>('businesses', { id }, 'Business not found.'))
       }),
     deleteBusiness: (id) =>
       guard(async () => {
         const current = await businessById(id)
-        const arProducts = await publishedIds(id) // read before the rows cascade away
         const { data, error } = await sb.from('businesses').delete().eq('id', id).select('id')
         if (error) return mapDbError(error)
         if (!data.length) return refusedOrMissing('businesses', { id }, 'Business not found.')
         // Rows cascade in the database; files live in Storage and are removed here (folder = business id). The public
-        // AR copies are removed by sync-ar-models (clients cannot write ar-models).
-        arProducts.forEach((pid) => syncArModels(pid, id))
+        // AR copies are removed by sync-ar-models (clients cannot write ar-models): it empties every folder of the business.
+        syncArBusiness(id)
         const [media, logos, photos] = await Promise.all([removeFolder(MEDIA_BUCKET, id), removeFolder(LOGO_BUCKET, id), removeFolderWithSubfolders(REQUEST_PHOTO_BUCKET, id)])
         const sweep: StorageSweep = { removedFiles: media.removed + logos.removed + photos.removed, failedFiles: media.failed + logos.failed + photos.failed }
         const logo = current.ok ? ownedLogoPath(current.data.logoUrl, id) : null

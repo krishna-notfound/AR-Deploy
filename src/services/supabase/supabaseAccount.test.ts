@@ -7,6 +7,10 @@ type Answer = { data?: unknown; error?: unknown }
 type Call = [string, ...unknown[]]
 
 const UID = 'user-1'
+// The first bytes of a real picture: an upload is accepted only when its header says it is the type it declares (F-TI-1).
+const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0))
+const REAL_PNG = new Uint8Array([0x89, ...ascii('PNG\r\n'), 0x1a, 0x0a, 0, 0, 0, 13, ...ascii('IHDR'), 0, 0, 0, 64, 0, 0, 0, 64, 8, 6, 0, 0, 0])
+const REAL_WEBP = new Uint8Array([...ascii('RIFF'), 40, 0, 0, 0, ...ascii('WEBPVP8X'), 10, 0, 0, 0, 0, 0, 0, 0, 63, 0, 0, 63, 0, 0, 0, 0])
 const authError = (code: string, status = 422) => ({ name: 'AuthApiError', code, status, message: `raw provider text: ${code}` })
 /** What supabase-js returns for a non-2xx function response: a FunctionsHttpError whose context is the Response. */
 const httpError = (status: number, body: unknown) => ({ name: 'FunctionsHttpError', context: new Response(JSON.stringify(body), { status }) })
@@ -475,7 +479,7 @@ describe('Supabase account service', () => {
         },
       },
     })
-    const file = new Blob(['img'], { type: 'image/webp' })
+    const file = new Blob([REAL_WEBP], { type: 'image/webp' })
     const r = await account(f).uploadAvatar(file)
     expect(r.ok).toBe(true)
     expect(f.log).toContainEqual(['storage.from', 'avatars'])
@@ -488,8 +492,18 @@ describe('Supabase account service', () => {
     expect(f.bucket.remove).toHaveBeenCalledWith([`${UID}/previous.webp`])
     expect(r.ok && r.data.avatarUrl).toBe(`https://cdn.test/avatars/${upload[0]}`)
 
-    const big = await account(fake()).uploadAvatar(new Blob([new Uint8Array(512 * 1024 + 1)], { type: 'image/webp' }))
+    const big = await account(fake()).uploadAvatar(new Blob([REAL_WEBP, new Uint8Array(512 * 1024)], { type: 'image/webp' }))
     expect(!big.ok && big.error.reason).toBe('invalid_avatar')
+
+    // F-TI-1: a file that only says it is a picture is refused before any upload.
+    const html = fake()
+    for (const [body, type] of [['<html><script>alert(1)</script></html>', 'image/png'], [REAL_PNG, 'image/webp'], [REAL_WEBP, 'image/png'], ['<svg xmlns="http://www.w3.org/2000/svg"/>', 'image/webp'], [new Uint8Array(40), 'image/jpeg']] as const) {
+      const bad = await account(html).uploadAvatar(new Blob([body], { type }))
+      expect(!bad.ok && bad.error.reason, String(type)).toBe('invalid_avatar')
+    }
+    expect(html.bucket.upload).not.toHaveBeenCalled()
+    const png = await account(fake({ tables: { profiles: () => ({ data: PROFILE_ROW }) } })).uploadAvatar(new Blob([REAL_PNG], { type: 'image/png' }))
+    expect(png.ok).toBe(true)
     const gif = await account(fake()).uploadAvatar(new Blob(['x'], { type: 'image/gif' }))
     expect(!gif.ok && gif.error.reason).toBe('invalid_avatar')
 

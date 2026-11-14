@@ -63,11 +63,11 @@ describe('ar_public_models migration', () => {
     expect(all.at(-1)! >= AR_MIGRATION).toBe(true)
   })
 
-  it('creates the public ar-models bucket: 50 MB, GLB and USDZ only', async () => {
+  it('creates the public ar-models bucket: 40 MB (50 MB when created, lowered by the storage hardening, ADR-0071), GLB and USDZ only', async () => {
     const { rows } = await db.query<{ public: boolean; file_size_limit: string; allowed_mime_types: string[] }>(
       `select public, file_size_limit::text, allowed_mime_types from storage.buckets where id = 'ar-models'`,
     )
-    expect(rows).toEqual([{ public: true, file_size_limit: '52428800', allowed_mime_types: ['model/gltf-binary', 'model/vnd.usdz+zip'] }])
+    expect(rows).toEqual([{ public: true, file_size_limit: '41943040', allowed_mime_types: ['model/gltf-binary', 'model/vnd.usdz+zip'] }])
   })
 
   it('no client role can write ar-models objects (only the service role writes)', async () => {

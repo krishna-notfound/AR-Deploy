@@ -133,18 +133,52 @@ describe('sync-ar-models after product actions (Supabase service)', () => {
 })
 
 describe('sync-ar-models after business actions (review fixes)', () => {
-  it('setBusinessStatus asks for a sync of each published product of the business, with the business id', async () => {
-    const t = stub('published')
-    expect((await t.svc.setBusinessStatus(BIZ, 'inactive')).ok).toBe(true)
-    await flush()
-    await flush()
-    expect(syncCalls(t.invoke)).toEqual([{ body: { productId: PID, businessId: BIZ } }])
+  it('setBusinessStatus asks for one business-wide sync; the function lists the products, so staff who cannot read them still pause the copies (BL-2)', async () => {
+    // The products table answers nothing to this caller (no products.view): the call must not depend on it.
+    for (const start of ['published', 'draft'] as const) {
+      const t = stub(start)
+      expect((await t.svc.setBusinessStatus(BIZ, 'inactive')).ok).toBe(true)
+      await flush()
+      expect(syncCalls(t.invoke)).toEqual([{ body: { businessId: BIZ } }])
+    }
   })
 
-  it('deleteBusiness asks for a sync of each published product it had, so the public copies are removed', async () => {
+  it('deleteBusiness asks for one business-wide sync, so every public copy of the business is removed', async () => {
     const t = stub('published')
     expect((await t.svc.deleteBusiness(BIZ)).ok).toBe(true)
     await flush()
-    expect(syncCalls(t.invoke)).toEqual([{ body: { productId: PID, businessId: BIZ } }])
+    expect(syncCalls(t.invoke)).toEqual([{ body: { businessId: BIZ } }])
+  })
+})
+
+describe('a failed sync call is tried once more (RLS-01)', () => {
+  it('after an error answer, and still never changes the result', async () => {
+    vi.useFakeTimers()
+    try {
+      const refused = { data: null, error: { message: 'non-2xx' } }
+      const t = stub('published', async () => refused)
+      const r = await t.svc.setBusinessStatus(BIZ, 'inactive')
+      expect(r.ok).toBe(true)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(syncCalls(t.invoke)).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(2500)
+      expect(syncCalls(t.invoke)).toHaveLength(2)
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(syncCalls(t.invoke)).toHaveLength(2) // only once more
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a call that went through is not repeated', async () => {
+    vi.useFakeTimers()
+    try {
+      const t = stub('published')
+      await t.svc.setBusinessStatus(BIZ, 'inactive')
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(syncCalls(t.invoke)).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

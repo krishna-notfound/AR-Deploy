@@ -254,11 +254,14 @@ describe('account settings: profiles and policy (Task 1)', () => {
   it('avatars bucket: a user may write only under their own folder', async () => {
     expect((await db.query('select public, file_size_limit, allowed_mime_types from storage.buckets where id = $1', ['avatars'])).rows[0])
       .toEqual({ public: true, file_size_limit: 524288, allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp'] })
-    const put = (u: string, folder: string) => affected(u, `insert into storage.objects (bucket_id, name, owner) values ('avatars', $1, $2)`, [`${folder}/x.webp`, u])
+    // Names are {user}/{uuid}.{jpg|png|webp} since the storage hardening (ADR-0071, F-TI-1).
+    const FILE = '0a1b2c3d-1111-4222-8333-444455556666.webp'
+    const put = (u: string, folder: string, file = FILE) => affected(u, `insert into storage.objects (bucket_id, name, owner) values ('avatars', $1, $2)`, [`${folder}/${file}`, u])
     expect(await put(STRANGER_U, STRANGER_U)).toBe(1)
+    await expect(put(STRANGER_U, STRANGER_U, 'x.webp')).rejects.toThrow(/row-level security/)
     await expect(put(STRANGER_U, BIZ_OWNER_U)).rejects.toThrow(/row-level security/)
     await expect(put(STRANGER_U, 'public')).rejects.toThrow(/row-level security/)
-    await expect(probe('', `insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [`${STRANGER_U}/x.webp`], null, 'anon')).rejects.toThrow(/row-level security/)
+    await expect(probe('', `insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [`${STRANGER_U}/${FILE}`], null, 'anon')).rejects.toThrow(/row-level security/)
     await db.query(`insert into storage.objects (bucket_id, name) values ('avatars', $1), ('avatars', $2)`, [`${BIZ_OWNER_U}/a.webp`, `${STRANGER_U}/b.webp`])
     expect(await affected(STRANGER_U, `delete from storage.objects where bucket_id = 'avatars' and name = $1`, [`${BIZ_OWNER_U}/a.webp`])).toBe(0)
     expect(await affected(STRANGER_U, `update storage.objects set metadata = '{}' where bucket_id = 'avatars' and name = $1`, [`${BIZ_OWNER_U}/a.webp`])).toBe(0)
