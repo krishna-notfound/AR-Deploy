@@ -99,6 +99,8 @@ describe('ApplyForm follows the published form', () => {
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findAllByText('This field is required.')).not.toHaveLength(0)
     expect(screen.getByRole('heading', { level: 2, name: 'Your business' })).toBeInTheDocument()
+    // Focus lands on the first invalid field, so a keyboard or screen-reader user is taken to what to fix (QA FV-08).
+    await waitFor(() => expect(document.activeElement).toHaveAttribute('aria-invalid', 'true'))
   })
 
   it('uses the Editor wording over the dictionary, per language, and the original where it is empty', async () => {

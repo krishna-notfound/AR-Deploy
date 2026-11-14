@@ -17,11 +17,13 @@ import { errorText, fieldText } from '@/i18n/errorText'
 import type { FieldError } from '@/i18n/fieldMessage'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { slugInput, slugify } from '@/lib/slug'
+import { useBeforeUnload } from '@/lib/useBeforeUnload'
 import { BUSINESS_SLUG_MAX } from '@/lib/slug'
 import { PUBLIC_URLS_ARE_LIVE, PUBLIC_URL_MODE, ROOT_DOMAIN, catalogPublicUrl } from '@/lib/urls'
 import { service } from '@/services'
 import type { BusinessInput } from '@/services/catalogService'
 import { BUSINESS_LIMITS, validateBusiness } from '@/services/validation'
+import { useUnsavedDraft } from '../settings/SettingsUi'
 import { BusinessIdentityPreview } from './BusinessIdentityPreview'
 
 export type BusinessFormMode = 'create' | 'edit' | 'owner'
@@ -37,12 +39,27 @@ function toInput(b: Business | null): BusinessInput {
 const OWNER_FIELDS: (keyof BusinessInput)[] = ['name', 'logoUrl', 'banner', 'description', 'contact']
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
+const CONTACT_KEYS = ['email', 'phone', 'website', 'address'] as const
+type ContactKey = (typeof CONTACT_KEYS)[number]
+/** The contact entries of `next` that differ from `base`, one by one (a cleared entry is present with value undefined). */
+function changedContact(next: BusinessInput['contact'], base: BusinessInput['contact'], keys: readonly ContactKey[] = CONTACT_KEYS): BusinessInput['contact'] {
+  return Object.fromEntries(keys.filter((k) => !same(next[k], base[k])).map((k) => [k, next[k]]))
+}
+
 /**
  * The fields of `next` that differ from `base`. Edits send only these, so a value the form never touched
- * (e.g. the status just changed from the page header) is never written back stale.
+ * (e.g. the status just changed from the page header) is never written back stale. The contact is compared entry by entry
+ * (email, phone, website, address), so an older tab cannot undo a contact entry saved meanwhile (QA FV-02).
  */
 export function changedBusinessFields(next: BusinessInput, base: BusinessInput, fields: (keyof BusinessInput)[] = Object.keys(next) as (keyof BusinessInput)[]): Partial<BusinessInput> {
-  return Object.fromEntries(fields.filter((k) => !same(next[k], base[k])).map((k) => [k, next[k]])) as Partial<BusinessInput>
+  const out: Partial<BusinessInput> = {}
+  for (const k of fields) {
+    if (k === 'contact') {
+      const contact = changedContact(next.contact, base.contact)
+      if (Object.keys(contact).length) out.contact = contact
+    } else if (!same(next[k], base[k])) (out as Record<string, unknown>)[k] = next[k]
+  }
+  return out
 }
 
 /**
@@ -74,14 +91,31 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
     // Keep the user's unsaved edits, but take the stored value for every field they have not touched
     // (e.g. a status change made from the page header), so the form never shows or resends a stale value.
     // Decided inside the updater, against the latest state, so a keystroke between render and effect is never lost.
-    setData((d) => ({ ...d, ...changedBusinessFields(next, base, (Object.keys(next) as (keyof BusinessInput)[]).filter((k) => same(d[k], base[k]))) }))
+    // The contact is merged entry by entry, so a phone being typed does not hold back an email saved elsewhere.
+    setData((d) => ({
+      ...d,
+      ...changedBusinessFields(next, base, (Object.keys(next) as (keyof BusinessInput)[]).filter((k) => k !== 'contact' && same(d[k], base[k]))),
+      contact: { ...d.contact, ...changedContact(next.contact, base.contact, CONTACT_KEYS.filter((k) => same(d.contact[k], base.contact[k]))) },
+    }))
     setSnapshot(JSON.stringify(next))
   }, [business?.updatedAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useBeforeUnload(dirty) // a reload or closing the tab (QA EF-06); in-app navigation is the blocker below
+  // Inside Settings the layout holds the only blocker (a router uses one at a time), so the form reports its draft to it.
+  useUnsavedDraft(dirty)
   const blocker = useBlocker(({ currentLocation, nextLocation }) => !skipBlock.current && dirty && currentLocation.pathname !== nextLocation.pathname)
 
-  const set = (patch: Partial<BusinessInput>) => setData((d) => ({ ...d, ...patch }))
-  const setContact = (patch: Partial<BusinessInput['contact']>) => setData((d) => ({ ...d, contact: { ...d.contact, ...patch } }))
+  // A field's error goes away as soon as the field is edited (QA FV-08); it comes back on the next save if the value is still wrong.
+  const clearErrors = (...fields: string[]) =>
+    setErrors((e) => (fields.some((f) => f in e) ? Object.fromEntries(Object.entries(e).filter(([k]) => !fields.includes(k))) : e))
+  const set = (patch: Partial<BusinessInput>) => {
+    setData((d) => ({ ...d, ...patch }))
+    clearErrors(...Object.keys(patch), ...(patch.branding ? ['branding.accentColor'] : []))
+  }
+  const setContact = (patch: Partial<BusinessInput['contact']>) => {
+    setData((d) => ({ ...d, contact: { ...d.contact, ...patch } }))
+    clearErrors(...Object.keys(patch).map((k) => `contact.${k}`))
+  }
 
   const submit = async (intent: 'draft' | 'create' | 'save') => {
     const payload: BusinessInput = {
@@ -164,6 +198,7 @@ export function BusinessForm({ business, mode, onSaved }: { business: Business |
                 onChange={(e) => {
                   const name = e.target.value
                   setData((d) => ({ ...d, name, slug: slugTouched ? d.slug : slugify(name) }))
+                  clearErrors('name', ...(slugTouched ? [] : ['slug']))
                 }}
               />
             </FormField>

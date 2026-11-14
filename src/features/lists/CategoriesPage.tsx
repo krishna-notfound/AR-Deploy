@@ -17,6 +17,7 @@ import { categoryFieldErrors } from '@/services/listsService'
 import { reloadLists, useCategories } from '@/services/listsHooks'
 
 type Errors = Record<string, string>
+const without = (e: Errors, key: string): Errors => Object.fromEntries(Object.entries(e).filter(([k]) => k !== key))
 
 /** Admin console: the product categories (ADR-0055). Add, rename in both languages, reorder, hide and delete. */
 export default function CategoriesPage() {
@@ -166,10 +167,10 @@ function AddCategory({ busy, onAdd }: { busy: boolean; onAdd: (labelEn: string, 
       <CardBody>
         <form onSubmit={(e) => void submit(e)} noValidate className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <FormField label={t('admin.lists.categories.labelEn')} error={errors.labelEn}>
-            <Input value={en} maxLength={60} onChange={(e) => setEn(e.target.value)} />
+            <Input value={en} maxLength={60} onChange={(e) => { setEn(e.target.value); setErrors((e) => without(e, 'labelEn')) }} />
           </FormField>
           <FormField label={t('admin.lists.categories.labelPt')} error={errors.labelPt}>
-            <Input value={pt} maxLength={60} onChange={(e) => setPt(e.target.value)} />
+            <Input value={pt} maxLength={60} onChange={(e) => { setPt(e.target.value); setErrors((e) => without(e, 'labelPt')) }} />
           </FormField>
           <Button type="submit" variant="primary" loading={busy}>
             {t('admin.lists.categories.add')}
@@ -195,10 +196,10 @@ function EditCategory({ category, busy, onSave, onCancel }: { category: Category
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
       <FormField label={t('admin.lists.categories.labelEn')} error={errors.labelEn}>
-        <Input value={en} maxLength={60} onChange={(e) => setEn(e.target.value)} />
+        <Input value={en} maxLength={60} onChange={(e) => { setEn(e.target.value); setErrors((e) => without(e, 'labelEn')) }} />
       </FormField>
       <FormField label={t('admin.lists.categories.labelPt')} error={errors.labelPt}>
-        <Input value={pt} maxLength={60} onChange={(e) => setPt(e.target.value)} />
+        <Input value={pt} maxLength={60} onChange={(e) => { setPt(e.target.value); setErrors((e) => without(e, 'labelPt')) }} />
       </FormField>
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={busy}>

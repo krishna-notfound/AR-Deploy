@@ -11,7 +11,10 @@ export function useBusinesses() {
   return { query: q, list: sorted, map }
 }
 
-/** Per-product analytics for tables (scoped when businessId is given). */
+/**
+ * Per-product analytics for tables (scoped when businessId is given). When the read fails `map` is empty and `query.status`
+ * is 'error': a page shows <StatsNotice query={stats.query} /> so the table's 0s are not taken for real counts.
+ */
 export function useProductStats(businessId?: string) {
   const q = useServiceQuery(() => (businessId ? service.getBusinessAnalytics(businessId) : service.getAnalytics()), [businessId])
   const map = useMemo(() => new Map<string, ProductAnalytics>((q.data?.byProduct ?? []).map((p) => [p.productId, p])), [q.data])

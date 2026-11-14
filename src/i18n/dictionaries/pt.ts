@@ -22,6 +22,7 @@ export const ptCore: Partial<Record<TranslationKey, string>> = {
   'catalog.noResultsTitle': 'Nenhum produto encontrado',
   'catalog.noResultsBody': 'Experimente outra pesquisa ou categoria.',
   'catalog.clearFilters': 'Limpar filtros',
+  'catalog.refreshFailed': 'Não foi possível atualizar este catálogo. Está a ver os últimos produtos que carregaram.',
   'catalog.notFoundTitle': 'Catálogo não encontrado',
   'catalog.notFoundBody': 'Verifique o endereço ou peça à loja o link do catálogo.',
   'catalog.goHome': 'Ir para a Sanctus',

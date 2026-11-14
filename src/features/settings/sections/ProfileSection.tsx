@@ -18,7 +18,7 @@ import { MB } from '@/lib/files'
 import { renderCrop } from '@/lib/imageCrop'
 import { imageFrame } from '@/lib/imageFrames'
 import { AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, type Profile, account, isDemoMode } from '@/services'
-import { SectionHeader, SettingsCard } from '../SettingsUi'
+import { SectionHeader, SettingsCard, useUnsavedDraft } from '../SettingsUi'
 import { useMyProfile } from '../useMyProfile'
 
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -75,7 +75,10 @@ function NameCard({ profile, setProfile }: CardProps) {
   const { user } = useAccount()
   const toast = useToast()
   // Supabase falls back to the email for an account with no name: never prefill that as a name.
-  const [draft, setDraft] = useState(() => profile.displayName ?? (user && user.name !== user.email ? user.name : ''))
+  const prefill = user && user.name !== user.email ? user.name : ''
+  const [draft, setDraft] = useState(() => profile.displayName ?? prefill)
+  // Unsaved while the box differs from the saved name (or from the prefilled one when none is saved yet).
+  useUnsavedDraft(draft.trim() !== (profile.displayName ?? prefill).trim())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 

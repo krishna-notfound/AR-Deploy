@@ -16,6 +16,7 @@ import { withPrerequisites } from '@/domain/permissions'
 import type { MemberRole, Permission, RolePermissions } from '@/domain/types'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { useBeforeUnload } from '@/lib/useBeforeUnload'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, PERMISSION_GROUPS } from './permissions'
@@ -70,6 +71,7 @@ export default function RolePermissionsPage() {
       h1.focus({ preventScroll: true })
     }
   }, [savedTick])
+  useBeforeUnload(dirty) // a reload or closing the tab (QA EF-06); in-app navigation is the blocker below
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && !saving && currentLocation.pathname !== nextLocation.pathname)
 
   const toggle = (role: MemberRole, p: Permission) =>
@@ -105,13 +107,22 @@ export default function RolePermissionsPage() {
     // The prerequisites the database added, and the newly ticked permissions that needed them.
     const alsoAdded = new Set<Permission>()
     const causes = new Set<Permission>()
+    const done: MemberRole[] = []
     for (const r of changed) {
       const res = await service.setRolePermissions(r, draft[r])
       if (!res.ok) {
         setSaving(false)
-        toast.error(t('team.perms.notSaved'), errorText(res.error, t))
+        if (done.length === 0) {
+          toast.error(t('team.perms.notSaved'), errorText(res.error, t))
+          return
+        }
+        // An earlier role was already saved: the page must say so, and treat it as saved from now on (QA EF-01).
+        setBase((b) => (b ? { ...b, ...Object.fromEntries(done.map((d) => [d, [...effective[d]]])) } : b))
+        setDraft((d) => (d ? { ...d, ...Object.fromEntries(done.map((x) => [x, [...effective[x]]])) } : d))
+        toast.error(t('team.perms.partlySaved'), t('team.perms.partlySavedBody', { saved: done.map((x) => words.role(x)).join(', '), failed: changed.slice(done.length).map((x) => words.role(x)).join(', '), reason: errorText(res.error, t) }))
         return
       }
+      done.push(r)
       for (const p of res.data.added) alsoAdded.add(p)
       for (const q of draft[r]) if (!base[r].includes(q) && needs(q).some((p) => res.data.added.includes(p))) causes.add(q)
     }

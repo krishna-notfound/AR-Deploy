@@ -38,6 +38,9 @@ export const ptSettings: Partial<Record<TranslationKey, string>> = {
   'settings.layout.demo': 'demonstração',
   'settings.layout.sections': 'Secções das definições',
   'settings.layout.signOut': 'Terminar sessão',
+  'settings.layout.leaveTitle': 'Sair sem guardar?',
+  'settings.layout.leaveBody': 'Tem alterações nesta secção que não foram guardadas. Se sair agora, perdem-se.',
+  'settings.layout.leaveConfirm': 'Sair',
   // Onboarding
   'settings.onboarding.name': 'Adicione o seu nome',
   'settings.onboarding.nameHint': 'As pessoas com quem trabalha veem quem fez uma alteração.',

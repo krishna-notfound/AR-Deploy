@@ -10,6 +10,22 @@ import { cn } from '@/lib/cn'
  */
 export const TitleFocusContext = createContext<{ take: () => boolean } | null>(null)
 
+/**
+ * The settings layout's list of drafts nobody has saved yet (QA EF-05). A section reports its own with `useUnsavedDraft`;
+ * while any is reported, closing settings, Esc or moving to another section asks before the draft is thrown away.
+ */
+export const UnsavedDraftsContext = createContext<((id: string, dirty: boolean) => void) | null>(null)
+
+/** Tells the settings layout that this section holds an unsaved draft while `dirty` is true. */
+export function useUnsavedDraft(dirty: boolean): void {
+  const report = useContext(UnsavedDraftsContext)
+  const id = useId()
+  useEffect(() => {
+    report?.(id, dirty)
+    return () => report?.(id, false)
+  }, [report, id, dirty])
+}
+
 /** A settings section's title (the page's h1) and one muted line under it. */
 export function SectionHeader({ title, description }: { title: string; description?: ReactNode }) {
   const { t } = useI18n()

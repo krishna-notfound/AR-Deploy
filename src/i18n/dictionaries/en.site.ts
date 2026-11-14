@@ -9,6 +9,7 @@ export const enSite = {
   'site.collection.pieces': 'Pieces in {name}',
   'site.collection.emptyTitle': 'Pieces coming soon',
   'site.collection.emptyBody': 'We are choosing the first pieces for this collection. Do you make or sell furniture? Show your pieces in 3D and AR with Sanctus.',
+  'site.collection.pageError': 'We could not load this collection.',
   'site.collection.loadError': 'We could not load the pieces of this collection.',
 
   // The showcase product page /showcase/:slug (ADR-0047)

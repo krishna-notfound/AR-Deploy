@@ -6,6 +6,7 @@ export const ptAdmin: Partial<Record<TranslationKey, string>> = {
   'admin.lists.title': 'Categorias e moedas',
   'admin.lists.description': 'As categorias de produtos e as moedas que as empresas podem escolher. As alterações aplicam-se de imediato a todas as empresas.',
   'admin.lists.tabs': 'Listas',
+  'admin.lists.staleNotice': 'Não foi possível atualizar a lista, por isso o que vê pode estar desatualizado.',
   'admin.lists.tab.categories': 'Categorias',
   'admin.lists.tab.currencies': 'Moedas',
   'admin.lists.categories.intro': 'As categorias agrupam os produtos no editor de produtos, nos filtros e no catálogo público. Uma categoria oculta não é oferecida em produtos novos; os produtos que já a têm mantêm-na.',
@@ -269,6 +270,7 @@ export const ptAdmin: Partial<Record<TranslationKey, string>> = {
   'admin.products.emptyBody': 'Adicione o primeiro produto ao catálogo de uma empresa.',
   'admin.products.pickerTitle': 'Adicionar um produto',
   'admin.products.pickerBody': 'Escolha o catálogo da empresa a que este produto pertence.',
+  'admin.products.pickerNone': 'Ainda não há empresas. Adicione primeiro uma empresa.',
   'admin.products.business': 'Empresa',
   // ---- admin overview ----
   'admin.overview.activeCount': '{n} ativas',

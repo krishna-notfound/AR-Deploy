@@ -122,6 +122,15 @@ describe('published hooks', () => {
     expect(chrome.result.current.error?.code).toBe('PERMISSION')
   })
 
+  it('usePublishedCollection reports a failed read as an error with reload, not as notFound (QA EF-07)', async () => {
+    localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    const c = renderHook(() => usePublishedCollection('sofas'), { wrapper: draftSource })
+    await waitFor(() => expect(c.result.current.loading).toBe(false))
+    expect(c.result.current.error?.code).toBe('PERMISSION')
+    expect(c.result.current.notFound).toBe(false)
+    expect(typeof c.result.current.reload).toBe('function')
+  })
+
   it('useLandingFeatured and usePublishedCollection read the published collections, never a later draft, and honour the draft source', async () => {
     const ref = { businessSlug: 'acme', productSlug: 'chair' }
     const col = (slug: string, over: Record<string, unknown> = {}) => ({ id: crypto.randomUUID(), slug, title: { en: slug }, image: 'lamp-vase', link: { kind: 'collection' as const }, products: [ref], ...over })

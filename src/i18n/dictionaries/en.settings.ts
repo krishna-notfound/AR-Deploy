@@ -36,6 +36,9 @@ export const enSettings = {
   'settings.layout.demo': 'demo',
   'settings.layout.sections': 'Settings sections',
   'settings.layout.signOut': 'Sign out',
+  'settings.layout.leaveTitle': 'Leave without saving?',
+  'settings.layout.leaveBody': 'You have changes in this section that are not saved. If you leave now they are lost.',
+  'settings.layout.leaveConfirm': 'Leave',
   // Onboarding
   'settings.onboarding.name': 'Add your name',
   'settings.onboarding.nameHint': 'People you work with see who made a change.',

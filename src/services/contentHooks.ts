@@ -78,12 +78,13 @@ export function useLandingShowcase(): { showcase?: LandingShowcase; loading: boo
 /**
  * A published (not hidden) landing collection by its slug, for /collections/:slug. `notFound` is true once the read has
  * finished and there is no such collection (this includes the built-in four before anything is published: the page
- * then shows its own built-in version).
+ * then shows its own built-in version). A failed read is `error` (with `reload`), never `notFound`: the page must not
+ * answer "no such collection" when it could not ask.
  */
-export function usePublishedCollection(slug: string): { collection?: LandingCollection; loading: boolean; notFound: boolean } {
-  const { chrome, loading } = usePublishedChrome()
+export function usePublishedCollection(slug: string): { collection?: LandingCollection; loading: boolean; error: ServiceError | null; notFound: boolean; reload: () => void } {
+  const { chrome, loading, error, reload } = usePublishedChrome()
   const collection = chrome?.landingCollections.find((c) => c.slug === slug && !c.hidden)
-  return { collection, loading, notFound: !loading && !collection }
+  return { collection, loading, error, notFound: !loading && !error && !collection, reload }
 }
 
 export function usePublishedApplyForm(): { config: ApplyFormConfig | null; version: number; loading: boolean; error: ServiceError | null; reload: () => void } {

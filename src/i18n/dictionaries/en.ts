@@ -23,6 +23,7 @@ export const enCore = {
   'catalog.noResultsTitle': 'No matching products',
   'catalog.noResultsBody': 'Try another search or category.',
   'catalog.clearFilters': 'Clear filters',
+  'catalog.refreshFailed': 'We could not refresh this catalogue. You are seeing the last products that loaded.',
   'catalog.notFoundTitle': 'Catalog not found',
   'catalog.notFoundBody': 'Check the address, or ask the store for their catalog link.',
   'catalog.goHome': 'Go to Sanctus',

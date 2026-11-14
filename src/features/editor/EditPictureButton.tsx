@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n/LanguageProvider'
 import { editedFile } from '@/lib/imageCrop'
 import { type ImageFrameKey, imageFrame } from '@/lib/imageFrames'
 import { content, siteAssetUrl } from '@/services'
+import { uploadErrorText } from './uploadError'
 
 /**
  * "Edit picture" for an uploaded Website Editor picture (ADR-0063): opens the crop dialog on the untouched original with the
@@ -43,7 +44,7 @@ export function EditPictureButton({
     setBusy(true)
     try {
       const copy = await content.uploadSiteAsset(editedFile(result.blob, original.split('/').pop() ?? 'picture'), 'image')
-      if (!copy.ok) return setError(copy.error.message)
+      if (!copy.ok) return setError(uploadErrorText(copy.error, t))
       onEdited({ path: copy.data.path, originalPath: original, crop: result.crop })
     } finally {
       setBusy(false)

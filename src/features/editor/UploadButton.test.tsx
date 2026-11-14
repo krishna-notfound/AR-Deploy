@@ -111,6 +111,18 @@ describe('UploadButton with a frame', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('enorme.png é demasiado grande (26 MB). Escolha uma imagem JPG, PNG ou WebP até 25 MB.'))
   })
 
+  it('says a failed upload in Portuguese, not the service English (QA EF-03)', async () => {
+    localStorage.setItem('arfurn:lang', 'pt')
+    vi.spyOn(content, 'uploadSiteAsset').mockResolvedValue(fail('UNKNOWN', 'The file could not be uploaded. Try again.'))
+    render(
+      <LanguageProvider>
+        <UploadButton kind="glb" label="Carregar modelo" onUploaded={() => {}} />
+      </LanguageProvider>,
+    )
+    await userEvent.upload(screen.getByTestId('upload-glb'), new File(['glTF'], 'a.glb', { type: 'model/gltf-binary' }), { applyAccept: false })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o ficheiro. Tente novamente.')
+  })
+
   it('when the original cannot be uploaded it says so, keeps nothing, and does not try the copy', async () => {
     const upload = vi.spyOn(content, 'uploadSiteAsset').mockResolvedValue(fail('UNKNOWN', 'The file could not be uploaded. Try again.'))
     const onUploaded = pictureButton()

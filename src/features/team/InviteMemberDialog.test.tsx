@@ -55,6 +55,19 @@ describe('Invite member dialog (ADR-0030)', () => {
     ])
   })
 
+  it('says so, with a retry, when what the role can do could not be read, instead of loading forever (QA EF-09)', async () => {
+    const user = userEvent.setup()
+    const real = service.getRolePermissions.bind(service)
+    vi.spyOn(service, 'getRolePermissions').mockResolvedValue(teamFail('forbidden'))
+    const d = renderDialog()
+    expect(await d.findByRole('alert')).toHaveTextContent('Could not load what this role can do.')
+    expect(d.queryByText('Loading…')).toBeNull()
+    vi.mocked(service.getRolePermissions).mockImplementation(real)
+    await user.click(d.getByRole('button', { name: 'Try again' }))
+    expect(await d.findByRole('list', { name: /permissions$/ })).toBeInTheDocument()
+    expect(d.queryByRole('alert')).toBeNull()
+  })
+
   it('reviews, sends and reports the result honestly', async () => {
     const user = userEvent.setup()
     const spy = vi.spyOn(service, 'inviteMember')

@@ -5,6 +5,7 @@ import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { arrowLinkClasses, Button, ButtonLink } from '@/components/ui/Button'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { ErrorState } from '@/components/ui/States'
 import type { ProductRef } from '@/domain/siteContent'
 import type { Category, Product } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
@@ -38,9 +39,10 @@ interface View {
 export default function CollectionPage() {
   const { slug = '' } = useParams()
   const { t, localized } = useI18n()
-  const { collection, loading } = usePublishedCollection(slug)
+  const { collection, loading, error, reload } = usePublishedCollection(slug)
   const { chrome } = useSiteContent()
-  const nothingPublished = !loading && (chrome?.landingCollections.length ?? 0) === 0
+  // A failed read is not "nothing published": it must neither fall back to the built-in four nor show a 404.
+  const nothingPublished = !loading && !error && (chrome?.landingCollections.length ?? 0) === 0
 
   const view: View | null = useMemo(() => {
     if (collection) {
@@ -65,7 +67,16 @@ export default function CollectionPage() {
   }, [view, ofRef, all])
 
   if (loading) return <Frame><Skeletons /></Frame>
-  if (!view) return <PublicNotFoundPage />
+  if (error && !view) {
+    return (
+      <Frame>
+        <main className={cn(SECTION, 'flex-1 py-12')}>
+          <ErrorState message={`${t('site.collection.pageError')} ${errorText(error, t)}`} onRetry={reload} />
+        </main>
+      </Frame>
+    )
+  }
+  if (!view)return <PublicNotFoundPage />
 
   return (
     <Frame>

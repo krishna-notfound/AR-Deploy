@@ -12,6 +12,7 @@ import { useProductRequestStates } from '../modelRequests/hooks'
 import { useServiceQuery } from '@/services/hooks'
 import { CLEARED_PRODUCT_FILTERS, ProductFilterBar, applyProductFilters, hasProductFilters, useProductFilterParams } from '../products/ProductFilters'
 import { ProductTable } from '../products/ProductTable'
+import { StatsNotice } from '../products/StatsNotice'
 import { useProductStats } from '../products/useCatalogData'
 
 export default function MyProductsPage() {
@@ -45,6 +46,7 @@ export default function MyProductsPage() {
       />
       <Card>
         {!hasNoProducts && <ProductFilterBar state={filters} update={update} requestFilter />}
+        <StatsNotice query={stats.query} className="px-4 pt-3" />
         {products.status === 'error' && !products.data ? (
           <ErrorState message={errorText(products.error, t)} onRetry={products.refetch} retryLabel={t('common.retry')} />
         ) : filters.model === 'open' && requests.status === 'error' && !requests.data ? (

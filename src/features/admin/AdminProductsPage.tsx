@@ -14,6 +14,7 @@ import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 import { CLEARED_PRODUCT_FILTERS, ProductFilterBar, applyProductFilters, hasProductFilters, useProductFilterParams } from '../products/ProductFilters'
 import { ProductTable } from '../products/ProductTable'
+import { StatsNotice } from '../products/StatsNotice'
 import { useBusinesses, useProductStats } from '../products/useCatalogData'
 
 export default function AdminProductsPage() {
@@ -21,18 +22,20 @@ export default function AdminProductsPage() {
   const can = useCan()
   const [filters, update] = useProductFilterParams()
   const products = useServiceQuery(() => service.getProducts(), [])
-  const { list: businesses, map: bizMap } = useBusinesses()
+  const { query: businessesQuery, list: businesses, map: bizMap } = useBusinesses()
   const stats = useProductStats()
   const navigate = useNavigate()
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [pick, setPick] = useState('')
+  const [picked, setPick] = useState('')
+  // The first business until one is chosen: the list may still be loading when the picker opens, or load again after a failed read (QA EF-10).
+  const pick = businesses.some((b) => b.id === picked) ? picked : (businesses[0]?.id ?? '')
 
   const filtered = useMemo(() => applyProductFilters(products.data ?? [], filters), [products.data, filters])
   const hasFilters = hasProductFilters(filters)
 
   const addProduct = () => {
     if (filters.business) return navigate(`/admin/products/new?business=${filters.business}`)
-    setPick(businesses[0]?.id ?? '')
+    setPick('')
     setPickerOpen(true)
   }
 
@@ -55,6 +58,7 @@ export default function AdminProductsPage() {
       />
       <Card>
         <ProductFilterBar state={filters} update={update} businesses={businesses} />
+        <StatsNotice query={stats.query} className="px-4 pt-3" />
         {products.status === 'error' && !products.data ? (
           <ErrorState message={errorText(products.error, t)} onRetry={products.refetch} />
         ) : (
@@ -96,15 +100,25 @@ export default function AdminProductsPage() {
           </>
         }
       >
-        <FormField label={t('admin.products.business')}>
-          <Select value={pick} onChange={(e) => setPick(e.target.value)} data-autofocus>
-            {businesses.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </Select>
-        </FormField>
+        {businessesQuery.status === 'error' && !businessesQuery.data ? (
+          <ErrorState message={errorText(businessesQuery.error, t)} onRetry={businessesQuery.refetch} />
+        ) : businessesQuery.status === 'loading' && !businessesQuery.data ? (
+          <p role="status" className="text-ui-body text-ink-muted">
+            {t('common.loading')}
+          </p>
+        ) : businesses.length === 0 ? (
+          <p className="text-ui-body text-ink-muted">{t('admin.products.pickerNone')}</p>
+        ) : (
+          <FormField label={t('admin.products.business')}>
+            <Select value={pick} onChange={(e) => setPick(e.target.value)} data-autofocus>
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        )}
       </Modal>
     </>
   )

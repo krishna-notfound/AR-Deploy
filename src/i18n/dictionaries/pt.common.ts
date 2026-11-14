@@ -26,6 +26,9 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'common.created': 'Criado',
   'common.updated': 'Atualizado',
   'common.errorTitle': 'Ocorreu um erro',
+  'common.errorPage.body': 'A página não carregou. Recarregue para tentar novamente.',
+  'common.errorPage.reload': 'Recarregar',
+  'common.offline': 'Está sem ligação. As alterações não podem ser guardadas até a ligação voltar.',
 
   'nav.overview': 'Visão geral',
   'nav.applications': 'Candidaturas',

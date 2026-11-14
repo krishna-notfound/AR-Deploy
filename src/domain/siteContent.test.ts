@@ -3,6 +3,7 @@ import {
   RESERVED_PAGE_SLUGS,
   SOCIAL_NETWORKS,
   emptySiteContent,
+  isAllowedLinkHref,
   isAllowedSocialUrl,
   normalizeSiteContent,
   normalizeSocialUrl,
@@ -78,6 +79,12 @@ describe('validateSiteContent', () => {
     expect(validateSiteContent(doc({ builtinPages: { privacy: { en: '[x](  JavaScript:alert(1))' } } }))).toHaveProperty(['builtinPages.privacy.en'], 'invalid_link')
     expect(validateSiteContent(doc({ builtinPages: { privacy: { en: '[x](//evil.example)' } } }))).toHaveProperty(['builtinPages.privacy.en'], 'invalid_link')
     expect(validateSiteContent(doc({ builtinPages: { terms: { en: '[a](https://example.com) [b](mailto:a@b.pt) [c](/pages/about) [[PLACEHOLDER]]' } } }))).toEqual({})
+  })
+
+  it('refuses a backslash in a site path, as browsers read /\\host as //host (QA UX-5)', () => {
+    for (const bad of ['/\\evil.example', '/\\/evil.example', '/a\\b']) expect(isAllowedLinkHref(bad), bad).toBe(false)
+    expect(validateSiteContent(doc({ builtinPages: { privacy: { en: '[x](/\\evil.example)' } } }))).toHaveProperty(['builtinPages.privacy.en'], 'invalid_link')
+    expect(isAllowedLinkHref('/pages/about?x=1#y')).toBe(true)
   })
 
   it('refuses a body over 60,000 characters', () => {

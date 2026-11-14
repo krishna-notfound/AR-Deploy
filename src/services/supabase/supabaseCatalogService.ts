@@ -186,9 +186,10 @@ export interface DailyRow {
 
 type DbError = { code?: string; message: string }
 
+// Translatable messages, like the validators' (validation.ts): the dashboard shows them in the chosen language (QA FV-03).
 const SLUG_TAKEN = {
-  business: 'This catalog address is already used by another business.',
-  product: 'Another product in this catalog already uses this slug.',
+  business: msg('common.validation.business.slugTaken'),
+  product: msg('common.validation.product.slugTaken'),
 }
 
 /** Rules raised by our own triggers (supabase/migrations), keyed by their exception message. */
@@ -279,7 +280,7 @@ export const toBusiness = (r: BusinessRow): Business => ({
   updatedAt: r.updated_at,
 })
 
-function fromBusinessInput(d: Partial<BusinessInput>): Partial<BusinessRow> {
+export function fromBusinessInput(d: Partial<BusinessInput>): Partial<BusinessRow> {
   const row: Partial<BusinessRow> = {}
   if (d.name !== undefined) row.name = d.name.trim()
   if (d.slug !== undefined) row.slug = d.slug
@@ -291,11 +292,12 @@ function fromBusinessInput(d: Partial<BusinessInput>): Partial<BusinessRow> {
     row.banner_crop = d.banner?.crop ?? null
   }
   if (d.description !== undefined) row.description = d.description
+  // Only the entries present are written: an edit sends the entries it changed, so an older tab cannot undo the others (QA FV-02).
   if (d.contact) {
-    row.contact_email = d.contact.email || null
-    row.contact_phone = d.contact.phone || null
-    row.contact_website = d.contact.website || null
-    row.contact_address = d.contact.address || null
+    if ('email' in d.contact) row.contact_email = d.contact.email || null
+    if ('phone' in d.contact) row.contact_phone = d.contact.phone || null
+    if ('website' in d.contact) row.contact_website = d.contact.website || null
+    if ('address' in d.contact) row.contact_address = d.contact.address || null
   }
   if (d.status !== undefined) row.status = d.status
   if (d.branding) row.accent_color = d.branding.accentColor

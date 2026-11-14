@@ -451,6 +451,7 @@ export const enProducts = {
 
   // Import many products from a CSV (ADR-0051)
   'products.import.button': 'Import',
+  'products.stats.failed': 'Views and AR counts could not be loaded. The 0 shown for each product is not a real count.',
   'products.import.title': 'Import products',
   'products.import.lead': 'Add many products at once from a CSV file. Each row becomes a draft; nothing is published.',
   'products.import.step1': '1. Choose the file',

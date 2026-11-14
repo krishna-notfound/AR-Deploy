@@ -26,6 +26,9 @@ export const enCommon = {
   'common.created': 'Created',
   'common.updated': 'Updated',
   'common.errorTitle': 'Something went wrong',
+  'common.errorPage.body': 'This page could not load. Reload to try again.',
+  'common.errorPage.reload': 'Reload',
+  'common.offline': 'You are offline. Changes cannot be saved until the connection is back.',
 
   // Dashboard navigation (components/layout/nav.ts).
   'nav.overview': 'Overview',

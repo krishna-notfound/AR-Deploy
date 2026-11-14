@@ -3,7 +3,7 @@
 // list is its own first screen and a section opens with a "Settings" back link.
 import { ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router'
+import { Link, Navigate, useBlocker, useLocation, useNavigate, useParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
 import { SecurityNoticeSlot } from '@/auth/securityNotice'
@@ -12,14 +12,16 @@ import { DashboardContext, type DashboardContextValue } from '@/components/layou
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
 import { IconButton } from '@/components/ui/Button'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { readReturnState, settingsReturnState } from '@/lib/settingsReturn'
 import { settingsPath } from '@/lib/urls'
+import { useBeforeUnload } from '@/lib/useBeforeUnload'
 import { isDemoMode } from '@/services'
 import { SettingsSectionPage } from './SettingsSectionPage'
-import { TitleFocusContext } from './SettingsUi'
+import { TitleFocusContext, UnsavedDraftsContext } from './SettingsUi'
 import { useMyProfile } from './useMyProfile'
 import {
   GROUP_LABEL_KEY,
@@ -72,6 +74,27 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
   )
 
   const close = useCallback(() => navigate(from ?? home), [navigate, from, home])
+
+  // Sections with a draft nobody has saved report it here; leaving (Close, Esc, another section, a reload) then asks first (QA EF-05).
+  const confirm = useConfirm()
+  const drafts = useRef(new Set<string>())
+  const [hasDrafts, setHasDrafts] = useState(false)
+  const reportDraft = useCallback((id: string, dirty: boolean) => {
+    if (dirty) drafts.current.add(id)
+    else drafts.current.delete(id)
+    setHasDrafts(drafts.current.size > 0)
+  }, [])
+  useBeforeUnload(hasDrafts)
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => hasDrafts && currentLocation.pathname !== nextLocation.pathname)
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    void (async () => {
+      const leave = await confirm({ title: t('settings.layout.leaveTitle'), body: t('settings.layout.leaveBody'), confirmLabel: t('settings.layout.leaveConfirm'), destructive: true })
+      if (leave) blocker.proceed()
+      else blocker.reset()
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocker.state])
 
   // Dialogs, menus and toasts render in portals under <body>: mark it so the dashboard type reaches them (as DashboardShell does).
   useEffect(() => {
@@ -133,6 +156,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
     <DashboardContext.Provider value={dashboard}>
       <SettingsScopeContext.Provider value={scope}>
         <TitleFocusContext.Provider value={takeTitleFocus}>
+        <UnsavedDraftsContext.Provider value={reportDraft}>
         <div data-surface="dashboard" data-settings-root className="flex min-h-dvh bg-canvas text-ink-body">
           {(wide || !current) && (
             <SectionList
@@ -190,6 +214,7 @@ export default function SettingsLayout({ scope }: { scope: SettingsScope }) {
             </div>
           )}
         </div>
+        </UnsavedDraftsContext.Provider>
         </TitleFocusContext.Provider>
       </SettingsScopeContext.Provider>
     </DashboardContext.Provider>

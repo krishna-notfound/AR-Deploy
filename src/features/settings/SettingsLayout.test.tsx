@@ -228,7 +228,33 @@ describe('Settings hub', () => {
     expect(window.location.pathname).toBe('/dashboard/settings/business')
   })
 
-  it('removes data-surface from body when settings closes', { timeout: 20_000 }, async () => {
+  it('Esc or Close with an unsaved profile name asks first; Cancel keeps the draft, Leave closes (QA EF-05)', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    open(BUSINESS, '/dashboard/settings/profile')
+    const name = await screen.findByLabelText('Name')
+    await user.type(name, ' Jr')
+    await user.click(screen.getByRole('heading', { level: 1, name: 'Profile' }))
+    await user.keyboard('{Escape}')
+    const ask = await screen.findByRole('dialog', { name: 'Leave without saving?' })
+    await user.click(within(ask).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(window.location.pathname).toBe('/dashboard/settings/profile')
+    expect(screen.getByLabelText('Name')).toHaveValue((name as HTMLInputElement).value)
+    expect((name as HTMLInputElement).value.endsWith(' Jr')).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Close settings' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Leave without saving?' })).getByRole('button', { name: 'Leave' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
+  })
+
+  it('closes without asking when nothing is unsaved', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    open(BUSINESS, '/dashboard/settings/profile')
+    await screen.findByRole('heading', { level: 1, name: 'Profile' })
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
+  })
+
+  it('removes data-surface from body when settings closes',{ timeout: 20_000 }, async () => {
     const r = open(BUSINESS, '/dashboard/settings/account')
     await screen.findByRole('heading', { level: 1, name: 'My account' })
     // The body mark is set in an effect; under a loaded parallel run it can land after the heading.
