@@ -320,11 +320,11 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
       note: 'The code works once and expires after an hour. If it has expired, ask the Sanctus team to send a new invitation.',
     }),
     pt: (d) => ({
-      subject: `Convite para gerenciar ${d.businessName ?? 'seu catálogo'} na Sanctus`,
-      heading: 'Sua conta Sanctus está pronta',
-      body: `A equipe Sanctus criou uma conta de proprietário para ${d.businessName ?? 'sua empresa'}. Abra a página do convite, informe este endereço de e-mail e o código abaixo e depois defina sua senha.`,
+      subject: `Convite para gerir ${d.businessName ?? 'o seu catálogo'} na Sanctus`,
+      heading: 'A sua conta Sanctus está pronta',
+      body: `A equipa Sanctus criou uma conta de proprietário para ${d.businessName ?? 'a sua empresa'}. Abra a página do convite, indique este endereço de e-mail e o código abaixo e depois defina a sua palavra-passe.`,
       cta: 'Abrir a página do convite',
-      note: 'O código funciona uma vez e expira em uma hora. Se tiver expirado, peça à equipe Sanctus um novo convite.',
+      note: 'O código funciona uma vez e expira numa hora. Se tiver expirado, peça à equipa Sanctus um novo convite.',
     }),
   },
   invitation_resend: {
@@ -336,11 +336,11 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
       note: 'Only the newest code works. It expires after an hour.',
     }),
     pt: (d) => ({
-      subject: `Novo código de convite para ${d.businessName ?? 'sua conta Sanctus'}`,
+      subject: `Novo código de convite para ${d.businessName ?? 'a sua conta Sanctus'}`,
       heading: 'Aqui está um novo código de convite',
-      body: 'O código de convite anterior já não funciona. Abra a página do convite e informe este endereço de e-mail e o código abaixo para definir sua senha.',
+      body: 'O código de convite anterior já não funciona. Abra a página do convite e indique este endereço de e-mail e o código abaixo para definir a sua palavra-passe.',
       cta: 'Abrir a página do convite',
-      note: 'Apenas o código mais recente funciona. Ele expira em uma hora.',
+      note: 'Apenas o código mais recente funciona. Expira numa hora.',
     }),
   },
   // Goes to an address typed into a public form, so it carries no applicant-supplied text: anything inserted here
@@ -352,9 +352,9 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
       body: "The Sanctus team reviews every business before its catalogue goes public. If we approve it, you will receive an invitation to set up your catalog. If we can't, we will tell you by email. If you did not apply, you can ignore this email.",
     }),
     pt: () => ({
-      subject: 'Recebemos sua candidatura',
-      heading: 'Obrigado, recebemos sua candidatura',
-      body: 'A equipe Sanctus analisa cada empresa antes de o catálogo ficar público. Se for aprovada, receberá um convite para configurar o seu catálogo. Se não for possível, informamos por email. Se você não se candidatou, pode ignorar este e-mail.',
+      subject: 'Recebemos a sua candidatura',
+      heading: 'Obrigado, recebemos a sua candidatura',
+      body: 'A equipa Sanctus analisa cada empresa antes de o catálogo ficar público. Se for aprovada, receberá um convite para configurar o seu catálogo. Se não for possível, informamos por email. Se não se candidatou, pode ignorar este e-mail.',
     }),
   },
   admin_notification: {
@@ -365,7 +365,7 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
       cta: 'Open the review',
     }),
     pt: (d) => ({
-      subject: `Nova empresa aguardando análise: ${d.businessName?.trim() || d.applicantEmail || 'sem nome'}`,
+      subject: `Nova empresa a aguardar análise: ${d.businessName?.trim() || d.applicantEmail || 'sem nome'}`,
       heading: 'Uma empresa aguarda aprovação',
       body: `${d.businessName?.trim() || (d.applicantEmail ? 'Uma empresa sem nome' : 'Uma empresa')}${d.applicantEmail ? ` (${d.applicantEmail})` : ''} aguarda análise.`,
       cta: 'Abrir a análise',
@@ -388,7 +388,7 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
 /** The longest rejection reason (business_applications.decision_reason is at most 1000 characters). */
 export const REASON_MAX_LENGTH = 1000
 
-const CODE_LABEL: Record<EmailLang, string> = { en: 'Your code', pt: 'Seu código' }
+const CODE_LABEL: Record<EmailLang, string> = { en: 'Your code', pt: 'O seu código' }
 
 export function renderEmail(kind: TemplateKind, lang: EmailLang, data: TemplateData = {}): RenderedEmail {
   if (data.actionUrl && !/^https:\/\/[^\s]+$/.test(data.actionUrl)) throw new Error('actionUrl must be an absolute https:// URL')

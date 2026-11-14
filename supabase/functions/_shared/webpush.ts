@@ -4,7 +4,7 @@
 // `npx web-push generate-vapid-keys`. Without all three there is no sender and notify() skips the push.
 // @ts-ignore: resolved by Deno at deploy time
 import webpush from 'npm:web-push@3.6.7'
-import type { PushSender } from './notify.ts'
+import { type PushSender, isAllowedPushEndpoint } from './notify.ts'
 
 /** A day: a phone that is off still gets the message when it comes back, an old one is dropped. */
 const TTL_SECONDS = 24 * 60 * 60
@@ -22,6 +22,8 @@ export function createPushSender(env: (name: string) => string | undefined): Pus
     return null
   }
   return async (sub, payload) => {
+    // Defence in depth: notify() already drops these, and the database refuses them, but the sender is the last stop before a request leaves.
+    if (!isAllowedPushEndpoint(sub.endpoint)) return { ok: false, status: 0 }
     try {
       await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, {
         TTL: TTL_SECONDS,

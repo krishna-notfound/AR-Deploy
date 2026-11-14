@@ -103,6 +103,28 @@ export const resetNotifyWarnings = () => {
   warnedNoPush = false
 }
 
+/**
+ * The push services browsers use: Chrome, Edge on Android and Samsung (FCM), Firefox, Safari and Edge on Windows (WNS).
+ * A subscription endpoint is chosen by the device that registers it, so the server only ever posts to these hosts (EF-4):
+ * anything else would make the function send requests to an address a signed-in user picked. The same list is the check
+ * constraint push_subscriptions_endpoint_host_check in the database.
+ */
+const PUSH_HOSTS = new Set(['fcm.googleapis.com', 'updates.push.services.mozilla.com', 'web.push.apple.com'])
+const PUSH_HOST_SUFFIXES = ['.notify.windows.com']
+
+/** True for an https endpoint on a known push service host: no credentials, default port. */
+export function isAllowedPushEndpoint(endpoint: string): boolean {
+  let url: URL
+  try {
+    url = new URL(endpoint)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return false
+  const host = url.hostname.toLowerCase()
+  return PUSH_HOSTS.has(host) || PUSH_HOST_SUFFIXES.some((s) => host.endsWith(s) && host.length > s.length)
+}
+
 /** True for a path the app can open: starts with one slash, no scheme or host. */
 export const isAppPath = (link: string) => /^\/[^/\\]/.test(link) && link.length <= 300
 
@@ -145,6 +167,11 @@ export async function notify(deps: NotifyDeps, input: NotifyInput): Promise<Noti
     const dead: string[] = []
     await Promise.all(
       subs.map(async (sub) => {
+        // Never post to a host that is not a push service; the saved device is dropped.
+        if (!isAllowedPushEndpoint(sub.endpoint)) {
+          dead.push(sub.endpoint)
+          return
+        }
         const { title, body } = text(sub.userId)
         const outcome = await deps.push!(sub, JSON.stringify({ title, body, url: input.link, tag: input.kind }))
         if (outcome.ok) result.pushed++

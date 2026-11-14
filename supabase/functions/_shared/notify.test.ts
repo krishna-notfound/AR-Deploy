@@ -9,6 +9,7 @@ import {
   type Prefs,
   type PushOutcome,
   type PushSub,
+  isAllowedPushEndpoint,
   notify,
   resetNotifyWarnings,
 } from './notify'
@@ -61,7 +62,40 @@ function setup(opts: { prefs?: Record<string, Partial<Prefs>>; subs?: PushSub[];
   return { deps, rows, removed, pushes, log }
 }
 
-const sub = (userId: string, n = 1): PushSub => ({ userId, endpoint: `https://push.example/${userId}/${n}`, p256dh: 'k', auth: 'a' })
+const sub = (userId: string, n = 1): PushSub => ({ userId, endpoint: `https://fcm.googleapis.com/fcm/send/${userId}-${n}`, p256dh: 'k', auth: 'a' })
+
+describe('isAllowedPushEndpoint (EF-4)', () => {
+  it('accepts the browser push services over https', () => {
+    for (const e of [
+      'https://fcm.googleapis.com/fcm/send/abc',
+      'https://fcm.googleapis.com/wp/abc',
+      'https://updates.push.services.mozilla.com/wpush/v2/abc',
+      'https://web.push.apple.com/QAbc',
+      'https://db5p.notify.windows.com/?token=abc',
+      'https://WNS2-pn1p.notify.windows.com/w/?token=abc',
+    ])
+      expect(isAllowedPushEndpoint(e), e).toBe(true)
+  })
+  it('refuses any other host, plain http, credentials, ports and look-alike names', () => {
+    for (const e of [
+      'https://push.example/x',
+      'https://evil.example/fcm.googleapis.com',
+      'https://fcm.googleapis.com.evil.example/x',
+      'https://evilfcm.googleapis.com/x',
+      'https://notify.windows.com/x',
+      'https://x.notify.windows.com.evil.example/x',
+      'http://fcm.googleapis.com/fcm/send/abc',
+      'https://user:pw@fcm.googleapis.com/x',
+      'https://fcm.googleapis.com:8443/x',
+      'https://127.0.0.1/x',
+      'https://169.254.169.254/latest/meta-data',
+      'javascript:alert(1)',
+      'not a url',
+      '',
+    ])
+      expect(isAllowedPushEndpoint(e), e).toBe(false)
+  })
+})
 
 beforeEach(() => resetNotifyWarnings())
 
@@ -80,11 +114,20 @@ describe('notify()', () => {
   it('removes a subscription the push service reports gone (404 or 410) and keeps the others', async () => {
     const { deps, removed } = setup({
       subs: [sub(ANA, 1), sub(ANA, 2), sub(BEN, 1), sub(BEN, 2)],
-      outcome: (s) => (s.endpoint.endsWith('/ana/1') || s.endpoint.endsWith('user-ana/1') ? { ok: false, status: 410 } : s.endpoint.endsWith('user-ben/2') ? { ok: false, status: 404 } : s.endpoint.endsWith('user-ben/1') ? { ok: false, status: 500 } : { ok: true }),
+      outcome: (s) => (s.endpoint.endsWith('user-ana-1') ? { ok: false, status: 410 } : s.endpoint.endsWith('user-ben-2') ? { ok: false, status: 404 } : s.endpoint.endsWith('user-ben-1') ? { ok: false, status: 500 } : { ok: true }),
     })
     const r = await notify(deps, INPUT)
     expect(r).toMatchObject({ pushed: 1, removed: 2 })
-    expect(removed).toEqual([['https://push.example/user-ana/1', 'https://push.example/user-ben/2']])
+    expect(removed).toEqual([['https://fcm.googleapis.com/fcm/send/user-ana-1', 'https://fcm.googleapis.com/fcm/send/user-ben-2']])
+  })
+
+  it('never sends to an endpoint that is not a push service host, and drops that saved device (EF-4)', async () => {
+    const evil: PushSub = { userId: ANA, endpoint: 'https://169.254.169.254/latest/meta-data', p256dh: 'k', auth: 'a' }
+    const { deps, pushes, removed } = setup({ subs: [evil, sub(ANA, 2)] })
+    const r = await notify(deps, INPUT)
+    expect(pushes.map((p) => p.sub.endpoint)).toEqual(['https://fcm.googleapis.com/fcm/send/user-ana-2'])
+    expect(r).toMatchObject({ pushed: 1, removed: 1 })
+    expect(removed).toEqual([['https://169.254.169.254/latest/meta-data']])
   })
 
   it('respects each kind switch: nothing is written or pushed for a person who turned that kind off', async () => {

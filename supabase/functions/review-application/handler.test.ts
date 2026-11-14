@@ -53,6 +53,7 @@ function deps(over: Partial<ReviewDeps> = {}, start: Record<string, string> = { 
         : id === PT_APP
           ? { businessName: 'Casa do Porto', email: 'joao@shop.test', language: 'pt', status: status[id]! }
           : null,
+    claimDecisionEmail: async () => true,
     log: async (e) => (logs.push(e), `log-${logs.length}`),
     ...over,
   }
@@ -128,6 +129,45 @@ describe('review-application (R-W2-1)', () => {
     const again = await handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'No' }), d)
     expect(await json(again)).toEqual({ ok: true, status: 'rejected' })
     expect(logs).toHaveLength(1)
+  })
+
+  // QA EF-3: two requests that both read "under review" before either rejects. Only the one that wins the claim emails.
+  it('two concurrent rejects send the applicant one email, not two', async () => {
+    let waiting = 0
+    let open!: () => void
+    const bothRead = new Promise<void>((r) => (open = r))
+    const claimed = new Set<string>()
+    const base = deps()
+    const { d, logs, sent } = deps({
+      getApplicant: async (id) => {
+        const a = await base.d.getApplicant(id)
+        if (++waiting === 2) open()
+        await bothRead
+        return a
+      },
+      claimDecisionEmail: async (id) => (claimed.has(id) ? false : (claimed.add(id), true)),
+    })
+    const two = await Promise.all([
+      handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'No' }), { ...d, reviewAsCaller: async (...a) => base.d.reviewAsCaller(...a) }),
+      handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'No' }), { ...d, reviewAsCaller: async (...a) => base.d.reviewAsCaller(...a) }),
+    ])
+    expect(two.map((r) => r.status)).toEqual([200, 200])
+    expect(sent).toHaveLength(1)
+    expect(logs).toHaveLength(1)
+    const bodies = await Promise.all(two.map(json))
+    expect(bodies.filter((b) => 'email' in b)).toHaveLength(1)
+  })
+
+  it('still sends when the claim cannot be made (the claim function is missing before its migration): a duplicate is better than a lost rejection notice', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const { d, sent } = deps({ claimDecisionEmail: async () => { throw new Error('function does not exist') } })
+      const res = await handleReviewApplication(post({ applicationId: APP, action: 'reject', reason: 'No' }), d)
+      expect(await json(res)).toEqual({ ok: true, status: 'rejected', email: { status: 'accepted' } })
+      expect(sent).toHaveLength(1)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   // Final review: raw provider text never reaches the browser; only fixed reason codes do.

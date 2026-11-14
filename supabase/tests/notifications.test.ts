@@ -1,4 +1,4 @@
-// @vitest-environment node
+﻿// @vitest-environment node
 // Client requests round 2, W5 (ADR-0056): notifications, push_subscriptions and notification_prefs. Each person reads and marks
 // read only their own notifications; inserts are the service role's alone; a device moves to the user who registers it; the
 // rollback drops all three tables and the function, and the migration applies again. PGlite only; nothing touches a live project.
@@ -92,20 +92,20 @@ describe('push_subscriptions', () => {
   const owner = async (endpoint: string) => (await db.query<{ u: string }>(`select user_id as u from public.push_subscriptions where endpoint = '${endpoint}'`)).rows[0]?.u
 
   it('register_push_subscription saves a device for the caller; anon cannot call it', async () => {
-    await h.call(ANA, REG, ['https://push.example/a'])
-    expect(await owner('https://push.example/a')).toBe(ANA)
-    await expect(h.probe('', REG, ['https://push.example/b'], null, 'anon')).rejects.toThrow()
+    await h.call(ANA, REG, ['https://fcm.googleapis.com/fcm/send/a'])
+    expect(await owner('https://fcm.googleapis.com/fcm/send/a')).toBe(ANA)
+    await expect(h.probe('', REG, ['https://fcm.googleapis.com/fcm/send/b'], null, 'anon')).rejects.toThrow()
   })
 
   it('a device registered again by another user moves to that user; the first no longer sees it', async () => {
-    await h.call(BEN, REG, ['https://push.example/a'])
-    expect(await owner('https://push.example/a')).toBe(BEN)
+    await h.call(BEN, REG, ['https://fcm.googleapis.com/fcm/send/a'])
+    expect(await owner('https://fcm.googleapis.com/fcm/send/a')).toBe(BEN)
     expect(await h.count(ANA, `select count(*)::int as n from public.push_subscriptions`)).toBe(0)
     expect(await h.count(BEN, `select count(*)::int as n from public.push_subscriptions`)).toBe(1)
   })
 
   it('a user adds, reads and deletes only their own subscriptions directly', async () => {
-    const insert = (uid: string) => `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ('${uid}', 'https://push.example/direct-${uid}', 'k', 'a')`
+    const insert = (uid: string) => `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ('${uid}', 'https://fcm.googleapis.com/fcm/send/direct-${uid}', 'k', 'a')`
     await h.call(ANA, `with r as (${insert(ANA)} returning id) select to_jsonb(count(*)) as r from r`)
     await expect(h.probe(ANA, insert(BEN))).rejects.toThrow()
     expect(await h.affected(ANA, `delete from public.push_subscriptions where user_id = '${BEN}'`)).toBe(0)
@@ -114,11 +114,11 @@ describe('push_subscriptions', () => {
   })
 
   it('rejects a plain-http endpoint and keeps at most 10 devices per user, newest first', async () => {
-    await expect(h.call(ANA, REG, ['http://push.example/insecure'])).rejects.toThrow()
-    for (let i = 0; i < 12; i++) await h.call(ANA, REG, [`https://push.example/d${i}`])
+    await expect(h.call(ANA, REG, ['http://fcm.googleapis.com/fcm/send/insecure'])).rejects.toThrow()
+    for (let i = 0; i < 12; i++) await h.call(ANA, REG, [`https://fcm.googleapis.com/fcm/send/d${i}`])
     expect(await h.count(ANA, `select count(*)::int as n from public.push_subscriptions`)).toBe(10)
-    expect(await owner('https://push.example/d11')).toBe(ANA)
-    expect(await owner('https://push.example/d0')).toBeUndefined()
+    expect(await owner('https://fcm.googleapis.com/fcm/send/d11')).toBe(ANA)
+    expect(await owner('https://fcm.googleapis.com/fcm/send/d0')).toBeUndefined()
   })
 })
 
@@ -140,7 +140,7 @@ describe('notification_prefs', () => {
 })
 
 describe('rollback', () => {
-  it('apply → rollback → re-apply: the tables and the function go and come back', async () => {
+  it('apply â†’ rollback â†’ re-apply: the tables and the function go and come back', async () => {
     const rolled = await freshDb()
     try {
       const exists = async (target: PGlite) =>

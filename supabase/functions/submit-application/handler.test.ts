@@ -4,7 +4,7 @@ import type { NormalizedApplication } from '../_shared/application'
 import type { EmailConfig, LogEntry } from '../_shared/email'
 import { renderEmail } from '../_shared/email-templates'
 import { type ApplyFormConfig, DEFAULT_APPLY_FORM, rulesFromConfig } from '../_shared/applyForm'
-import { MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, type SubmitDeps, handleSubmitApplication, submitterHash } from './handler'
+import { MAX_APPLICATIONS_PER_EMAIL_PER_DAY, MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, type SubmitDeps, handleSubmitApplication, submitterHash } from './handler'
 
 const CONFIG: EmailConfig = {
   apiKey: 're_test',
@@ -94,6 +94,7 @@ function deps(over: Partial<SubmitDeps> = {}) {
     staffAlertRecipients: async () => [],
     loadApplyRules: async () => null,
     catalogueObject: async () => ({ size: 1_000_000, contentType: 'application/pdf' }),
+    recentApplicationsForEmail: async () => 0,
     ...over,
   }
   return { d, rows, logs, audits, sends, fetchFn, attempts, clock }
@@ -191,6 +192,74 @@ describe('submit-application', () => {
     expect(blocked.status).toBe(429)
     const other = await handleSubmitApplication(post({ ...VALID, businessName: 'Elsewhere', submissionKey: key(9) }, '198.51.100.1'), d)
     expect(other.status).toBe(200)
+  })
+
+  it('keys the limit on the platform-set address: a spoofed X-Forwarded-For does not give a fresh allowance', async () => {
+    const { d } = deps()
+    const spoofed = (body: unknown, xff: string) =>
+      new Request('https://fn.test/submit-application', { method: 'POST', headers: { 'content-type': 'application/json', 'cf-connecting-ip': '198.51.100.30', 'x-forwarded-for': xff }, body: JSON.stringify(body) })
+    for (let i = 0; i < MAX_SUBMISSIONS_PER_HOUR; i++)
+      expect((await handleSubmitApplication(spoofed({ ...VALID, businessName: `Studio ${i}`, submissionKey: key(i) }, `10.0.0.${i}`), d)).status).toBe(200)
+    expect((await handleSubmitApplication(spoofed({ ...VALID, businessName: 'One more', submissionKey: key(8) }, '10.9.9.9'), d)).status).toBe(429)
+  })
+
+  // QA EF-1: with the IP limit alone, many addresses can still be used to send one person many confirmation emails.
+  it(`refuses a ${MAX_APPLICATIONS_PER_EMAIL_PER_DAY + 1}th application for one email address within a day, whatever the connection, and sends nothing`, async () => {
+    const stateRows: string[] = []
+    const { d, sends } = deps({
+      recentApplicationsForEmail: async (email) => stateRows.filter((r) => r.toLowerCase() === email.toLowerCase()).length,
+      insert: async (app) => {
+        stateRows.push(app.applicantEmail)
+        return { id: `app-${stateRows.length}`, reference: `REF${stateRows.length}`, applicantEmail: app.applicantEmail, businessName: app.businessName, language: app.language, createdAt: '2026-10-26T12:00:00.000Z' }
+      },
+    })
+    for (let i = 0; i < MAX_APPLICATIONS_PER_EMAIL_PER_DAY; i++) {
+      const r = await handleSubmitApplication(post({ ...VALID, businessName: `Studio ${i}`, submissionKey: key(i) }, `198.51.100.${i + 10}`), d)
+      expect(r.status).toBe(200)
+    }
+    const before = sends.length
+    const blocked = await handleSubmitApplication(post({ ...VALID, businessName: 'One more', submissionKey: key(8) }, '198.51.100.99'), d)
+    expect(blocked.status).toBe(429)
+    expect(await blocked.json()).toEqual({ error: 'rate_limited' })
+    expect(sends).toHaveLength(before)
+    expect(stateRows).toHaveLength(MAX_APPLICATIONS_PER_EMAIL_PER_DAY)
+  })
+
+  it('counts the applications of the last 24 hours for the typed address', async () => {
+    const asked: { email: string; since: string }[] = []
+    const { d } = deps({ recentApplicationsForEmail: async (email, since) => (asked.push({ email, since: since.toISOString() }), 0) })
+    await handleSubmitApplication(post(VALID), d)
+    expect(asked).toEqual([{ email: 'ana@studio.test', since: '2026-10-25T12:00:00.000Z' }])
+  })
+
+  it('answers the request once the application is stored and sends the emails in the background when the runtime can defer them', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const background: Promise<unknown>[] = []
+    const slowFetch = vi.fn(async () => {
+      await gate
+      return new Response(JSON.stringify({ id: 'msg-late-abcdef' }), { status: 200 })
+    })
+    const { d, rows, logs } = deps({ fetch: slowFetch as unknown as typeof fetch, defer: (work) => void background.push(work) })
+    const res = await handleSubmitApplication(post(VALID), d)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: 'app-1', reference: 'REF1' })
+    expect(rows).toHaveLength(1)
+    // The provider has not answered yet: the response did not wait for it.
+    expect(logs).toHaveLength(0)
+    expect(background).toHaveLength(1)
+    release()
+    await Promise.all(background)
+    expect(logs.map((l) => [l.kind, l.status])).toEqual([
+      ['application_confirmation', 'accepted'],
+      ['admin_notification', 'accepted'],
+    ])
+  })
+
+  it('waits for the emails before answering when the runtime cannot defer them (keeps email_log complete)', async () => {
+    const { d, logs } = deps()
+    expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
+    expect(logs).toHaveLength(2)
   })
 
   it('keeps the application when email is not configured and logs the emails as blocked', async () => {

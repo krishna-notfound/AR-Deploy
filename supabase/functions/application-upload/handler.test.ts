@@ -10,6 +10,8 @@ const BODY = { submissionKey: KEY, size: 3 * MB, contentType: 'application/pdf' 
 function deps(over: Partial<UploadDeps> = {}) {
   const attempts: string[] = []
   const created: string[] = []
+  /** Submission keys that already have a stored application. */
+  const submitted = new Set<string>()
   const d: UploadDeps = {
     salt: 'salt',
     now: () => new Date('2026-11-05T12:00:00Z'),
@@ -19,10 +21,11 @@ function deps(over: Partial<UploadDeps> = {}) {
       attempts.push(hashes[0]!)
       return true
     },
+    submissionExists: async (key) => submitted.has(key),
     createUpload: async (path) => (created.push(path), { path, signedUrl: `https://project.supabase.co/storage/v1/object/upload/sign/application-files/${path}?token=t0k`, token: 't0k' }),
     ...over,
   }
-  return { d, attempts, created }
+  return { d, attempts, created, submitted }
 }
 
 const post = (body: unknown, ip = '203.0.113.9') =>
@@ -88,6 +91,42 @@ describe('application-upload', () => {
     // A refused request is not an attempt: validation comes first, so garbage cannot use up an address's allowance.
     expect(attempts).toHaveLength(0)
     expect(created).toHaveLength(0)
+  })
+
+  it('gives no upload URL once an application with this submission key is stored (the catalogue cannot be replaced after submitting)', async () => {
+    const { d, created, submitted, attempts } = deps()
+    expect((await handleApplicationUpload(post(BODY), d)).status).toBe(200)
+    submitted.add(KEY)
+    const res = await handleApplicationUpload(post({ ...BODY, submissionKey: KEY.toUpperCase() }), d)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'already_submitted' })
+    expect(created).toHaveLength(1)
+    // A refused replacement is not an allowed attempt either.
+    expect(attempts).toHaveLength(1)
+  })
+
+  it('answers 500 unknown when the submission lookup fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const { d, created } = deps({ submissionExists: async () => { throw new Error('db down') } })
+      const res = await handleApplicationUpload(post(BODY), d)
+      expect(res.status).toBe(500)
+      expect(created).toHaveLength(0)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('keys the limit on the platform-set address, not on a spoofed X-Forwarded-For', async () => {
+    const { d } = deps()
+    const spoofed = (xff: string) =>
+      new Request('https://fn.test/application-upload', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '198.51.100.30', 'x-forwarded-for': xff },
+        body: JSON.stringify(BODY),
+      })
+    for (let i = 0; i < MAX_UPLOADS_PER_HOUR; i++) expect((await handleApplicationUpload(spoofed(`10.0.0.${i}`), d)).status).toBe(200)
+    expect((await handleApplicationUpload(spoofed('10.9.9.9'), d)).status).toBe(429)
   })
 
   it('answers 500 not_configured without a salt', async () => {

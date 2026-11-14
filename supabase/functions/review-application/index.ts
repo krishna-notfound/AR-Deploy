@@ -57,6 +57,11 @@ Deno.serve((req) =>
       if (!data) return null
       return { businessName: data.business_name, email: data.applicant_email, language: data.language === 'pt' ? 'pt' : 'en', status: data.status }
     },
+    async claimDecisionEmail(applicationId) {
+      const { data, error } = await admin.rpc('service_claim_decision_email', { p_application_id: applicationId })
+      if (error) throw new Error(`claim failed: ${error.code ?? 'unknown'}`)
+      return data === true
+    },
     async log(e) {
       const { data, error } = await admin.from('email_log').insert(logRow(e)).select('id').single()
       if (error) throw new Error(`email_log insert failed: ${error.code ?? 'unknown'}`)
