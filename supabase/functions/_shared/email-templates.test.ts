@@ -8,7 +8,7 @@ describe('invitation email with a code (ADR-0027)', () => {
       const e = renderEmail('owner_invitation', lang, { businessName: 'Casa', actionUrl: 'https://app.test/accept-invite?lang=' + lang, code: '48213907' })
       expect(e.html).toContain('48213907')
       expect(e.text).toContain('48213907')
-      expect(e.text).toContain(lang === 'en' ? 'Your code: 48213907' : 'Seu código: 48213907')
+      expect(e.text).toContain(lang === 'en' ? 'Your code: 48213907' : 'O seu código: 48213907')
       expect(e.html).not.toContain('/auth/v1/verify')
     }
   })
@@ -52,6 +52,32 @@ describe('team invitation email (ADR-0030)', () => {
 
   it('refuses a note over 500 characters', () => {
     expect(() => renderEmail('team_invitation', 'en', { ...data, note: 'x'.repeat(501) })).toThrow()
+  })
+})
+
+// QA EMAIL-INTG-02: every Portuguese email is European Portuguese, like the app's PT-PT dictionaries.
+describe('Portuguese emails are PT-PT, not pt-BR', () => {
+  const BRAZILIAN = /\b(voc[eê]s?|equipe|gerenci\w*|senha|informe|sua|seu|suas|seus|usu[aá]rios?|celular|arquivos?|aguardando|cadastr\w*|em uma hora)\b/i
+  const kinds = ['owner_invitation', 'invitation_resend', 'application_confirmation', 'admin_notification', 'test'] as const
+
+  it('uses PT-PT wording in the invitation and confirmation emails', () => {
+    const invite = renderEmail('owner_invitation', 'pt', { businessName: 'Casa', actionUrl: 'https://app.test/accept', code: '48213907' })
+    expect(invite.subject).toBe('Convite para gerir Casa na Sanctus')
+    expect(invite.text).toContain('A sua conta Sanctus está pronta')
+    expect(invite.text).toContain('A equipa Sanctus criou uma conta de proprietário para Casa')
+    expect(invite.text).toContain('defina a sua palavra-passe')
+    expect(renderEmail('owner_invitation', 'pt', { actionUrl: 'https://app.test/accept' }).subject).toBe('Convite para gerir o seu catálogo na Sanctus')
+    const confirmation = renderEmail('application_confirmation', 'pt')
+    expect(confirmation.subject).toBe('Recebemos a sua candidatura')
+    expect(confirmation.text).toContain('A equipa Sanctus analisa cada empresa')
+    expect(confirmation.text).toContain('Se não se candidatou, pode ignorar este e-mail.')
+  })
+
+  it.each(kinds)('%s has no Brazilian wording in any field (the "o/a seu/sua" forms are fine)', (kind) => {
+    const e = renderEmail(kind, 'pt', { businessName: 'Casa', applicantEmail: 'ana@studio.test', actionUrl: 'https://app.test/x', code: '48213907' })
+    // "sua"/"seu" are only valid after an article ("a sua", "o seu"); bare ones are the Brazilian forms.
+    const text = `${e.subject}\n${e.text}`.replace(/\b(?:a|o|as|os|à|ao|da|do|pela|pelo) (sua|seu|suas|seus)\b/gi, '$1_ok').replace(/\b(sua|seu|suas|seus)_ok/gi, 'ok')
+    expect(text.match(BRAZILIAN)?.[0]).toBeUndefined()
   })
 })
 

@@ -19,6 +19,10 @@ const salt = await applicationSalt(env, key)
 const notify = createNotifier(admin, env)
 const CATALOGUE_BUCKET = 'application-files'
 
+// Supabase's edge runtime keeps a request's background work alive with EdgeRuntime.waitUntil; undefined elsewhere.
+const edgeRuntime = (globalThis as { EdgeRuntime?: { waitUntil?: (work: Promise<unknown>) => void } }).EdgeRuntime
+const waitUntil = typeof edgeRuntime?.waitUntil === 'function' ? (work: Promise<unknown>) => edgeRuntime.waitUntil!(work) : undefined
+
 const OPEN = ['submitted', 'under_review']
 const STORED_COLUMNS = 'id, reference, applicant_email, business_name, language, created_at'
 
@@ -61,6 +65,17 @@ Deno.serve((req) =>
       if (error) throw new Error(`duplicate check failed: ${error.message}`)
       return data?.[0] ?? null
     },
+    async recentApplicationsForEmail(email, since) {
+      const { count, error } = await admin
+        .from('business_applications')
+        .select('id', { count: 'exact', head: true })
+        .ilike('applicant_email', email.replace(/[\\%_]/g, (c) => `\\${c}`))
+        .gte('created_at', since.toISOString())
+      if (error) throw new Error(`email count failed: ${error.message}`)
+      return count ?? 0
+    },
+    // The emails go out after the response when the edge runtime supports EdgeRuntime.waitUntil; otherwise the handler awaits them.
+    defer: waitUntil,
     async allowAttempt(hashes) {
       const { data, error } = await admin.rpc('service_application_attempt', { p_hashes: hashes, p_max: MAX_SUBMISSIONS_PER_HOUR })
       if (error) throw new Error(`rate check failed: ${error.message}`)

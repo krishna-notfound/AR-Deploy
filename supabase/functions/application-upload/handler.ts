@@ -5,6 +5,7 @@
 // `pending/<submissionKey>/catalogue.pdf` in the private bucket application-files (20 MB, application/pdf only: the bucket
 // refuses anything else even if the caller lies here). Every accepted request counts against the same per-IP hourly limit as
 // submit-application (R-W2-10), with an allowance one smaller than the applications' so uploads cannot use up the hour.
+// Once an application with the submission key is stored, no URL is signed: the catalogue cannot be replaced afterwards (409 already_submitted).
 import { MAX_CATALOGUE_BYTES, cataloguePathFor } from '../_shared/application.ts'
 import { MAX_UPLOADS_PER_HOUR, attemptHashes } from '../_shared/attempts.ts'
 import { UUID, clientIp, readJsonObject, reply } from '../_shared/http.ts'
@@ -18,6 +19,8 @@ export interface UploadDeps {
   now?: () => Date
   /** service_application_attempt: true when the attempt is allowed (and recorded). `max` is this function's allowance. */
   allowAttempt(hashes: string[], max: number): Promise<boolean>
+  /** Whether an application with this submission key (lower case) is already stored. Throws on a database error. */
+  submissionExists(submissionKey: string): Promise<boolean>
   /** A signed upload URL for `path` (replacing an earlier upload of the same submission). Throws on a storage error. */
   createUpload(path: string): Promise<{ path: string; signedUrl: string; token: string }>
 }
@@ -44,6 +47,9 @@ export async function handleApplicationUpload(req: Request, deps: UploadDeps): P
     return reply(400, { error: 'invalid_request' })
 
   try {
+    // The one object of a submission may be replaced (a retry) only until the application is stored; after that the file
+    // is what the reviewers saw, so no new URL is signed (QA 2026-11-14 EF-2).
+    if (await deps.submissionExists(submissionKey.toLowerCase())) return reply(409, { error: 'already_submitted' })
     const now = (deps.now ?? (() => new Date()))()
     if (!(await deps.allowAttempt(await attemptHashes(clientIp(req), deps.salt, now), MAX_UPLOADS_PER_HOUR))) return reply(429, { error: 'rate_limited' })
     const { path, signedUrl, token } = await deps.createUpload(cataloguePathFor(submissionKey))

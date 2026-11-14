@@ -49,6 +49,12 @@ export interface ReviewDeps {
    * reject (a double click or a retry) does not email twice.
    */
   getApplicant(applicationId: string): Promise<{ businessName: string | null; email: string; language: 'en' | 'pt'; status: string } | null>
+  /**
+   * Atomically marks the application's current rejection as emailed (service_claim_decision_email): true for the one
+   * request that gets to send, false for any other (a concurrent or repeated reject). A new rejection (after a reopen) is a
+   * new claim. Rejects on a database error.
+   */
+  claimDecisionEmail(applicationId: string): Promise<boolean>
   log(entry: LogEntry): Promise<string>
 }
 
@@ -93,10 +99,25 @@ export async function handleReviewApplication(req: Request, deps: ReviewDeps): P
 
   const result: Record<string, unknown> = { ok: true, status: reviewed.status }
   if (reviewed.businessId) result.businessId = reviewed.businessId
-  if (action === 'reject' && reviewed.status === 'rejected' && applicant.status !== 'rejected') {
+  // The status read above is only a fast path: two requests can both read "under review" and both get a rejected row back
+  // (the database serialises them and the second changes nothing). The claim is atomic, so only one of them emails (EF-3).
+  if (action === 'reject' && reviewed.status === 'rejected' && applicant.status !== 'rejected' && (await claimEmail(deps, applicationId))) {
     result.email = await sendDecision(deps, { applicationId, applicant, reason: includeReason ? reason : undefined, actorId })
   }
   return reply(200, result)
+}
+
+/**
+ * True when this request may send the decision email. If the claim itself fails (for example before its migration is
+ * applied) the email is still sent: a duplicate notice is better than a rejection the applicant never hears about.
+ */
+async function claimEmail(deps: ReviewDeps, applicationId: string): Promise<boolean> {
+  try {
+    return await deps.claimDecisionEmail(applicationId)
+  } catch (e) {
+    console.error(`decision email claim failed: ${String(e).slice(0, 120)}`)
+    return true
+  }
 }
 
 async function sendDecision(

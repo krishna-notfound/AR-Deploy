@@ -20,6 +20,11 @@ Deno.serve((req) =>
       if (error) throw new Error(`rate check failed: ${error.message}`)
       return data === true
     },
+    async submissionExists(submissionKey) {
+      const { data, error } = await admin.from('business_applications').select('id').eq('submission_key', submissionKey).limit(1)
+      if (error) throw new Error(`submission lookup failed: ${error.message}`)
+      return (data ?? []).length > 0
+    },
     async createUpload(path) {
       const { data, error } = await admin.storage.from('application-files').createSignedUploadUrl(path, { upsert: true })
       if (error) throw new Error(`signed upload url failed: ${error.message}`)

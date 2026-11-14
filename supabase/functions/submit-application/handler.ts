@@ -4,7 +4,8 @@
 // application with the service role, records the audit event and sends the confirmation and the admin notification
 // (to the admin inbox and to opted-in staff who can view applications). Nothing after the insert undoes the stored
 // application: an audit failure is logged and the emails still go, and a retry with the same submission key sends
-// the emails that were never logged (S1.5 R-W2-10, R-W2-11).
+// the emails that were never logged (S1.5 R-W2-10, R-W2-11). The emails run after the response when the runtime allows it
+// (deps.defer), and one applicant address is limited to 3 stored applications a day (ADR-0073).
 import { MAX_CATALOGUE_BYTES, type NormalizedApplication, validateApplication } from '../_shared/application.ts'
 import type { ApplyRules } from '../_shared/applyForm.ts'
 import { MAX_SUBMISSIONS_PER_HOUR, attemptHashes, submitterHash } from '../_shared/attempts.ts'
@@ -16,6 +17,8 @@ import { applicationNotice } from '../_shared/notificationText.ts'
 
 // Kept exported from here: the tests and index.ts import them from the handler.
 export { MAX_SUBMISSIONS_PER_HOUR, submitterHash }
+/** Stored applications per applicant email address and 24 hours (each sends that address a confirmation email). */
+export const MAX_APPLICATIONS_PER_EMAIL_PER_DAY = 3
 /** Room for the answers to up to 10 questions (the custom block itself is capped at 40,000 bytes). */
 const MAX_BODY_BYTES = 48_000
 /** A key replay newer than this is a double click while the first request may still be sending: it sends nothing. */
@@ -64,6 +67,16 @@ export interface SubmitDeps {
   catalogueObject(path: string): Promise<{ size: number; contentType: string } | null>
   /** In-app notification and phone push to staff with applications.view (ADR-0056). Never throws; absent in tests that do not need it. */
   notify?(request: NotifyRequest): Promise<void>
+  /**
+   * How many applications this address (any case) stored since `since`; each one sent it a confirmation email. Throws on a
+   * database error (the request then fails with 500 and nothing is stored).
+   */
+  recentApplicationsForEmail(email: string, since: Date): Promise<number>
+  /**
+   * Keeps `work` running after the response is sent (EdgeRuntime.waitUntil). Absent when the runtime has no such call: the
+   * handler then awaits the work before answering.
+   */
+  defer?(work: Promise<unknown>): void
 }
 
 /** An error for console.error: email addresses removed (provider and database messages can quote them), shortened. */
@@ -102,7 +115,7 @@ export async function handleSubmitApplication(req: Request, deps: SubmitDeps): P
   // what the first request may not have finished. It is the retry of an attempt that already counted: no rate limit.
   const existing = await deps.findByKey(app.submissionKey)
   if (existing) {
-    if (now.getTime() - Date.parse(existing.createdAt) > REPLAY_SETTLE_MS) await completeAfterInsert(deps, existing)
+    if (now.getTime() - Date.parse(existing.createdAt) > REPLAY_SETTLE_MS) await inBackground(deps, completeAfterInsert(deps, existing))
     return reply(200, { id: existing.id, reference: existing.reference })
   }
 
@@ -126,6 +139,11 @@ export async function handleSubmitApplication(req: Request, deps: SubmitDeps): P
   const dup = await deps.findOpenDuplicate(app.applicantEmail, app.businessName)
   if (dup) return reply(409, { error: 'duplicate_application' })
 
+  // Every stored application sends its applicant a confirmation, so one address can only be the target of a few a day,
+  // however many connections the sender uses (QA EF-1).
+  const since = new Date(now.getTime() - 24 * 3600_000)
+  if ((await deps.recentApplicationsForEmail(app.applicantEmail, since)) >= MAX_APPLICATIONS_PER_EMAIL_PER_DAY) return reply(429, { error: 'rate_limited' })
+
   const inserted = await deps.insert(app, hashes[0]!)
   if (inserted === 'duplicate_key') {
     // A concurrent request with the same key stored the row; that request sends the emails.
@@ -134,8 +152,19 @@ export async function handleSubmitApplication(req: Request, deps: SubmitDeps): P
   }
 
   await recordSubmitted(deps, inserted.id)
-  await sendApplicationEmails(deps, inserted, new Set())
+  await inBackground(deps, sendApplicationEmails(deps, inserted, new Set()))
   return reply(200, { id: inserted.id, reference: inserted.reference })
+}
+
+/**
+ * The emails after the insert (up to 7 sends, several seconds) do not hold up the applicant's answer when the runtime can
+ * finish work after responding (deps.defer, EdgeRuntime.waitUntil). Without it they are awaited, as before. The work never
+ * rejects (sendApplicationEmails catches everything); the catch here is the last guard so a stray error cannot go unhandled.
+ */
+async function inBackground(deps: SubmitDeps, work: Promise<void>) {
+  const guarded = work.catch((e) => console.error(`application emails failed: ${loggable(e)}`))
+  if (deps.defer) deps.defer(guarded)
+  else await guarded
 }
 
 /** Key replay after the settle time: the missing audit row and every email workflow with no email_log row. */

@@ -140,6 +140,48 @@ describe('send-test-email handler', () => {
     expect(status).toEqual({ providerMessageId: 'abc12345-msg', lastEvent: 'delivered', status: 'delivered' })
     expect(updates).toEqual([['abc12345-msg', 'delivered']])
   })
+  // QA EF-6: a body that parses but is not an object used to throw on body.action (a 500).
+  it('answers 400 invalid_json for a body that is not a JSON object, never a 500', async () => {
+    const { d } = deps()
+    for (const raw of ['null', '[1]', '5', '"text"', 'true', 'nope', '']) {
+      const res = await handleTestEmail(new Request('https://fn.test/send-test-email', { method: 'POST', headers: { authorization: 'Bearer admin-token' }, body: raw }), d)
+      expect(res.status, raw).toBe(400)
+      expect(await res.json()).toEqual({ error: 'invalid_json' })
+    }
+  })
+
+  it('refuses an oversized body with 400 before reading it all', async () => {
+    const { d } = deps()
+    const res = await handleTestEmail(post({ action: 'send', to: 'delivered@resend.dev', pad: 'x'.repeat(10_000) }), d)
+    expect(res.status).toBe(400)
+  })
+
+  it('returns only a fixed reason code for an email that was not sent, never provider text', async () => {
+    const { d, logs } = deps({ fetch: resend403() as unknown as typeof fetch })
+    const res = await handleTestEmail(post({ action: 'send', to: 'delivered@resend.dev' }), d)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.status).toBe('failed')
+    expect(body).not.toHaveProperty('error')
+    expect(JSON.stringify(body)).not.toMatch(/own email address/)
+    // The provider text is still in the log for the Owner's email log view.
+    expect(logs[0]).toMatchObject({ status: 'failed', error: expect.stringMatching(/own email address/) })
+  })
+
+  it('keeps safe reason codes: a blocked recipient says why', async () => {
+    const { d } = deps()
+    const res = await handleTestEmail(post({ action: 'send', to: 'someone@else.test' }), d)
+    expect(await res.json()).toMatchObject({ status: 'blocked', error: 'test_sender_recipient_not_allowed' })
+  })
+
+  it('a failed status lookup answers 502 with a code only, never the provider message', async () => {
+    const { d } = deps({ fetch: vi.fn(async () => new Response(JSON.stringify({ message: 'secret provider detail' }), { status: 500 })) as unknown as typeof fetch })
+    const res = await handleTestEmail(post({ action: 'status', providerMessageId: 'abc12345-msg' }), d)
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body).toEqual({ error: 'provider_lookup_failed' })
+  })
+
   it('never writes a lower-ranked status: opened, clicked, scheduled, queued and unknown events write nothing', async () => {
     const { d, updates } = deps()
     for (const last_event of ['opened', 'clicked', 'scheduled', 'queued', 'something_new']) {

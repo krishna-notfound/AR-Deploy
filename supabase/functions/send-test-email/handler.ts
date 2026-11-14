@@ -3,9 +3,13 @@
 //   POST { "action": "send", "to": "...", "lang": "en" | "pt" }      → sends the test template, logs it
 //   POST { "action": "status", "providerMessageId": "..." }          → asks Resend what happened, updates the log
 // Web-standard APIs only, so it runs under Deno in production and under Vitest in tests.
-import { type ConfigResult, type EmailStatus, type LogEntry, fetchProviderStatus, sendAndLog } from '../_shared/email.ts'
+import { type ConfigResult, type EmailStatus, type LogEntry, SAFE_EMAIL_REASONS, fetchProviderStatus, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
+import { readJsonObject } from '../_shared/http.ts'
+
+/** Action, address, language and an optional idempotency key. */
+const MAX_BODY_BYTES = 2_000
 
 export interface TestEmailDeps {
   config: ConfigResult
@@ -45,18 +49,16 @@ export async function handleTestEmail(req: Request, deps: TestEmailDeps): Promis
   if (!deps.config.ok) return reply(503, { error: 'email_not_configured', missing: deps.config.missing })
   const config = deps.config.config
 
-  let body: Record<string, unknown>
-  try {
-    body = (await req.json()) as Record<string, unknown>
-  } catch {
-    return reply(400, { error: 'invalid_json' })
-  }
+  // A small JSON object: anything else (invalid, too large, an array or a scalar) is the caller's mistake, a 400.
+  const body = await readJsonObject(req, MAX_BODY_BYTES)
+  if (!body) return reply(400, { error: 'invalid_json' })
 
   if (body.action === 'status') {
     const id = typeof body.providerMessageId === 'string' ? body.providerMessageId : ''
     if (!/^[\w-]{8,100}$/.test(id)) return reply(400, { error: 'invalid_provider_message_id' })
     const r = await fetchProviderStatus(deps.fetch, config, id)
-    if (!r.ok) return reply(502, { error: 'provider_lookup_failed', detail: r.error })
+    // Provider text (r.error) is not sent to the browser; only the code.
+    if (!r.ok) return reply(502, { error: 'provider_lookup_failed' })
     if (EVIDENCE_EVENTS.has(r.lastEvent)) await deps.updateStatus(id, r.status)
     return reply(200, { providerMessageId: id, lastEvent: r.lastEvent, status: r.status })
   }
@@ -69,8 +71,14 @@ export async function handleTestEmail(req: Request, deps: TestEmailDeps): Promis
       { config, fetch: deps.fetch, log: deps.log },
       { ...email, to, kind: 'test', triggeredBy: userId, idempotencyKey: typeof body.idempotencyKey === 'string' ? body.idempotencyKey.slice(0, 100) : undefined },
     )
-    // 200 even when blocked/failed: the request worked and the log row tells the outcome.
-    return reply(200, { ...result, note: result.status === 'accepted' ? 'Accepted by Resend. Not yet evidence of delivery: query action=status.' : undefined })
+    // 200 even when blocked/failed: the request worked and the log row tells the outcome. Only a fixed reason code goes back;
+    // provider or network text stays in email_log (CONSTRAINTS: raw provider text never reaches the UI).
+    const { error, ...rest } = result
+    return reply(200, {
+      ...rest,
+      ...(error && SAFE_EMAIL_REASONS.has(error) ? { error } : {}),
+      note: result.status === 'accepted' ? 'Accepted by Resend. Not yet evidence of delivery: query action=status.' : undefined,
+    })
   }
 
   return reply(400, { error: 'unknown_action' })
