@@ -18,6 +18,7 @@ import { formatFileSize } from '@/lib/format'
 import { useFormat } from '@/lib/useFormat'
 import { type MeasuredSize, type ScaleCheck, type ScaleMismatchReason, type ScaleProposal, checkScale, modelSizeSuggestion, scaleProposal } from '@/lib/scale'
 import { MODEL_OPTIMIZATION_ENABLED, measureModel, optimizeModel, optimizeReasonText, optimizedNote, scaleModel } from './modelOptimizeClient'
+import { useReportModelBusy } from './modelBusy'
 import { ScaleFixPanel, formatMeters, formatSizeMeters } from './ScaleFixPanel'
 
 type ModelContext = 'product' | 'variant' | 'request'
@@ -108,7 +109,9 @@ function ModelSlot({
   const fmt = useFormat()
   const id = useId()
   const [error, setError] = useState<string | null>(null)
-  const [checking, setChecking] = useState<false | 'checking' | 'optimizing' | 'building' | 'scaling'>(false)
+  const [checking, setChecking] = useState<false | 'checking' | 'optimizing' | 'uploading' | 'building' | 'scaling'>(false)
+  /** Size of the file being sent, shown while it uploads (the storage client reports no byte progress). */
+  const [uploadSize, setUploadSize] = useState(0)
   /** Result of the size optimization, and the untouched file so the admin can upload it instead. */
   const [optimizeNote, setOptimizeNote] = useState<{ text: string; original?: File } | null>(null)
   /** A GLB waiting for the person's scale choice ("Fix the scale", ADR-0058): nothing is uploaded or changed until they pick. */
@@ -117,6 +120,8 @@ function ModelSlot({
   const [urlDraft, setUrlDraft] = useState('')
   const info = FORMAT_INFO[format]
   const stale = isStaleSessionAsset(asset)
+  // The editor's Save waits for a file that is still being processed or uploaded, or that waits for the scale choice (QA P3D-01).
+  useReportModelBusy(checking ? 'working' : pending ? 'waiting' : null)
 
   const onFile = async (original: File, opts: { keepOriginal?: boolean; built?: boolean } = {}) => {
     if (checking) return
@@ -157,15 +162,20 @@ function ModelSlot({
   const finishUpload = async (file: File, note: { text: string; original?: File } | null, scaleNote?: string, original?: File) => {
     const text = [note?.text, scaleNote].filter(Boolean).join(' ')
     setOptimizeNote(text ? { text, ...(note?.original ?? original ? { original: note?.original ?? original } : {}) } : null)
-    setChecking('checking')
+    setUploadSize(file.size)
+    setChecking('uploading')
     const res = await service.uploadAsset({ kind: format, file, businessId })
-    setChecking(false)
-    if (!res.ok) return setError(errorText(res.error, t))
+    if (!res.ok) {
+      setChecking(false)
+      return setError(errorText(res.error, t))
+    }
     setError(null)
-    // Stored with the asset so the Android AR warning and readiness survive a reload (AR-01/02).
+    // Stored with the asset so the Android AR warning and readiness survive a reload (AR-01/02). Still busy until the form has the
+    // file: a Save in this gap would leave it out (QA P3D-01).
     const requiredExtensions = format === 'glb' ? await readRequiredExtensions(file) : undefined
     const { url, storagePath, status } = res.data
     onChange({ format, url, fileName: file.name, sizeBytes: file.size, status, ...(storagePath ? { storagePath } : {}), ...(requiredExtensions ? { requiredExtensions } : {}) })
+    setChecking(false)
   }
 
   const applyScale = async (factor: number) => {
@@ -281,9 +291,11 @@ function ModelSlot({
           {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Upload className="size-4" aria-hidden />}
           {checking === 'optimizing'
             ? t('products.model.optimizing')
-            : checking
-              ? t('products.model.checking')
-              : t(asset ? 'products.model.replaceFile' : 'products.model.uploadFile', { format })}
+            : checking === 'uploading'
+              ? t('products.model.uploading', { size: formatFileSize(uploadSize) })
+              : checking
+                ? t('products.model.checking')
+                : t(asset ? 'products.model.replaceFile' : 'products.model.uploadFile', { format })}
           <input
             id={id}
             type="file"

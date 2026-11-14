@@ -182,6 +182,46 @@ describe('ImageUpload: Edit picture', () => {
   })
 })
 
+describe('ImageUpload: order (P3D-02)', () => {
+  const three = [stored({ id: 'a', alt: 'front' }), stored({ id: 'b', alt: 'side', isPrimary: false }), stored({ id: 'c', alt: 'back', isPrimary: false })]
+
+  it('moves a photo later and earlier with buttons, keeping the primary photo', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={three} />)
+    await user.click(screen.getByRole('button', { name: 'Move front later' }))
+    expect(current.map((i) => i.id)).toEqual(['b', 'a', 'c'])
+    expect(current.find((i) => i.isPrimary)?.id).toBe('a')
+    await user.click(screen.getByRole('button', { name: 'Move back earlier' }))
+    expect(current.map((i) => i.id)).toEqual(['b', 'c', 'a'])
+  })
+
+  it('disables the move past either end, and shows no buttons for a single photo', () => {
+    const { unmount } = render(<Harness initial={three} />)
+    expect(screen.getByRole('button', { name: 'Move front earlier' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move back later' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move side earlier' })).toBeEnabled()
+    unmount()
+    render(<Harness initial={[stored()]} />)
+    expect(screen.queryByRole('button', { name: /^Move / })).not.toBeInTheDocument()
+  })
+
+  it('announces the new position', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={three} />)
+    await user.click(screen.getByRole('button', { name: 'Move front later' }))
+    expect(screen.getByRole('status')).toHaveTextContent('front is now number 2 of 3')
+  })
+
+  it('reorders only its own kind and leaves the other photos where they are', async () => {
+    const user = userEvent.setup()
+    const extra = stored({ id: 'x', alt: 'detail', isPrimary: false, kind: 'additional' })
+    render(<Harness initial={[...three, extra]} />)
+    await user.click(screen.getByRole('button', { name: 'Move front later' }))
+    expect(current.filter((i) => i.kind === 'gallery').map((i) => i.id)).toEqual(['b', 'a', 'c'])
+    expect(current.filter((i) => i.kind === 'additional').map((i) => i.id)).toEqual(['x'])
+  })
+})
+
 describe('ImageUpload: the product frame', () => {
   it('shows every photo in a 4:5 frame, whole (contain), never stretched', () => {
     render(<Harness initial={[stored()]} />)

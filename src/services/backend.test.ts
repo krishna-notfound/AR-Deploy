@@ -236,6 +236,16 @@ describe('product draft validation', () => {
     expect(validateProductDraft(variant(NaN), []).variants).toBeDefined()
     expect(validateProductDraft(variant(-100), []).variants).toBeDefined()
   })
+
+  it('names the limit for a price, price difference, size or weight beyond what the database holds (QA FV-04)', async () => {
+    const { validateProductDraft } = await import('./validation')
+    const base = sampleProduct({})
+    expect(validateProductDraft({ ...base, price: 2_100_000_000 }, []).price).toBeUndefined()
+    expect(validateProductDraft({ ...base, price: 2_100_000_001 }, []).price).toEqual({ key: 'common.validation.priceTooLarge' })
+    expect(validateProductDraft({ ...base, dimensions: { ...base.dimensions, depth: 1_000_000 } }, [])['dimensions.depth']).toEqual({ key: 'common.validation.numberTooLarge' })
+    expect(validateProductDraft({ ...base, weight: { value: 1e9, unit: 'kg' } }, []).weight).toEqual({ key: 'common.validation.numberTooLarge' })
+    expect(validateProductDraft(sampleProduct({ variants: [{ id: 'v', name: { en: 'Oak' }, priceDelta: 3_000_000_000 }] }), []).variants).toEqual({ key: 'common.validation.priceTooLarge' })
+  })
 })
 
 function sampleProduct(over: Partial<ProductInput> = {}): ProductInput {
@@ -297,6 +307,12 @@ describe('storage path helpers', () => {
 })
 
 describe('database errors shown to users', () => {
+  it('reads an out-of-range number (22003) as a rejected value, not a generic retry (QA FV-04)', async () => {
+    const { mapDbError } = await import('./supabase/supabaseCatalogService')
+    const r = mapDbError({ code: '22003', message: 'numeric field overflow' })
+    expect(r.ok === false && r.error.code).toBe('VALIDATION')
+  })
+
   it('never echo raw Postgres text (policy, constraint or column names)', async () => {
     const { mapDbError } = await import('./supabase/supabaseCatalogService')
     const raw = 'new row violates row-level security policy "Members manage products" for table "products"'

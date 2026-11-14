@@ -1,6 +1,7 @@
 import type { Business, LocalizedText, Product } from '@/domain/types'
 import { type FieldMessage, msg } from '@/i18n/fieldMessage'
 import { isHttpUrl } from '@/lib/files'
+import { MAX_MEASURE, MAX_PRICE_MINOR } from '@/lib/format'
 import { PRODUCT_SLUG_MAX, isValidSlug } from '@/lib/slug'
 import { RESERVED_SUBDOMAINS } from '@/tenant/resolveTenant'
 import type { BusinessInput, ProductInput } from './catalogService'
@@ -50,15 +51,19 @@ export function validateProductDraft(data: ProductInput, siblings: Product[]): F
   else if (!isValidSlug(data.slug)) e.slug = msg('common.validation.slugFormat')
   else if (siblings.some((p) => p.slug === data.slug)) e.slug = msg('common.validation.product.slugTaken')
   if (!Number.isFinite(data.price) || data.price < 0) e.price = msg('common.validation.priceInvalid')
+  else if (data.price > MAX_PRICE_MINOR) e.price = msg('common.validation.priceTooLarge')
   for (const k of ['width', 'height', 'depth'] as const) {
     const v = data.dimensions[k]
     if (!Number.isFinite(v) || v < 0) e[`dimensions.${k}`] = msg('common.validation.numberPositive')
+    else if (v > MAX_MEASURE) e[`dimensions.${k}`] = msg('common.validation.numberTooLarge')
   }
   if (data.cta.url && !isHttpUrl(data.cta.url)) e['cta.url'] = msg('common.validation.urlInvalid')
   // R-W4-13: a link with no text would render as an empty, invisible button on the product page.
   if (data.cta.url && !data.cta.label.en.trim()) e['cta.label'] = msg('common.validation.product.ctaLabelRequired')
   if (data.weight && (!Number.isFinite(data.weight.value) || data.weight.value < 0)) e.weight = msg('common.validation.product.weightInvalid')
+  else if (data.weight && data.weight.value > MAX_MEASURE) e.weight = msg('common.validation.numberTooLarge')
   if (data.variants.some((v) => v.priceDelta !== undefined && !(Number.isInteger(v.priceDelta) && v.priceDelta >= 0))) e.variants = msg('common.validation.product.priceDeltaInvalid')
+  else if (data.variants.some((v) => (v.priceDelta ?? 0) > MAX_PRICE_MINOR)) e.variants = msg('common.validation.priceTooLarge')
   // Same caps as save_product (20261020143507_variant_media).
   else if (data.variants.length > MAX_VARIANTS) e.variants = msg('common.validation.product.variantsMax', { n: MAX_VARIANTS })
   else if (data.variants.some((v) => (v.images?.length ?? 0) > MAX_VARIANT_IMAGES)) e.variants = msg('common.validation.product.variantImagesMax', { n: MAX_VARIANT_IMAGES })
