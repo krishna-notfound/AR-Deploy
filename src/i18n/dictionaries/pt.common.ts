@@ -111,6 +111,8 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'common.validation.product.filesNotUploaded': 'Alguns ficheiros não foram carregados para o armazenamento. Remova-os e carregue-os novamente.',
   'common.validation.product.variantFilesNotUploaded': 'Alguns ficheiros de cores ou opções não foram carregados para o armazenamento. Remova-os e carregue-os novamente.',
   'common.validation.product.nameRequired': 'O nome do produto (em inglês) é obrigatório.',
+  'common.validation.product.categoryHidden': 'Essa categoria está oculta. Escolha outra.',
+  'common.validation.product.currencyDisabled': 'Essa moeda está desativada. Escolha outra.',
   'common.validation.product.slugRequired': 'O identificador do produto no URL é obrigatório.',
   'common.validation.product.slugTaken': 'Outro produto deste catálogo já utiliza este identificador.',
   'common.validation.product.ctaLabelRequired': 'Adicione um texto ao botão ou remova a ligação.',

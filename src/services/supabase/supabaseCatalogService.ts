@@ -197,6 +197,9 @@ const DB_RULES: Record<string, { field: string; message: string | FieldMessage }
   publish_requires_gallery_image: { field: 'images', message: 'Add at least one product image before publishing.' },
   too_many_variants: { field: 'variants', message: 'Use 50 colours or options or fewer.' },
   too_many_variant_images: { field: 'variants', message: 'Each colour or option can have up to 20 photos.' },
+  // QA 2026-11-14 (ADR-0072): a new value must come from the managed lists (a product keeps one that was hidden later).
+  category_hidden: { field: 'category', message: msg('common.validation.product.categoryHidden') },
+  currency_disabled: { field: 'currency', message: msg('common.validation.product.currencyDisabled') },
 }
 
 /** Stable message keys raised by the database functions (20261020091428_applications_and_owner_access). */

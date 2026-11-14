@@ -615,7 +615,7 @@ export function ProductEditorForm({
             <LocalizedField label={t('products.editor.fullDescription')} multiline rows={5} value={form.input.description} onChange={(description) => setInput({ description })} />
             {/* Below sm: Category on its own row, then Price and a 96px Currency side by side. */}
             <div className="grid grid-cols-[1fr_96px] gap-4 sm:grid-cols-[2fr_1fr_1fr] [&>*:first-child]:max-sm:col-span-2">
-              <FormField label={t('products.filters.category')}>
+              <FormField label={t('products.filters.category')} error={err('category')}>
                 {/* The categories are managed in the admin console (ADR-0055); this product's own stays offered even if hidden. */}
                 <Select value={form.input.category} onChange={(e) => setInput({ category: e.target.value })}>
                   {categoryLists.offered(form.input.category).map((c) => (
@@ -628,7 +628,7 @@ export function ProductEditorForm({
               <FormField label={t('products.table.price')} error={err('price')} hint={t('products.editor.priceHint')}>
                 <Input inputMode="decimal" placeholder="0.00" className="tabular-nums" value={form.priceText} onChange={(e) => setForm((f) => ({ ...f, priceText: e.target.value }))} />
               </FormField>
-              <FormField label={t('products.editor.currency')}>
+              <FormField label={t('products.editor.currency')} error={err('currency')}>
                 <Select value={form.input.currency} onChange={(e) => setInput({ currency: e.target.value })}>
                   {currencyLists.offered(form.input.currency).map((c) => (
                     <option key={c} value={c}>
