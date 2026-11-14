@@ -65,14 +65,68 @@ describe('supabase notifications service', () => {
   it('reads prefs (defaults when there is no row) and upserts only the given switches for the signed-in user', async () => {
     expect(await createSupabaseNotifications(client().sb).getNotificationPrefs()).toEqual({
       ok: true,
-      data: { newApplication: true, newModelRequest: true, companyUpdates: true, pushEnabled: true, language: null },
+      data: {
+        newApplication: true,
+        newModelRequest: true,
+        companyUpdates: true,
+        emailNewApplication: true,
+        emailNewModelRequest: true,
+        emailCompanyUpdates: true,
+        emailModelRequestUpdates: true,
+        emailBusinessNotices: true,
+        pushEnabled: true,
+        language: null,
+      },
     })
-    const saved = { new_application: false, new_model_request: true, company_updates: true, push_enabled: true, language: 'pt' }
+    const saved = {
+      new_application: false,
+      new_model_request: true,
+      company_updates: true,
+      email_new_application: true,
+      email_new_model_request: true,
+      email_company_updates: true,
+      email_model_request_updates: true,
+      email_business_notices: false,
+      push_enabled: true,
+      language: 'pt',
+    }
     const { sb, calls } = client({ tables: { notification_prefs: { data: saved } } })
     const r = await createSupabaseNotifications(sb).setNotificationPrefs({ newApplication: false, language: 'pt' })
-    expect(r).toEqual({ ok: true, data: { newApplication: false, newModelRequest: true, companyUpdates: true, pushEnabled: true, language: 'pt' } })
+    expect(r).toMatchObject({ ok: true, data: { newApplication: false, newModelRequest: true, companyUpdates: true, emailBusinessNotices: false, emailNewApplication: true, pushEnabled: true, language: 'pt' } })
     expect(calls).toContainEqual(['upsert', [{ user_id: 'u1', new_application: false, language: 'pt' }, { onConflict: 'user_id' }]])
     expect(await createSupabaseNotifications(client({ user: null }).sb).setNotificationPrefs({ pushEnabled: false })).toMatchObject({ ok: false, error: { code: 'PERMISSION' } })
+  })
+})
+
+describe('email switches and unsubscribe (ADR-0078)', () => {
+  it('saves one email switch under its own column, and reads them all with the prefs', async () => {
+    const { sb, calls } = client({ tables: { notification_prefs: { data: { new_application: true, new_model_request: true, company_updates: true, email_new_application: true, email_new_model_request: true, email_company_updates: true, email_model_request_updates: false, email_business_notices: true, push_enabled: true, language: null } } } })
+    const r = await createSupabaseNotifications(sb).setNotificationPrefs({ emailModelRequestUpdates: false })
+    expect(calls).toContainEqual(['upsert', [{ user_id: 'u1', email_model_request_updates: false }, { onConflict: 'user_id' }]])
+    expect(r).toMatchObject({ ok: true, data: { emailModelRequestUpdates: false, emailNewApplication: true } })
+    expect(calls.find(([m]) => m === 'select')?.[1][0]).toContain('email_business_notices')
+  })
+
+  it('the unsubscribe button calls the public function with the token and returns the type', async () => {
+    const invoke = vi.fn(async () => ({ data: { ok: true, type: 'business_notices' }, error: null }))
+    const sb = { functions: { invoke } } as unknown as SupabaseClient
+    expect(await createSupabaseNotifications(sb).unsubscribeEmail('v1.a.b')).toEqual({ ok: true, data: { type: 'business_notices' } })
+    expect(invoke).toHaveBeenCalledWith('email-unsubscribe', { body: { t: 'v1.a.b' } })
+  })
+
+  it.each(['invalid_token', 'expired_token', 'rate_limited'])('carries the fixed reason %s from the function, never its text', async (reason) => {
+    const context = new Response(JSON.stringify({ error: reason, message: 'secret detail' }), { status: reason === 'rate_limited' ? 429 : 400 })
+    const sb = { functions: { invoke: vi.fn(async () => ({ data: null, error: { context } })) } } as unknown as SupabaseClient
+    const r = await createSupabaseNotifications(sb).unsubscribeEmail('v1.a.b')
+    expect(r).toMatchObject({ ok: false, error: { reason } })
+    expect(JSON.stringify(r)).not.toContain('secret detail')
+  })
+
+  it('maps any other failure, including a network error, to the unknown reason', async () => {
+    const other = { functions: { invoke: vi.fn(async () => ({ data: null, error: { context: new Response('<html>', { status: 502 }) } })) } } as unknown as SupabaseClient
+    expect(await createSupabaseNotifications(other).unsubscribeEmail('t')).toMatchObject({ ok: false, error: { reason: 'unknown' } })
+    const down = { functions: { invoke: vi.fn(async () => { throw new Error('offline') }) } } as unknown as SupabaseClient
+    expect(await createSupabaseNotifications(down).unsubscribeEmail('t')).toMatchObject({ ok: false, error: { code: 'UNKNOWN' } })
   })
 })
 

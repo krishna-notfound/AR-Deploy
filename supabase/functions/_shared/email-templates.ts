@@ -2,6 +2,7 @@
 // ignore stylesheets) plus a text version. Every inserted value is escaped. PT wording follows the landing
 // copy (Brazilian Portuguese) until the client confirms the dialect (open decision C6).
 import type { EmailKind } from './email.ts'
+import { FOOTER_MARKER } from './emailFooter.ts'
 import { type MemberRole, permissionBullets } from './team.ts'
 
 export type EmailLang = 'en' | 'pt'
@@ -61,6 +62,8 @@ export type SecurityNotice =
   | 'password_reset'
 
 export interface RenderedEmail {
+  /** The language of the email; sendAndLog uses it for the footer (ADR-0078). */
+  lang: EmailLang
   subject: string
   html: string
   text: string
@@ -299,6 +302,15 @@ const modelRequestUpdate = (lang: EmailLang) => (d: TemplateData): Copy => {
   return { subject, heading: subject, body: `${c.done(target)} ${event === 'delivered_published' ? c.published : c.draft}`, closing: c.footer }
 }
 
+// A business asked for a 3D model (ADR-0078): told to platform staff with models.manage. The console is English only, so one
+// wording serves both languages (like the new-application alert). The names are the business's own text, escaped by renderEmail.
+const modelRequestStaff = (d: TemplateData): Copy => ({
+  subject: `New 3D model request: ${d.productName?.trim() || 'a product'}`,
+  heading: 'A business asked for a 3D model',
+  body: `${d.businessName?.trim() || 'A business'} asked for a 3D model of ${d.productName?.trim() || 'a product'}.`,
+  cta: 'Open the request',
+})
+
 /** Every email kind has its copy in COPY below. */
 export type TemplateKind = EmailKind
 
@@ -311,6 +323,7 @@ const COPY: Record<TemplateKind, Record<EmailLang, (d: TemplateData) => Copy>> =
   business_notice: { en: businessNotice('en'), pt: businessNotice('pt') },
   team_notice: { en: teamNotice, pt: teamNotice },
   model_request_update: { en: modelRequestUpdate('en'), pt: modelRequestUpdate('pt') },
+  model_request_staff: { en: modelRequestStaff, pt: modelRequestStaff },
   owner_invitation: {
     en: (d) => ({
       subject: `You're invited to manage ${d.businessName ?? 'your catalogue'} on Sanctus`,
@@ -418,9 +431,9 @@ ${codeBlock}
 ${button}
 ${c.note ? `<p style="margin:0;font-size:13px;color:#5A5148">${esc(c.note)}</p>` : ''}
 ${data.actionUrl ? `<p style="margin:24px 0 0;font-size:12px;color:#6E6559;word-break:break-all">${esc(data.actionUrl)}</p>` : ''}
-</td></tr></table></td></tr></table></body></html>`
+</td></tr>${FOOTER_MARKER}</table></td></tr></table></body></html>`
   const text = [c.heading, '', c.body, ...(c.list ? c.list.map((li) => `- ${li}`) : []), ...(c.quote ? ['', c.quote] : []), ...(c.closing ? ['', c.closing] : []), ...(data.code ? ['', `${CODE_LABEL[lang]}: ${data.code}`] : []), ...(c.cta && data.actionUrl ? ['', `${c.cta}: ${data.actionUrl}`] : []), ...(c.note ? ['', c.note] : []), '', 'Sanctus'].join('\n')
-  return { subject: c.subject, html, text }
+  return { lang, subject: c.subject, html, text }
 }
 
 /** The rejection notice to an applicant (R-W2-1), in the application's language; the reason only when the reviewer ticked it. */

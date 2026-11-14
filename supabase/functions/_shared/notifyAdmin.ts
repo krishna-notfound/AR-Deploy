@@ -19,6 +19,29 @@ export async function staffUserIds(admin: SupabaseClient, permission: string): P
   return [...new Set<string>([...(members.data ?? []), ...(owners.data ?? [])].map((r: { user_id: string }) => r.user_id))]
 }
 
+/**
+ * The same people with their sign-in address, for the emails that go with a notification (ADR-0078). A member without a
+ * saved address and an Owner without an Auth address are left out. Throws on a read error.
+ */
+export async function staffEmailRecipients(admin: SupabaseClient, permission: string): Promise<{ userId: string; email: string }[]> {
+  const perms = await admin.from('platform_role_permissions').select('role').eq('permission', permission)
+  if (perms.error) throw new Error(`permission lookup failed: ${perms.error.code ?? 'unknown'}`)
+  const roles = (perms.data ?? []).map((r: { role: string }) => r.role)
+  const members = roles.length
+    ? await admin.from('platform_members').select('user_id, email').eq('status', 'active').in('role', roles).not('user_id', 'is', null)
+    : { data: [] as { user_id: string; email: string }[], error: null }
+  if (members.error) throw new Error(`member lookup failed: ${members.error.code ?? 'unknown'}`)
+  const owners = await admin.from('platform_admins').select('user_id')
+  if (owners.error) throw new Error(`owner lookup failed: ${owners.error.code ?? 'unknown'}`)
+  const byUser = new Map<string, string>((members.data ?? []).map((m: { user_id: string; email: string }) => [m.user_id, m.email]))
+  for (const o of owners.data ?? []) {
+    if (byUser.has(o.user_id)) continue
+    const { data } = await admin.auth.admin.getUserById(o.user_id)
+    if (data.user?.email) byUser.set(o.user_id, data.user.email)
+  }
+  return [...byUser].filter(([, email]) => !!email).map(([userId, email]) => ({ userId, email }))
+}
+
 /** Every member of the business. Throws on a read error. */
 export async function businessUserIds(admin: SupabaseClient, businessId: string): Promise<string[]> {
   const { data, error } = await admin.from('business_members').select('user_id').eq('business_id', businessId)

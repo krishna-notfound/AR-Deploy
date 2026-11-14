@@ -1,5 +1,5 @@
 import { RequirePermission } from '@/auth/usePermission'
-import { JOIN_PATH, PRIVACY_PATH, TERMS_PATH } from '@/lib/urls'
+import { EMAIL_PREFERENCES_PATH, EMAIL_UNSUBSCRIBE_PATH, JOIN_PATH, PRIVACY_PATH, TERMS_PATH } from '@/lib/urls'
 import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, type RouteObject, createBrowserRouter, useLocation } from 'react-router'
 import { isDemoMode } from '@/services'
@@ -24,6 +24,8 @@ const NotFoundPage = lazy(() => import('@/features/demo/NotFoundPage'))
 const PublicNotFoundPage = lazy(() => import('@/features/marketing/PublicNotFoundPage'))
 const LegalPage = lazy(() => import('@/features/legal/LegalPage'))
 const CustomPage = lazy(() => import('@/features/legal/CustomPage'))
+const EmailUnsubscribePage = lazy(() => import('@/features/email/EmailUnsubscribePage'))
+const EmailPreferencesRedirect = lazy(() => import('@/features/email/EmailPreferencesRedirect'))
 const CollectionPage = lazy(() => import('@/features/marketing/CollectionPage'))
 const ShowcaseProductPage = lazy(() => import('@/features/marketing/ShowcaseProductPage'))
 
@@ -239,6 +241,9 @@ function pathModeRoutes(): RouteObject[] {
             { path: PRIVACY_PATH, element: <LegalPage doc="privacy" /> },
             { path: TERMS_PATH, element: <LegalPage doc="terms" /> },
             { path: '/pages/:slug', element: <CustomPage /> },
+            // The links at the foot of every email (ADR-0078): the unsubscribe page and the preferences redirect.
+            { path: EMAIL_UNSUBSCRIBE_PATH, element: <EmailUnsubscribePage /> },
+            { path: EMAIL_PREFERENCES_PATH, element: <EmailPreferencesRedirect /> },
             { path: '/collections/:slug', element: <CollectionPage /> },
             // The platform's own showcase pieces (ADR-0047); path mode only. The old /products/sanctus-showcase/:slug redirects here.
             { path: '/showcase/:productSlug', element: <ShowcaseProductPage /> },

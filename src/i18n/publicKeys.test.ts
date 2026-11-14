@@ -28,6 +28,8 @@ const ROOTS = [
   'features/auth/LoginPage.tsx',
   'features/auth/ResetPasswordPage.tsx',
   'features/auth/AcceptInvitePage.tsx',
+  'features/email/EmailUnsubscribePage.tsx',
+  'features/email/EmailPreferencesRedirect.tsx',
   'features/apply/ApplyPage.tsx',
   'features/legal/LegalPage.tsx',
   'features/legal/CustomPage.tsx',

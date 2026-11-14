@@ -5,17 +5,19 @@ import { type ActOutcome, type EmailContext, type ReviewModelRequestDeps, handle
 
 const REQ = '11111111-1111-4111-8111-111111111111'
 const BIZ = '22222222-2222-4222-8222-222222222222'
+const OWNER_ID = '33333333-3333-4333-8333-333333333333'
 const CONFIG: EmailConfig = {
   apiKey: 're_test',
   from: 'Sanctus <hello@sanctus.example>',
   appBaseUrl: 'https://preview.example.app',
   testRecipients: [],
   adminNotificationEmail: 'team@account.test',
+  unsubscribeSecret: 'unsub-secret',
 }
 
 const CTX: EmailContext = {
   businessId: BIZ,
-  recipient: { email: 'owner@shop.test', language: 'en' },
+  recipient: { userId: OWNER_ID, email: 'owner@shop.test', language: 'en' },
   productName: { en: 'Oslo sofa', pt: 'Sofá Oslo' },
   productStatus: 'published',
 }
@@ -105,12 +107,12 @@ describe('S4 Task 7: review-model-request (R-S4-15)', () => {
   })
 
   it('a PT recipient → PT subject and body with the PT product and option names, falling back to EN', async () => {
-    const pt = setup({}, { recipient: { email: 'dono@shop.test', language: 'pt' }, optionName: { en: 'Walnut', pt: 'Nogueira' } })
+    const pt = setup({}, { recipient: { userId: OWNER_ID, email: 'dono@shop.test', language: 'pt' }, optionName: { en: 'Walnut', pt: 'Nogueira' } })
     await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), pt.d)
     expect(pt.sent[0]!.subject).toBe('O modelo 3D de Sofá Oslo está pronto')
     expect(pt.sent[0]!.text).toContain('A equipa Sanctus terminou o modelo 3D de Sofá Oslo (Nogueira).')
 
-    const fallback = setup({}, { recipient: { email: 'dono@shop.test', language: 'pt' }, productName: { en: 'Oslo sofa' }, optionName: { en: 'Walnut' } })
+    const fallback = setup({}, { recipient: { userId: OWNER_ID, email: 'dono@shop.test', language: 'pt' }, productName: { en: 'Oslo sofa' }, optionName: { en: 'Walnut' } })
     await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), fallback.d)
     expect(fallback.sent[0]!.subject).toBe('O modelo 3D de Oslo sofa está pronto')
     expect(fallback.sent[0]!.text).toContain('modelo 3D de Oslo sofa (Walnut).')
@@ -261,5 +263,35 @@ describe('review-model-request notifications (ADR-0056)', () => {
     expect(notify).toHaveBeenCalledWith(expect.not.objectContaining({ fallbackLang: expect.anything() }))
     const failing = setup({ notify: async () => Promise.reject(new Error('down')) })
     expect((await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), failing.d)).status).toBe(200)
+  })
+})
+describe('email switch "3D model request updates" (ADR-0078)', () => {
+  it('sends with the footer, the Unsubscribe link and the List-Unsubscribe headers when the owner keeps it on', async () => {
+    const emailPref = vi.fn(async () => true)
+    const { d, sent } = setup({ emailPref })
+    await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), d)
+    expect(emailPref).toHaveBeenCalledWith(OWNER_ID, 'model_request_updates')
+    const body = sent[0] as unknown as { html: string; headers: Record<string, string> }
+    expect(body.html).toContain('>Unsubscribe</a>')
+    expect(body.html).toContain('https://preview.example.app/privacy')
+    expect(body.headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
+  })
+
+  it('sends nothing to Resend and logs nothing when the owner switched it off; the bell is still written', async () => {
+    const notify = vi.fn(async () => {})
+    const { d, sent, logs, fetchFn } = setup({ emailPref: async () => false, notify })
+    const res = await handleReviewModelRequest(post({ requestId: REQ, action: 'deliver' }), d)
+    expect((await json(res)).email).toEqual({ status: 'skipped' })
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(sent).toEqual([])
+    expect(logs).toEqual([])
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not email when the switch cannot be read, and still answers success', async () => {
+    const { d, sent } = setup({ emailPref: async () => { throw new Error('prefs lookup failed') } })
+    const res = await handleReviewModelRequest(post({ requestId: REQ, action: 'reject', reason: 'No' }), d)
+    expect(res.status).toBe(200)
+    expect(sent).toEqual([])
   })
 })

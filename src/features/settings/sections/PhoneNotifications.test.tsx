@@ -165,9 +165,9 @@ describe('Phone notifications card', () => {
 describe('Event switches', () => {
   it('platform staff see applications, 3D requests and the phone switch; each saves and survives a reload', async () => {
     open(OWNER, '/admin/settings/notifications')
-    const apps = await screen.findByRole('switch', { name: 'New applications' })
-    expect(screen.getByRole('switch', { name: 'New 3D model requests' })).toBeInTheDocument()
-    expect(screen.queryByRole('switch', { name: 'Updates about your company' })).toBeNull()
+    const apps = await screen.findByRole('switch', { name: 'New applications In-app' })
+    expect(screen.getByRole('switch', { name: 'New 3D model requests In-app' })).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: /3D model request updates|Platform notices/ })).toBeNull()
     expect(apps).toHaveAttribute('aria-checked', 'true')
     await userEvent.click(apps)
     await waitFor(() => expect(apps).toHaveAttribute('aria-checked', 'false'))
@@ -180,18 +180,19 @@ describe('Event switches', () => {
     })
   })
 
-  it('business owners see only the company updates switch and the phone switch', async () => {
+  it('business owners see the company update rows and the phone switch, not the staff types', async () => {
     open(BUSINESS, '/dashboard/settings/notifications')
-    expect(await screen.findByRole('switch', { name: 'Updates about your company' })).toBeInTheDocument()
+    expect(await screen.findByRole('switch', { name: '3D model request updates In-app' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Platform notices about your company In-app' })).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Send to my phones' })).toBeInTheDocument()
-    expect(screen.queryByRole('switch', { name: 'New applications' })).toBeNull()
-    expect(screen.queryByRole('switch', { name: 'New 3D model requests' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: /^New applications/ })).toBeNull()
+    expect(screen.queryByRole('switch', { name: /^New 3D model requests/ })).toBeNull()
   })
 
   it('a failed save says so and the switch rolls back', async () => {
     vi.spyOn(notifications, 'setNotificationPrefs').mockResolvedValue({ ok: false, error: { code: 'UNKNOWN', message: 'x' } })
     open(OWNER, '/admin/settings/notifications')
-    const apps = await screen.findByRole('switch', { name: 'New applications' })
+    const apps = await screen.findByRole('switch', { name: 'New applications In-app' })
     await userEvent.click(apps)
     expect(await screen.findByText('Could not save the notification setting')).toBeInTheDocument()
     await waitFor(() => expect(apps).toHaveAttribute('aria-checked', 'true'))
@@ -203,6 +204,6 @@ describe('Event switches', () => {
     expect(await screen.findByText(/Could not load your notification settings/)).toBeInTheDocument()
     spy.mockRestore()
     await userEvent.click(screen.getAllByRole('button', { name: 'Try again' })[0]!)
-    expect(await screen.findByRole('switch', { name: 'New applications' })).toBeInTheDocument()
+    expect(await screen.findByRole('switch', { name: 'New applications In-app' })).toBeInTheDocument()
   })
 })

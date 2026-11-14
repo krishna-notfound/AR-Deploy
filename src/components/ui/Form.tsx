@@ -173,21 +173,46 @@ export function Switch({
         </label>
         {description && <p className={cn('text-ink-muted', dash ? 'text-ui-small' : 'text-xs')}>{description}</p>}
       </div>
-      <button
-        id={id}
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          'relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors disabled:opacity-50',
-          checked ? 'bg-accent' : dash ? 'bg-subtle ring-1 ring-line-strong ring-inset' : 'bg-line-strong',
-        )}
-      >
-        <span className={cn('inline-block size-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-[18px]' : 'translate-x-0.5')} />
-      </button>
+      <SwitchButton id={id} checked={checked} onChange={onChange} disabled={disabled} className="mt-0.5" />
     </div>
+  )
+}
+
+/** The toggle itself, for rows that carry more than one (Settings → Notifications: In-app and Email). Name it with ria-label or ria-labelledby. */
+export function SwitchButton({
+  checked,
+  onChange,
+  disabled,
+  id,
+  className,
+  ...aria
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+  id?: string
+  className?: string
+  'aria-label'?: string
+  'aria-labelledby'?: string
+}) {
+  const dash = useInDashboard()
+  return (
+    <button
+      id={id}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      {...aria}
+      className={cn(
+        'relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors disabled:opacity-50',
+        checked ? 'bg-accent' : dash ? 'bg-subtle ring-1 ring-line-strong ring-inset' : 'bg-line-strong',
+        className,
+      )}
+    >
+      <span className={cn('inline-block size-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-[18px]' : 'translate-x-0.5')} />
+    </button>
   )
 }
 

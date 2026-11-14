@@ -29,6 +29,7 @@ export const enApplications = {
   'applications.emailReason.invalid_recipient': 'The email address is not valid.',
   'applications.emailReason.admin_recipient_not_configured': 'No admin notification address (ADMIN_NOTIFICATION_EMAIL) is configured.',
   'applications.emailReason.no_recipient': 'The account has no email address.',
+  'applications.emailReason.unsubscribe_not_configured': 'The unsubscribe link cannot be signed yet (EMAIL_UNSUBSCRIBE_SECRET is not set), so this optional email was not sent.',
   'applications.emailKind.owner_invitation': 'Owner invitation',
   'applications.emailKind.invitation_resend': 'Invitation resent',
   'applications.emailKind.application_confirmation': 'Application confirmation',
@@ -42,6 +43,7 @@ export const enApplications = {
   'applications.emailKind.admin_notification': 'Admin notification',
   'applications.emailKind.test': 'Test email',
   'applications.emailKind.model_request_update': '3D model update',
+  'applications.emailKind.model_request_staff': '3D model request alert',
 
   // ---- audit events ----
   'applications.event.application_submitted': 'Application submitted',

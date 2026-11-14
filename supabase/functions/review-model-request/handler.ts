@@ -10,6 +10,7 @@
 // no email_log row yet, so a retry never emails twice (and a retry that finds it already sent carries no `email`).
 import { type ConfigResult, type EmailStatus, type LogEntry, SAFE_EMAIL_REASONS, sendAndLog } from '../_shared/email.ts'
 import { type EmailLang, type ModelRequestEmailEvent, REASON_MAX_LENGTH, modelRequestUpdateEmail } from '../_shared/email-templates.ts'
+import { type EmailPrefReader, emailWanted } from '../_shared/emailPrefs.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
 import { modelUpdateNotice } from '../_shared/notificationText.ts'
@@ -42,7 +43,7 @@ export interface EmailContext {
   /** The product the request is for (the notification links to its editor). */
   productId?: string
   /** The business owner's address and the source application's language; null when the business has no owner. */
-  recipient: { email: string; language: 'en' | 'pt' } | null
+  recipient: { userId: string; email: string; language: 'en' | 'pt' } | null
   productName: Localized
   optionName?: Localized
   productStatus: string
@@ -70,6 +71,8 @@ export interface ReviewModelRequestDeps {
   log(entry: LogEntry): Promise<string>
   /** In-app notification and phone push to the business's members (ADR-0056). Never throws; absent in tests that do not need it. */
   notify?(request: NotifyRequest): Promise<void>
+  /** Whether the owner keeps "3D model request updates" emails on (ADR-0078). Absent in tests that do not need it: on. */
+  emailPref?: EmailPrefReader
 }
 
 type OwnerEmail = { status: EmailStatus | 'skipped'; error?: string }
@@ -157,6 +160,8 @@ async function notifyOwner(
         .catch(() => {})
     }
     if (!ctx?.recipient) return { status: 'skipped' }
+    // The owner can switch these emails off (ADR-0078): nothing goes to Resend and nothing is logged; the bell is unaffected.
+    if (!(await emailWanted(deps.emailPref, ctx.recipient.userId, 'model_request_updates'))) return { status: 'skipped' }
     const workflow = `model_request:${a.requestId}:${a.action === 'deliver' ? 'delivered' : 'rejected'}`
     if (await deps.alreadySent(workflow)) return null
     const lang = ctx.recipient.language
@@ -173,7 +178,7 @@ async function notifyOwner(
       return { status: 'blocked', error: 'email_not_configured' }
     }
     // The idempotency key makes Resend send once even if two calls pass the alreadySent check together.
-    const r = await sendAndLog({ config: deps.config.config, fetch: deps.fetch, log }, { ...email, ...base, to: ctx.recipient.email, idempotencyKey: workflow })
+    const r = await sendAndLog({ config: deps.config.config, fetch: deps.fetch, log }, { ...email, ...base, to: ctx.recipient.email, idempotencyKey: workflow, optional: { userId: ctx.recipient.userId, type: 'model_request_updates' } })
     return r.error && SAFE_EMAIL_REASONS.has(r.error) ? { status: r.status, error: r.error } : { status: r.status }
   } catch {
     return { status: 'failed' }

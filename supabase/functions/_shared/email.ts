@@ -1,5 +1,7 @@
 // Server-side email through Resend (design/23-email.md). Web-standard APIs only (fetch, no SDK, no Deno globals),
 // so it runs in Edge Functions and under Vitest. The API key is an Edge Function secret and never reaches a browser.
+import { type EmailPrefType, signUnsubscribeToken } from './emailPrefs.ts'
+import { emailFooter, withFooter } from './emailFooter.ts'
 
 export type EmailKind =
   | 'owner_invitation'
@@ -18,6 +20,8 @@ export type EmailKind =
   | 'team_notice'
   // S4 (spec section 8.5): the owner is told a 3D model request was delivered or declined.
   | 'model_request_update'
+  // ADR-0078: platform staff with models.manage are told about a new 3D model request.
+  | 'model_request_staff'
 
 /** Same values as the email_log.status check constraint. */
 export type EmailStatus = 'blocked' | 'failed' | 'accepted' | 'sent' | 'delivered' | 'delayed' | 'bounced' | 'complained'
@@ -32,6 +36,10 @@ export interface EmailConfig {
   testRecipients: string[]
   /** Where admin notifications go. */
   adminNotificationEmail: string
+  /** EMAIL_UNSUBSCRIBE_SECRET: signs the unsubscribe links of optional emails (ADR-0078). Without it optional emails are not sent. */
+  unsubscribeSecret?: string
+  /** `<SUPABASE_URL>/functions/v1`: where the List-Unsubscribe header's one-click POST goes (the email-unsubscribe function). */
+  functionsBaseUrl?: string
 }
 
 export type ConfigResult = { ok: true; config: EmailConfig } | { ok: false; missing: string[] }
@@ -45,6 +53,8 @@ export function readEmailConfig(env: (name: string) => string | undefined): Conf
     appBaseUrl: get('APP_BASE_URL').replace(/\/+$/, ''),
     testRecipients: get('EMAIL_TEST_RECIPIENTS').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
     adminNotificationEmail: get('ADMIN_NOTIFICATION_EMAIL'),
+    unsubscribeSecret: get('EMAIL_UNSUBSCRIBE_SECRET'),
+    functionsBaseUrl: get('SUPABASE_URL').replace(/\/+$/, '') ? `${get('SUPABASE_URL').replace(/\/+$/, '')}/functions/v1` : '',
   }
   const missing = (['RESEND_API_KEY', 'EMAIL_FROM', 'APP_BASE_URL'] as const).filter((n) => !get(n))
   if (config.appBaseUrl && !/^https?:\/\/[^\s/]+/.test(config.appBaseUrl)) missing.push('APP_BASE_URL')
@@ -61,7 +71,7 @@ export const isValidEmail = (to: string) => to.length <= 320 && EMAIL.test(to)
  * (provider or network text) stays in email_log only: raw provider text never reaches the UI (CONSTRAINTS).
  */
 export const SAFE_EMAIL_REASONS: ReadonlySet<string> = new Set([
-  'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'no_recipient', 'admin_recipient_not_configured', 'demo_mode',
+  'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'no_recipient', 'admin_recipient_not_configured', 'demo_mode', 'unsubscribe_not_configured',
 ])
 
 /** True while sending from Resend's shared test domain (no verified domain yet). */
@@ -86,6 +96,15 @@ export interface OutgoingEmail {
   text: string
   /** Same key → Resend sends at most once (protects against double clicks and retries). */
   idempotencyKey?: string
+  /** The email's language, for the footer. renderEmail returns it, so `...rendered` carries it; English when absent. */
+  lang?: 'en' | 'pt'
+  /**
+   * Set for an email a person can switch off (ADR-0078): the recipient and the type. sendAndLog then adds the Unsubscribe
+   * link and the List-Unsubscribe headers. Absent for always-sent emails, which carry a line on why they are sent instead.
+   */
+  optional?: { userId: string; type: EmailPrefType }
+  /** Extra message headers (the List-Unsubscribe pair); set by sendAndLog. */
+  headers?: Record<string, string>
 }
 
 export type SendResult = { ok: true; id: string } | { ok: false; status: number; error: string }
@@ -100,7 +119,14 @@ export async function sendViaResend(fetchFn: typeof fetch, config: EmailConfig, 
         'Content-Type': 'application/json',
         ...(email.idempotencyKey ? { 'Idempotency-Key': email.idempotencyKey } : {}),
       },
-      body: JSON.stringify({ from: config.from, to: [email.to], subject: email.subject, html: email.html, text: email.text }),
+      body: JSON.stringify({
+        from: config.from,
+        to: [email.to],
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+        ...(email.headers && Object.keys(email.headers).length ? { headers: email.headers } : {}),
+      }),
     })
     const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string; name?: string }
     if (res.ok && body.id) return { ok: true, id: body.id }
@@ -164,9 +190,35 @@ export interface SendDeps {
   fetch: typeof fetch
   /** Inserts one public.email_log row with the service role and returns its id. */
   log(entry: LogEntry): Promise<string>
+  /** The clock for the unsubscribe token's issue date (tests). */
+  now?: () => Date
 }
 
 export type SendAndLogResult = { logId: string; status: EmailStatus; providerMessageId?: string; error?: string }
+
+/**
+ * The footer every email carries and, for an optional email, the unsubscribe link and the List-Unsubscribe headers
+ * (ADR-0078). An optional email cannot be sent without EMAIL_UNSUBSCRIBE_SECRET: it is blocked, never sent without the link.
+ */
+export async function withFooterAndHeaders(
+  config: EmailConfig,
+  email: OutgoingEmail & { kind: EmailKind },
+  now: Date = new Date(),
+): Promise<{ ok: true; email: OutgoingEmail } | { ok: false; reason: string }> {
+  let unsubscribeUrl: string | undefined
+  let headers = email.headers
+  if (email.optional) {
+    if (!config.unsubscribeSecret) return { ok: false, reason: 'unsubscribe_not_configured' }
+    const token = await signUnsubscribeToken(config.unsubscribeSecret, email.optional.userId, email.optional.type, now)
+    unsubscribeUrl = `${config.appBaseUrl}/email/unsubscribe?t=${token}`
+    // Mail providers POST the one-click request straight to this URL, so it must be the function, not the page.
+    const oneClick = config.functionsBaseUrl ? `${config.functionsBaseUrl}/email-unsubscribe?t=${token}` : unsubscribeUrl
+    headers = { ...headers, 'List-Unsubscribe': `<${oneClick}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
+  }
+  const footer = emailFooter({ kind: email.kind, lang: email.lang ?? 'en', appBaseUrl: config.appBaseUrl, unsubscribeUrl })
+  const { html, text } = withFooter(email, footer)
+  return { ok: true, email: { ...email, html, text, ...(headers ? { headers } : {}) } }
+}
 
 /** Guard → send → log. Every attempt is logged; "accepted" means Resend took the message, not that it arrived. */
 export async function sendAndLog(
@@ -188,7 +240,12 @@ export async function sendAndLog(
     const logId = await deps.log({ ...base, status: 'blocked', error: allowed.reason })
     return { logId, status: 'blocked', error: allowed.reason }
   }
-  const sent = await sendViaResend(deps.fetch, deps.config, email)
+  const prepared = await withFooterAndHeaders(deps.config, email, deps.now?.())
+  if (!prepared.ok) {
+    const logId = await deps.log({ ...base, status: 'blocked', error: prepared.reason })
+    return { logId, status: 'blocked', error: prepared.reason }
+  }
+  const sent = await sendViaResend(deps.fetch, deps.config, prepared.email)
   if (!sent.ok) {
     const logId = await deps.log({ ...base, status: 'failed', error: sent.error })
     return { logId, status: 'failed', error: sent.error }

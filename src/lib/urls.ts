@@ -134,6 +134,11 @@ export const passwordResetRedirectUrl = (): string => absoluteLocalUrl(RESET_PAS
 /** Public legal pages (EN/PT, text from docs/legal/drafts). Served on the platform domain and on business subdomains. */
 export const PRIVACY_PATH = '/privacy'
 export const TERMS_PATH = '/terms'
+
+/** Email preferences (ADR-0078). The link in every email opens /email/preferences, which sends a signed-in person to their settings. */
+export const EMAIL_PREFERENCES_PATH = '/email/preferences'
+/** The public page behind an email's Unsubscribe link: /email/unsubscribe?t=<signed token>. Shows a button; nothing happens on open. */
+export const EMAIL_UNSUBSCRIBE_PATH = '/email/unsubscribe'
 /** A custom page made in the website Editor (ADR-0043): /pages/<slug>, on the platform domain and on business subdomains. */
 export const customPagePath = (slug: string) => `/pages/${encodeURIComponent(slug)}`
 
