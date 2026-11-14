@@ -184,6 +184,16 @@ describe('Tabs (pill) as a segmented control', () => {
     expect(other).not.toHaveClass('bg-surface')
   })
 
+  it('is 44px tall on a phone (not only on touch input), so every filter tab is an easy tap (QA #44)', () => {
+    render(
+      <InShell>
+        <Tabs tabs={tabs} value="a" onChange={() => {}} label="Filter" variant="pill" />
+      </InShell>,
+    )
+    expect(screen.getByRole('tablist')).toHaveClass('max-sm:h-[52px]')
+    for (const tab of screen.getAllByRole('tab')) expect(tab).toHaveClass('max-sm:h-11')
+  })
+
   it('keeps the pill and underline class strings byte-identical outside the dashboard', () => {
     const { rerender } = render(<Tabs tabs={tabs} value="a" onChange={() => {}} label="Filter" variant="pill" />)
     expect(screen.getByRole('tablist').className).toBe('flex gap-1 overflow-x-auto')

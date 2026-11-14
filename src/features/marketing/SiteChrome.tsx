@@ -8,6 +8,7 @@ import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useMaybeI18n } from '@/i18n/LanguageProvider'
 import { type Vars, translate } from '@/i18n/translate'
 import { cn } from '@/lib/cn'
+import { lockBodyScroll } from '@/lib/scrollLock'
 import { APPLY_PATH } from '@/lib/urls'
 import { LegalLinks } from '../legal/LegalLinks'
 import { isDemoMode } from '@/services'
@@ -116,6 +117,17 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
   const account = useAccountLink()
   const nav = useVisibleNav(NAV)
   const menuRef = useRef<HTMLDialogElement>(null)
+  // A modal <dialog> leaves the page behind it scrollable: lock it while the menu is open, however the menu closes.
+  const unlock = useRef<(() => void) | null>(null)
+  const release = () => {
+    unlock.current?.()
+    unlock.current = null
+  }
+  const openMenu = () => {
+    if (!unlock.current) unlock.current = lockBodyScroll()
+    menuRef.current?.showModal()
+  }
+  useEffect(() => release, [])
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface text-ink">
@@ -160,7 +172,7 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
               </Link>
             </>
           )}
-          <button type="button" aria-label={t('site.menuOpen')} className="-mr-2 grid size-11 place-items-center xl:hidden" onClick={() => menuRef.current?.showModal()}>
+          <button type="button" aria-label={t('site.menuOpen')} className="-mr-2 grid size-11 place-items-center xl:hidden" onClick={openMenu}>
             <Menu className="size-5" strokeWidth={1.4} aria-hidden />
           </button>
         </div>
@@ -170,6 +182,7 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
       <dialog
         ref={menuRef}
         aria-label={t('site.nav.label')}
+        onClose={release}
         className="m-0 ml-auto h-dvh max-h-none w-full max-w-sm bg-obsidian p-0 text-chalk backdrop:bg-obsidian/60"
       >
         <div className="flex h-full flex-col overflow-y-auto px-8 py-6">

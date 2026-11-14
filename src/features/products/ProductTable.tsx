@@ -122,13 +122,22 @@ export function ProductTable({
     ]
   }
 
+  // The name opens the editor, which needs products.edit (the route's RequirePermission): without it the name is plain text (QA #29).
+  const canEdit = allowed('products.edit')
+
   const name = (p: Product) => (
     <div className="flex min-w-0 items-center gap-3">
       <Thumb src={primaryImage(p)?.url} alt="" />
       <div className="min-w-0">
-        <Link to={editPath(scope, p)} title={p.name.en} className="block truncate font-medium text-ink hover:underline">
-          {p.name.en}
-        </Link>
+        {canEdit ? (
+          <Link to={editPath(scope, p)} title={p.name.en} className="block truncate font-medium text-ink hover:underline">
+            {p.name.en}
+          </Link>
+        ) : (
+          <span title={p.name.en} className="block truncate font-medium text-ink">
+            {p.name.en}
+          </span>
+        )}
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[length:var(--text-ui-small)] leading-[1.15] text-ink-muted">
           <span>{categoryLabel(p.category)}</span>
           <ArReadinessPill product={p} />
@@ -199,9 +208,13 @@ export function ProductTable({
           <div className="flex items-start gap-3">
             <Thumb src={primaryImage(p)?.url} alt="" size="lg" />
             <div className="min-w-0 flex-1">
-              <Link to={editPath(scope, p)} className="block truncate text-sm font-medium hover:underline">
-                {p.name.en}
-              </Link>
+              {canEdit ? (
+                <Link to={editPath(scope, p)} className="block truncate text-sm font-medium hover:underline">
+                  {p.name.en}
+                </Link>
+              ) : (
+                <span className="block truncate text-sm font-medium">{p.name.en}</span>
+              )}
               {showBusiness && <p className="truncate text-xs text-ink-muted">{businesses.get(p.businessId)?.name}</p>}
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
                 <ProductStatusBadge status={p.status} />

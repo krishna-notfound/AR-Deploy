@@ -110,7 +110,7 @@ export function DataTable<T>({
         ))}
       </ul>
       {/* Table */}
-      <div className={cn('hidden overflow-x-auto', dash ? 'sm:block' : 'md:block')}>
+      <div className={cn('relative hidden overflow-x-auto', dash ? 'sm:block' : 'md:block')}>
         <table className="w-full text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead>

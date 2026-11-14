@@ -63,7 +63,7 @@ export function Tabs<T extends string>({
       onScroll={inDashboard ? measure : undefined}
       className={cn(
         inDashboard && variant === 'pill'
-          ? 'inline-flex h-10 max-w-full gap-1 overflow-x-auto rounded-[var(--radius-control)] bg-subtle p-1 [scrollbar-width:none] pointer-coarse:h-[52px]'
+          ? 'inline-flex h-10 max-w-full gap-1 overflow-x-auto rounded-[var(--radius-control)] bg-subtle p-1 [scrollbar-width:none] max-sm:h-[52px] pointer-coarse:h-[52px]'
           : 'flex gap-1 overflow-x-auto',
         variant === 'underline' && 'border-b border-line',
         // scroll padding keeps a keyboard-focused tab clear of the 24px fade
@@ -91,7 +91,7 @@ export function Tabs<T extends string>({
                 ? cn('-mb-px min-h-11 border-b-2 px-3', selected ? 'border-ink text-ink' : 'border-transparent text-ink-muted hover:text-ink')
                 : inDashboard
                   ? cn(
-                      'h-8 rounded-[var(--radius-control)] border px-3 pointer-coarse:h-11',
+                      'h-8 rounded-[var(--radius-control)] border px-3 max-sm:h-11 pointer-coarse:h-11',
                       selected ? 'border-line bg-surface text-ink' : 'border-transparent text-ink-muted hover:text-ink',
                     )
                   : cn('min-h-9 rounded-[var(--radius-control)] px-3 pointer-coarse:min-h-11', selected ? 'bg-ink text-canvas' : 'text-ink-muted hover:bg-subtle hover:text-ink'),

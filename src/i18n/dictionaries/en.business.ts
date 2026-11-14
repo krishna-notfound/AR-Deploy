@@ -89,6 +89,7 @@ export const enBusiness = {
   'business.overview.stats.published': 'Published',
   'business.overview.stats.drafts': 'Drafts',
   'business.overview.stats.draftsHint': 'Not published yet',
+  'business.overview.stats.viewsDeleted': 'Last 30 days. Includes deleted products: {n}',
   'business.overview.stats.views': 'Product page views',
   'business.overview.stats.arAttempts': 'AR launch attempts',
   'business.overview.stats.arRate': 'Last 30 days · {rate}',

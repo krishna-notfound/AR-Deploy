@@ -19,6 +19,7 @@ export const ptCommon: Partial<Record<TranslationKey, string>> = {
   'common.notProvided': 'Não indicado',
   'common.required': 'Obrigatório',
   'common.optional': 'Opcional',
+  'common.dateRangeReversed': 'A data final é anterior à data inicial. Escolha uma data final igual ou posterior.',
   'common.actions': 'Ações',
   'common.status': 'Estado',
   'common.name': 'Nome',

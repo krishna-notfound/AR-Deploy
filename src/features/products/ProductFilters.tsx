@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { Select } from '@/components/ui/Form'
 import { cn } from '@/lib/cn'
+import { matchesSearch } from '@/lib/searchText'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { type Business, type Category, type Product, type ProductStatus } from '@/domain/types'
 import type { ProductRequestState } from '@/domain/modelRequests'
@@ -75,7 +76,6 @@ export function useProductFilterParams() {
 
 /** `states`: each product's request state, needed only for the `model` filter. */
 export function applyProductFilters(products: Product[], f: ProductFilterState, states?: Record<string, ProductRequestState>): Product[] {
-  const term = f.q.trim().toLowerCase()
   return products.filter(
     (p) =>
       (!f.business || p.businessId === f.business) &&
@@ -83,7 +83,7 @@ export function applyProductFilters(products: Product[], f: ProductFilterState, 
       (!f.category || p.category === f.category) &&
       (!f.ar || productArReadiness(p) === f.ar) &&
       (!f.model || !!states?.[p.id]?.open) &&
-      (!term || p.name.en.toLowerCase().includes(term) || (p.name.pt ?? '').toLowerCase().includes(term) || p.slug.includes(term)),
+      matchesSearch([p.name.en, p.name.pt, p.slug], f.q),
   )
 }
 

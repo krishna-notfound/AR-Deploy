@@ -19,6 +19,7 @@ export const enCommon = {
   'common.notProvided': 'Not provided',
   'common.required': 'Required',
   'common.optional': 'Optional',
+  'common.dateRangeReversed': 'The end date is before the start date. Choose an end date on or after it.',
   'common.actions': 'Actions',
   'common.status': 'Status',
   'common.name': 'Name',

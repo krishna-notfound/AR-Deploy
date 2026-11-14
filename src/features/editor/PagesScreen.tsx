@@ -99,7 +99,7 @@ export default function PagesScreen() {
             </tbody>
           </table>
         </div>
-        {draft.customPages.length === 0 && <p className="mt-3 text-ui-small text-ink-muted">{t('editor.pages.empty')}</p>}
+        {draft.customPages.length === 0 && <p className="mt-3 max-w-[72ch] text-ui-small text-ink-muted">{t('editor.pages.empty')}</p>}
       </section>
       <FooterPanel />
     </div>
@@ -118,7 +118,7 @@ function FooterPanel() {
       <CardHeader title={t('editor.footer.title')} description={t('editor.footer.description')} />
       <CardBody className="space-y-4">
         {list.length === 0 ? (
-          <p className="text-ui-body text-ink-muted">{t('editor.footer.empty')}</p>
+          <p className="max-w-[72ch] text-ui-body text-ink-muted">{t('editor.footer.empty')}</p>
         ) : (
           <ol aria-label={t('editor.footer.order')} className="divide-y divide-line border-y border-line">
             {list.map((p, i) => (

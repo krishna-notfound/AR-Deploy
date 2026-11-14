@@ -77,7 +77,10 @@ export default function BusinessOverviewPage() {
               { label: t('business.overview.stats.products'), value: fmt.number(s?.totals.products ?? 0), hint: withModel !== undefined ? t('business.overview.stats.withModel', { n: fmt.number(withModel) }) : undefined },
               { label: t('business.overview.stats.published'), value: fmt.number(s?.totals.published ?? 0), hint: t(PUBLISHED_HINT[business.status]) },
               { label: t('business.overview.stats.drafts'), value: fmt.number(s?.totals.drafts ?? 0), hint: t('business.overview.stats.draftsHint') },
-              { label: t('business.overview.stats.views'), value: fmt.number(s?.totals.views ?? 0), hint: t('business.overview.last30') },
+              { label: t('business.overview.stats.views'), value: fmt.number(s?.totals.views ?? 0),
+                // Deleted products still count here (they did get these views) but have no row in My products: say so.
+                hint: s?.deletedProducts?.views ? t('business.overview.stats.viewsDeleted', { n: fmt.number(s.deletedProducts.views) }) : t('business.overview.last30'),
+              },
               {
                 label: t('business.overview.stats.arAttempts'),
                 value: fmt.number(s?.totals.arActivations ?? 0),

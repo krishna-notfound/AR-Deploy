@@ -97,8 +97,8 @@ export function AccessHistory({ member }: { member?: { id: string; userId: strin
           <FormField label={t('team.access.filter.from')}>
             <Input type="date" value={from} onChange={(e) => set('from', e.target.value)} />
           </FormField>
-          <FormField label={t('team.access.filter.to')}>
-            <Input type="date" value={to} onChange={(e) => set('to', e.target.value)} />
+          <FormField label={t('team.access.filter.to')} error={from && to && from > to ? t('common.dateRangeReversed') : undefined}>
+            <Input type="date" value={to} min={from || undefined} onChange={(e) => set('to', e.target.value)} />
           </FormField>
         </div>
       )}

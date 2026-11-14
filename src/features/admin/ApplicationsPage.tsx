@@ -35,6 +35,7 @@ export default function ApplicationsPage() {
   const from = params.get('from') ?? ''
   const to = params.get('to') ?? ''
   const page = Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1)
+  const reversedRange = !!from && !!to && from > to
   const setParam = (k: string, v: string) => {
     const next = new URLSearchParams(params)
     if (v) next.set(k, v)
@@ -78,14 +79,15 @@ export default function ApplicationsPage() {
       <Tabs<TabValue> label={t('admin.businesses.list.filterStatus')} variant="pill" tabs={tabs} value={status ?? 'all'} onChange={(v) => setParam('status', v === 'all' ? '' : v)} className="mb-6" />
 
       <Card>
-        <div className="grid grid-cols-2 items-end gap-3 border-b border-line p-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_10rem_10rem]">
+        <div className="grid grid-cols-2 items-start gap-3 border-b border-line p-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_10rem_10rem]">
           <FormField label={t('admin.applications.search')} className="col-span-2 md:col-span-1">
             <SearchInput value={search} onChange={(v) => setParam('q', v)} label={t('admin.applications.search')} placeholder={t('admin.applications.search')} className="w-full" />
           </FormField>
           <FormField label={t('admin.applications.submittedFrom')}>
             <Input type="date" value={from} max={to || undefined} onChange={(e) => setParam('from', e.target.value)} />
           </FormField>
-          <FormField label={t('admin.applications.to')}>
+          {/* The date inputs' min and max only mark a typed range invalid: say so on the field (ISO dates compare as text). */}
+          <FormField label={t('admin.applications.to')} error={reversedRange ? t('common.dateRangeReversed') : undefined}>
             <Input type="date" value={to} min={from || undefined} onChange={(e) => setParam('to', e.target.value)} />
           </FormField>
         </div>
@@ -134,7 +136,8 @@ export default function ApplicationsPage() {
               ))}
             </ul>
 
-            <div className="hidden overflow-x-auto sm:block">
+            {/* `relative` keeps the screen-reader-only header inside the scroll box: unpositioned, it sat past the table's right edge and widened the page. */}
+            <div className="relative hidden overflow-x-auto sm:block">
               <table className="w-full text-sm">
                 <caption className="sr-only">{t('admin.applications.list')}</caption>
                 <thead>

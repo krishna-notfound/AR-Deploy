@@ -11,6 +11,7 @@ import { SearchInput } from '@/components/ui/SearchInput'
 import { EmptyState } from '@/components/ui/States'
 import type { MemberStatus, PlatformMember, PlatformRole } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { matchesSearch } from '@/lib/searchText'
 import { useFormat } from '@/lib/useFormat'
 import { InviteStatusBadge, MEMBER_STATUS_KEY, MemberStatusBadge, ROLE_KEY, RoleBadge } from './teamLabels'
 import { useMemberActions } from './useMemberActions'
@@ -40,13 +41,7 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
     )
 
   const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return members.filter(
-      (m) =>
-        (!role || m.role === role) &&
-        (!status || m.status === status) &&
-        (!needle || m.email.includes(needle) || (m.fullName ?? '').toLowerCase().includes(needle)),
-    )
+    return members.filter((m) => (!role || m.role === role) && (!status || m.status === status) && matchesSearch([m.email, m.fullName], q))
   }, [members, q, role, status])
 
   const menu = (m: PlatformMember): (MenuItem | 'separator')[] => {
@@ -108,7 +103,7 @@ export function MembersTable({ members, onInvite, onOpenInvite }: { members: Pla
 
   return (
     <>
-      <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:items-end sm:px-6 sm:py-5">
+      <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-end sm:px-6 sm:py-5">
         <FormField label={t('team.members.search')} className="sm:w-80">
           <SearchInput value={q} onChange={(v) => set('q', v)} label={t('team.members.search')} placeholder={t('team.members.searchPlaceholder')} className="w-full" />
         </FormField>

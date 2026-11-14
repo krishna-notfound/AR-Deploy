@@ -92,7 +92,7 @@ export default function AuditLogPage() {
     <>
       <PageHeader title={t('nav.auditLog')} description={t('admin.audit.description')} />
       <Card>
-        <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:items-end sm:gap-6 sm:p-6">
+        <div className="flex flex-col gap-4 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-6 sm:p-6">
           <label className="flex flex-col gap-2 sm:w-[420px]">
             <span className="text-[length:var(--text-ui-body)] leading-5 font-medium text-ink">{t('admin.audit.search')}</span>
             <SearchInput value={search} onChange={(v) => set('q', v)} label={t('admin.audit.search')} placeholder={t('admin.audit.searchPlaceholder')} className="w-full" />

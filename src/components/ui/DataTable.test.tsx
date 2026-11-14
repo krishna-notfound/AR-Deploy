@@ -45,6 +45,15 @@ function table(rows: Row[]) {
   )
 }
 
+describe('DataTable scroll box (QA #38)', () => {
+  it('is a positioned scroll container, so the sr-only header cell cannot widen the page past the table', () => {
+    render(inShell(table([{ id: '1', email: 'a@b.pt', views: 4 }])))
+    const box = screen.getByRole('table', { hidden: true }).parentElement!
+    expect(box).toHaveClass('overflow-x-auto')
+    expect(box).toHaveClass('relative')
+  })
+})
+
 describe('DataTable inside the dashboard shell', () => {
   it('header cells are sentence case (no uppercase class)', () => {
     render(inShell(table([{ id: '1', email: 'a@b.pt', views: 4 }])))
