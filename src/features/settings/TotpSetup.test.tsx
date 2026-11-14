@@ -148,6 +148,20 @@ describe('TotpSetup', () => {
     expect(start).toHaveBeenCalledTimes(2)
   })
 
+  it('a setup that another tab replaced says so and offers a fresh start, instead of "That code didn\'t match" (AUTH10)', async () => {
+    const user = userEvent.setup()
+    const start = vi.spyOn(account, 'startTotpEnrollment')
+    vi.spyOn(account, 'confirmTotpEnrollment').mockResolvedValueOnce(accountFail('totp_setup_replaced'))
+    renderSetup()
+    await user.type(await screen.findByLabelText('6-digit code'), '123456')
+    await user.click(screen.getByRole('button', { name: 'Verify and turn on' }))
+    expect(await screen.findByText(/This setup was replaced by one started in another tab or window/)).toBeInTheDocument()
+    expect(screen.queryByText(/That code didn't match/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('img', { name: 'QR code for your authenticator app' })).toBeInTheDocument()
+    expect(start).toHaveBeenCalledTimes(2)
+  })
+
   it('2FA is on but the codes could not be created: says so, offers Try again and lets the person finish', async () => {
     const user = userEvent.setup()
     vi.spyOn(account, 'generateRecoveryCodes').mockResolvedValueOnce(accountFail('unknown'))

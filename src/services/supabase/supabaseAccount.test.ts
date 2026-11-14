@@ -127,7 +127,7 @@ describe('Supabase account service', () => {
   it('changePassword posts change_password with both passwords and the code, never calls updateUser, then clears the local session', async () => {
     const f = fake({ invoke: { data: { ok: true, signedOut: true } } })
     const input = { current: 'old-password-1', next: 'new-password-12', code: '123456' }
-    expect(await account(f).changePassword(input)).toEqual({ ok: true, data: undefined })
+    expect(await account(f).changePassword(input)).toEqual({ ok: true, data: { sessionsEnded: true } })
     expect(f.invoke).toHaveBeenCalledWith('account-security', { body: { action: 'change_password', current_password: 'old-password-1', new_password: 'new-password-12', code: '123456' } })
     expect(f.auth.updateUser).not.toHaveBeenCalled()
     expect(f.auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
@@ -192,6 +192,53 @@ describe('Supabase account service', () => {
     }
     const short = await account(fake()).resetPassword('short')
     expect(!short.ok && short.error.reason).toBe('weak_password')
+  })
+
+  // ADR-0069: bcrypt hashes only the first 72 bytes, so that is the longest password (counted in bytes, not characters).
+  it('refuses a password over 72 bytes before any call, and takes exactly 72', async () => {
+    for (const next of ['x'.repeat(73), 'é'.repeat(37)]) {
+      const f = fake()
+      const r = await account(f).changePassword({ current: 'old-password-1', next, code: '123456' })
+      expect(!r.ok && r.error.reason).toBe('weak_password')
+      const s = await account(f).resetPassword(next)
+      expect(!s.ok && s.error.reason).toBe('weak_password')
+      expect(f.invoke).not.toHaveBeenCalled()
+    }
+    const f = fake({ invoke: { data: { ok: true, signedOut: true } } })
+    expect((await account(f).resetPassword('x'.repeat(72))).ok).toBe(true)
+  })
+
+  it('a password change the function could not end the sessions for retries a global sign-out, and says so when that fails too (AUTH1)', async () => {
+    const input = { current: 'old-password-1', next: 'new-password-12', code: '123456' }
+    // The retry works: every session ended after all.
+    const retried = fake({ invoke: { data: { ok: true, signedOut: false } } })
+    expect(await account(retried).changePassword(input)).toEqual({ ok: true, data: { sessionsEnded: true } })
+    expect(retried.auth.signOut).toHaveBeenCalledWith({ scope: 'global' })
+    expect(retried.auth.signOut).toHaveBeenLastCalledWith({ scope: 'local' })
+    // The retry fails too: the password changed, the other devices may still be signed in, this browser is signed out.
+    const failed = fake({ invoke: { data: { ok: true, signedOut: false } }, auth: { signOut: (...a: unknown[]) => ((a[0] as { scope: string }).scope === 'global' ? { error: authError('unexpected_failure', 500) } : { error: null }) } })
+    expect(await account(failed).resetPassword('a-new-long-password')).toEqual({ ok: true, data: { sessionsEnded: false } })
+    expect(failed.auth.signOut).toHaveBeenLastCalledWith({ scope: 'local' })
+  })
+
+  it('confirming a setup whose factor another tab removed says the setup was replaced, not "wrong code" (AUTH10)', async () => {
+    const f = fake({ mfa: { challengeAndVerify: () => ({ data: null, error: authError('mfa_factor_not_found', 404) }) } })
+    const r = await account(f).confirmTotpEnrollment('gone', '123456')
+    expect(!r.ok && r.error.reason).toBe('totp_setup_replaced')
+    const wrong = fake({ mfa: { challengeAndVerify: () => ({ data: null, error: authError('mfa_verification_failed', 422) }) } })
+    const w = await account(wrong).confirmTotpEnrollment('f', '123456')
+    expect(!w.ok && w.error.reason).toBe('invalid_code')
+  })
+
+  it('cancelClosure asks sync-ar-models to copy the published products again, since requesting took the copies offline (ADR-0069)', async () => {
+    const f = fake({ invoke: { data: { ok: true } }, tables: { products: () => ({ data: [{ id: 'p1' }, { id: 'p2' }] }) } })
+    expect((await account(f).cancelClosure()).ok).toBe(true)
+    await vi.waitFor(() => expect(f.invoke).toHaveBeenCalledWith('sync-ar-models', { body: { productId: 'p2' } }))
+    expect(f.invoke).toHaveBeenCalledWith('sync-ar-models', { body: { productId: 'p1' } })
+    // A refused cancel changes nothing.
+    const refused = fake({ invoke: { data: null, error: httpError(400, { ok: false, error: 'not_found' }) }, tables: { products: () => ({ data: [{ id: 'p1' }] }) } })
+    expect((await account(refused).cancelClosure()).ok).toBe(false)
+    expect(refused.invoke).toHaveBeenCalledTimes(1)
   })
 
   it("requestEmailChange verifies the password on a throwaway client first and maps a failure to password_incorrect; then calls updateUser({ email }, { emailRedirectTo: origin + settingsPath('business'|'admin','account') }) and logs account_email_change_requested", async () => {

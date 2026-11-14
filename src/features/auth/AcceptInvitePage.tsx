@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField, Input } from '@/components/ui/Form'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useI18n } from '@/i18n/LanguageProvider'
-import { auth } from '@/services'
+import { PASSWORD_MAX, account, auth, passwordTooLong } from '@/services'
 import { cn } from '@/lib/cn'
 import { TermsAgreement } from '../legal/LegalLinks'
 import { AuthHeading, AuthLayout, StepIndicator, authFieldsClass } from './AuthLayout'
@@ -26,7 +26,7 @@ import { authErrorText, normalizeCode } from './authErrors'
 export default function AcceptInvitePage() {
   const { t } = useI18n()
   useDocumentTitle(t('invite.title'))
-  const { user, business, accountError, retry, logout } = useAccount()
+  const { user, business, accountError, signedInEmail, retry, logout } = useAccount()
   // Links from invitations sent before ADR-0027 still land here; Supabase reports expired or used ones in the fragment.
   const [linkError] = useState(() => new URLSearchParams(window.location.hash.replace(/^#/, '')).get('error_code'))
 
@@ -38,7 +38,9 @@ export default function AcceptInvitePage() {
   else if (user === undefined) return <FullPageSpinner label={t('invite.checking')} />
   else if (!user) {
     step = 0
-    body = <EnterCode linkError={linkError} />
+    // Signed in, but the account has no invitation waiting (no business, or access turned off): the code form would
+    // spin for ever, so say who is signed in and offer the sign-out.
+    body = signedInEmail ? <NotInvited email={signedInEmail} logout={logout} /> : <EnterCode linkError={linkError} />
   }
   else if (user.role === 'super_admin') return <Navigate to="/admin" replace />
   else if (!user.invitationPending) return <Navigate to="/dashboard" replace />
@@ -63,6 +65,15 @@ export default function AcceptInvitePage() {
 
 /** Which account is signed in, above the password step: the invitation may be meant for someone else (R-W1-9). */
 function SignedInAs({ email, logout }: { email: string; logout: () => Promise<LogoutResult> }) {
+  return <SignOutNotice messageKey="invite.signedInAs" email={email} logout={logout} />
+}
+
+/** A signed-in account that is not a pending owner (AUTH2): the code step cannot finish for it. */
+function NotInvited({ email, logout }: { email: string; logout: () => Promise<LogoutResult> }) {
+  return <SignOutNotice messageKey="invite.notInvited" email={email} logout={logout} />
+}
+
+function SignOutNotice({ messageKey, email, logout }: { messageKey: 'invite.signedInAs' | 'invite.notInvited'; email: string; logout: () => Promise<LogoutResult> }) {
   const { t } = useI18n()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -81,7 +92,7 @@ function SignedInAs({ email, logout }: { email: string; logout: () => Promise<Lo
   return (
     <InlineNotice tone="neutral">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <span>{t('invite.signedInAs', { email })}</span>
+        <span>{t(messageKey, { email })}</span>
         <Button type="button" variant="secondary" size="sm" loading={pending} onClick={signOut}>
           {t('invite.signOut')}
         </Button>
@@ -188,6 +199,8 @@ function SetPassword({ userId, businessName }: { userId: string; businessName: s
     if (!agreed) return setAgreeError(t('legal.agree.required'))
     if (!passwordSaved) {
       if (password.length < MIN_PASSWORD_LENGTH) return setError(t('invite.passwordShort', { n: MIN_PASSWORD_LENGTH }))
+      // bcrypt hashes only the first 72 bytes: a longer password would be accepted and then cut short (ADR-0069).
+      if (passwordTooLong(password)) return setError(t('reset.passwordLong', { n: PASSWORD_MAX }))
       if (password !== confirm) return setError(t('invite.passwordMismatch'))
     }
     setPending(true)
@@ -200,7 +213,15 @@ function SetPassword({ userId, businessName }: { userId: string; businessName: s
       writePasswordSaved(userId)
       setPasswordSaved(true)
     }
-    if (name.trim()) await auth.updateDisplayName(name.trim())
+    // The name goes to the profile (what Settings and the setup checklist read), not only to the sign-in metadata (ACT-F1).
+    // A failed save is shown, not skipped (EF-15): the owner retries or clears the field, and the password is not asked again.
+    if (name.trim()) {
+      const saved = await account.updateProfile({ displayName: name.trim() })
+      if (!saved.ok) {
+        setPending(false)
+        return setError(t('invite.nameFailed'))
+      }
+    }
     const done = await auth.completeOwnerOnboarding()
     setPending(false)
     if (!done.ok) return setError(t('invite.failed'))

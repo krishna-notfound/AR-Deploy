@@ -13,10 +13,16 @@ export type ActionPurpose = (typeof ACTION_PURPOSES)[number]
 /** Codes only the platform Owner may ask for (their actions refuse everyone else anyway). */
 const OWNER_PURPOSES: ReadonlySet<string> = new Set(['owner_reset_2fa', 'complete_closure'])
 
-/** The buckets whose folder named after the business is removed when its closure completes (R-S4-18 adds the request photos). */
-export const SWEEP_BUCKETS = ['product-media', 'business-logos', 'model-request-photos'] as const
-/** Buckets whose objects sit one level down, in a subfolder per request: {business}/{request}/{file}. */
-const NESTED_SWEEP_BUCKETS: ReadonlySet<string> = new Set(['model-request-photos'])
+/**
+ * The buckets whose folder named after the business is removed when its closure completes (R-S4-18 adds the request
+ * photos, ADR-0069 the public AR copies).
+ */
+export const SWEEP_BUCKETS = ['product-media', 'business-logos', 'model-request-photos', 'ar-models'] as const
+/**
+ * How many folder levels sit below the business folder: request photos are {business}/{request}/{file} (1); the public
+ * AR copies written by sync-ar-models are {business}/{product}/{variant|base}/{file} (2).
+ */
+const SWEEP_DEPTH: Readonly<Record<string, number>> = { 'model-request-photos': 1, 'ar-models': 2 }
 
 /** The storage calls the closure sweep needs (the wiring passes the service-role client). Both throw on an error. */
 export interface SweepStorage {
@@ -42,21 +48,27 @@ export async function removeBusinessFolder(storage: SweepStorage, bucket: string
     for (let i = 0; i < files.length; i += 1000) await storage.remove(bucket, files.slice(i, i + 1000))
     return entries.filter((e) => !e.id).map((e) => `${dir}/${e.name}`)
   }
-  const subfolders = await clear(folder)
-  if (!NESTED_SWEEP_BUCKETS.has(bucket)) return
-  for (const sub of subfolders) {
-    try {
-      await clear(sub)
-    } catch {
-      failed = true
+  let level = await clear(folder)
+  for (let depth = 1; depth <= (SWEEP_DEPTH[bucket] ?? 0); depth++) {
+    const below: string[] = []
+    for (const sub of level) {
+      try {
+        below.push(...(await clear(sub)))
+      } catch {
+        failed = true
+      }
     }
+    level = below
   }
   if (failed) throw new Error(`storage sweep incomplete: ${bucket}`)
 }
 
-/** Password rules, the same as the reset page and Settings (src/services/accountService.ts PASSWORD_MIN/MAX). */
+/**
+ * Password rules, the same as the reset page and Settings (src/services/accountService.ts PASSWORD_MIN/MAX). The
+ * maximum is bcrypt's limit: Supabase Auth hashes only the first 72 BYTES, so a longer one is refused (ADR-0069).
+ */
 export const PASSWORD_MIN = 12
-export const PASSWORD_MAX = 128
+export const PASSWORD_MAX = 72
 /** ADR-0066: a password change by a 2FA account needs an authenticator code verified this recently (JWT amr). */
 export const TOTP_FRESH_MS = 5 * 60_000
 /** ADR-0066: a password reset needs a sign-in with the emailed reset code this recently (JWT amr). */
@@ -134,6 +146,12 @@ export interface AccountSecurityDeps {
   deleteBusiness(businessId: string): Promise<void>
   /** Removes the business's folder in every SWEEP_BUCKETS bucket. Throws when it could not remove everything. */
   sweepBusinessStorage(businessId: string): Promise<void>
+  /**
+   * Takes the business's public AR copies offline (the ar-models folder, and public_url cleared on its model rows) when
+   * a closure is requested: the business is inactive from then on, so nothing of it may stay public (ADR-0069).
+   * Throws when it could not remove everything.
+   */
+  removeArCopies(businessId: string): Promise<void>
   userEmail(userId: string): Promise<string | null>
   /** sendAndLog: sends through Resend and writes one email_log row. */
   send(email: SecurityEmail): Promise<SendAndLogResult>
@@ -252,7 +270,9 @@ const ACTIONS: Record<string, Action> = {
     const salt = hex(deps.random(16))
     const hashes = await Promise.all(codes.map((c) => sha256Hex(salt + c)))
     await sql(ctx, 'service_set_recovery_codes', { p_user: userId, p_hashes: hashes, p_salt: salt })
-    await logEvent(ctx, userId, firstSet ? 'account_2fa_enabled' : 'account_recovery_regenerated')
+    // The codes are saved now and exist in plain text only in this answer: a failed audit write must not lose them
+    // (a retry would then need a new emailed code, and the saved set could never be shown).
+    await logEventQuietly(ctx, userId, firstSet ? 'account_2fa_enabled' : 'account_recovery_regenerated')
     await notify(ctx, userId, firstSet ? '2fa_enabled' : 'recovery_regenerated')
     return done({ codes: codes.map((c) => `${c.slice(0, 5)}-${c.slice(5)}`) })
   },
@@ -265,7 +285,13 @@ const ACTIONS: Record<string, Action> = {
     if (ctx.aal !== 'aal1') throw new Refusal('not_allowed')
     if (!(await deps.listFactors(userId)).some(isVerifiedTotp)) throw new Refusal('not_allowed')
     await sql(ctx, 'service_use_recovery_code', { p_user: userId, p_code: code })
-    await wipeSecondFactor(ctx, userId)
+    try {
+      await wipeSecondFactor(ctx, userId)
+    } catch (e) {
+      // The code was spent but the factor is still there: give the code back so the person can try again.
+      await restoreRecoveryCode(ctx, userId, code)
+      throw e
+    }
     await logEvent(ctx, userId, 'account_recovery_used')
     await notify(ctx, userId, 'recovery_used')
     return done()
@@ -298,8 +324,19 @@ const ACTIONS: Record<string, Action> = {
 
     if (r.kind === 'business' && kind === 'business') {
       const businessId = typeof r.business_id === 'string' ? r.business_id : undefined
+      // ADR-0069: the business is inactive now, so its public AR copies go offline at once (a failure is noted in the event).
+      let arCopiesLeft = false
+      if (businessId) {
+        try {
+          await deps.removeArCopies(businessId)
+        } catch (e) {
+          console.error(`account-security: AR copies not removed (${errorName(e)})`)
+          arCopiesLeft = true
+        }
+      }
       // R-W7-9: the event names the business (column and metadata), so it filters and shows with it.
-      await logEvent(ctx, userId, 'account_closure_requested', businessId ? { business_id: businessId } : {}, businessId)
+      const metadata = { ...(businessId ? { business_id: businessId } : {}), ...(arCopiesLeft ? { ar_copies_removal_incomplete: true } : {}) }
+      await logEvent(ctx, userId, 'account_closure_requested', metadata, businessId)
       await notify(ctx, userId, 'closure_requested', email)
       await alertInbox(ctx, closureRequestEmail(email ?? 'A business owner', deps.appBaseUrl), businessId, `closure_request:${userId}`)
       return done({ kind: 'business' })
@@ -415,11 +452,12 @@ const ACTIONS: Record<string, Action> = {
     const check = await deps.checkPassword(email, current)
     if (check === 'password_incorrect') throw new Refusal('current_password_mismatch')
     if (check !== 'ok') throw new Refusal(check)
-    await applyPassword(ctx, next)
+    const signedOut = await applyPassword(ctx, next)
     await voidCodes(ctx, 'change_password')
-    await logEvent(ctx, userId, 'account_password_changed')
+    // The password has changed: a failed audit write must not turn this into an error answer.
+    await logEventQuietly(ctx, userId, 'account_password_changed', signedOut ? {} : { sessions_end_failed: true })
     await notify(ctx, userId, 'password_changed', email)
-    return done({ signedOut: true })
+    return done({ signedOut })
   },
 
   // ADR-0066: the last step of "Forgot password". Only a session started with the emailed reset code in the last
@@ -431,10 +469,10 @@ const ACTIONS: Record<string, Action> = {
     checkNewPassword(next)
     if (!recentEmailedCode(ctx)) throw new Refusal('reset_expired')
     if (ctx.aal !== 'aal2' && (await deps.listFactors(userId)).some(isVerifiedTotp)) throw new Refusal('aal2_required')
-    await applyPassword(ctx, next)
-    await logEvent(ctx, userId, 'account_password_reset')
+    const signedOut = await applyPassword(ctx, next)
+    await logEventQuietly(ctx, userId, 'account_password_reset', signedOut ? {} : { sessions_end_failed: true })
     await notify(ctx, userId, 'password_reset')
-    return done({ signedOut: true })
+    return done({ signedOut })
   },
 
   async restore_closure(ctx) {
@@ -448,9 +486,9 @@ const ACTIONS: Record<string, Action> = {
 
 // ---------------------------------------------------------------- gates and helpers
 
-/** The same rules as the rest of the app: 12 to 128 characters and nothing more (spec 8: no composition rules). */
+/** The same rules as the rest of the app: at least 12 characters, at most 72 bytes, nothing more (spec 8: no composition rules). */
 function checkNewPassword(next: string) {
-  if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) throw new Refusal('weak_password')
+  if (next.length < PASSWORD_MIN || new TextEncoder().encode(next).length > PASSWORD_MAX) throw new Refusal('weak_password')
 }
 
 /** Has this session an amr entry of one of these methods from the last `windowMs` (and not from the future, 60 s skew)? */
@@ -461,13 +499,36 @@ function recentAmr(ctx: Ctx, methods: ReadonlySet<string>, windowMs: number): bo
 const freshTotp = (ctx: Ctx) => recentAmr(ctx, TOTP_METHODS, TOTP_FRESH_MS)
 const recentEmailedCode = (ctx: Ctx) => recentAmr(ctx, EMAILED_CODE_METHODS, RESET_WINDOW_MS)
 
-/** Sets the password, then ends every session of the account (a failure there is logged; the new password stands). */
-async function applyPassword(ctx: Ctx, next: string) {
+/**
+ * Sets the password, then ends every session of the account. A failure to end them is logged and the new password
+ * stands; the answer says whether they ended (false: the app must not claim every device was signed out).
+ */
+async function applyPassword(ctx: Ctx, next: string): Promise<boolean> {
   if ((await ctx.deps.setPassword(ctx.userId, next)) === 'weak_password') throw new Refusal('weak_password')
   try {
     await ctx.deps.endSessions(ctx.userId)
+    return true
   } catch (e) {
     console.error(`account-security: ending sessions after a password change failed (${errorName(e)})`)
+    return false
+  }
+}
+
+/** An audit write after the action already happened: a failure is logged, never answered as an error. */
+async function logEventQuietly(ctx: Ctx, user: string, event: string, metadata: Record<string, unknown> = {}) {
+  try {
+    await logEvent(ctx, user, event, metadata)
+  } catch (e) {
+    console.error(`account-security: audit event ${event} not written (${e instanceof Refusal ? e.code : errorName(e)})`)
+  }
+}
+
+/** Gives back a recovery code that was spent by a request that then failed (service_restore_recovery_code, just-used codes only). */
+async function restoreRecoveryCode(ctx: Ctx, user: string, code: string) {
+  try {
+    await ctx.deps.rpc('service_restore_recovery_code', { p_user: user, p_code: code })
+  } catch (e) {
+    console.error(`account-security: could not give back a recovery code (${errorName(e)})`)
   }
 }
 

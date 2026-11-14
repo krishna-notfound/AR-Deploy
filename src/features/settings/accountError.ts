@@ -26,6 +26,7 @@ const REASON_KEY: Record<string, TranslationKey> = {
   invalid_totp: 'settings.err.invalid_totp',
   totp_required: 'settings.err.totp_required',
   reset_expired: 'settings.err.reset_expired',
+  totp_setup_replaced: 'settings.err.totp_setup_replaced',
   password_incorrect: 'settings.err.password_incorrect',
   email_taken: 'settings.err.email_taken',
   invalid_name: 'settings.err.invalid_name',

@@ -26,7 +26,7 @@ The public pages pick English or Portuguese from the visitor's phone or browser 
 ## 2. Signing in and accounts
 
 - **Sign in:** go to `/login` and enter your email and password.
-- **Forgot your password:** use the "Forgot your password?" link on the sign-in page (or go to `/reset-password`). Enter your email: if it belongs to an account, we email it a code (you can ask for a new one after a minute). Type the code, then, if your account has two-step sign-in, the code from your authenticator app (or a recovery code), and choose a new password of 12 to 128 characters. Every device is signed out and we email you that the password was reset; sign in with the new password.
+- **Forgot your password:** use the "Forgot your password?" link on the sign-in page (or go to `/reset-password`). Enter your email: if it belongs to an account, we email it a code (you can ask for a new one after a minute). Type the code, then, if your account has two-step sign-in, the code from your authenticator app (or a recovery code), and choose a new password of 12 to 72 characters. Every device is signed out and we email you that the password was reset; sign in with the new password.
 
 **There is no public sign-up.** Businesses apply, and the Sanctus team decides:
 

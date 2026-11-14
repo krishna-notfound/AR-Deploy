@@ -68,6 +68,9 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
     setPasswords: [] as { user: string; password: string }[],
     endedSessions: [] as string[],
     authRefusesPassword: false,
+    /** ADR-0069: businesses whose public AR copies were taken offline, and recovery codes given back after a failed recovery. */
+    arCopiesRemoved: [] as string[],
+    restoredRecoveryCodes: [] as string[],
   }
   const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
     const b = JSON.parse(String(init?.body)) as { to: string[]; subject: string; text: string; html: string }
@@ -114,6 +117,15 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
         if (!row) return { error: 'invalid_code' }
         row.used = true
         return { ok: true, remaining: set.rows.filter((r) => !r.used).length }
+      }
+      case 'service_restore_recovery_code': {
+        const set = s.recovery[user]
+        const h = set ? await sha256Hex(set.salt + norm(String(a.p_code))) : ''
+        const row = set?.rows.find((r) => r.hash === h && r.used)
+        if (!row) return { error: 'invalid_code' }
+        row.used = false
+        s.restoredRecoveryCodes.push(norm(String(a.p_code)))
+        return { ok: true }
       }
       case 'service_clear_recovery_codes':
         delete s.recovery[user]
@@ -191,6 +203,7 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
       for (const c of Object.values(s.closures)) if (c.businessId === b) c.businessId = null
     },
     sweepBusinessStorage: async (b) => void s.order.push(`sweep:${b}`),
+    removeArCopies: async (b) => void s.arCopiesRemoved.push(b),
     userEmail: async (u) => USERS[u]?.email ?? null,
     async callerRpc(token, fn) {
       s.callerCalls.push({ token, fn })
@@ -634,8 +647,32 @@ describe('account-security', () => {
     expect(s.sends.map((m) => m.to)).toEqual(['owner@sanctus.test', 'maria@studio.pt'])
   })
 
-  it('SWEEP_BUCKETS lists product-media, business-logos and model-request-photos', () => {
-    expect([...SWEEP_BUCKETS]).toEqual(['product-media', 'business-logos', 'model-request-photos'])
+  it('SWEEP_BUCKETS lists product-media, business-logos, model-request-photos and ar-models (ADR-0069)', () => {
+    expect([...SWEEP_BUCKETS]).toEqual(['product-media', 'business-logos', 'model-request-photos', 'ar-models'])
+  })
+
+  it('request_closure: a business owner closing takes the business public AR copies offline; a failure is noted in the event', async () => {
+    const { d, s } = deps()
+    s.factors[BIZ_OWNER] = []
+    expect(await json(await call(d, tok(BIZ_OWNER), { action: 'request_closure', code: await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1') }))).toEqual({ ok: true, kind: 'business' })
+    expect(s.arCopiesRemoved).toEqual([BUSINESS_ID])
+    expect(s.events.at(-1)!.metadata).toEqual({ business_id: BUSINESS_ID })
+
+    // A second business owner whose removal fails: the closure still goes ahead, and the event says what is left.
+    const other = deps()
+    other.s.factors[BIZ_OWNER] = []
+    other.d.removeArCopies = async () => Promise.reject(new Error('storage down'))
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = await call(other.d, tok(BIZ_OWNER), { action: 'request_closure', code: await codeFor(other.d, other.s, BIZ_OWNER, 'request_closure', 'aal1') })
+    quiet.mockRestore()
+    expect(await json(r)).toEqual({ ok: true, kind: 'business' })
+    expect(other.s.events.at(-1)).toMatchObject({ event: 'account_closure_requested', metadata: { business_id: BUSINESS_ID, ar_copies_removal_incomplete: true } })
+  })
+
+  it('request_closure: a staff closure has no business and removes no AR copies', async () => {
+    const { d, s } = deps()
+    await call(d, tok(STAFF, 'aal2'), { action: 'request_closure', code: await codeFor(d, s, STAFF, 'request_closure') })
+    expect(s.arCopiesRemoved).toEqual([])
   })
 
   describe('removeBusinessFolder (R-S4-18)', () => {
@@ -674,6 +711,33 @@ describe('account-security', () => {
     it('throws when a subfolder files cannot be removed, after trying every subfolder', async () => {
       const s = storage(tree, ['model-request-photos'])
       await expect(removeBusinessFolder(s, 'model-request-photos', 'b1')).rejects.toThrow()
+    })
+
+    // sync-ar-models writes ar-models/<business>/<product>/<variant|base>/<format>-<id>.<ext> (two folder levels).
+    const arTree = {
+      'ar-models/b1': [{ name: 'p1', id: null }, { name: 'p2', id: null }],
+      'ar-models/b1/p1': [{ name: 'base', id: null }, { name: 'v1', id: null }],
+      'ar-models/b1/p1/base': [{ name: 'glb-a.glb', id: 'a' }, { name: 'usdz-a.usdz', id: 'b' }],
+      'ar-models/b1/p1/v1': [{ name: 'glb-v.glb', id: 'c' }],
+      'ar-models/b1/p2': [{ name: 'base', id: null }],
+      'ar-models/b1/p2/base': [{ name: 'glb-z.glb', id: 'd' }],
+      'ar-models/b2/p9/base': [{ name: 'other.glb', id: 'e' }],
+    }
+
+    it('ar-models: removes the files two folder levels down (product, then variant), and only in the business folder', async () => {
+      const s = storage(arTree)
+      await removeBusinessFolder(s, 'ar-models', 'b1')
+      expect(s.removed.sort()).toEqual([
+        'ar-models:b1/p1/base/glb-a.glb',
+        'ar-models:b1/p1/base/usdz-a.usdz',
+        'ar-models:b1/p1/v1/glb-v.glb',
+        'ar-models:b1/p2/base/glb-z.glb',
+      ])
+    })
+
+    it('ar-models: throws when the files cannot be removed, after trying every folder', async () => {
+      const s = storage(arTree, ['ar-models'])
+      await expect(removeBusinessFolder(s, 'ar-models', 'b1')).rejects.toThrow('storage sweep incomplete: ar-models')
     })
   })
 
@@ -947,11 +1011,16 @@ describe('account-security: password change and reset (ADR-0066)', () => {
     s.factors[STAFF] = []
     const code = await codeFor(d, s, STAFF, 'change_password', 'aal1')
     expect(await json(await change(d, tok(STAFF), { code, new_password: 'short' }))).toEqual({ ok: false, error: 'weak_password' })
-    expect(await json(await change(d, tok(STAFF), { code, new_password: 'x'.repeat(129) }))).toEqual({ ok: false, error: 'weak_password' })
+    // bcrypt hashes only the first 72 bytes (ADR-0069): 73 ASCII characters, or 37 two-byte ones, are refused.
+    expect(await json(await change(d, tok(STAFF), { code, new_password: 'x'.repeat(73) }))).toEqual({ ok: false, error: 'weak_password' })
+    expect(await json(await change(d, tok(STAFF), { code, new_password: 'é'.repeat(37) }))).toEqual({ ok: false, error: 'weak_password' })
     expect(await json(await change(d, tok(STAFF), { code, new_password: 'old-password-123' }))).toEqual({ ok: false, error: 'same_password' })
     expect(await json(await change(d, tok(STAFF), { code, current_password: '' }))).toEqual({ ok: false, error: 'invalid_request' })
     expect(s.codes.filter((c) => c.purpose === 'change_password' && !c.consumed)).toHaveLength(1)
     expect(await json(await change(d, tok(STAFF), { code }))).toEqual({ ok: true, signedOut: true })
+    // Exactly 72 bytes is the longest password that works.
+    const again = await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    expect(await json(await change(d, tok(STAFF), { code: again, new_password: 'x'.repeat(72) }))).toEqual({ ok: true, signedOut: true })
   })
 
   it('change_password: a wrong current password is refused after the code (no password oracle without the inbox)', async () => {
@@ -1004,16 +1073,76 @@ describe('account-security: password change and reset (ADR-0066)', () => {
     expect(s.events).toEqual([])
   })
 
-  it('change_password: a failure to end the sessions keeps the new password, and is still audited', async () => {
+  it('change_password: a failure to end the sessions keeps the new password, says so (signedOut false) and is audited', async () => {
     const { d, s } = deps()
     s.factors[STAFF] = []
     const code = await codeFor(d, s, STAFF, 'change_password', 'aal1')
     const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
     const failing = { ...d, endSessions: async () => Promise.reject(new Error('db down')) }
-    expect(await json(await change(failing, tok(STAFF), { code }))).toEqual({ ok: true, signedOut: true })
+    expect(await json(await change(failing, tok(STAFF), { code }))).toEqual({ ok: true, signedOut: false })
     quiet.mockRestore()
     expect(s.setPasswords).toHaveLength(1)
-    expect(s.events.map((e) => e.event)).toEqual(['account_password_changed'])
+    expect(s.events).toMatchObject([{ event: 'account_password_changed', metadata: { sessions_end_failed: true } }])
+  })
+
+  it('change_password: a failed audit write after the password changed is not an error answer', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    const code = await codeFor(d, s, STAFF, 'change_password', 'aal1')
+    const base = d.rpc
+    const failing = { ...d, rpc: async (fn: string, a: Record<string, unknown>) => (fn === 'service_log_account_event' ? Promise.reject(new Error('db down')) : base(fn, a)) }
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = await change(failing, tok(STAFF), { code })
+    quiet.mockRestore()
+    expect(r.status).toBe(200)
+    expect(await json(r)).toEqual({ ok: true, signedOut: true })
+    expect(s.setPasswords).toHaveLength(1)
+    // The notice email still goes out.
+    expect(s.sends.map((m) => m.subject)).toContain('Your Sanctus password was changed')
+  })
+
+  it('reset_password: says when the sessions could not be ended, and a failed audit write is not an error answer', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = []
+    s.amr[tok(STAFF)] = [{ method: 'recovery', at: at(3) }]
+    const base = d.rpc
+    const failing = {
+      ...d,
+      endSessions: async () => Promise.reject(new Error('db down')),
+      rpc: async (fn: string, a: Record<string, unknown>) => (fn === 'service_log_account_event' ? Promise.reject(new Error('db down')) : base(fn, a)),
+    }
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = await call(failing, tok(STAFF), { action: 'reset_password', new_password: NEW })
+    quiet.mockRestore()
+    expect(await json(r)).toEqual({ ok: true, signedOut: false })
+    expect(s.setPasswords).toHaveLength(1)
+  })
+
+  it('generate_recovery_codes: a failed audit write still returns the saved codes (they can never be shown again)', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = [{ id: 'f-new', type: 'totp', status: 'verified', updatedAt: new Date(NOW.getTime() - 60_000).toISOString() }]
+    const base = d.rpc
+    const failing = { ...d, rpc: async (fn: string, a: Record<string, unknown>) => (fn === 'service_log_account_event' ? Promise.reject(new Error('db down')) : base(fn, a)) }
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = await json(await call(failing, tok(STAFF, 'aal2'), { action: 'generate_recovery_codes' }))
+    quiet.mockRestore()
+    expect(r.ok).toBe(true)
+    expect(r.codes).toHaveLength(8)
+    expect(s.recovery[STAFF]!.rows).toHaveLength(8)
+  })
+
+  it('redeem_recovery_code: when removing the authenticator fails, the spent code is given back', async () => {
+    const { d, s } = deps()
+    s.factors[STAFF] = [{ id: 'f-new', type: 'totp', status: 'verified', updatedAt: new Date(NOW.getTime() - 60_000).toISOString() }]
+    const codes = (await json(await call(d, tok(STAFF, 'aal2'), { action: 'generate_recovery_codes' }))).codes as string[]
+    const failing = { ...d, deleteFactor: async () => Promise.reject(new Error('auth down')) }
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(call(failing, tok(STAFF, 'aal1'), { action: 'redeem_recovery_code', code: codes[1] })).rejects.toThrow('auth down')
+    quiet.mockRestore()
+    expect(s.restoredRecoveryCodes).toEqual([codes[1]!.replace('-', '')])
+    expect(s.recovery[STAFF]!.rows.filter((r) => r.used)).toHaveLength(0)
+    // The same code works on the next try.
+    expect(await json(await call(d, tok(STAFF, 'aal1'), { action: 'redeem_recovery_code', code: codes[1] }))).toEqual({ ok: true })
   })
 
   it('reset_password: needs a session started with an emailed code in the last 15 minutes', async () => {

@@ -127,6 +127,11 @@ export function TotpSetup({ onDone, onCancel, onEnabled, email }: { onDone: () =
     if (!mounted.current) return
     if (!r.ok) {
       setVerifying(false)
+      // Another tab started its own setup, which removed this one: the code cannot work here, so offer a fresh start.
+      if (r.error.reason === 'totp_setup_replaced') {
+        setStage({ kind: 'failed', error: r.error, unavailable: false })
+        return
+      }
       refuse(r.error.reason === 'invalid_code' ? t('settings.totp.wrongCode') : r.error.reason === 'mfa_not_enabled' ? t('settings.totp.notAvailable') : accountErrorText(r.error, t))
       return
     }

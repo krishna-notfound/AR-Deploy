@@ -360,14 +360,30 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
   // R-W6-8: a platform user's role and permissions are read again on the security state's cadence and after a
   // PERMISSION error, so a change the Owner makes elsewhere reaches this session. A change updates the account (the
   // nav and permission checks follow) and says so; access turned off reloads the account, which signs them out of
-  // the dashboard. Business owners have no platform access to reload.
+  // the dashboard. Business owners have no platform access to reload; their membership is read again instead (AUTH8).
   const toast = useOptionalToast()
   const { t } = useI18n()
   const accessLoad = useRef({ running: false, at: 0 })
   const refreshAccess = useCallback(async () => {
     const cur = accountRef.current
     const platform = cur?.user?.role === 'super_admin' ? cur.user.platform : undefined
-    if (!cur?.user || !platform || accessLoad.current.running) return
+    if (!cur?.user || accessLoad.current.running) return
+    // AUTH8: a business owner has no platform access to reload, but the Owner can remove them while a tab is open. Their
+    // membership is read again on the same cadence; a changed or missing one reloads the account, which signs the tab out
+    // of the dashboard (an auth event would otherwise be the only thing to do that).
+    if (!platform) {
+      if (cur.user.role !== 'business_admin') return
+      accessLoad.current = { running: true, at: Date.now() }
+      try {
+        const id = loadId.current
+        const r = await auth.getCurrentUser()
+        if (!r.ok || id !== loadId.current || accountRef.current !== cur) return
+        if (r.data?.user?.businessId !== cur.user.businessId) load()
+      } finally {
+        accessLoad.current.running = false
+      }
+      return
+    }
     accessLoad.current = { running: true, at: Date.now() }
     try {
       const id = loadId.current
@@ -382,7 +398,7 @@ export function SupabaseAccountProvider({ auth, children }: { auth: AuthService;
     } finally {
       accessLoad.current.running = false
     }
-  }, [load, toast, t])
+  }, [auth, load, toast, t])
   useEffect(() => {
     refreshAccessRef.current = () => void refreshAccess()
   }, [refreshAccess])

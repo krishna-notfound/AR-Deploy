@@ -98,6 +98,28 @@ Deno.serve((req) =>
       const results = await Promise.allSettled(SWEEP_BUCKETS.map((bucket) => removeBusinessFolder(sweepStorage, bucket, businessId)))
       if (results.some((r) => r.status === 'rejected')) throw new Error('storage sweep incomplete')
     },
+    // ADR-0069: the folder of public copies sync-ar-models wrote ({business}/{product}/{variant|base}/{file}) goes, then
+    // every model row of the business stops pointing at it (public_url null), so a cancelled closure falls back to the
+    // private file until the copies are made again. Both steps are tried; the error at the end says one failed.
+    async removeArCopies(businessId) {
+      let failed = false
+      try {
+        await removeBusinessFolder(sweepStorage, 'ar-models', businessId)
+      } catch {
+        failed = true
+      }
+      const { data, error } = await admin.from('products').select('id').eq('business_id', businessId).limit(5000)
+      if (error) throw new Error(`product lookup failed: ${error.code ?? 'unknown'}`)
+      const ids = (data ?? []).map((r: { id: string }) => r.id)
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100)
+        for (const table of ['product_models', 'product_variant_models'] as const) {
+          const res = await admin.from(table).update({ public_url: null }).in('product_id', chunk).not('public_url', 'is', null)
+          if (res.error) failed = true
+        }
+      }
+      if (failed) throw new Error('AR copy removal incomplete')
+    },
     async userEmail(userId) {
       const { data, error } = await admin.auth.admin.getUserById(userId)
       return error ? null : (data.user?.email ?? null)

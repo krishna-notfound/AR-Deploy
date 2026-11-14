@@ -27,7 +27,13 @@ export interface PasswordChange {
   totp?: string
 }
 
-export type ProfilePatch =Partial<Pick<Profile, 'displayName' | 'timezone' | 'dateFormat' | 'clock' | 'notifyNewApplications'>>
+/** What a password change or reset did to the account's sessions (ADR-0069). */
+export interface PasswordOutcome {
+  /** false: the password changed but ending every session failed, so other devices may still be signed in. */
+  sessionsEnded: boolean
+}
+
+export type ProfilePatch = Partial<Pick<Profile, 'displayName' | 'timezone' | 'dateFormat' | 'clock' | 'notifyNewApplications'>>
 
 export interface AccountService {
   getProfile(): Promise<Result<Profile>>
@@ -52,12 +58,12 @@ export interface AccountService {
    * too_many_attempts | invalid_totp | totp_required | aal2_required | current_password_mismatch | same_password |
    * weak_password | rate_limited.
    */
-  changePassword(input: PasswordChange): Promise<Result<void>>
+  changePassword(input: PasswordChange): Promise<Result<PasswordOutcome>>
   /**
    * ADR-0066: the last step of "Forgot password", from the session the emailed reset code started (account-security
    * reset_password). Every session ends afterwards. Reasons: weak_password | reset_expired | aal2_required.
    */
-  resetPassword(next: string): Promise<Result<void>>
+  resetPassword(next: string): Promise<Result<PasswordOutcome>>
   /** Reasons: password_incorrect | email_taken | invalid_email | rate_limited. */
   requestEmailChange(currentPassword: string, newEmail: string): Promise<Result<void>>
   cancelEmailChange(): Promise<Result<void>>
@@ -109,12 +115,13 @@ export const ACCOUNT_ERRORS: Record<string, { code: ServiceErrorCode; message: s
   // Supabase Auth and client-side checks
   current_password_mismatch: { code: 'VALIDATION', message: 'Your current password is incorrect.' },
   same_password: { code: 'VALIDATION', message: 'Choose a password different from your current one.' },
-  weak_password: { code: 'VALIDATION', message: 'Choose a stronger password of 12 to 128 characters.' },
+  weak_password: { code: 'VALIDATION', message: 'Choose a stronger password of 12 to 72 characters.' },
   reauthentication_needed: { code: 'PERMISSION', message: 'For your security, sign out, sign in again and retry.' },
   // ADR-0066: password change and reset
   invalid_totp: { code: 'VALIDATION', message: "That authenticator code isn't right. Enter the newest code from the app." },
   totp_required: { code: 'PERMISSION', message: 'Enter a new code from your authenticator app and try again.' },
   reset_expired: { code: 'PERMISSION', message: 'This reset has expired. Request a new code and start again.' },
+  totp_setup_replaced: { code: 'CONFLICT', message: 'This setup was replaced by one started in another tab or window. Start again here, or finish it there.' },
   password_incorrect: { code: 'VALIDATION', message: 'Password is incorrect.' },
   email_taken: { code: 'CONFLICT', message: 'This email is already used by another account.' },
   invalid_email: { code: 'VALIDATION', message: 'Enter a valid email address.' },
@@ -136,7 +143,10 @@ export function accountFail<T = never>(code: string): Result<T> {
 }
 
 export const PASSWORD_MIN = 12
-export const PASSWORD_MAX = 128
+/** bcrypt, which Supabase Auth uses, hashes only the first 72 BYTES of a password (ADR-0069), so that is the limit. */
+export const PASSWORD_MAX = 72
+/** Longer than bcrypt hashes: counted in UTF-8 bytes, because an accented letter or emoji takes more than one. */
+export const passwordTooLong = (password: string): boolean => new TextEncoder().encode(password).length > PASSWORD_MAX
 export const DISPLAY_NAME_MAX = 80
 export const AVATAR_MAX_BYTES = 512 * 1024
 export const AVATAR_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }

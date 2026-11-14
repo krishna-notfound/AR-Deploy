@@ -61,8 +61,6 @@ export interface AuthService {
    * Re-entering the current password counts as success.
    */
   updatePassword(password: string): Promise<AuthResult<void>>
-  /** Saves the display name in the user's own Auth metadata. Reloads the account via the auth listener. */
-  updateDisplayName(name: string): Promise<Result<void>>
   /** An invited owner finished onboarding (password set): records acceptance and returns their business id. */
   completeOwnerOnboarding(): Promise<Result<{ businessId: string | null }>>
   /** Returns an unsubscribe function. */
@@ -135,12 +133,6 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
       // Sessions opened before the password was set (e.g. on another device) end now. If this fails the user is not blocked.
       await sb.auth.signOut({ scope: 'others' }).catch(() => undefined)
       return ok(undefined)
-    },
-
-    async updateDisplayName(name) {
-      const display_name = name.trim().slice(0, 80) || null
-      const { error } = await sb.auth.updateUser({ data: { display_name } })
-      return error ? fail('UNKNOWN', 'Could not save your name. Try again.') : ok(undefined)
     },
 
     async completeOwnerOnboarding() {
