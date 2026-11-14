@@ -5,11 +5,16 @@
 // text only inside this function and the email to the account holder: only salted SHA-256 hashes reach the database,
 // and neither is ever logged, audited or put in the email log (which stores the subject, kind and status only).
 import { type EmailStatus, type LogEntry, type OutgoingEmail, SAFE_EMAIL_REASONS, type SendAndLogResult } from '../_shared/email.ts'
-import { type RenderedEmail, type SecurityNotice, closureCancelledEmail, closureRequestEmail, securityCodeEmail, securityNoticeEmail, teamNoticeEmail } from '../_shared/email-templates.ts'
+import { type RenderedEmail, type SecurityNotice, aliasCodeEmail, closureCancelledEmail, closureRequestEmail, securityCodeEmail, securityNoticeEmail, teamNoticeEmail } from '../_shared/email-templates.ts'
 import { UUID, bearerToken, clientIp, readJsonObject, reply, sha256Hex } from '../_shared/http.ts'
 
 export const ACTION_PURPOSES = ['disable_2fa', 'regenerate_recovery', 'request_closure', 'owner_reset_2fa', 'complete_closure', 'change_password'] as const
 export type ActionPurpose = (typeof ACTION_PURPOSES)[number]
+/**
+ * Every purpose a code can have in private.action_codes. 'add_alias' (ADR-0077) is not in ACTION_PURPOSES: its code goes
+ * to the new alias address, not to the account's own email, so send_code refuses it and alias_send_code sends it.
+ */
+type CodePurpose = ActionPurpose | 'add_alias'
 /** Codes only the platform Owner may ask for (their actions refuse everyone else anyway). */
 const OWNER_PURPOSES: ReadonlySet<string> = new Set(['owner_reset_2fa', 'complete_closure'])
 
@@ -91,11 +96,14 @@ export type ErrorCode =
   | 'not_found' | 'email_failed' | 'unknown'
   | 'nothing_to_reset' | 'email_blocked'
   | 'totp_required' | 'current_password_mismatch' | 'weak_password' | 'same_password' | 'reset_expired'
+  // ADR-0077: owner sign-in aliases. invalid_credentials is the one neutral answer of the anonymous alias sign-in.
+  | 'alias_limit' | 'email_in_use' | 'invalid_credentials'
 
 const STATUS: Record<ErrorCode, number> = {
   not_signed_in: 401,
   invalid_request: 400, invalid_code: 400, code_expired: 400, already_requested: 400, not_found: 400, email_failed: 400,
-  email_blocked: 400,
+  email_blocked: 400, invalid_credentials: 400,
+  alias_limit: 409, email_in_use: 409,
   current_password_mismatch: 400, weak_password: 400, same_password: 400,
   totp_required: 403, reset_expired: 403,
   aal2_required: 403, policy_requires_2fa: 403, owner_cannot_close: 403, not_allowed: 403,
@@ -124,8 +132,25 @@ export interface NoticeOutcome {
 export interface AccountSecurityDeps {
   /** The app's https base URL, the only link a notice may carry ('' when not configured). */
   appBaseUrl: string
-  /** The admin notification inbox for closure alerts ('' when not configured). */
-  adminNotificationEmail: string
+  /**
+   * The secret mixed into the rate-limit keys of the anonymous alias actions (APPLICATION_SALT, else derived from the
+   * service key): the keys hold no readable IP or address.
+   */
+  attemptSalt: string
+  /** service_application_attempt: true when this attempt is allowed (and it is then recorded under hashes[0]). */
+  attempt(hashes: string[], max: number): Promise<boolean>
+  /** The session_id claim of the (already accepted) token; null when it has none. */
+  sessionFromToken(token: string): string | null
+  /** Ends every session of the user except `keep` (all of them when null). Throws on an error. */
+  endOtherSessions(userId: string, keep: string | null): Promise<void>
+  /** Changes the Auth email with the Auth admin API, already confirmed (email_confirm). 'email_taken' when Auth refuses it; throws on anything else. */
+  setEmail(userId: string, email: string): Promise<'ok' | 'email_taken'>
+  /** Signs in on a throwaway anon client and keeps the session (its tokens go to the browser). */
+  signIn(email: string, password: string): Promise<AliasSignInResult>
+  /** Signs in with an emailed recovery code on a throwaway anon client and keeps the session. */
+  verifyRecovery(email: string, code: string): Promise<AliasSignInResult>
+  /** Asks Supabase Auth to email a reset code to this address (the same email "Forgot password" sends). Answers the same for an unknown address. */
+  sendRecovery(email: string): Promise<void>
   userIdFromToken(token: string): Promise<string | null>
   /** Read from the JWT payload; only called after userIdFromToken accepted the token. */
   aalFromToken(token: string): 'aal1' | 'aal2'
@@ -168,6 +193,15 @@ export interface AccountSecurityDeps {
   now(): Date
 }
 
+/** The tokens the browser needs to set the session (supabase-js setSession). Never logged or audited. */
+export interface AliasSession {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+  token_type: string
+}
+export type AliasSignInResult = { status: 'ok'; session: AliasSession } | { status: 'invalid' | 'rate_limited' | 'unknown' }
+
 /** One amr entry; `at` is the time in ms, or null when the token carries the bare method list (no timestamps). */
 export interface AmrEntry {
   method: string
@@ -199,14 +233,26 @@ export async function handleAccountSecurity(req: Request, deps: AccountSecurityD
   if (req.method !== 'POST') return reply(405, { ok: false, error: 'invalid_request' })
 
   const token = bearerToken(req)
+  const body = await readJsonObject(req, 4_000)
+  const ip = clientIp(req)
+
+  // ADR-0077: the three actions that run before anyone is signed in (the gateway lets the app's public key through:
+  // verify_jwt is off for this function, and every other action below still needs the caller's own token).
+  if (body && typeof body.action === 'string' && Object.hasOwn(ANONYMOUS_ACTIONS, body.action)) {
+    try {
+      return await ANONYMOUS_ACTIONS[body.action]!({ deps, body, ip })
+    } catch (e) {
+      if (e instanceof Refusal) return fail(e.code)
+      throw e
+    }
+  }
+
   const userId = token ? await deps.userIdFromToken(token) : null
   if (!userId) return fail('not_signed_in')
 
-  const body = await readJsonObject(req, 4_000)
   const action = body?.action
   if (!body || typeof action !== 'string' || !Object.hasOwn(ACTIONS, action)) return fail('invalid_request')
 
-  const ip = clientIp(req)
   const ctx: Ctx = { deps, token, userId, aal: deps.aalFromToken(token), ip: ip === 'unknown' ? null : ip, body }
   try {
     return await ACTIONS[action]!(ctx)
@@ -482,6 +528,205 @@ const ACTIONS: Record<string, Action> = {
     await sql(ctx, 'service_restore_closure', { p_user: target, p_actor: ctx.userId })
     return done({ notice: await notify(ctx, target, 'closure_restored', email) })
   },
+
+  // ---- ADR-0077: owner sign-in aliases. The Auth email is the primary (every email goes there); an alias only signs in.
+
+  // The Owner's sign-in emails for Settings: the primary (read from Auth) and the verified aliases.
+  async alias_list(ctx) {
+    await requireOwner(ctx)
+    const primary = await ctx.deps.userEmail(ctx.userId)
+    if (!primary) throw new Refusal('not_found')
+    const r = await sql(ctx, 'service_alias_list', { p_user: ctx.userId })
+    const rows = Array.isArray(r.aliases) ? (r.aliases as { email?: unknown; added_at?: unknown }[]) : []
+    const aliases = rows.flatMap((a) => (typeof a.email === 'string' ? [{ email: a.email, addedAt: typeof a.added_at === 'string' ? a.added_at : null }] : []))
+    return done({ primary, aliases })
+  },
+
+  // Step 1 of adding: the address is held as pending and a one-time code (purpose add_alias) goes to THAT address.
+  async alias_send_code(ctx) {
+    const { deps, userId } = ctx
+    await requireOwner(ctx)
+    await requireAal2For2faUsers(ctx)
+    const alias = aliasEmail(ctx.body.email)
+    await sql(ctx, 'service_alias_begin', { p_user: userId, p_email: alias })
+
+    const code = sixDigitCode(deps.random)
+    const salt = hex(deps.random(16))
+    let sent: SendAndLogResult | null = null
+    try {
+      const created = await sql(ctx, 'service_create_action_code', { p_user: userId, p_purpose: 'add_alias', p_code_hash: await sha256Hex(salt + code), p_salt: salt })
+      sent = await deps.send({
+        ...aliasCodeEmail(code),
+        to: alias,
+        kind: 'security_code',
+        workflow: `security_code:${userId}:add_alias`,
+        triggeredBy: userId,
+        idempotencyKey: `security_code:${String(created.id ?? '')}`,
+      })
+    } catch (e) {
+      if (e instanceof Refusal) {
+        await cancelPendingAlias(ctx, alias)
+        throw e
+      }
+      console.error(`account-security: alias code email failed (${errorName(e)})`)
+    }
+    if (sent?.status !== 'accepted') {
+      await voidCodes(ctx, 'add_alias')
+      await cancelPendingAlias(ctx, alias)
+      throw new Refusal(sent?.status === 'blocked' ? 'email_blocked' : 'email_failed')
+    }
+    return done({ sentTo: maskEmail(alias) })
+  },
+
+  // Step 2: the code proves the person can read the alias inbox. The code is for the one pending address.
+  async alias_add(ctx) {
+    const { userId } = ctx
+    await requireOwner(ctx)
+    await requireAal2For2faUsers(ctx)
+    const alias = aliasEmail(ctx.body.email)
+    await checkCode(ctx, 'add_alias', ctx.body.code)
+    await sql(ctx, 'service_alias_verify', { p_user: userId, p_email: alias })
+    await logEventQuietly(ctx, userId, 'account_alias_added', { alias_sha256: await emailHash(alias) })
+    return done()
+  },
+
+  // Swaps the Auth email with a verified alias. aal2 and an authenticator code from the last 5 minutes (as
+  // change_password). The Auth email changes first; if the alias table cannot follow, the old email is put back.
+  async alias_make_primary(ctx) {
+    const { deps, userId } = ctx
+    await requireOwner(ctx)
+    requireAal2(ctx)
+    if (!freshTotp(ctx)) throw new Refusal('totp_required')
+    const next = aliasEmail(ctx.body.email)
+    const old = await deps.userEmail(userId)
+    if (!old) throw new Refusal('not_found')
+    const listed = await sql(ctx, 'service_alias_list', { p_user: userId })
+    const known = Array.isArray(listed.aliases) && (listed.aliases as { email?: unknown }[]).some((a) => a.email === next)
+    if (!known) throw new Refusal('not_found')
+
+    if ((await deps.setEmail(userId, next)) === 'email_taken') throw new Refusal('email_in_use')
+    try {
+      await sql(ctx, 'service_alias_swap', { p_user: userId, p_new: next, p_old: old.trim().toLowerCase() })
+    } catch (e) {
+      try {
+        await deps.setEmail(userId, old)
+      } catch (restore) {
+        console.error(`account-security: could not put the old Auth email back (${errorName(restore)})`)
+      }
+      throw e
+    }
+    let signedOutOthers = true
+    try {
+      await deps.endOtherSessions(userId, deps.sessionFromToken(ctx.token))
+    } catch (e) {
+      console.error(`account-security: ending the other sessions after a primary change failed (${errorName(e)})`)
+      signedOutOthers = false
+    }
+    await logEventQuietly(ctx, userId, 'account_primary_email_changed', { from_sha256: await emailHash(old), to_sha256: await emailHash(next) })
+    // Both addresses hear of it: the old one is the person who may not have asked for this.
+    for (const to of new Set([old, next])) {
+      await sendQuietly(ctx, { ...securityNoticeEmail('primary_email_changed', deps.appBaseUrl), to, kind: 'security_notice', workflow: `security_notice:${userId}:primary_email_changed:${await emailHash(to)}`, triggeredBy: userId })
+    }
+    return done({ primary: next, signedOutOthers })
+  },
+
+  async alias_remove(ctx) {
+    const { userId } = ctx
+    await requireOwner(ctx)
+    requireAal2(ctx)
+    const alias = aliasEmail(ctx.body.email)
+    // The primary is the Auth email and is not in the alias table, so it cannot be removed here (not_found).
+    await sql(ctx, 'service_alias_remove', { p_user: userId, p_email: alias })
+    await logEventQuietly(ctx, userId, 'account_alias_removed', { alias_sha256: await emailHash(alias) })
+    return done()
+  },
+}
+
+// ---------------------------------------------------------------- anonymous alias actions (ADR-0077)
+
+interface AnonCtx {
+  deps: AccountSecurityDeps
+  body: Record<string, unknown>
+  ip: string
+}
+
+/** Per hour: attempts of one address, and of one IP, per action. A key is a salted hash, never the address or the IP. */
+const ALIAS_LIMITS = {
+  sign_in: { perEmail: 6, perIp: 20 },
+  reset_request: { perEmail: 3, perIp: 10 },
+  reset_verify: { perEmail: 8, perIp: 20 },
+} as const
+/** Never a real address (.invalid is reserved): a lookup for an alias that does not exist signs in here, so it costs the same. */
+const PROBE_EMAIL = 'alias-probe@sanctus.invalid'
+
+async function aliasAttemptAllowed(a: AnonCtx, kind: keyof typeof ALIAS_LIMITS, email: string): Promise<boolean> {
+  const limit = ALIAS_LIMITS[kind]
+  const now = a.deps.now()
+  const days = [now.toISOString().slice(0, 10)]
+  const hourAgo = new Date(now.getTime() - 3600_000).toISOString().slice(0, 10)
+  if (hourAgo !== days[0]) days.push(hourAgo)
+  const keys = (scope: string, value: string) => Promise.all(days.map((day) => sha256Hex(`alias|${kind}|${scope}|${day}|${value}|${a.deps.attemptSalt}`)))
+  if (!(await a.deps.attempt(await keys('ip', a.ip), limit.perIp))) return false
+  return a.deps.attempt(await keys('email', email), limit.perEmail)
+}
+
+/** The typed address in its stored form, or null when it is not an address at all. */
+function typedEmail(raw: unknown): string | null {
+  if (typeof raw !== 'string' || raw.length > 254) return null
+  const email = raw.trim().toLowerCase()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null
+}
+
+/** The primary email of the Owner this alias belongs to, or null (unknown, not verified yet, or no Auth email). */
+async function primaryOfAlias(a: AnonCtx, alias: string): Promise<string | null> {
+  const r = await a.deps.rpc('service_alias_resolve', { p_email: alias })
+  const user = r?.ok === true && typeof r.user_id === 'string' ? r.user_id : null
+  return user ? ((await a.deps.userEmail(user).catch(() => null)) ?? null) : null
+}
+
+const ANONYMOUS_ACTIONS: Record<string, (a: AnonCtx) => Promise<Response>> = {
+  // The login form calls this only after a normal sign-in answered invalid_credentials. Every failure is the same
+  // neutral answer: it never says whether the address is an alias, nor what the primary is.
+  async alias_sign_in(a) {
+    const email = typedEmail(a.body.email)
+    const password = a.body.password
+    if (!email || typeof password !== 'string' || password.length < 1 || password.length > 1024) throw new Refusal('invalid_credentials')
+    if (!(await aliasAttemptAllowed(a, 'sign_in', email))) throw new Refusal('rate_limited')
+    const primary = await primaryOfAlias(a, email)
+    // Not an alias: the same sign-in happens on a probe address, so the answer takes about as long.
+    const result = await a.deps.signIn(primary ?? PROBE_EMAIL, password)
+    if (primary && result.status === 'ok') return done({ session: result.session })
+    if (result.status === 'rate_limited') throw new Refusal('rate_limited')
+    if (primary && result.status === 'unknown') throw new Refusal('unknown')
+    throw new Refusal('invalid_credentials')
+  },
+
+  // "Forgot password" typed with an alias: the reset code goes to the primary. Always the same answer.
+  async alias_reset_request(a) {
+    const email = typedEmail(a.body.email)
+    if (!email || !(await aliasAttemptAllowed(a, 'reset_request', email))) return done()
+    const primary = await primaryOfAlias(a, email)
+    try {
+      await a.deps.sendRecovery(primary ?? PROBE_EMAIL)
+    } catch (e) {
+      console.error(`account-security: alias reset request failed (${errorName(e)})`)
+    }
+    return done()
+  },
+
+  // The reset page types the alias and the code that was sent to the primary: Auth only knows the primary, so the
+  // function swaps the address and answers with the recovery session.
+  async alias_reset_verify(a) {
+    const email = typedEmail(a.body.email)
+    const code = typeof a.body.code === 'string' ? a.body.code.replace(/\s+/g, '') : ''
+    if (!email || !/^\d{6,10}$/.test(code)) throw new Refusal('invalid_code')
+    if (!(await aliasAttemptAllowed(a, 'reset_verify', email))) throw new Refusal('rate_limited')
+    const primary = await primaryOfAlias(a, email)
+    const result = await a.deps.verifyRecovery(primary ?? PROBE_EMAIL, code)
+    if (primary && result.status === 'ok') return done({ session: result.session })
+    if (result.status === 'rate_limited') throw new Refusal('rate_limited')
+    throw new Refusal('invalid_code')
+  },
 }
 
 // ---------------------------------------------------------------- gates and helpers
@@ -556,9 +801,29 @@ async function classify(ctx: Ctx, user: string): Promise<string> {
   return typeof kind === 'string' ? kind : 'none'
 }
 
-async function requireOwnerAal2(ctx: Ctx) {
+async function requireOwner(ctx: Ctx) {
   if ((await classify(ctx, ctx.userId)) !== 'owner') throw new Refusal('not_allowed')
+}
+
+async function requireOwnerAal2(ctx: Ctx) {
+  await requireOwner(ctx)
   requireAal2(ctx)
+}
+
+/** The alias address from the request body in its stored form (lower case, trimmed); invalid_request when it is not an address. */
+function aliasEmail(raw: unknown): string {
+  const email = typedEmail(raw)
+  if (!email) throw new Refusal('invalid_request')
+  return email
+}
+
+/** The email failed to send: the held (unverified) alias goes, so nothing stays half added. */
+async function cancelPendingAlias(ctx: Ctx, alias: string) {
+  try {
+    await ctx.deps.rpc('service_alias_cancel', { p_user: ctx.userId, p_email: alias })
+  } catch (e) {
+    console.error(`account-security: could not drop the pending alias (${errorName(e)})`)
+  }
 }
 
 function targetUser(ctx: Ctx): string {
@@ -568,7 +833,7 @@ function targetUser(ctx: Ctx): string {
 }
 
 /** Checks (and on success consumes) the caller's newest emailed code for this purpose. */
-async function checkCode(ctx: Ctx, purpose: ActionPurpose, raw: unknown) {
+async function checkCode(ctx: Ctx, purpose: CodePurpose, raw: unknown) {
   const code = typeof raw === 'string' ? raw.replace(/\s+/g, '') : ''
   if (!/^\d{6}$/.test(code)) throw new Refusal('invalid_code')
   await sql(ctx, 'service_check_action_code', { p_user: ctx.userId, p_purpose: purpose, p_code: code })
@@ -637,13 +902,18 @@ async function sendQuietly(ctx: Ctx, email: SecurityEmail): Promise<NoticeOutcom
 }
 
 /**
- * A closure alert for the admin inbox. With no inbox set, a blocked row is logged instead (R-W7-9), so the email log
- * shows the alert that had nowhere to go.
+ * A closure alert for the platform Owner (ADR-0077): to each Owner's primary email, read from Auth now, so it follows
+ * "Make primary". ADMIN_NOTIFICATION_EMAIL is no longer read here. With no Owner address, a blocked row is logged
+ * instead (R-W7-9), so the email log shows the alert that had nowhere to go.
  */
 async function alertInbox(ctx: Ctx, rendered: RenderedEmail, businessId: string | undefined, workflow: string) {
-  const to = ctx.deps.adminNotificationEmail
-  if (to) {
-    await sendQuietly(ctx, { ...rendered, to, kind: 'closure_request', businessId, workflow, triggeredBy: ctx.userId })
+  const owners = await ctx.deps.ownerEmails().catch((e: unknown) => {
+    console.error(`account-security: owner lookup failed (${errorName(e)})`)
+    return [] as string[]
+  })
+  const recipients = [...new Set(owners.map((o) => o.trim()).filter(Boolean))]
+  if (recipients.length) {
+    for (const to of recipients) await sendQuietly(ctx, { ...rendered, to, kind: 'closure_request', businessId, workflow, triggeredBy: ctx.userId })
     return
   }
   try {
@@ -719,6 +989,12 @@ function jwtPayload(token: string): Record<string, unknown> | null {
   } catch {
     return null
   }
+}
+
+/** The session_id claim of a JWT getUser() already accepted (the row in auth.sessions); null when it has none. */
+export function sessionFromJwt(token: string): string | null {
+  const id = jwtPayload(token)?.session_id
+  return typeof id === 'string' && UUID.test(id) ? id.toLowerCase() : null
 }
 
 /** The aal claim of a JWT the gateway and getUser() already accepted; anything unreadable counts as aal1. */

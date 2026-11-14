@@ -471,10 +471,12 @@ verify_jwt = true
 [functions.accept-member-invite]
 verify_jwt = false
 
-# Account security (S1): action codes, recovery codes, 2FA off, closure and the Owner's reset tools. Signed-in
-# callers only; the handler takes the caller from getUser() and reads aal only after that.
+# Account security (S1): action codes, recovery codes, 2FA off, closure and the Owner's reset tools; ADR-0077 adds the
+# Owner's sign-in aliases. verify_jwt is false because three alias actions (alias_sign_in, alias_reset_request,
+# alias_reset_verify) run before anyone is signed in, and the app's publishable key is not a JWT. Every other action
+# still needs the caller's token: the handler takes the caller from getUser() (no token: 401) and reads aal only after that.
 [functions.account-security]
-verify_jwt = true
+verify_jwt = false
 
 # Public AR model copies (owner decision 2026-10-26): business members and staff (can_sync_ar_models), the Owner alone
 # for the one-time backfill ({ all: true }); re-checked in the handler with the caller's own token.

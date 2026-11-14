@@ -596,5 +596,49 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     async restoreClosure(targetUserId) {
       return withNotice(await invoke('restore_closure', { target_user_id: targetUserId }))
     },
+
+    // ADR-0077: the Owner's sign-in aliases. The alias table is closed to the browser; the account-security function does everything.
+    async listSignInEmails() {
+      const r = await invoke('alias_list')
+      if (!r.ok) return r
+      const primary = str(r.data.primary)
+      if (!primary || !Array.isArray(r.data.aliases)) return accountFail('unknown')
+      const aliases = (r.data.aliases as { email?: unknown; addedAt?: unknown }[]).flatMap((a) => {
+        const email = str(a?.email)
+        return email ? [{ email, addedAt: str(a.addedAt) }] : []
+      })
+      return ok({ primary, aliases })
+    },
+
+    async sendAliasCode(email) {
+      const alias = email.trim()
+      if (!EMAIL_PATTERN.test(alias)) return accountFail('invalid_email')
+      const r = await invoke('alias_send_code', { email: alias })
+      return r.ok ? ok({ sentTo: str(r.data.sentTo) ?? '' }) : r
+    },
+
+    async addAlias(email, code) {
+      return voidOf(await invoke('alias_add', { email: email.trim(), code }))
+    },
+
+    // As changePassword: the authenticator code is verified here first, so the session's token carries a fresh time for it
+    // (the function wants one from the last 5 minutes). The code itself is never sent to the function.
+    async makeAliasPrimary(email, totp) {
+      const factors = await listTotp()
+      if (!factors.ok) return factors
+      const factor = factors.data.verified[0]
+      if (!factor) return accountFail('aal2_required')
+      const verified = await verifyTotp(factor.id, totp)
+      if (!verified.ok) return verified.error.reason === 'invalid_code' ? accountFail('invalid_totp') : verified
+      const r = await invoke('alias_make_primary', { email: email.trim() })
+      if (!r.ok) return r
+      // The Auth email changed: pick up a token and user that carry it.
+      await refresh()
+      return ok({ othersSignedOut: r.data.signedOutOthers !== false })
+    },
+
+    async removeAlias(email) {
+      return voidOf(await invoke('alias_remove', { email: email.trim() }))
+    },
   }
 }

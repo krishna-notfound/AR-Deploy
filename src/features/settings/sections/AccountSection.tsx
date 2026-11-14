@@ -20,6 +20,7 @@ import { type QueryResult, useServiceQuery } from '@/services/hooks'
 import { ActionCodeDialog } from '../ActionCodeDialog'
 import { useCancelClosure } from '../useCancelClosure'
 import { SectionHeader, SettingsCard, useUnsavedDraft } from '../SettingsUi'
+import { SignInEmailsCard } from './SignInEmailsCard'
 
 type Security = QueryResult<SecurityState>
 
@@ -32,6 +33,8 @@ const CLOSURE_LINE = {
 export default function AccountSection() {
   const { t } = useI18n()
   const { user } = useAccount()
+  // ADR-0077: the sign-in emails (primary and aliases) are the platform Owner's only.
+  const isOwner = useCan()('owner')
   const security = useServiceQuery(() => account.getSecurityState(), [])
   const { refetch } = security
 
@@ -55,6 +58,7 @@ export default function AccountSection() {
           <InlineNotice tone="neutral">{t('settings.account.demoNotice')}</InlineNotice>
         )}
         <EmailCard currentEmail={user?.email ?? ''} security={security} />
+        {isOwner && <SignInEmailsCard />}
         <PasswordCard security={security} />
         <ClosureCard security={security} />
       </div>

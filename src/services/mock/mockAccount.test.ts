@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DEMO_RESET_CODE } from '../passwordResetService'
 import { DEMO_CODE, mockAccountService as a, resetMockAccount } from './mockAccount'
 import { mockPasswordReset } from './mockPasswordReset'
@@ -143,5 +143,88 @@ describe('demo account service', () => {
     expect(await mockPasswordReset.hasSession()).toEqual({ ok: true, data: false })
     const ev = await a.listSecurityEvents()
     expect(ev.ok && ev.data[0]?.type).toBe('account_password_reset')
+  })
+})
+
+describe('demo account service: owner sign-in aliases (ADR-0077)', () => {
+  const asOwner = () => localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin' }))
+  const as = (platformRole: string) => localStorage.setItem('arfurn:account', JSON.stringify({ role: 'super_admin', platformRole }))
+  const reason = (r: { ok: boolean; error?: { reason?: string } }) => (!r.ok ? r.error?.reason : undefined)
+  /** 2FA on and the session at aal2: what the real function wants for the sensitive steps. */
+  const withTwoFactor = async () => {
+    const enrol = await a.startTotpEnrollment()
+    if (!enrol.ok) throw new Error('enrol')
+    await a.confirmTotpEnrollment(enrol.data.factorId, DEMO_CODE)
+  }
+
+  beforeEach(() => {
+    resetMockAccount()
+    asOwner()
+  })
+  afterEach(() => localStorage.removeItem('arfurn:account'))
+
+  it('only the Owner has sign-in emails', async () => {
+    for (const role of ['admin', 'team']) {
+      as(role)
+      expect(reason(await a.listSignInEmails())).toBe('not_allowed')
+      expect(reason(await a.sendAliasCode('x@client.test'))).toBe('not_allowed')
+      expect(reason(await a.addAlias('x@client.test', DEMO_CODE))).toBe('not_allowed')
+      expect(reason(await a.makeAliasPrimary('x@client.test', DEMO_CODE))).toBe('not_allowed')
+      expect(reason(await a.removeAlias('x@client.test'))).toBe('not_allowed')
+    }
+    localStorage.setItem('arfurn:account', JSON.stringify({ role: 'business_admin', businessId: 'biz_oak' }))
+    expect(reason(await a.listSignInEmails())).toBe('not_allowed')
+  })
+
+  it('add: a code is sent to the alias; the demo code adds it; a wrong code, a bad address, a taken address and a fourth alias are refused', async () => {
+    const before = await a.listSignInEmails()
+    expect(before.ok && before.data).toEqual({ primary: 'demo@demo.example', aliases: [] })
+    expect(reason(await a.sendAliasCode('nope'))).toBe('invalid_email')
+    expect(reason(await a.sendAliasCode('DEMO@demo.example'))).toBe('email_in_use')
+    const sent = await a.sendAliasCode(' Client@Client.test ')
+    expect(sent.ok && sent.data.sentTo).toBe('c•••@client.test')
+    expect(reason(await a.addAlias('client@client.test', '000000'))).toBe('invalid_code')
+    expect(reason(await a.addAlias('other@client.test', DEMO_CODE))).toBe('not_found')
+    expect((await a.addAlias('client@client.test', DEMO_CODE)).ok).toBe(true)
+    const after = await a.listSignInEmails()
+    expect(after.ok && after.data.aliases.map((x) => x.email)).toEqual(['client@client.test'])
+    expect(reason(await a.sendAliasCode('client@client.test'))).toBe('email_in_use')
+    for (const e of ['two@client.test', 'three@client.test']) {
+      await a.sendAliasCode(e)
+      await a.addAlias(e, DEMO_CODE)
+    }
+    expect(reason(await a.sendAliasCode('four@client.test'))).toBe('alias_limit')
+    const ev = await a.listSecurityEvents()
+    expect(ev.ok && ev.data.filter((e) => e.type === 'account_alias_added')).toHaveLength(3)
+  })
+
+  it('make primary: needs aal2 and the authenticator code; swaps with the old primary; nothing else changes', async () => {
+    await a.sendAliasCode('client@client.test')
+    await a.addAlias('client@client.test', DEMO_CODE)
+    // No second step yet.
+    expect(reason(await a.makeAliasPrimary('client@client.test', DEMO_CODE))).toBe('aal2_required')
+    expect(reason(await a.removeAlias('client@client.test'))).toBe('aal2_required')
+    await withTwoFactor()
+    expect(reason(await a.makeAliasPrimary('client@client.test', '000000'))).toBe('invalid_totp')
+    expect(reason(await a.makeAliasPrimary('unknown@client.test', DEMO_CODE))).toBe('not_found')
+    expect(reason(await a.makeAliasPrimary('demo@demo.example', DEMO_CODE))).toBe('not_found')
+    expect(await a.makeAliasPrimary('Client@Client.test', DEMO_CODE)).toEqual({ ok: true, data: { othersSignedOut: true } })
+    const now = await a.listSignInEmails()
+    expect(now.ok && now.data).toMatchObject({ primary: 'client@client.test', aliases: [{ email: 'demo@demo.example' }] })
+    const ev = await a.listSecurityEvents()
+    expect(ev.ok && ev.data.some((e) => e.type === 'account_primary_email_changed')).toBe(true)
+  })
+
+  it('remove: needs aal2; the primary cannot be removed; an alias goes', async () => {
+    await a.sendAliasCode('client@client.test')
+    await a.addAlias('client@client.test', DEMO_CODE)
+    await withTwoFactor()
+    expect(reason(await a.removeAlias('demo@demo.example'))).toBe('not_found')
+    expect((await a.removeAlias(' CLIENT@client.test ')).ok).toBe(true)
+    const now = await a.listSignInEmails()
+    expect(now.ok && now.data.aliases).toEqual([])
+    expect(reason(await a.removeAlias('client@client.test'))).toBe('not_found')
+    const ev = await a.listSecurityEvents()
+    expect(ev.ok && ev.data.some((e) => e.type === 'account_alias_removed')).toBe(true)
   })
 })

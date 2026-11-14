@@ -662,3 +662,87 @@ describe('Supabase account service', () => {
     expect(args.p_user_agent.length).toBeLessThanOrEqual(200)
   })
 })
+
+describe('Supabase account service: owner sign-in aliases (ADR-0077)', () => {
+  const FACTORS = () => ({ data: { all: [{ id: 'f1', factor_type: 'totp', status: 'verified' }], totp: [{ id: 'f1' }], phone: [] }, error: null })
+
+  it('listSignInEmails reads the primary and the aliases from the function', async () => {
+    const f = fake({ invoke: { data: { ok: true, primary: 'dev@owner.test', aliases: [{ email: 'a@client.test', addedAt: '2026-11-14T10:00:00Z' }, { email: 7 }, { email: 'b@client.test' }] } } })
+    expect(await account(f).listSignInEmails()).toEqual({
+      ok: true,
+      data: { primary: 'dev@owner.test', aliases: [{ email: 'a@client.test', addedAt: '2026-11-14T10:00:00Z' }, { email: 'b@client.test', addedAt: null }] },
+    })
+    expect(f.invoke).toHaveBeenCalledWith('account-security', { body: { action: 'alias_list' } })
+    const no = fake({ invoke: { data: { ok: true } } })
+    const r = await account(no).listSignInEmails()
+    expect(!r.ok && r.error.reason).toBe('unknown')
+    const staff = fake({ invoke: { error: httpError(403, { ok: false, error: 'not_allowed' }) } })
+    const s = await account(staff).listSignInEmails()
+    expect(!s.ok && s.error.reason).toBe('not_allowed')
+  })
+
+  it('sendAliasCode and addAlias post the address (trimmed) and the code, and map the refusals', async () => {
+    const f = fake({ invoke: { data: { ok: true, sentTo: 'c•••@client.test' } } })
+    const a = account(f)
+    expect(await a.sendAliasCode('  Client@Client.test ')).toEqual({ ok: true, data: { sentTo: 'c•••@client.test' } })
+    expect(f.invoke).toHaveBeenLastCalledWith('account-security', { body: { action: 'alias_send_code', email: 'Client@Client.test' } })
+    expect((await a.addAlias('client@client.test', '123456')).ok).toBe(true)
+    expect(f.invoke).toHaveBeenLastCalledWith('account-security', { body: { action: 'alias_add', email: 'client@client.test', code: '123456' } })
+
+    const bad = await a.sendAliasCode('not an email')
+    expect(!bad.ok && bad.error.reason).toBe('invalid_email')
+    for (const [status, code] of [[409, 'alias_limit'], [409, 'email_in_use'], [400, 'email_failed'], [400, 'email_blocked'], [403, 'aal2_required'], [429, 'rate_limited'], [403, 'not_allowed']] as const) {
+      const g = fake({ invoke: { error: httpError(status, { ok: false, error: code }) } })
+      const r = await account(g).sendAliasCode('client@client.test')
+      expect(!r.ok && r.error.reason).toBe(code)
+    }
+    for (const code of ['invalid_code', 'code_expired', 'too_many_attempts', 'not_found']) {
+      const g = fake({ invoke: { error: httpError(400, { ok: false, error: code }) } })
+      const r = await account(g).addAlias('client@client.test', '000000')
+      expect(!r.ok && r.error.reason).toBe(code)
+    }
+  })
+
+  it('makeAliasPrimary verifies the authenticator code first, never sends it, and refreshes the session after the swap', async () => {
+    const f = fake({ invoke: { data: { ok: true, primary: 'client@client.test', signedOutOthers: true } }, mfa: { listFactors: FACTORS } })
+    expect(await account(f).makeAliasPrimary('Client@Client.test', '654 321')).toEqual({ ok: true, data: { othersSignedOut: true } })
+    expect(f.auth.mfa.challengeAndVerify).toHaveBeenCalledWith({ factorId: 'f1', code: '654321' })
+    expect(f.invoke).toHaveBeenCalledWith('account-security', { body: { action: 'alias_make_primary', email: 'Client@Client.test' } })
+    expect(JSON.stringify(f.invoke.mock.calls)).not.toContain('654')
+    const order = names(f.log)
+    expect(order.indexOf('mfa.challengeAndVerify')).toBeLessThan(order.indexOf('invoke'))
+    // The Auth email changed: the session's user is read again (refresh), so the app shows the new primary.
+    expect(order.indexOf('invoke')).toBeLessThan(order.indexOf('auth.refreshSession'))
+
+    const partial = fake({ invoke: { data: { ok: true, signedOutOthers: false } }, mfa: { listFactors: FACTORS } })
+    expect(await account(partial).makeAliasPrimary('client@client.test', '654321')).toEqual({ ok: true, data: { othersSignedOut: false } })
+  })
+
+  it('makeAliasPrimary: a wrong authenticator code is invalid_totp with no call; no factor is aal2_required; the refusals map', async () => {
+    const wrong = fake({ mfa: { listFactors: FACTORS, challengeAndVerify: () => ({ data: null, error: authError('mfa_verification_failed', 422) }) } })
+    const r = await account(wrong).makeAliasPrimary('client@client.test', '000000')
+    expect(!r.ok && r.error.reason).toBe('invalid_totp')
+    expect(wrong.invoke).not.toHaveBeenCalled()
+    const none = fake()
+    const n = await account(none).makeAliasPrimary('client@client.test', '000000')
+    expect(!n.ok && n.error.reason).toBe('aal2_required')
+    expect(none.invoke).not.toHaveBeenCalled()
+    for (const [status, code] of [[403, 'totp_required'], [403, 'aal2_required'], [400, 'not_found'], [409, 'email_in_use']] as const) {
+      const g = fake({ invoke: { error: httpError(status, { ok: false, error: code }) }, mfa: { listFactors: FACTORS } })
+      const x = await account(g).makeAliasPrimary('client@client.test', '654321')
+      expect(!x.ok && x.error.reason).toBe(code)
+      expect(g.auth.refreshSession).not.toHaveBeenCalled()
+    }
+  })
+
+  it('removeAlias posts the address and maps the refusals', async () => {
+    const f = fake({ invoke: { data: { ok: true } } })
+    expect((await account(f).removeAlias(' a@client.test ')).ok).toBe(true)
+    expect(f.invoke).toHaveBeenCalledWith('account-security', { body: { action: 'alias_remove', email: 'a@client.test' } })
+    for (const [status, code] of [[403, 'aal2_required'], [400, 'not_found']] as const) {
+      const g = fake({ invoke: { error: httpError(status, { ok: false, error: code }) } })
+      const r = await account(g).removeAlias('a@client.test')
+      expect(!r.ok && r.error.reason).toBe(code)
+    }
+  })
+})

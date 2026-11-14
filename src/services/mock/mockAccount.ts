@@ -4,7 +4,7 @@
 // driven by tests: same validation, same reasons, aal2 needed for the platform policy.
 import type { BusinessStatus, ClosureRequest, PlatformSettings, Profile, SecurityEvent, SecurityState } from '@/domain/types'
 import { newId } from '@/lib/id'
-import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, type NoticeOutcome, PASSWORD_MIN, accountFail, passwordTooLong } from '../accountService'
+import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, MAX_ALIASES, type NoticeOutcome, PASSWORD_MIN, type SignInAlias, accountFail, passwordTooLong } from '../accountService'
 import { type Result, ok } from '../catalogService'
 import { mockCatalogService } from './mockCatalogService'
 import { clearDemoMember2fa, demoMemberHas2fa, demoPlatformRole, recordDemoSelfClosure } from './mockTeam'
@@ -34,6 +34,9 @@ interface State {
   platform: PlatformSettings
   events: SecurityEvent[]
   closureRequests: ClosureRequest[]
+  /** ADR-0077: the Owner's sign-in aliases, and the one address a code was sent to and not yet entered. */
+  aliases: SignInAlias[]
+  pendingAlias: string | null
 }
 
 /** When the demo accounts finished "Complete your setup": they start completed, so the dashboards open directly. */
@@ -60,6 +63,8 @@ function initial(onboarding: 'completed' | 'new' = 'completed'): State {
     closure: null,
     platform: { require2faStaff: false, require2faBusiness: false, updatedAt: null },
     events: [],
+    aliases: [],
+    pendingAlias: null,
     closureRequests: [
       // The seeded business and owner (seed.ts), so the owner-removal dialog and Complete/Restore have a real target.
       { userId: DEMO_CLOSING_OWNER, email: 'closing@demo.example', businessId: DEMO_CLOSING_BUSINESS, businessName: 'Oak & Ember Studio', requestedAt: '2026-10-20T10:00:00.000Z' },
@@ -440,4 +445,67 @@ export const mockAccountService: AccountService = {
       state.closureRequests = state.closureRequests.filter((r) => r.userId !== target)
       return ok({ notice: DEMO_NOTICE })
     }),
+
+  // ADR-0077: the Owner's sign-in aliases, with the same rules and reasons as the account-security function. Demo
+  // sends no email: the code is the demo code, and no alias can be used to sign in (the demo has no password sign-in).
+  listSignInEmails: () =>
+    run(() => {
+      if (demoPlatformRole() !== 'owner') return accountFail('not_allowed')
+      return ok({ primary: state.email, aliases: state.aliases })
+    }),
+
+  sendAliasCode: (email) =>
+    run(() => {
+      if (demoPlatformRole() !== 'owner') return accountFail('not_allowed')
+      const alias = email.trim().toLowerCase()
+      if (!EMAIL_PATTERN.test(alias)) return accountFail('invalid_email')
+      if (state.factor?.verified && state.aal !== 'aal2') return accountFail('aal2_required')
+      if (state.aliases.length >= MAX_ALIASES) return accountFail('alias_limit')
+      if (alias === state.email.toLowerCase() || state.aliases.some((x) => x.email === alias)) return accountFail('email_in_use')
+      state.pendingAlias = alias
+      return ok({ sentTo: maskDemoEmail(alias) })
+    }),
+
+  addAlias: (email, code) =>
+    run(() => {
+      if (demoPlatformRole() !== 'owner') return accountFail('not_allowed')
+      if (state.factor?.verified && state.aal !== 'aal2') return accountFail('aal2_required')
+      const alias = email.trim().toLowerCase()
+      const c = checkCode(code)
+      if (!c.ok) return c
+      // The code belongs to the one address it was sent to.
+      if (state.pendingAlias !== alias) return accountFail('not_found')
+      state.pendingAlias = null
+      state.aliases = [...state.aliases, { email: alias, addedAt: nowIso() }]
+      record('account_alias_added')
+      return ok(undefined)
+    }),
+
+  makeAliasPrimary: (email, totp) =>
+    run(() => {
+      if (demoPlatformRole() !== 'owner') return accountFail('not_allowed')
+      if (state.aal !== 'aal2') return accountFail('aal2_required')
+      if (totp.replace(/\s/g, '') !== DEMO_CODE) return accountFail('invalid_totp')
+      const alias = email.trim().toLowerCase()
+      if (!state.aliases.some((x) => x.email === alias)) return accountFail('not_found')
+      // The old primary becomes an alias, so the count stays.
+      state.aliases = [...state.aliases.filter((x) => x.email !== alias), { email: state.email, addedAt: nowIso() }]
+      state.email = alias
+      record('account_primary_email_changed')
+      return ok({ othersSignedOut: true })
+    }),
+
+  removeAlias: (email) =>
+    run(() => {
+      if (demoPlatformRole() !== 'owner') return accountFail('not_allowed')
+      if (state.aal !== 'aal2') return accountFail('aal2_required')
+      const alias = email.trim().toLowerCase()
+      if (!state.aliases.some((x) => x.email === alias)) return accountFail('not_found')
+      state.aliases = state.aliases.filter((x) => x.email !== alias)
+      record('account_alias_removed')
+      return ok(undefined)
+    }),
 }
+
+/** "c•••@client.test", like the function's masked address. */
+const maskDemoEmail = (email: string): string => `${email[0] ?? ''}•••${email.slice(email.lastIndexOf('@'))}`
