@@ -228,7 +228,7 @@ One migration (`supabase/migrations/20261026041731_business_logic_fixes.sql`) an
    npx supabase functions deploy provision-owner invite-member manage-member accept-member-invite send-test-email account-security track-event resend-webhook submit-application --project-ref zggylkbgajamhriebdrg
    ```
    - `review-application` and `notify-business-owner` are new, and both are `verify_jwt = true` in `supabase/config.toml`.
-   - `provision-owner`, `invite-member`, `manage-member`, `send-test-email` and `account-security` keep `verify_jwt = true`; `accept-member-invite`, `track-event`, `resend-webhook` and `submit-application` keep `false`. The settings come from `config.toml`.
+   - `provision-owner`, `invite-member`, `manage-member`, `send-test-email` keep `verify_jwt = true`; `account-security` is `verify_jwt = false` since 2026-11-14 (ADR-0077: alias sign-in and reset run before sign-in; the handler checks the token itself on every other action); `accept-member-invite`, `track-event`, `resend-webhook` and `submit-application` keep `false`. The settings come from `config.toml`.
    - `account-security` carries the Task 13 changes (notices, `email_blocked`, `cancel_closure`, staff self-closure notice).
    - `submit-application` is deployed with the others: it needs `private.application_attempts` and `service_application_attempt` from the migration.
 7. **Subscribe the Resend webhook to `email.suppressed`** (Resend dashboard → Webhooks → the existing endpoint → add the event). Without it a suppressed address stays at `sent` or `failed` instead of `bounced`.
