@@ -123,7 +123,8 @@ describe('publish rules (20261013093006_publish_rules)', () => {
   it('lets save_product replace the images of a published product (checked at commit, not mid-transaction)', async () => {
     const id = await saveDraft()
     await publish(id)
-    await saveDraft({ images: [{ id: 'i2', url: 'https://img.test/b.jpg', isPrimary: true, kind: 'gallery' }] }, id)
+    // keepModels: a published product keeps its GLB (20261114123349_qa_database_rules), so the save leaves the model rows alone.
+    await saveDraft({ images: [{ id: 'i2', url: 'https://img.test/b.jpg', isPrimary: true, kind: 'gallery' }], keepModels: true }, id)
     const r = await db.query<{ url: string }>('select url from public.product_images where product_id = $1', [id])
     expect(r.rows.map((x) => x.url)).toEqual(['https://img.test/b.jpg'])
   })
@@ -328,7 +329,7 @@ describe('variant media (20261020143507_variant_media)', () => {
       await db.query(`update public.businesses set status = 'active' where id = $1`, [BIZ])
     }
     // Removing the variant deletes its media rows, and the file is no longer readable through it.
-    await save({ variants: [] }, id)
+    await save({ variants: [], keepModels: true }, id) // the published product keeps its GLB (20261114123349_qa_database_rules)
     expect(await countMedia(id, OWNER, 'authenticated')).toEqual({ i: 0, m: 0 })
     expect(await fileVisible()).toBe(0)
   })
@@ -575,7 +576,7 @@ describe('security hardening (20261024065538_security_hardening)', () => {
       await as(HOWNER, (tx) =>
         tx.query(
           `update public.businesses set name = 'Hardened Co', logo_url = 'https://cdn.test/new.png', description = 'Hand-made',
-             contact_email = 'shop@test', contact_phone = '+351 1', contact_website = 'https://shop.test', contact_address = 'Lisboa' where id = $1`,
+             contact_email = 'shop@test.pt', contact_phone = '+351 1', contact_website = 'https://shop.test', contact_address = 'Lisboa' where id = $1`,
           [HB],
         ),
       )
@@ -688,8 +689,9 @@ describe('security hardening (20261024065538_security_hardening)', () => {
     it('refuses ar_activation and model_interaction for a product without a model; views still count', async () => {
       const id = await saveDraft()
       await publish(id)
-      // A product published before the 3D-only rule (W3): the model it needed to be published is removed again.
-      await db.query('delete from public.product_models where product_id = $1', [id])
+      // A product published before the 3D-only rule (W3): the model it needed to be published is removed again. The database
+      // refuses that now (20261114123349_qa_database_rules), so the legacy state is made with triggers off.
+      await db.exec(`set session_replication_role = replica; delete from public.product_models where product_id = '${id}'; set session_replication_role = origin;`)
       expect(await record(id, 'view')).toBe('recorded')
       expect(await record(id, 'ar_activation')).toBe('invalid')
       expect(await record(id, 'model_interaction')).toBe('invalid')

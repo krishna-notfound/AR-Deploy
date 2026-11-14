@@ -43,7 +43,9 @@ afterAll(async () => {
 const SAVE = `select public.save_product($1::jsonb, '[{"url":"/a.jpg","is_primary":true}]'::jsonb, '[]'::jsonb, '[]'::jsonb) as r`
 const product = (extra: Record<string, unknown> = {}) => ({
   business_id: BIZ, slug: 'new-one', name: { en: 'New one' }, category: 'sofa', price: 1000, currency: 'EUR',
-  width: 10, height: 10, depth: 10, dimension_unit: 'cm', ...extra,
+  width: 10, height: 10, depth: 10, dimension_unit: 'cm',
+  keep_models: true, // a published product keeps its GLB (20261114123349_qa_database_rules): these saves leave the model rows alone
+  ...extra,
 })
 const hidden = async (where: string) => (await db.query<{ h: boolean }>(`select cta_hidden as h from public.products where ${where}`)).rows[0]!.h
 

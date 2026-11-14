@@ -117,6 +117,8 @@ export const enCommon = {
   'common.validation.product.filesNotUploaded': 'Some files were not uploaded to storage. Remove them and upload again.',
   'common.validation.product.variantFilesNotUploaded': 'Some colour or option files were not uploaded to storage. Remove them and upload again.',
   'common.validation.product.nameRequired': 'Product name (English) is required.',
+  'common.validation.product.categoryHidden': 'That category is hidden. Choose another one.',
+  'common.validation.product.currencyDisabled': 'That currency is switched off. Choose another one.',
   'common.validation.product.slugRequired': 'Product URL slug is required.',
   'common.validation.product.slugTaken': 'Another product in this catalog already uses this slug.',
   'common.validation.product.ctaLabelRequired': 'Add a button label, or remove the link.',

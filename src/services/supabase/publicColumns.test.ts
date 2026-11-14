@@ -112,4 +112,15 @@ describe('Share switch and publish rule over Supabase', () => {
     const r = mapDbError({ code: '23514', message: 'publish_needs_model' })
     expect(r).toMatchObject({ ok: false, error: { code: 'VALIDATION', fieldErrors: { models: { key: 'common.validation.publish.modelRequired' } } } })
   })
+
+  it('category_hidden and currency_disabled (QA 2026-11-14) become field messages on "category" and "currency"', () => {
+    expect(mapDbError({ code: '23514', message: 'category_hidden' })).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', fieldErrors: { category: { key: 'common.validation.product.categoryHidden' } } },
+    })
+    expect(mapDbError({ code: '23514', message: 'currency_disabled' })).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', fieldErrors: { currency: { key: 'common.validation.product.currencyDisabled' } } },
+    })
+  })
 })

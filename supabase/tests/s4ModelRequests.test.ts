@@ -902,7 +902,8 @@ describe('S4 Task 4: request and cancel', () => {
       const id = randomUUID()
       const photos = await upload(f.bizA, id, 2)
       await send(f.ownerA, id, f.productP, null, photos)
-      await expect(h.probe(f.ownerB, CANCEL, [id])).rejects.toMatchObject({ message: 'model_request_not_found', code: 'P0002' })
+      // P0001 (PostgREST: 400) since the QA round of 2026-11-14 (ADR-0072); it was P0002, which PostgREST answers with 500.
+      await expect(h.probe(f.ownerB, CANCEL, [id])).rejects.toMatchObject({ message: 'model_request_not_found', code: 'P0001' })
       await expect(h.probe(f.admin, CANCEL, [id])).rejects.toMatchObject({ message: 'model_request_not_found' })
       await expect(h.probe(f.ownerA, CANCEL, [randomUUID()])).rejects.toMatchObject({ message: 'model_request_not_found' })
       // Photos of a sent request can't be deleted by the member until it is cancelled.

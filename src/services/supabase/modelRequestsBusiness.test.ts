@@ -96,6 +96,9 @@ describe('S4 Task 4: Supabase requestModel and cancelModelRequest', () => {
     const partial = fakeClient({ rpc: { data: { status: 'cancelled', photo_paths: paths }, error: null }, removeError: { message: 'nope' } })
     expect(await createSupabaseModelRequestsBusiness(partial.sb, () => {}).cancelModelRequest('r1')).toEqual({ ok: true, data: { status: 'cancelled', cleanup: 'partial' } })
 
+    // QA 2026-11-14 (F-TI-2): the database raises "not found" with P0001 (HTTP 400, not 500); the reason is read from the message.
+    const missing = fakeClient({ rpc: { data: null, error: { code: 'P0001', message: 'model_request_not_found' } } })
+    expect(await createSupabaseModelRequestsBusiness(missing.sb, () => {}).cancelModelRequest('gone')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND', reason: 'model_request_not_found' } })
     const refused = fakeClient({ rpc: { data: null, error: { code: 'P0001', message: 'model_request_not_cancellable' } } })
     expect(await createSupabaseModelRequestsBusiness(refused.sb, () => {}).cancelModelRequest('r1')).toMatchObject({
       ok: false,
