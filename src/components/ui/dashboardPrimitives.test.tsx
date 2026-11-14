@@ -251,8 +251,10 @@ describe('Switch off state', () => {
 
   it('keeps the original classes outside the dashboard', () => {
     render(<Switch checked={false} onChange={() => {}} label="Show prices" />)
-    expect(screen.getByRole('switch').className).toBe(
-      'relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 bg-line-strong',
+    // The same classes (their order does not matter to the browser).
+    const classes = (s: string) => s.split(/\s+/).filter(Boolean).sort()
+    expect(classes(screen.getByRole('switch').className)).toEqual(
+      classes('relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 bg-line-strong'),
     )
   })
 })
