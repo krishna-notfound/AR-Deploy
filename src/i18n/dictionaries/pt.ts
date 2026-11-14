@@ -24,6 +24,7 @@ export const ptCore: Partial<Record<TranslationKey, string>> = {
   'catalog.clearFilters': 'Limpar filtros',
   'catalog.notFoundTitle': 'Catálogo não encontrado',
   'catalog.notFoundBody': 'Verifique o endereço ou peça à loja o link do catálogo.',
+  'catalog.metaDescription': '{name}: o catálogo, com fotografias, 3D interativo e realidade aumentada.',
   'catalog.goHome': 'Ir para a Sanctus',
   'catalog.inactiveTitle': 'Este catálogo está indisponível de momento',
   'catalog.inactiveBody': 'A loja suspendeu o catálogo online. Contacte-a diretamente.',

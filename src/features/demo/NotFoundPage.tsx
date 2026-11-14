@@ -2,10 +2,12 @@ import { Compass } from 'lucide-react'
 import { ButtonLink } from '@/components/ui/Button'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { useNoIndex } from '@/lib/pageMeta'
 
 export default function NotFoundPage({ inShell }: { inShell?: boolean }) {
   const { t } = useI18n()
   useDocumentTitle(t('notFound.title'))
+  useNoIndex()
   return (
     <div className={inShell ? 'py-16' : 'grid min-h-dvh place-items-center bg-canvas p-6'}>
       <div className="mx-auto max-w-sm text-center">

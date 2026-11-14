@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react'
 import { useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
+import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
@@ -11,6 +12,7 @@ import { ErrorState } from '@/components/ui/States'
 import type { Product } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { metaSnippet, useMetaDescription, useNoIndex } from '@/lib/pageMeta'
 import { service } from '@/services'
 import { MEDIA_URL_TTL_SECONDS } from '@/services/catalogService'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
@@ -63,6 +65,12 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
   useEffect(() => {
     if (b) document.title = b.name
   }, [b])
+  // Not the business's own description: that text is internal and never reaches a visitor (ADR-0054).
+  useMetaDescription(b ? metaSnippet(t('catalog.metaDescription', { name: b.name })) : '')
+  // A catalogue that does not exist or is switched off is not a page to index: the host answers 200 either way.
+  const gone = !b && (isHouse || (business.status === 'error' && business.error.code === 'NOT_FOUND'))
+  useNoIndex(gone || (!!b && !showCatalog && !accountPending))
+  useDocumentTitle(gone ? t('catalog.notFoundTitle') : undefined)
 
   const setParam = (k: string, v: string) => {
     const next = new URLSearchParams(search)
@@ -91,10 +99,9 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
     )
 
   if (!b) {
-    const notFound = isHouse || (business.status === 'error' && business.error.code === 'NOT_FOUND')
     return (
       <PublicShell>
-        {notFound ? (
+        {gone ? (
           <PublicMessage
             icon={Store}
             title={t('catalog.notFoundTitle')}

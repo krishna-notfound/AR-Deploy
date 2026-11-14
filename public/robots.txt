@@ -1,0 +1,15 @@
+# Sanctus: public pages may be crawled, the dashboards, sign-in pages and embeds may not.
+# Whether this whole site should be hidden while it is the testing site is the owner's decision (docs/qa/2026-11-14-web-seo.md).
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /embed/
+Disallow: /login
+Disallow: /demo
+Disallow: /join
+Disallow: /reset-password
+Disallow: /accept-invite
+Disallow: /*?preview=
+
+Sitemap: https://sanctus.warpkit.online/sitemap.xml

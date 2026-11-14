@@ -133,12 +133,37 @@ describe('vercel.json framing headers', () => {
     return out
   }
 
+  const directive = (policy: string | undefined, name: string) => policy?.split(';').map((d) => d.trim()).find((d) => d.startsWith(`${name} `))
+
   it('lets any website frame the embed routes and nothing else', () => {
     for (const path of ['/embed/products/casa-lisboa/glam-velvet-sofa', '/embed/products/glam-velvet-sofa'])
-      expect(headersFor(path).get('Content-Security-Policy')).toBe('frame-ancestors *')
+      expect(directive(headersFor(path).get('Content-Security-Policy'), 'frame-ancestors')).toBe('frame-ancestors *')
     for (const path of ['/', '/products/casa-lisboa/glam-velvet-sofa', '/catalog/casa-lisboa', '/dashboard', '/admin/products', '/login', '/embed', '/embedded/x'])
-      expect(headersFor(path).get('Content-Security-Policy')).toBe("frame-ancestors 'none'")
+      expect(directive(headersFor(path).get('Content-Security-Policy'), 'frame-ancestors')).toBe("frame-ancestors 'none'")
   })
+
+  // SEC-WEB-01: the script, style, font, worker, object, base and form sources are enforced everywhere, embeds included.
+  // connect-src, img-src and media-src stay in the report-only policy until checked against Supabase and on a phone.
+  it('enforces the verified CSP directives on every route, and not the unverified ones', () => {
+    for (const path of ['/', '/catalog/casa-lisboa', '/admin/products', '/embed/products/casa-lisboa/glam-velvet-sofa']) {
+      const csp = headersFor(path).get('Content-Security-Policy')
+      expect(directive(csp, 'script-src')).toBe("script-src 'self' 'wasm-unsafe-eval'")
+      expect(directive(csp, 'worker-src')).toBe("worker-src 'self' blob:")
+      expect(directive(csp, 'object-src')).toBe("object-src 'none'")
+      expect(directive(csp, 'base-uri')).toBe("base-uri 'self'")
+      expect(directive(csp, 'form-action')).toBe("form-action 'self'")
+      expect(csp).not.toMatch(/default-src|connect-src|img-src|media-src/)
+    }
+  })
+
+  it('does not let the single-page rewrite answer robots.txt or sitemap.xml with the app', () => {
+    const rewrite = (JSON.parse(readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8')) as { rewrites: { source: string }[] }).rewrites.find((r) => r.source.includes('manifest'))!
+    const spa = new RegExp(`^${rewrite.source}$`)
+    expect(spa.test('/robots.txt')).toBe(false)
+    expect(spa.test('/sitemap.xml')).toBe(false)
+    expect(spa.test('/catalog/casa-lisboa')).toBe(true)
+  })
+
 
   it('keeps the other security headers on the embed routes', () => {
     const h = headersFor('/embed/products/casa-lisboa/glam-velvet-sofa')

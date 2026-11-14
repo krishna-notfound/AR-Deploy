@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router'
 import { useAccount } from '@/auth/AccountProvider'
 import { FullPageSpinner } from '@/components/layout/FullPageSpinner'
+import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { ButtonLink } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { ErrorState } from '@/components/ui/States'
@@ -11,6 +12,7 @@ import { HOUSE_BUSINESS_SLUG } from '@/domain/siteContent'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { useCategoryLabel } from '@/services/listsHooks'
 import { cn } from '@/lib/cn'
+import { metaSnippet, useMetaDescription, useNoIndex } from '@/lib/pageMeta'
 import { catalogLocalPath, needsPreview, showcaseProductPath, tenantCatalogPath } from '@/lib/urls'
 import { service } from '@/services'
 import { useRefreshWhenStale, useServiceQuery } from '@/services/hooks'
@@ -63,6 +65,13 @@ function BusinessProductPage({ tenantSlug }: { tenantSlug?: string }) {
   const hiddenFromPublic = !!res.data && needsPreview(res.data.product, res.data.business)
   const ownerMismatch = canPreview && hiddenFromPublic && user?.role === 'business_admin' && res.data?.business.id !== user.businessId
 
+  // R-W4-8: a refetch that says NOT_FOUND (renamed, unpublished, deleted) outranks the kept-stale product and its AR button.
+  const gone = res.status === 'error' && res.error.code === 'NOT_FOUND'
+  const notFound = gone || ownerMismatch
+  // The host answers 200 for any address: a product that is not there tells crawlers not to index it.
+  useNoIndex(notFound)
+  useDocumentTitle(notFound ? t('product.notFoundTitle') : undefined)
+
   if (res.status === 'loading' && !res.data)
     return (
       <PublicShell>
@@ -70,10 +79,7 @@ function BusinessProductPage({ tenantSlug }: { tenantSlug?: string }) {
       </PublicShell>
     )
 
-  // R-W4-8: a refetch that says NOT_FOUND (renamed, unpublished, deleted) outranks the kept-stale product and its AR button.
-  const gone = res.status === 'error' && res.error.code === 'NOT_FOUND'
   if (!res.data || ownerMismatch || gone) {
-    const notFound = gone || ownerMismatch
     return (
       <PublicShell>
         {notFound ? (
@@ -109,6 +115,7 @@ function ProductView({ business, product, catalogHref, isPreview }: { business: 
   useEffect(() => {
     document.title = `${name} · ${business.name}`
   }, [name, business.name])
+  useMetaDescription(metaSnippet(localized(product.shortDescription) || localized(product.description)))
 
   const hasContact = !!(business.contact.email || business.contact.phone || business.contact.website || business.contact.address)
   // Status labels, not controls: no border, so they never read as buttons that do nothing.

@@ -2,6 +2,7 @@ import { Compass } from 'lucide-react'
 import { useDocumentTitle } from '@/components/layout/PageHeader'
 import { ButtonLink } from '@/components/ui/Button'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { useNoIndex } from '@/lib/pageMeta'
 import { PublicMessage } from '../public/PublicMessage'
 import { PublicShell } from '../public/PublicShell'
 import { SiteFooter, SiteHeader } from './SiteChrome'
@@ -14,6 +15,7 @@ import { SiteFooter, SiteHeader } from './SiteChrome'
 export default function PublicNotFoundPage({ tenant }: { tenant?: boolean }) {
   const { t } = useI18n()
   useDocumentTitle(t('notFound.title'))
+  useNoIndex() // the host answers 200 for any address, so this is how a crawler learns the page is not real
   const message = (
     <PublicMessage
       icon={Compass}
