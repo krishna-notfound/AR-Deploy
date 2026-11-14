@@ -33,6 +33,8 @@ const REASON_KEY: Record<string, TranslationKey> = {
   invalid_avatar: 'settings.err.invalid_avatar',
   mfa_not_enabled: 'settings.err.mfa_not_enabled',
   not_enabled: 'settings.err.not_enabled',
+  alias_limit: 'settings.err.alias_limit',
+  email_in_use: 'settings.err.email_in_use',
   unknown: 'settings.err.unknown',
 }
 

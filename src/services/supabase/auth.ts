@@ -42,6 +42,42 @@ function authFail(code: ServiceErrorCode, error: { code?: string; message: strin
   return { ok: false, error: { code, message: authMessage(error), reason: isAuthRetryableFetchError(error) ? 'network' : error.code } }
 }
 
+/**
+ * The platform Owner's sign-in aliases (ADR-0077). Three anonymous actions of the account-security function; each answer
+ * is neutral on the server, so a failure here only means "keep the normal failure". 
+ull when the function did not answer ok.
+ */
+const ALIAS_FUNCTION = 'account-security'
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+type AliasAnswer = { ok: true; session: { access_token: string; refresh_token: string } | null } | { ok: false; rateLimited: boolean }
+
+async function aliasCall(sb: SupabaseClient, body: Record<string, unknown>): Promise<AliasAnswer> {
+  try {
+    const { data, error } = await sb.functions.invoke(ALIAS_FUNCTION, { body })
+    if (error) {
+      const ctx = (error as { context?: unknown }).context
+      const answer = ctx instanceof Response ? ((await ctx.json().catch(() => null)) as { error?: unknown } | null) : null
+      return { ok: false, rateLimited: answer?.error === 'rate_limited' }
+    }
+    const a = (data ?? {}) as { ok?: unknown; session?: { access_token?: unknown; refresh_token?: unknown } | null }
+    if (a.ok !== true) return { ok: false, rateLimited: false }
+    const s = a.session
+    return { ok: true, session: typeof s?.access_token === 'string' && typeof s.refresh_token === 'string' ? { access_token: s.access_token, refresh_token: s.refresh_token } : null }
+  } catch {
+    return { ok: false, rateLimited: false }
+  }
+}
+
+/** The browser takes over the session the function signed in (the tokens never leave memory). */
+async function adoptSession(sb: SupabaseClient, session: { access_token: string; refresh_token: string }): Promise<boolean> {
+  try {
+    const { error } = await sb.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
+    return !error
+  } catch {
+    return false
+  }
+}
+
 export interface AuthService {
   getSession(): Promise<Result<Session | null>>
   /** null when signed out; `user` is null when signed in but not given a role yet. */
@@ -111,11 +147,23 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
 
     async signInWithPassword(email, password) {
       const { error } = await sb.auth.signInWithPassword({ email, password })
-      return error ? authFail('PERMISSION', error) : ok(undefined)
+      if (!error) return ok(undefined)
+      const failed = authFail('PERMISSION', error)
+      // ADR-0077: only a wrong email or password may be an alias of the platform Owner. The function answers the same
+      // for everything else, and the person sees the normal failure.
+      if (error.code !== 'invalid_credentials' || !EMAIL_SHAPE.test(email)) return failed
+      const alias = await aliasCall(sb, { action: 'alias_sign_in', email, password })
+      if (alias.ok && alias.session && (await adoptSession(sb, alias.session))) return ok(undefined)
+      return !alias.ok && alias.rateLimited ? authFail('RATE_LIMITED', { code: 'over_request_rate_limit', message: 'Too many attempts.' }) : failed
     },
 
     async requestPasswordReset(email, redirectTo) {
-      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo })
+      // An alias of the Owner gets its code at the primary address: the function resolves it, and answers the same for
+      // every address, so it is always asked (alongside the normal request) and its answer is never shown.
+      const [{ error }] = await Promise.all([
+        sb.auth.resetPasswordForEmail(email, { redirectTo }),
+        EMAIL_SHAPE.test(email) ? aliasCall(sb, { action: 'alias_reset_request', email }) : Promise.resolve(null),
+      ])
       // Rate limits and delivery problems are reported; "unknown email" is not distinguishable by design.
       return error ? authFail('UNKNOWN', error) : ok(undefined)
     },
@@ -123,7 +171,12 @@ export function createSupabaseAuthService(sb: SupabaseClient): AuthService {
     async verifyEmailCode(email, code, purpose) {
       // 'email' accepts both kinds of code provision-owner sends: an invitation (confirmation token) and a sign-in code.
       const { error } = await sb.auth.verifyOtp({ email, token: code, type: purpose === 'recovery' ? 'recovery' : 'email' })
-      return error ? authFail('PERMISSION', error) : ok(undefined)
+      if (!error) return ok(undefined)
+      const failed = authFail('PERMISSION', error)
+      // A reset code that went to the primary of an alias the person typed: Auth only knows the primary, so the function verifies it.
+      if (purpose !== 'recovery' || isAuthRetryableFetchError(error) || !EMAIL_SHAPE.test(email)) return failed
+      const alias = await aliasCall(sb, { action: 'alias_reset_verify', email, code })
+      return alias.ok && alias.session && (await adoptSession(sb, alias.session)) ? ok(undefined) : failed
     },
 
     async updatePassword(password) {

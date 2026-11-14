@@ -3,17 +3,38 @@
 // Every database step is a service_* function or the Auth admin API, with the service role, which lives only in
 // Edge Function secrets; cancel_account_closure alone runs as the caller (anon key plus their token), and the current
 // password check of change_password signs in on a throwaway anon client (ADR-0066). Secrets:
-// RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS, ADMIN_NOTIFICATION_EMAIL (design/23-email.md).
+// RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md); optionally APPLICATION_SALT.
+// ADR-0077: verify_jwt is OFF for this function (supabase/config.toml), because the owner-alias actions run before anyone
+// is signed in (alias_sign_in, alias_reset_request, alias_reset_verify) and the app's publishable key is not a JWT. The
+// handler authenticates every other action itself with getUser() on the caller's token (no token: 401). Closure alerts
+// go to the Owner's Auth email, so ADMIN_NOTIFICATION_EMAIL is not read here.
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
+import { applicationSalt } from '../_shared/attempts.ts'
 import { callerRpc } from '../_shared/caller.ts'
 import { type LogEntry, logRow, readEmailConfig, sendAndLog } from '../_shared/email.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
-import { SWEEP_BUCKETS, type SweepStorage, aalFromJwt, amrFromJwt, handleAccountSecurity, removeBusinessFolder } from './handler.ts'
+import { type AliasSignInResult, SWEEP_BUCKETS, type SweepStorage, aalFromJwt, amrFromJwt, handleAccountSecurity, removeBusinessFolder, sessionFromJwt } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
 const url = env('SUPABASE_URL') ?? ''
-const admin = createClient(url, serviceKeyFrom(env), { auth: { persistSession: false, autoRefreshToken: false } })
+const serviceKey = serviceKeyFrom(env)
+const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
 const config = readEmailConfig(env)
+const salt = await applicationSalt(env, serviceKey)
+
+/** A throwaway anon client: no storage, no refresh, so it never touches anyone's session. */
+const anonClient = () => createClient(url, env('SUPABASE_ANON_KEY') ?? '', { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
+
+/** The answer of a sign-in on a throwaway client: the tokens on success, otherwise only a fixed reason (never Auth's text). */
+function signInResult(error: { status?: number; code?: string } | null, session: { access_token: string; refresh_token: string; expires_in: number; token_type: string } | null): AliasSignInResult {
+  if (error) {
+    if (error.status === 429 || error.code === 'over_request_rate_limit') return { status: 'rate_limited' }
+    const invalid = ['invalid_credentials', 'otp_expired', 'otp_disabled', 'validation_failed', 'bad_json'].includes(error.code ?? '') || error.status === 400 || error.status === 403 || error.status === 422
+    return { status: invalid ? 'invalid' : 'unknown' }
+  }
+  if (!session) return { status: 'unknown' }
+  return { status: 'ok', session: { access_token: session.access_token, refresh_token: session.refresh_token, expires_in: session.expires_in, token_type: session.token_type } }
+}
 
 async function log(e: LogEntry): Promise<string> {
   const { data, error } = await admin.from('email_log').insert(logRow(e)).select('id').single()
@@ -37,7 +58,44 @@ const sweepStorage: SweepStorage = {
 Deno.serve((req) =>
   handleAccountSecurity(req, {
     appBaseUrl: config.ok ? config.config.appBaseUrl : '',
-    adminNotificationEmail: config.ok ? config.config.adminNotificationEmail : '',
+    attemptSalt: salt,
+    async attempt(hashes, max) {
+      const { data, error } = await admin.rpc('service_application_attempt', { p_hashes: hashes, p_max: max })
+      // A limiter that cannot answer refuses: these actions are anonymous.
+      if (error) return false
+      return data === true
+    },
+    sessionFromToken: sessionFromJwt,
+    async endOtherSessions(userId, keep) {
+      const { error } = await admin.rpc('service_end_other_sessions', { p_user: userId, p_keep: keep })
+      if (error) throw new Error(`service_end_other_sessions failed: ${error.code ?? 'unknown'}`)
+    },
+    async setEmail(userId, email) {
+      const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true })
+      if (!error) return 'ok'
+      if (error.code === 'email_exists' || error.code === 'user_already_exists') return 'email_taken'
+      throw new Error(`updateUserById failed: ${error.code ?? error.name}`)
+    },
+    async signIn(email, password) {
+      try {
+        const { data, error } = await anonClient().auth.signInWithPassword({ email, password })
+        return signInResult(error, data.session)
+      } catch {
+        return { status: 'unknown' }
+      }
+    },
+    async verifyRecovery(email, code) {
+      try {
+        const { data, error } = await anonClient().auth.verifyOtp({ email, token: code, type: 'recovery' })
+        return signInResult(error, data.session)
+      } catch {
+        return { status: 'unknown' }
+      }
+    },
+    async sendRecovery(email) {
+      // Answers the same for an address with no account; a send-rate limit is the only error and is not shown to anyone.
+      await anonClient().auth.resetPasswordForEmail(email, { redirectTo: config.ok ? `${config.config.appBaseUrl}/reset-password` : undefined })
+    },
     async userIdFromToken(token) {
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)

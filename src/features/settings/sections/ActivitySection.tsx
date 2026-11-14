@@ -27,6 +27,9 @@ const LABELS: Record<string, TranslationKey> = {
   account_closure_completed: 'settings.activity.event.closureCompleted',
   account_closure_restored: 'settings.activity.event.closureRestored',
   account_deleted: 'settings.activity.event.deleted',
+  account_alias_added: 'settings.activity.event.aliasAdded',
+  account_alias_removed: 'settings.activity.event.aliasRemoved',
+  account_primary_email_changed: 'settings.activity.event.primaryChanged',
   platform_security_policy_changed: 'settings.activity.event.policyChanged',
 }
 

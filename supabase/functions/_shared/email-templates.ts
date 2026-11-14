@@ -39,6 +39,8 @@ export interface TemplateData {
   /** Model request update (R-S4-15): what happened, and the option's name when the request was for an option. */
   modelEvent?: ModelRequestEmailEvent
   optionName?: string
+  /** Security code (ADR-0077): the code is for a new sign-in alias, so the wording does not assume a Sanctus account. */
+  aliasCode?: boolean
 }
 
 /** What the owner is told about a 3D model request (S4 section 9.2): delivered to a published or a draft product, or declined. */
@@ -59,6 +61,7 @@ export type SecurityNotice =
   | 'closure_restored'
   | 'password_changed'
   | 'password_reset'
+  | 'primary_email_changed'
 
 export interface RenderedEmail {
   subject: string
@@ -95,7 +98,12 @@ The Sanctus team has invited you to join the platform as ${role}.${can}`,
 
 // Account security emails (S1). The account pages are English only, so each has one wording for both languages.
 // The code email carries no link at all: a security code next to a button is what phishing looks like.
-const securityCode = (): Copy => ({
+const securityCode = (d: TemplateData = {}): Copy => d.aliasCode ? ({
+  // ADR-0077: goes to the address being added as a sign-in email, which cannot be assumed to belong to a Sanctus user.
+  subject: 'Your Sanctus code to add this sign-in email',
+  heading: 'Add this email to a Sanctus account',
+  body: 'Someone asked to add this email address as a sign-in email of a Sanctus account. Use this code to confirm that you can read this inbox. It expires in 10 minutes and works once. A sign-in email only signs in: Sanctus never sends its notices or codes here. If you did not expect this, you can ignore this email: nothing changes without the code.',
+}) : ({
   subject: 'Your Sanctus security code',
   heading: 'Your security code',
   body: 'Use this code to confirm the change you started in Sanctus. It expires in 10 minutes and works once. If you did not ask for it, you can ignore this email: nothing changes without the code.',
@@ -162,6 +170,13 @@ const NOTICE: Record<SecurityNotice, Omit<Copy, 'cta'>> = {
     heading: 'Your password was reset',
     body: 'The password of your Sanctus account was reset with a code sent to this address. Every device was signed out: sign in again with the new password.',
     note: 'If this was not you, reset your password again from the sign-in page ("Forgot password") and contact the Sanctus team.',
+  },
+  // ADR-0077. Sent to the old and the new main address alike.
+  primary_email_changed: {
+    subject: 'The main email of your Sanctus account changed',
+    heading: 'Your main email changed',
+    body: 'The main email address of your Sanctus account was changed from your account settings. Sanctus now sends every code and notice to the new main address, and you sign in with it. The old address still signs in as a sign-in email. Every other device was signed out.',
+    note: 'If this was not you, contact the Sanctus team at once.',
   },
 }
 const securityNotice = (d: TemplateData): Copy => ({ ...NOTICE[d.notice ?? '2fa_disabled'], cta: 'Open Sanctus' })
@@ -442,6 +457,12 @@ const appLink = (appBaseUrl: string | undefined) => (appBaseUrl && /^https:\/\/[
 export function securityCodeEmail(code: string): RenderedEmail {
   if (!/^\d{6}$/.test(code)) throw new Error('a security code is 6 digits')
   return renderEmail('security_code', 'en', { code })
+}
+
+/** The code emailed to an address being added as a sign-in alias (ADR-0077). No link. */
+export function aliasCodeEmail(code: string): RenderedEmail {
+  if (!/^\d{6}$/.test(code)) throw new Error('a security code is 6 digits')
+  return renderEmail('security_code', 'en', { code, aliasCode: true })
 }
 
 /** A plain notice about a change to the account, with at most a link to the app. */

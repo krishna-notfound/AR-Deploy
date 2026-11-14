@@ -33,6 +33,22 @@ export interface PasswordOutcome {
   sessionsEnded: boolean
 }
 
+/** An extra email the platform Owner can sign in with (ADR-0077). It never gets mail: only the primary does. */
+export interface SignInAlias {
+  email: string
+  /** When the code sent to it was entered (ISO). */
+  addedAt: string | null
+}
+
+/** The Owner's sign-in emails: the primary (the Auth email, which gets every email) and up to MAX_ALIASES aliases. */
+export interface SignInEmails {
+  primary: string
+  aliases: SignInAlias[]
+}
+
+/** At most this many aliases (database rule, ADR-0077). */
+export const MAX_ALIASES = 3
+
 export type ProfilePatch = Partial<Pick<Profile, 'displayName' | 'timezone' | 'dateFormat' | 'clock' | 'notifyNewApplications'>>
 
 export interface AccountService {
@@ -88,6 +104,22 @@ export interface AccountService {
   listClosureRequests(): Promise<Result<ClosureRequest[]>>
   completeClosure(targetUserId: ID, code: string): Promise<Result<{ notice: NoticeOutcome }>>
   restoreClosure(targetUserId: ID): Promise<Result<{ notice: NoticeOutcome }>>
+
+  // ---- ADR-0077: the platform Owner's sign-in aliases (the account-security function; demo: an in-memory harness).
+  /** Reason: not_allowed for anyone but the Owner. */
+  listSignInEmails(): Promise<Result<SignInEmails>>
+  /** Emails a one-time code to the new alias (not to the primary). Reasons: invalid_request | alias_limit | email_in_use | email_failed | email_blocked | aal2_required | rate_limited. */
+  sendAliasCode(email: string): Promise<Result<{ sentTo: string }>>
+  /** Adds the alias the code was sent to. Reasons: invalid_code | code_expired | too_many_attempts | not_found | alias_limit | aal2_required. */
+  addAlias(email: string, code: string): Promise<Result<void>>
+  /**
+   * Makes an alias the primary (the Auth email), after a fresh authenticator code (verified first, so the session
+   * carries a new authenticator time, as changePassword). Other sessions end; this one stays. Reasons: invalid_totp |
+   * totp_required | aal2_required | not_found | email_in_use.
+   */
+  makeAliasPrimary(email: string, totp: string): Promise<Result<{ othersSignedOut: boolean }>>
+  /** The primary cannot be removed (not_found). Reasons: aal2_required | not_found. */
+  removeAlias(email: string): Promise<Result<void>>
 }
 
 /**
@@ -111,6 +143,9 @@ export const ACCOUNT_ERRORS: Record<string, { code: ServiceErrorCode; message: s
   email_failed: { code: 'UNKNOWN', message: "We couldn't send the email. Try again." },
   email_blocked: { code: 'CONFIG', message: "Email can't be sent to this address yet. Contact the Sanctus team." },
   nothing_to_reset: { code: 'CONFLICT', message: "They don't have 2FA set up, so there is nothing to reset." },
+  // ADR-0077: owner sign-in aliases
+  alias_limit: { code: 'CONFLICT', message: 'You can have up to 3 extra sign-in emails. Remove one first.' },
+  email_in_use: { code: 'CONFLICT', message: 'This email is already used by an account or another sign-in email.' },
   unknown: { code: 'UNKNOWN', message: 'Something went wrong. Try again.' },
   // Supabase Auth and client-side checks
   current_password_mismatch: { code: 'VALIDATION', message: 'Your current password is incorrect.' },

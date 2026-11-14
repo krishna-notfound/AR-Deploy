@@ -72,6 +72,22 @@ Open **Settings** from the dashboard menu. Everything about you is in the "Your 
 
 The platform owner may require two-step sign-in for everyone. If so, you will be asked to set it up the next time you sign in.
 
+### Sign-in emails (platform Owner only)
+
+Under **Settings → My account → Sign-in emails** the platform Owner has one **primary** email and up to 3 extra sign-in emails (**aliases**). The primary gets every email from Sanctus, including password reset codes and closure alerts. An alias only lets you sign in: Sanctus never emails it, apart from the one-time code when you add it. If you type an alias on the sign-in page, or on "Forgot password", it works the same; the reset code goes to the primary.
+
+- **Add alias:** type the address; we send a 6-digit code to it; enter the code. It takes the device with the authenticator app if two-step sign-in is on.
+- **Make primary:** needs two-step sign-in and a fresh code from the authenticator app. The old primary stays as a sign-in email, every other device is signed out, and both addresses get a notice.
+- **Remove:** needs two-step sign-in. The primary cannot be removed.
+
+**Handing the Owner account to the client** (nobody creates a second Owner):
+
+1. The current Owner adds the client's email as an alias. The client reads out the code that arrives at their address.
+2. The Owner makes it primary.
+3. The client opens "Forgot password" on the sign-in page, uses their email, and sets their own password.
+4. The client sets up their own authenticator app. The previous Owner removes the old authenticator factor first (**Security & 2FA → turn off**; if the platform's security policy requires two-step sign-in for staff, it has to be switched off in **Settings → Security policy** for that moment, then back on).
+5. The client removes the developer's address, which is now an alias.
+
 ---
 
 ### Dark mode

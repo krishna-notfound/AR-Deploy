@@ -24,7 +24,7 @@ const CONFIG: EmailConfig = {
   apiKey: 're_test',
   from: 'Sanctus <onboarding@resend.dev>',
   appBaseUrl: 'https://app.sanctus.test',
-  testRecipients: ['owner@sanctus.test', 'staff@sanctus.test', 'team@sanctus.test', 'maria@studio.pt', 'inbox@sanctus.test'],
+  testRecipients: ['owner@sanctus.test', 'owner2@sanctus.test', 'staff@sanctus.test', 'team@sanctus.test', 'maria@studio.pt', 'client@example.test', 'dev@owner.test', 'inbox@sanctus.test'],
   adminNotificationEmail: 'inbox@sanctus.test',
 }
 
@@ -71,6 +71,19 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
     /** ADR-0069: businesses whose public AR copies were taken offline, and recovery codes given back after a failed recovery. */
     arCopiesRemoved: [] as string[],
     restoredRecoveryCodes: [] as string[],
+    /** ADR-0077: each account's Auth (primary) email, its aliases, the one unverified alias, and what the alias steps did. */
+    emails: Object.fromEntries(Object.entries(USERS).map(([id, u]) => [id, u.email])) as Record<string, string>,
+    aliases: {} as Record<string, string[]>,
+    pending: {} as Record<string, string | undefined>,
+    endedOthers: [] as { user: string; keep: string | null }[],
+    failEndOthers: false,
+    failSwap: false,
+    setEmailFailsFor: new Set<string>(),
+    signIns: [] as string[],
+    recoveryVerifies: [] as string[],
+    recoveries: [] as string[],
+    attemptCounts: {} as Record<string, number>,
+    attemptKeys: [] as string[],
   }
   const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
     const b = JSON.parse(String(init?.body)) as { to: string[]; subject: string; text: string; html: string }
@@ -162,13 +175,82 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
         delete s.closures[user]
         return { ok: true }
       }
+      case 'service_alias_list':
+        if (USERS[user]?.kind !== 'owner') return { error: 'not_allowed' }
+        return { ok: true, aliases: (s.aliases[user] ?? []).map((email, i) => ({ email, added_at: `2026-10-0${i + 1}T10:00:00Z` })) }
+      case 'service_alias_begin': {
+        if (USERS[user]?.kind !== 'owner') return { error: 'not_allowed' }
+        const email = String(a.p_email).trim().toLowerCase()
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'invalid_request' }
+        if ((s.aliases[user] ?? []).length >= 3) return { error: 'alias_limit' }
+        if (Object.values(s.emails).includes(email) || Object.values(s.aliases).some((l) => l.includes(email))) return { error: 'email_in_use' }
+        s.pending[user] = email
+        return { ok: true, email }
+      }
+      case 'service_alias_cancel':
+        if (s.pending[user] === a.p_email) s.pending[user] = undefined
+        return { ok: true }
+      case 'service_alias_verify': {
+        if (s.pending[user] !== a.p_email) return { error: 'not_found' }
+        s.aliases[user] = [...(s.aliases[user] ?? []), a.p_email as string]
+        s.pending[user] = undefined
+        return { ok: true, email: a.p_email }
+      }
+      case 'service_alias_remove': {
+        const list = s.aliases[user] ?? []
+        if (!list.includes(a.p_email as string)) return { error: 'not_found' }
+        s.aliases[user] = list.filter((e) => e !== a.p_email)
+        return { ok: true }
+      }
+      case 'service_alias_resolve': {
+        const found = Object.entries(s.aliases).find(([, l]) => l.includes(String(a.p_email).toLowerCase()))
+        return found ? { ok: true, user_id: found[0] } : { error: 'not_found' }
+      }
+      case 'service_alias_swap': {
+        if (s.failSwap) throw new Error('service_alias_swap failed: XX000')
+        const list = s.aliases[user] ?? []
+        if (!list.includes(a.p_new as string)) return { error: 'not_found' }
+        s.aliases[user] = [...list.filter((e) => e !== a.p_new), a.p_old as string]
+        s.order.push('alias_swap')
+        return { ok: true }
+      }
       default:
         throw new Error(`unexpected rpc ${fn}`)
     }
   }
+  const session = (email: string) => ({ access_token: `at-${email}`, refresh_token: `rt-${email}`, expires_in: 3600, token_type: 'bearer' })
   const d: AccountSecurityDeps = {
     appBaseUrl: CONFIG.appBaseUrl,
-    adminNotificationEmail: CONFIG.adminNotificationEmail,
+    attemptSalt: 'test-salt',
+    attempt: async (hashes, max) => {
+      const key = hashes[0]!
+      s.attemptKeys.push(key)
+      if ((s.attemptCounts[key] ?? 0) >= max) return false
+      s.attemptCounts[key] = (s.attemptCounts[key] ?? 0) + 1
+      return true
+    },
+    sessionFromToken: (t) => `session-of-${t}`,
+    endOtherSessions: async (user, keep) => {
+      if (s.failEndOthers) throw new Error('end failed')
+      s.endedOthers.push({ user, keep })
+      s.order.push('endOthers')
+    },
+    setEmail: async (user, email) => {
+      if (s.setEmailFailsFor.has(email)) throw new Error('updateUserById failed')
+      if (Object.entries(s.emails).some(([u, e]) => u !== user && e === email)) return 'email_taken'
+      s.emails[user] = email
+      s.order.push(`setEmail:${email}`)
+      return 'ok'
+    },
+    signIn: async (email, password) => {
+      s.signIns.push(email)
+      return s.passwords[email] === password && Object.values(s.emails).includes(email) ? { status: 'ok', session: session(email) } : { status: 'invalid' }
+    },
+    verifyRecovery: async (email, code) => {
+      s.recoveryVerifies.push(email)
+      return code === '12345678' && Object.values(s.emails).includes(email) ? { status: 'ok', session: session(email) } : { status: 'invalid' }
+    },
+    sendRecovery: async (email) => void s.recoveries.push(email),
     userIdFromToken: async (t) => (t.startsWith('tok:') ? t.split(':')[1]! : null),
     aalFromToken: (t) => (t.endsWith(':aal2') ? 'aal2' : 'aal1'),
     amrFromToken: (t) => s.amr[t] ?? [{ method: 'password', at: NOW.getTime() - 60 * 60_000 }],
@@ -204,7 +286,7 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
     },
     sweepBusinessStorage: async (b) => void s.order.push(`sweep:${b}`),
     removeArCopies: async (b) => void s.arCopiesRemoved.push(b),
-    userEmail: async (u) => USERS[u]?.email ?? null,
+    userEmail: async (u) => s.emails[u] ?? null,
     async callerRpc(token, fn) {
       s.callerCalls.push({ token, fn })
       if (fn !== 'cancel_account_closure') throw new Error(`unexpected caller rpc ${fn}`)
@@ -217,7 +299,7 @@ function deps(over: Partial<AccountSecurityDeps> = {}) {
       return { ok: true }
     },
     businessSummary: async (b) => s.businesses[b] ?? null,
-    ownerEmails: async () => Object.values(USERS).filter((u) => u.kind === 'owner').map((u) => u.email),
+    ownerEmails: async () => Object.entries(USERS).filter(([, u]) => u.kind === 'owner').map(([id]) => s.emails[id]!),
     log: async (l) => (s.logs.push(l), `log-${s.logs.length}`),
     send: (e) => sendAndLog({ config: CONFIG, fetch: fetchFn as unknown as typeof fetch, log: async (l) => (s.logs.push(l), `log-${s.logs.length}`) }, e),
     random: (n) => crypto.getRandomValues(new Uint8Array(n)),
@@ -441,8 +523,8 @@ describe('account-security', () => {
     s.sends.length = 0
     expect(await json(await call(d, tok(BIZ_OWNER), { action: 'request_closure', code: bizCode }))).toEqual({ ok: true, kind: 'business' })
     expect(s.closures[BIZ_OWNER]).toEqual({ businessId: BUSINESS_ID })
-    expect(s.sends.map((m) => m.to).sort()).toEqual(['inbox@sanctus.test', 'maria@studio.pt'])
-    expect(s.logs.filter((l) => l.kind === 'closure_request').map((l) => l.recipient)).toEqual(['inbox@sanctus.test'])
+    expect(s.sends.map((m) => m.to).sort()).toEqual(['maria@studio.pt', 'owner2@sanctus.test', 'owner@sanctus.test'])
+    expect(s.logs.filter((l) => l.kind === 'closure_request').map((l) => l.recipient).sort()).toEqual(['owner2@sanctus.test', 'owner@sanctus.test'])
     expect(s.events.at(-1)).toMatchObject({ user: BIZ_OWNER, event: 'account_closure_requested' })
     expect(s.deletedUsers).toEqual([])
 
@@ -879,8 +961,8 @@ describe('account-security: S1.5 Task 13 (R-W6-3, R-W7-6, R-W7-7, R-W7-9)', () =
     // Nothing is undone with the service role: the caller's own function does it, with their 2FA gate.
     expect(s.rpcCalls.map((c) => c.fn)).not.toContain('service_restore_closure')
     expect(s.closures[BIZ_OWNER]).toBeUndefined()
-    expect(s.sends).toHaveLength(1)
-    expect(s.sends[0]!.to).toBe('inbox@sanctus.test')
+    // ADR-0077: to each platform Owner's primary email, read from Auth at send time (no ADMIN_NOTIFICATION_EMAIL).
+    expect(s.sends.map((m) => m.to).sort()).toEqual(['owner2@sanctus.test', 'owner@sanctus.test'])
     expect(s.sends[0]!.subject).toBe('Closure request cancelled: Casa Maria')
     expect(s.sends[0]!.text).toContain('The owner of Casa Maria cancelled their account-closure request. The catalog is back to live.')
     expect(s.logs.at(-1)).toMatchObject({ kind: 'closure_request', status: 'accepted', businessId: BUSINESS_ID, triggeredBy: BIZ_OWNER })
@@ -888,7 +970,7 @@ describe('account-security: S1.5 Task 13 (R-W6-3, R-W7-6, R-W7-7, R-W7-9)', () =
     // Nothing to cancel: the SQL answer, and no email.
     const again = await call(d, tok(BIZ_OWNER), { action: 'cancel_closure' })
     expect(await json(again)).toEqual({ ok: false, error: 'not_found' })
-    expect(s.sends).toHaveLength(1)
+    expect(s.sends).toHaveLength(2)
     // The SQL's own refusals pass through.
     const gated = { ...d, callerRpc: async () => ({ error: 'aal2_required' }) }
     const g = await call(gated, tok(BIZ_OWNER), { action: 'cancel_closure' })
@@ -896,8 +978,8 @@ describe('account-security: S1.5 Task 13 (R-W6-3, R-W7-6, R-W7-7, R-W7-9)', () =
     expect(await json(g)).toEqual({ ok: false, error: 'aal2_required' })
   })
 
-  it('no inbox → a blocked closure_request row', async () => {
-    const { d, s } = deps({ adminNotificationEmail: '' })
+  it('no Owner address → a blocked closure_request row', async () => {
+    const { d, s } = deps({ ownerEmails: async () => [] })
     s.factors[BIZ_OWNER] = []
     const code = await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1')
     s.sends.length = 0
@@ -1189,5 +1271,371 @@ describe('account-security: password change and reset (ADR-0066)', () => {
     expect(amrFromJwt(jwt({ amr: [{ timestamp: 1 }, null, 5] }))).toEqual([])
     expect(amrFromJwt(jwt({ sub: 'x' }))).toEqual([])
     expect(amrFromJwt('not-a-jwt')).toEqual([])
+  })
+})
+
+describe('account-security: owner sign-in aliases (ADR-0077)', () => {
+  const at = (minutesAgo: number) => NOW.getTime() - minutesAgo * 60_000
+  const ALIAS = 'client@example.test'
+  /** The Owner's session after the authenticator step, with a code from 1 minute ago. */
+  const ownerTok = tok(OWNER, 'aal2')
+  const freshOwner = (s: { amr: Record<string, AmrEntry[]> }) => (s.amr[ownerTok] = [{ method: 'password', at: at(30) }, { method: 'totp', at: at(1) }])
+  const addAlias = async (d: AccountSecurityDeps, s: ReturnType<typeof deps>['s'], email = ALIAS, token = ownerTok) => {
+    expect((await call(d, token, { action: 'alias_send_code', email })).status).toBe(200)
+    const r = await call(d, token, { action: 'alias_add', email, code: lastCode(s) })
+    expect(await json(r)).toEqual({ ok: true })
+  }
+
+  it('alias_list: the Owner sees the primary and the aliases; nobody else may', async () => {
+    const { d, s } = deps()
+    s.aliases[OWNER] = ['a@example.test']
+    const r = await call(d, tok(OWNER), { action: 'alias_list' })
+    expect(await json(r)).toEqual({ ok: true, primary: 'owner@sanctus.test', aliases: [{ email: 'a@example.test', addedAt: '2026-10-01T10:00:00Z' }] })
+    for (const user of [STAFF, BIZ_OWNER]) expect(await json(await call(d, tok(user, 'aal2'), { action: 'alias_list' }))).toEqual({ ok: false, error: 'not_allowed' })
+    expect((await call(d, null, { action: 'alias_list' })).status).toBe(401)
+  })
+
+  describe('add', () => {
+    it('emails the code to the ALIAS (never the primary), as purpose add_alias, hashed; answers a masked address', async () => {
+      const { d, s } = deps()
+      const r = await call(d, ownerTok, { action: 'alias_send_code', email: '  Client@Example.TEST ' })
+      expect(await json(r)).toEqual({ ok: true, sentTo: 'c•••@example.test' })
+      expect(s.sends.map((m) => m.to)).toEqual([ALIAS])
+      const code = lastCode(s)
+      expect(s.codes[0]).toMatchObject({ user: OWNER, purpose: 'add_alias' })
+      expect(s.codes[0]!.hash).toBe(await sha256Hex(s.codes[0]!.salt + code))
+      expect(JSON.stringify(s.rpcCalls)).not.toContain(code)
+      expect(s.sends[0]!.text).toContain('expires in 10 minutes')
+      expect(s.logs.map((l) => [l.kind, l.status])).toEqual([['security_code', 'accepted']])
+      expect(s.pending[OWNER]).toBe(ALIAS)
+    })
+
+    it('is for the Owner only, and an account with 2FA needs aal2', async () => {
+      const { d, s } = deps()
+      for (const user of [STAFF, BIZ_OWNER]) expect(await json(await call(d, tok(user, 'aal2'), { action: 'alias_send_code', email: ALIAS }))).toEqual({ ok: false, error: 'not_allowed' })
+      expect(await json(await call(d, tok(OWNER, 'aal1'), { action: 'alias_send_code', email: ALIAS }))).toEqual({ ok: false, error: 'aal2_required' })
+      expect(s.sends).toHaveLength(0)
+      expect(s.pending[OWNER]).toBeUndefined()
+    })
+
+    it('refuses a bad address, an address already in use and a fourth alias, before any email', async () => {
+      const { d, s } = deps()
+      expect(await json(await call(d, ownerTok, { action: 'alias_send_code', email: 'nope' }))).toEqual({ ok: false, error: 'invalid_request' })
+      expect(await json(await call(d, ownerTok, { action: 'alias_send_code', email: 42 }))).toEqual({ ok: false, error: 'invalid_request' })
+      const used = await call(d, ownerTok, { action: 'alias_send_code', email: 'STAFF@sanctus.test' })
+      expect(used.status).toBe(409)
+      expect(await json(used)).toEqual({ ok: false, error: 'email_in_use' })
+      s.aliases[OWNER] = ['a@example.test', 'b@example.test', 'c@example.test']
+      const full = await call(d, ownerTok, { action: 'alias_send_code', email: ALIAS })
+      expect(full.status).toBe(409)
+      expect(await json(full)).toEqual({ ok: false, error: 'alias_limit' })
+      expect(s.sends).toHaveLength(0)
+      expect(s.codes).toHaveLength(0)
+    })
+
+    it('a failed email voids the code and drops the pending alias (blocked address: email_blocked)', async () => {
+      const { d, s } = deps()
+      s.failSend = true
+      expect(await json(await call(d, ownerTok, { action: 'alias_send_code', email: ALIAS }))).toEqual({ ok: false, error: 'email_failed' })
+      expect(s.codes.filter((c) => !c.consumed)).toHaveLength(0)
+      expect(s.pending[OWNER]).toBeUndefined()
+      s.failSend = false
+      expect(await json(await call(d, ownerTok, { action: 'alias_send_code', email: 'stranger@elsewhere.test' }))).toEqual({ ok: false, error: 'email_blocked' })
+      expect(s.pending[OWNER]).toBeUndefined()
+    })
+
+    it('alias_add: the right code stores the alias, audits it without the address, and works once', async () => {
+      const { d, s } = deps()
+      await addAlias(d, s)
+      expect(s.aliases[OWNER]).toEqual([ALIAS])
+      const ev = s.events.find((e) => e.event === 'account_alias_added')!
+      expect(ev).toMatchObject({ user: OWNER, ip: '203.0.113.7' })
+      expect(ev.metadata).toEqual({ alias_sha256: await sha256Hex(ALIAS) })
+      expect(JSON.stringify(s.events)).not.toContain(ALIAS)
+      // The code is spent.
+      const again = await call(d, ownerTok, { action: 'alias_add', email: ALIAS, code: lastCode(s) })
+      expect(await json(again)).toEqual({ ok: false, error: 'invalid_code' })
+    })
+
+    it('alias_add: a wrong code, and a code that was sent for another address, add nothing', async () => {
+      const { d, s } = deps()
+      await call(d, ownerTok, { action: 'alias_send_code', email: ALIAS })
+      expect(await json(await call(d, ownerTok, { action: 'alias_add', email: ALIAS, code: '000000' }))).toEqual({ ok: false, error: 'invalid_code' })
+      expect(await json(await call(d, ownerTok, { action: 'alias_add', email: ALIAS, code: 'abc' }))).toEqual({ ok: false, error: 'invalid_code' })
+      // The code belongs to the pending address: another address is not verified by it.
+      expect(await json(await call(d, ownerTok, { action: 'alias_add', email: 'other@example.test', code: lastCode(s) }))).toEqual({ ok: false, error: 'not_found' })
+      expect(s.aliases[OWNER]).toBeUndefined()
+      expect(s.events.some((e) => e.event === 'account_alias_added')).toBe(false)
+    })
+
+    it('alias_add: needs the Owner and, with 2FA, aal2', async () => {
+      const { d, s } = deps()
+      await call(d, ownerTok, { action: 'alias_send_code', email: ALIAS })
+      const code = lastCode(s)
+      expect(await json(await call(d, tok(OWNER, 'aal1'), { action: 'alias_add', email: ALIAS, code }))).toEqual({ ok: false, error: 'aal2_required' })
+      expect(await json(await call(d, tok(STAFF, 'aal2'), { action: 'alias_add', email: ALIAS, code }))).toEqual({ ok: false, error: 'not_allowed' })
+    })
+  })
+
+  describe('make primary', () => {
+    it('swaps the Auth email, makes the old primary an alias, ends the other sessions, tells both addresses and audits', async () => {
+      const { d, s } = deps()
+      freshOwner(s)
+      await addAlias(d, s)
+      s.sends.length = 0
+      s.logs.length = 0
+      const r = await call(d, ownerTok, { action: 'alias_make_primary', email: ALIAS })
+      expect(r.status).toBe(200)
+      expect(await json(r)).toEqual({ ok: true, primary: ALIAS, signedOutOthers: true })
+      expect(s.emails[OWNER]).toBe(ALIAS)
+      expect(s.aliases[OWNER]).toEqual(['owner@sanctus.test'])
+      expect(s.order.filter((o) => o === 'alias_swap' || o.startsWith('setEmail') || o === 'endOthers')).toEqual([`setEmail:${ALIAS}`, 'alias_swap', 'endOthers'])
+      // Every other session ends; this one stays.
+      expect(s.endedOthers).toEqual([{ user: OWNER, keep: `session-of-${ownerTok}` }])
+      expect(s.sends.map((m) => m.to).sort()).toEqual(['client@example.test', 'owner@sanctus.test'])
+      expect(s.sends.every((m) => m.subject === 'The main email of your Sanctus account changed')).toBe(true)
+      expect(s.logs.every((l) => l.kind === 'security_notice' && l.status === 'accepted')).toBe(true)
+      const ev = s.events.find((e) => e.event === 'account_primary_email_changed')!
+      expect(ev.metadata).toEqual({ from_sha256: await sha256Hex('owner@sanctus.test'), to_sha256: await sha256Hex(ALIAS) })
+    })
+
+    it('needs aal2 AND an authenticator code from the last 5 minutes; nothing changes otherwise', async () => {
+      const { d, s } = deps()
+      await addAlias(d, s)
+      const body = { action: 'alias_make_primary', email: ALIAS }
+      expect(await json(await call(d, tok(OWNER, 'aal1'), body))).toEqual({ ok: false, error: 'aal2_required' })
+      s.amr[ownerTok] = [{ method: 'password', at: at(30) }, { method: 'totp', at: at(6) }]
+      const stale = await call(d, ownerTok, body)
+      expect(stale.status).toBe(403)
+      expect(await json(stale)).toEqual({ ok: false, error: 'totp_required' })
+      s.amr[ownerTok] = [{ method: 'totp', at: null }]
+      expect(await json(await call(d, ownerTok, body))).toEqual({ ok: false, error: 'totp_required' })
+      expect(await json(await call(d, tok(STAFF, 'aal2'), body))).toEqual({ ok: false, error: 'not_allowed' })
+      expect(s.emails[OWNER]).toBe('owner@sanctus.test')
+      expect(s.endedOthers).toEqual([])
+    })
+
+    it('only a verified alias of this Owner can become primary; an address taken elsewhere is email_in_use', async () => {
+      const { d, s } = deps()
+      freshOwner(s)
+      await addAlias(d, s)
+      expect(await json(await call(d, ownerTok, { action: 'alias_make_primary', email: 'unknown@example.test' }))).toEqual({ ok: false, error: 'not_found' })
+      expect(await json(await call(d, ownerTok, { action: 'alias_make_primary', email: 'owner@sanctus.test' }))).toEqual({ ok: false, error: 'not_found' })
+      expect(await json(await call(d, ownerTok, { action: 'alias_make_primary', email: 5 }))).toEqual({ ok: false, error: 'invalid_request' })
+      // Another account took the address in the meantime (Auth refuses it).
+      s.emails[STAFF_2] = ALIAS
+      expect(await json(await call(d, ownerTok, { action: 'alias_make_primary', email: ALIAS }))).toEqual({ ok: false, error: 'email_in_use' })
+      expect(s.emails[OWNER]).toBe('owner@sanctus.test')
+      expect(s.aliases[OWNER]).toEqual([ALIAS])
+    })
+
+    it('puts the old Auth email back when the alias swap fails', async () => {
+      const { d, s } = deps()
+      freshOwner(s)
+      await addAlias(d, s)
+      s.failSwap = true
+      s.sends.length = 0
+      await expect(call(d, ownerTok, { action: 'alias_make_primary', email: ALIAS })).rejects.toThrow()
+      expect(s.order.filter((o) => o.startsWith('setEmail'))).toEqual([`setEmail:${ALIAS}`, 'setEmail:owner@sanctus.test'])
+      expect(s.emails[OWNER]).toBe('owner@sanctus.test')
+      expect(s.aliases[OWNER]).toEqual([ALIAS])
+      expect(s.sends).toHaveLength(0)
+      expect(s.endedOthers).toEqual([])
+      expect(s.events.some((e) => e.event === 'account_primary_email_changed')).toBe(false)
+    })
+
+    it('a failure to change the Auth email changes nothing', async () => {
+      const { d, s } = deps()
+      freshOwner(s)
+      await addAlias(d, s)
+      s.setEmailFailsFor.add(ALIAS)
+      await expect(call(d, ownerTok, { action: 'alias_make_primary', email: ALIAS })).rejects.toThrow()
+      expect(s.aliases[OWNER]).toEqual([ALIAS])
+      expect(s.rpcCalls.some((c) => c.fn === 'service_alias_swap')).toBe(false)
+    })
+
+    it('a failure to end the other sessions does not undo the swap, and the answer says so', async () => {
+      const { d, s } = deps()
+      freshOwner(s)
+      await addAlias(d, s)
+      s.failEndOthers = true
+      expect(await json(await call(d, ownerTok, { action: 'alias_make_primary', email: ALIAS }))).toEqual({ ok: true, primary: ALIAS, signedOutOthers: false })
+      expect(s.emails[OWNER]).toBe(ALIAS)
+      expect(s.events.some((e) => e.event === 'account_primary_email_changed')).toBe(true)
+    })
+
+    it('closure alerts follow the swap (the new primary is read at send time); nothing goes to ADMIN_NOTIFICATION_EMAIL', async () => {
+      const { d, s } = deps()
+      freshOwner(s)
+      await addAlias(d, s)
+      await call(d, ownerTok, { action: 'alias_make_primary', email: ALIAS })
+      s.factors[BIZ_OWNER] = []
+      const code = await codeFor(d, s, BIZ_OWNER, 'request_closure', 'aal1')
+      s.sends.length = 0
+      expect(await json(await call(d, tok(BIZ_OWNER), { action: 'request_closure', code }))).toEqual({ ok: true, kind: 'business' })
+      expect(s.sends.map((m) => m.to).sort()).toEqual(['client@example.test', 'maria@studio.pt', 'owner2@sanctus.test'])
+      expect(s.sends.map((m) => m.to)).not.toContain('inbox@sanctus.test')
+    })
+  })
+
+  describe('remove', () => {
+    it('needs aal2; removes the alias and audits it; the primary cannot be removed', async () => {
+      const { d, s } = deps()
+      await addAlias(d, s)
+      const body = { action: 'alias_remove', email: ALIAS }
+      expect(await json(await call(d, tok(OWNER, 'aal1'), body))).toEqual({ ok: false, error: 'aal2_required' })
+      expect(await json(await call(d, tok(STAFF, 'aal2'), body))).toEqual({ ok: false, error: 'not_allowed' })
+      expect(await json(await call(d, ownerTok, { action: 'alias_remove', email: 'owner@sanctus.test' }))).toEqual({ ok: false, error: 'not_found' })
+      expect(s.emails[OWNER]).toBe('owner@sanctus.test')
+      expect(await json(await call(d, ownerTok, body))).toEqual({ ok: true })
+      expect(s.aliases[OWNER]).toEqual([])
+      expect(s.events.find((e) => e.event === 'account_alias_removed')!.metadata).toEqual({ alias_sha256: await sha256Hex(ALIAS) })
+      expect(await json(await call(d, ownerTok, body))).toEqual({ ok: false, error: 'not_found' })
+    })
+  })
+
+  describe('sign-in with an alias (anonymous)', () => {
+    const signIn = (d: AccountSecurityDeps, email: unknown, password: unknown, ip = '203.0.113.7') =>
+      handleAccountSecurity(
+        new Request('https://fn.test/account-security', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-forwarded-for': ip, authorization: 'Bearer anon-key' },
+          body: JSON.stringify({ action: 'alias_sign_in', email, password }),
+        }),
+        d,
+      )
+    const NEUTRAL = { ok: false, error: 'invalid_credentials' }
+
+    it('returns the session tokens of the account when the alias and the password are right', async () => {
+      const { d, s } = deps()
+      s.aliases[OWNER] = [ALIAS]
+      const r = await signIn(d, 'Client@Example.test', 'old-password-123')
+      expect(r.status).toBe(200)
+      expect(await json(r)).toEqual({ ok: true, session: { access_token: 'at-owner@sanctus.test', refresh_token: 'rt-owner@sanctus.test', expires_in: 3600, token_type: 'bearer' } })
+      expect(s.signIns).toEqual(['owner@sanctus.test'])
+    })
+
+    it('gives the same neutral answer for a wrong password, an unknown address and a pending alias; the unknown one costs a sign-in too', async () => {
+      const { d, s } = deps()
+      s.aliases[OWNER] = [ALIAS]
+      s.pending[OWNER] = 'pending@example.test'
+      const wrong = await signIn(d, ALIAS, 'not-the-password')
+      expect(wrong.status).toBe(400)
+      const wrongBody = await json(wrong)
+      const unknown = await signIn(d, 'nobody@example.test', 'old-password-123')
+      const pending = await signIn(d, 'pending@example.test', 'old-password-123')
+      expect(wrongBody).toEqual(NEUTRAL)
+      expect(await json(unknown)).toEqual(wrongBody)
+      expect(await json(pending)).toEqual(wrongBody)
+      expect(unknown.status).toBe(wrong.status)
+      // The unknown address did the same amount of work (a sign-in on a probe address), so timing says nothing.
+      expect(s.signIns).toHaveLength(3)
+      expect(s.signIns.filter((e) => e === 'owner@sanctus.test')).toHaveLength(1)
+    })
+
+    it('never says what the primary is, in a success or a failure', async () => {
+      const { d, s } = deps()
+      s.aliases[OWNER] = [ALIAS]
+      const failure = JSON.stringify(await json(await signIn(d, ALIAS, 'wrong')))
+      expect(failure).not.toContain('owner@')
+      expect(failure).not.toContain(OWNER)
+    })
+
+    it('rejects malformed input with the neutral answer and does nothing', async () => {
+      const { d, s } = deps()
+      for (const [email, password] of [[1, 'x'], ['a@b.test', 2], ['not an email', 'x'], ['a@b.test', ''], ['a@b.test', 'x'.repeat(2000)]] as const)
+        expect(await json(await signIn(d, email, password))).toEqual(NEUTRAL)
+      expect(s.signIns).toHaveLength(0)
+    })
+
+    it('is rate limited per email and per IP (the limit does not depend on whether the alias exists)', async () => {
+      const { d, s } = deps()
+      s.aliases[OWNER] = [ALIAS]
+      const results: number[] = []
+      for (let i = 0; i < 8; i++) results.push((await signIn(d, ALIAS, 'wrong', `198.51.100.${i}`)).status)
+      expect(results).toEqual([400, 400, 400, 400, 400, 400, 429, 429])
+      const limited = await signIn(d, ALIAS, 'old-password-123', '198.51.100.99')
+      expect(await json(limited)).toEqual({ ok: false, error: 'rate_limited' })
+      const before = s.signIns.length
+      // Another email from the same IP: 20 per hour per IP.
+      let status = 0
+      for (let i = 0; i < 25; i++) status = (await signIn(d, `probe${i}@example.test`, 'x', '192.0.2.1')).status
+      expect(status).toBe(429)
+      expect(s.signIns.length).toBeLessThan(before + 25)
+      // The keys are salted hashes: neither the address nor the IP appear.
+      expect(s.attemptKeys.join('|')).not.toContain('192.0.2.1')
+      expect(s.attemptKeys.join('|')).not.toContain('probe')
+    })
+
+    it('answers an error from the sign-in itself: the Auth rate limit is rate_limited, anything else unknown', async () => {
+      const { d, s } = deps({ signIn: async () => ({ status: 'rate_limited' }) })
+      s.aliases[OWNER] = [ALIAS]
+      const r = await signIn(d, ALIAS, 'x')
+      expect(r.status).toBe(429)
+      expect(await json(r)).toEqual({ ok: false, error: 'rate_limited' })
+      const broken = deps({ signIn: async () => ({ status: 'unknown' }) })
+      broken.s.aliases[OWNER] = [ALIAS]
+      expect((await signIn(broken.d, ALIAS, 'x')).status).toBe(500)
+    })
+  })
+
+  describe('forgot password with an alias (anonymous)', () => {
+    const anon = (d: AccountSecurityDeps, body: Record<string, unknown>, ip = '203.0.113.7') =>
+      handleAccountSecurity(
+        new Request('https://fn.test/account-security', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ip, authorization: 'Bearer anon-key' }, body: JSON.stringify(body) }),
+        d,
+      )
+
+    it('sends the reset code to the PRIMARY and answers the same for an unknown address', async () => {
+      const { d, s } = deps()
+      s.aliases[OWNER] = [ALIAS]
+      const known = await anon(d, { action: 'alias_reset_request', email: ALIAS })
+      expect(known.status).toBe(200)
+      const knownBody = await json(known)
+      expect(knownBody).toEqual({ ok: true })
+      expect(s.recoveries).toEqual(['owner@sanctus.test'])
+      s.recoveries.length = 0
+      const unknown = await anon(d, { action: 'alias_reset_request', email: 'nobody@example.test' })
+      expect(await json(unknown)).toEqual(knownBody)
+      expect(unknown.status).toBe(known.status)
+      // No real address got a code; the probe address cost the same call.
+      expect(s.recoveries).toHaveLength(1)
+      expect(s.recoveries[0]).not.toBe('owner@sanctus.test')
+      expect(s.sends).toHaveLength(0)
+    })
+
+    it('stays neutral when rate limited or when the input is bad; a pending alias gets nothing', async () => {
+      const { d, s } = deps()
+      s.aliases[OWNER] = [ALIAS]
+      s.pending[OWNER] = 'pending@example.test'
+      for (let i = 0; i < 6; i++) expect(await json(await anon(d, { action: 'alias_reset_request', email: ALIAS }, `198.51.100.${i}`))).toEqual({ ok: true })
+      // 3 per hour per email: the rest sent nothing.
+      expect(s.recoveries.filter((e) => e === 'owner@sanctus.test')).toHaveLength(3)
+      expect(await json(await anon(d, { action: 'alias_reset_request', email: 'bad' }))).toEqual({ ok: true })
+      expect(await json(await anon(d, { action: 'alias_reset_request', email: 'pending@example.test' }))).toEqual({ ok: true })
+      expect(s.recoveries.filter((e) => e === 'owner@sanctus.test')).toHaveLength(3)
+    })
+
+    it('alias_reset_verify: the code sent to the primary signs in as the account; a wrong code is neutral', async () => {
+      const { d, s } = deps()
+      s.aliases[OWNER] = [ALIAS]
+      const ok = await anon(d, { action: 'alias_reset_verify', email: ALIAS, code: '12345678' })
+      expect(ok.status).toBe(200)
+      expect(await json(ok)).toEqual({ ok: true, session: { access_token: 'at-owner@sanctus.test', refresh_token: 'rt-owner@sanctus.test', expires_in: 3600, token_type: 'bearer' } })
+      expect(s.recoveryVerifies).toEqual(['owner@sanctus.test'])
+      const wrong = await anon(d, { action: 'alias_reset_verify', email: ALIAS, code: '00000000' })
+      expect(wrong.status).toBe(400)
+      expect(await json(wrong)).toEqual({ ok: false, error: 'invalid_code' })
+      const unknown = await anon(d, { action: 'alias_reset_verify', email: 'nobody@example.test', code: '12345678' })
+      expect(unknown.status).toBe(400)
+      expect(await json(unknown)).toEqual({ ok: false, error: 'invalid_code' })
+      expect(await json(await anon(d, { action: 'alias_reset_verify', email: ALIAS, code: 'abc' }))).toEqual({ ok: false, error: 'invalid_code' })
+    })
+  })
+
+  it('the anonymous actions do not open the signed-in ones: no token still answers not_signed_in', async () => {
+    const { d } = deps()
+    for (const action of ['alias_add', 'alias_remove', 'alias_make_primary', 'alias_send_code', 'alias_list', 'send_code'])
+      expect((await call(d, null, { action, email: ALIAS })).status).toBe(401)
   })
 })
