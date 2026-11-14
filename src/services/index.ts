@@ -113,9 +113,9 @@ export function siteAssetUrl(asset: SiteAsset): string {
 
 export { checkSiteAssetFile, siteAssetProblem } from './siteAsset'
 export { backend, isDemoMode } from './backend'
-export type { AccountService, AssuranceLevels, NoticeOutcome, PasswordChange, ProfilePatch } from './accountService'
+export type { AccountService, AssuranceLevels, NoticeOutcome, PasswordChange, PasswordOutcome, ProfilePatch } from './accountService'
 export { DEMO_RESET_CODE, type PasswordResetService } from './passwordResetService'
-export { ACCOUNT_ERRORS, AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, PASSWORD_MAX, PASSWORD_MIN } from './accountService'
+export { ACCOUNT_ERRORS, AVATAR_MAX_BYTES, DISPLAY_NAME_MAX, PASSWORD_MAX, PASSWORD_MIN, passwordTooLong } from './accountService'
 export type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, SettingsSection, TotpEnrollment } from '@/domain/types'
 export type { AuthError, AuthResult, AuthService, SignedInAccount } from './supabase/auth'
 export type { CatalogService, Result, ServiceError, BusinessInput, ProductInput, ProductQuery } from './catalogService'

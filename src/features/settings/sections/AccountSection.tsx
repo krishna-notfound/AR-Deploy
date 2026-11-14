@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { accountErrorText } from '../accountError'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { useFormat } from '@/lib/useFormat'
-import { PASSWORD_MAX, PASSWORD_MIN, type SecurityState, account, auth, isDemoMode } from '@/services'
+import { PASSWORD_MAX, PASSWORD_MIN, type SecurityState, account, auth, isDemoMode, passwordTooLong } from '@/services'
 import { EMAIL_PATTERN } from '@/services/accountService'
 import { type QueryResult, useServiceQuery } from '@/services/hooks'
 import { ActionCodeDialog } from '../ActionCodeDialog'
@@ -217,10 +217,12 @@ function PendingEmail({ currentEmail, pendingEmail, onChanged }: { currentEmail:
 /* ---------- Password ---------- */
 
 /** Length is the only rule (spec 8: a strength hint, no composition rules). */
-function lengthHint(n: number, t: ReturnType<typeof useI18n>['t'], tn: ReturnType<typeof useI18n>['tn']): string {
+function lengthHint(password: string, t: ReturnType<typeof useI18n>['t'], tn: ReturnType<typeof useI18n>['tn']): string {
+  const n = password.length
+  const tooLong = passwordTooLong(password)
   if (n === 0) return t('settings.account.pw.range', { min: PASSWORD_MIN, max: PASSWORD_MAX })
   if (n < PASSWORD_MIN) return tn('settings.account.pw.short', PASSWORD_MIN - n)
-  if (n > PASSWORD_MAX) return t('settings.account.pw.long', { max: PASSWORD_MAX })
+  if (tooLong) return t('settings.account.pw.long', { max: PASSWORD_MAX })
   if (n < 16) return t('settings.account.pw.ok')
   return t('settings.account.pw.strong')
 }
@@ -252,7 +254,7 @@ function PasswordCard({ security }: { security: Security }) {
     const found: typeof errors = {}
     if (!current) found.current = t('settings.account.enterCurrent')
     if (next.length < PASSWORD_MIN) found.next = t('settings.account.pw.min', { n: PASSWORD_MIN })
-    else if (next.length > PASSWORD_MAX) found.next = t('settings.account.pw.max', { n: PASSWORD_MAX })
+    else if (passwordTooLong(next)) found.next = t('settings.account.pw.max', { n: PASSWORD_MAX })
     else if (confirmNext !== next) found.confirm = t('settings.account.pw.mismatch')
     else if (current && next === current) found.next = t('settings.err.same_password')
     setErrors(found)
@@ -275,7 +277,8 @@ function PasswordCard({ security }: { security: Security }) {
       setCurrent('')
       setNext('')
       setConfirmNext('')
-      toast.success(t('settings.account.pw.changed'), t('settings.account.pw.changedBody'))
+      // The server could not end every session: say so, instead of claiming every device was signed out.
+      toast.success(t('settings.account.pw.changed'), t(r.data?.sessionsEnded === false ? 'settings.account.pw.changedPartialBody' : 'settings.account.pw.changedBody'))
       // Every session has ended on the server; this ends the one in this browser, then on to sign-in.
       await logout()
       navigate(SIGN_IN_PATH, { replace: true })
@@ -307,7 +310,7 @@ function PasswordCard({ security }: { security: Security }) {
         <FormField label={t('settings.account.currentPassword')} error={errors.current}>
           <Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
         </FormField>
-        <FormField label={t('settings.account.pw.new')} error={errors.next} hint={lengthHint(next.length, t, tn)}>
+        <FormField label={t('settings.account.pw.new')} error={errors.next} hint={lengthHint(next, t, tn)}>
           <Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
         </FormField>
         <FormField label={t('settings.account.pw.confirm')} error={errors.confirm}>

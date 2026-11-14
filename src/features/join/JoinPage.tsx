@@ -13,7 +13,7 @@ import type { InviteInspection } from '@/domain/types'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { useFormat } from '@/lib/useFormat'
-import { PASSWORD_MIN, auth, service } from '@/services'
+import { PASSWORD_MAX, PASSWORD_MIN, auth, passwordTooLong, service } from '@/services'
 import { type ServiceError, TEAM_ERRORS } from '@/services/catalogService'
 import { AuthHeading, AuthLayout } from '../auth/AuthLayout'
 import { authErrorText } from '../auth/authErrors'
@@ -95,9 +95,6 @@ function Intro({ invite }: { invite: InviteInspection }) {
   )
 }
 
-/** Supabase Auth (bcrypt) hashes only the first 72 bytes of a password, so a longer one is refused here (R-W1-7). */
-const STAFF_PASSWORD_MAX = 72
-
 function CreateAccount({ token, invite }: { token: string; invite: InviteInspection }) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -107,12 +104,33 @@ function CreateAccount({ token, invite }: { token: string; invite: InviteInspect
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  // The address of the account once it exists. The invitation is used up then, so a failed sign-in is retried on its own.
+  const [created, setCreated] = useState<string | null>(null)
+
+  /** Signs in with the new account. A failure says why (network, rate limit...) and keeps the retry on the sign-in alone. */
+  const signInCreated = async (email: string): Promise<boolean> => {
+    if (!auth) return false
+    const s = await auth.signInWithPassword(email, password)
+    if (!s.ok) {
+      setPending(false)
+      setError(`${t('join.signInFailed')} ${authErrorText(t, s.error)}`)
+      return false
+    }
+    return true
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (created) {
+      setError(null)
+      setPending(true)
+      if (!(await signInCreated(created))) return
+      return navigate('/admin', { replace: true })
+    }
     if (!fullName.trim()) return setError(t('join.nameRequired'))
     if (password.length < PASSWORD_MIN) return setError(t('reset.passwordShort', { n: PASSWORD_MIN }))
-    if (password.length > STAFF_PASSWORD_MAX) return setError(t('join.passwordLong', { n: STAFF_PASSWORD_MAX }))
+    // Supabase Auth (bcrypt) hashes only the first 72 bytes of a password, so a longer one is refused here (R-W1-7, ADR-0069).
+    if (passwordTooLong(password)) return setError(t('join.passwordLong', { n: PASSWORD_MAX }))
     if (password !== confirm) return setError(t('join.passwordMismatch'))
     setError(null)
     setPending(true)
@@ -122,11 +140,8 @@ function CreateAccount({ token, invite }: { token: string; invite: InviteInspect
       return setError(errorText(r.error, t))
     }
     if (auth) {
-      const s = await auth.signInWithPassword(r.data.email, password)
-      if (!s.ok) {
-        setPending(false)
-        return setError(t('join.signInFailed'))
-      }
+      setCreated(r.data.email)
+      if (!(await signInCreated(r.data.email))) return
     } else {
       // Demo mode: no real accounts; switch the demo session to the accepted role.
       signInAs({ role: 'super_admin', platformRole: invite.role ?? 'team' })
@@ -147,17 +162,24 @@ function CreateAccount({ token, invite }: { token: string; invite: InviteInspect
           <Input type="email" value={invite.email ?? ''} readOnly />
         </FormField>
         <FormField label={t('join.fullName')}>
-          <Input autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <Input autoComplete="name" value={fullName} readOnly={!!created} onChange={(e) => setFullName(e.target.value)} />
         </FormField>
         <FormField label={t('auth.login.password')} hint={t('join.passwordHint', { n: PASSWORD_MIN })}>
-          <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input type="password" autoComplete="new-password" value={password} readOnly={!!created} onChange={(e) => setPassword(e.target.value)} />
         </FormField>
         <FormField label={t('join.confirmPassword')}>
-          <Input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          <Input type="password" autoComplete="new-password" value={confirm} readOnly={!!created} onChange={(e) => setConfirm(e.target.value)} />
         </FormField>
         <Button type="submit" variant="primary" className="w-full" loading={pending} icon={<ArrowRight className="size-4" aria-hidden />}>
-          {t('join.create')}
+          {created ? t('auth.login.title') : t('join.create')}
         </Button>
+        {created && (
+          <p className="text-sm">
+            <Link to="/login" className="font-medium text-accent-ink hover:underline">
+              {t('invite.signIn')}
+            </Link>
+          </p>
+        )}
       </form>
     </div>
   )

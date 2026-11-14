@@ -4,7 +4,7 @@
 // driven by tests: same validation, same reasons, aal2 needed for the platform policy.
 import type { BusinessStatus, ClosureRequest, PlatformSettings, Profile, SecurityEvent, SecurityState } from '@/domain/types'
 import { newId } from '@/lib/id'
-import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, type NoticeOutcome, PASSWORD_MAX, PASSWORD_MIN, accountFail } from '../accountService'
+import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, type NoticeOutcome, PASSWORD_MIN, accountFail, passwordTooLong } from '../accountService'
 import { type Result, ok } from '../catalogService'
 import { mockCatalogService } from './mockCatalogService'
 import { clearDemoMember2fa, demoMemberHas2fa, demoPlatformRole, recordDemoSelfClosure } from './mockTeam'
@@ -258,22 +258,22 @@ export const mockAccountService: AccountService = {
         if (totp === undefined) return accountFail('totp_required')
         if (totp.replace(/\s/g, '') !== DEMO_CODE) return accountFail('invalid_totp')
       }
-      if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) return accountFail('weak_password')
+      if (next.length < PASSWORD_MIN || passwordTooLong(next)) return accountFail('weak_password')
       if (current === next) return accountFail('same_password')
       const c = checkCode(code)
       if (!c.ok) return c
       record('account_password_changed')
-      return ok(undefined)
+      return ok({ sessionsEnded: true })
     }),
 
   resetPassword: (next) =>
     run(() => {
-      if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) return accountFail('weak_password')
+      if (next.length < PASSWORD_MIN || passwordTooLong(next)) return accountFail('weak_password')
       if (!recovering) return accountFail('reset_expired')
       if (state.factor?.verified && state.aal !== 'aal2') return accountFail('aal2_required')
       record('account_password_reset')
       recovering = false
-      return ok(undefined)
+      return ok({ sessionsEnded: true })
     }),
 
   requestEmailChange: (_password, newEmail) =>

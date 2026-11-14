@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type LogoutResult, AccountProvider, SupabaseAccountProvider, useAccount } from '@/auth/AccountProvider'
 import AcceptInvitePage from '@/features/auth/AcceptInvitePage'
 import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
-import { type AuthService, type SignedInAccount, service } from '@/services'
+import { type AuthService, type Profile, type SignedInAccount, account, service } from '@/services'
+import { accountFail } from '@/services/accountService'
 import { fail, ok } from '@/services/catalogService'
 
 // AcceptInvitePage and AccountProvider read `auth` from '@/services'; tests swap in a fake Supabase auth.
@@ -30,7 +31,6 @@ function fakeAuth(overrides: Partial<AuthService> = {}) {
     requestPasswordReset: vi.fn(async () => ok(undefined)),
     verifyEmailCode: vi.fn(async () => ok(undefined)),
     updatePassword: vi.fn(async () => ok(undefined)),
-    updateDisplayName: vi.fn(async () => ok(undefined)),
     completeOwnerOnboarding: vi.fn(async () => ok({ businessId: 'biz_casa' })),
     onAuthStateChange: vi.fn((l: () => void) => {
       listeners.add(l)
@@ -136,6 +136,26 @@ describe('SupabaseAccountProvider', () => {
     )
     expect(await screen.findByText('user:none')).toBeInTheDocument()
     expect(screen.getByText('email:rui@test')).toBeInTheDocument()
+  })
+
+  it("a business owner who was removed while a tab is open is signed out of the dashboard on the next focus, without an auth event (AUTH8)", async () => {
+    const getCurrentUser = vi.fn<AuthService['getCurrentUser']>().mockResolvedValue(ok(owner))
+    const { auth } = fakeAuth({ getCurrentUser })
+    render(
+      <SupabaseAccountProvider auth={auth}>
+        <Probe />
+      </SupabaseAccountProvider>,
+    )
+    expect(await screen.findByText('user:Rui', undefined, { timeout: 15_000 })).toBeInTheDocument()
+    // The Owner removes the membership; the tab is later shown again (more than 30 s after the last load).
+    getCurrentUser.mockResolvedValue(ok({ email: 'rui@test', user: null }))
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 60_000)
+    await waitFor(() => {
+      act(() => void window.dispatchEvent(new Event('focus')))
+      expect(screen.getByText('user:none')).toBeInTheDocument()
+    }, { timeout: 15_000 })
+    clock.mockRestore()
   })
 
   it('awaits sign-out and falls back to this device when the server cannot be reached (COR-17)', async () => {
@@ -278,6 +298,83 @@ describe('AcceptInvitePage (COR-15)', () => {
     expect(await screen.findByLabelText(/^Code from the email/)).toBeInTheDocument()
     expect(screen.queryByLabelText(/^Password/)).not.toBeInTheDocument()
     expect(auth.updatePassword).not.toHaveBeenCalled()
+  })
+
+  async function fillPasswordForm(user: ReturnType<typeof userEvent.setup>, opts: { name?: string; password?: string } = {}) {
+    const password = opts.password ?? 'a-long-password'
+    if (opts.name) await user.type(await screen.findByLabelText(/^Your name/), opts.name)
+    await user.type(await screen.findByLabelText(/^Password/), password)
+    await user.type(screen.getByLabelText(/^Repeat the password/), password)
+    await user.click(screen.getByRole('checkbox', { name: /^I agree to the Terms/ }))
+  }
+
+  it('saves the name to the profile (what Settings and the setup checklist read), not only to the sign-in metadata (ACT-F1)', async () => {
+    const update = vi.spyOn(account, 'updateProfile').mockResolvedValue(ok({} as Profile))
+    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(pendingOwner)) })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    await fillPasswordForm(user, { name: 'Rui Costa' })
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByText('owner dashboard')).toBeInTheDocument()
+    expect(update).toHaveBeenCalledWith({ displayName: 'Rui Costa' })
+    expect(auth.completeOwnerOnboarding).toHaveBeenCalled()
+  })
+
+  it('does not touch the profile when no name was typed', async () => {
+    const update = vi.spyOn(account, 'updateProfile')
+    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(pendingOwner)) })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    await fillPasswordForm(user)
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByText('owner dashboard')).toBeInTheDocument()
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('a failed name save is shown, not skipped, and a retry does not ask for the password again (EF-15)', async () => {
+    const update = vi.spyOn(account, 'updateProfile').mockResolvedValueOnce(accountFail('unknown')).mockResolvedValue(ok({} as Profile))
+    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(pendingOwner)) })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    await fillPasswordForm(user, { name: 'Rui Costa' })
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't save your name")
+    expect(auth.completeOwnerOnboarding).not.toHaveBeenCalled()
+    expect(auth.updatePassword).toHaveBeenCalledTimes(1)
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByText('owner dashboard')).toBeInTheDocument()
+    expect(update).toHaveBeenCalledTimes(2)
+    expect(auth.updatePassword).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a password longer than 72 bytes, which bcrypt would cut short (AUTH3)', async () => {
+    const { auth } = fakeAuth({ getCurrentUser: vi.fn(async () => ok<SignedInAccount | null>(pendingOwner)) })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    await fillPasswordForm(user, { password: 'x'.repeat(73) })
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Use at most 72 characters.')
+    expect(auth.updatePassword).not.toHaveBeenCalled()
+  })
+
+  it('a signed-in account with no invitation waiting is told so, with a sign-out, instead of a code form that spins (AUTH2)', async () => {
+    const noRole: SignedInAccount = { email: 'maria@test', user: null }
+    const getCurrentUser = vi.fn<AuthService['getCurrentUser']>().mockResolvedValue(ok(noRole))
+    const { auth, emit } = fakeAuth({ getCurrentUser })
+    fake.auth = auth
+    const user = userEvent.setup()
+    renderPage()
+    expect(await screen.findByText(/You're signed in as maria@test, but this account has no invitation waiting/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Code from the email/)).not.toBeInTheDocument()
+    getCurrentUser.mockResolvedValue(ok(null))
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(auth.signOut).toHaveBeenCalled()
+    await emit()
+    expect(await screen.findByLabelText(/^Code from the email/)).toBeInTheDocument()
   })
 
   it('the signed-in notice is translated (R-W1-9)', async () => {

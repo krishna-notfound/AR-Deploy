@@ -113,8 +113,8 @@ describe('ResetPasswordPage', () => {
 
     await choosePassword(user, 'too-short')
     expect(await screen.findByText('Use at least 12 characters.')).toBeInTheDocument()
-    await choosePassword(user, 'x'.repeat(129))
-    expect(await screen.findByText('Use at most 128 characters.')).toBeInTheDocument()
+    await choosePassword(user, 'x'.repeat(73))
+    expect(await screen.findByText('Use at most 72 characters.')).toBeInTheDocument()
     await choosePassword(user, NEW, `${NEW}!`)
     expect(await screen.findByText('The passwords do not match.')).toBeInTheDocument()
     expect(fake.account.resetPassword).not.toHaveBeenCalled()

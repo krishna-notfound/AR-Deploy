@@ -26,6 +26,7 @@ export default function LoginPage() {
   useDocumentTitle(t('auth.login.title'))
   // Signing in leads to a dashboard: fetch its text while the person types, so the dashboard opens without waiting for it.
   useEffect(() => preloadDashboardDictionaries(lang), [lang])
+  const [signedIn, setSignedIn] = useState(false)
   const [params] = useSearchParams()
   const next = params.get('next')
   const { user, signedInEmail, accessDeactivated, accountFailure } = useAccount()
@@ -38,12 +39,21 @@ export default function LoginPage() {
   const [pending, setPending] = useState(false)
   // 'verifying'/'recovering': the step stays up while the account reloads after the code; then on to the app.
   const [stage, setStage] = useState<'idle' | 'verifying' | 'recovering' | 'recovered'>('idle')
+  // The password sign-in went through and the account is loading (AUTH9): pressing the button again would sign in a second
+  // time. Cleared by the sign-out buttons below, and after 15 s in case no account ever arrives.
+  useEffect(() => {
+    if (!signedIn) return
+    const timer = setTimeout(() => setSignedIn(false), 15_000)
+    return () => clearTimeout(timer)
+  }, [signedIn])
 
   const authService = auth
   if (!authService) return <Navigate to={`/demo${next ? `?next=${encodeURIComponent(next)}` : ''}`} replace />
   // Signed in: once the security state has answered, either the code step or the app. A failed check goes on to the
   // app: the database still refuses data, and the 2FA gate there retries the check in the background.
   const checking = !!user && !security.loaded
+  // Busy from pressing the button until the account has loaded (or failed to): there is no gap in which it can be pressed again.
+  const busy = pending || checking || (signedIn && !accountFailure && !signedInEmail)
   const codeStep = stage === 'recovering' || (stage === 'verifying' && !user) || (!!user && !checking && stage === 'idle' && needsCodeStep(security))
   if (user && !checking && !codeStep) {
     const scope = user.role === 'super_admin' ? 'admin' : 'business'
@@ -74,6 +84,7 @@ export default function LoginPage() {
           }}
           onSignOut={() => {
             setStage('idle')
+            setSignedIn(false)
             void leave({ signOut: true })
           }}
         />
@@ -91,7 +102,8 @@ export default function LoginPage() {
     if (!res.ok) clearPasswordSignIn()
     // A password sign-in replaces any half-finished reset in this tab (ADR-0066).
     else clearRecoveryPending()
-    // On success the auth listener reloads the account and the redirect above takes over.
+    // On success the auth listener reloads the account and the redirect above takes over; until then the button stays busy.
+    setSignedIn(res.ok)
     setError(res.ok ? null : authErrorText(t, res.error))
   }
 
@@ -112,7 +124,14 @@ export default function LoginPage() {
               {t('auth.login.invitationOnly')}
             </p>
           )}
-          <Button onClick={() => void leave({ signOut: true })}>{t('auth.signOut')}</Button>
+          <Button
+            onClick={() => {
+              setSignedIn(false)
+              void leave({ signOut: true })
+            }}
+          >
+            {t('auth.signOut')}
+          </Button>
         </div>
       ) : (
         <form onSubmit={submit} className={cn('mt-8 space-y-5', authFieldsClass)} noValidate>
@@ -134,9 +153,9 @@ export default function LoginPage() {
           >
             <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </FormField>
-          <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending || checking} disabled={!email || !password}>
+          <Button type="submit" variant="primary" size="lg" className="w-full" loading={busy} disabled={!email || !password}>
             {t('auth.login.title')}
-            {!pending && !checking && <ArrowRight className="size-4" aria-hidden />}
+            {!busy && <ArrowRight className="size-4" aria-hidden />}
           </Button>
           <div className="mt-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-canvas px-5 py-4 text-sm">
             <span className="text-ink-muted">{t('auth.login.newTo')}</span>

@@ -356,6 +356,8 @@ export const ptCore: Partial<Record<TranslationKey, string>> = {
   'invite.steps': 'Passos do convite',
   'invite.signedInAs': 'Tem sessão iniciada como {email}. Se este convite for para outra pessoa, termine a sessão primeiro.',
   'invite.signOut': 'Terminar sessão',
+  'invite.notInvited': 'Tem sessão iniciada como {email}, mas esta conta não tem nenhum convite pendente. Termine a sessão e introduza o endereço de email e o código do seu convite.',
+  'invite.nameFailed': 'Não foi possível guardar o seu nome. Tente novamente ou deixe-o em branco e adicione-o mais tarde nas Definições.',
   'invite.step.code': 'Validar código',
   'invite.step.password': 'Definir palavra-passe',
 
@@ -390,6 +392,7 @@ export const ptCore: Partial<Record<TranslationKey, string>> = {
   'reset.save': 'Guardar nova palavra-passe',
   'reset.updated': 'Palavra-passe atualizada',
   'reset.updatedBody': 'A sessão foi terminada em todos os dispositivos. Entre com a nova palavra-passe.',
+  'reset.updatedPartialBody': 'Não foi possível terminar a sessão nos outros dispositivos. Depois de entrar, abra Segurança e 2FA e escolha terminar a sessão nos outros dispositivos.',
   'reset.requestTitle': 'Repor a sua palavra-passe',
   'reset.requestIntro': 'Vamos enviar-lhe por email um código para escolher uma nova palavra-passe.',
   'reset.email': 'Email',

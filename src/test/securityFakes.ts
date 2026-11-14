@@ -38,7 +38,6 @@ export function fakeAuth(initial: SignedInAccount | null = null, signsInAs: Sign
     requestPasswordReset: vi.fn(async () => ok(undefined)),
     verifyEmailCode: vi.fn(async () => ok(undefined)),
     updatePassword: vi.fn(async () => ok(undefined)),
-    updateDisplayName: vi.fn(async () => ok(undefined)),
     completeOwnerOnboarding: vi.fn(async () => ok({ businessId: 'biz_casa' })),
     onAuthStateChange: vi.fn((l: () => void) => {
       listeners.add(l)

@@ -358,6 +358,8 @@ export const enCore = {
   'invite.steps': 'Invitation steps',
   'invite.signedInAs': "You're signed in as {email}. If this invitation is for someone else, sign out first.",
   'invite.signOut': 'Sign out',
+  'invite.notInvited': "You're signed in as {email}, but this account has no invitation waiting. Sign out, then enter the email address and code from your invitation.",
+  'invite.nameFailed': "We couldn't save your name. Try again, or leave it empty and add it later in Settings.",
   'invite.step.code': 'Verify code',
   'invite.step.password': 'Set password',
 
@@ -392,6 +394,7 @@ export const enCore = {
   'reset.save': 'Save new password',
   'reset.updated': 'Password updated',
   'reset.updatedBody': 'Every device was signed out. Sign in with your new password.',
+  'reset.updatedPartialBody': 'Your other devices could not be signed out. After you sign in, open Security & 2FA and choose to sign out of your other devices.',
   'reset.requestTitle': 'Reset your password',
   'reset.requestIntro': 'We will email you a code to choose a new password.',
   'reset.email': 'Email',

@@ -8,7 +8,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActionPurpose, ClosureRequest, DateFormatPref, PlatformSettings, Profile, SecurityEvent, SecurityState, TotpEnrollment } from '@/domain/types'
 import { settingsPath } from '@/lib/urls'
-import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, type NoticeOutcome, PASSWORD_MAX, PASSWORD_MIN, type ProfilePatch, accountFail } from '../accountService'
+import { type AccountService, AVATAR_MAX_BYTES, AVATAR_TYPES, DISPLAY_NAME_MAX, EMAIL_PATTERN, type NoticeOutcome, PASSWORD_MIN, type ProfilePatch, accountFail, passwordTooLong } from '../accountService'
 import { type Result, ok } from '../catalogService'
 
 const FUNCTION = 'account-security'
@@ -66,6 +66,8 @@ const isRateLimit = (e: AuthErr) => e?.status === 429 || e?.code === 'over_reque
 const mfaFail = <T = never>(e: AuthErr): Result<T> => {
   if (e?.code && MFA_OFF.has(e.code)) return accountFail('mfa_not_enabled')
   if (isRateLimit(e)) return accountFail('rate_limited')
+  // Starting a setup in another tab removes this one's unconfirmed factor (startTotpEnrollment): say so, not "wrong code".
+  if (e?.code === 'mfa_factor_not_found') return accountFail('totp_setup_replaced')
   // A wrong, expired, reused or rejected code: the Auth server answers 4xx (mfa_verification_failed,
   // mfa_verification_rejected, mfa_challenge_expired, ...).
   if (e && (e.status ?? 0) >= 400 && (e.status ?? 0) < 500) return accountFail('invalid_code')
@@ -215,7 +217,33 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
    * browser (local scope: the server-side session is already gone, so there is nothing else to revoke).
    */
   const endLocalSession = () => sb.auth.signOut({ scope: 'local' }).then(() => undefined, () => undefined)
+  /**
+   * The function says `signedOut: false` when it changed the password but could not end every session (ADR-0069). This
+   * browser's session still works then, so it asks once more for every session to end; if that fails too, the answer
+   * says the other devices may still be signed in. This browser is signed out either way. An answer without the field
+   * (an older function) means they ended.
+   */
+  async function finishSessions(answer: FnAnswer): Promise<boolean> {
+    let ended = answer.signedOut !== false
+    if (!ended) ended = await sb.auth.signOut({ scope: 'global' }).then((r) => !r.error, () => false)
+    await endLocalSession()
+    return ended
+  }
   const voidOf = (r: Result<unknown>): Result<void> => (r.ok ? ok(undefined) : r)
+  /**
+   * Asks sync-ar-models to copy each published product of the caller's business again (the same call the catalogue
+   * makes when a business is set active). Fire and forget: a failure leaves phone AR on the private file until the next save.
+   */
+  async function remakeArCopies(): Promise<void> {
+    try {
+      const { data } = await sb.from('products').select('id').eq('status', 'published').limit(500)
+      for (const row of (data ?? []) as { id: string }[]) {
+        await sb.functions.invoke('sync-ar-models', { body: { productId: row.id } }).catch(() => undefined)
+      }
+    } catch {
+      // Not worth telling the person who just cancelled: the next save of a product copies it again.
+    }
+  }
   /** The notice outcome of an Owner action (R-W7-6). An answer without one is never read as "emailed". */
   const withNotice = (r: Result<FnAnswer>): Result<{ notice: NoticeOutcome }> => {
     if (!r.ok) return r
@@ -385,7 +413,7 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     // ADR-0066: never updateUser({ password }) from here; the account-security function checks the emailed code, the
     // 2FA step and the current password, sets the password and ends every session (this one too).
     async changePassword({ current, next, code, totp }) {
-      if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) return accountFail('weak_password')
+      if (next.length < PASSWORD_MIN || passwordTooLong(next)) return accountFail('weak_password')
       if (totp !== undefined) {
         const factors = await listTotp()
         if (!factors.ok) return factors
@@ -397,16 +425,14 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
       }
       const r = await invoke('change_password', { current_password: current, new_password: next, code })
       if (!r.ok) return r
-      await endLocalSession()
-      return ok(undefined)
+      return ok({ sessionsEnded: await finishSessions(r.data) })
     },
 
     async resetPassword(next) {
-      if (next.length < PASSWORD_MIN || next.length > PASSWORD_MAX) return accountFail('weak_password')
+      if (next.length < PASSWORD_MIN || passwordTooLong(next)) return accountFail('weak_password')
       const r = await invoke('reset_password', { new_password: next })
       if (!r.ok) return r
-      await endLocalSession()
-      return ok(undefined)
+      return ok({ sessionsEnded: await finishSessions(r.data) })
     },
 
     async requestEmailChange(currentPassword, newEmail) {
@@ -513,7 +539,10 @@ export function createSupabaseAccount(sb: SupabaseClient, deps: { verifyCurrentP
     },
 
     async cancelClosure() {
-      return voidOf(await invoke('cancel_closure'))
+      const r = voidOf(await invoke('cancel_closure'))
+      // Requesting the closure took the business's public AR copies offline (ADR-0069); it is live again, so make them again.
+      if (r.ok) void remakeArCopies()
+      return r
     },
 
     async getPlatformSettings() {

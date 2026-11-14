@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import type { TranslationKey } from '@/i18n/dictionaries/en'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { RESET_PASSWORD_PATH, settingsPath } from '@/lib/urls'
-import { DEMO_RESET_CODE, PASSWORD_MAX, PASSWORD_MIN, type ServiceError, account, isDemoMode, passwordReset } from '@/services'
+import { DEMO_RESET_CODE, PASSWORD_MAX, PASSWORD_MIN, type ServiceError, account, isDemoMode, passwordReset, passwordTooLong } from '@/services'
 import { cn } from '@/lib/cn'
 import { AuthHeading, AuthLayout, StepIndicator, authFieldsClass } from './AuthLayout'
 import { authErrorText, normalizeCode } from './authErrors'
@@ -179,7 +179,7 @@ export default function ResetPasswordPage() {
   const setNewPassword = async (e: FormEvent) => {
     e.preventDefault()
     if (password.length < PASSWORD_MIN) return setError(t('reset.passwordShort', { n: PASSWORD_MIN }))
-    if (password.length > PASSWORD_MAX) return setError(t('reset.passwordLong', { n: PASSWORD_MAX }))
+    if (passwordTooLong(password)) return setError(t('reset.passwordLong', { n: PASSWORD_MAX }))
     if (password !== confirm) return setError(t('reset.passwordMismatch'))
     setPending(true)
     // The function sets it and ends every session of the account, this one too (ADR-0066).
@@ -187,7 +187,7 @@ export default function ResetPasswordPage() {
     if (!res.ok) return resetFailed(res.error)
     clearRecoveryPending()
     setPending(false)
-    toast.success(t('reset.updated'), t('reset.updatedBody'))
+    toast.success(t('reset.updated'), t(res.data?.sessionsEnded === false ? 'reset.updatedPartialBody' : 'reset.updatedBody'))
     navigate(SIGN_IN_PATH, { replace: true })
   }
 
