@@ -5,7 +5,7 @@
 -- table policy changes.
 --
 --   A. Bucket size limits equal the largest file the app accepts (UX-3). The browser checks stay; the bucket now agrees.
---        business-logos  40 MB -> 5 MB   (a logo is 2 MB; a banner's untouched original is a picture, IMAGE_RULES 5 MB)
+--        business-logos  unchanged at 40 MB (ADR-0065, owner 2026-11-11)
 --        product-media   50 MB -> 40 MB  (the largest file is a 40 MB USDZ; a GLB is 30 MB; a picture 5 MB)
 --        ar-models       50 MB -> 40 MB  (copies of the product-media models)
 --      Unchanged because a legitimate file reaches the limit: site-content 40 MB (.usdz), avatars 512 KB,
@@ -37,7 +37,7 @@
 -- ---------------------------------------------------------------------------------------------------------------------
 -- A. Bucket limits (only ever lowered)
 -- ---------------------------------------------------------------------------------------------------------------------
-update storage.buckets set file_size_limit = 5242880 where id = 'business-logos' and (file_size_limit is null or file_size_limit > 5242880);
+-- business-logos stays at 40 MB (owner decision 2026-11-11, ADR-0065: catalogue banner originals); not lowered here.
 update storage.buckets set file_size_limit = 41943040 where id in ('product-media', 'ar-models') and (file_size_limit is null or file_size_limit > 41943040);
 
 -- ---------------------------------------------------------------------------------------------------------------------

@@ -68,7 +68,7 @@ describe('the migration', () => {
 
 describe('bucket size limits (UX-3)', () => {
   it('match the largest legitimate file of each bucket', async () => {
-    expect(await limit('business-logos')).toBe(String(5 * 1024 * 1024)) // a banner original: IMAGE_RULES 5 MB
+    expect(await limit('business-logos')).toBe(String(40 * 1024 * 1024)) // kept at 40 MB: banner originals (ADR-0065, owner 2026-11-11)
     expect(await limit('product-media')).toBe(String(40 * 1024 * 1024)) // the 40 MB USDZ
     expect(await limit('ar-models')).toBe(String(40 * 1024 * 1024))
     expect(await limit('site-content')).toBe(String(40 * 1024 * 1024)) // a .usdz of the Website Editor stays possible
@@ -78,10 +78,10 @@ describe('bucket size limits (UX-3)', () => {
   })
 
   it('only ever lowers a limit', async () => {
-    await db.exec(`update storage.buckets set file_size_limit = 1048576 where id = 'business-logos'`)
+    await db.exec(`update storage.buckets set file_size_limit = 1048576 where id = 'product-media'`)
     for (const stmt of readFileSync(join(MIGRATIONS, MIGRATION), 'utf8').match(/^update storage\.buckets .*;$/gm) ?? []) await db.exec(stmt)
-    expect(await limit('business-logos')).toBe('1048576')
-    await db.exec(`update storage.buckets set file_size_limit = 5242880 where id = 'business-logos'`)
+    expect(await limit('product-media')).toBe('1048576')
+    await db.exec(`update storage.buckets set file_size_limit = 41943040 where id = 'product-media'`)
   })
 })
 

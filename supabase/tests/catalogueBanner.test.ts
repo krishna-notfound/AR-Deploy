@@ -76,8 +76,8 @@ describe('the migration', () => {
     )
     const logos = r.rows.find((x) => x.id === 'business-logos')!
     const site = r.rows.find((x) => x.id === 'site-content')!
-    // 40 MB when this migration ran (ADR-0065); the storage hardening (ADR-0071) later lowered it to the 5 MB the app accepts.
-    expect(Number(logos.file_size_limit)).toBe(5242880)
+    // 40 MB (ADR-0065); the storage hardening (ADR-0071) keeps it.
+    expect(Number(logos.file_size_limit)).toBe(41943040)
     expect(Number(site.file_size_limit)).toBe(41943040)
     expect(logos.public).toBe(true)
     expect(logos.allowed_mime_types).toEqual(['image/png', 'image/jpeg', 'image/webp'])
@@ -342,7 +342,7 @@ describe('rollback', () => {
       const bad = doc((c) => (c.chrome = { catalogBanner: { path: 'landing/a.glb' } }))
 
       expect(await columns(rolled)).toBe(3)
-      expect(await limit(rolled)).toBe('5242880') // 40 MB from this migration, lowered to 5 MB by the storage hardening (ADR-0071)
+      expect(await limit(rolled)).toBe('41943040') // 40 MB from this migration; the storage hardening (ADR-0071) keeps it
       expect(await gateOf(rolled, bad)).toBe('chrome.catalogBanner|invalid_value')
       expect(await defs(rolled)).not.toEqual(await defs(before))
 
