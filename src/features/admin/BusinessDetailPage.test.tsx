@@ -485,6 +485,35 @@ describe('BusinessDetailPage: history gating (R-W7-8)', () => {
   })
 })
 
+describe('the products tab follows products.edit (QA #29)', () => {
+  function renderAsTeam(permissions: Permission[]) {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))
+    vi.spyOn(service, 'getMyAccess').mockResolvedValue(ok({ role: 'team', permissions, status: 'active' }))
+    renderPage('products')
+  }
+
+  async function firstProductName() {
+    const res = await service.getProductsByBusiness('biz_nord')
+    if (!res.ok) throw new Error('no products')
+    return res.data[0]!.name.en
+  }
+
+  it('without products.edit there is no Add product and the names are plain text (the editor route would refuse)', async () => {
+    const name = await firstProductName()
+    renderAsTeam(['businesses.view', 'products.view'])
+    await screen.findAllByText(name)
+    await waitFor(() => expect(screen.queryByRole('link', { name })).toBeNull())
+    expect(screen.queryByRole('link', { name: 'Add product' })).toBeNull()
+  })
+
+  it('with products.edit the Add product button and the name links are there', async () => {
+    const name = await firstProductName()
+    renderAsTeam(['businesses.view', 'products.view', 'products.edit'])
+    expect((await screen.findAllByRole('link', { name })).length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: 'Add product' })).toHaveAttribute('href', '/admin/products/new?business=biz_nord')
+  })
+})
+
 describe('S2 Task 2: the details tab follows businesses.edit (R-W3-5)', () => {
   function renderAsTeam(permissions: Permission[]) {
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin', platformRole: 'team' }))

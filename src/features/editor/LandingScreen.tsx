@@ -119,7 +119,7 @@ export default function LandingScreen() {
         <LandingTextsBlock />
       </Block>
 
-      <p className="text-ui-small text-ink-muted">{t('editor.landing.previewHint')}</p>
+      <p className="max-w-[72ch] text-ui-small text-ink-muted">{t('editor.landing.previewHint')}</p>
     </div>
   )
 }

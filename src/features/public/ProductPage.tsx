@@ -81,11 +81,7 @@ function BusinessProductPage({ tenantSlug }: { tenantSlug?: string }) {
             icon={PackageX}
             title={t('product.notFoundTitle')}
             body={t('product.notFoundBody')}
-            action={
-              <ButtonLink to={catalogHref} variant="brand">
-                {t('product.viewCatalog')}
-              </ButtonLink>
-            }
+            action={<ProductNotFoundAction businessSlug={businessSlug} catalogHref={catalogHref} tenant={!!tenantSlug} />}
           />
         ) : (
           <ErrorState message={t('common.errorTitle')} onRetry={res.refetch} retryLabel={t('common.retry')} className="py-24" />
@@ -95,6 +91,34 @@ function BusinessProductPage({ tenantSlug }: { tenantSlug?: string }) {
   }
 
   return <ProductView key={res.data.product.id} business={res.data.business} product={res.data.product} catalogHref={catalogHref} isPreview={canPreview && needsPreview(res.data.product, res.data.business)} />
+}
+
+/**
+ * The way out of "Product not available". When the business itself is unknown, its catalogue would be another "not
+ * found", so the link goes to the home page instead (QA #20). On a business subdomain the catalogue is the site's own.
+ */
+function ProductNotFoundAction({ businessSlug, catalogHref, tenant }: { businessSlug: string; catalogHref: string; tenant: boolean }) {
+  const { t } = useI18n()
+  if (tenant)
+    return (
+      <ButtonLink to={catalogHref} variant="brand">
+        {t('product.viewCatalog')}
+      </ButtonLink>
+    )
+  return <PlatformNotFoundAction businessSlug={businessSlug} catalogHref={catalogHref} />
+}
+
+function PlatformNotFoundAction({ businessSlug, catalogHref }: { businessSlug: string; catalogHref: string }) {
+  const { t } = useI18n()
+  const business = useServiceQuery(() => service.getBusinessBySlug(businessSlug), [businessSlug])
+  // Offered once we know where it leads.
+  if (business.status === 'loading') return null
+  const unknown = business.status === 'error' && business.error.code === 'NOT_FOUND'
+  return (
+    <ButtonLink to={unknown ? '/' : catalogHref} variant="brand">
+      {t(unknown ? 'catalog.goHome' : 'product.viewCatalog')}
+    </ButtonLink>
+  )
 }
 
 function ProductView({ business, product, catalogHref, isPreview }: { business: Business; product: Product; catalogHref: string; isPreview: boolean }) {

@@ -106,7 +106,7 @@ export default function CategoriesPage() {
                           <span className="font-normal text-ink-muted [overflow-wrap:anywhere]">/ {c.labelPt}</span>
                           {!c.active && <Badge>{t('admin.lists.categories.hidden')}</Badge>}
                         </p>
-                        <p className="text-ui-small text-ink-muted">{isOther ? t('admin.lists.categories.otherNote') : t('admin.lists.categories.key', { slug: c.slug })}</p>
+                        <p className="max-w-[72ch] text-ui-small text-ink-muted">{isOther ? t('admin.lists.categories.otherNote') : t('admin.lists.categories.key', { slug: c.slug })}</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-1">
                         {!isOther && (

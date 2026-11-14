@@ -17,6 +17,8 @@ import { useToast } from '@/components/ui/ToastProvider'
 import type { Business, BusinessCatalog, BusinessStatus, ClosureRequest, OwnerState } from '@/domain/types'
 import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
+import { usePreferences } from '@/lib/preferences'
+import { matchesSearch } from '@/lib/searchText'
 import { useFormat } from '@/lib/useFormat'
 import { businessAdminPath, catalogLocalPath } from '@/lib/urls'
 import { account, isDemoMode, service } from '@/services'
@@ -65,7 +67,9 @@ export default function BusinessesListPage() {
   }
 
   const catalogs = useServiceQuery(() => service.getCatalogs(), [])
-  const analytics = useServiceQuery(() => service.getAnalytics(), [])
+  // The same 30 local days as the Overview and Analytics pages (the person's saved time zone).
+  const timeZone = usePreferences()?.timezone
+  const analytics = useServiceQuery(() => service.getAnalytics({ timeZone }), [timeZone])
   // Owner state of every row (R-W2-5). A failure leaves the list usable: a notice above it and no owner filter.
   const ownerStates = useServiceQuery(() => service.getOwnerStates(), [])
   const ownerOf = useMemo(() => new Map((ownerStates.data ?? []).map((s) => [s.businessId, s])), [ownerStates.data])
@@ -94,12 +98,12 @@ export default function BusinessesListPage() {
 
   const rows = useMemo<Row[]>(() => {
     const perf = new Map((analytics.data?.byBusiness ?? []).map((b) => [b.businessId, b]))
-    const term = q.trim().toLowerCase()
     return (catalogs.data ?? [])
       .filter((c) => !closureOnly || closing.has(c.business.id))
       .filter((c) => !status || c.business.status === status)
       .filter((c) => !ownerFilter || !ownerStates.data || ownerOf.get(c.business.id)?.state === ownerFilter)
-      .filter((c) => !term || c.business.name.toLowerCase().includes(term) || c.business.slug.includes(term))
+      // Ignores case and accents ("Moveis" finds "Web Móveis").
+      .filter((c) => matchesSearch([c.business.name, c.business.slug], q))
       .map((c) => ({ catalog: c, views: perf.get(c.business.id)?.views ?? 0, ar: perf.get(c.business.id)?.arActivations ?? 0 }))
   }, [catalogs.data, analytics.data, q, status, ownerFilter, ownerStates.data, ownerOf, closureOnly, closing])
 
@@ -177,7 +181,7 @@ export default function BusinessesListPage() {
         }
       />
       <Card>
-        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-end sm:px-6">
+        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:flex-wrap sm:items-end sm:px-6">
           <FormField label={t('admin.businesses.list.search')}>
             <SearchInput value={q} onChange={(v) => setParam('q', v)} label={t('admin.businesses.list.search')} placeholder={t('admin.businesses.list.searchPlaceholder')} />
           </FormField>

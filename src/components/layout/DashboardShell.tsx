@@ -6,6 +6,7 @@ import { useAccount } from '@/auth/AccountProvider'
 import { useLeaveAccount } from '@/auth/RequireRole'
 import { SecurityNoticeSlot } from '@/auth/securityNotice'
 import { cn } from '@/lib/cn'
+import { useBodyScrollLock } from '@/lib/scrollLock'
 import { useFormat } from '@/lib/useFormat'
 import { catalogLocalPath, settingsPath } from '@/lib/urls'
 import { settingsReturnState } from '@/lib/settingsReturn'
@@ -373,6 +374,8 @@ function MobileDrawer({ nav, variant, onClose }: { nav: NavItem[]; variant: Vari
   const { t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
   useFocusTrap(ref, true, onClose)
+  // The drawer is modal: the page behind it stays put until it closes.
+  useBodyScrollLock(true)
   return (
     <div className="fixed inset-0 z-40 lg:hidden">
       <div className="absolute inset-0 animate-fade-in bg-obsidian/50" onClick={onClose} aria-hidden />

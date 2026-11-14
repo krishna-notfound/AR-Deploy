@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { Business, ProductAnalytics } from '@/domain/types'
+import { usePreferences } from '@/lib/preferences'
 import { service } from '@/services'
 import { useServiceQuery } from '@/services/hooks'
 
@@ -11,9 +12,17 @@ export function useBusinesses() {
   return { query: q, list: sorted, map }
 }
 
-/** Per-product analytics for tables (scoped when businessId is given). */
+/**
+ * Per-product analytics for tables (scoped when businessId is given). The 30 days are the person's own local days
+ * (their saved time zone), the same window as the Overview and Analytics pages: another zone puts the window's edges
+ * on other days, and the same product showed different view counts on different pages (QA #3).
+ */
 export function useProductStats(businessId?: string) {
-  const q = useServiceQuery(() => (businessId ? service.getBusinessAnalytics(businessId) : service.getAnalytics()), [businessId])
+  const timeZone = usePreferences()?.timezone
+  const q = useServiceQuery(
+    () => (businessId ? service.getBusinessAnalytics(businessId, { timeZone }) : service.getAnalytics({ timeZone })),
+    [businessId, timeZone],
+  )
   const map = useMemo(() => new Map<string, ProductAnalytics>((q.data?.byProduct ?? []).map((p) => [p.productId, p])), [q.data])
   return { query: q, map }
 }

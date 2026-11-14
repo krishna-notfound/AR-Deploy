@@ -87,6 +87,22 @@ describe('draft preview (COR-09)', () => {
   })
 })
 
+describe('the way out of "Product not available" (QA #20)', () => {
+  it('goes to the home page when the business is unknown (its catalogue would be another "not found")', async () => {
+    openApp('/products/no-such-store/anything')
+    await screen.findByRole('heading', { name: 'Product not available' })
+    const link = await screen.findByRole('link', { name: 'Go to Sanctus' })
+    expect(link).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('link', { name: 'Browse the catalog' })).toBeNull()
+  })
+
+  it("still goes to the business's catalogue when only the product is unknown", async () => {
+    openApp('/products/nordhaus/no-such-product')
+    await screen.findByRole('heading', { name: 'Product not available' })
+    expect(await screen.findByRole('link', { name: 'Browse the catalog' })).toHaveAttribute('href', '/catalog/nordhaus')
+  })
+})
+
 describe('preview banner by cause (R-W4-1, PUB-01)', () => {
   const BUSINESS_BANNER = 'Preview. Customers cannot see this catalog until it is activated.'
   const PRODUCT_BANNER = 'Draft preview. Customers cannot see this page until it is published.'

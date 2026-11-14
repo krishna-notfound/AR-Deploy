@@ -199,6 +199,15 @@ describe('Card and dialogs in the dashboard', () => {
     expect(screen.getByText('Shown to customers.')).toHaveClass('text-ui-small')
   })
 
+  it('Card header description keeps a readable line length on very wide screens (QA #43)', () => {
+    render(
+      <Card>
+        <CardHeader title="Details" description="Shown to customers." />
+      </Card>,
+    )
+    expect(screen.getByText('Shown to customers.')).toHaveClass('max-w-[72ch]')
+  })
+
   it('Card keeps its 20px padding outside the dashboard', () => {
     render(
       <Card>

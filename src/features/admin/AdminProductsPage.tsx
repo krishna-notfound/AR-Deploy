@@ -74,7 +74,7 @@ export default function AdminProductsPage() {
                   action={<Button onClick={() => update(CLEARED_PRODUCT_FILTERS)}>{t('admin.products.clearFilters')}</Button>}
                 />
               ) : (
-                <EmptyState icon={Package} title={t('admin.products.emptyTitle')} body={t('admin.products.emptyBody')} action={<Button variant="primary" onClick={addProduct}>{t('admin.products.add')}</Button>} />
+                <EmptyState icon={Package} title={t('admin.products.emptyTitle')} body={t('admin.products.emptyBody')} action={can('products.edit') && <Button variant="primary" onClick={addProduct}>{t('admin.products.add')}</Button>} />
               )
             }
           />

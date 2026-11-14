@@ -183,9 +183,12 @@ export default function BusinessDetailPage() {
         <Card>
           <div className="flex items-center justify-between gap-3 border-b border-line p-4">
             <p className="text-ui-body text-ink-muted">{t('admin.overview.products')}</p>
-            <ButtonLink to={`/admin/products/new?business=${b.id}`} size="sm" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
-              {t('admin.products.add')}
-            </ButtonLink>
+            {/* Adding a product needs products.edit, like the route behind it (QA #29). */}
+            {can('products.edit') && (
+              <ButtonLink to={`/admin/products/new?business=${b.id}`} size="sm" variant="primary" icon={<PackagePlus className="size-4" aria-hidden />}>
+                {t('admin.products.add')}
+              </ButtonLink>
+            )}
           </div>
           {products.status === 'error' && !products.data ? (
             <ErrorState message={`${t('admin.businesses.detail.productsFailed')} ${errorText(products.error, t)}`} onRetry={products.refetch} />
@@ -203,9 +206,11 @@ export default function BusinessDetailPage() {
                   title={t('admin.products.emptyTitle')}
                   body={t('admin.businesses.detail.productsEmptyBody')}
                   action={
-                    <ButtonLink to={`/admin/products/new?business=${b.id}`} variant="primary">
-                      {t('admin.products.add')}
-                    </ButtonLink>
+                    can('products.edit') && (
+                      <ButtonLink to={`/admin/products/new?business=${b.id}`} variant="primary">
+                        {t('admin.products.add')}
+                      </ButtonLink>
+                    )
                   }
                 />
               }

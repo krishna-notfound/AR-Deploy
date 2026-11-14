@@ -13,7 +13,7 @@ export function CardHeader({ title, description, actions, className }: { title: 
     <div className={cn('flex flex-wrap items-start justify-between gap-3', dash ? 'px-6 pt-6 pb-4' : 'px-5 pt-4 pb-3', className)}>
       <div className="min-w-0">
         <h2 className={cn('font-semibold text-ink', dash ? 'text-ui-card' : 'text-[15px]')}>{title}</h2>
-        {description && <p className={cn('text-ink-muted', dash ? 'mt-1 text-ui-small' : 'mt-0.5 text-[13px]')}>{description}</p>}
+        {description && <p className={cn('max-w-[72ch] text-ink-muted', dash ? 'mt-1 text-ui-small' : 'mt-0.5 text-[13px]')}>{description}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>

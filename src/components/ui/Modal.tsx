@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useInDashboard } from '@/components/layout/dashboardContext'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
+import { useBodyScrollLock } from '@/lib/scrollLock'
 import { IconButton } from './Button'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -88,14 +89,7 @@ export function Modal({
   const descId = useId()
   useFocusTrap(ref, open, dismissible ? onClose : undefined)
 
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [open])
+  useBodyScrollLock(open)
 
   if (!open) return null
   return createPortal(

@@ -91,6 +91,7 @@ export const ptBusiness: Partial<Record<TranslationKey, string>> = {
   'business.overview.stats.published': 'Publicados',
   'business.overview.stats.drafts': 'Rascunhos',
   'business.overview.stats.draftsHint': 'Ainda não publicados',
+  'business.overview.stats.viewsDeleted': 'Últimos 30 dias. Inclui produtos eliminados: {n}',
   'business.overview.stats.views': 'Visualizações de páginas de produto',
   'business.overview.stats.arAttempts': 'Tentativas de abrir a RA',
   'business.overview.stats.arRate': 'Últimos 30 dias · {rate}',
