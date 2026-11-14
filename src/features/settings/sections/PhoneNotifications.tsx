@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { Switch } from '@/components/ui/Form'
+import { Switch, SwitchButton } from '@/components/ui/Form'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, InlineNotice } from '@/components/ui/States'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -129,24 +129,56 @@ function PhoneCard({ onEnabled }: { onEnabled: () => void }) {
   )
 }
 
+type SwitchKey = 'newApplication' | 'newModelRequest' | 'companyUpdates' | 'emailNewApplication' | 'emailNewModelRequest' | 'emailModelRequestUpdates' | 'emailBusinessNotices' | 'pushEnabled'
+
+/** One kind of update: the bell (In-app) and, where the platform sends an email for it, an Email switch (ADR-0078). */
+interface EventRow {
+  id: string
+  label: string
+  body: string
+  inApp?: 'newApplication' | 'newModelRequest' | 'companyUpdates'
+  email?: 'emailNewApplication' | 'emailNewModelRequest' | 'emailModelRequestUpdates' | 'emailBusinessNotices'
+}
+
+/** A labelled switch inside a row; its name reads "<row title> <In-app | Email>". */
+function ChannelSwitch({ rowId, label, checked, disabled, onChange }: { rowId: string; label: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void }) {
+  const id = useId()
+  return (
+    <div className="flex items-center gap-2">
+      <span id={id} className="text-ui-small text-ink-muted">
+        {label}
+      </span>
+      <SwitchButton checked={checked} disabled={disabled} onChange={onChange} aria-labelledby={`${rowId} ${id}`} />
+    </div>
+  )
+}
+
 function EventsCard({ prefs }: { prefs: Prefs }) {
   const { t } = useI18n()
   const toast = useToast()
   const scope = useSettingsScope()
   const can = useCan()
   const [pending, setPending] = useState<keyof NotificationPrefs | null>(null)
+  const idBase = useId()
 
-  const rows: { key: 'newApplication' | 'newModelRequest' | 'companyUpdates'; label: string; body: string }[] = [
+  // Staff see the types their permissions give them; business owners see theirs (ADR-0078). An Email switch exists only
+  // where an email is sent: each type below has one.
+  const rows: EventRow[] = [
     ...(scope === 'admin' && can('applications.view')
-      ? [{ key: 'newApplication' as const, label: t('settings.notifications.eventApplications'), body: t('settings.notifications.eventApplicationsBody') }]
+      ? [{ id: 'applications', label: t('settings.notifications.eventApplications'), body: t('settings.notifications.eventApplicationsBody'), inApp: 'newApplication', email: 'emailNewApplication' } as const]
       : []),
     ...(scope === 'admin' && can('models.manage')
-      ? [{ key: 'newModelRequest' as const, label: t('settings.notifications.eventModelRequests'), body: t('settings.notifications.eventModelRequestsBody') }]
+      ? [{ id: 'models', label: t('settings.notifications.eventModelRequests'), body: t('settings.notifications.eventModelRequestsBody'), inApp: 'newModelRequest', email: 'emailNewModelRequest' } as const]
       : []),
-    ...(scope === 'business' ? [{ key: 'companyUpdates' as const, label: t('settings.notifications.eventCompany'), body: t('settings.notifications.eventCompanyBody') }] : []),
+    ...(scope === 'business'
+      ? [
+          { id: 'modelUpdates', label: t('settings.notifications.eventModelUpdates'), body: t('settings.notifications.eventModelUpdatesBody'), inApp: 'companyUpdates', email: 'emailModelRequestUpdates' } as const,
+          { id: 'notices', label: t('settings.notifications.eventBusinessNotices'), body: t('settings.notifications.eventBusinessNoticesBody'), inApp: 'companyUpdates', email: 'emailBusinessNotices' } as const,
+        ]
+      : []),
   ]
 
-  const change = async (key: 'newApplication' | 'newModelRequest' | 'companyUpdates' | 'pushEnabled', next: boolean) => {
+  const change = async (key: SwitchKey, next: boolean) => {
     setPending(key)
     const ok = await prefs.save({ [key]: next })
     setPending(null)
@@ -155,6 +187,7 @@ function EventsCard({ prefs }: { prefs: Prefs }) {
   }
 
   const ready = prefs.state.status === 'ready' ? prefs.state.prefs : null
+  const shown = (key: SwitchKey) => (ready ? (pending === key ? !ready[key] : ready[key]) : false)
   return (
     <SettingsCard title={t('settings.notifications.eventsTitle')} description={t('settings.notifications.eventsDescription')}>
       {!ready && prefs.state.status === 'loading' ? (
@@ -165,17 +198,33 @@ function EventsCard({ prefs }: { prefs: Prefs }) {
       ) : !ready ? (
         <ErrorState message={t('settings.notifications.loadFailed')} onRetry={prefs.reload} className="py-4" />
       ) : (
-        <div className="space-y-4">
-          {[...rows, { key: 'pushEnabled' as const, label: t('settings.notifications.eventPush'), body: t('settings.notifications.eventPushBody') }].map((row) => (
+        <div className="divide-y divide-line">
+          {rows.map((row) => {
+            const titleId = `${idBase}-${row.id}`
+            return (
+              <div key={row.id} className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 py-4 first:pt-0">
+                <div className="min-w-0 max-w-xl">
+                  <p id={titleId} className="text-ui-body font-medium text-ink">
+                    {row.label}
+                  </p>
+                  <p className="text-ui-small text-ink-muted">{row.body}</p>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
+                  {row.inApp && <ChannelSwitch rowId={titleId} label={t('settings.notifications.channelInApp')} checked={shown(row.inApp)} disabled={pending !== null} onChange={(v) => void change(row.inApp!, v)} />}
+                  {row.email && <ChannelSwitch rowId={titleId} label={t('settings.notifications.channelEmail')} checked={shown(row.email)} disabled={pending !== null} onChange={(v) => void change(row.email!, v)} />}
+                </div>
+              </div>
+            )
+          })}
+          <div className={rows.length ? 'pt-4' : undefined}>
             <Switch
-              key={row.key}
-              checked={pending === row.key ? !ready[row.key] : ready[row.key]}
+              checked={shown('pushEnabled')}
               disabled={pending !== null}
-              onChange={(v) => void change(row.key, v)}
-              label={row.label}
-              description={row.body}
+              onChange={(v) => void change('pushEnabled', v)}
+              label={t('settings.notifications.eventPush')}
+              description={t('settings.notifications.eventPushBody')}
             />
-          ))}
+          </div>
         </div>
       )}
     </SettingsCard>

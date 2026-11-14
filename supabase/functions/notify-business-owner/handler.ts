@@ -8,6 +8,7 @@
 // `sent` counts notices Resend accepted; `skipped` counts rows already notified, or rows of a business with no owner.
 import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
 import { type BusinessNoticeEvent, businessNoticeEmail } from '../_shared/email-templates.ts'
+import { type EmailPrefReader, emailWanted } from '../_shared/emailPrefs.ts'
 import { type GateResult, gateReply } from '../_shared/gate.ts'
 import { UUID, bearerToken, readJsonObject, reply } from '../_shared/http.ts'
 import { companyNotice } from '../_shared/notificationText.ts'
@@ -32,8 +33,10 @@ export interface NotifyDeps {
    * row, metadata carries to_status.
    */
   recentRows(businessId: string, actorId: string, sinceIso: string): Promise<{ id: string; eventType: string; metadata: Record<string, unknown> }[]>
-  /** The business owner's address, the source application's language (else en) and the business name; null without an owner. */
-  recipient(businessId: string): Promise<{ email: string; language: 'en' | 'pt'; businessName: string } | null>
+  /** The business owner's account, address, the source application's language (else en) and the business name; null without an owner. */
+  recipient(businessId: string): Promise<{ userId: string; email: string; language: 'en' | 'pt'; businessName: string } | null>
+  /** Whether the owner keeps "platform notices about their company" emails on (ADR-0078). Absent in tests that do not need it: on. */
+  emailPref?: EmailPrefReader
   /** True when email_log already has a row for this workflow. */
   alreadySent(workflow: string): Promise<boolean>
   log(entry: LogEntry): Promise<string>
@@ -98,6 +101,9 @@ export async function handleNotifyBusinessOwner(req: Request, deps: NotifyDeps):
 
   let sent = 0
   let skipped = 0
+  // The owner can switch these emails off (ADR-0078): nothing is sent to Resend and nothing is logged. The bell above is unaffected.
+  // A failed read throws to the caller (index.ts answers 500), so a notice is never sent against a switch we could not read.
+  if (!(await emailWanted(deps.emailPref, owner.userId, 'business_notices'))) return reply(200, { ok: true, sent: 0, skipped: notices.length })
   for (const { row, event } of notices) {
     const workflow = `business_notice:${row.id}`
     if (await deps.alreadySent(workflow)) {
@@ -111,7 +117,7 @@ export async function handleNotifyBusinessOwner(req: Request, deps: NotifyDeps):
       continue
     }
     // The idempotency key makes Resend send once even if two calls pass the alreadySent check together.
-    const r = await sendAndLog({ config: deps.config.config, fetch: deps.fetch, log: deps.log }, { ...email, ...base, to: owner.email, idempotencyKey: workflow })
+    const r = await sendAndLog({ config: deps.config.config, fetch: deps.fetch, log: deps.log }, { ...email, ...base, to: owner.email, idempotencyKey: workflow, optional: { userId: owner.userId, type: 'business_notices' } })
     if (r.status === 'accepted') sent++
   }
   return reply(200, { ok: true, sent, skipped })

@@ -12,6 +12,7 @@ const CONFIG: EmailConfig = {
   appBaseUrl: 'https://preview.example.app',
   testRecipients: ['team@account.test', 'ana@studio.test'],
   adminNotificationEmail: 'team@account.test',
+  unsubscribeSecret: 'unsub-secret',
 }
 
 const VALID = {
@@ -40,12 +41,14 @@ function deps(over: Partial<SubmitDeps> = {}) {
   const logs: LogEntry[] = []
   const audits: { eventType: string; applicationId: string }[] = []
   const sends: { to: string; subject: string }[] = []
+  const bodies: { to: string; html: string; text: string; headers?: Record<string, string> }[] = []
   /** Recorded attempts (service_application_attempt): the first hash of each allowed call. */
   const attempts: string[] = []
   const clock = { at: new Date('2026-10-26T12:00:00Z') }
   const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
-    const b = JSON.parse(String(init?.body)) as { to: string[]; subject: string }
+    const b = JSON.parse(String(init?.body)) as { to: string[]; subject: string; html: string; text: string; headers?: Record<string, string> }
     sends.push({ to: b.to[0]!, subject: b.subject })
+    bodies.push({ to: b.to[0]!, html: b.html, text: b.text, headers: b.headers })
     return new Response(JSON.stringify({ id: `msg-${sends.length}-abcdef` }), { status: 200 })
   })
   const stored = (r: (typeof rows)[number]): StoredApplication => ({
@@ -97,7 +100,7 @@ function deps(over: Partial<SubmitDeps> = {}) {
     recentApplicationsForEmail: async () => 0,
     ...over,
   }
-  return { d, rows, logs, audits, sends, fetchFn, attempts, clock }
+  return { d, rows, logs, audits, sends, bodies, fetchFn, attempts, clock }
 }
 
 const STORED_9: StoredApplication = { id: 'app-9', reference: 'REF9', applicantEmail: 'ana@studio.test', businessName: 'Atelier Cão', language: 'pt', createdAt: '2026-10-26T11:00:00.000Z' }
@@ -293,19 +296,73 @@ describe('submit-application', () => {
     expect(sends.map((s) => s.to)).toEqual(['team@account.test'])
   })
 
-  it('emails opted-in staff with applications.view once each, without duplicating the admin inbox', async () => {
-    const recipients = vi.fn(async () => ['Team@Account.test', 'ana.staff@account.test', 'ana.staff@account.test', 'bo@account.test'])
+  it('emails staff with applications.view once each, without duplicating the admin inbox', async () => {
+    const recipients = vi.fn(async () => [
+      { userId: 'u-team', email: 'Team@Account.test' },
+      { userId: 'u-ana', email: 'ana.staff@account.test' },
+      { userId: 'u-ana', email: 'ana.staff@account.test' },
+      { userId: 'u-bo', email: 'bo@account.test' },
+    ])
     const { d, logs, sends } = deps({
       staffAlertRecipients: recipients,
       config: { ok: true, config: { ...CONFIG, testRecipients: [...CONFIG.testRecipients, 'ana.staff@account.test', 'bo@account.test'] } },
     })
     expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
     expect(recipients).toHaveBeenCalledTimes(1)
-    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test', 'ana.staff@account.test', 'bo@account.test'])
+    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'Team@Account.test', 'ana.staff@account.test', 'bo@account.test'])
     expect(logs.filter((l) => l.kind === 'admin_notification').map((l) => l.status)).toEqual(['accepted', 'accepted', 'accepted'])
     expect(new Set(logs.map((l) => l.workflow)).size).toBe(4)
   })
 
+  it('skips a staff member who switched "new applications" emails off, sends the rest, and the applicant confirmation is unaffected (ADR-0078)', async () => {
+    const emailPref = vi.fn(async (userId: string) => userId !== 'u-ana')
+    const { d, logs, sends } = deps({
+      staffAlertRecipients: async () => [{ userId: 'u-ana', email: 'ana.staff@account.test' }, { userId: 'u-bo', email: 'bo@account.test' }],
+      emailPref,
+      config: { ok: true, config: { ...CONFIG, testRecipients: [...CONFIG.testRecipients, 'ana.staff@account.test', 'bo@account.test'] } },
+    })
+    await handleSubmitApplication(post(VALID), d)
+    expect(emailPref).toHaveBeenCalledWith('u-ana', 'new_application')
+    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test', 'bo@account.test'])
+    expect(logs.map((l) => l.recipient)).not.toContain('ana.staff@account.test')
+  })
+
+  it('staff alerts carry the Unsubscribe link and headers; the confirmation and the inbox alert carry a reason line instead', async () => {
+    const { d, bodies } = deps({
+      staffAlertRecipients: async () => [{ userId: '11111111-2222-4333-8444-555555555555', email: 'bo@account.test' }],
+      config: { ok: true, config: { ...CONFIG, testRecipients: [...CONFIG.testRecipients, 'bo@account.test'] } },
+    })
+    await handleSubmitApplication(post(VALID), d)
+    const by = (to: string) => bodies.find((s) => s.to === to)!
+    expect(by('bo@account.test').html).toContain('>Unsubscribe</a>')
+    expect(by('bo@account.test').headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
+    for (const to of ['ana@studio.test', 'team@account.test']) {
+      expect(by(to).html).not.toContain('Unsubscribe')
+      expect(by(to).headers).toBeUndefined()
+      expect(by(to).html).toContain('/privacy')
+    }
+    expect(by('ana@studio.test').text).toContain('Recebe este e-mail porque se candidatou à Sanctus.')
+    expect(by('team@account.test').text).toContain('this address is the Sanctus notification inbox')
+  })
+
+  it('when the admin inbox is also a staff member, they get one email, with Unsubscribe, and can opt out of it', async () => {
+    const mine = { userId: '11111111-2222-4333-8444-555555555555', email: 'team@account.test' }
+    const on = deps({ staffAlertRecipients: async () => [mine], emailPref: async () => true })
+    await handleSubmitApplication(post(VALID), on.d)
+    expect(on.sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test'])
+    expect(on.bodies[1]!.html).toContain('>Unsubscribe</a>')
+    const off = deps({ staffAlertRecipients: async () => [mine], emailPref: async () => false })
+    await handleSubmitApplication(post(VALID), off.d)
+    expect(off.sends.map((s) => s.to)).toEqual(['ana@studio.test'])
+  })
+
+  it('sends no staff email when the switch cannot be read, and still stores the application', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { d, sends } = deps({ staffAlertRecipients: async () => [{ userId: 'u-bo', email: 'bo@account.test' }], emailPref: async () => Promise.reject(new Error('db down')) })
+    expect((await handleSubmitApplication(post(VALID), d)).status).toBe(200)
+    expect(sends.map((s) => s.to)).toEqual(['ana@studio.test', 'team@account.test'])
+    spy.mockRestore()
+  })
   it('keeps the application when the staff lookup fails', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { d, sends } = deps({ staffAlertRecipients: async () => Promise.reject(new Error('db down')) })

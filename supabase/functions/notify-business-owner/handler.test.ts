@@ -5,6 +5,8 @@ import { type NotifyDeps, handleNotifyBusinessOwner } from './handler'
 
 const BIZ = '11111111-1111-4111-8111-111111111111'
 const PT_BIZ = '22222222-2222-4222-8222-222222222222'
+const OWNER_ID = '33333333-3333-4333-8333-333333333333'
+const PT_OWNER_ID = '44444444-4444-4444-8444-444444444444'
 const NOW = new Date('2026-10-26T12:00:00Z')
 const CONFIG: EmailConfig = {
   apiKey: 're_test',
@@ -12,6 +14,7 @@ const CONFIG: EmailConfig = {
   appBaseUrl: 'https://preview.example.app',
   testRecipients: [],
   adminNotificationEmail: 'team@account.test',
+  unsubscribeSecret: 'unsub-secret',
 }
 
 type Row = { id: string; eventType: string; metadata: Record<string, unknown> }
@@ -33,9 +36,9 @@ function deps(rows: Row[], over: Partial<NotifyDeps> = {}) {
     recentRows: async (businessId, actorId, sinceIso) => (recentCalls.push([businessId, actorId, sinceIso]), rows),
     recipient: async (businessId) =>
       businessId === BIZ
-        ? { email: 'owner@shop.test', language: 'en', businessName: 'Casa Lisboa' }
+        ? { userId: OWNER_ID, email: 'owner@shop.test', language: 'en', businessName: 'Casa Lisboa' }
         : businessId === PT_BIZ
-          ? { email: 'dono@shop.test', language: 'pt', businessName: 'Casa do Porto' }
+          ? { userId: PT_OWNER_ID, email: 'dono@shop.test', language: 'pt', businessName: 'Casa do Porto' }
           : null,
     alreadySent: async (workflow) => logs.some((l) => l.workflow === workflow),
     log: async (e) => (logs.push(e), `log-${logs.length}`),
@@ -186,5 +189,41 @@ describe('notify-business-owner notifications (ADR-0056)', () => {
     await handleNotifyBusinessOwner(post({ businessId: BIZ }), deps([], { notify }).d)
     await handleNotifyBusinessOwner(post({ businessId: '33333333-3333-4333-8333-333333333333' }), deps([PAUSE], { notify }).d)
     expect(notify).not.toHaveBeenCalled()
+  })
+})
+describe('email switch "platform notices about their company" (ADR-0078)', () => {
+  it('sends when the owner keeps it on: footer, Unsubscribe link and List-Unsubscribe headers', async () => {
+    const emailPref = vi.fn(async () => true)
+    const { d, sent } = deps([PAUSE], { emailPref })
+    expect(await json(await handleNotifyBusinessOwner(post({ businessId: BIZ }), d))).toEqual({ ok: true, sent: 1, skipped: 0 })
+    expect(emailPref).toHaveBeenCalledWith(OWNER_ID, 'business_notices')
+    const body = sent[0] as unknown as { html: string; headers: Record<string, string> }
+    expect(body.html).toContain('>Unsubscribe</a>')
+    expect(body.html).toContain('https://preview.example.app/privacy')
+    expect(body.headers['List-Unsubscribe']).toMatch(/^<https:\/\/preview\.example\.app\/email\/unsubscribe\?t=v1\./)
+    expect(body.headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
+  })
+
+  it('sends nothing to Resend and logs nothing when the owner switched it off, but still writes the bell entry', async () => {
+    const notify = vi.fn(async () => {})
+    const { d, sent, logs, fetchFn } = deps([PAUSE], { emailPref: async () => false, notify })
+    expect(await json(await handleNotifyBusinessOwner(post({ businessId: BIZ }), d))).toEqual({ ok: true, sent: 0, skipped: 1 })
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(sent).toHaveLength(0)
+    expect(logs).toHaveLength(0)
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not send the email against a switch it could not read', async () => {
+    const { d, sent } = deps([PAUSE], { emailPref: async () => { throw new Error('prefs lookup failed') } })
+    await expect(handleNotifyBusinessOwner(post({ businessId: BIZ }), d)).rejects.toThrow('prefs lookup failed')
+    expect(sent).toHaveLength(0)
+  })
+
+  it('blocks and logs the email when the unsubscribe secret is not set', async () => {
+    const { d, sent, logs } = deps([PAUSE], { config: { ok: true, config: { ...CONFIG, unsubscribeSecret: '' } } })
+    expect(await json(await handleNotifyBusinessOwner(post({ businessId: BIZ }), d))).toEqual({ ok: true, sent: 0, skipped: 0 })
+    expect(sent).toHaveLength(0)
+    expect(logs[0]).toMatchObject({ status: 'blocked', error: 'unsubscribe_not_configured' })
   })
 })

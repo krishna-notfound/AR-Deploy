@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
-import { type NotifyModelRequestDeps, type SentRequest, handleNotifyModelRequest } from './handler'
+import type { EmailConfig, LogEntry } from '../_shared/email'
+import { type NotifyModelRequestDeps, type SentRequest, type StaffEmailDeps, handleNotifyModelRequest } from './handler'
 
 const REQ = '11111111-1111-4111-8111-111111111111'
 const NOW = new Date('2026-11-09T12:00:00Z')
@@ -65,5 +66,77 @@ describe('notify-model-request (ADR-0056)', () => {
       expect([res.status, await json(res)]).toEqual([200, { ok: true, notified: false }])
       expect(notify).not.toHaveBeenCalled()
     }
+  })
+})
+
+describe('notify-model-request staff email (ADR-0078)', () => {
+  const ANA = '11111111-2222-4333-8444-555555555551'
+  const BO = '11111111-2222-4333-8444-555555555552'
+  const CONFIG: EmailConfig = { apiKey: 're_test', from: 'Sanctus <hello@sanctus.test>', appBaseUrl: 'https://app.sanctus.test', testRecipients: [], adminNotificationEmail: '', unsubscribeSecret: 'unsub-secret' }
+
+  function withEmail(over: Partial<StaffEmailDeps> = {}) {
+    const logs: LogEntry[] = []
+    const bodies: { to: string[]; subject: string; html: string; text: string; headers?: Record<string, string> }[] = []
+    const fetchFn = vi.fn(async (_u: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)))
+      return new Response(JSON.stringify({ id: `msg-${bodies.length}` }), { status: 200 })
+    })
+    const email: StaffEmailDeps = {
+      config: { ok: true, config: CONFIG },
+      fetch: fetchFn as unknown as typeof fetch,
+      staff: async () => [{ userId: ANA, email: 'ana@team.test' }, { userId: BO, email: 'bo@team.test' }],
+      alreadySent: async (w) => logs.some((l) => l.workflow === w),
+      log: async (e) => (logs.push(e), `log-${logs.length}`),
+      ...over,
+    }
+    return { email, logs, bodies, fetchFn }
+  }
+
+  it('emails each staff member with models.manage once, with the footer, Unsubscribe and headers', async () => {
+    const { email, bodies, logs } = withEmail()
+    const { d } = setup({}, {})
+    const res = await handleNotifyModelRequest(post({ requestId: REQ }), { ...d, email })
+    expect(await json(res)).toEqual({ ok: true, notified: true })
+    expect(bodies.map((b) => b.to[0])).toEqual(['ana@team.test', 'bo@team.test'])
+    expect(bodies[0]!.subject).toBe('New 3D model request: Oslo sofa')
+    expect(bodies[0]!.text).toContain('Casa Lisboa asked for a 3D model of Oslo sofa.')
+    expect(bodies[0]!.html).toContain(`https://app.sanctus.test/admin/model-requests/${REQ}`)
+    expect(bodies[0]!.html).toContain('>Unsubscribe</a>')
+    expect(bodies[0]!.html).toContain('https://app.sanctus.test/privacy')
+    expect(bodies[0]!.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
+    expect(logs.map((l) => [l.kind, l.status])).toEqual([['model_request_staff', 'accepted'], ['model_request_staff', 'accepted']])
+    // A second call (a retry) sends nothing new.
+    await handleNotifyModelRequest(post({ requestId: REQ }), { ...d, email })
+    expect(bodies).toHaveLength(2)
+  })
+
+  it('skips a staff member who switched the email off: nothing to Resend, nothing logged for them', async () => {
+    const emailPref = vi.fn(async (id: string) => id !== ANA)
+    const { email, bodies, logs } = withEmail({ emailPref })
+    const { d, notify } = setup({}, {})
+    await handleNotifyModelRequest(post({ requestId: REQ }), { ...d, email })
+    expect(emailPref).toHaveBeenCalledWith(ANA, 'new_model_request')
+    expect(bodies.map((b) => b.to[0])).toEqual(['bo@team.test'])
+    expect(logs.map((l) => l.recipient)).toEqual(['bo@team.test'])
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends no email for an old or foreign request, and a failing email never fails the request', async () => {
+    const stale = withEmail()
+    await handleNotifyModelRequest(post({ requestId: REQ }), { ...setup({ createdAt: '2026-11-09T09:00:00Z' }).d, email: stale.email })
+    expect(stale.bodies).toHaveLength(0)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const broken = withEmail({ staff: async () => Promise.reject(new Error('db down for ana@team.test')) })
+    const res = await handleNotifyModelRequest(post({ requestId: REQ }), { ...setup().d, email: broken.email })
+    expect(await json(res)).toEqual({ ok: true, notified: true })
+    expect(String(spy.mock.calls[0]?.[0])).not.toContain('ana@team.test')
+    spy.mockRestore()
+  })
+
+  it('logs a blocked row, not an email, when email is not configured', async () => {
+    const { email, bodies, logs } = withEmail({ config: { ok: false, missing: ['RESEND_API_KEY'] } })
+    await handleNotifyModelRequest(post({ requestId: REQ }), { ...setup().d, email })
+    expect(bodies).toHaveLength(0)
+    expect(logs.map((l) => l.status)).toEqual(['blocked', 'blocked'])
   })
 })

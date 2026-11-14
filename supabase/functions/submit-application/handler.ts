@@ -11,6 +11,7 @@ import type { ApplyRules } from '../_shared/applyForm.ts'
 import { MAX_SUBMISSIONS_PER_HOUR, attemptHashes, submitterHash } from '../_shared/attempts.ts'
 import { type ConfigResult, type LogEntry, sendAndLog } from '../_shared/email.ts'
 import { renderEmail } from '../_shared/email-templates.ts'
+import { type EmailPrefReader, emailWanted } from '../_shared/emailPrefs.ts'
 import { clientIp, readJsonObject, reply, sha256Hex } from '../_shared/http.ts'
 import type { NotifyRequest } from '../_shared/notify.ts'
 import { applicationNotice } from '../_shared/notificationText.ts'
@@ -53,8 +54,10 @@ export interface SubmitDeps {
   /** The email_log workflows already logged for the application (any status). */
   loggedWorkflows(applicationId: string): Promise<Set<string>>
   log(entry: LogEntry): Promise<string>
-  /** Staff who can see applications (applications.view) and keep new-application alerts on (profiles). */
-  staffAlertRecipients(): Promise<string[]>
+  /** Staff who can see applications (applications.view), with their account id and address. Their email switch is applied by `emailPref`. */
+  staffAlertRecipients(): Promise<{ userId: string; email: string }[]>
+  /** Whether a staff member keeps "new applications" emails on (ADR-0078). Absent in tests that do not need it: on. */
+  emailPref?: EmailPrefReader
   /**
    * The rules of the published application form (service role read of site_content.published), or null when nothing is
    * published. Throws when the read fails: that is not "no form" (spec section 10), the request is answered 503.
@@ -201,17 +204,22 @@ async function recordSubmitted(deps: SubmitDeps, applicationId: string) {
 async function sendApplicationEmails(deps: SubmitDeps, stored: StoredApplication, skip: Set<string>) {
   await notifyStaff(deps, stored)
   const inbox = deps.config.ok ? deps.config.config.adminNotificationEmail : ''
-  const jobs: { kind: 'application_confirmation' | 'admin_notification'; to: string; lang: 'en' | 'pt'; workflow: string }[] = [
-    { kind: 'application_confirmation', to: stored.applicantEmail, lang: stored.language, workflow: `application:${stored.id}:application_confirmation` },
-    { kind: 'admin_notification', to: inbox, lang: 'en', workflow: `application:${stored.id}:admin_notification` },
-  ]
-  // Opted-in staff get the same alert, once each and never twice for the admin inbox (S1, spec §3).
-  const seen = new Set([inbox.trim().toLowerCase()].filter(Boolean))
-  for (const email of await staffRecipients(deps)) {
-    const key = email.trim().toLowerCase()
+  type Job = { kind: 'application_confirmation' | 'admin_notification'; to: string; lang: 'en' | 'pt'; workflow: string; optional?: { userId: string; type: 'new_application' } }
+  const inboxKey = inbox.trim().toLowerCase()
+  // Staff with the permission get the same alert, once each (S1, spec §3), unless they switched "new applications" emails off
+  // (ADR-0078). When the admin inbox is one of them, that person's alert is the inbox alert: still one email, and they can opt out.
+  const staff = await staffRecipients(deps)
+  const jobs: Job[] = [{ kind: 'application_confirmation', to: stored.applicantEmail, lang: stored.language, workflow: `application:${stored.id}:application_confirmation` }]
+  const inboxStaff = inboxKey ? staff.find((s) => s.email.trim().toLowerCase() === inboxKey) : undefined
+  if (!inboxStaff) jobs.push({ kind: 'admin_notification', to: inbox, lang: 'en', workflow: `application:${stored.id}:admin_notification` })
+  const seen = new Set<string>()
+  for (const member of staff) {
+    const key = member.email.trim().toLowerCase()
     if (!key || seen.has(key)) continue
     seen.add(key)
-    jobs.push({ kind: 'admin_notification', to: email.trim(), lang: 'en', workflow: `application:${stored.id}:staff_alert:${(await sha256Hex(key)).slice(0, 16)}` })
+    if (!(await staffWantsEmail(deps, member.userId))) continue
+    const workflow = key === inboxKey ? `application:${stored.id}:admin_notification` : `application:${stored.id}:staff_alert:${(await sha256Hex(key)).slice(0, 16)}`
+    jobs.push({ kind: 'admin_notification', to: member.email.trim(), lang: 'en', workflow, optional: { userId: member.userId, type: 'new_application' } })
   }
   for (const job of jobs) {
     const workflow = job.workflow
@@ -236,7 +244,7 @@ async function sendApplicationEmails(deps: SubmitDeps, stored: StoredApplication
         applicantEmail: stored.applicantEmail,
         actionUrl: job.kind === 'admin_notification' && config.appBaseUrl.startsWith('https://') ? `${config.appBaseUrl}/admin/applications/${stored.id}` : undefined,
       })
-      await sendAndLog({ config, fetch: deps.fetch, log: deps.log }, { ...email, to: job.to, kind: job.kind, applicationId: stored.id, workflow, idempotencyKey: workflow })
+      await sendAndLog({ config, fetch: deps.fetch, log: deps.log }, { ...email, to: job.to, kind: job.kind, applicationId: stored.id, workflow, idempotencyKey: workflow, ...(job.optional ? { optional: job.optional } : {}) })
     } catch (e) {
       // The application is stored; a logging failure must not turn the response into an error.
       console.error(`application email ${job.kind} failed: ${loggable(e)}`)
@@ -254,7 +262,17 @@ async function notifyStaff(deps: SubmitDeps, stored: StoredApplication) {
   }
 }
 
-async function staffRecipients(deps: SubmitDeps): Promise<string[]> {
+/** The staff member's "new applications" email switch. A failed read means no email to them this time (logged, never guessed). */
+async function staffWantsEmail(deps: SubmitDeps, userId: string): Promise<boolean> {
+  try {
+    return await emailWanted(deps.emailPref, userId, 'new_application')
+  } catch (e) {
+    console.error(`staff email preference lookup failed: ${loggable(e)}`)
+    return false
+  }
+}
+
+async function staffRecipients(deps: SubmitDeps): Promise<{ userId: string; email: string }[]> {
   try {
     return await deps.staffAlertRecipients()
   } catch (e) {

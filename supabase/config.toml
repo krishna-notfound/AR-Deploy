@@ -484,3 +484,7 @@ verify_jwt = true
 # Resend delivery events: authenticated by the svix signature (RESEND_WEBHOOK_SECRET), not a Supabase JWT.
 [functions.resend-webhook]
 verify_jwt = false
+
+# One-click unsubscribe from optional emails (ADR-0078): the link carries a signed token (EMAIL_UNSUBSCRIBE_SECRET), not a JWT.
+[functions.email-unsubscribe]
+verify_jwt = false

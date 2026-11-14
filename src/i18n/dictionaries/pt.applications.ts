@@ -28,6 +28,7 @@ export const ptApplications: Partial<Record<TranslationKey, string>> = {
   'applications.emailReason.invalid_recipient': 'O endereço de email não é válido.',
   'applications.emailReason.admin_recipient_not_configured': 'Não está configurado nenhum endereço para as notificações de administração (ADMIN_NOTIFICATION_EMAIL).',
   'applications.emailReason.no_recipient': 'A conta não tem endereço de email.',
+  'applications.emailReason.unsubscribe_not_configured': 'A ligação para cancelar a subscrição ainda não pode ser assinada (EMAIL_UNSUBSCRIBE_SECRET não está definido), por isso este email opcional não foi enviado.',
   'applications.emailKind.owner_invitation': 'Convite ao responsável',
   'applications.emailKind.invitation_resend': 'Convite reenviado',
   'applications.emailKind.application_confirmation': 'Confirmação da candidatura',
@@ -41,6 +42,7 @@ export const ptApplications: Partial<Record<TranslationKey, string>> = {
   'applications.emailKind.admin_notification': 'Notificação de administração',
   'applications.emailKind.test': 'Email de teste',
   'applications.emailKind.model_request_update': 'Atualização do modelo 3D',
+  'applications.emailKind.model_request_staff': 'Alerta de pedido de modelo 3D',
 
   // ---- audit events ----
   'applications.event.application_submitted': 'Candidatura submetida',

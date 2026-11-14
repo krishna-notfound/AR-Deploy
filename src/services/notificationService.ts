@@ -1,10 +1,10 @@
 // In-app notifications, phone push subscriptions and their switches (ADR-0056). The UI imports `notifications` from
 // services/index.ts. Supabase: services/supabase/supabaseNotifications.ts (tables notifications, push_subscriptions,
 // notification_prefs; the Edge Functions write the notifications). Demo: services/mock/mockNotifications.ts, an in-memory harness.
-import type { AppNotification, NotificationList, NotificationPrefs, PushSubscriptionInput } from '@/domain/notifications'
+import type { AppNotification, EmailPrefType, NotificationList, NotificationPrefs, PushSubscriptionInput } from '@/domain/notifications'
 import type { Result } from './catalogService'
 
-export type { AppNotification, NotificationKind, NotificationList, NotificationPrefs, PushSubscriptionInput } from '@/domain/notifications'
+export type { AppNotification, EmailPrefType, NotificationKind, NotificationList, NotificationPrefs, PushSubscriptionInput } from '@/domain/notifications'
 
 /** How many notifications the bell loads. */
 export const NOTIFICATION_PAGE = 30
@@ -21,4 +21,10 @@ export interface NotificationService {
   getNotificationPrefs(): Promise<Result<NotificationPrefs>>
   /** Saves the given switches (and the language the text is written in); returns the saved prefs. */
   setNotificationPrefs(patch: Partial<NotificationPrefs>): Promise<Result<NotificationPrefs>>
+  /**
+   * The public unsubscribe page's button (ADR-0078): switches off the one email type the signed token in the email names, for
+   * the person it was issued to, with no sign-in. Idempotent. A failure carries a fixed reason code (error.reason):
+   * invalid_token, expired_token, rate_limited or unknown.
+   */
+  unsubscribeEmail(token: string): Promise<Result<{ type: EmailPrefType }>>
 }

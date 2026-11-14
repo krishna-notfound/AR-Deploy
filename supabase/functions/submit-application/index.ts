@@ -1,6 +1,6 @@
 // Supabase Edge Function: public business application (ADR-0024). verify_jwt is off (anonymous visitors apply);
 // the handler validates, rate-limits and writes with the service role. Browsers can never insert applications directly.
-// Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS, ADMIN_NOTIFICATION_EMAIL (design/23-email.md);
+// Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS, ADMIN_NOTIFICATION_EMAIL (design/23-email.md), EMAIL_UNSUBSCRIBE_SECRET (ADR-0078);
 // VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT turn on phone push (optional; the in-app list works without them);
 // APPLICATION_SALT is optional (without it the salt is derived from the service key, which never leaves the server).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
@@ -8,7 +8,8 @@ import { normalizeApplyForm, rulesFromConfig } from '../_shared/applyForm.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
 import { applicationSalt } from '../_shared/attempts.ts'
 import { serviceKeyFrom } from '../_shared/http.ts'
-import { createNotifier } from '../_shared/notifyAdmin.ts'
+import { createEmailPrefReader } from '../_shared/emailPrefsAdmin.ts'
+import { createNotifier, staffEmailRecipients } from '../_shared/notifyAdmin.ts'
 import { MAX_SUBMISSIONS_PER_HOUR, type StoredApplication, handleSubmitApplication, loggable } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
@@ -154,30 +155,10 @@ Deno.serve((req) =>
       if (error) throw new Error(`email_log insert failed: ${error.message}`)
       return data.id as string
     },
-    // Active members whose role has applications.view, plus the Owner, minus anyone who turned the alert off in
-    // their profile (the column defaults to on, so a missing profile row counts as on).
-    async staffAlertRecipients() {
-      const perms = await admin.from('platform_role_permissions').select('role').eq('permission', 'applications.view')
-      if (perms.error) throw new Error(`permission lookup failed: ${perms.error.message}`)
-      const roles = (perms.data ?? []).map((r) => r.role as string)
-      const members = roles.length
-        ? await admin.from('platform_members').select('user_id, email').eq('status', 'active').in('role', roles).not('user_id', 'is', null)
-        : { data: [] as { user_id: string; email: string }[], error: null }
-      if (members.error) throw new Error(`member lookup failed: ${members.error.message}`)
-      const owners = await admin.from('platform_admins').select('user_id')
-      if (owners.error) throw new Error(`owner lookup failed: ${owners.error.message}`)
-      const byUser = new Map<string, string>((members.data ?? []).map((m) => [m.user_id as string, m.email as string]))
-      for (const o of owners.data ?? []) {
-        if (byUser.has(o.user_id)) continue
-        const { data } = await admin.auth.admin.getUserById(o.user_id)
-        if (data.user?.email) byUser.set(o.user_id, data.user.email)
-      }
-      if (!byUser.size) return []
-      const off = await admin.from('profiles').select('user_id').in('user_id', [...byUser.keys()]).eq('notify_new_applications', false)
-      if (off.error) throw new Error(`profile lookup failed: ${off.error.message}`)
-      for (const p of off.data ?? []) byUser.delete(p.user_id as string)
-      return [...byUser.values()]
-    },
+    // Active members whose role has applications.view, plus the Owner. Each one's "new applications" email switch (ADR-0078)
+    // is applied by the handler through emailPref; people who switched alerts off in their profile before are carried over by the migration.
+    staffAlertRecipients: () => staffEmailRecipients(admin, 'applications.view'),
+    emailPref: createEmailPrefReader(admin),
   }).catch((e) => {
     console.error(`submit-application: ${loggable(e, 300)}`)
     return new Response(JSON.stringify({ error: 'unknown' }), { status: 500, headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' } })

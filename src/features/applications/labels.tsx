@@ -43,7 +43,7 @@ export function EmailStatusBadge({ status }: { status: EmailAttemptStatus }) {
   return <Badge tone={EMAIL_TONE[status]}>{translate(lang, `applications.emailStatus.${status}`)}</Badge>
 }
 
-const EMAIL_REASONS = ['demo_mode', 'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'admin_recipient_not_configured', 'no_recipient'] as const
+const EMAIL_REASONS = ['demo_mode', 'email_not_configured', 'test_sender_recipient_not_allowed', 'invalid_recipient', 'admin_recipient_not_configured', 'no_recipient', 'unsubscribe_not_configured'] as const
 
 /** Why an email was not sent or failed, in plain words, for the email log. Unknown text is the provider's own (sanitized) message. */
 export function emailReason(error?: string, lang: Lang = 'en'): string | undefined {
@@ -70,6 +70,7 @@ const EMAIL_KINDS = [
   'admin_notification',
   'test',
   'model_request_update',
+  'model_request_staff',
 ] as const
 
 /** The label of an email kind; an unknown kind shows as it is. */

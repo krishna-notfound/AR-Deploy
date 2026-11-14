@@ -1,7 +1,7 @@
 // Demo implementation of the notification service (ADR-0056). A test harness only: it keeps its state in memory (gone on
 // reload) and sends nothing. The list starts with two sample notifications so the bell is not empty in the demo; they are
 // labelled "Sample" in their text. Subscribing records the endpoint here and nothing else.
-import { type AppNotification, DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs, type PushSubscriptionInput } from '@/domain/notifications'
+import { type AppNotification, DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs, type PushSubscriptionInput, isEmailPrefType } from '@/domain/notifications'
 import { newId } from '@/lib/id'
 import { type Result, fail, ok } from '../catalogService'
 import { NOTIFICATION_PAGE, type NotificationService } from '../notificationService'
@@ -33,6 +33,21 @@ export function addMockNotification(n: Pick<AppNotification, 'kind' | 'title' | 
 /** The endpoints saved for this demo session (tests). */
 export const mockPushEndpoints = (): string[] => [...devices.keys()]
 
+/** The prefs key behind each email type (the demo's unsubscribe button flips it, as the Edge Function flips the column). */
+const EMAIL_PREF_KEY = {
+  new_application: 'emailNewApplication',
+  new_model_request: 'emailNewModelRequest',
+  company_updates: 'emailCompanyUpdates',
+  model_request_updates: 'emailModelRequestUpdates',
+  business_notices: 'emailBusinessNotices',
+} as const
+
+/**
+ * Demo unsubscribe tokens: demo.<type> works, demo.expired is an expired link, anything else is invalid. Real tokens are
+ * signed by the Edge Functions; nothing here can verify one.
+ */
+export const demoUnsubscribeToken = (type: string): string => `demo.${type}`
+
 export const mockNotificationService: NotificationService = {
   async getNotifications() {
     return ok({ items: items.slice(0, NOTIFICATION_PAGE).map((n) => ({ ...n })), unread: items.filter((n) => !n.readAt).length })
@@ -62,5 +77,12 @@ export const mockNotificationService: NotificationService = {
   async setNotificationPrefs(patch) {
     prefs = { ...prefs, ...patch }
     return ok({ ...prefs })
+  },
+  async unsubscribeEmail(token) {
+    const type = token.startsWith('demo.') ? token.slice(5) : ''
+    if (type === 'expired') return { ok: false, error: { code: 'VALIDATION', message: 'This link has expired.', reason: 'expired_token' } }
+    if (!isEmailPrefType(type)) return { ok: false, error: { code: 'VALIDATION', message: 'This link is not valid.', reason: 'invalid_token' } }
+    prefs = { ...prefs, [EMAIL_PREF_KEY[type]]: false }
+    return ok({ type })
   },
 }

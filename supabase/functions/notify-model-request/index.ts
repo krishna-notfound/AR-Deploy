@@ -2,9 +2,12 @@
 // (supabase/config.toml). The request is read with the caller's own token, so row-level security decides what they may
 // see; the service role only reads staff and preferences and writes notifications and push messages.
 // Secrets: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (optional: without them only the in-app list is written).
+// The staff email (ADR-0078) uses RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS and EMAIL_UNSUBSCRIBE_SECRET.
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
+import { logRow, readEmailConfig } from '../_shared/email.ts'
+import { createEmailPrefReader } from '../_shared/emailPrefsAdmin.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
-import { createNotifier } from '../_shared/notifyAdmin.ts'
+import { createNotifier, staffEmailRecipients } from '../_shared/notifyAdmin.ts'
 import { handleNotifyModelRequest } from './handler.ts'
 
 const env = (n: string) => Deno.env.get(n)
@@ -23,6 +26,22 @@ const first = <T>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) 
 Deno.serve((req) =>
   handleNotifyModelRequest(req, {
     notify,
+    email: {
+      config: readEmailConfig(env),
+      fetch,
+      staff: () => staffEmailRecipients(admin, 'models.manage'),
+      emailPref: createEmailPrefReader(admin),
+      async alreadySent(workflow) {
+        const { count, error } = await admin.from('email_log').select('id', { count: 'exact', head: true }).eq('workflow', workflow)
+        if (error) throw new Error(`email_log lookup failed: ${error.code ?? 'unknown'}`)
+        return (count ?? 0) > 0
+      },
+      async log(e) {
+        const { data, error } = await admin.from('email_log').insert(logRow(e)).select('id').single()
+        if (error) throw new Error(`email_log insert failed: ${error.code ?? 'unknown'}`)
+        return data.id as string
+      },
+    },
     async userIdFromToken(token) {
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)

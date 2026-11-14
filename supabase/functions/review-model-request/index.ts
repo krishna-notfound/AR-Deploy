@@ -2,10 +2,11 @@
 // the handler re-checks the caller through the 2FA gate (R-W1-1, permission models.manage). The admin_*_model_request
 // functions run with the caller's own token, so the audit actor and the database checks stay the caller's; the service
 // role only reads the request, the owner and email_log, and writes email_log.
-// Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md).
+// Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md), EMAIL_UNSUBSCRIBE_SECRET (ADR-0078).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { callerRpc } from '../_shared/caller.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
+import { createEmailPrefReader } from '../_shared/emailPrefsAdmin.ts'
 import { gateCaller } from '../_shared/gate.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
 import { createNotifier } from '../_shared/notifyAdmin.ts'
@@ -35,6 +36,7 @@ Deno.serve((req) =>
     config: readEmailConfig(env),
     fetch,
     notify,
+    emailPref: createEmailPrefReader(admin),
     async userIdFromToken(token) {
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)
@@ -86,7 +88,7 @@ Deno.serve((req) =>
       return {
         businessId: data.business_id,
         ...(data.product_id ? { productId: data.product_id as string } : {}),
-        recipient: owner ? { email: owner.email, language: owner.language } : null,
+        recipient: owner ? { userId: owner.userId, email: owner.email, language: owner.language } : null,
         productName: localized(product?.name),
         ...(option ? { optionName: localized(option.name) } : {}),
         productStatus: product?.status ?? 'draft',

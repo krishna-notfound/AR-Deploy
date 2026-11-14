@@ -4,8 +4,8 @@
 // @ts-ignore: resolved by Deno at deploy time
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.3'
 
-/** The business owner's address, the source application's language (else en) and the business name; null without an owner. */
-export async function ownerRecipient(admin: SupabaseClient, businessId: string): Promise<{ email: string; language: 'en' | 'pt'; businessName: string } | null> {
+/** The business owner's account, address, the source application's language (else en) and the business name; null without an owner. */
+export async function ownerRecipient(admin: SupabaseClient, businessId: string): Promise<{ userId: string; email: string; language: 'en' | 'pt'; businessName: string } | null> {
   const [biz, member, app] = await Promise.all([
     admin.from('businesses').select('name').eq('id', businessId).maybeSingle(),
     admin.from('business_members').select('user_id').eq('business_id', businessId).limit(1).maybeSingle(),
@@ -17,5 +17,5 @@ export async function ownerRecipient(admin: SupabaseClient, businessId: string):
   if (u.error) throw new Error(`recipient lookup failed: ${u.error.code ?? 'unknown'}`)
   const email = u.data.user?.email ?? ''
   if (!email) return null
-  return { email, language: app.data?.language === 'pt' ? 'pt' : 'en', businessName: biz.data.name }
+  return { userId: member.data.user_id as string, email, language: app.data?.language === 'pt' ? 'pt' : 'en', businessName: biz.data.name }
 }

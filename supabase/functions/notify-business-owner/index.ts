@@ -1,10 +1,11 @@
 // Supabase Edge Function: owner notices for platform-team changes (R-W7-2). JWT verification stays on
 // (supabase/config.toml) and the handler re-checks the caller through the 2FA gate (R-W1-1), staff only. The service
 // role reads the caller's audit rows, the owner's address and language, and writes email_log.
-// Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md).
+// Secrets: RESEND_API_KEY, EMAIL_FROM, APP_BASE_URL, EMAIL_TEST_RECIPIENTS (design/23-email.md), EMAIL_UNSUBSCRIBE_SECRET (ADR-0078).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { callerRpc } from '../_shared/caller.ts'
 import { logRow, readEmailConfig } from '../_shared/email.ts'
+import { createEmailPrefReader } from '../_shared/emailPrefsAdmin.ts'
 import { gateCaller } from '../_shared/gate.ts'
 import { CORS_HEADERS, serviceKeyFrom } from '../_shared/http.ts'
 import { createNotifier } from '../_shared/notifyAdmin.ts'
@@ -26,6 +27,7 @@ Deno.serve((req) =>
     config: readEmailConfig(env),
     fetch,
     notify,
+    emailPref: createEmailPrefReader(admin),
     async userIdFromToken(token) {
       const { data, error } = await admin.auth.getUser(token)
       return error ? null : (data.user?.id ?? null)
