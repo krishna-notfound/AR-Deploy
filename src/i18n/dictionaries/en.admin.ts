@@ -5,6 +5,7 @@ export const enAdmin = {
   'admin.lists.title': 'Categories & currencies',
   'admin.lists.description': 'The product categories and currencies that companies can choose from. Changes apply to every company straight away.',
   'admin.lists.tabs': 'Lists',
+  'admin.lists.staleNotice': 'The list could not be refreshed, so what you see may be out of date.',
   'admin.lists.tab.categories': 'Categories',
   'admin.lists.tab.currencies': 'Currencies',
   'admin.lists.categories.intro': 'Categories group products in the product editor, the filters and the public catalogue. A hidden category is not offered for new products; products already in it keep it.',
@@ -268,6 +269,7 @@ export const enAdmin = {
   'admin.products.emptyBody': 'Add the first product to a business catalog.',
   'admin.products.pickerTitle': 'Add a product',
   'admin.products.pickerBody': 'Choose the business catalog this product belongs to.',
+  'admin.products.pickerNone': 'There are no businesses yet. Add a business first.',
   'admin.products.business': 'Business',
   // ---- admin overview ----
   'admin.overview.activeCount': '{n} active',

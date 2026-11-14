@@ -21,6 +21,17 @@ export function onPermissionError(listener: () => void): () => void {
 function reportRefusal(res: Result<unknown>) {
   if (!res.ok && res.error.code === 'PERMISSION') permissionListeners.forEach((l) => l())
 }
+/** A service call that rejects or throws (a network drop, a bug) becomes a failed result, so no query loads forever and no mutation leaves its caller hanging. */
+function failed<T>(e: unknown): Result<T> {
+  return { ok: false, error: { code: 'UNKNOWN', message: e instanceof Error && e.message ? e.message : 'Something went wrong. Try again.' } }
+}
+async function settle<T>(run: () => Promise<Result<T>>): Promise<Result<T>> {
+  try {
+    return await run()
+  } catch (e) {
+    return failed(e)
+  }
+}
 
 /**
  * Runs a service call and re-runs it whenever deps change or the data store changes.
@@ -39,8 +50,7 @@ export function useServiceQuery<T>(fn: () => Promise<Result<T>>, deps: readonly 
     const id = ++requestId.current
     if (mode === 'background') setRefreshing(true)
     else setState((s) => ({ status: 'loading', data: mode === 'new' ? undefined : s.data }))
-    fnRef
-      .current()
+    settle(() => fnRef.current())
       .then((res) => {
         reportRefusal(res)
         if (id !== requestId.current) return
@@ -69,7 +79,7 @@ export function useServiceMutation<A extends unknown[], T>(fn: (...args: A) => P
   const mutate = useCallback(async (...args: A): Promise<Result<T>> => {
     setPending(true)
     try {
-      const res = await fnRef.current(...args)
+      const res = await settle(() => fnRef.current(...args))
       reportRefusal(res)
       return res
     } finally {

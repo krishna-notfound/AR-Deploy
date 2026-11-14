@@ -11,7 +11,7 @@ import { cn } from '@/lib/cn'
 import { type DatePrefs, formatDate, formatDateTime, formatTime } from '@/lib/format'
 import { browserTimeZone, timeZoneList, useProfileSettings } from '@/lib/preferences'
 import { ThemeChoiceControl } from '@/theme/ThemeChoiceControl'
-import { SectionHeader, SettingsCard } from '../SettingsUi'
+import { SectionHeader, SettingsCard, useUnsavedDraft } from '../SettingsUi'
 
 const DATE_FORMATS: DateFormatPref[] = ['d MMM yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd']
 // Fixed sample for the option labels (shown in UTC so the label is the same everywhere): 25 Oct 2026, 14:05.
@@ -74,6 +74,7 @@ function PreferencesForm({ profile }: { profile: Profile }) {
   const device = useMemo(() => browserTimeZone(), [])
   const zones = useMemo(() => timeZoneList([profile.timezone, device]), [profile.timezone, device])
   const dirty = draft.timezone !== profile.timezone || draft.dateFormat !== profile.dateFormat || draft.clock !== profile.clock
+  useUnsavedDraft(dirty)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()

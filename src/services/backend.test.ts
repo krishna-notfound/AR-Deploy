@@ -138,7 +138,8 @@ describe('Supabase catalog service', () => {
     expect(res.ok).toBe(false)
     if (!res.ok) {
       expect(res.error.code).toBe('CONFLICT')
-      expect(res.error.fieldErrors?.slug).toMatch(/already used/)
+      // A translatable message, not English text (QA FV-03).
+      expect(res.error.fieldErrors?.slug).toEqual({ key: 'common.validation.business.slugTaken' })
     }
   })
 
@@ -303,6 +304,16 @@ describe('storage path helpers', () => {
   it('demo mode keeps owner management session-only and never claims an email was sent', async () => {
     const res = await mockCatalogService.provisionOwner({ businessId: 'biz_casa', email: 'owner@demo.test', language: 'en' })
     expect(res.ok && res.data.email).toMatchObject({ status: 'blocked', error: 'demo_mode' })
+  })
+})
+
+describe('business updates write only what they carry (QA FV-02)', () => {
+  it('writes only the contact entries present; an entry set to undefined clears its column', async () => {
+    const { fromBusinessInput } = await import('./supabase/supabaseCatalogService')
+    expect(fromBusinessInput({ contact: { phone: '123' } })).toEqual({ contact_phone: '123' })
+    expect(fromBusinessInput({ contact: { email: undefined } })).toEqual({ contact_email: null })
+    expect(fromBusinessInput({ contact: {} })).toEqual({})
+    expect(fromBusinessInput({ description: 'x' })).toEqual({ description: 'x' })
   })
 })
 

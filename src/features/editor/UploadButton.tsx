@@ -8,6 +8,7 @@ import { formatMb } from '@/lib/files'
 import { editedFile } from '@/lib/imageCrop'
 import { type ImageFrameKey, imageFrame } from '@/lib/imageFrames'
 import { content, siteAssetProblem } from '@/services'
+import { uploadErrorText } from './uploadError'
 
 const ACCEPT: Record<SiteAssetKind, string> = { image: 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', glb: '.glb,model/gltf-binary', usdz: '.usdz', favicon: 'image/png,.png' }
 
@@ -66,7 +67,7 @@ export function UploadButton({
     const r = await content.uploadSiteAsset(file, kind)
     setBusy(false)
     if (r.ok) onUploaded(r.data)
-    else setError(r.error.message)
+    else setError(uploadErrorText(r.error, t))
   }
 
   /** Uploads the original and the edited copy, then hands both over. Nothing is kept when either upload fails. */
@@ -74,9 +75,9 @@ export function UploadButton({
     setBusy(true)
     try {
       const original = await content.uploadSiteAsset(file, 'image')
-      if (!original.ok) return setError(original.error.message)
+      if (!original.ok) return setError(uploadErrorText(original.error, t))
       const copy = await content.uploadSiteAsset(editedFile(result.blob, file.name), 'image')
-      if (!copy.ok) return setError(copy.error.message)
+      if (!copy.ok) return setError(uploadErrorText(copy.error, t))
       onUploaded({ path: copy.data.path, originalPath: original.data.path, crop: result.crop })
     } finally {
       setBusy(false)

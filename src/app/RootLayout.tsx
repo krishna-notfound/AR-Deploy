@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { LanguageProvider, useI18n } from '@/i18n/LanguageProvider'
 import { demoStore as store, isDemoMode } from '@/services'
 import { ThemeSync } from '@/theme/ThemeSync'
+import { OfflineBanner } from './OfflineBanner'
 import { useSiteFavicon } from './useSiteFavicon'
 
 /** Browser-storage notices (demo mode only), in the person's language. */
@@ -30,6 +31,7 @@ export function RootLayout() {
       <DemoStorageNotices />
       <ThemeSync />
       <ScrollRestoration />
+      <OfflineBanner />
       <Outlet />
     </LanguageProvider>
   )

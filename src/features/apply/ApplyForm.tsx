@@ -89,6 +89,18 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
   const [honeypot, setHoneypot] = useState('')
   const headingRef = useRef<HTMLHeadingElement>(null)
   const shownStep = useRef(step.id)
+  const formRef = useRef<HTMLFormElement>(null)
+  /** Set when Next or Send finds errors: once they are on screen, focus moves to the first invalid field (QA FV-08). */
+  const focusInvalid = useRef(false)
+  useEffect(() => {
+    if (!focusInvalid.current) return
+    const form = formRef.current
+    const first = form?.querySelector<HTMLElement>('[aria-invalid="true"]')
+    if (!first) return
+    focusInvalid.current = false
+    // After the step heading's own focus (a step change), so the field wins.
+    requestAnimationFrame(() => (first.matches('input,select,textarea,button') ? first : first.querySelector<HTMLElement>('input,select,textarea,button'))?.focus())
+  })
 
   // A refresh (or coming back to /apply in this tab) resumes the saved step without adding a history entry.
   useEffect(() => {
@@ -191,7 +203,10 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
     if (uploading) return
     const errs = stepErrors([step])
     setErrors(errs)
-    if (Object.keys(errs).length) return
+    if (Object.keys(errs).length) {
+      focusInvalid.current = true
+      return
+    }
     go(steps[idx + 1]!)
   }
 
@@ -211,6 +226,7 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
     const all = stepErrors(steps)
     setErrors(all)
     if (Object.keys(all).length) {
+      focusInvalid.current = true
       const first = firstWithErrors(all)
       if (first) go(first)
       return
@@ -241,6 +257,7 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
     if (res.error.code === 'VALIDATION' && res.error.fieldErrors) {
       const errs = Object.fromEntries(Object.entries(res.error.fieldErrors).map(([f, c]) => [f, typeof c === 'string' ? message(f, c) : translate(language, c.key, c.vars)]))
       setErrors(errs)
+      focusInvalid.current = true
       const first = firstWithErrors(errs)
       if (first) go(first)
       return
@@ -276,7 +293,7 @@ export function ApplyForm({ config, version = 0, lang, preview = false, onStale 
       </AuthHeading>
       <StepIndicator className="mt-10" label={tx.text('apply.progress')} current={idx} steps={steps.map((s) => tx.stepTitle(s))} onGo={(i) => i < idx && go(steps[i]!)} compactLabels />
 
-      <form onSubmit={isReview ? submit : next} noValidate className={cn('mt-10 min-w-0', authFieldsClass)}>
+      <form ref={formRef} onSubmit={isReview ? submit : next} noValidate className={cn('mt-10 min-w-0', authFieldsClass)}>
         {stale && (
           <InlineNotice tone="warning" className="mb-6">
             <span role="alert">{translate(language, 'applications.apply.formChanged')}</span>

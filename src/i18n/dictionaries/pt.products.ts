@@ -456,6 +456,7 @@ export const ptProducts: Partial<Record<TranslationKey, string>> = {
 
   // Importar produtos de um CSV (ADR-0051)
   'products.import.button': 'Importar',
+  'products.stats.failed': 'Não foi possível carregar as visualizações e as contagens de RA. O 0 mostrado em cada produto não é uma contagem real.',
   'products.import.title': 'Importar produtos',
   'products.import.lead': 'Adicione muitos produtos de uma só vez a partir de um ficheiro CSV. Cada linha passa a rascunho; nada é publicado.',
   'products.import.step1': '1. Escolha o ficheiro',

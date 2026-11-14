@@ -108,7 +108,8 @@ const adminRoutes: RouteObject = {
       <AdminFrame />
     </DashboardDictionaries>
   ),
-  children: [
+  // A page that crashes shows the error inside the shell (the sidebar and header stay), not instead of the whole app (QA EF-17).
+  children: [{ errorElement: <RouteError shell />, children: [
     { index: true, element: <AdminOverviewPage /> },
     // Each page needs its permission (ADR-0029). UX only: the database enforces the same rules.
     { path: 'applications', element: <RequirePermission need="applications.view"><ApplicationsPage /></RequirePermission> },
@@ -159,7 +160,7 @@ const adminRoutes: RouteObject = {
     { path: 'team/:memberId', element: <RequirePermission need="owner"><MemberDetailPage /></RequirePermission> },
     { path: 'activity', element: <RequirePermission need={['records.view', 'access.view']}><AuditLogPage /></RequirePermission> },
     { path: '*', element: <NotFoundPage inShell /> },
-  ],
+  ] }],
 }
 
 const businessRoutes: RouteObject = {
@@ -169,7 +170,7 @@ const businessRoutes: RouteObject = {
       <BusinessFrame />
     </DashboardDictionaries>
   ),
-  children: [
+  children: [{ errorElement: <RouteError shell />, children: [
     { index: true, element: <BusinessOverviewPage /> },
     { path: 'products', element: <MyProductsPage /> },
     { path: 'products/new', element: <ProductEditorPage scope="business" /> },
@@ -178,7 +179,7 @@ const businessRoutes: RouteObject = {
     { path: 'analytics', element: <BusinessAnalyticsPage /> },
     { path: 'catalog', element: <MyCatalogPage /> },
     { path: '*', element: <NotFoundPage inShell /> },
-  ],
+  ] }],
 }
 
 // The settings hub is full-screen, outside DashboardShell but behind the same role guard and 2FA gate. Every platform role
@@ -221,16 +222,13 @@ function pathModeRoutes(): RouteObject[] {
       children: [
         {
           element: <Standalone />,
-          children: [
-            ...settingsRoutes,
-            editorPreviewRoute,
-          ],
+          children: [{ errorElement: <RouteError />, children: [...settingsRoutes, editorPreviewRoute] }],
         },
         adminRoutes,
         businessRoutes,
         {
           element: <PublicLayout />,
-          children: [
+          children: [{ errorElement: <RouteError />, children: [
             { path: '/', element: <LandingPage /> },
             // The sign-in pages read their panel from the published site content (ADR-0067), so they share this provider too.
             // The demo account picker exists only in demo mode; on the live site /demo goes to the sign-in page.
@@ -251,7 +249,7 @@ function pathModeRoutes(): RouteObject[] {
             // Framable by any website (vercel.json, ADR-0026); chrome-less, public data only.
             { path: '/embed/products/:businessSlug/:productSlug', element: <LowercaseSlugs route="embed"><EmbedProductPage /></LowercaseSlugs> },
             { path: '*', element: <PublicNotFoundPage /> },
-          ],
+          ] }],
         },
       ],
     },
@@ -267,7 +265,7 @@ function hostnameModeRoutes(slug: string): RouteObject[] {
       children: [
         {
           element: <PublicLayout />,
-          children: [
+          children: [{ errorElement: <RouteError />, children: [
             { path: '/', element: <CatalogPage tenantSlug={slug} /> },
             { path: '/products/:productSlug', element: <LowercaseSlugs route="product" tenant><ProductPage tenantSlug={slug} /></LowercaseSlugs> },
             { path: '/embed/products/:productSlug', element: <LowercaseSlugs route="embed" tenant><EmbedProductPage tenantSlug={slug} /></LowercaseSlugs> },
@@ -276,7 +274,7 @@ function hostnameModeRoutes(slug: string): RouteObject[] {
             { path: TERMS_PATH, element: <LegalPage doc="terms" tenant /> },
             { path: '/pages/:slug', element: <CustomPage tenant /> },
             { path: '*', element: <PublicNotFoundPage tenant /> },
-          ],
+          ] }],
         },
       ],
     },

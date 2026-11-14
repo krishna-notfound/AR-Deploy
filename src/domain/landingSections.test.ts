@@ -155,7 +155,7 @@ describe('validate sections', () => {
 
   it('the button link is a site path or an https URL, at most 300; the label is required with a button', () => {
     for (const ok of ['/', '/apply', '/#sobre', '/catalog/x?y=1', 'https://example.com', 'https://example.com/a?b=c#d']) expect(isAllowedSectionHref(ok), ok).toBe(true)
-    for (const bad of ['', 'apply', '//evil.test', 'http://x.test', 'javascript:alert(1)', 'mailto:a@b.c', 'data:text/html,x', '/a b', 'https://', 'https://a b', ' /a'])
+    for (const bad of ['', 'apply', '//evil.test', 'http://x.test', 'javascript:alert(1)', 'mailto:a@b.c', 'data:text/html,x', '/a b', '/\\evil.test', '/a\\b', 'https://', 'https://a b', ' /a'])
       expect(isAllowedSectionHref(bad), bad).toBe(false)
     expect(isAllowedSectionHref(`/${'a'.repeat(299)}`)).toBe(true)
     expect(isAllowedSectionHref(`/${'a'.repeat(300)}`)).toBe(false)

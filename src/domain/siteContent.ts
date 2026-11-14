@@ -264,7 +264,7 @@ export const defaultLandingSections = (): BuiltinSection[] => BUILTIN_SECTION_ID
 export const resolveLandingSections = (landing: Pick<SiteContent['landing'], 'sections'> | undefined): LandingSection[] => landing?.sections ?? defaultLandingSections()
 
 /** A site path (`/…`, not `//host`) or an https URL, without spaces, at most 300 characters. The twin of the pattern in the SQL gate. */
-export const isAllowedSectionHref = (href: string): boolean => href.length <= MAX_SECTION_HREF && /^(?:\/(?:[^/\s]\S*)?|https:\/\/\S+)$/.test(href)
+export const isAllowedSectionHref = (href: string): boolean => href.length <= MAX_SECTION_HREF && /^(?:\/(?:[^/\\\s][^\\\s]*)?|https:\/\/\S+)$/.test(href)
 
 export const MAX_LANDING_COLLECTIONS = 8
 export const MAX_COLLECTION_TITLE = 60
@@ -608,7 +608,8 @@ function normalizeCollection(x: unknown): LandingCollection {
 /** `https://`, `mailto:` and site-relative `/...` (not `//host`) only. Everything else, `javascript:` and `data:` included, is refused. */
 export function isAllowedLinkHref(href: string): boolean {
   const h = href.trim()
-  return /^https:\/\/\S/i.test(h) || /^mailto:\S/i.test(h) || /^\/(?!\/)/.test(h)
+  // A backslash is refused in a site path: browsers read `/\host` as `//host`, an external link.
+  return /^https:\/\/\S/i.test(h) || /^mailto:\S/i.test(h) || /^\/(?![/\\])[^\\]*$/.test(h)
 }
 /** Whether every Markdown link `[text](href)` in `body` is allowed. Raw HTML is never parsed, so only links matter. */
 export function hasOnlyAllowedLinks(body: string): boolean {

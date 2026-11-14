@@ -97,6 +97,36 @@ describe('BusinessForm (edit)', () => {
     expect(Object.keys(update.mock.calls[0]![1])).toEqual(['contact'])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  // QA FV-02: the form sent all four contact entries, so an older tab silently undid a contact edit saved meanwhile.
+  it('sends only the contact entries that changed, and shows one saved meanwhile', async () => {
+    const user = userEvent.setup()
+    renderEdit()
+    await user.type(await screen.findByLabelText(/^Phone/), '1')
+    await act(async () => {
+      await service.updateBusiness('biz_nord', { contact: { email: 'new@nord.example' } })
+    })
+    await waitFor(() => expect(screen.getByLabelText(/^Email/)).toHaveValue('new@nord.example'))
+    const update = vi.spyOn(service, 'updateBusiness')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(Object.keys(update.mock.calls[0]![1].contact ?? {})).toEqual(['phone'])
+    const saved = await service.getBusinessById('biz_nord')
+    expect(saved.ok && saved.data.contact.email).toBe('new@nord.example')
+  })
+
+  it('warns before a reload or tab close only while there are unsaved edits (QA EF-06)', async () => {
+    const user = userEvent.setup()
+    renderEdit()
+    const clean = new Event('beforeunload', { cancelable: true })
+    await screen.findByLabelText(/^Phone/)
+    window.dispatchEvent(clean)
+    expect(clean.defaultPrevented).toBe(false)
+    await user.type(screen.getByLabelText(/^Phone/), '1')
+    const dirty = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(dirty)
+    expect(dirty.defaultPrevented).toBe(true)
+  })
 })
 
 describe('S2 Task 2: field limits and the status select (R-W3-5, R-W3-7)', () => {
@@ -135,6 +165,17 @@ describe('S2 Task 2: field limits and the status select (R-W3-5, R-W3-7)', () =>
     expect(await screen.findByText('Use 500 characters or fewer.')).toBeInTheDocument()
     expect(screen.getByLabelText(/^Address/)).toHaveAttribute('aria-invalid', 'true')
     expect(update).not.toHaveBeenCalled()
+  })
+
+  it('a field error goes away as soon as the field is edited (QA FV-08)', async () => {
+    const user = userEvent.setup()
+    renderEdit()
+    fireEvent.change(await screen.findByLabelText(/^Address/), { target: { value: 'a'.repeat(501) } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Use 500 characters or fewer.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/^Address/), { target: { value: 'Rua A' } })
+    await waitFor(() => expect(screen.queryByText('Use 500 characters or fewer.')).toBeNull())
+    expect(screen.getByLabelText(/^Address/)).not.toHaveAttribute('aria-invalid', 'true')
   })
 
   it('the status select shows only with businesses.status', async () => {

@@ -137,6 +137,14 @@ export function InviteMemberDialog({
               ) : (
                 <p className="mt-2 text-ui-body text-ink-muted">{t('team.invite.nothingYet')}</p>
               )
+            ) : perms.status === 'error' ? (
+              // A failed read is not "loading": say so and let the person try again (QA EF-09).
+              <div role="alert" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-body text-ink-muted">
+                <span>{`${t('team.invite.permsFailed')} ${errorText(perms.error, t)}`}</span>
+                <Button size="sm" variant="ghost" className="underline underline-offset-2" onClick={perms.refetch}>
+                  {t('common.retry')}
+                </Button>
+              </div>
             ) : (
               <p className="mt-2 text-ui-body text-ink-muted">{t('common.loading')}</p>
             )}

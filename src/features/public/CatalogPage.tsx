@@ -8,7 +8,7 @@ import { Button, ButtonLink } from '@/components/ui/Button'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { ErrorState } from '@/components/ui/States'
+import { ErrorState, InlineNotice } from '@/components/ui/States'
 import type { Product } from '@/domain/types'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
@@ -203,6 +203,17 @@ export default function CatalogPage({ tenantSlug }: { tenantSlug?: string }) {
       </div>
 
       <section className="mx-auto max-w-[1320px] px-5 pt-8 pb-16 sm:px-10 sm:pt-10 sm:pb-24" aria-live="polite">
+        {/* A refresh that failed while products are on screen keeps them, and says so without blocking (QA EF-13). */}
+        {products.status === 'error' && products.data && (
+          <InlineNotice tone="neutral" className="mb-6 items-center">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>{t('catalog.refreshFailed')}</span>
+              <Button size="sm" variant="ghost" className="underline underline-offset-2" onClick={products.refetch}>
+                {t('common.retry')}
+              </Button>
+            </span>
+          </InlineNotice>
+        )}
         {products.status === 'loading' && !products.data ? (
           <CardSkeletons label={t('common.loading')} />
         ) : products.status === 'error' && !products.data ? (

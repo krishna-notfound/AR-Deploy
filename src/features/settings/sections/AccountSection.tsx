@@ -19,7 +19,7 @@ import { EMAIL_PATTERN } from '@/services/accountService'
 import { type QueryResult, useServiceQuery } from '@/services/hooks'
 import { ActionCodeDialog } from '../ActionCodeDialog'
 import { useCancelClosure } from '../useCancelClosure'
-import { SectionHeader, SettingsCard } from '../SettingsUi'
+import { SectionHeader, SettingsCard, useUnsavedDraft } from '../SettingsUi'
 
 type Security = QueryResult<SecurityState>
 
@@ -95,6 +95,7 @@ function EmailForm({ currentEmail, onRequested }: { currentEmail: string; onRequ
   const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  useUnsavedDraft(email.trim() !== '')
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
   const [pending, setPending] = useState(false)
 
@@ -243,6 +244,7 @@ function PasswordCard({ security }: { security: Security }) {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirmNext, setConfirmNext] = useState('')
+  useUnsavedDraft(next !== '' || confirmNext !== '')
   const [errors, setErrors] = useState<{ current?: string; next?: string; confirm?: string; form?: string }>({})
   const [pending, setPending] = useState(false)
   const [dialog, setDialog] = useState(false)

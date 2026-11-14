@@ -79,7 +79,27 @@ describe('Role permissions (ADR-0029)', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   })
 
-  it('moves focus to the page heading when a successful save removes the bar', { timeout: 20_000 }, async () => {
+  it('says so when only one role was saved, and counts only what is still unsaved (QA EF-01)', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    const real = service.setRolePermissions.bind(service)
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ role: 'super_admin' }))
+    const admin = await service.getRolePermissions()
+    if (!admin.ok) throw new Error('setup')
+    expect((await real('admin', admin.data.admin.filter((p) => p !== 'products.publish'))).ok).toBe(true)
+    vi.spyOn(service, 'setRolePermissions').mockImplementation(async (role, perms) => (role === 'admin' ? real(role, perms) : fail('UNKNOWN', 'Network down.')))
+    open()
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(34))
+    await user.click(box('Admin', 'Publish and unpublish'))
+    await user.click(box('Team', 'Publish and unpublish'))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Only some permissions were saved')).toBeInTheDocument()
+    expect(screen.getByText(/Saved for: Admin\. Not saved for: Team\./)).toBeInTheDocument()
+    expect(screen.queryByText('Permissions not saved')).toBeNull()
+    // The Admin change is saved, so only the Team change is still unsaved.
+    expect(document.querySelector('[data-save-status]')).toHaveTextContent('1 unsaved change')
+  })
+
+  it('moves focus to the page heading when a successful save removes the bar',{ timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     open()
     await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(34))

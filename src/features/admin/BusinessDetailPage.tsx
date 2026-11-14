@@ -34,6 +34,7 @@ import { closureByBusiness } from '../businesses/closure'
 import { useBusinessActions } from '../businesses/useBusinessActions'
 import { CatalogQrPanel } from '../catalogs/CatalogQrPanel'
 import { ProductTable } from '../products/ProductTable'
+import { StatsNotice } from '../products/StatsNotice'
 import { useProductStats } from '../products/useCatalogData'
 import { ActionCodeDialog } from '../settings/ActionCodeDialog'
 
@@ -190,6 +191,7 @@ export default function BusinessDetailPage() {
               </ButtonLink>
             )}
           </div>
+          <StatsNotice query={stats.query} className="px-4 pt-3" />
           {products.status === 'error' && !products.data ? (
             <ErrorState message={`${t('admin.businesses.detail.productsFailed')} ${errorText(products.error, t)}`} onRetry={products.refetch} />
           ) : (

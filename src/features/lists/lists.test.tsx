@@ -2,13 +2,14 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACCOUNT_KEY, AccountProvider } from '@/auth/AccountProvider'
 import { RequirePermission } from '@/auth/usePermission'
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
 import { service } from '@/services'
+import { fail } from '@/services/catalogService'
 import { resetListsCache } from '@/services/listsHooks'
 import { resetMockAccount } from '@/services/mock/mockAccount'
 import { mockListsService as lists } from '@/services/mock/mockLists'
@@ -27,6 +28,8 @@ beforeEach(async () => {
   resetListsCache()
   await service.resetDemoData()
 })
+
+afterEach(() => vi.restoreAllMocks())
 
 function renderLists(path = '/admin/lists/categories') {
   const router = createMemoryRouter(
@@ -71,6 +74,21 @@ const order = async () => {
   return Array.from(list.querySelectorAll('[data-category]')).map((li) => li.getAttribute('data-category'))
 }
 
+describe('a failed reload after a successful change (QA EF-11)', () => {
+  it('says the list may be out of date and offers a retry, instead of staying silent', async () => {
+    const user = userEvent.setup()
+    renderLists()
+    const first = await row('sofa')
+    vi.spyOn(lists, 'getCategories').mockResolvedValue(fail('UNKNOWN', 'down'))
+    await user.click(first.getByRole('switch'))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('could not be refreshed')
+    vi.mocked(lists.getCategories).mockRestore()
+    await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  })
+})
+
 describe('Categories', () => {
   it('lists the seeded categories with both names, and Other has no delete, hide or move', async () => {
     renderLists()
@@ -94,6 +112,11 @@ describe('Categories', () => {
     await user.click(screen.getByRole('button', { name: 'Add category' }))
     expect(await screen.findByText('Enter the English name.')).toBeInTheDocument()
     expect(screen.getByText('Enter the Portuguese name.')).toBeInTheDocument()
+    // A field's error goes away as soon as that field is edited (QA FV-08); the other stays.
+    await user.type(screen.getByLabelText('Name in English'), 'G')
+    expect(screen.queryByText('Enter the English name.')).toBeNull()
+    expect(screen.getByText('Enter the Portuguese name.')).toBeInTheDocument()
+    await user.clear(screen.getByLabelText('Name in English'))
     await user.type(screen.getByLabelText('Name in English'), 'Garden furniture')
     await user.type(screen.getByLabelText('Name in Portuguese'), 'Mobiliário de jardim')
     await user.click(screen.getByRole('button', { name: 'Add category' }))

@@ -17,6 +17,7 @@ export const ptSite: Partial<Record<TranslationKey, string>> = {
   'showcase.bannerTitle': 'É assim que os seus clientes vão ver as suas peças.',
   'showcase.bannerBody': 'Fotografias, 3D e Realidade Aumentada em cada peça, numa página só sua. Conte-nos sobre o seu negócio e preparamos tudo consigo.',
   'showcase.loadError': 'Não foi possível carregar esta peça.',
+  'site.collection.pageError': 'Não foi possível carregar esta coleção.',
   'site.collection.loadError': 'Não foi possível carregar as peças desta coleção.',
 
   'site.social.label': 'Redes sociais',

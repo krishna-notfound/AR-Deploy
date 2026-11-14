@@ -13,6 +13,7 @@ import { errorText } from '@/i18n/errorText'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
 import { EDITOR_PATH, editorApplyPath, editorLandingPath, editorPagesPath, editorPreviewPath, editorShowcasePath, editorSitePath, editorSocialPath } from '@/lib/urls'
+import { useBeforeUnload } from '@/lib/useBeforeUnload'
 import { useFormat } from '@/lib/useFormat'
 import { EditorContext } from './EditorContext'
 import { EditorAreaSkeleton, EditorSkeleton } from './EditorSkeleton'
@@ -90,12 +91,7 @@ function EditorFrame({ editor }: { editor: DraftEditor }) {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocker.state])
-  useEffect(() => {
-    if (!dirty) return
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [dirty])
+  useBeforeUnload(dirty)
 
   const problems = useMemo(() => describeProblems(editor.errors, editor.draft, t), [editor.errors, editor.draft, t])
   const preview = async () => {
@@ -139,7 +135,16 @@ function EditorFrame({ editor }: { editor: DraftEditor }) {
         <div role="alert" className="mb-6 flex flex-wrap items-center gap-3 border border-warning/40 bg-warning-soft px-4 py-3 text-ui-body text-warning">
           <AlertTriangle className="size-4 shrink-0" aria-hidden />
           <span className="flex-1">{t('editor.conflict.banner')}</span>
-          <Button size="sm" onClick={() => void editor.reload()}>
+          <Button
+            size="sm"
+            onClick={() =>
+              // Reload replaces the working copy with the server's, so the edits that could not be saved are lost: ask first (QA FV-01).
+              void (async () => {
+                const yes = await confirm({ title: t('editor.conflict.discardTitle'), body: t('editor.conflict.discardBody'), confirmLabel: t('editor.conflict.discardConfirm'), destructive: true })
+                if (yes) void editor.reload()
+              })()
+            }
+          >
             {t('editor.conflict.reload')}
           </Button>
         </div>
