@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -711,8 +711,8 @@ describe('delete anything (ADR-0057)', () => {
     expect(latest.applyForm.removedFields).toEqual(['website'])
     expect(latest.applyForm.fields.some((f) => f.key === 'website')).toBe(false)
     expect(validateApplyForm(latest.applyForm)).toEqual({})
-    // The neighbour takes keyboard focus.
-    expect(document.activeElement).toBe(rowOf('category').querySelector('[data-handle]'))
+    // The neighbour takes keyboard focus (on the next animation frame, QuestionCard.tsx).
+    await waitFor(() => expect(document.activeElement).toBe(rowOf('category').querySelector('[data-handle]')))
     await user.click(screen.getByRole('button', { name: 'Add question' }))
     expect(await screen.findByText('Restore a standard question')).toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Website' }))
