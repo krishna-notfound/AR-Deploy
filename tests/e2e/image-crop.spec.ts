@@ -220,3 +220,38 @@ test.describe('card and product page', () => {
     await expect(dialog(page)).toBeHidden()
   })
 })
+// ADR-0080: "More photos" pick a camera shape; the main photo keeps 4:5 with no shape choice.
+test.describe('More photos shapes', () => {
+  test('the main photo has no shape choice; a More photo saves in the shape picked and Original keeps its own', async ({ page }) => {
+    await newProduct(page)
+    await choose(page, 'landscape.jpg')
+    await expect(dialog(page).getByRole('radiogroup', { name: 'Shape' })).toHaveCount(0)
+    await dialog(page).getByRole('button', { name: 'Cancel' }).click()
+
+    const shapes = [
+      { file: 'landscape.jpg', shape: '16:9', ratio: 16 / 9 },
+      { file: 'portrait.jpg', shape: '3:4', ratio: 3 / 4 },
+      { file: 'square.jpg', shape: '1:1', ratio: 1 },
+    ]
+    for (const { file, shape, ratio } of shapes) {
+      await choose(page, file, 'Upload additional photos')
+      const group = dialog(page).getByRole('radiogroup', { name: 'Shape' })
+      await expect(group.getByRole('radio', { name: 'Original' })).toHaveAttribute('aria-checked', 'true')
+      await group.getByRole('radio', { name: shape }).click()
+      await expect(group.getByRole('radio', { name: shape })).toHaveAttribute('aria-checked', 'true')
+      await expect(dialog(page).getByText(NUDGE)).toBeHidden() // the centred fill crop covers the new frame
+      await dialog(page).getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(dialog(page)).toBeHidden()
+      const saved = await measure(page.getByRole('img', { name: file.replace('.jpg', '') }).last())
+      expect(saved.naturalWidth / saved.naturalHeight).toBeCloseTo(ratio, 1)
+      expect((await opaque(page.getByRole('img', { name: file.replace('.jpg', '') }).last())).cornerAlpha).toEqual([255, 255])
+    }
+
+    // Original: saved in the picture's own shape, nothing cut and no margins.
+    await choose(page, 'wide-4x1.jpg', 'Upload additional photos')
+    await dialog(page).getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(dialog(page)).toBeHidden()
+    const wide = await measure(page.getByRole('img', { name: 'wide-4x1' }).last())
+    expect(wide.naturalWidth / wide.naturalHeight).toBeCloseTo(4, 1)
+  })
+})
