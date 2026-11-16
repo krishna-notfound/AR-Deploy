@@ -4,7 +4,6 @@ import { SmartImage } from '@/components/ui/SmartImage'
 import type { LengthUnit, Product } from '@/domain/types'
 import { LocalizedSpan, useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
-import { imageFrame } from '@/lib/imageFrames'
 import type { MeasuredSize } from '@/lib/scale'
 import { DimensionDiagram } from './DimensionDiagram'
 import type { ProductStage } from './useProductStage'
@@ -183,9 +182,11 @@ export function ProductSpecs({ product }: { product: Product }) {
   )
 }
 
-const MORE_FRAME = imageFrame('product')
-
-/** The additional photographs, below the product, in the product photo frame (4:5). */
+/**
+ * The additional photographs, below the product. Each one keeps its own saved shape (Original, 4:5, 3:4, 2:3, 1:1, 4:3, 3:2
+ * or 16:9): full column width, natural height, in staggered CSS columns. Owner decision 2026-11-16; the main photos (stage,
+ * thumbnails, catalogue cards) keep the 4:5 product frame.
+ */
 export function MorePhotos({ stage }: { stage: ProductStage }) {
   const { t } = useI18n()
   if (stage.additional.length === 0) return null
@@ -194,10 +195,16 @@ export function MorePhotos({ stage }: { stage: ProductStage }) {
       <h2 id="more-h" className="text-[12px] leading-[1.4] font-medium tracking-[0.08em] uppercase text-ink">
         {t('product.morePhotos')}
       </h2>
-      <ul className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+      <ul className="mt-6 columns-2 gap-3 sm:gap-5 md:columns-3 lg:columns-4">
         {stage.additional.map((img) => (
-          <li key={img.id} className="rounded-[var(--radius-card)] border border-line bg-surface p-2.5 sm:p-3">
-            <SmartImage src={img.url} alt={img.alt || stage.name} className={cn('w-full rounded-[var(--radius-control)] bg-subtle', MORE_FRAME.aspectClass, MORE_FRAME.fitClass)} />
+          <li key={img.id} className="mb-3 break-inside-avoid rounded-[var(--radius-card)] border border-line bg-surface p-2.5 sm:mb-5 sm:p-3">
+            <SmartImage
+              natural
+              src={img.url}
+              alt={img.alt || stage.name}
+              className="block h-auto w-full rounded-[var(--radius-control)]"
+              fallbackClassName="aspect-[4/3] w-full rounded-[var(--radius-control)]"
+            />
           </li>
         ))}
       </ul>

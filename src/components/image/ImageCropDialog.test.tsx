@@ -1,8 +1,8 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LANG_KEY, LanguageProvider } from '@/i18n/LanguageProvider'
-import { fillFrameCrop, fitWholeCrop } from '@/lib/imageCrop'
+import { CROP_SHAPES, fillFrameCrop, fitWholeCrop } from '@/lib/imageCrop'
 import { ImageCropDialog, type ImageCropDialogProps } from './ImageCropDialog'
 
 // The real cropper needs a laid-out browser (sizes, image load); here it reports a 400x200 display of a 2000x1000
@@ -257,5 +257,85 @@ describe('ImageCropDialog', () => {
     setup()
     await screen.findByTestId('cropper')
     for (const b of screen.getAllByRole('button')) expect(b).toHaveAccessibleName()
+  })
+})
+
+describe('ImageCropDialog: shapes (more photos)', () => {
+  const frameRatio = () => {
+    const [w, h] = screen.getByTestId('cropper').getAttribute('data-frame')!.split('x').map(Number)
+    return w! / h!
+  }
+
+  it('shows no shape buttons without the shapes prop', async () => {
+    setup()
+    await screen.findByTestId('cropper')
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  })
+
+  it('exports the shapes in order, original first', () => {
+    expect(CROP_SHAPES.map((s) => s.id)).toEqual(['original', '4:5', '3:4', '2:3', '1:1', '4:3', '3:2', '16:9'])
+  })
+
+  it('opens a new file on Original: the frame is the picture shape and the whole picture is saved, covering the frame', async () => {
+    const { user, onSave } = setup({ shapes: true })
+    await screen.findByTestId('cropper')
+    const group = await screen.findByRole('radiogroup', { name: 'Shape' })
+    expect(within(group).getAllByRole('radio')).toHaveLength(8)
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Original' })).toBeChecked())
+    await waitFor(() => expect(frameRatio()).toBeCloseTo(2, 1))
+    expect(screen.queryByText("This picture doesn't fill the frame.")).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    const { crop, whole } = onSave.mock.calls[0]![0]
+    expect(whole).toBe(false)
+    expect(crop.x).toBeCloseTo(0, 1)
+    expect(crop.width).toBeCloseTo(2000, 1)
+    expect(crop.height).toBeCloseTo(1000, 1)
+  })
+
+  it('choosing 16:9 reshapes the frame and saves a 16:9 crop', async () => {
+    const { user, onSave } = setup({ shapes: true })
+    await screen.findByTestId('cropper')
+    await user.click(await screen.findByRole('radio', { name: '16:9' }))
+    expect(screen.getByRole('radio', { name: '16:9' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Original' })).not.toBeChecked()
+    await waitFor(() => expect(frameRatio()).toBeCloseTo(16 / 9, 1))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    const { crop, whole } = onSave.mock.calls[0]![0]
+    expect(crop.width / crop.height).toBeCloseTo(16 / 9, 2)
+    expect(whole).toBe(false)
+  })
+
+  it('opens an initialCrop of 3:2 with 3:2 selected, and Reset returns to it', async () => {
+    const initialCrop = { x: 100, y: 0, width: 1500, height: 1000 }
+    const { user, onSave } = setup({ shapes: true, initialCrop })
+    await screen.findByTestId('cropper')
+    await waitFor(() => expect(screen.getByRole('radio', { name: '3:2' })).toBeChecked())
+    await waitFor(() => expect(frameRatio()).toBeCloseTo(1.5, 1))
+    await user.click(screen.getByRole('radio', { name: '1:1' }))
+    await waitFor(() => expect(frameRatio()).toBeCloseTo(1, 1))
+    await user.click(screen.getByRole('button', { name: 'Reset' }))
+    await waitFor(() => expect(screen.getByRole('radio', { name: '3:2' })).toBeChecked())
+    await waitFor(() => expect(frameRatio()).toBeCloseTo(1.5, 1))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    const { crop } = onSave.mock.calls[0]![0]
+    expect(crop.x).toBeCloseTo(100, 1)
+    expect(crop.width / crop.height).toBeCloseTo(1.5, 2)
+  })
+
+  it('an initialCrop that matches no shape falls back to Original with the whole picture', async () => {
+    setup({ shapes: true, initialCrop: { x: 0, y: 0, width: 900, height: 1000 } })
+    await screen.findByTestId('cropper')
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Original' })).toBeChecked())
+  })
+
+  it('labels the shapes in Portuguese', async () => {
+    setup({ shapes: true }, 'pt')
+    await screen.findByTestId('cropper')
+    expect(await screen.findByRole('radiogroup', { name: 'Formato' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Original' })).toBeInTheDocument()
   })
 })

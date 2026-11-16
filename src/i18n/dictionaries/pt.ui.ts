@@ -124,6 +124,8 @@ export const ptUi: Partial<Record<TranslationKey, string>> = {
   'ui.crop.zoom': 'Zoom',
   'ui.crop.zoomIn': 'Aproximar',
   'ui.crop.zoomOut': 'Afastar',
+  'ui.crop.shape': 'Formato',
+  'ui.crop.shape.original': 'Original',
   'ui.crop.fill': 'Preencher a moldura',
   'ui.crop.whole': 'Mostrar a imagem inteira',
   'ui.crop.reset': 'Repor',

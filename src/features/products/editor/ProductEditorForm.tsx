@@ -652,7 +652,7 @@ export function ProductEditorForm({
             <div className="border-t border-line pt-6">
               <h3 className="text-[14px] leading-5 font-semibold text-ink">{t('products.editor.additionalPhotos')}</h3>
               <p className="mt-0.5 mb-3 text-[13px] leading-[1.45] text-ink-muted">{t('products.editor.additionalPhotosHint')}</p>
-              <ImageUpload label={t('products.editor.uploadAdditional')} kind="additional" businessId={form.input.businessId} allowPrimary={false} images={form.input.images} onChange={updateImages} />
+              <ImageUpload label={t('products.editor.uploadAdditional')} kind="additional" shapes businessId={form.input.businessId} allowPrimary={false} images={form.input.images} onChange={updateImages} />
             </div>
           </Section>
 

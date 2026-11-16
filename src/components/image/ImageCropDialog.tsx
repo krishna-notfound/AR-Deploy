@@ -7,14 +7,18 @@ import { Modal } from '@/components/ui/Modal'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { ImageTooLargeError } from '@/lib/image'
 import {
+  CROP_SHAPES,
   type CropArea,
+  type CropShapeId,
   type CropView,
   clampView,
   coversFrame,
   cropFromView,
   fillFrameCrop,
   fitWholeCrop,
+  matchShape,
   renderCrop,
+  shapeRatio,
   touchesPicture,
   viewFromCrop,
   zoomAroundCenter,
@@ -31,6 +35,10 @@ import {
  * - `src`      a URL (data:, blob: or https with CORS) to open instead of `file`: "Edit picture" on a stored original.
  *              Give one of `file` or `src`.
  * - `aspect`   the frame's width divided by its height, from `src/lib/imageFrames.ts` (`imageFrame('product').aspect`).
+ * - `shapes`   true lets the user pick the frame's shape (Original, 4:5, 3:4, 2:3, 1:1, 4:3, 3:2, 16:9; `CROP_SHAPES`): the
+ *              "more photos" of a product. It starts on Original (the whole picture) or, with `initialCrop`, on the shape
+ *              within 1% of that crop's ratio. Then `aspect` is only the frame's size before the picture has loaded.
+ *              Without it the frame is always `aspect`, as for every other picture.
  * - `initialCrop`  the crop to start from (the stored `crop` of a picture being edited). Without it the dialog starts
  *              with the WHOLE picture fitted in the frame; nothing is cropped until the user chooses to.
  * - `title`    the dialog heading (already translated).
@@ -46,6 +54,7 @@ export interface ImageCropDialogProps {
   file?: File | Blob
   src?: string
   aspect: number
+  shapes?: boolean
   initialCrop?: CropArea
   title: string
   /** Smaller output than the default (long side 2000, quality 0.85): the logo and the profile photo. */
@@ -73,7 +82,7 @@ function frameIn(box: { width: number; height: number } | null, aspect: number) 
   return w / h > aspect ? { width: h * aspect, height: h } : { width: w, height: w / aspect }
 }
 
-export function ImageCropDialog({ file, src, aspect, initialCrop, title, output, onSave, onCancel }: ImageCropDialogProps) {
+export function ImageCropDialog({ file, src, aspect, shapes = false, initialCrop, title, output, onSave, onCancel }: ImageCropDialogProps) {
   const { t } = useI18n()
   const hintId = useId()
   const stageRef = useRef<HTMLDivElement>(null)
@@ -114,12 +123,17 @@ export function ImageCropDialog({ file, src, aspect, initialCrop, title, output,
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
-  const frame = frameIn(stage, aspect)
+  // The frame's shape: always `aspect`, or with `shapes` the chosen shape (Original is the picture's own ratio).
+  const [shapeId, setShapeId] = useState<CropShapeId>('original')
+  const startShapeRef = useRef<CropShapeId>('original')
+  const [media, setMedia] = useState<MediaSize | null>(null)
+  const frameAspect = shapes && media ? shapeRatio(shapeId, media.naturalWidth / media.naturalHeight) : aspect
+  const frame = frameIn(stage, frameAspect)
   // A new frame size remounts the cropper; it then restores the crop the user had (areaRef) in the new size.
-  const frameKey = `${Math.round(frame.width)}x${Math.round(frame.height)}`
+  const keyOf = (f: { width: number; height: number }) => `${Math.round(f.width)}x${Math.round(f.height)}`
+  const frameKey = keyOf(frame)
 
   // ---- the crop: view = where the cropper is; areaRef = the same as a rectangle of the picture (survives a remount) ----
-  const [media, setMedia] = useState<MediaSize | null>(null)
   const [readyKey, setReadyKey] = useState('')
   const [view, setView] = useState<CropView>({ crop: { x: 0, y: 0 }, zoom: 1 })
   const viewRef = useRef(view)
@@ -148,9 +162,22 @@ export function ImageCropDialog({ file, src, aspect, initialCrop, title, output,
   const onMediaLoaded = (m: MediaSize) => {
     mediaRef.current = m
     setMedia(m)
-    startRef.current ??= initialCrop ?? fitWholeCrop(m.naturalWidth, m.naturalHeight, aspect)
+    if (!startRef.current) {
+      if (shapes) {
+        // The first load picks the starting shape, so the frame (set at once, before the next render) is that shape's.
+        const naturalRatio = m.naturalWidth / m.naturalHeight
+        const matched = initialCrop ? matchShape(initialCrop.width / initialCrop.height, naturalRatio) : null
+        const id = matched ?? 'original'
+        startShapeRef.current = id
+        startRef.current = initialCrop && matched ? initialCrop : fitWholeCrop(m.naturalWidth, m.naturalHeight, naturalRatio)
+        frameRef.current = frameIn(stage, shapeRatio(id, naturalRatio))
+        setShapeId(id)
+      } else {
+        startRef.current = initialCrop ?? fitWholeCrop(m.naturalWidth, m.naturalHeight, aspect)
+      }
+    }
     showArea(areaRef.current ?? startRef.current)
-    setReadyKey(frameKey)
+    setReadyKey(keyOf(frameRef.current))
   }
 
   const natural = media ? { width: media.naturalWidth, height: media.naturalHeight } : null
@@ -162,9 +189,23 @@ export function ImageCropDialog({ file, src, aspect, initialCrop, title, output,
   const ready = !!media && readyKey === frameKey
 
   const zoomTo = (zoom: number) => apply(zoomAroundCenter(viewRef.current, Math.min(maxZoom, Math.max(minZoom, zoom))))
-  const fill = () => natural && showArea(fillFrameCrop(natural.width, natural.height, aspect))
-  const whole = () => natural && showArea(fitWholeCrop(natural.width, natural.height, aspect))
-  const reset = () => startRef.current && showArea(startRef.current)
+  const fill = () => natural && showArea(fillFrameCrop(natural.width, natural.height, frameAspect))
+  const whole = () => natural && showArea(fitWholeCrop(natural.width, natural.height, frameAspect))
+  /** Takes a shape: the frame gets its ratio at once and the picture is shown as `areaFor` says (centred fill by default). */
+  const chooseShape = (id: CropShapeId, areaFor?: () => CropArea) => {
+    const m = mediaRef.current
+    if (!m) return
+    const ratio = shapeRatio(id, m.naturalWidth / m.naturalHeight)
+    frameRef.current = frameIn(stage, ratio)
+    setShapeId(id)
+    showArea(areaFor?.() ?? fillFrameCrop(m.naturalWidth, m.naturalHeight, ratio))
+  }
+  const reset = () => {
+    const start = startRef.current
+    if (!start) return
+    if (shapes) chooseShape(startShapeRef.current, () => start)
+    else showArea(start)
+  }
 
   // Arrow keys move the picture once the frame has focus: focus it as soon as the picture is shown.
   useEffect(() => {
@@ -251,7 +292,7 @@ export function ImageCropDialog({ file, src, aspect, initialCrop, title, output,
                 image={source.url}
                 crop={view.crop}
                 zoom={view.zoom}
-                aspect={aspect}
+                aspect={frameAspect}
                 cropSize={frame}
                 minZoom={minZoom}
                 maxZoom={maxZoom}
@@ -273,6 +314,24 @@ export function ImageCropDialog({ file, src, aspect, initialCrop, title, output,
         <p id={hintId} className="text-xs text-ink-muted">
           {t('ui.crop.hint')}
         </p>
+
+        {shapes && (
+          <div role="radiogroup" aria-label={t('ui.crop.shape')} className="flex flex-wrap items-center gap-2">
+            {CROP_SHAPES.map((s) => (
+              <Button
+                key={s.id}
+                size="sm"
+                variant={shapeId === s.id ? 'primary' : 'secondary'}
+                role="radio"
+                aria-checked={shapeId === s.id}
+                onClick={() => chooseShape(s.id)}
+                disabled={!ready}
+              >
+                {s.id === 'original' ? t('ui.crop.shape.original') : s.id}
+              </Button>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <IconButton aria-label={t('ui.crop.zoomOut')} className={zoomButton} onClick={() => zoomTo(viewRef.current.zoom / ZOOM_STEP)} disabled={!ready}>

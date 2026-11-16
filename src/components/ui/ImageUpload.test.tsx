@@ -17,11 +17,12 @@ vi.mock('@/components/image/ImageCropDialog', () => ({
     src?: string
     aspect: number
     initialCrop?: unknown
+    shapes?: boolean
     title: string
     onSave: (r: { blob: Blob; crop: typeof CROP; whole: boolean }) => void | Promise<void>
     onCancel: () => void
   }) => (
-    <div role="dialog" aria-label={p.title} data-file={p.file?.name ?? ''} data-src={p.src ?? ''} data-aspect={p.aspect} data-initial={JSON.stringify(p.initialCrop ?? null)}>
+    <div role="dialog" aria-label={p.title} data-file={p.file?.name ?? ''} data-src={p.src ?? ''} data-aspect={p.aspect} data-initial={JSON.stringify(p.initialCrop ?? null)} data-shapes={p.shapes === undefined ? 'unset' : String(p.shapes)}>
       <button type="button" onClick={() => void p.onSave({ blob: new Blob(['edited'], { type: 'image/webp' }), crop: CROP, whole: false })}>
         Save crop
       </button>
@@ -35,12 +36,12 @@ vi.mock('@/components/image/ImageCropDialog', () => ({
 const png = (name: string) => new File([new Uint8Array(64)], name, { type: 'image/png' })
 
 let current: ProductImage[] = []
-function Harness({ initial = [], max }: { initial?: ProductImage[]; max?: number }) {
+function Harness({ initial = [], max, shapes }: { initial?: ProductImage[]; max?: number; shapes?: boolean }) {
   const [images, setImages] = useState<ProductImage[]>(initial)
   current = images
   return (
     <LanguageProvider>
-      <ImageUpload label="Upload product images" kind="gallery" images={images} onChange={(fn) => setImages(fn)} businessId="biz_nord" {...(max ? { max } : {})} />
+      <ImageUpload label="Upload product images" kind="gallery" images={images} onChange={(fn) => setImages(fn)} businessId="biz_nord" {...(max ? { max } : {})} {...(shapes ? { shapes } : {})} />
     </LanguageProvider>
   )
 }
@@ -63,6 +64,21 @@ describe('ImageUpload: crop on upload', () => {
     expect(dialog).toHaveAttribute('data-file', 'sofa.png')
     expect(Number(dialog.getAttribute('data-aspect'))).toBeCloseTo(4 / 5)
     expect(upload).not.toHaveBeenCalled()
+  })
+
+  it('passes shapes to the dialog (new photo and Edit picture) only when set', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<Harness initial={[stored({ originalUrl: 'data:image/png;base64,ORIGINAL' })]} />)
+    await user.upload(screen.getByLabelText('Upload product images'), png('sofa.png'))
+    expect(await screen.findByRole('dialog', { name: 'Adjust the photo' })).toHaveAttribute('data-shapes', 'unset')
+    unmount()
+
+    render(<Harness shapes initial={[stored({ originalUrl: 'data:image/png;base64,ORIGINAL' })]} />)
+    await user.upload(screen.getByLabelText('Upload product images'), png('sofa.png'))
+    expect(await screen.findByRole('dialog', { name: 'Adjust the photo' })).toHaveAttribute('data-shapes', 'true')
+    await user.click(screen.getByRole('button', { name: 'Cancel crop' }))
+    await user.click(screen.getByRole('button', { name: 'Edit picture sofa' }))
+    expect(await screen.findByRole('dialog', { name: 'Adjust the photo' })).toHaveAttribute('data-shapes', 'true')
   })
 
   it('Save uploads the original and the edited copy and adds one photo with both and the crop', async () => {

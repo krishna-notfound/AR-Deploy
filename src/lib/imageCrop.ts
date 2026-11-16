@@ -29,6 +29,42 @@ export interface CropView {
 /** Output of renderCrop: the long side is at most 2000 px, WebP at 0.85 (JPEG where WebP cannot be written). */
 export const CROP_OUTPUT = { maxSide: 2000, type: 'image/webp', quality: 0.85 } as const
 
+export type CropShapeId = 'original' | '4:5' | '3:4' | '2:3' | '1:1' | '4:3' | '3:2' | '16:9'
+
+/**
+ * The frame shapes a "more photos" picture may take (the main product photos stay 4:5). `ratio` is the frame's width
+ * divided by its height; `null` is "Original": the picture's own shape, known only once it has loaded.
+ */
+export const CROP_SHAPES: readonly { id: CropShapeId; ratio: number | null }[] = [
+  { id: 'original', ratio: null },
+  { id: '4:5', ratio: 4 / 5 },
+  { id: '3:4', ratio: 3 / 4 },
+  { id: '2:3', ratio: 2 / 3 },
+  { id: '1:1', ratio: 1 },
+  { id: '4:3', ratio: 4 / 3 },
+  { id: '3:2', ratio: 3 / 2 },
+  { id: '16:9', ratio: 16 / 9 },
+]
+
+/** The frame ratio of a shape; `naturalRatio` is the picture's width divided by its height. */
+export function shapeRatio(id: CropShapeId, naturalRatio: number): number {
+  return CROP_SHAPES.find((s) => s.id === id)?.ratio ?? naturalRatio
+}
+
+/** The shape whose ratio is nearest to `ratio` and within 1% of it, or null when none is. */
+export function matchShape(ratio: number, naturalRatio: number): CropShapeId | null {
+  let best: CropShapeId | null = null
+  let bestDiff = 0.01
+  for (const s of CROP_SHAPES) {
+    const diff = Math.abs(ratio / (s.ratio ?? naturalRatio) - 1)
+    if (diff <= bestDiff && (best === null || diff < bestDiff)) {
+      best = s.id
+      bestDiff = diff
+    }
+  }
+  return best
+}
+
 /** The whole picture, fitted: the smallest frame-shaped rectangle that contains it, centred on it. */
 export function fitWholeCrop(imgW: number, imgH: number, aspect: number): CropArea {
   if (imgW / imgH >= aspect) {

@@ -35,6 +35,7 @@ export function ImageUpload({
   max = 12,
   businessId,
   frame = 'product',
+  shapes = false,
 }: {
   images: ProductImage[]
   /** Receives an updater, so uploads that finish later never overwrite changes made meanwhile. */
@@ -46,6 +47,8 @@ export function ImageUpload({
   businessId?: string
   /** The picture frame the photos are cropped to and shown in (src/lib/imageFrames.ts). */
   frame?: ImageFrameKey
+  /** Lets the crop dialog offer frame shapes (the "more photos"); without it every photo is cropped to the frame's own shape. */
+  shapes?: boolean
 }) {
   const { t } = useI18n()
   const inputId = useId()
@@ -284,6 +287,7 @@ export function ImageUpload({
           key={`${queued.name}-${queued.size}-${queued.lastModified}-${own.length}`}
           file={queued}
           aspect={shape.aspect}
+          {...(shapes ? { shapes } : {})}
           title={t('ui.images.cropTitle')}
           onCancel={next}
           onSave={(result) => saveNew(queued, result)}
@@ -294,6 +298,7 @@ export function ImageUpload({
           key={editing.image.id}
           src={editing.src}
           aspect={shape.aspect}
+          {...(shapes ? { shapes } : {})}
           {...(editing.image.crop ? { initialCrop: editing.image.crop } : {})}
           title={t('ui.images.cropTitle')}
           onCancel={() => setEditing(null)}

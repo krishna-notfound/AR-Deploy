@@ -123,6 +123,8 @@ export const enUi = {
   'ui.crop.zoom': 'Zoom',
   'ui.crop.zoomIn': 'Zoom in',
   'ui.crop.zoomOut': 'Zoom out',
+  'ui.crop.shape': 'Shape',
+  'ui.crop.shape.original': 'Original',
   'ui.crop.fill': 'Fill the frame',
   'ui.crop.whole': 'Show whole picture',
   'ui.crop.reset': 'Reset',
