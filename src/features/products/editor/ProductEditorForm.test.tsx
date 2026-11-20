@@ -296,9 +296,12 @@ describe('product editor: uploads and units', () => {
     const user = userEvent.setup()
     const resolveUpload = deferUploads()
     renderNew()
-    // Each picture goes through the crop dialog; its original and its edited copy are then uploaded, in that order.
+    // Each picture goes through the crop dialog; its original and its edited copy are then uploaded, in that order. A main
+    // photo has two crop steps (ADR-0081): the catalogue card, then the product page; its page copy is uploaded last.
     await user.upload(screen.getByLabelText('Upload product images'), new File(['a'], 'front.png', { type: 'image/png' }))
     await user.click(await screen.findByRole('button', { name: 'Save crop' }))
+    const pageStep = await screen.findByRole('dialog', { name: /Product page crop/ })
+    await user.click(await within(pageStep).findByRole('button', { name: 'Save crop' }))
     await user.upload(screen.getByLabelText('Upload additional photos'), new File(['b'], 'detail.png', { type: 'image/png' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Save crop' })).toHaveLength(2)) // the first stays open while its uploads wait
     await user.click(screen.getAllByRole('button', { name: 'Save crop' })[1]!)
@@ -306,7 +309,8 @@ describe('product editor: uploads and units', () => {
     await resolveUpload('detail.png')
     await resolveUpload('detail.webp')
     await resolveUpload('front.png')
-    await resolveUpload('front.webp')
+    await resolveUpload('front.webp') // the catalogue card copy
+    await resolveUpload('front.webp') // the product page copy
     expect(await screen.findByRole('img', { name: 'front' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'detail' })).toBeInTheDocument()
   })
