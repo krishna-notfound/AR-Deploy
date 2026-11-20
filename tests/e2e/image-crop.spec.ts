@@ -216,21 +216,20 @@ test.describe('card and product page', () => {
     expect(onCard.boxWidth / onCard.boxHeight).toBeCloseTo(0.8, 2)
     expect(onCard.fit).toBe('contain')
 
-    // Product page: the photos stage takes the shown picture's own shape (ADR-0081: the product-page copy when there is one,
-    // else the 4:5 card copy), and the picture fills it.
+    // Product page: the product-page copy (Original: the whole 1600 x 1000 photo), shown whole in the original stage box
+    // (owner 2026-11-21: 5:4 at desktop width, the same box as the 3D view).
     await page.goto('/products/nordhaus/fjord-shell-chair')
     const photos = page.getByRole('button', { name: 'Photos', exact: true })
     if (await photos.isVisible().catch(() => false)) await photos.click()
     const stage = page.getByRole('region', { name: /Fjord Shell Chair/ }).locator('img').first()
     const onPage = await measure(stage)
-    const shape = onPage.naturalWidth / onPage.naturalHeight
-    expect(onPage.boxWidth / onPage.boxHeight).toBeCloseTo(shape, 2)
-    const box = await stage.evaluate((el) => {
-      const r = el.parentElement!.parentElement!.getBoundingClientRect()
-      return { w: r.width, h: r.height, vh: window.innerHeight }
+    expect(onPage.naturalWidth / onPage.naturalHeight).toBeCloseTo(1.6, 1)
+    expect(onPage.fit).toBe('contain')
+    const box = await page.getByTestId('product-stage').evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      return { w: r.width, h: r.height }
     })
-    expect(box.w / box.h).toBeCloseTo(shape, 2)
-    expect(box.h).toBeLessThanOrEqual(box.vh) // the stage is never taller than the screen
+    expect(box.w / box.h).toBeCloseTo(5 / 4, 1)
 
     // Back in the editor, the saved crop is still there.
     await page.goto('/dashboard/products/prd_shell_chair/edit')
@@ -239,7 +238,7 @@ test.describe('card and product page', () => {
     await expect(dialog(page).getByText(NUDGE)).toBeHidden()
   })
 
-  test('a main photo saved with a 16:9 product page crop shows a 16:9 stage, while the catalogue card stays 4:5', async ({ page }) => {
+  test('a main photo saved with a 16:9 product page crop shows that copy whole in the original stage box, while the catalogue card stays 4:5', async ({ page }) => {
     await signInAsBusiness(page, 'Nordhaus Living')
     await page.goto('/dashboard/products/prd_shell_chair/edit')
     await expect(page.getByLabel('Upload product images')).toBeVisible()
@@ -261,11 +260,13 @@ test.describe('card and product page', () => {
     const stage = page.getByRole('region', { name: /Fjord Shell Chair/ }).locator('img').first()
     const onPage = await measure(stage)
     expect(onPage.naturalWidth / onPage.naturalHeight).toBeCloseTo(16 / 9, 1)
-    const box = await stage.evaluate((el) => {
-      const r = el.parentElement!.parentElement!.getBoundingClientRect()
+    expect(onPage.fit).toBe('contain')
+    // The original product page box (owner 2026-11-21): 5:4 at desktop width.
+    const box = await page.getByTestId('product-stage').evaluate((el) => {
+      const r = el.getBoundingClientRect()
       return { w: r.width, h: r.height }
     })
-    expect(box.w / box.h).toBeCloseTo(16 / 9, 1)
+    expect(box.w / box.h).toBeCloseTo(5 / 4, 1)
   })
 
   test('an old photo (no original) can be edited too, and keeps showing whole until it is', async ({ page }) => {

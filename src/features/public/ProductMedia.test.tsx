@@ -7,7 +7,7 @@ import type { Product, ProductImage } from '@/domain/types'
 import { LanguageProvider } from '@/i18n/LanguageProvider'
 import { service } from '@/services'
 import { ProductCard } from './ProductCard'
-import { type MediaMode, photoStageRatio, ProductMedia } from './ProductMedia'
+import { type MediaMode, ProductMedia } from './ProductMedia'
 
 const wide: ProductImage = {
   id: 'img_wide',
@@ -30,7 +30,8 @@ function media(gallery: ProductImage[], mode: MediaMode = 'photos') {
 
 const stage = () => screen.getByTestId('product-stage')
 const stageImage = () => within(screen.getByRole('region', { name: 'Chair' })).getAllByRole('img')[0] as HTMLImageElement
-const ratio = () => Number(stage().style.getPropertyValue('--stage-ratio'))
+// The original product page box (owner 2026-11-21): square on phones, 5:4 from sm, the same for photos and 3D.
+const OLD_BOX = ['aspect-square', 'sm:aspect-[5/4]']
 
 beforeEach(() => {
   localStorage.clear()
@@ -39,44 +40,34 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('product page photos (ADR-0081)', () => {
-  it('shows the page copy on the stage and in the thumbnails, in the page crop shape', () => {
+describe('product page photos (ADR-0081, original stage box)', () => {
+  it('shows the page copy on the stage and in the square thumbnails, whole, in the original box', () => {
     media([wide, old])
     expect(stageImage().getAttribute('src')).toBe(wide.pageUrl)
+    expect(stageImage().className).toContain('object-contain')
     const thumbs = Array.from(screen.getByRole('list', { name: 'Product media' }).querySelectorAll('img'))
     expect(thumbs.map((i) => i.getAttribute('src'))).toEqual([wide.pageUrl, old.url])
-    // Thumbnails stay a uniform 4:5 tile row.
-    for (const b of within(screen.getByRole('list', { name: 'Product media' })).getAllByRole('button')) expect(b.className).toContain('aspect-[4/5]')
-    expect(stage().className).toContain('aspect-(--stage-ratio)')
-    expect(ratio()).toBeCloseTo(16 / 9, 5)
+    for (const b of within(screen.getByRole('list', { name: 'Product media' })).getAllByRole('button')) expect(b.className).toContain('size-[4.5rem]')
+    for (const c of OLD_BOX) expect(stage().className).toContain(c)
   })
 
-  it('falls back to url and the 4:5 stage for a photo without a page copy', () => {
+  it('falls back to url for a photo without a page copy, in the same box', () => {
     media([wide, old])
     fireEvent.click(screen.getByRole('button', { name: 'Photo 2 of 2' }))
     expect(stageImage().getAttribute('src')).toBe(old.url)
-    expect(ratio()).toBeCloseTo(0.8, 5)
+    for (const c of OLD_BOX) expect(stage().className).toContain(c)
   })
 
-  it('a page copy with no stored crop takes its loaded size (4:5 until then)', () => {
+  it('a page copy without a stored crop shows in the same box', () => {
     media([uncropped])
-    expect(ratio()).toBeCloseTo(0.8, 5)
-    const img = stageImage()
-    Object.defineProperty(img, 'naturalWidth', { value: 1500 })
-    Object.defineProperty(img, 'naturalHeight', { value: 1000 })
-    fireEvent.load(img)
-    expect(ratio()).toBeCloseTo(1.5, 5)
+    expect(stageImage().getAttribute('src')).toBe(uncropped.pageUrl)
+    for (const c of OLD_BOX) expect(stage().className).toContain(c)
   })
 
-  it('the 3D view keeps its 4:5 box', () => {
+  it('the 3D view has the same box as the photos', () => {
     media([wide], '3d')
-    expect(stage().className).toContain('aspect-[4/5]')
-    expect(stage().style.getPropertyValue('--stage-ratio')).toBe('')
-  })
-
-  it('photoStageRatio ignores a measurement of another file', () => {
-    expect(photoStageRatio(uncropped, { src: 'https://x.test/other.jpg', ratio: 2 })).toBeCloseTo(0.8, 5)
-    expect(photoStageRatio(undefined)).toBeCloseTo(0.8, 5)
+    for (const c of OLD_BOX) expect(stage().className).toContain(c)
+    expect(stage().className).not.toContain('aspect-[4/5]')
   })
 
   it('the catalogue card still shows the 4:5 url copy', async () => {
