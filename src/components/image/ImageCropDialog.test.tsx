@@ -84,6 +84,11 @@ const WHOLE_ZOOM = 288 / 400
 const FILL_ZOOM = 360 / 200
 
 describe('ImageCropDialog', () => {
+  it('shows the note under the heading only when given (ADR-0081)', async () => {
+    setup({ note: 'Step 2 of 2. How the photo looks on the product page.' })
+    expect(await screen.findByText('Step 2 of 2. How the photo looks on the product page.')).toBeInTheDocument()
+  })
+
   it('opens on the whole picture, fitted, with a note that it does not fill the frame', async () => {
     setup()
     expect(await screen.findByRole('dialog', { name: 'Adjust the photo' })).toBeInTheDocument()

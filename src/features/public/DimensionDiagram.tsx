@@ -4,6 +4,14 @@ import { convertLength } from '@/lib/format'
 
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
 
+/** Font size of the measurement labels (SVG user units). */
+const LABEL_SIZE = 11
+/**
+ * A generous width for one label at LABEL_SIZE, 0.04em tracking: 7 units per character covers digits, the space and
+ * "cm"/"in" in any of the site's typefaces. Used to keep the labels inside the drawing; too wide only adds margin.
+ */
+export const labelWidth = (text: string) => text.length * 7
+
 /**
  * Architectural-style isometric outline of the product's bounding box with
  * W / H / D dimension lines, drawn to the product's real proportions.
@@ -70,9 +78,32 @@ export function DimensionDiagram({ dims, unit }: { dims: Dimensions; unit: Lengt
   const hLine = line(hl1, hl2, -off, 0)
   const mid = (l: { x1: number; y1: number; x2: number; y2: number }) => [(l.x1 + l.x2) / 2, (l.y1 + l.y2) / 2] as const
 
+  const texts = [
+    { text: label(w), x: mid(wLine)[0] - 4, y: mid(wLine)[1] + 16, anchor: 'middle' as const },
+    { text: label(d), x: mid(dLine)[0] + 10, y: mid(dLine)[1] + 14, anchor: 'start' as const },
+    { text: label(h), x: mid(hLine)[0] - 6, y: mid(hLine)[1] + 4, anchor: 'end' as const },
+  ]
+  // The frame fits the box, its dimension lines and every label (client, 2026-11-18: measurements were cut off on
+  // tall, wide or deep pieces, whose labels fell outside a fixed 320×230 frame).
+  const xs: number[] = [...faces.flat(), E].map((v) => v[0])
+  const ys: number[] = [...faces.flat(), E].map((v) => v[1])
+  for (const l of [wLine, dLine, hLine]) xs.push(l.x1, l.x2), ys.push(l.y1, l.y2)
+  for (const tx of texts) {
+    const tw = labelWidth(tx.text)
+    const left = tx.anchor === 'end' ? tx.x - tw : tx.anchor === 'middle' ? tx.x - tw / 2 : tx.x
+    xs.push(left, left + tw)
+    ys.push(tx.y - LABEL_SIZE, tx.y + 3)
+  }
+  const pad = 6
+  const minX = Math.min(...xs) - pad
+  const minY = Math.min(...ys) - pad
+  const vw = Math.max(...xs) + pad - minX
+  const vh = Math.max(...ys) + pad - minY
+  const viewBox = [minX, minY, vw, vh].map((n) => n.toFixed(1)).join(' ')
+
   return (
     <figure className="select-none">
-      <svg viewBox="0 0 320 230" className="h-auto w-full max-w-[320px]" role="img" aria-label={`${t('product.width')} ${label(w)}, ${t('product.height')} ${label(h)}, ${t('product.depth')} ${label(d)}`}>
+      <svg viewBox={viewBox} className="mx-auto h-auto max-h-64 w-full max-w-[360px]" role="img" aria-label={`${t('product.width')} ${label(w)}, ${t('product.height')} ${label(h)}, ${t('product.depth')} ${label(d)}`}>
         <defs>
           <marker id="dim-tick" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
             <path d="M2 8 L8 2" stroke="currentColor" strokeWidth="1.4" />
@@ -97,16 +128,12 @@ export function DimensionDiagram({ dims, unit }: { dims: Dimensions; unit: Lengt
             <line key={i} {...l} markerStart="url(#dim-tick)" markerEnd="url(#dim-tick)" />
           ))}
         </g>
-        <g fontSize="11" fontWeight="500" letterSpacing="0.04em" style={{ fill: 'var(--color-ink)' }} fontFamily="inherit">
-          <text x={mid(wLine)[0] - 4} y={mid(wLine)[1] + 16} textAnchor="middle">
-            {label(w)}
-          </text>
-          <text x={mid(dLine)[0] + 10} y={mid(dLine)[1] + 14} textAnchor="start">
-            {label(d)}
-          </text>
-          <text x={mid(hLine)[0] - 6} y={mid(hLine)[1] + 4} textAnchor="end">
-            {label(h)}
-          </text>
+        <g fontSize={LABEL_SIZE} fontWeight="500" letterSpacing="0.04em" style={{ fill: 'var(--color-ink)' }} fontFamily="inherit">
+          {texts.map((tx) => (
+            <text key={tx.anchor} x={tx.x} y={tx.y} textAnchor={tx.anchor}>
+              {tx.text}
+            </text>
+          ))}
         </g>
       </svg>
     </figure>

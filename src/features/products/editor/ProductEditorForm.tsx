@@ -648,7 +648,7 @@ export function ProductEditorForm({
           </Section>
 
           <Section id="images" title={t('products.editor.sections.images')} description={t('products.editor.imagesDescription')} error={err('images')}>
-            <ImageUpload label={t('products.editor.uploadImages')} kind="gallery" businessId={form.input.businessId} images={form.input.images} onChange={updateImages} />
+            <ImageUpload label={t('products.editor.uploadImages')} kind="gallery" pageCrop businessId={form.input.businessId} images={form.input.images} onChange={updateImages} />
             <div className="border-t border-line pt-6">
               <h3 className="text-[14px] leading-5 font-semibold text-ink">{t('products.editor.additionalPhotos')}</h3>
               <p className="mt-0.5 mb-3 text-[13px] leading-[1.45] text-ink-muted">{t('products.editor.additionalPhotosHint')}</p>

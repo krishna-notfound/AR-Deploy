@@ -1,5 +1,5 @@
 # ADR-0064: Product photo frame is 4:5 everywhere
-- **Status:** Accepted; "More photos" part superseded by ADR-0080 (2026-11-16)
+- **Status:** Accepted; "More photos" part superseded by ADR-0080 (2026-11-16); product page stage part superseded by ADR-0081 (2026-11-20)
 - **Date:** 2026-11-11
 - **Affects:** design/11-design-system.md, design/14-features-public.md, design/12-features-admin.md; amends ADR-0054 and ADR-0062 (not superseded)
 

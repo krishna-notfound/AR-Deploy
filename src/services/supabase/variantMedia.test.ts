@@ -39,8 +39,8 @@ describe('save_product arguments for variant media', () => {
     const { p_variants } = toSaveProductArgs('p1', base)
     expect(p_variants[0]).toMatchObject({ id: '11111111-1111-4111-8111-111111111111', sort_order: 0 })
     expect(p_variants[0]!.images).toEqual([
-      { storage_path: 'b1/d1.jpg', original_path: null, crop: null, alt: null, is_primary: true },
-      { storage_path: 'b1/d2.jpg', original_path: null, crop: null, alt: null, is_primary: false },
+      { storage_path: 'b1/d1.jpg', original_path: null, crop: null, page_path: null, page_crop: null, alt: null, is_primary: true },
+      { storage_path: 'b1/d2.jpg', original_path: null, crop: null, page_path: null, page_crop: null, alt: null, is_primary: false },
     ])
     expect(p_variants[0]!.models).toEqual([
       { format: 'glb', storage_path: 'b1/d.glb', file_name: 'm.glb', size_bytes: null, required_extensions: ['EXT_texture_webp'] },
@@ -62,7 +62,7 @@ describe('photo originals and crops (ADR-0063)', () => {
     const args = toSaveProductArgs('p1', { ...base, images: [cropped, photo('b1/old.jpg')], variants: [{ id: 'var_1', name: { en: 'A' }, images: [cropped] }] })
     expect(args.p_images[0]).toMatchObject({ storage_path: 'b1/shown.webp', original_path: 'b1/orig.jpg', crop })
     expect(args.p_images[1]).toMatchObject({ storage_path: 'b1/old.jpg', original_path: null, crop: null })
-    expect(args.p_variants[0]!.images[0]).toEqual({ storage_path: 'b1/shown.webp', original_path: 'b1/orig.jpg', crop, alt: null, is_primary: true })
+    expect(args.p_variants[0]!.images[0]).toEqual({ storage_path: 'b1/shown.webp', original_path: 'b1/orig.jpg', crop, page_path: null, page_crop: null, alt: null, is_primary: true })
     expect(JSON.stringify(args)).not.toContain('signed.test/orig')
   })
 
@@ -79,6 +79,37 @@ describe('photo originals and crops (ADR-0063)', () => {
 
   it('orphan cleanup and signing cover the originals too', () => {
     expect(mediaPaths({ ...base, images: [cropped], models: {}, variants: [{ id: 'v', name: { en: 'A' }, images: [{ ...cropped, storagePath: 'b1/v.webp', originalPath: 'b1/vo.png' }] }] })).toEqual(['b1/shown.webp', 'b1/orig.jpg', 'b1/v.webp', 'b1/vo.png'])
+  })
+})
+
+describe('product-page copies (ADR-0081)', () => {
+  const crop = { x: -10, y: 0, width: 800, height: 1000 }
+  const pageCrop = { x: 0, y: 100, width: 1600, height: 900 }
+  const twoCrops: ProductImage = { ...photo('b1/card.webp', true), originalPath: 'b1/orig.jpg', crop, pagePath: 'b1/page.webp', pageUrl: 'https://signed.test/page', pageCrop }
+
+  it('sends page_path and page_crop per photo and per option photo, and never the signed page link', () => {
+    const args = toSaveProductArgs('p1', { ...base, images: [twoCrops, photo('b1/old.jpg')], variants: [{ id: 'var_1', name: { en: 'A' }, images: [twoCrops] }] })
+    expect(args.p_images[0]).toMatchObject({ storage_path: 'b1/card.webp', original_path: 'b1/orig.jpg', crop, page_path: 'b1/page.webp', page_crop: pageCrop })
+    expect(args.p_images[1]).toMatchObject({ storage_path: 'b1/old.jpg', page_path: null, page_crop: null })
+    expect(args.p_variants[0]!.images[0]).toEqual({ storage_path: 'b1/card.webp', original_path: 'b1/orig.jpg', crop, page_path: 'b1/page.webp', page_crop: pageCrop, alt: null, is_primary: true })
+    expect(JSON.stringify(args)).not.toContain('signed.test/page')
+  })
+
+  it('reads them back: the page copy is signed into pageUrl; a stray page_crop is ignored; none means no keys', () => {
+    const row = (over: object) => ({ id: 'i1', url: null, storage_path: 'b1/card.webp', alt: null, is_primary: true, kind: 'gallery', sort_order: 0, ...over })
+    const signed = new Map([['b1/card.webp', 'https://signed.test/card'], ['b1/page.webp', 'https://signed.test/page']])
+    const product = (images: object[]) => toProduct({ ...row, product_images: images } as ProductRow, signed)
+    expect(product([row({ page_path: 'b1/page.webp', page_crop: pageCrop })]).images[0]).toMatchObject({ url: 'https://signed.test/card', pagePath: 'b1/page.webp', pageUrl: 'https://signed.test/page', pageCrop })
+    const plain = product([row({ page_path: null, page_crop: null })]).images[0]!
+    expect('pagePath' in plain || 'pageUrl' in plain || 'pageCrop' in plain).toBe(false)
+    expect(product([row({ page_path: 'b1/page.webp', page_crop: { x: 0, y: 0, width: -1, height: 5 } })]).images[0]!.pageCrop).toBeUndefined()
+    // A page copy with no link (missing file) keeps its path but no pageUrl, so the page falls back to the card copy.
+    expect(product([row({ page_path: 'b1/gone.webp' })]).images[0]).toMatchObject({ pagePath: 'b1/gone.webp' })
+    expect(product([row({ page_path: 'b1/gone.webp' })]).images[0]!.pageUrl).toBeUndefined()
+  })
+
+  it('orphan cleanup covers the page copies too', () => {
+    expect(mediaPaths({ ...base, images: [twoCrops], models: {}, variants: [{ id: 'v', name: { en: 'A' }, images: [{ ...twoCrops, storagePath: 'b1/v.webp', originalPath: 'b1/vo.png', pagePath: 'b1/vp.webp' }] }] })).toEqual(['b1/card.webp', 'b1/orig.jpg', 'b1/page.webp', 'b1/v.webp', 'b1/vo.png', 'b1/vp.webp'])
   })
 })
 
@@ -103,7 +134,7 @@ function fakeClient(opts: { row: ProductRow; stillUsed?: Record<string, string[]
       Promise.resolve(
         table === 'products' && deleting
           ? { data: [{ id: opts.row.id }], error: null }
-          : { data: (opts.stillUsed?.[table] ?? []).map((p) => ({ storage_path: p, original_path: p })), error: null },
+          : { data: (opts.stillUsed?.[table] ?? []).map((p) => ({ storage_path: p, original_path: p, page_path: p })), error: null },
       ).then(ok)
     return b
   }
@@ -201,6 +232,32 @@ describe('Supabase service: variant media', () => {
     const removed = calls.find((c) => c.op === 'remove')?.args[0] as string[]
     expect(removed).toContain('b1/main-orig.jpg')
     expect(removed).not.toContain('b1/side-orig.jpg')
+  })
+
+  it('signs a main and an option photo’s product-page copy (ADR-0081) and maps it to pageUrl, pagePath and pageCrop', async () => {
+    const pageCrop = { x: 0, y: 40, width: 1200, height: 900 }
+    const withPages: ProductRow = {
+      ...row,
+      product_images: [{ ...row.product_images![0]!, page_path: 'b1/main-page.webp', page_crop: pageCrop }],
+      product_variants: [{ ...row.product_variants![0]!, product_variant_images: [{ id: 'vi1', storage_path: 'b1/d1.jpg', page_path: 'b1/d1-page.webp', page_crop: pageCrop, alt: null, is_primary: true, sort_order: 0 }] }],
+    }
+    const calls: Call[] = []
+    const res = await createSupabaseCatalogService(fakeClient({ row: withPages }, calls)).getProductById('p1')
+    if (!res.ok) throw new Error(res.error.message)
+    expect(calls.find((c) => c.op === 'sign')?.args[0]).toEqual(expect.arrayContaining(['b1/main.jpg', 'b1/main-page.webp', 'b1/d1-page.webp']))
+    expect(res.data.images[0]).toMatchObject({ url: 'https://signed.test/b1/main.jpg', pagePath: 'b1/main-page.webp', pageUrl: 'https://signed.test/b1/main-page.webp', pageCrop })
+    expect(res.data.variants[0]!.images![0]).toMatchObject({ pagePath: 'b1/d1-page.webp', pageUrl: 'https://signed.test/b1/d1-page.webp', pageCrop })
+  })
+
+  it('deleting a product removes its photos’ page copies too, except one a duplicate still uses', async () => {
+    const withPages: ProductRow = { ...row, product_images: [{ ...row.product_images![0]!, page_path: 'b1/main-page.webp' }, { id: 'i2', url: null, storage_path: 'b1/side.jpg', page_path: 'b1/side-page.webp', alt: null, is_primary: false, kind: 'gallery', sort_order: 1 }] }
+    const calls: Call[] = []
+    const svc = createSupabaseCatalogService(fakeClient({ row: withPages, stillUsed: { product_images: ['b1/side-page.webp'] } }, calls))
+    expect((await svc.deleteProduct('p1')).ok).toBe(true)
+    expect(calls.some((c) => c.op === 'in' && c.args[0] === 'page_path')).toBe(true)
+    const removed = calls.find((c) => c.op === 'remove')?.args[0] as string[]
+    expect(removed).toContain('b1/main-page.webp')
+    expect(removed).not.toContain('b1/side-page.webp')
   })
 
   it('refuses variant files that were not uploaded to storage', async () => {

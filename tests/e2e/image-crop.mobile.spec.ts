@@ -11,7 +11,8 @@ test('the crop dialog fits a phone and its controls are touch-sized', async ({ p
   await signInAsBusiness(page, 'Nordhaus Living')
   await page.goto('/dashboard/products/new')
   await page.getByLabel('Upload product images').setInputFiles(picture)
-  const dialog = page.getByRole('dialog', { name: 'Adjust the photo' })
+  // A main photo: step 1 is the catalogue card crop, step 2 the product page crop (ADR-0081).
+  const dialog = page.getByRole('dialog', { name: 'Catalogue card crop' })
   await expect(dialog).toBeVisible()
   const save = dialog.getByRole('button', { name: 'Save', exact: true })
   await expect(save).toBeEnabled({ timeout: 15_000 })
@@ -32,5 +33,22 @@ test('the crop dialog fits a phone and its controls are touch-sized', async ({ p
   await dialog.getByRole('button', { name: 'Fill the frame' }).click()
   await save.click()
   await expect(dialog).toBeHidden()
-  await expect(page.getByRole('button', { name: 'Edit picture landscape' })).toBeVisible() // shown without hovering
+
+  // Step 2 (product page crop) also fits, and its shape choice is reachable.
+  const step2 = page.getByRole('dialog', { name: 'Product page crop' })
+  const save2 = step2.getByRole('button', { name: 'Save', exact: true })
+  await expect(save2).toBeEnabled({ timeout: 15_000 })
+  await page.waitForTimeout(600)
+  const box2 = (await step2.boundingBox())!
+  expect(box2.width).toBeLessThanOrEqual(viewport.width)
+  expect(box2.y + box2.height).toBeLessThanOrEqual(viewport.height + 1)
+  await expect(step2.getByRole('radio', { name: 'Original' })).toHaveAttribute('aria-checked', 'true')
+  const s2 = (await save2.boundingBox())!
+  expect(s2.y + s2.height).toBeLessThanOrEqual(viewport.height + 1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await save2.click()
+  await expect(step2).toBeHidden({ timeout: 20_000 })
+  // Both edit buttons are shown without hovering.
+  await expect(page.getByRole('button', { name: 'Edit catalogue crop of landscape' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Edit product page crop of landscape' })).toBeVisible()
 })

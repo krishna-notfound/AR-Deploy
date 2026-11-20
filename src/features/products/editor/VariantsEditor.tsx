@@ -163,6 +163,7 @@ export function VariantsEditor({
                       <ImageUpload
                         label={t('products.variants.uploadPhotos', { label })}
                         kind="gallery"
+                        pageCrop
                         allowPrimary={false}
                         max={MAX_VARIANT_IMAGES}
                         businessId={businessId}

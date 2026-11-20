@@ -664,6 +664,8 @@ export type Database = {
           is_primary: boolean
           kind: string
           original_path: string | null
+          page_crop: Json | null
+          page_path: string | null
           product_id: string
           sort_order: number
           storage_path: string | null
@@ -677,6 +679,8 @@ export type Database = {
           is_primary?: boolean
           kind?: string
           original_path?: string | null
+          page_crop?: Json | null
+          page_path?: string | null
           product_id: string
           sort_order?: number
           storage_path?: string | null
@@ -690,6 +694,8 @@ export type Database = {
           is_primary?: boolean
           kind?: string
           original_path?: string | null
+          page_crop?: Json | null
+          page_path?: string | null
           product_id?: string
           sort_order?: number
           storage_path?: string | null
@@ -757,6 +763,8 @@ export type Database = {
           id: string
           is_primary: boolean
           original_path: string | null
+          page_crop: Json | null
+          page_path: string | null
           product_id: string
           sort_order: number
           storage_path: string
@@ -769,6 +777,8 @@ export type Database = {
           id?: string
           is_primary?: boolean
           original_path?: string | null
+          page_crop?: Json | null
+          page_path?: string | null
           product_id: string
           sort_order?: number
           storage_path: string
@@ -781,6 +791,8 @@ export type Database = {
           id?: string
           is_primary?: boolean
           original_path?: string | null
+          page_crop?: Json | null
+          page_path?: string | null
           product_id?: string
           sort_order?: number
           storage_path?: string

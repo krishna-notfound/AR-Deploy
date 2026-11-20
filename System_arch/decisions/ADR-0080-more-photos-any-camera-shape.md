@@ -1,5 +1,5 @@
 # ADR-0080: "More photos" keep their own camera shape
-- **Status:** Accepted (supersedes the "More photos" part of ADR-0064)
+- **Status:** Accepted (supersedes the "More photos" part of ADR-0064); "main photo stays 4:5 on the product page" superseded by ADR-0081 (2026-11-20)
 - **Date:** 2026-11-16
 - **Affects:** src/components/image/ImageCropDialog.tsx, src/lib/imageCrop.ts, src/components/ui/ImageUpload.tsx, src/features/products/editor/ProductEditorForm.tsx, src/features/public/ProductParts.tsx
 

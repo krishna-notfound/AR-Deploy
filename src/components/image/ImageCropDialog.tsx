@@ -42,6 +42,7 @@ import {
  * - `initialCrop`  the crop to start from (the stored `crop` of a picture being edited). Without it the dialog starts
  *              with the WHOLE picture fitted in the frame; nothing is cropped until the user chooses to.
  * - `title`    the dialog heading (already translated).
+ * - `note`     an optional line under the heading saying what this crop is for (already translated; ADR-0081).
  * - `onSave({ blob, crop, whole })`  `blob` is the edited WebP (JPEG where WebP cannot be written), long side at most
  *              2000 px; `crop` is the rectangle of the ORIGINAL it was cut from, in the original's pixels (it may reach
  *              past the picture); `whole` is true when the picture does not fill the frame (margins stay transparent).
@@ -57,6 +58,8 @@ export interface ImageCropDialogProps {
   shapes?: boolean
   initialCrop?: CropArea
   title: string
+  /** A line under the heading saying what this crop is for: the catalogue card or the product page (ADR-0081). */
+  note?: string
   /** Smaller output than the default (long side 2000, quality 0.85): the logo and the profile photo. */
   output?: { maxSide?: number; quality?: number }
   onSave: (result: { blob: Blob; crop: CropArea; whole: boolean }) => void | Promise<void>
@@ -82,7 +85,7 @@ function frameIn(box: { width: number; height: number } | null, aspect: number) 
   return w / h > aspect ? { width: h * aspect, height: h } : { width: w, height: w / aspect }
 }
 
-export function ImageCropDialog({ file, src, aspect, shapes = false, initialCrop, title, output, onSave, onCancel }: ImageCropDialogProps) {
+export function ImageCropDialog({ file, src, aspect, shapes = false, initialCrop, title, note, output, onSave, onCancel }: ImageCropDialogProps) {
   const { t } = useI18n()
   const hintId = useId()
   const stageRef = useRef<HTMLDivElement>(null)
@@ -264,6 +267,7 @@ export function ImageCropDialog({ file, src, aspect, shapes = false, initialCrop
       }
     >
       <div className="space-y-3">
+        {note && <p className="text-sm text-ink">{note}</p>}
         <div
           ref={stageRef}
           className="relative h-[min(52vh,26rem)] overflow-hidden rounded-[var(--radius-control)] bg-subtle"

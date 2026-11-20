@@ -120,7 +120,20 @@ export interface ProductImage {
   originalUrl?: string
   /** What of the original the shown copy holds. Absent: the picture was never cropped (shown whole). */
   crop?: ImageCrop
+  /**
+   * Main photos only (kind `gallery`, ADR-0081): a second copy cut from the same original for the product page, in a
+   * standard camera shape (CROP_SHAPES). `url` stays the 4:5 catalogue-card copy. Absent (a photo from before ADR-0081,
+   * or an additional photo): the product page shows `url`.
+   */
+  pagePath?: string
+  /** Where to show the product-page copy now: a data URL (demo) or a signed link (Supabase, from pagePath). */
+  pageUrl?: string
+  /** What of the original the product-page copy holds. */
+  pageCrop?: ImageCrop
 }
+
+/** The picture the product page shows for a photo (ADR-0081): its own product-page copy, else the card copy. */
+export const pageImageUrl = (img: Pick<ProductImage, 'url' | 'pageUrl'>): string => img.pageUrl || img.url
 
 export type ModelFormat = 'glb' | 'usdz'
 export type AssetStatus = 'valid' | 'invalid' | 'missing' | 'session-only'

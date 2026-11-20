@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, ImagePlus, Pencil, Star, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Crop, ImagePlus, Pencil, Star, Trash2 } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import { ImageCropDialog } from '@/components/image/ImageCropDialog'
 import type { ImageCrop, ProductImage } from '@/domain/types'
@@ -14,16 +14,25 @@ import { isDemoMode, service } from '@/services'
 import { IconButton } from './Button'
 import { SmartImage } from './SmartImage'
 
-/** A photo being edited: where its original opens from, and the crop it started with. */
+/** Which copy of a photo a crop is for: the catalogue card copy (`url`/`crop`) or the product page copy (`pageUrl`/`pageCrop`, ADR-0081). */
+type CropTarget = 'card' | 'page'
+
+/** A photo being edited: where its original opens from, and which of its crops is being changed. */
 interface Editing {
   image: ProductImage
   src: string
+  target: CropTarget
 }
+
+type CropResult = { blob: Blob; crop: ImageCrop }
 
 /**
  * Multi-image picker: thumbnails, choose primary, edit picture, remove, and validation messages.
  * Every chosen photo opens the crop dialog first (ADR-0063): the untouched original and the edited copy are both uploaded,
  * the pages show the copy, and "Edit picture" reopens the original with the crop it had.
+ * With `pageCrop` (main photos, ADR-0081) a chosen photo gets two crops from the same original: first the catalogue card
+ * crop (the frame's shape), then the product page crop (any shape, Original by default). Cancelling the second keeps the
+ * photo with the card copy only. Each crop has its own edit button.
  * Storage is up to the active service: data URLs in demo mode (ADR-0007), Supabase Storage otherwise.
  */
 export function ImageUpload({
@@ -36,6 +45,7 @@ export function ImageUpload({
   businessId,
   frame = 'product',
   shapes = false,
+  pageCrop = false,
 }: {
   images: ProductImage[]
   /** Receives an updater, so uploads that finish later never overwrite changes made meanwhile. */
@@ -49,6 +59,8 @@ export function ImageUpload({
   frame?: ImageFrameKey
   /** Lets the crop dialog offer frame shapes (the "more photos"); without it every photo is cropped to the frame's own shape. */
   shapes?: boolean
+  /** Main photos (ADR-0081): each photo also gets a product page crop, chosen after the card crop and edited on its own. */
+  pageCrop?: boolean
 }) {
   const { t } = useI18n()
   const inputId = useId()
@@ -60,6 +72,8 @@ export function ImageUpload({
   /** Chosen files waiting for the crop dialog: the first one is open. */
   const [queue, setQueue] = useState<File[]>([])
   const [editing, setEditing] = useState<Editing | null>(null)
+  /** With `pageCrop`: the card crop of the first queued file, kept while the product page crop dialog is open. */
+  const [cardCrop, setCardCrop] = useState<CropResult | null>(null)
   const shape = imageFrame(frame)
   const own = images.filter((i) => i.kind === kind)
   /** Applies a change to this kind's images in the latest list, keeping every other kind as it is. */
@@ -104,23 +118,34 @@ export function ImageUpload({
     setQueue(valid)
   }
 
-  const next = () => setQueue((q) => q.slice(1))
+  const next = () => {
+    setCardCrop(null)
+    setQueue((q) => q.slice(1))
+  }
 
-  /** Uploads the original and the edited copy of a newly chosen photo, then adds it. */
-  const saveNew = async (file: File, result: { blob: Blob; crop: ImageCrop }) => {
+  /**
+   * Uploads the original and the edited copy (copies) of a newly chosen photo, then adds it.
+   * `page` is the product page crop (ADR-0081); without it the product page shows the card copy.
+   */
+  const saveNew = async (file: File, card: CropResult, page?: CropResult) => {
     setBusy(true)
     try {
       const original = await service.uploadAsset({ kind: 'image', file, businessId })
       if (!original.ok) return addError(errorText(original.error, t))
-      const copy = await service.uploadAsset({ kind: 'image', file: editedFile(result.blob, file.name), businessId })
+      const copy = await service.uploadAsset({ kind: 'image', file: editedFile(card.blob, file.name), businessId })
       if (!copy.ok) return addError(errorText(copy.error, t))
+      const pageCopy = page ? await service.uploadAsset({ kind: 'image', file: editedFile(page.blob, file.name), businessId }) : null
+      if (pageCopy && !pageCopy.ok) return addError(errorText(pageCopy.error, t))
       const added: ProductImage = {
         id: newId('img'),
         url: copy.data.url,
         ...(copy.data.storagePath ? { storagePath: copy.data.storagePath } : {}),
         ...(original.data.storagePath ? { originalPath: original.data.storagePath } : {}),
         originalUrl: original.data.url,
-        crop: result.crop,
+        crop: card.crop,
+        ...(page && pageCopy?.ok
+          ? { pageUrl: pageCopy.data.url, ...(pageCopy.data.storagePath ? { pagePath: pageCopy.data.storagePath } : {}), pageCrop: page.crop }
+          : {}),
         alt: file.name.replace(/\.[^.]+$/, ''),
         isPrimary: false,
         kind,
@@ -132,26 +157,25 @@ export function ImageUpload({
     }
   }
 
-  /** Uploads a new edited copy of a photo and points the photo at it; the original and the old copy are left in storage. */
-  const saveEdit = async (target: ProductImage, result: { blob: Blob; crop: ImageCrop }) => {
+  /**
+   * Uploads a new edited copy of a photo and points the photo at it; the original and the old copy are left in storage.
+   * A card edit changes `url`/`storagePath`/`crop`; a page edit changes only `pageUrl`/`pagePath`/`pageCrop` (ADR-0081).
+   */
+  const saveEdit = async (target: ProductImage, to: CropTarget, result: CropResult) => {
     setBusy(true)
     try {
       const copy = await service.uploadAsset({ kind: 'image', file: editedFile(result.blob, target.alt || 'photo'), businessId })
       if (!copy.ok) return addError(errorText(copy.error, t))
       update((mine) =>
-        mine.map((i) =>
-          i.id !== target.id
-            ? i
-            : {
-                ...i,
-                url: copy.data.url,
-                ...(copy.data.storagePath ? { storagePath: copy.data.storagePath } : {}),
-                // A photo from before the crop dialog is its own original: from now on it is the original of the new copy.
-                originalPath: i.originalPath ?? i.storagePath,
-                originalUrl: i.originalUrl ?? i.url,
-                crop: result.crop,
-              },
-        ),
+        mine.map((i) => {
+          if (i.id !== target.id) return i
+          // A photo from before the crop dialog is its own original: from now on it is the original of the new copy.
+          const originals = { originalPath: i.originalPath ?? i.storagePath, originalUrl: i.originalUrl ?? i.url }
+          if (to === 'card') return { ...i, url: copy.data.url, ...(copy.data.storagePath ? { storagePath: copy.data.storagePath } : {}), ...originals, crop: result.crop }
+          // The page copy's path always belongs to the new copy: a stale one would point at the old picture.
+          const { pagePath: _stale, ...rest } = i
+          return { ...rest, ...originals, pageUrl: copy.data.url, ...(copy.data.storagePath ? { pagePath: copy.data.storagePath } : {}), pageCrop: result.crop }
+        }),
       )
     } finally {
       setBusy(false)
@@ -159,8 +183,8 @@ export function ImageUpload({
     }
   }
 
-  /** Finds where the photo's original opens from (a fresh link in Supabase mode), then opens the dialog. */
-  const startEdit = async (image: ProductImage) => {
+  /** Finds where the photo's original opens from (a fresh link in Supabase mode), then opens the dialog for one of its crops. */
+  const startEdit = async (image: ProductImage, target: CropTarget = 'card') => {
     if (busy || queue.length || editing) return
     setErrors([])
     setBusy(true)
@@ -171,7 +195,7 @@ export function ImageUpload({
         if (!res.ok) return addError(t('ui.images.openFailed', { name: image.alt || t('ui.images.image') }))
         src = res.data
       }
-      setEditing({ image, src: src || image.url })
+      setEditing({ image, src: src || image.url, target })
     } finally {
       setBusy(false)
     }
@@ -209,10 +233,22 @@ export function ImageUpload({
             {img.isPrimary && allowPrimary && (
               <figcaption className="absolute bottom-1.5 left-1.5 rounded bg-obsidian/80 px-1.5 py-0.5 text-[12px] font-medium text-chalk">{t('ui.images.primary')}</figcaption>
             )}
-            <div className="absolute top-1.5 right-1.5 flex gap-1 rounded-md bg-surface/95 p-0.5 opacity-100 shadow-sm sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-              <IconButton aria-label={t('ui.images.edit', { name: img.alt || t('ui.images.image') })} title={t('ui.images.editLabel')} size="sm" className="size-7" disabled={busy} onClick={() => void startEdit(img)}>
+            <div className="absolute top-1.5 right-1.5 flex max-w-[calc(100%-0.75rem)] flex-wrap justify-end gap-1 rounded-md bg-surface/95 p-0.5 opacity-100 shadow-sm sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+              <IconButton
+                aria-label={t(pageCrop ? 'ui.images.editCard' : 'ui.images.edit', { name: img.alt || t('ui.images.image') })}
+                title={t(pageCrop ? 'ui.images.editCardLabel' : 'ui.images.editLabel')}
+                size="sm"
+                className="size-7"
+                disabled={busy}
+                onClick={() => void startEdit(img, 'card')}
+              >
                 <Pencil className="size-3.5" />
               </IconButton>
+              {pageCrop && (
+                <IconButton aria-label={t('ui.images.editPage', { name: img.alt || t('ui.images.image') })} title={t('ui.images.editPageLabel')} size="sm" className="size-7" disabled={busy} onClick={() => void startEdit(img, 'page')}>
+                  <Crop className="size-3.5" />
+                </IconButton>
+              )}
               {allowPrimary && !img.isPrimary && (
                 <IconButton aria-label={t('ui.images.makePrimary', { name: img.alt || t('ui.images.image') })} size="sm" className="size-7" onClick={() => setPrimary(img.id)}>
                   <Star className="size-3.5" />
@@ -268,7 +304,7 @@ export function ImageUpload({
       <p className="mt-2 text-xs text-ink-muted">
         {t('ui.images.rules', { size: formatFileSize(IMAGE_RULES.maxBytes) })}
         {isDemoMode && ` ${t('ui.images.demoResize')}`}
-        {` ${t('ui.images.cropHelp')}`}
+        {` ${t(pageCrop ? 'ui.images.cropHelpTwo' : 'ui.images.cropHelp')}`}
         {allowPrimary && ` ${t('ui.images.primaryHelp')}`}
         {own.length > 1 && ` ${t('ui.images.orderHelp')}`}
       </p>
@@ -282,27 +318,45 @@ export function ImageUpload({
           ))}
         </ul>
       )}
-      {queued && (
+      {queued && !cardCrop && (
         <ImageCropDialog
           key={`${queued.name}-${queued.size}-${queued.lastModified}-${own.length}`}
           file={queued}
           aspect={shape.aspect}
           {...(shapes ? { shapes } : {})}
-          title={t('ui.images.cropTitle')}
+          {...(pageCrop ? { title: t('ui.crop.cardTitle'), note: t('ui.crop.cardStep') } : { title: t('ui.images.cropTitle') })}
           onCancel={next}
-          onSave={(result) => saveNew(queued, result)}
+          // With a page crop to come, the card crop waits for it; the uploads start after the second dialog.
+          onSave={(result) => (pageCrop ? setCardCrop(result) : saveNew(queued, result))}
+        />
+      )}
+      {queued && cardCrop && (
+        <ImageCropDialog
+          key={`${queued.name}-${queued.size}-${queued.lastModified}-${own.length}-page`}
+          file={queued}
+          aspect={shape.aspect}
+          shapes
+          title={t('ui.crop.pageTitle')}
+          note={t('ui.crop.pageStep')}
+          // Cancel keeps the photo with its card copy: the product page then shows that copy. The dialog stays up while
+          // that upload runs, so `busy` stops a second Cancel or a Save from adding the photo twice.
+          onCancel={() => {
+            if (!busy) void saveNew(queued, cardCrop)
+          }}
+          onSave={(result) => (busy ? undefined : saveNew(queued, cardCrop, result))}
         />
       )}
       {editing && (
         <ImageCropDialog
-          key={editing.image.id}
+          key={`${editing.image.id}-${editing.target}`}
           src={editing.src}
           aspect={shape.aspect}
-          {...(shapes ? { shapes } : {})}
-          {...(editing.image.crop ? { initialCrop: editing.image.crop } : {})}
-          title={t('ui.images.cropTitle')}
+          {...(shapes || editing.target === 'page' ? { shapes: true } : {})}
+          {...(editing.target === 'page'
+            ? { ...(editing.image.pageCrop ? { initialCrop: editing.image.pageCrop } : {}), title: t('ui.crop.pageTitle'), note: t('ui.crop.pageHint') }
+            : { ...(editing.image.crop ? { initialCrop: editing.image.crop } : {}), title: t(pageCrop ? 'ui.crop.cardTitle' : 'ui.images.cropTitle'), ...(pageCrop ? { note: t('ui.crop.cardHint') } : {}) })}
           onCancel={() => setEditing(null)}
-          onSave={(result) => saveEdit(editing.image, result)}
+          onSave={(result) => saveEdit(editing.image, editing.target, result)}
         />
       )}
     </div>

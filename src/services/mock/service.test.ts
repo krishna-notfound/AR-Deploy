@@ -151,6 +151,16 @@ describe('products', () => {
     expect(saved.variants[1]!.images?.filter((i) => i.isPrimary)).toHaveLength(1)
   })
 
+  it('keeps a photo’s product-page copy and crop (ADR-0081) through a save and a duplicate', async () => {
+    const pageCrop = { x: 0, y: 20, width: 1600, height: 900 }
+    const main = { id: 'img_main', url: 'data:image/webp;base64,AAA', pageUrl: 'data:image/webp;base64,BBB', pageCrop, isPrimary: true, kind: 'gallery' as const }
+    const created = unwrap(await svc.createProduct(draftInput({ slug: 'two-crops', images: [main], variants: [{ id: 'var_a', name: { en: 'A' }, images: [main] }] })))
+    expect(created.images[0]).toMatchObject({ pageUrl: main.pageUrl, pageCrop })
+    const copy = unwrap(await svc.duplicateProduct(created.id))
+    expect(copy.images[0]).toMatchObject({ pageUrl: main.pageUrl, pageCrop })
+    expect(copy.variants[0]!.images?.[0]).toMatchObject({ pageUrl: main.pageUrl, pageCrop })
+  })
+
   it('caps options and photos per option like the database', async () => {
     const many = Array.from({ length: 51 }, (_, i) => ({ id: `v${i}`, name: { en: `V${i}` } }))
     const res = await svc.createProduct(draftInput({ slug: 'too-many', variants: many }))

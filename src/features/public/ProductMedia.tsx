@@ -1,9 +1,9 @@
 import { AlertTriangle, ChevronLeft, ChevronRight, Maximize, Rotate3d } from 'lucide-react'
-import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { type CSSProperties, type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { SmartImage } from '@/components/ui/SmartImage'
 import { type ArStatus, MODEL_STALL_TIMEOUT_MS, type ModelLoadInfo, ModelViewer, type ModelViewerHandle } from '@/components/three/ModelViewer'
-import type { ProductImage, ProductModels } from '@/domain/types'
+import { pageImageUrl, type ProductImage, type ProductModels } from '@/domain/types'
 import { arLaunchUrl } from '@/features/ar/variantMedia'
 import { useI18n } from '@/i18n/LanguageProvider'
 import { cn } from '@/lib/cn'
@@ -19,13 +19,31 @@ export function initialMediaMode(media: { gallery: ProductImage[]; models: Produ
   return media.gallery.length || !media.models.glb ? 'photos' : '3d'
 }
 
-/** The stage and its thumbnails are the product photo frame, 4:5 at every width (ADR-0064). */
+/** The 3D stage and the thumbnails are the product photo frame, 4:5 at every width (ADR-0064). */
 const STAGE_FRAME = imageFrame('product')
 /**
  * On a wide screen a 4:5 stage in a half-width column would be taller than the screen: its width is capped so its height stays
  * within the viewport less the page's own chrome (the header, the card's top bar and padding: 16rem) (never narrower than 18rem), and it is centred in its card.
  */
 const STAGE_WIDTH = 'mx-auto w-[min(100%,max(18rem,calc((100svh_-_16rem)_*_0.8)))]'
+/**
+ * The photos stage takes the shown photo's own shape (ADR-0081): the same width cap with the photo's ratio (`--stage-ratio`, width
+ * divided by height) in place of 0.8, so a tall photo is never taller than the screen and a wide one fills the column.
+ */
+const PHOTO_STAGE = 'mx-auto aspect-(--stage-ratio) w-[min(100%,max(18rem,calc((100svh_-_16rem)_*_var(--stage-ratio))))]'
+
+/**
+ * The shape of the photos stage for one photo (ADR-0081): its product-page copy's crop when it has one (known before the file
+ * loads, so nothing jumps), else that copy's measured size once loaded; 4:5 before then and for a photo with no page copy
+ * (its `url` is the 4:5 card copy).
+ */
+export function photoStageRatio(img: ProductImage | undefined, measured?: { src: string; ratio: number } | null): number {
+  if (!img?.pageUrl) return STAGE_FRAME.aspect
+  const c = img.pageCrop
+  if (c && c.width > 0 && c.height > 0) return c.width / c.height
+  if (measured && measured.src === img.pageUrl && measured.ratio > 0) return measured.ratio
+  return STAGE_FRAME.aspect
+}
 
 const primaryIndex = (images: ProductImage[]) => Math.max(0, images.findIndex((i) => i.isPrimary))
 
@@ -98,7 +116,14 @@ export function ProductMedia({
     getDimensions: () => innerRef.current?.getDimensions() ?? null,
     resetCamera: () => innerRef.current?.resetCamera(),
   }))
-  const poster = gallery.find((i) => i.isPrimary)?.url ?? gallery[0]?.url
+  const posterImage = gallery.find((i) => i.isPrimary) ?? gallery[0]
+  const poster = posterImage ? pageImageUrl(posterImage) : undefined
+  const shownIdx = Math.min(photoIdx, Math.max(0, gallery.length - 1))
+  // The loaded page copy's own size, for a page copy without a stored crop (keyed by its URL, so another photo's is ignored).
+  const [measured, setMeasured] = useState<{ src: string; ratio: number } | null>(null)
+  // Only the photos view takes the photo's shape; the 3D view and the embed (which fills its parent) keep their box.
+  const photosStage = !fill && mode === 'photos' && gallery.length > 0
+  const stageRatio = photoStageRatio(gallery[shownIdx], measured)
 
   const update = (s: ModelState, info?: ModelLoadInfo, patch: Partial<Load> = {}) => {
     setLoad((l) => (l.url === glbUrl ? { ...l, ...patch, state: s } : l))
@@ -123,7 +148,11 @@ export function ProductMedia({
 
   return (
     <div className={cn(fill && 'flex h-full flex-col')}>
-      <div className={cn('relative overflow-hidden rounded-[var(--radius-control)] bg-subtle', fill ? 'min-h-0 flex-1' : cn(STAGE_FRAME.aspectClass, STAGE_WIDTH))}>
+      <div
+        data-testid="product-stage"
+        className={cn('relative overflow-hidden rounded-[var(--radius-control)] bg-subtle', fill ? 'min-h-0 flex-1' : photosStage ? PHOTO_STAGE : cn(STAGE_FRAME.aspectClass, STAGE_WIDTH))}
+        style={photosStage ? ({ '--stage-ratio': String(stageRatio) } as CSSProperties) : undefined}
+      >
         {glb && (
           <div className={cn('absolute inset-0', mode !== '3d' && 'invisible')} aria-hidden={mode !== '3d'}>
             <ModelViewer
@@ -188,7 +217,7 @@ export function ProductMedia({
             )}
           </div>
         )}
-        {mode === 'photos' && <Gallery images={gallery} name={name} idx={Math.min(photoIdx, Math.max(0, gallery.length - 1))} onIdx={setPhotoIdx} />}
+        {mode === 'photos' && <Gallery images={gallery} name={name} idx={shownIdx} onIdx={setPhotoIdx} onMeasure={setMeasured} />}
         {/* Photo | 3D, inside the stage, top left (the reset chip is top right). Only where both exist and the model works. */}
         {switcher && glb && gallery.length > 0 && (state === 'loading' || state === 'loaded') && (
           <div role="group" aria-label={t('product.stageSwitch')} className="absolute top-3 left-3 z-10 inline-flex rounded-[var(--radius-control)] border border-line bg-surface p-0.5 sm:top-4 sm:left-4">
@@ -226,7 +255,7 @@ export function ProductMedia({
                 onClick={() => showPhoto(i)}
                 className={cn('block w-[4.5rem] overflow-hidden rounded-[var(--radius-control)] border bg-subtle p-1.5 transition-colors sm:w-24', STAGE_FRAME.aspectClass, mode === 'photos' && i === photoIdx ? 'border-ink' : 'border-line opacity-80 hover:border-line-strong hover:opacity-100')}
               >
-                <SmartImage src={img.url} alt="" className="size-full object-contain" />
+                <SmartImage src={pageImageUrl(img)} alt="" className="size-full object-contain" />
               </button>
             </li>
           ))}
@@ -247,7 +276,20 @@ export function ProductMedia({
   )
 }
 
-function Gallery({ images, name, idx, onIdx }: { images: ProductImage[]; name: string; idx: number; onIdx: (i: number) => void }) {
+function Gallery({
+  images,
+  name,
+  idx,
+  onIdx,
+  onMeasure,
+}: {
+  images: ProductImage[]
+  name: string
+  idx: number
+  onIdx: (i: number) => void
+  /** Reports a loaded product-page copy's own shape (for a page copy with no stored crop). */
+  onMeasure: (m: { src: string; ratio: number }) => void
+}) {
   const { t } = useI18n()
   const current = images[idx]
   const go = (d: number) => onIdx((idx + d + images.length) % images.length)
@@ -263,7 +305,15 @@ function Gallery({ images, name, idx, onIdx }: { images: ProductImage[]; name: s
         if (e.key === 'ArrowLeft') go(-1)
       }}
     >
-      <SmartImage src={current?.url} alt={`${name}. ${t('product.photo', { n: idx + 1, total: images.length })}`} className="size-full object-contain" />
+      <SmartImage
+        src={current ? pageImageUrl(current) : undefined}
+        alt={`${name}. ${t('product.photo', { n: idx + 1, total: images.length })}`}
+        className="size-full object-contain"
+        onLoad={(e) => {
+          const { naturalWidth: w, naturalHeight: h } = e.currentTarget
+          if (current?.pageUrl && w > 0 && h > 0) onMeasure({ src: current.pageUrl, ratio: w / h })
+        }}
+      />
       {images.length > 1 && (
         <>
           <button type="button" aria-label={t('product.prevPhoto')} onClick={() => go(-1)} className="absolute top-1/2 left-3 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-line bg-surface transition-colors hover:border-line-strong">
