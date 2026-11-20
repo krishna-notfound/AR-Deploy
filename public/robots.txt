@@ -12,4 +12,4 @@ Disallow: /reset-password
 Disallow: /accept-invite
 Disallow: /*?preview=
 
-Sitemap: https://sanctus.warpkit.online/sitemap.xml
+Sitemap: https://sanctus.company/sitemap.xml
