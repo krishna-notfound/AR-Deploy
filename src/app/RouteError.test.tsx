@@ -36,6 +36,13 @@ describe('route error boundary (QA EF-17)', () => {
     expect(screen.getByRole('button', { name: 'Recarregar' })).toBeInTheDocument()
   })
 
+  it('names the actual error and logs it, so a screenshot from a live visit shows the cause (client report 2026-11-24)', () => {
+    localStorage.setItem(LANG_KEY, 'pt')
+    renderCrash()
+    expect(screen.getByText(/Detalhe técnico: Error: boom/)).toBeInTheDocument()
+    expect(console.error).toHaveBeenCalledWith('[route error]', expect.objectContaining({ message: 'boom' }))
+  })
+
   it('says it in English when English is chosen, even if the browser is Portuguese', () => {
     localStorage.setItem(LANG_KEY, 'en')
     vi.spyOn(navigator, 'language', 'get').mockReturnValue('pt-PT')
