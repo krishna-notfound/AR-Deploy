@@ -30,7 +30,7 @@ export default defineConfig(({ mode, command }) => {
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
-      include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts', 'supabase/tests/**/*.test.ts'],
+      include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts', 'supabase/tests/**/*.test.ts', 'scripts/**/*.test.mjs'],
       css: false,
       // Component tests drive whole pages with simulated input; 5 s is too tight once the suite runs in parallel.
       testTimeout: 20_000,
